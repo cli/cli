@@ -12,7 +12,7 @@ import (
 )
 
 type printer interface {
-	Printf(fmt string, v ...interface{})
+	Printf(fmt string, v ...any)
 }
 
 // Shell runs an interactive secure shell over an existing
@@ -121,7 +121,7 @@ func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 
 	for _, arg := range command {
 		// Replace "remote:" prefix with (e.g.) "root@localhost:".
-		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
+		if rest, ok := strings.CutPrefix(arg, "remote:"); ok {
 			arg = dst + ":" + rest
 		}
 		cmdArgs = append(cmdArgs, arg)

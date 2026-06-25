@@ -206,7 +206,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.GraphQL(`query ListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`
 		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"foo","repository":{"url":"https://github.com/OWNER/REPO"}}},{"ref":{"name":"bar","repository":{"url":"https://github.com/OWNER/REPO"}}}]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
+					`, func(query string, inputs map[string]any) {
 						assert.Equal(t, float64(42), inputs["number"])
 						assert.Equal(t, "OWNER", inputs["owner"])
 						assert.Equal(t, "REPO", inputs["name"])
@@ -234,7 +234,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.GraphQL(`query ListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`
 		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"foo","repository":{"url":"https://github.com/OWNER/REPO"}}},{"ref":{"name":"bar","repository":{"url":"https://github.com/OWNER/OTHER-REPO"}}}]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
+					`, func(query string, inputs map[string]any) {
 						assert.Equal(t, float64(42), inputs["number"])
 						assert.Equal(t, "OWNER", inputs["owner"])
 						assert.Equal(t, "REPO", inputs["name"])
@@ -273,7 +273,7 @@ func TestDevelopRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
 					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-issue-1"}}}}}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "SOMEID", inputs["issueId"])
 							assert.Equal(t, "DEFAULTOID", inputs["oid"])
@@ -302,7 +302,7 @@ func TestDevelopRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
 					httpmock.GraphQLQuery(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`,
-						func(_ string, inputs map[string]interface{}) {
+						func(_ string, inputs map[string]any) {
 							assert.Equal(t, "OWNER", inputs["owner"])
 							assert.Equal(t, "REPO", inputs["repo"])
 							assert.Equal(t, float64(123), inputs["number"])
@@ -311,7 +311,7 @@ func TestDevelopRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query FindRepoBranchID\b`),
 					httpmock.GraphQLQuery(`{"data":{"repository":{"id":"REPOID","defaultBranchRef":{"target":{"oid":"DEFAULTOID"}},"ref":{"target":{"oid":""}}}}}`,
-						func(_ string, inputs map[string]interface{}) {
+						func(_ string, inputs map[string]any) {
 							assert.Equal(t, "OWNER2", inputs["owner"])
 							assert.Equal(t, "REPO", inputs["name"])
 						}),
@@ -319,7 +319,7 @@ func TestDevelopRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
 					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-issue-1"}}}}}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "SOMEID", inputs["issueId"])
 							assert.Equal(t, "DEFAULTOID", inputs["oid"])
@@ -357,7 +357,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.GraphQL(`query ListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`
 		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
+					`, func(query string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["number"])
 						assert.Equal(t, "OWNER", inputs["owner"])
 						assert.Equal(t, "REPO", inputs["name"])
@@ -366,7 +366,7 @@ func TestDevelopRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
 					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "SOMEID", inputs["issueId"])
 							assert.Equal(t, "OID", inputs["oid"])
@@ -404,7 +404,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.GraphQL(`query ListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`
 		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"my-branch","repository":{"url":"https://github.com/OWNER/REPO"}}}]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
+					`, func(query string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["number"])
 						assert.Equal(t, "OWNER", inputs["owner"])
 						assert.Equal(t, "REPO", inputs["name"])
@@ -447,7 +447,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.GraphQL(`query ListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`
 		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"my-branch","repository":{"url":"https://github.com/OWNER/REPO"}}}]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
+					`, func(query string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["number"])
 						assert.Equal(t, "OWNER", inputs["owner"])
 						assert.Equal(t, "REPO", inputs["name"])
@@ -484,7 +484,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.GraphQL(`query ListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`
 		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"my-branch","repository":{"url":"https://github.com/OWNER/REPO"}}}]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
+					`, func(query string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["number"])
 						assert.Equal(t, "OWNER", inputs["owner"])
 						assert.Equal(t, "REPO", inputs["name"])
@@ -517,7 +517,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.GraphQL(`query ListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`
 		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
+					`, func(query string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["number"])
 						assert.Equal(t, "OWNER", inputs["owner"])
 						assert.Equal(t, "REPO", inputs["name"])
@@ -529,7 +529,7 @@ func TestDevelopRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
 					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":""}}}}}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "SOMEID", inputs["issueId"])
 							assert.Equal(t, "OID", inputs["oid"])
@@ -563,7 +563,7 @@ func TestDevelopRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
 					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-issue-1"}}}}}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "SOMEID", inputs["issueId"])
 							assert.Equal(t, "DEFAULTOID", inputs["oid"])
@@ -599,7 +599,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.GraphQL(`query ListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`
 		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
+					`, func(query string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["number"])
 						assert.Equal(t, "OWNER", inputs["owner"])
 						assert.Equal(t, "REPO", inputs["name"])
@@ -608,7 +608,7 @@ func TestDevelopRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
 					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "SOMEID", inputs["issueId"])
 							assert.Equal(t, "OID", inputs["oid"])
@@ -651,7 +651,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.GraphQL(`query ListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`
 		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
+					`, func(query string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["number"])
 						assert.Equal(t, "OWNER", inputs["owner"])
 						assert.Equal(t, "REPO", inputs["name"])
@@ -660,7 +660,7 @@ func TestDevelopRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
 					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "SOMEID", inputs["issueId"])
 							assert.Equal(t, "OID", inputs["oid"])

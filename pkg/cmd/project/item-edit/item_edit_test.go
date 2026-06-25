@@ -195,10 +195,10 @@ func TestRunItemEdit_Draft(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation EditDraftIssueItem.*","variables":{"input":{"draftIssueId":"DI_item_id","title":"a title","body":"a new body"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2DraftIssue": map[string]interface{}{
-					"draftIssue": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2DraftIssue": map[string]any{
+					"draftIssue": map[string]any{
 						"title": "a title",
 						"body":  "a new body",
 					},
@@ -238,9 +238,9 @@ func TestRunItemEdit_DraftTitleOnly(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"query DraftIssueByID.*","variables":{"id":"DI_item_id"}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"node": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"node": map[string]any{
 					"id":    "DI_item_id",
 					"title": "existing title",
 					"body":  "existing body",
@@ -252,10 +252,10 @@ func TestRunItemEdit_DraftTitleOnly(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation EditDraftIssueItem.*","variables":{"input":{"draftIssueId":"DI_item_id","title":"new title","body":"existing body"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2DraftIssue": map[string]interface{}{
-					"draftIssue": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2DraftIssue": map[string]any{
+					"draftIssue": map[string]any{
 						"title": "new title",
 						"body":  "existing body",
 					},
@@ -294,9 +294,9 @@ func TestRunItemEdit_DraftBodyOnly(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"query DraftIssueByID.*","variables":{"id":"DI_item_id"}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"node": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"node": map[string]any{
 					"id":    "DI_item_id",
 					"title": "existing title",
 					"body":  "existing body",
@@ -308,10 +308,10 @@ func TestRunItemEdit_DraftBodyOnly(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation EditDraftIssueItem.*","variables":{"input":{"draftIssueId":"DI_item_id","title":"existing title","body":"new body"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2DraftIssue": map[string]interface{}{
-					"draftIssue": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2DraftIssue": map[string]any{
+					"draftIssue": map[string]any{
 						"title": "existing title",
 						"body":  "new body",
 					},
@@ -350,8 +350,8 @@ func TestRunItemEdit_DraftFetchError(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"query DraftIssueByID.*","variables":{"id":"DI_item_id"}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"errors": []map[string]interface{}{
+		JSON(map[string]any{
+			"errors": []map[string]any{
 				{
 					"type":    "NOT_FOUND",
 					"message": "Could not resolve to a node with the global id of 'DI_item_id' (node)",
@@ -388,16 +388,16 @@ func TestRunItemEdit_Text(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"text":"item text"}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"body":   "body",
 							"title":  "title",
 							"number": 1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -434,17 +434,17 @@ func TestRunItemEdit_Number(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"number":123.45}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -487,17 +487,17 @@ func TestRunItemEdit_NumberZero(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"number":0}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -540,17 +540,17 @@ func TestRunItemEdit_Date(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"date":"2023-01-01T00:00:00Z"}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -587,17 +587,17 @@ func TestRunItemEdit_SingleSelect(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"singleSelectOptionId":"option_id"}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -634,17 +634,17 @@ func TestRunItemEdit_Iteration(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"iterationId":"option_id"}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -726,17 +726,17 @@ func TestRunItemEdit_Clear(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation ClearItemFieldValue.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"clearProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"clearProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -775,10 +775,10 @@ func TestRunItemEdit_JSON(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation EditDraftIssueItem.*","variables":{"input":{"draftIssueId":"DI_item_id","title":"a title","body":"a new body"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2DraftIssue": map[string]interface{}{
-					"draftIssue": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2DraftIssue": map[string]any{
+					"draftIssue": map[string]any{
 						"id":    "DI_item_id",
 						"title": "a title",
 						"body":  "a new body",

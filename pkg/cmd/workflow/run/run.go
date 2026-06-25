@@ -194,7 +194,7 @@ type InputAnswer struct {
 	providedInputs map[string]string
 }
 
-func (ia *InputAnswer) WriteAnswer(name string, value interface{}) error {
+func (ia *InputAnswer) WriteAnswer(name string, value any) error {
 	if s, ok := value.(string); ok {
 		ia.providedInputs[name] = s
 		return nil
@@ -321,7 +321,7 @@ func runRun(opts *RunOptions) error {
 
 	path := fmt.Sprintf("repos/%s/%s/actions/workflows/%d/dispatches", url.PathEscape(repo.RepoOwner()), url.PathEscape(repo.RepoName()), workflow.ID)
 
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"ref":    ref,
 		"inputs": providedInputs,
 	}

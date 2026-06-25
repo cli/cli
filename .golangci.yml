@@ -18,6 +18,7 @@ linters:
     - goprintffuncname # checks that printf-like functions are named with f at the end
     - govet # reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
     - ineffassign # detects when assignments to existing variables are not used
+    - modernize # suggests simplifications to Go code, using modern language and library features
     - nilerr # finds the code that returns nil even if it checks that the error is not nil
     - nolintlint # reports ill-formed or insufficient nolint directives
     - nosprintfhostport # checks for misuse of Sprintf to construct a host with port in a URL
@@ -56,6 +57,9 @@ linters:
     govet:
       enable:
         - httpresponse
+    modernize:
+      disable:
+        - omitzero
 
 formatters:
   enable:

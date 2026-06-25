@@ -462,7 +462,7 @@ func parseCheckStatusFromCheckConclusionState(state CheckConclusionState) checkS
 }
 
 // CreatePullRequest creates a pull request in a GitHub repository
-func CreatePullRequest(client *Client, repo *Repository, params map[string]interface{}) (*PullRequest, error) {
+func CreatePullRequest(client *Client, repo *Repository, params map[string]any) (*PullRequest, error) {
 	query := `
 		mutation PullRequestCreate($input: CreatePullRequestInput!) {
 			createPullRequest(input: $input) {
@@ -473,7 +473,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 			}
 	}`
 
-	inputParams := map[string]interface{}{
+	inputParams := map[string]any{
 		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
@@ -482,7 +482,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 			inputParams[key] = val
 		}
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": inputParams,
 	}
 
@@ -500,7 +500,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 
 	// metadata parameters aren't currently available in `createPullRequest`,
 	// but they are in `updatePullRequest`
-	updateParams := make(map[string]interface{})
+	updateParams := make(map[string]any)
 	for key, val := range params {
 		switch key {
 		case "assigneeIds", "labelIds", "projectIds", "milestoneId":
@@ -515,7 +515,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 			updatePullRequest(input: $input) { clientMutationId }
 		}`
 		updateParams["pullRequestId"] = pr.ID
-		variables := map[string]interface{}{
+		variables := map[string]any{
 			"input": updateParams,
 		}
 		err := client.GraphQL(repo.RepoHost(), updateQuery, variables, &result)
@@ -547,7 +547,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 	} else {
 		// Use ID-based mutation (requestReviews) for GHES compatibility
-		reviewParams := make(map[string]interface{})
+		reviewParams := make(map[string]any)
 		if ids, ok := params["userReviewerIds"]; ok && !isBlank(ids) {
 			reviewParams["userIds"] = ids
 		}
@@ -563,7 +563,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}`
 			reviewParams["pullRequestId"] = pr.ID
 			reviewParams["union"] = true
-			variables := map[string]interface{}{
+			variables := map[string]any{
 				"input": reviewParams,
 			}
 			err := client.GraphQL(repo.RepoHost(), reviewQuery, variables, &result)
@@ -614,7 +614,7 @@ func ReplaceActorsForAssignableByLogin(client *Client, repo ghrepo.Interface, as
 		} `graphql:"replaceActorsForAssignable(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": ReplaceActorsForAssignableInput{
 			AssignableID: githubv4.ID(assignableID),
 			ActorLogins:  actorLogins,
@@ -670,7 +670,7 @@ func SuggestedAssignableActors(client *Client, repo ghrepo.Interface, assignable
 		} `graphql:"node(id: $id)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"id":    githubv4.ID(assignableID),
 		"query": githubv4.String(query),
 		"owner": githubv4.String(repo.RepoOwner()),
@@ -724,11 +724,11 @@ func UpdatePullRequestBranch(client *Client, repo ghrepo.Interface, params githu
 			}
 		} `graphql:"updatePullRequestBranch(input: $input)"`
 	}
-	variables := map[string]interface{}{"input": params}
+	variables := map[string]any{"input": params}
 	return client.Mutate(repo.RepoHost(), "PullRequestUpdateBranch", &mutation, variables)
 }
 
-func isBlank(v interface{}) bool {
+func isBlank(v any) bool {
 	switch vv := v.(type) {
 	case string:
 		return vv == ""
@@ -748,7 +748,7 @@ func PullRequestClose(httpClient *http.Client, repo ghrepo.Interface, prID strin
 		} `graphql:"closePullRequest(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.ClosePullRequestInput{
 			PullRequestID: prID,
 		},
@@ -767,7 +767,7 @@ func PullRequestReopen(httpClient *http.Client, repo ghrepo.Interface, prID stri
 		} `graphql:"reopenPullRequest(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.ReopenPullRequestInput{
 			PullRequestID: prID,
 		},
@@ -786,7 +786,7 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 		} `graphql:"markPullRequestReadyForReview(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.MarkPullRequestReadyForReviewInput{
 			PullRequestID: pr.ID,
 		},
@@ -809,7 +809,7 @@ func PullRequestRevert(client *Client, repo ghrepo.Interface, params githubv4.Re
 		} `graphql:"revertPullRequest(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": params,
 	}
 	err := client.Mutate(repo.RepoHost(), "PullRequestRevert", &mutation, variables)
@@ -835,7 +835,7 @@ func ConvertPullRequestToDraft(client *Client, repo ghrepo.Interface, pr *PullRe
 		} `graphql:"convertPullRequestToDraft(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.ConvertPullRequestToDraftInput{
 			PullRequestID: pr.ID,
 		},
@@ -877,7 +877,7 @@ func ComparePullRequestBaseBranchWith(client *Client, repo ghrepo.Interface, prN
 			}
 		}
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":             repo.RepoOwner(),
 		"repo":              repo.RepoName(),
 		"pullRequestNumber": prNumber,

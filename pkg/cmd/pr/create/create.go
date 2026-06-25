@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -654,10 +655,10 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 	} else {
 		state.Title = humanize(ctx.PRRefs.UnqualifiedHeadRef())
 		var body strings.Builder
-		for i := len(commits) - 1; i >= 0; i-- {
-			fmt.Fprintf(&body, "- **%s**\n", commits[i].Title)
+		for i, v := range slices.Backward(commits) {
+			fmt.Fprintf(&body, "- **%s**\n", v.Title)
 			if addBody {
-				x := regexPattern.ReplaceAllString(commits[i].Body, "  ")
+				x := regexPattern.ReplaceAllString(v.Body, "  ")
 				fmt.Fprintf(&body, "%s", x)
 
 				if i > 0 {
@@ -1036,7 +1037,7 @@ func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
 func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support) error {
 	client := ctx.Client
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"title":               state.Title,
 		"body":                state.Body,
 		"draft":               state.Draft,
@@ -1077,7 +1078,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	return nil
 }
 
-func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *shared.IssueMetadataState) error {
+func renderPullRequestPlain(w io.Writer, params map[string]any, state *shared.IssueMetadataState) error {
 	fmt.Fprint(w, "Would have created a Pull Request with:\n")
 	fmt.Fprintf(w, "title:\t%s\n", params["title"])
 	fmt.Fprintf(w, "draft:\t%t\n", params["draft"])
@@ -1106,7 +1107,7 @@ func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *s
 	return nil
 }
 
-func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}, state *shared.IssueMetadataState) error {
+func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]any, state *shared.IssueMetadataState) error {
 	cs := io.ColorScheme()
 	out := io.Out
 

@@ -120,7 +120,7 @@ func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneO
 	toCreate := make(chan createOptions)
 
 	wg, ctx := errgroup.WithContext(context.Background())
-	for i := 0; i < workers; i++ {
+	for range workers {
 		wg.Go(func() error {
 			for {
 				select {

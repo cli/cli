@@ -233,7 +233,7 @@ func TestCreateJob(t *testing.T) {
 								"updated_at": "%[1]s"
 							}
 						`, sampleDateString),
-						func(payload map[string]interface{}) {
+						func(payload map[string]any) {
 							assert.Equal(t, "Do the thing", payload["problem_statement"])
 							assert.Equal(t, "gh_cli", payload["event_type"])
 						},
@@ -280,10 +280,10 @@ func TestCreateJob(t *testing.T) {
 								"updated_at": "%[1]s"
 							}
 						`, sampleDateString),
-						func(payload map[string]interface{}) {
+						func(payload map[string]any) {
 							assert.Equal(t, "Do the thing", payload["problem_statement"])
 							assert.Equal(t, "gh_cli", payload["event_type"])
-							assert.Equal(t, "refs/heads/some-branch", payload["pull_request"].(map[string]interface{})["base_ref"])
+							assert.Equal(t, "refs/heads/some-branch", payload["pull_request"].(map[string]any)["base_ref"])
 						},
 					),
 				)
@@ -329,7 +329,7 @@ func TestCreateJob(t *testing.T) {
 								"updated_at": "%[1]s"
 							}
 						`, sampleDateString),
-						func(payload map[string]interface{}) {
+						func(payload map[string]any) {
 							assert.Equal(t, "Do the thing", payload["problem_statement"])
 							assert.Equal(t, "gh_cli", payload["event_type"])
 							assert.Equal(t, "my-custom-agent", payload["custom_agent"])

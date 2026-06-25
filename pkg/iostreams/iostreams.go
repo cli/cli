@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -213,8 +214,8 @@ func (s *IOStreams) StartPager() error {
 	}
 
 	pagerEnv := os.Environ()
-	for i := len(pagerEnv) - 1; i >= 0; i-- {
-		if strings.HasPrefix(pagerEnv[i], "PAGER=") {
+	for i, v := range slices.Backward(pagerEnv) {
+		if strings.HasPrefix(v, "PAGER=") {
 			pagerEnv = append(pagerEnv[0:i], pagerEnv[i+1:]...)
 		}
 	}

@@ -116,16 +116,16 @@ func runEdit(config editConfig) error {
 	return printResults(config, query.UpdateProjectV2.ProjectV2)
 }
 
-func editArgs(config editConfig) (*updateProjectMutation, map[string]interface{}) {
+func editArgs(config editConfig) (*updateProjectMutation, map[string]any) {
 	variables := githubv4.UpdateProjectV2Input{ProjectID: githubv4.ID(config.opts.projectID)}
 	if config.opts.title != "" {
-		variables.Title = githubv4.NewString(githubv4.String(config.opts.title))
+		variables.Title = new(githubv4.String(config.opts.title))
 	}
 	if config.opts.shortDescription != "" {
-		variables.ShortDescription = githubv4.NewString(githubv4.String(config.opts.shortDescription))
+		variables.ShortDescription = new(githubv4.String(config.opts.shortDescription))
 	}
 	if config.opts.readme != "" {
-		variables.Readme = githubv4.NewString(githubv4.String(config.opts.readme))
+		variables.Readme = new(githubv4.String(config.opts.readme))
 	}
 	if config.opts.visibility != "" {
 		if config.opts.visibility == projectVisibilityPublic {
@@ -135,7 +135,7 @@ func editArgs(config editConfig) (*updateProjectMutation, map[string]interface{}
 		}
 	}
 
-	return &updateProjectMutation{}, map[string]interface{}{
+	return &updateProjectMutation{}, map[string]any{
 		"input":       variables,
 		"firstItems":  githubv4.Int(0),
 		"afterItems":  (*githubv4.String)(nil),

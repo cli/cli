@@ -472,7 +472,7 @@ func TestRepoList_filtering(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`query RepositoryList\b`),
-		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]any) {
 			assert.Equal(t, "PRIVATE", params["privacy"])
 			assert.Equal(t, float64(2), params["perPage"])
 		}),
@@ -499,7 +499,7 @@ func TestRepoList_noVisibilityField(t *testing.T) {
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryList\b`),
 		httpmock.GraphQLQuery(`{"data":{"repositoryOwner":{"login":"octocat","repositories":{"totalCount":0}}}}`,
-			func(query string, params map[string]interface{}) {
+			func(query string, params map[string]any) {
 				assert.False(t, strings.Contains(query, "visibility"))
 			},
 		),

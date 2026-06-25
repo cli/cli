@@ -109,7 +109,7 @@ func TestPRRevert_acceptedIdentifierFormats(t *testing.T) {
                "URL": "https://github.com/OWNER/REPO/pull/456"
             } } } }
 			`,
-					func(inputs map[string]interface{}) {
+					func(inputs map[string]any) {
 						assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
 					}),
 			)
@@ -165,7 +165,7 @@ func TestPRRevert_withTitleAndBody(t *testing.T) {
                "URL": "https://github.com/OWNER/REPO/pull/456"
             } } } }
 			`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
 				assert.Equal(t, inputs["title"], "Revert PR title")
 				assert.Equal(t, inputs["body"], "Revert PR body")
@@ -202,7 +202,7 @@ func TestPRRevert_withDraft(t *testing.T) {
                "URL": "https://github.com/OWNER/REPO/pull/456"
             } } } }
 			`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
 				assert.Equal(t, inputs["draft"], true)
 			}),
@@ -233,7 +233,7 @@ func TestPRRevert_APIFailure(t *testing.T) {
 			{ "errors": [{
               "message": "Authorization error"
             }]}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
 			}),
 	)
@@ -267,7 +267,7 @@ func TestPRRevert_multipleInvocations(t *testing.T) {
                "URL": "https://github.com/OWNER/REPO/pull/456"
             } } } }
 			`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
 			}),
 	)
@@ -297,7 +297,7 @@ func TestPRRevert_multipleInvocations(t *testing.T) {
                "URL": "https://github.com/OWNER/REPO/pull/456"
             } } } }
 			`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
 			}),
 	)

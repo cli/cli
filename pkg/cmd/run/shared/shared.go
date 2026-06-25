@@ -159,14 +159,14 @@ func (r Run) WorkflowName() string {
 	return r.workflowName
 }
 
-func (r *Run) ExportData(fields []string) map[string]interface{} {
+func (r *Run) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(r).Elem()
 	fieldByName := func(v reflect.Value, field string) reflect.Value {
 		return v.FieldByNameFunc(func(s string) bool {
 			return strings.EqualFold(field, s)
 		})
 	}
-	data := map[string]interface{}{}
+	data := map[string]any{}
 
 	for _, f := range fields {
 		switch f {
@@ -177,15 +177,15 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 		case "workflowName":
 			data[f] = r.WorkflowName()
 		case "jobs":
-			jobs := make([]interface{}, 0, len(r.Jobs))
+			jobs := make([]any, 0, len(r.Jobs))
 			for _, j := range r.Jobs {
-				steps := make([]interface{}, 0, len(j.Steps))
+				steps := make([]any, 0, len(j.Steps))
 				for _, s := range j.Steps {
 					var stepCompletedAt time.Time
 					if !s.CompletedAt.IsZero() {
 						stepCompletedAt = s.CompletedAt
 					}
-					steps = append(steps, map[string]interface{}{
+					steps = append(steps, map[string]any{
 						"name":        s.Name,
 						"status":      s.Status,
 						"conclusion":  s.Conclusion,
@@ -198,7 +198,7 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 				if !j.CompletedAt.IsZero() {
 					jobCompletedAt = j.CompletedAt
 				}
-				jobs = append(jobs, map[string]interface{}{
+				jobs = append(jobs, map[string]any{
 					"databaseId":  j.ID,
 					"status":      j.Status,
 					"conclusion":  j.Conclusion,
@@ -366,10 +366,7 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		path = fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), opts.WorkflowID)
 	}
 
-	perPage := limit
-	if limit > 100 {
-		perPage = 100
-	}
+	perPage := min(limit, 100)
 	path += fmt.Sprintf("?per_page=%d", perPage)
 	path += "&exclude_pull_requests=true" // significantly reduces payload size
 
@@ -604,7 +601,7 @@ func PullRequestForRun(client *api.Client, repo ghrepo.Interface, run Run) (int,
 		Number int
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":       repo.RepoOwner(),
 		"repo":        repo.RepoName(),
 		"headRefName": run.HeadBranch,

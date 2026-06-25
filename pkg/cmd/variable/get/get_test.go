@@ -208,7 +208,7 @@ func Test_getRun(t *testing.T) {
 						NumSelectedRepos: 0, // This should be populated in a second API call.
 					}))
 				reg.Register(httpmock.REST("GET", "path/to/fetch/selected/repos"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"total_count": 99,
 					}))
 			},

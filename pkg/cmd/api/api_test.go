@@ -986,7 +986,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {
-		Variables map[string]interface{}
+		Variables map[string]any
 	}
 
 	bb, err := io.ReadAll(responses[0].Request.Body)
@@ -1089,7 +1089,7 @@ func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {
-		Variables map[string]interface{}
+		Variables map[string]any
 	}
 
 	bb, err := io.ReadAll(responses[0].Request.Body)
@@ -1185,7 +1185,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {
-		Variables map[string]interface{}
+		Variables map[string]any
 	}
 
 	bb, err := io.ReadAll(responses[0].Request.Body)

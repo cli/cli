@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -108,13 +109,7 @@ func TestGenerateAutomaticSSHKeys(t *testing.T) {
 		}
 		for _, file := range allExistingFiles {
 			filename := file.Name()
-			isWantedFile := false
-			for _, wantedFile := range tt.wantFinalFiles {
-				if filename == wantedFile {
-					isWantedFile = true
-					break
-				}
-			}
+			isWantedFile := slices.Contains(tt.wantFinalFiles, filename)
 
 			if !isWantedFile {
 				t.Errorf("Unexpected file %q exists after generateAutomaticSSHKeys", filename)
@@ -218,13 +213,14 @@ func TestSelectSSHKeys(t *testing.T) {
 		configPath := filepath.Join(sshDir, "test-config")
 
 		// Seed the config with a non-existent key so that the default config won't apply
-		configContent := "IdentityFile dummy\n"
+		var configContent strings.Builder
+		configContent.WriteString("IdentityFile dummy\n")
 
 		for _, key := range tt.sshConfigKeys {
-			configContent += fmt.Sprintf("IdentityFile %s\n", filepath.Join(sshDir, key))
+			configContent.WriteString(fmt.Sprintf("IdentityFile %s\n", filepath.Join(sshDir, key)))
 		}
 
-		err := os.WriteFile(configPath, []byte(configContent), 0666)
+		err := os.WriteFile(configPath, []byte(configContent.String()), 0666)
 		if err != nil {
 			t.Fatalf("could not write test config %v", err)
 		}

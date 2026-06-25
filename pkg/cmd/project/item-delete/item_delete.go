@@ -107,8 +107,8 @@ func runDeleteItem(config deleteItemConfig) error {
 
 }
 
-func deleteItemArgs(config deleteItemConfig) (*deleteProjectItemMutation, map[string]interface{}) {
-	return &deleteProjectItemMutation{}, map[string]interface{}{
+func deleteItemArgs(config deleteItemConfig) (*deleteProjectItemMutation, map[string]any) {
+	return &deleteProjectItemMutation{}, map[string]any{
 		"input": githubv4.DeleteProjectV2ItemInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
 			ItemID:    githubv4.ID(config.opts.itemID),
@@ -126,7 +126,7 @@ func printResults(config deleteItemConfig) error {
 }
 
 func printJSON(config deleteItemConfig, id githubv4.ID) error {
-	m := map[string]interface{}{
+	m := map[string]any{
 		"id": id,
 	}
 	return config.opts.exporter.Write(config.io, m)

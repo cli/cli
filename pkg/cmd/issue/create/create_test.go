@@ -482,7 +482,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createIssue": { "issue": {
 							"URL": "https://github.com/OWNER/REPO/issues/12"
 						} } } }
-					`, func(inputs map[string]interface{}) {
+					`, func(inputs map[string]any) {
 						assert.Equal(t, "title", inputs["title"])
 						assert.Equal(t, "body", inputs["body"])
 					}))
@@ -520,7 +520,7 @@ func Test_createRun(t *testing.T) {
 		{ "data": { "createIssue": { "issue": {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 						assert.Equal(t, "bug: ", inputs["title"])
 						assert.Equal(t, "Does not work :((", inputs["body"])
 					}))
@@ -596,7 +596,7 @@ func Test_createRun(t *testing.T) {
 							"id": "ISSUEID",
 							"URL": "https://github.com/OWNER/REPO/issues/12"
 						} } } }
-					`, func(inputs map[string]interface{}) {
+					`, func(inputs map[string]any) {
 						if v, ok := inputs["assigneeIds"]; ok {
 							t.Errorf("did not expect assigneeIds: %v", v)
 						}
@@ -605,9 +605,9 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-					`, func(inputs map[string]interface{}) {
+					`, func(inputs map[string]any) {
 						assert.Equal(t, "ISSUEID", inputs["assignableId"])
-						assert.Equal(t, []interface{}{"copilot-swe-agent[bot]", "MonaLisa"}, inputs["actorLogins"])
+						assert.Equal(t, []any{"copilot-swe-agent[bot]", "MonaLisa"}, inputs["actorLogins"])
 					}))
 			},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
@@ -679,8 +679,8 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createIssue": { "issue": {
 							"URL": "https://github.com/OWNER/REPO/issues/12"
 						} } } }
-					`, func(inputs map[string]interface{}) {
-						assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["assigneeIds"])
+					`, func(inputs map[string]any) {
+						assert.Equal(t, []any{"HUBOTID", "MONAID"}, inputs["assigneeIds"])
 					}))
 			},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
@@ -721,7 +721,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "updateIssueIssueType": { "issue": { "id": "ISSUE_ID_123" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "ISSUE_ID_123", inputs["issueId"])
 							assert.Equal(t, "IT_1", inputs["issueTypeId"])
 						}))
@@ -779,7 +779,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "updateIssueIssueType": { "issue": { "id": "ISSUE_ID_123" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "ISSUE_ID_123", inputs["issueId"])
 							assert.Equal(t, "IT_2", inputs["issueTypeId"])
 						}))
@@ -852,7 +852,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation AddSubIssue\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "addSubIssue": { "issue": { "id": "PARENT_ID_100" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "PARENT_ID_100", inputs["issueId"])
 							assert.Equal(t, "ISSUE_ID_123", inputs["subIssueId"])
 							assert.Equal(t, false, inputs["replaceParent"])
@@ -903,23 +903,23 @@ func Test_createRun(t *testing.T) {
 				// also don't depend on parallel ordering.
 				// --blocked-by N: this issue is blocked by N
 				r.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]any) bool {
 						return input["issueId"] == "ISSUE_ID_123" && input["blockingIssueId"] == "BLOCKER_ID_200"
 					}),
 					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "ISSUE_ID_123" } } } }`))
 				r.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]any) bool {
 						return input["issueId"] == "ISSUE_ID_123" && input["blockingIssueId"] == "BLOCKER_ID_201"
 					}),
 					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "ISSUE_ID_123" } } } }`))
 				// --blocking N: N is blocked by this issue (args swapped)
 				r.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]any) bool {
 						return input["issueId"] == "BLOCKED_ID_300" && input["blockingIssueId"] == "ISSUE_ID_123"
 					}),
 					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "BLOCKED_ID_300" } } } }`))
 				r.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]any) bool {
 						return input["issueId"] == "BLOCKED_ID_301" && input["blockingIssueId"] == "ISSUE_ID_123"
 					}),
 					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "BLOCKED_ID_301" } } } }`))
@@ -1040,7 +1040,7 @@ func TestIssueCreate(t *testing.T) {
 				{ "data": { "createIssue": { "issue": {
 					"URL": "https://github.com/OWNER/REPO/issues/12"
 				} } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["repositoryId"], "REPOID")
 				assert.Equal(t, inputs["title"], "hello")
 				assert.Equal(t, inputs["body"], "cash rules everything around me")
@@ -1084,10 +1084,10 @@ func TestIssueCreate_recover(t *testing.T) {
 		{ "data": { "createIssue": { "issue": {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "recovered title", inputs["title"])
 			assert.Equal(t, "recovered body", inputs["body"])
-			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
+			assert.Equal(t, []any{"BUGID", "TODOID"}, inputs["labelIds"])
 		}))
 
 	pm := &prompter.PrompterMock{}
@@ -1167,7 +1167,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 			{ "data": { "createIssue": { "issue": {
 				"URL": "https://github.com/OWNER/REPO/issues/12"
 			} } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["repositoryId"], "REPOID")
 				assert.Equal(t, inputs["title"], "hello")
 				assert.Equal(t, inputs["body"], "I have a suggestion for an enhancement")
@@ -1329,14 +1329,14 @@ func TestIssueCreate_metadata(t *testing.T) {
 			"id": "NEWISSUEID",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "TITLE", inputs["title"])
 			assert.Equal(t, "BODY", inputs["body"])
 			if v, ok := inputs["assigneeIds"]; ok {
 				t.Errorf("did not expect assigneeIds: %v", v)
 			}
-			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
-			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
+			assert.Equal(t, []any{"BUGID", "TODOID"}, inputs["labelIds"])
+			assert.Equal(t, []any{"ROADMAPID"}, inputs["projectIds"])
 			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
 			assert.NotContains(t, inputs, "userIds")
 			assert.NotContains(t, inputs, "teamIds")
@@ -1346,9 +1346,9 @@ func TestIssueCreate_metadata(t *testing.T) {
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "NEWISSUEID", inputs["assignableId"])
-			assert.Equal(t, []interface{}{"monalisa"}, inputs["actorLogins"])
+			assert.Equal(t, []any{"monalisa"}, inputs["actorLogins"])
 		}))
 
 	output, err := runCommand(http, true, `-t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`, nil)
@@ -1405,7 +1405,7 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 			"id": "NEWISSUEID",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "hello", inputs["title"])
 			assert.Equal(t, "cash rules everything around me", inputs["body"])
 			if v, ok := inputs["assigneeIds"]; ok {
@@ -1416,9 +1416,9 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "NEWISSUEID", inputs["assignableId"])
-			assert.Equal(t, []interface{}{"MonaLisa", "someoneelse"}, inputs["actorLogins"])
+			assert.Equal(t, []any{"MonaLisa", "someoneelse"}, inputs["actorLogins"])
 		}))
 
 	output, err := runCommand(http, true, `-a @me -a someoneelse -t hello -b "cash rules everything around me"`, nil)
@@ -1448,7 +1448,7 @@ func TestIssueCreate_AtCopilotAssignee(t *testing.T) {
 			"id": "NEWISSUEID",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "hello", inputs["title"])
 			assert.Equal(t, "cash rules everything around me", inputs["body"])
 			if v, ok := inputs["assigneeIds"]; ok {
@@ -1459,9 +1459,9 @@ func TestIssueCreate_AtCopilotAssignee(t *testing.T) {
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "NEWISSUEID", inputs["assignableId"])
-			assert.Equal(t, []interface{}{"copilot-swe-agent[bot]"}, inputs["actorLogins"])
+			assert.Equal(t, []any{"copilot-swe-agent[bot]"}, inputs["actorLogins"])
 		}))
 
 	output, err := runCommand(http, true, `-a @copilot -t hello -b "cash rules everything around me"`, nil)
@@ -1531,7 +1531,7 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 			"id": "Issue#1",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "TITLE", inputs["title"])
 			assert.Equal(t, "BODY", inputs["body"])
 			assert.Nil(t, inputs["projectIds"])
@@ -1543,7 +1543,7 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 			{ "data": { "add_000": { "item": {
 				"id": "1"
 			} } } }
-	`, func(mutations string, inputs map[string]interface{}) {
+	`, func(mutations string, inputs map[string]any) {
 			variables, err := json.Marshal(inputs)
 			assert.NoError(t, err)
 			expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"

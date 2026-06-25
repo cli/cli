@@ -338,8 +338,8 @@ func TestDelete(t *testing.T) {
 
 func sortLines(s string) string {
 	trailing := ""
-	if strings.HasSuffix(s, "\n") {
-		s = strings.TrimSuffix(s, "\n")
+	if before, ok := strings.CutSuffix(s, "\n"); ok {
+		s = before
 		trailing = "\n"
 	}
 	lines := strings.Split(s, "\n")

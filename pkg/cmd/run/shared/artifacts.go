@@ -50,7 +50,7 @@ func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string)
 	return results, nil
 }
 
-func apiGet(httpClient *http.Client, url string, data interface{}) (string, error) {
+func apiGet(httpClient *http.Client, url string, data any) (string, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", err

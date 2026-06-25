@@ -91,8 +91,8 @@ func runCreate(config createConfig) error {
 	return printResults(config, query.CreateProjectV2.ProjectV2)
 }
 
-func createArgs(config createConfig) (*createProjectMutation, map[string]interface{}) {
-	return &createProjectMutation{}, map[string]interface{}{
+func createArgs(config createConfig) (*createProjectMutation, map[string]any) {
+	return &createProjectMutation{}, map[string]any{
 		"input": githubv4.CreateProjectV2Input{
 			OwnerID: githubv4.ID(config.opts.ownerID),
 			Title:   githubv4.String(config.opts.title),

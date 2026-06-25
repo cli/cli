@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -50,7 +51,7 @@ func (w *Workflow) Base() string {
 	return path.Base(w.Path)
 }
 
-func (w *Workflow) ExportData(fields []string) map[string]interface{} {
+func (w *Workflow) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(w, fields)
 }
 
@@ -101,12 +102,9 @@ func selectWorkflow(p iprompter, workflows []Workflow, promptMsg string, states 
 	filtered := []Workflow{}
 	candidates := []string{}
 	for _, workflow := range workflows {
-		for _, state := range states {
-			if workflow.State == state {
-				filtered = append(filtered, workflow)
-				candidates = append(candidates, fmt.Sprintf("%s (%s)", workflow.Name, workflow.Base()))
-				break
-			}
+		if slices.Contains(states, workflow.State) {
+			filtered = append(filtered, workflow)
+			candidates = append(candidates, fmt.Sprintf("%s (%s)", workflow.Name, workflow.Base()))
 		}
 	}
 
@@ -178,11 +176,8 @@ func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, name string, 
 		if !strings.EqualFold(workflow.Name, name) {
 			continue
 		}
-		for _, state := range states {
-			if workflow.State == state {
-				filtered = append(filtered, workflow)
-				break
-			}
+		if slices.Contains(states, workflow.State) {
+			filtered = append(filtered, workflow)
 		}
 	}
 
@@ -222,11 +217,12 @@ func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, r
 	}
 
 	if !io.CanPrompt() {
-		errMsg := "could not resolve to a unique workflow; found:"
+		var errMsg strings.Builder
+		errMsg.WriteString("could not resolve to a unique workflow; found:")
 		for _, workflow := range workflows {
-			errMsg += fmt.Sprintf(" %s", workflow.Base())
+			errMsg.WriteString(fmt.Sprintf(" %s", workflow.Base()))
 		}
-		return nil, errors.New(errMsg)
+		return nil, errors.New(errMsg.String())
 	}
 
 	return selectWorkflow(p, workflows, "Which workflow do you mean?", states)

@@ -126,8 +126,8 @@ func runMarkTemplate(config markTemplateConfig) error {
 	return printResults(config, query.TemplateProject.Project)
 }
 
-func markTemplateArgs(config markTemplateConfig) (*markProjectTemplateMutation, map[string]interface{}) {
-	return &markProjectTemplateMutation{}, map[string]interface{}{
+func markTemplateArgs(config markTemplateConfig) (*markProjectTemplateMutation, map[string]any) {
+	return &markProjectTemplateMutation{}, map[string]any{
 		"input": githubv4.MarkProjectV2AsTemplateInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
 		},
@@ -138,8 +138,8 @@ func markTemplateArgs(config markTemplateConfig) (*markProjectTemplateMutation, 
 	}
 }
 
-func unmarkTemplateArgs(config markTemplateConfig) (*unmarkProjectTemplateMutation, map[string]interface{}) {
-	return &unmarkProjectTemplateMutation{}, map[string]interface{}{
+func unmarkTemplateArgs(config markTemplateConfig) (*unmarkProjectTemplateMutation, map[string]any) {
+	return &unmarkProjectTemplateMutation{}, map[string]any{
 		"input": githubv4.UnmarkProjectV2AsTemplateInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
 		},

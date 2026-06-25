@@ -203,8 +203,8 @@ func syncRemoteRepo(opts *SyncOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
 		branchName := opts.Branch
-		if idx := strings.Index(baseBranchLabel, ":"); idx >= 0 {
-			branchName = baseBranchLabel[idx+1:]
+		if _, after, ok := strings.Cut(baseBranchLabel, ":"); ok {
+			branchName = after
 		}
 		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s:%s\" branch from \"%s\"\n",
 			cs.SuccessIcon(),

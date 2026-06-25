@@ -148,7 +148,7 @@ func Test_updateBranchRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(_ string, inputs map[string]interface{}) {
+					}`, func(_ string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
 						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
 					}))
@@ -185,7 +185,7 @@ func Test_updateBranchRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(_ string, inputs map[string]interface{}) {
+					}`, func(_ string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
 						assert.Equal(t, "head-ref-name", inputs["headRef"])
 					}))
@@ -230,7 +230,7 @@ func Test_updateBranchRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(_ string, inputs map[string]interface{}) {
+					}`, func(_ string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
 						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
 					}))
@@ -242,7 +242,7 @@ func Test_updateBranchRun(t *testing.T) {
 								"pullRequest": {}
 							}
 						}
-					}`, func(inputs map[string]interface{}) {
+					}`, func(inputs map[string]any) {
 						assert.Equal(t, "123", inputs["pullRequestId"])
 						assert.Equal(t, "head-ref-oid", inputs["expectedHeadOid"])
 						assert.Equal(t, "MERGE", inputs["updateMethod"])
@@ -273,7 +273,7 @@ func Test_updateBranchRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(_ string, inputs map[string]interface{}) {
+					}`, func(_ string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
 						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
 					}))
@@ -285,7 +285,7 @@ func Test_updateBranchRun(t *testing.T) {
 								"pullRequest": {}
 							}
 						}
-					}`, func(inputs map[string]interface{}) {
+					}`, func(inputs map[string]any) {
 						assert.Equal(t, "123", inputs["pullRequestId"])
 						assert.Equal(t, "head-ref-oid", inputs["expectedHeadOid"])
 						assert.Equal(t, "REBASE", inputs["updateMethod"])
@@ -308,7 +308,7 @@ func Test_updateBranchRun(t *testing.T) {
 								"message": "some error"
 							}
 						]
-					}`, func(_ string, inputs map[string]interface{}) {
+					}`, func(_ string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
 						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
 					}))
@@ -337,7 +337,7 @@ func Test_updateBranchRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(_ string, inputs map[string]interface{}) {
+					}`, func(_ string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
 						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
 					}))
@@ -350,7 +350,7 @@ func Test_updateBranchRun(t *testing.T) {
 								"message": "merge conflict between base and head (updatePullRequestBranch)"
 							}
 						]
-					}`, func(inputs map[string]interface{}) {
+					}`, func(inputs map[string]any) {
 						assert.Equal(t, "123", inputs["pullRequestId"])
 						assert.Equal(t, "head-ref-oid", inputs["expectedHeadOid"])
 						assert.Equal(t, "MERGE", inputs["updateMethod"])
@@ -381,7 +381,7 @@ func Test_updateBranchRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(_ string, inputs map[string]interface{}) {
+					}`, func(_ string, inputs map[string]any) {
 						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
 						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
 					}))
@@ -394,7 +394,7 @@ func Test_updateBranchRun(t *testing.T) {
 								"message": "some error"
 							}
 						]
-					}`, func(inputs map[string]interface{}) {
+					}`, func(inputs map[string]any) {
 						assert.Equal(t, "123", inputs["pullRequestId"])
 						assert.Equal(t, "head-ref-oid", inputs["expectedHeadOid"])
 						assert.Equal(t, "MERGE", inputs["updateMethod"])

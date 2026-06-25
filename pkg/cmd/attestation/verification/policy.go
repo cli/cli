@@ -90,13 +90,13 @@ func (c EnforcementCriteria) BuildPolicyInformation() string {
 		}
 	}
 
-	policyInfo := ""
+	var policyInfo strings.Builder
 	for _, attr := range policyAttr {
 		dots := strings.Repeat(".", maxColLen-len(attr[0]))
-		policyInfo += fmt.Sprintf("%s:%s %s\n", attr[0], dots, attr[1])
+		policyInfo.WriteString(fmt.Sprintf("%s:%s %s\n", attr[0], dots, attr[1]))
 	}
 
-	return policyInfo
+	return policyInfo.String()
 }
 
 func appendStr(arr [][]string, a, b string) [][]string {

@@ -119,7 +119,7 @@ func runCreateField(config createFieldConfig) error {
 	return printResults(config, query.CreateProjectV2Field.Field)
 }
 
-func createFieldArgs(config createFieldConfig) (*createProjectV2FieldMutation, map[string]interface{}) {
+func createFieldArgs(config createFieldConfig) (*createProjectV2FieldMutation, map[string]any) {
 	input := githubv4.CreateProjectV2FieldInput{
 		ProjectID: githubv4.ID(config.opts.projectID),
 		DataType:  githubv4.ProjectV2CustomFieldType(config.opts.dataType),
@@ -137,7 +137,7 @@ func createFieldArgs(config createFieldConfig) (*createProjectV2FieldMutation, m
 		input.SingleSelectOptions = &opts
 	}
 
-	return &createProjectV2FieldMutation{}, map[string]interface{}{
+	return &createProjectV2FieldMutation{}, map[string]any{
 		"input": input,
 	}
 }

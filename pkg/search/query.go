@@ -242,7 +242,7 @@ func groupWithOR(qualifier string, vs []string) string {
 func (q Qualifiers) Map() map[string][]string {
 	m := map[string][]string{}
 	v := reflect.ValueOf(q)
-	t := reflect.TypeOf(q)
+	t := reflect.TypeFor[Qualifiers]()
 	for i := 0; i < v.NumField(); i++ {
 		field := t.Field(i)
 		key := field.Tag.Get("qualifier")
@@ -251,7 +251,7 @@ func (q Qualifiers) Map() map[string][]string {
 		}
 		value := v.Field(i)
 		switch value.Kind() {
-		case reflect.Ptr:
+		case reflect.Pointer:
 			if value.IsNil() {
 				continue
 			}

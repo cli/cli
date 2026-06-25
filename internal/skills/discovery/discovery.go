@@ -1048,7 +1048,7 @@ func validateName(name string) bool {
 
 // hasHiddenSegment reports whether any path component starts with a dot.
 func hasHiddenSegment(p string) bool {
-	for _, seg := range strings.Split(p, "/") {
+	for seg := range strings.SplitSeq(p, "/") {
 		if strings.HasPrefix(seg, ".") {
 			return true
 		}
@@ -1058,7 +1058,7 @@ func hasHiddenSegment(p string) bool {
 
 // hasPluginsAncestor reports whether any path component is "plugins".
 func hasPluginsAncestor(p string) bool {
-	for _, seg := range strings.Split(p, "/") {
+	for seg := range strings.SplitSeq(p, "/") {
 		if seg == "plugins" {
 			return true
 		}

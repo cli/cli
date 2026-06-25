@@ -261,7 +261,7 @@ func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *Pu
 	}
 
 	body := githubv4.String(input.Body)
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.AddPullRequestReviewInput{
 			PullRequestID: pr.ID,
 			Event:         &state,
@@ -380,7 +380,7 @@ func RequestReviewsByLogin(client *Client, repo ghrepo.Interface, prID string, u
 	teamSlugValues := toGitHubV4Strings(teamSlugs, "")
 	input.TeamSlugs = &teamSlugValues
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": input,
 	}
 
@@ -451,7 +451,7 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"id":    githubv4.ID(prID),
 		"query": githubv4.String(query),
 		"owner": githubv4.String(repo.RepoOwner()),
@@ -601,7 +601,7 @@ func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"query": githubv4.String(query),
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),

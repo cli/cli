@@ -42,7 +42,7 @@ func TestPinRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation IssuePin\b`),
 					httpmock.GraphQLMutation(`{"id": "ISSUE-ID"}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, inputs["issueId"], "ISSUE-ID")
 						},
 					),

@@ -4,9 +4,9 @@ import (
 	"reflect"
 )
 
-func (repo *Repository) ExportData(fields []string) map[string]interface{} {
+func (repo *Repository) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(repo).Elem()
-	data := map[string]interface{}{}
+	data := map[string]any{}
 
 	for _, f := range fields {
 		switch f {
@@ -41,11 +41,11 @@ func (repo *Repository) ExportData(fields []string) map[string]interface{} {
 	return data
 }
 
-func miniRepoExport(r *Repository) map[string]interface{} {
+func miniRepoExport(r *Repository) map[string]any {
 	if r == nil {
 		return nil
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"id":    r.ID,
 		"name":  r.Name,
 		"owner": r.Owner,

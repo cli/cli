@@ -18,7 +18,7 @@ func Test_listReposWithLanguage(t *testing.T) {
 
 	var searchData struct {
 		Query     string
-		Variables map[string]interface{}
+		Variables map[string]any
 	}
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryListSearch\b`),

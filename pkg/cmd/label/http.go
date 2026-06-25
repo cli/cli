@@ -88,7 +88,7 @@ func listLabels(client *http.Client, repo ghrepo.Interface, opts listQueryOption
 		}
 	}`
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":   repo.RepoOwner(),
 		"repo":    repo.RepoName(),
 		"orderBy": opts.OrderBy(),

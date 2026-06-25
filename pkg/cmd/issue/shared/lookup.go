@@ -165,7 +165,7 @@ func FindIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 		}
 	}`, api.IssueGraphQL(fields), api.PullRequestGraphQL(fields))
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  repo.RepoOwner(),
 		"repo":   repo.RepoName(),
 		"number": number,

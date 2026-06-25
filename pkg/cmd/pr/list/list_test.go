@@ -122,8 +122,8 @@ func TestPRList_filtering(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`query PullRequestList\b`),
-		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, []interface{}{"OPEN", "CLOSED", "MERGED"}, params["state"].([]interface{}))
+		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]any) {
+			assert.Equal(t, []any{"OPEN", "CLOSED", "MERGED"}, params["state"].([]any))
 		}))
 
 	output, err := runCommand(http, nil, true, `-s all`)
@@ -160,8 +160,8 @@ func TestPRList_filteringClosed(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`query PullRequestList\b`),
-		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, []interface{}{"CLOSED", "MERGED"}, params["state"].([]interface{}))
+		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]any) {
+			assert.Equal(t, []any{"CLOSED", "MERGED"}, params["state"].([]any))
 		}))
 
 	_, err := runCommand(http, nil, true, `-s closed`)
@@ -174,8 +174,8 @@ func TestPRList_filteringHeadBranch(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`query PullRequestList\b`),
-		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, interface{}("bug-fix"), params["headBranch"])
+		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]any) {
+			assert.Equal(t, any("bug-fix"), params["headBranch"])
 		}))
 
 	_, err := runCommand(http, nil, true, `-H bug-fix`)
@@ -188,7 +188,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`query PullRequestSearch\b`),
-		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]any) {
 			assert.Equal(t, `assignee:hubot base:develop is:merged label:"needs tests" repo:OWNER/REPO type:pr`, params["q"].(string))
 		}))
 
@@ -223,7 +223,7 @@ func TestPRList_filteringDraft(t *testing.T) {
 
 			http.Register(
 				httpmock.GraphQL(`query PullRequestSearch\b`),
-				httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+				httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]any) {
 					assert.Equal(t, test.expectedQuery, params["q"].(string))
 				}))
 
@@ -270,7 +270,7 @@ func TestPRList_filteringAuthor(t *testing.T) {
 
 			http.Register(
 				httpmock.GraphQL(`query PullRequestSearch\b`),
-				httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+				httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]any) {
 					assert.Equal(t, test.expectedQuery, params["q"].(string))
 				}))
 
@@ -366,12 +366,12 @@ func TestPRList_withProjectItems(t *testing.T) {
 				}
 			  }
 			}
-		  }`, func(_ string, params map[string]interface{}) {
-			require.Equal(t, map[string]interface{}{
+		  }`, func(_ string, params map[string]any) {
+			require.Equal(t, map[string]any{
 				"owner": "OWNER",
 				"repo":  "REPO",
 				"limit": float64(30),
-				"state": []interface{}{"OPEN"},
+				"state": []any{"OPEN"},
 			}, params)
 		}))
 
@@ -438,8 +438,8 @@ func TestPRList_Search_withProjectItems(t *testing.T) {
 				]
 			  }
 			}
-		  }`, func(_ string, params map[string]interface{}) {
-			require.Equal(t, map[string]interface{}{
+		  }`, func(_ string, params map[string]any) {
+			require.Equal(t, map[string]any{
 				"limit": float64(30),
 				"q":     "( just used to force the search API branch ) repo:OWNER/REPO state:open type:pr",
 				"type":  "ISSUE_ADVANCED",

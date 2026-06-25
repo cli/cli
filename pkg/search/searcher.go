@@ -196,7 +196,7 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 // - Items: the actual matching search results, up to 100 max items per page
 //
 // For more information, see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28.
-func (s searcher) search(query Query, result interface{}) (string, error) {
+func (s searcher) search(query Query, result any) (string, error) {
 	path := fmt.Sprintf("%ssearch/%s", ghinstance.RESTPrefix(s.host), query.Kind)
 	qs := url.Values{}
 	qs.Set("page", strconv.Itoa(query.Page))
@@ -337,11 +337,4 @@ func nextPage(link string) (page int) {
 		}
 	}
 	return 0
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

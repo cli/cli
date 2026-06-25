@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"strings"
@@ -248,9 +249,7 @@ func getVariablesFromOptions(opts *SetOptions) (map[string]string, error) {
 		if len(envs) == 0 {
 			return nil, fmt.Errorf("no variables found in file")
 		}
-		for key, value := range envs {
-			variables[key] = value
-		}
+		maps.Copy(variables, envs)
 		return variables, nil
 	}
 

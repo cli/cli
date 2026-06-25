@@ -66,7 +66,7 @@ func TestIssueList(t *testing.T) {
 	}
 	var reqBody struct {
 		Query     string
-		Variables map[string]interface{}
+		Variables map[string]any
 	}
 
 	bodyBytes, _ := io.ReadAll(reg.Requests[0].Body)
@@ -199,7 +199,7 @@ func TestSearchIssuesAndAdvancedSearch(t *testing.T) {
 
 			reg.Register(
 				httpmock.GraphQL(`query IssueSearch\b`),
-				httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
+				httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]any) {
 					assert.Equal(t, tt.wantSearchType, vars["type"])
 					// Since no repeated usage of special search qualifiers is possible
 					// with our current implementation, we can assert against the same

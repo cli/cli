@@ -608,7 +608,7 @@ func TestCodespace_ExportData(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   map[string]interface{}
+		want   map[string]any
 	}{
 		{
 			name: "just name",
@@ -618,7 +618,7 @@ func TestCodespace_ExportData(t *testing.T) {
 			args: args{
 				fields: []string{"name"},
 			},
-			want: map[string]interface{}{
+			want: map[string]any{
 				"name": "test",
 			},
 		},
@@ -632,7 +632,7 @@ func TestCodespace_ExportData(t *testing.T) {
 			args: args{
 				fields: []string{"owner"},
 			},
-			want: map[string]interface{}{
+			want: map[string]any{
 				"owner": "test",
 			},
 		},
@@ -646,7 +646,7 @@ func TestCodespace_ExportData(t *testing.T) {
 			args: args{
 				fields: []string{"machineName"},
 			},
-			want: map[string]interface{}{
+			want: map[string]any{
 				"machineName": "test",
 			},
 		},
@@ -690,7 +690,7 @@ func createFakeEditServer(t *testing.T, codespaceName string) *httptest.Server {
 		}
 		defer body.Close()
 
-		var data map[string]interface{}
+		var data map[string]any
 		err := json.NewDecoder(body).Decode(&data)
 
 		if err != nil {

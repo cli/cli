@@ -931,10 +931,10 @@ func TestIssueView_json_IssueType(t *testing.T) {
 	output, err := runCommand(httpReg, false, `123 --json issueType`)
 	require.NoError(t, err)
 
-	var data map[string]interface{}
+	var data map[string]any
 	require.NoError(t, json.Unmarshal(output.OutBuf.Bytes(), &data))
 
-	issueType, ok := data["issueType"].(map[string]interface{})
+	issueType, ok := data["issueType"].(map[string]any)
 	require.True(t, ok, "issueType should be an object")
 	assert.Equal(t, "IT_1", issueType["id"])
 	assert.Equal(t, "Bug", issueType["name"])
@@ -954,11 +954,11 @@ func TestIssueView_json_ParentSubIssues(t *testing.T) {
 	output, err := runCommand(httpReg, false, `123 --json parent,subIssues,subIssuesSummary`)
 	require.NoError(t, err)
 
-	var data map[string]interface{}
+	var data map[string]any
 	require.NoError(t, json.Unmarshal(output.OutBuf.Bytes(), &data))
 
 	// Parent
-	parent, ok := data["parent"].(map[string]interface{})
+	parent, ok := data["parent"].(map[string]any)
 	require.True(t, ok, "parent should be an object")
 	assert.Equal(t, float64(100), parent["number"])
 	assert.Equal(t, "Epic: Authentication overhaul", parent["title"])
@@ -966,26 +966,26 @@ func TestIssueView_json_ParentSubIssues(t *testing.T) {
 	assert.Equal(t, "OPEN", parent["state"])
 
 	// Sub-issues
-	subIssuesObj, ok := data["subIssues"].(map[string]interface{})
+	subIssuesObj, ok := data["subIssues"].(map[string]any)
 	require.True(t, ok, "subIssues should be an object")
 	assert.Equal(t, float64(2), subIssuesObj["totalCount"])
 
-	subIssues, ok := subIssuesObj["nodes"].([]interface{})
+	subIssues, ok := subIssuesObj["nodes"].([]any)
 	require.True(t, ok, "subIssues.nodes should be an array")
 	require.Len(t, subIssues, 2)
 
-	sub0 := subIssues[0].(map[string]interface{})
+	sub0 := subIssues[0].(map[string]any)
 	assert.Equal(t, float64(101), sub0["number"])
 	assert.Equal(t, "Design auth module", sub0["title"])
 	assert.Equal(t, "CLOSED", sub0["state"])
 
-	sub1 := subIssues[1].(map[string]interface{})
+	sub1 := subIssues[1].(map[string]any)
 	assert.Equal(t, float64(102), sub1["number"])
 	assert.Equal(t, "Token refresh logic", sub1["title"])
 	assert.Equal(t, "OPEN", sub1["state"])
 
 	// Sub-issues summary
-	summary, ok := data["subIssuesSummary"].(map[string]interface{})
+	summary, ok := data["subIssuesSummary"].(map[string]any)
 	require.True(t, ok, "subIssuesSummary should be an object")
 	assert.Equal(t, float64(2), summary["total"])
 	assert.Equal(t, float64(1), summary["completed"])
@@ -1004,34 +1004,34 @@ func TestIssueView_json_BlockedByBlocking(t *testing.T) {
 	output, err := runCommand(httpReg, false, `123 --json blockedBy,blocking`)
 	require.NoError(t, err)
 
-	var data map[string]interface{}
+	var data map[string]any
 	require.NoError(t, json.Unmarshal(output.OutBuf.Bytes(), &data))
 
 	// Blocked by
-	blockedByObj, ok := data["blockedBy"].(map[string]interface{})
+	blockedByObj, ok := data["blockedBy"].(map[string]any)
 	require.True(t, ok, "blockedBy should be an object")
 	assert.Equal(t, float64(1), blockedByObj["totalCount"])
 
-	blockedBy, ok := blockedByObj["nodes"].([]interface{})
+	blockedBy, ok := blockedByObj["nodes"].([]any)
 	require.True(t, ok, "blockedBy.nodes should be an array")
 	require.Len(t, blockedBy, 1)
 
-	blocked0 := blockedBy[0].(map[string]interface{})
+	blocked0 := blockedBy[0].(map[string]any)
 	assert.Equal(t, float64(200), blocked0["number"])
 	assert.Equal(t, "API rate limiting", blocked0["title"])
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/200", blocked0["url"])
 	assert.Equal(t, "OPEN", blocked0["state"])
 
 	// Blocking
-	blockingObj, ok := data["blocking"].(map[string]interface{})
+	blockingObj, ok := data["blocking"].(map[string]any)
 	require.True(t, ok, "blocking should be an object")
 	assert.Equal(t, float64(1), blockingObj["totalCount"])
 
-	blocking, ok := blockingObj["nodes"].([]interface{})
+	blocking, ok := blockingObj["nodes"].([]any)
 	require.True(t, ok, "blocking.nodes should be an array")
 	require.Len(t, blocking, 1)
 
-	blocking0 := blocking[0].(map[string]interface{})
+	blocking0 := blocking[0].(map[string]any)
 	assert.Equal(t, float64(300), blocking0["number"])
 	assert.Equal(t, "Release v2.0", blocking0["title"])
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/300", blocking0["url"])

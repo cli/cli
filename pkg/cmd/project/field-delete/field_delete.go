@@ -76,8 +76,8 @@ func runDeleteField(config deleteFieldConfig) error {
 	return printResults(config, query.DeleteProjectV2Field.Field)
 }
 
-func deleteFieldArgs(config deleteFieldConfig) (*deleteProjectV2FieldMutation, map[string]interface{}) {
-	return &deleteProjectV2FieldMutation{}, map[string]interface{}{
+func deleteFieldArgs(config deleteFieldConfig) (*deleteProjectV2FieldMutation, map[string]any) {
+	return &deleteProjectV2FieldMutation{}, map[string]any{
 		"input": githubv4.DeleteProjectV2FieldInput{
 			FieldID: githubv4.ID(config.opts.fieldID),
 		},

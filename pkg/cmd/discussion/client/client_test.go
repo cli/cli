@@ -287,7 +287,7 @@ func TestList(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Equal(t, "someCursor", vars["after"])
 					}),
 				)
@@ -301,8 +301,8 @@ func TestList(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
-						assert.Equal(t, []interface{}{"OPEN"}, vars["states"])
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
+						assert.Equal(t, []any{"OPEN"}, vars["states"])
 					}),
 				)
 			},
@@ -314,8 +314,8 @@ func TestList(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
-						assert.Equal(t, []interface{}{"CLOSED"}, vars["states"])
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
+						assert.Equal(t, []any{"CLOSED"}, vars["states"])
 					}),
 				)
 			},
@@ -327,7 +327,7 @@ func TestList(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Equal(t, true, vars["answered"])
 					}),
 				)
@@ -340,7 +340,7 @@ func TestList(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Equal(t, false, vars["answered"])
 					}),
 				)
@@ -353,7 +353,7 @@ func TestList(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Equal(t, "CAT123", vars["categoryId"])
 					}),
 				)
@@ -366,8 +366,8 @@ func TestList(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
-						orderBy, ok := vars["orderBy"].(map[string]interface{})
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
+						orderBy, ok := vars["orderBy"].(map[string]any)
 						require.True(t, ok, "orderBy should be a map")
 						assert.Equal(t, "CREATED_AT", orderBy["field"])
 						assert.Equal(t, "ASC", orderBy["direction"])
@@ -382,8 +382,8 @@ func TestList(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
-						orderBy, ok := vars["orderBy"].(map[string]interface{})
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
+						orderBy, ok := vars["orderBy"].(map[string]any)
 						require.True(t, ok, "orderBy should be a map")
 						assert.Equal(t, "UPDATED_AT", orderBy["field"])
 						assert.Equal(t, "DESC", orderBy["direction"])
@@ -456,13 +456,13 @@ func TestList(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(listResp(true, "pg2cursor", 101, minimalNodes(100)), func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(listResp(true, "pg2cursor", 101, minimalNodes(100)), func(_ string, vars map[string]any) {
 						assert.Equal(t, float64(100), vars["first"])
 					}),
 				)
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionList\b`),
-					httpmock.GraphQLQuery(listResp(false, "", 101, minimalNode("D101", "Discussion 101")), func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(listResp(false, "", 101, minimalNode("D101", "Discussion 101")), func(_ string, vars map[string]any) {
 						assert.Equal(t, float64(1), vars["first"])
 					}),
 				)
@@ -694,7 +694,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Equal(t, "someCursor", vars["after"])
 					}),
 				)
@@ -708,7 +708,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Contains(t, vars["query"].(string), "is:open")
 					}),
 				)
@@ -721,7 +721,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Contains(t, vars["query"].(string), "is:closed")
 					}),
 				)
@@ -734,7 +734,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Contains(t, vars["query"].(string), "is:answered")
 					}),
 				)
@@ -747,7 +747,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Contains(t, vars["query"].(string), "is:unanswered")
 					}),
 				)
@@ -760,7 +760,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Contains(t, vars["query"].(string), `author:"alice"`)
 					}),
 				)
@@ -773,7 +773,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						q := vars["query"].(string)
 						assert.Contains(t, q, `label:"bug"`)
 						assert.Contains(t, q, `label:"enhancement"`)
@@ -788,7 +788,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Contains(t, vars["query"].(string), `category:"Q&A"`)
 					}),
 				)
@@ -801,7 +801,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Contains(t, vars["query"].(string), "some keyword")
 					}),
 				)
@@ -814,7 +814,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Contains(t, vars["query"].(string), "sort:created-asc")
 					}),
 				)
@@ -827,7 +827,7 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(emptyResp, func(_ string, vars map[string]any) {
 						assert.Contains(t, vars["query"].(string), "sort:updated-desc")
 					}),
 				)
@@ -841,13 +841,13 @@ func TestSearch(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(searchResp(true, "pg2cursor", 101, minimalNodes(100)), func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(searchResp(true, "pg2cursor", 101, minimalNodes(100)), func(_ string, vars map[string]any) {
 						assert.Equal(t, float64(100), vars["first"])
 					}),
 				)
 				reg.Register(
 					httpmock.GraphQL(`query DiscussionListSearch\b`),
-					httpmock.GraphQLQuery(searchResp(false, "", 101, minimalNode("D101", "Discussion 101")), func(_ string, vars map[string]interface{}) {
+					httpmock.GraphQLQuery(searchResp(false, "", 101, minimalNode("D101", "Discussion 101")), func(_ string, vars map[string]any) {
 						assert.Equal(t, float64(1), vars["first"])
 					}),
 				)
@@ -2375,7 +2375,7 @@ func TestCreate(t *testing.T) {
 					httpmock.StringResponse(repoMetaResp("R_1", true)),
 				)
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation CreateDiscussion\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation CreateDiscussion\b`, func(input map[string]any) bool {
 						assert.Equal(t, "R_1", input["repositoryId"])
 						assert.Equal(t, "CAT_1", input["categoryId"])
 						assert.Equal(t, "New Discussion", input["title"])
@@ -2550,11 +2550,11 @@ func TestCreate(t *testing.T) {
 					`)),
 				)
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddLabelsToDiscussion\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddLabelsToDiscussion\b`, func(input map[string]any) bool {
 						assert.Equal(t, "D_new", input["labelableId"])
-						labelIDs, ok := input["labelIds"].([]interface{})
+						labelIDs, ok := input["labelIds"].([]any)
 						assert.True(t, ok)
-						assert.Equal(t, []interface{}{"L_bug", "L_enh"}, labelIDs)
+						assert.Equal(t, []any{"L_bug", "L_enh"}, labelIDs)
 						return true
 					}),
 					httpmock.StringResponse(heredoc.Doc(`
@@ -2899,18 +2899,18 @@ func TestEditDiscussionLabels(t *testing.T) {
 			removeIDs: []string{"L_old"},
 			setupMock: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation RemoveLabelsFromDiscussion\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation RemoveLabelsFromDiscussion\b`, func(input map[string]any) bool {
 						assert.Equal(t, "D_1", input["labelableId"])
-						assert.Equal(t, []interface{}{"L_old"}, input["labelIds"])
+						assert.Equal(t, []any{"L_old"}, input["labelIds"])
 						return true
 					}),
 					// This response is superseded by the subsequent add mutation so we don't need all fields.
 					httpmock.StringResponse(`{"data":{"removeLabelsFromLabelable":{"labelable":{"id": "D_1"}}}}`),
 				)
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddLabelsToDiscussion\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddLabelsToDiscussion\b`, func(input map[string]any) bool {
 						assert.Equal(t, "D_1", input["labelableId"])
-						assert.Equal(t, []interface{}{"L_bug", "L_enh"}, input["labelIds"])
+						assert.Equal(t, []any{"L_bug", "L_enh"}, input["labelIds"])
 						return true
 					}),
 					httpmock.StringResponse(heredoc.Doc(`
@@ -3429,7 +3429,7 @@ func TestAddComment(t *testing.T) {
 			body:         "Hello world",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddDiscussionComment\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddDiscussionComment\b`, func(input map[string]any) bool {
 						assert.Equal(t, "D_123", input["discussionId"])
 						assert.Equal(t, "Hello world", input["body"])
 						assert.Nil(t, input["replyToId"])
@@ -3470,7 +3470,7 @@ func TestAddComment(t *testing.T) {
 			replyToID:    "DC_parent",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddDiscussionComment\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddDiscussionComment\b`, func(input map[string]any) bool {
 						assert.Equal(t, "D_123", input["discussionId"])
 						assert.Equal(t, "Reply text", input["body"])
 						assert.Equal(t, "DC_parent", input["replyToId"])
@@ -3559,7 +3559,7 @@ func TestUpdateComment(t *testing.T) {
 			body:      "Updated body",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation UpdateDiscussionComment\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation UpdateDiscussionComment\b`, func(input map[string]any) bool {
 						assert.Equal(t, "DC_1", input["commentId"])
 						assert.Equal(t, "Updated body", input["body"])
 						return true

@@ -803,7 +803,7 @@ func TestFind(t *testing.T) {
 		                  }
 		                }
 		              }`,
-						func(query string, inputs map[string]interface{}) {
+						func(query string, inputs map[string]any) {
 							require.Equal(t, float64(13), inputs["number"])
 							require.Equal(t, "OWNER", inputs["owner"])
 							require.Equal(t, "REPO", inputs["name"])
