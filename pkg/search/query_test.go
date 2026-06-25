@@ -202,7 +202,7 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 			out: `( keyword ) (in:body OR in:comments OR in:title) in:foo (is:blocked OR is:blocking) (is:closed OR is:open) (is:issue OR is:pr) (is:locked OR is:unlocked) (is:merged OR is:unmerged) (is:private OR is:public) is:foo (repo:foo/bar OR repo:foo/baz) (user:janedoe OR user:johndoe)`,
 		},
 		{
-			// Since this is a general purpose package, we can't assume with know all
+			// Since this is a general purpose package, we can't assume we know all
 			// use cases of special qualifiers. So, here we ensure unknown values are
 			// not OR-ed by default.
 			name: "special qualifiers without special values",
