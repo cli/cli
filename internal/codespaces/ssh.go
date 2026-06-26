@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -81,8 +82,12 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to execute ssh: %w", err)
 	}
+	if !filepath.IsAbs(exe) {
+		return nil, nil, fmt.Errorf("ssh executable has unexpected relative path: %s", exe)
+	}
 
-	cmd := exec.CommandContext(ctx, exe, cmdArgs...)
+	cmd := exec.CommandContext(ctx, "ssh", cmdArgs...)
+	cmd.Path = exe // use safeexec-validated absolute path to prevent PATH hijacking
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
@@ -134,7 +139,8 @@ func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 
 	// Beware: invalid syntax causes scp to exit 1 with
 	// no error message, so don't let that happen.
-	cmd := exec.CommandContext(ctx, exe, cmdArgs...)
+	cmd := exec.CommandContext(ctx, "scp", cmdArgs...)
+	cmd.Path = exe // use safeexec-validated absolute path to prevent PATH hijacking
 
 	cmd.Stdin = nil
 	cmd.Stdout = os.Stderr
