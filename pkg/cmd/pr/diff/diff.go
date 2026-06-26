@@ -421,6 +421,10 @@ func splitDiffSections(diff string) []string {
 			if len(p) > 0 {
 				sections = append(sections, p+"\n")
 			}
+		} else if i < len(parts)-1 {
+			// The split marker "\ndiff --git " consumed the newline that trailed
+			// this section. Restore it so adjacent sections remain separated.
+			sections = append(sections, "diff --git "+p+"\n")
 		} else {
 			sections = append(sections, "diff --git "+p)
 		}

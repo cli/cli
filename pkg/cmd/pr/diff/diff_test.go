@@ -528,6 +528,117 @@ index 73974448..b7fc0154 100644
 	}
 }
 
+// testDiff3 is a three-file unified diff used to test filtering of middle sections.
+// It exercises the bug fixed in splitDiffSections where the trailing newline of
+// middle sections was lost, causing the next "diff --git" header to be joined to
+// the last line of the preceding section without a newline separator.
+const testDiff3 = `diff --git a/file1.go b/file1.go
+index aaaa..bbbb 100644
+--- a/file1.go
++++ b/file1.go
+@@ -1,2 +1,3 @@
+ package main
++// added
+diff --git a/file2.yml b/file2.yml
+index cccc..dddd 100644
+--- a/file2.yml
++++ b/file2.yml
+@@ -1,1 +1,2 @@
++key: value
+diff --git a/file3.go b/file3.go
+index eeee..ffff 100644
+--- a/file3.go
++++ b/file3.go
+@@ -1,1 +1,2 @@
++// new
+`
+
+func Test_splitDiffSections(t *testing.T) {
+	tests := []struct {
+		name         string
+		diff         string
+		wantSections []string
+	}{
+		{
+			name:         "single file",
+			diff:         "diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n@@ -1 +1 @@\n+x\n",
+			wantSections: []string{"diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n@@ -1 +1 @@\n+x\n"},
+		},
+		{
+			name: "three files: middle section must end with newline",
+			diff: testDiff3,
+			// Verify the middle section (file2.yml) ends with "\n" so that
+			// when sections are concatenated the diff structure is not corrupted.
+			wantSections: []string{
+				"diff --git a/file1.go b/file1.go\nindex aaaa..bbbb 100644\n--- a/file1.go\n+++ b/file1.go\n@@ -1,2 +1,3 @@\n package main\n+// added\n",
+				"diff --git a/file2.yml b/file2.yml\nindex cccc..dddd 100644\n--- a/file2.yml\n+++ b/file2.yml\n@@ -1,1 +1,2 @@\n+key: value\n",
+				"diff --git a/file3.go b/file3.go\nindex eeee..ffff 100644\n--- a/file3.go\n+++ b/file3.go\n@@ -1,1 +1,2 @@\n+// new\n",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitDiffSections(tt.diff)
+			assert.Equal(t, tt.wantSections, got)
+			// Round-trip: concatenating sections must reproduce the original diff.
+			assert.Equal(t, tt.diff, strings.Join(got, ""))
+		})
+	}
+}
+
+func Test_filterDiff_threeFiles(t *testing.T) {
+	tests := []struct {
+		name     string
+		patterns []string
+		want     string
+	}{
+		{
+			// Excluding the middle file (file2.yml) previously caused the trailing
+			// newline of file1.go's section to be dropped, merging its last line
+			// with "diff --git a/file3.go ..." without a newline separator.
+			name:     "exclude middle file leaves remaining sections intact",
+			patterns: []string{"*.yml"},
+			want: "diff --git a/file1.go b/file1.go\n" +
+				"index aaaa..bbbb 100644\n" +
+				"--- a/file1.go\n" +
+				"+++ b/file1.go\n" +
+				"@@ -1,2 +1,3 @@\n" +
+				" package main\n" +
+				"+// added\n" +
+				"diff --git a/file3.go b/file3.go\n" +
+				"index eeee..ffff 100644\n" +
+				"--- a/file3.go\n" +
+				"+++ b/file3.go\n" +
+				"@@ -1,1 +1,2 @@\n" +
+				"+// new\n",
+		},
+		{
+			name:     "exclude first file",
+			patterns: []string{"*.go"},
+			want: "diff --git a/file2.yml b/file2.yml\n" +
+				"index cccc..dddd 100644\n" +
+				"--- a/file2.yml\n" +
+				"+++ b/file2.yml\n" +
+				"@@ -1,1 +1,2 @@\n" +
+				"+key: value\n",
+		},
+		{
+			name:     "no matches returns full diff",
+			patterns: []string{"*.md"},
+			want:     testDiff3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader, err := filterDiff(strings.NewReader(testDiff3), tt.patterns)
+			require.NoError(t, err)
+			got, err := io.ReadAll(reader)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, string(got))
+		})
+	}
+}
+
 func Test_matchesAny(t *testing.T) {
 	tests := []struct {
 		name     string
