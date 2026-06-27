@@ -898,6 +898,43 @@ func TestNewCmdExtension(t *testing.T) {
 			isTTY:      true,
 			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
+		{
+			// Regression test for #13551: --force together with --pin must
+			// reinstall at the pinned tag, not silently upgrade to latest
+			// via the generic upgradeFunc path (which has no way to honor
+			// pinFlag at all).
+			name: "force install with pin when present",
+			args: []string{"install", "owner/gh-hello", "--force", "--pin", "v1.2.3"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{
+						&Extension{path: "owner/gh-hello", owner: "owner"},
+					}
+				}
+				em.RemoveFunc = func(name string) error {
+					return nil
+				}
+				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
+					return nil
+				}
+				em.UpgradeFunc = func(name string, force bool) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					removeCalls := em.RemoveCalls()
+					assert.Equal(t, 1, len(removeCalls))
+					assert.Equal(t, "hello", removeCalls[0].Name)
+					installCalls := em.InstallCalls()
+					assert.Equal(t, 1, len(installCalls))
+					assert.Equal(t, "gh-hello", installCalls[0].InterfaceMoqParam.RepoName())
+					assert.Equal(t, "v1.2.3", installCalls[0].S)
+					upgradeCalls := em.UpgradeCalls()
+					assert.Equal(t, 0, len(upgradeCalls))
+				}
+			},
+			isTTY:      true,
+			wantStdout: "✓ Installed extension owner/gh-hello\n✓ Pinned extension at v1.2.3\n",
+		},
 	}
 
 	for _, tt := range tests {
