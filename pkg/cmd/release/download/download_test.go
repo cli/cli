@@ -219,6 +219,37 @@ func Test_downloadRun(t *testing.T) {
 			},
 		},
 		{
+			name:  "downloads published release when the draft lookup is unauthorized",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				Destination: ".",
+				Concurrency: 2,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"),
+					httpmock.StringResponse(`{
+						"assets": [
+							{ "name": "linux.tgz", "size": 56, "url": "https://api.github.com/assets/5678" }
+						]
+					}`),
+				)
+				// An unauthenticated draft lookup fails over GraphQL and must not
+				// mask the published release found over REST.
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryReleaseByTag\b`),
+					httpmock.StatusStringResponse(403, `{"message":"This endpoint requires you to be authenticated."}`),
+				)
+				reg.Register(httpmock.REST("GET", "assets/5678"), httpmock.StringResponse(`5678`))
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantFiles: []string{
+				"linux.tgz",
+			},
+		},
+		{
 			name:  "download assets matching pattern into destination directory",
 			isTTY: true,
 			opts: DownloadOptions{
