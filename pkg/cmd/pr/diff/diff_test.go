@@ -576,3 +576,111 @@ func Test_sanitizedReader(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func Test_filterDiff_preservesSeparatorsAcrossThreeFiles(t *testing.T) {
+	// Regression test for https://github.com/cli/cli/issues/13022.
+	// splitDiffSections must restore the newline that strings.Split consumes at every
+	// "diff --git" boundary, not just the first one. With three or more files, dropping
+	// the newline after the second file concatenates its last line with the third file's
+	// header (e.g. "+new2diff --git a/file3..."), corrupting the diff. The existing
+	// Test_filterDiff fixture only has two files, so it never exercises this path.
+	threeFileDiff := `diff --git a/file1.txt b/file1.txt
+index 1111111..aaaaaaa 100644
+--- a/file1.txt
++++ b/file1.txt
+@@ -1 +1 @@
+-old1
++new1
+diff --git a/file2.txt b/file2.txt
+index 2222222..bbbbbbb 100644
+--- a/file2.txt
++++ b/file2.txt
+@@ -1 +1 @@
+-old2
++new2
+diff --git a/file3.txt b/file3.txt
+index 3333333..ccccccc 100644
+--- a/file3.txt
++++ b/file3.txt
+@@ -1 +1 @@
+-old3
++new3
+`
+
+	t.Run("no matching patterns round-trips unchanged", func(t *testing.T) {
+		reader, err := filterDiff(strings.NewReader(threeFileDiff), []string{"*.go"})
+		require.NoError(t, err)
+		got, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.Equal(t, threeFileDiff, string(got))
+	})
+
+	t.Run("excluding the first file keeps the rest well-formed", func(t *testing.T) {
+		want := `diff --git a/file2.txt b/file2.txt
+index 2222222..bbbbbbb 100644
+--- a/file2.txt
++++ b/file2.txt
+@@ -1 +1 @@
+-old2
++new2
+diff --git a/file3.txt b/file3.txt
+index 3333333..ccccccc 100644
+--- a/file3.txt
++++ b/file3.txt
+@@ -1 +1 @@
+-old3
++new3
+`
+		reader, err := filterDiff(strings.NewReader(threeFileDiff), []string{"file1.txt"})
+		require.NoError(t, err)
+		got, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.Equal(t, want, string(got))
+	})
+
+	t.Run("excluding the last file keeps the rest well-formed", func(t *testing.T) {
+		want := `diff --git a/file1.txt b/file1.txt
+index 1111111..aaaaaaa 100644
+--- a/file1.txt
++++ b/file1.txt
+@@ -1 +1 @@
+-old1
++new1
+diff --git a/file2.txt b/file2.txt
+index 2222222..bbbbbbb 100644
+--- a/file2.txt
++++ b/file2.txt
+@@ -1 +1 @@
+-old2
++new2
+`
+		reader, err := filterDiff(strings.NewReader(threeFileDiff), []string{"file3.txt"})
+		require.NoError(t, err)
+		got, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.Equal(t, want, string(got))
+	})
+
+	t.Run("excluding the middle file joins the survivors at a new boundary", func(t *testing.T) {
+		want := `diff --git a/file1.txt b/file1.txt
+index 1111111..aaaaaaa 100644
+--- a/file1.txt
++++ b/file1.txt
+@@ -1 +1 @@
+-old1
++new1
+diff --git a/file3.txt b/file3.txt
+index 3333333..ccccccc 100644
+--- a/file3.txt
++++ b/file3.txt
+@@ -1 +1 @@
+-old3
++new3
+`
+		reader, err := filterDiff(strings.NewReader(threeFileDiff), []string{"file2.txt"})
+		require.NoError(t, err)
+		got, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.Equal(t, want, string(got))
+	})
+}

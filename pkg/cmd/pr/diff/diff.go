@@ -417,13 +417,21 @@ func splitDiffSections(diff string) []string {
 	}
 	sections := make([]string, 0, len(parts))
 	for i, p := range parts {
-		if i == 0 {
-			if len(p) > 0 {
-				sections = append(sections, p+"\n")
-			}
-		} else {
-			sections = append(sections, "diff --git "+p)
+		if i > 0 {
+			// strings.Split consumed the marker's leading newline along with the
+			// "diff --git " prefix; restore the prefix here.
+			p = "diff --git " + p
+		} else if p == "" {
+			// A diff that begins exactly at a marker has no leading section.
+			continue
 		}
+		// The marker's leading newline terminated this section's final line. Every
+		// section except the last had that newline consumed by the following marker,
+		// so restore it; the final section keeps its original trailing bytes.
+		if i < len(parts)-1 {
+			p += "\n"
+		}
+		sections = append(sections, p)
 	}
 	return sections
 }
