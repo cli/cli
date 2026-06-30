@@ -77,7 +77,7 @@ func DisplayURL(urlStr string) string {
 	if scheme == "" {
 		scheme = "https"
 	}
-	return scheme + "://" + u.Hostname() + u.Path
+	return (&url.URL{Scheme: scheme, Host: u.Hostname(), Path: u.Path}).String()
 }
 
 // RemoveDiacritics returns the input value without "diacritics", or accent marks
