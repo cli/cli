@@ -20,6 +20,9 @@ var _ gh.Config = &ConfigMock{}
 //
 //		// make and configure a mocked gh.Config
 //		mockedConfig := &ConfigMock{
+//			APIHostFunc: func(hostname string) string {
+//				panic("mock out the APIHost method")
+//			},
 //			AccessibleColorsFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the AccessibleColors method")
 //			},
@@ -87,6 +90,9 @@ var _ gh.Config = &ConfigMock{}
 //
 //	}
 type ConfigMock struct {
+	// APIHostFunc mocks the APIHost method.
+	APIHostFunc func(hostname string) string
+
 	// AccessibleColorsFunc mocks the AccessibleColors method.
 	AccessibleColorsFunc func(hostname string) gh.ConfigEntry
 
@@ -149,6 +155,11 @@ type ConfigMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// APIHost holds details about calls to the APIHost method.
+		APIHost []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
 		// AccessibleColors holds details about calls to the AccessibleColors method.
 		AccessibleColors []struct {
 			// Hostname is the hostname argument value.
@@ -244,6 +255,7 @@ type ConfigMock struct {
 		Write []struct {
 		}
 	}
+	lockAPIHost            sync.RWMutex
 	lockAccessibleColors   sync.RWMutex
 	lockAccessiblePrompter sync.RWMutex
 	lockAliases            sync.RWMutex
@@ -264,6 +276,38 @@ type ConfigMock struct {
 	lockTelemetry          sync.RWMutex
 	lockVersion            sync.RWMutex
 	lockWrite              sync.RWMutex
+}
+
+// APIHost calls APIHostFunc.
+func (mock *ConfigMock) APIHost(hostname string) string {
+	if mock.APIHostFunc == nil {
+		panic("ConfigMock.APIHostFunc: method is nil but Config.APIHost was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockAPIHost.Lock()
+	mock.calls.APIHost = append(mock.calls.APIHost, callInfo)
+	mock.lockAPIHost.Unlock()
+	return mock.APIHostFunc(hostname)
+}
+
+// APIHostCalls gets all the calls that were made to APIHost.
+// Check the length with:
+//
+//	len(mockedConfig.APIHostCalls())
+func (mock *ConfigMock) APIHostCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockAPIHost.RLock()
+	calls = mock.calls.APIHost
+	mock.lockAPIHost.RUnlock()
+	return calls
 }
 
 // AccessibleColors calls AccessibleColorsFunc.

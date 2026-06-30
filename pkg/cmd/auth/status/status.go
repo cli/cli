@@ -37,6 +37,7 @@ type authEntry struct {
 	Token       string         `json:"token,omitempty"`
 	Scopes      string         `json:"scopes,omitempty"`
 	GitProtocol string         `json:"gitProtocol"`
+	APIHost     string         `json:"apiHost,omitempty"`
 }
 
 type authStatus struct {
@@ -112,6 +113,10 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		}
 		activeStr := fmt.Sprintf("%v", e.Active)
 		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+	}
+
+	if e.APIHost != "" {
+		sb.WriteString(fmt.Sprintf("  - API host override: %s\n", cs.Bold(e.APIHost)))
 	}
 
 	return sb.String()
@@ -236,6 +241,8 @@ func statusRun(opts *StatusOptions) error {
 			continue
 		}
 
+		apiHost := config.ResolveAPIHost(cfg, hostname)
+
 		var activeUser string
 		gitProtocol := cfg.GitProtocol(hostname).Value
 		activeUserToken, activeUserTokenSource := authCfg.ActiveToken(hostname)
@@ -250,6 +257,7 @@ func statusRun(opts *StatusOptions) error {
 			tokenSource: activeUserTokenSource,
 			username:    activeUser,
 		})
+		entry.APIHost = apiHost
 		statuses.Hosts[hostname] = append(statuses.Hosts[hostname], entry)
 
 		if finalErr == nil && entry.State != authEntryStateSuccess {
@@ -274,6 +282,7 @@ func statusRun(opts *StatusOptions) error {
 				tokenSource: tokenSource,
 				username:    username,
 			})
+			entry.APIHost = apiHost
 			statuses.Hosts[hostname] = append(statuses.Hosts[hostname], entry)
 
 			if finalErr == nil && entry.State != authEntryStateSuccess {

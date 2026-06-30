@@ -561,6 +561,9 @@ func Test_authRecoveryCommand(t *testing.T) {
 				AuthenticationFunc: func() gh.AuthConfig {
 					return authCfg
 				},
+				APIHostFunc: func(hostname string) string {
+					return ""
+				},
 			}
 
 			var requestURL *url.URL
@@ -585,4 +588,33 @@ func Test_authRecoveryCommand(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_authRecoveryCommand_apiHostReverseMapping(t *testing.T) {
+	authCfg := config.NewBlankConfig().Authentication()
+	authCfg.SetActiveToken("github_pat_abc123", "oauth_token")
+	authCfg.SetHosts([]string{"example.ghe.com"})
+
+	cfg := &ghmock.ConfigMock{
+		AuthenticationFunc: func() gh.AuthConfig {
+			return authCfg
+		},
+		APIHostFunc: func(hostname string) string {
+			if hostname == "example.ghe.com" {
+				return "api-gateway.example.net"
+			}
+			return ""
+		},
+	}
+
+	requestURL, _ := url.Parse("https://api-gateway.example.net/api/v3/user")
+	httpErr := api.HTTPError{
+		HTTPError: &ghAPI.HTTPError{
+			RequestURL: requestURL,
+			StatusCode: 401,
+		},
+	}
+
+	got := authRecoveryCommand(cfg, httpErr)
+	assert.Equal(t, "gh auth login -h example.ghe.com", got)
 }

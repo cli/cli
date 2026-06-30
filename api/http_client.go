@@ -28,6 +28,7 @@ type HTTPClientOptions struct {
 	LogVerboseHTTP     bool
 	SkipDefaultHeaders bool
 	TelemetryDisabler  ghtelemetry.Disabler
+	APIHostResolver    func(string) (string, error)
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
@@ -70,6 +71,10 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	client, err := ghAPI.NewHTTPClient(clientOpts)
 	if err != nil {
 		return nil, err
+	}
+
+	if opts.APIHostResolver != nil {
+		client.Transport = addAPIHostRewriter(client.Transport, opts.APIHostResolver)
 	}
 
 	if opts.Config != nil {
@@ -211,4 +216,19 @@ func (t telemetryDisablerTransport) RoundTrip(req *http.Request) (*http.Response
 		t.telemetryDisabler.Disable()
 	}
 	return t.wrappedTransport.RoundTrip(req)
+}
+
+func addAPIHostRewriter(rt http.RoundTripper, resolver func(string) (string, error)) http.RoundTripper {
+	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		apiHost, err := resolver(req.URL.Hostname())
+		if err != nil {
+			return nil, err
+		}
+		if apiHost != "" {
+			req = req.Clone(req.Context())
+			req.Host = req.URL.Host
+			req.URL.Host = apiHost
+		}
+		return rt.RoundTrip(req)
+	}}
 }

@@ -54,6 +54,12 @@ var HelpTopics = []helpTopic{
 			authenticated with, the stored credentials will be used. Otherwise, setting %[1]sGH_TOKEN%[1]s or
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s is required, depending on the targeted host.
 
+			%[1]sGH_API_HOST_<host>%[1]s: override the API endpoint for a specific host. The %[1]s<host>%[1]s suffix is
+			the hostname in lowercase, with dots replaced by %[1]s_%[1]s and hyphens by %[1]s__%[1]s. For example,
+			%[1]sGH_API_HOST_example_ghe_com=api-gateway.example.net%[1]s routes API traffic for
+			%[1]sexample.ghe.com%[1]s through the gateway. This is useful for API gateways, reverse proxies,
+			or GHEC data-residency tenants. The equivalent %[1]shosts.yml%[1]s setting is %[1]sapi_host%[1]s.
+
 			%[1]sGH_REPO%[1]s: specify the GitHub repository in the %[1]s[HOST/]OWNER/REPO%[1]s format for commands
 			that otherwise operate on a local repository.
 

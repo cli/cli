@@ -306,6 +306,20 @@ func authRecoveryCommand(cfg gh.Config, httpErr api.HTTPError) string {
 	}
 
 	hostname := ghauth.NormalizeHostname(httpErr.RequestURL.Hostname())
+
+	// The request URL may carry the rewritten api_host rather than the
+	// original host where credentials are stored. Reverse-map it so that
+	// the suggested auth command targets the right host.
+	for _, host := range cfg.Authentication().Hosts() {
+		if strings.EqualFold(host, hostname) {
+			break
+		}
+		if strings.EqualFold(config.ResolveAPIHost(cfg, host), hostname) {
+			hostname = host
+			break
+		}
+	}
+
 	token, source := cfg.Authentication().ActiveToken(hostname)
 	if shared.AuthTokenRefreshable(token, source) {
 		return fmt.Sprintf("gh auth refresh -h %s", hostname)

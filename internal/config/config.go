@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -20,6 +21,7 @@ const (
 	accessibleColorsKey   = "accessible_colors" // used by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
 	accessiblePrompterKey = "accessible_prompter"
 	aliasesKey            = "aliases"
+	apiHostKey            = "api_host"
 	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
 	colorLabelsKey        = "color_labels"
 	editorKey             = "editor" // used by cli/go-gh to open interactive text editor
@@ -123,6 +125,14 @@ func (c *cfg) AccessibleColors(hostname string) gh.ConfigEntry {
 func (c *cfg) AccessiblePrompter(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, accessiblePrompterKey).Unwrap()
+}
+
+func (c *cfg) APIHost(hostname string) string {
+	val, err := c.cfg.Get([]string{hostsKey, hostname, apiHostKey})
+	if err == nil {
+		return val
+	}
+	return ""
 }
 
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
@@ -719,4 +729,25 @@ func DataDir() string {
 
 func ConfigDir() string {
 	return ghConfig.ConfigDir()
+}
+
+// ResolveAPIHost returns the effective api_host override for a hostname.
+// It checks the GH_API_HOST_* environment variable first, then falls back
+// to the api_host key in hosts.yml. Returns "" when no override is configured.
+func ResolveAPIHost(cfg gh.Config, hostname string) string {
+	if v := os.Getenv("GH_API_HOST_" + EncodeHostnameForEnv(hostname)); v != "" {
+		return v
+	}
+	return cfg.APIHost(hostname)
+}
+
+// EncodeHostnameForEnv encodes a hostname for use in environment variable
+// names. Dots become single underscores and hyphens become double underscores.
+// The hostname portion is kept lowercase, matching the Terraform TF_TOKEN_*
+// convention.
+func EncodeHostnameForEnv(hostname string) string {
+	h := strings.ToLower(hostname)
+	h = strings.ReplaceAll(h, "-", "__")
+	h = strings.ReplaceAll(h, ".", "_")
+	return h
 }

@@ -360,6 +360,26 @@ func Test_statusRun(t *testing.T) {
 			`),
 		},
 		{
+			name: "api_host configured",
+			opts: StatusOptions{},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "ghe.io", "pete", "gho_abc123", "https")
+				c.Set("ghe.io", "api_host", "api-gateway.example.net")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				ghe.io
+				  ✓ Logged in to ghe.io account pete (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+				  - API host override: api-gateway.example.net
+			`),
+		},
+		{
 			name: "missing hostname",
 			opts: StatusOptions{
 				Hostname: "github.example.com",

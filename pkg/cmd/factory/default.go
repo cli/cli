@@ -11,13 +11,16 @@ import (
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 var ssoHeader string
@@ -191,6 +194,15 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 		if err != nil {
 			return nil, err
 		}
+		lookupAPIHost := func(hostname string) (string, error) {
+			v := config.ResolveAPIHost(cfg, hostname)
+			if v != "" {
+				if err := ghinstance.HostnameValidator(v); err != nil {
+					return "", fmt.Errorf("invalid api_host for %s: %q (%w)", hostname, v, err)
+				}
+			}
+			return v, nil
+		}
 		opts := api.HTTPClientOptions{
 			Config:            cfg.Authentication(),
 			Log:               ios.ErrOut,
@@ -198,6 +210,15 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 			AppVersion:        appVersion,
 			InvokingAgent:     invokingAgent,
 			TelemetryDisabler: telemetryDisabler,
+			APIHostResolver: func(hostname string) (string, error) {
+				if v, err := lookupAPIHost(hostname); v != "" || err != nil {
+					return v, err
+				}
+				if normalized := ghauth.NormalizeHostname(hostname); normalized != hostname {
+					return lookupAPIHost(normalized)
+				}
+				return "", nil
+			},
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {

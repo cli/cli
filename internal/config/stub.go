@@ -58,6 +58,9 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	mock.AccessiblePrompterFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.AccessiblePrompter(hostname)
 	}
+	mock.APIHostFunc = func(hostname string) string {
+		return cfg.APIHost(hostname)
+	}
 	mock.BrowserFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Browser(hostname)
 	}

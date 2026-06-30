@@ -438,6 +438,22 @@ func TestNewGitClient(t *testing.T) {
 	}
 }
 
+func TestEncodeHostnameForEnv(t *testing.T) {
+	tests := []struct {
+		hostname string
+		want     string
+	}{
+		{"github.com", "github_com"},
+		{"ghes.example.com", "ghes_example_com"},
+		{"git.corp-internal.io", "git_corp__internal_io"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.hostname, func(t *testing.T) {
+			assert.Equal(t, tt.want, config.EncodeHostnameForEnv(tt.hostname))
+		})
+	}
+}
+
 func defaultConfig() *ghmock.ConfigMock {
 	cfg := config.NewFromString("")
 	cfg.Set("nonsense.com", "oauth_token", "BLAH")

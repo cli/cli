@@ -444,6 +444,78 @@ func (c tinyConfig) ActiveToken(host string) (string, string) {
 	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], "oauth_token"
 }
 
+func TestAddAPIHostRewriter(t *testing.T) {
+	t.Run("rewrites host when resolver returns a value", func(t *testing.T) {
+		var gotHost, gotReqHost string
+		inner := &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			gotHost = req.URL.Host
+			gotReqHost = req.Host
+			return &http.Response{StatusCode: 200}, nil
+		}}
+		resolver := func(hostname string) (string, error) {
+			if hostname == "example.ghe.com" {
+				return "api-gateway.example.net", nil
+			}
+			return "", nil
+		}
+		rt := addAPIHostRewriter(inner, resolver)
+		req, _ := http.NewRequest("GET", "https://example.ghe.com/api/v3/user", nil)
+		_, _ = rt.RoundTrip(req)
+		assert.Equal(t, "api-gateway.example.net", gotHost)
+		assert.Equal(t, "example.ghe.com", gotReqHost, "req.Host should preserve original for Host header")
+		assert.Equal(t, "example.ghe.com", req.URL.Host, "original request must not be mutated")
+	})
+
+	t.Run("passes through when resolver returns empty", func(t *testing.T) {
+		var gotHost string
+		inner := &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			gotHost = req.URL.Host
+			return &http.Response{StatusCode: 200}, nil
+		}}
+		rt := addAPIHostRewriter(inner, func(string) (string, error) { return "", nil })
+		req, _ := http.NewRequest("GET", "https://github.com/api/v3/user", nil)
+		_, _ = rt.RoundTrip(req)
+		assert.Equal(t, "github.com", gotHost)
+	})
+
+	t.Run("returns error when resolver returns error", func(t *testing.T) {
+		inner := &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			t.Fatal("inner transport should not be called")
+			return nil, nil
+		}}
+		rt := addAPIHostRewriter(inner, func(string) (string, error) {
+			return "", fmt.Errorf("invalid api_host value")
+		})
+		req, _ := http.NewRequest("GET", "https://example.ghe.com/api/v3/user", nil)
+		_, err := rt.RoundTrip(req)
+		assert.EqualError(t, err, "invalid api_host value")
+	})
+
+	t.Run("auth sees original host when stacked correctly", func(t *testing.T) {
+		var wireHost, wireAuthHeader string
+		base := &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			wireHost = req.URL.Host
+			wireAuthHeader = req.Header.Get("Authorization")
+			return &http.Response{StatusCode: 200}, nil
+		}}
+		rewriter := addAPIHostRewriter(base, func(h string) (string, error) {
+			if h == "example.ghe.com" {
+				return "api-gateway.example.net", nil
+			}
+			return "", nil
+		})
+		cfg := tinyConfig{"example.ghe.com:oauth_token": "test-token"}
+		authed := AddAuthTokenHeader(rewriter, cfg)
+
+		req, _ := http.NewRequest("GET", "https://example.ghe.com/api/v3/user", nil)
+		_, _ = authed.RoundTrip(req)
+
+		assert.Equal(t, "api-gateway.example.net", wireHost, "request should be sent to api_host")
+		assert.Equal(t, "example.ghe.com", req.URL.Host, "original request should not be mutated")
+		assert.Equal(t, "token test-token", wireAuthHeader, "auth header should be set using original host credentials")
+	})
+}
+
 var requestAtRE = regexp.MustCompile(`(?m)^\* Request at .+`)
 var dateRE = regexp.MustCompile(`(?m)^< Date: .+`)
 var hostWithPortRE = regexp.MustCompile(`127\.0\.0\.1:\d+`)

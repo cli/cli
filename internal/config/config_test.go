@@ -183,6 +183,19 @@ func TestSetUserSpecificKeyNoUserPresent(t *testing.T) {
 	requireNoKey(t, c.cfg, []string{hostsKey, host, usersKey})
 }
 
+func TestAPIHost(t *testing.T) {
+	t.Run("returns empty when not configured", func(t *testing.T) {
+		cfg := newTestConfig()
+		require.Equal(t, "", cfg.APIHost("github.com"))
+	})
+
+	t.Run("returns configured value for host", func(t *testing.T) {
+		cfg := newTestConfig()
+		cfg.Set("example.ghe.com", apiHostKey, "api-gateway.example.net")
+		require.Equal(t, "api-gateway.example.net", cfg.APIHost("example.ghe.com"))
+	})
+}
+
 func TestTelemetry(t *testing.T) {
 	t.Run("returns default when not configured", func(t *testing.T) {
 		c := newTestConfig()
