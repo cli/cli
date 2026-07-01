@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/internal/accountrules"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
@@ -121,6 +124,7 @@ type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
+	Remotes    func() (ghContext.Remotes, error)
 	Exporter   cmdutil.Exporter
 
 	Hostname  string
@@ -133,6 +137,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		HttpClient: f.HttpClient,
 		IO:         f.IOStreams,
 		Config:     f.Config,
+		Remotes:    f.Remotes,
 	}
 
 	cmd := &cobra.Command{
@@ -326,7 +331,49 @@ func statusRun(opts *StatusOptions) error {
 		}
 	}
 
+	writeAccountResolution(opts, authCfg, cs)
+
 	return finalErr
+}
+
+// writeAccountResolution reports, in human-readable output, how context-scoped
+// account rules (or an explicit override) resolve for the current working
+// directory and repository. This makes automatic account switching observable
+// rather than silent. It is a no-op when no rules or override are configured.
+func writeAccountResolution(opts *StatusOptions, authCfg gh.AuthConfig, cs *iostreams.ColorScheme) {
+	rules := authCfg.AccountRules()
+	override := accountrules.Override()
+	if rules.IsEmpty() && override == "" {
+		return
+	}
+
+	defaultHost, _ := authCfg.DefaultHost()
+	ctx := accountrules.ResolveContext{Host: defaultHost, Override: override}
+	if cwd, err := os.Getwd(); err == nil {
+		ctx.Cwd = cwd
+	}
+	if opts.Remotes != nil {
+		if remotes, err := opts.Remotes(); err == nil && len(remotes) > 0 {
+			ctx.Owner = remotes[0].RepoOwner()
+		}
+	}
+
+	out := opts.IO.Out
+	fmt.Fprintf(out, "\n%s\n", cs.Bold("Context-scoped account resolution"))
+	if ctx.Cwd != "" {
+		fmt.Fprintf(out, "  - Working directory: %s\n", ctx.Cwd)
+	}
+	if ctx.Owner != "" {
+		fmt.Fprintf(out, "  - Repository owner: %s\n", ctx.Owner)
+	}
+
+	acct, matched := accountrules.Resolve(rules, ctx)
+	if !matched {
+		fmt.Fprintf(out, "  - No rule matched; commands here use the active account.\n")
+		return
+	}
+	fmt.Fprintf(out, "  - Commands here act as: %s (%s)\n",
+		cs.Bold(fmt.Sprintf("%s@%s", acct.User, acct.Host)), acct.Reason)
 }
 
 func maskToken(token string) string {

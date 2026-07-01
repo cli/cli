@@ -947,3 +947,38 @@ func preMigrationLogin(c *AuthConfig, hostname, username, token, gitProtocol str
 	}
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
+
+func TestAccountRulesEmptyWhenUnset(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+
+	rules := authCfg.AccountRules()
+
+	require.True(t, rules.IsEmpty())
+	require.Empty(t, rules.GitDir)
+	require.Empty(t, rules.Owner)
+}
+
+func TestAccountRulesParsedFromConfig(t *testing.T) {
+	cfgStr := `account_rules:
+  gitdir:
+    ~/work/: octocat_acme@github.com
+    ~/personal/: octocat
+  owner:
+    Acme-Corp: octocat_acme@github.com
+    octocat: octocat@github.com
+`
+	authCfg := &AuthConfig{cfg: ghConfig.ReadFromString(cfgStr)}
+
+	rules := authCfg.AccountRules()
+
+	require.False(t, rules.IsEmpty())
+	require.Equal(t, map[string]string{
+		"~/work/":     "octocat_acme@github.com",
+		"~/personal/": "octocat",
+	}, rules.GitDir)
+	// Owner keys are lower-cased for case-insensitive matching.
+	require.Equal(t, map[string]string{
+		"acme-corp": "octocat_acme@github.com",
+		"octocat":   "octocat@github.com",
+	}, rules.Owner)
+}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/accountrules"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	accessibilityCmd "github.com/cli/cli/v2/pkg/cmd/accessibility"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
@@ -81,6 +82,12 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, versi
 			"versionInfo": versionCmd.Format(version, buildDate),
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Honor the global --account override for context-scoped account
+			// resolution. GH_ACCOUNT is used as a fallback when the flag is unset.
+			if account, err := cmd.Flags().GetString("account"); err == nil && account != "" {
+				accountrules.SetOverride(account)
+			}
+
 			// require that the user is authenticated before running most commands
 			if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
 				parent := cmd.Parent()
@@ -100,6 +107,7 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, versi
 	// cmd.SetErr(f.IOStreams.ErrOut) // just let it default to os.Stderr instead
 
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
+	cmd.PersistentFlags().String("account", "", "Act as a specific authenticated account (`user` or `user@host`) for this invocation")
 
 	// override Cobra's default behaviors unless an opt-out has been set
 	if os.Getenv("GH_COBRA") == "" {

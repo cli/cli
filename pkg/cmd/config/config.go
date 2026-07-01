@@ -28,6 +28,30 @@ func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
 		longDoc.WriteRune('\n')
 	}
 
+	longDoc.WriteString(strings.TrimLeft(`
+Context-scoped account selection:
+
+The `+"`account_rules`"+` key lets gh automatically choose which authenticated account
+to act as, based on the current working directory or the repository owner, instead of
+the single globally active account. This is useful when multiple accounts share a host
+(for example an Enterprise Managed User and a personal account on github.com). Rules are
+edited directly in `+"`config.yml`"+` and take the following shape:
+
+    account_rules:
+      gitdir:
+        ~/work/: octocat_acme@github.com     # any repo under ~/work uses this account
+        ~/personal/: octocat@github.com
+      owner:
+        acme-corp: octocat_acme@github.com   # any repo owned by acme-corp uses this account
+        octocat: octocat@github.com
+
+Account values are `+"`user`"+` or `+"`user@host`"+`. When several rules apply, an owner rule wins
+over a gitdir rule, and the longest matching directory prefix wins. Resolution never
+changes the globally active account. Environment tokens (GH_TOKEN etc.) take precedence
+over rules, followed by the `+"`--account`"+` flag / GH_ACCOUNT, then rules, then the active
+account. Run `+"`gh auth status`"+` to see which account resolves for the current directory.
+`, "\n"))
+
 	cmd := &cobra.Command{
 		Use:   "config <command>",
 		Short: "Manage configuration for gh",

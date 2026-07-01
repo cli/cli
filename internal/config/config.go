@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -17,6 +18,9 @@ import (
 // Important: some of the following configuration settings are used outside of `cli/cli`,
 // they are defined here to avoid `cli/cli` being changed unexpectedly.
 const (
+	accountRulesKey       = "account_rules" // context-scoped account selection rules
+	accountRulesGitDirKey = "gitdir"
+	accountRulesOwnerKey  = "owner"
 	accessibleColorsKey   = "accessible_colors" // used by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
 	accessiblePrompterKey = "accessible_prompter"
 	aliasesKey            = "aliases"
@@ -509,6 +513,43 @@ func (c *AuthConfig) TokenForUser(hostname, user string) (string, string, error)
 	}
 
 	return "", "default", fmt.Errorf("no token found for '%s'", user)
+}
+
+// AccountRules reads the context-scoped account selection rules from the
+// configuration. Rules are stored as addressable maps so they fit the key-value
+// config API:
+//
+//	account_rules:
+//	  gitdir:
+//	    "~/work/": octocat_acme@github.com
+//	  owner:
+//	    acme-corp: octocat_acme@github.com
+//
+// A missing account_rules section yields empty maps (IsEmpty() == true), in
+// which case account resolution is a no-op.
+func (c *AuthConfig) AccountRules() gh.AccountRules {
+	rules := gh.AccountRules{
+		GitDir: map[string]string{},
+		Owner:  map[string]string{},
+	}
+
+	if keys, err := c.cfg.Keys([]string{accountRulesKey, accountRulesGitDirKey}); err == nil {
+		for _, k := range keys {
+			if v, err := c.cfg.Get([]string{accountRulesKey, accountRulesGitDirKey, k}); err == nil && v != "" {
+				rules.GitDir[k] = v
+			}
+		}
+	}
+
+	if keys, err := c.cfg.Keys([]string{accountRulesKey, accountRulesOwnerKey}); err == nil {
+		for _, k := range keys {
+			if v, err := c.cfg.Get([]string{accountRulesKey, accountRulesOwnerKey, k}); err == nil && v != "" {
+				rules.Owner[strings.ToLower(k)] = v
+			}
+		}
+	}
+
+	return rules
 }
 
 func keyringServiceName(hostname string) string {

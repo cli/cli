@@ -54,6 +54,13 @@ var HelpTopics = []helpTopic{
 			authenticated with, the stored credentials will be used. Otherwise, setting %[1]sGH_TOKEN%[1]s or
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s is required, depending on the targeted host.
 
+			%[1]sGH_ACCOUNT%[1]s: select which authenticated account to act as for a single invocation, in the
+			form %[1]suser%[1]s or %[1]suser@host%[1]s, without changing the globally active account (%[1]sgh auth switch%[1]s).
+			This is the explicit escape hatch for the automatic, context-scoped account resolution
+			configured via the %[1]saccount_rules%[1]s config key. Environment tokens (%[1]sGH_TOKEN%[1]s etc.) still take
+			precedence over %[1]sGH_ACCOUNT%[1]s. The %[1]s--account%[1]s global flag overrides this variable. See the
+			%[1]saccount_rules%[1]s section in %[1]sgh help config%[1]s for automatic, per-directory and per-owner selection.
+
 			%[1]sGH_REPO%[1]s: specify the GitHub repository in the %[1]s[HOST/]OWNER/REPO%[1]s format for commands
 			that otherwise operate on a local repository.
 
