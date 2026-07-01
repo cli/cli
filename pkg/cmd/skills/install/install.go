@@ -915,6 +915,14 @@ func resolveHosts(opts *InstallOptions, canPrompt bool) ([]*registry.AgentHost, 
 		return []*registry.AgentHost{h}, nil
 	}
 
+	if opts.Dir != "" {
+		h, err := registry.FindByID(registry.DefaultAgentID)
+		if err != nil {
+			return nil, err
+		}
+		return []*registry.AgentHost{h}, nil
+	}
+
 	if !canPrompt {
 		h, err := registry.FindByID(registry.DefaultAgentID)
 		if err != nil {
