@@ -36,8 +36,10 @@ type ReadDirOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Exporter   cmdutil.Exporter
 
-	Path string
-	Ref  string
+	Path   string
+	Ref    string
+	Format string
+	Output string
 }
 
 // NewCmdReadDir creates the `gh repo read-dir` command.
@@ -59,6 +61,11 @@ func NewCmdReadDir(f *cmdutil.Factory, runF func(*ReadDirOptions) error) *cobra.
 			By default, the directory is listed from the default branch. Use the %[1]s--ref%[1]s flag to
 			list from a specific branch, tag, or commit. When no path is given, the repository root
 			is listed.
+
+			The output can be saved as an archive with the %[1]s--format%[1]s and %[1]s--output%[1]s flags.
+			Supported archive formats are %[1]stxtar%[1]s (text files only), %[1]star%[1]s (with optional gzip
+			compression if the output path ends in .gz or .tgz), and %[1]szip%[1]s. The %[1]stxtar%[1]s format can
+			be printed to stdout, while %[1]star%[1]s and %[1]szip%[1]s must be saved to a file.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# List the root of the default branch
@@ -72,6 +79,12 @@ func NewCmdReadDir(f *cmdutil.Factory, runF func(*ReadDirOptions) error) *cobra.
 
 			# Print selected fields as JSON
 			$ gh repo read-dir docs --repo cli/cli --json name,path,type,size
+
+			# Download a directory as a zip archive
+			$ gh repo read-dir docs --repo cli/cli --format zip --output docs.zip
+
+			# Output a directory as a txtar archive to stdout
+			$ gh repo read-dir docs --repo cli/cli --format txtar
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -79,6 +92,24 @@ func NewCmdReadDir(f *cmdutil.Factory, runF func(*ReadDirOptions) error) *cobra.
 
 			if len(args) > 0 {
 				opts.Path = args[0]
+			}
+
+			if opts.Format != "" {
+				if opts.Format != "txtar" && opts.Format != "tar" && opts.Format != "zip" {
+					return cmdutil.FlagErrorf("invalid format: %s. Supported formats: txtar, tar, zip", opts.Format)
+				}
+				if opts.Format != "txtar" && opts.Output == "" {
+					return cmdutil.FlagErrorf("an output file must be specified with --output for %s format", opts.Format)
+				}
+				if err := cmdutil.MutuallyExclusive(
+					"specify only one of `--json` or `--format`",
+					opts.Exporter != nil,
+					opts.Format != "",
+				); err != nil {
+					return err
+				}
+			} else if opts.Output != "" {
+				return cmdutil.FlagErrorf("the `--output` flag requires `--format` to be specified")
 			}
 
 			if runF != nil {
@@ -90,6 +121,8 @@ func NewCmdReadDir(f *cmdutil.Factory, runF func(*ReadDirOptions) error) *cobra.
 	}
 
 	cmd.Flags().StringVar(&opts.Ref, "ref", "", "The branch, tag, or commit to list from")
+	cmd.Flags().StringVar(&opts.Format, "format", "", "Output format: txtar, tar, or zip")
+	cmd.Flags().StringVarP(&opts.Output, "output", "o", "", "Output file path for the archive")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, dirEntryFields)
 
@@ -99,6 +132,10 @@ func NewCmdReadDir(f *cmdutil.Factory, runF func(*ReadDirOptions) error) *cobra.
 }
 
 func readDirRun(opts *ReadDirOptions) error {
+	if opts.Format != "" {
+		return writeArchive(opts)
+	}
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
