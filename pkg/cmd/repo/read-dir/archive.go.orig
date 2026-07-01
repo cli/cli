@@ -46,7 +46,7 @@ func writeArchive(opts *ReadDirOptions) error {
 	}
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("%w. Run this command from within a git repository, or use the `--repo` flag to specify one", err)
+		return err
 	}
 
 	// 1. Build the tarball URL
@@ -88,11 +88,7 @@ func writeArchive(opts *ReadDirOptions) error {
 		if err != nil {
 			return err
 		}
-		defer func() {
-			if fOut != nil {
-				fOut.Close()
-			}
-		}()
+		defer fOut.Close()
 		out = fOut
 	} else if opts.Format == "txtar" {
 		out = opts.IO.Out
@@ -183,23 +179,19 @@ func writeArchive(opts *ReadDirOptions) error {
 				}
 			}
 		case "zip":
-			fh, err := zip.FileInfoHeader(header.FileInfo())
-			if err != nil {
-				return err
-			}
-			fh.Name = relPath
 			if header.Typeflag == tar.TypeDir {
-				if !strings.HasSuffix(fh.Name, "/") {
-					fh.Name += "/"
+				// Zip directory entries should end with a slash
+				if !strings.HasSuffix(relPath, "/") {
+					relPath += "/"
 				}
-			} else {
-				fh.Method = zip.Deflate
-			}
-			w, err := zw.CreateHeader(fh)
-			if err != nil {
-				return err
-			}
-			if header.Typeflag == tar.TypeReg {
+				if _, err := zw.Create(relPath); err != nil {
+					return err
+				}
+			} else if header.Typeflag == tar.TypeReg {
+				w, err := zw.Create(relPath)
+				if err != nil {
+					return err
+				}
 				if _, err := io.Copy(w, tarReader); err != nil {
 					return err
 				}
@@ -226,13 +218,6 @@ func writeArchive(opts *ReadDirOptions) error {
 		if err := zw.Close(); err != nil {
 			return err
 		}
-	}
-
-	if fOut != nil {
-		if err := fOut.Close(); err != nil {
-			return err
-		}
-		fOut = nil
 	}
 
 	if foundCount == 0 {
