@@ -94,12 +94,18 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 
 			The %[1]supstream%[1]s remote will be set as the default remote repository.
 
-			By default, when not running interactively, the fork is not cloned. To clone the
-			fork, pass %[1]s--clone%[1]s. The %[1]s--clone%[1]s flag takes an optional boolean value, so
-			%[1]s--clone%[1]s, %[1]s--clone=true%[1]s, and %[1]s--clone=false%[1]s are all valid.
-
 			Additional %[1]sgit clone%[1]s flags can be passed after %[1]s--%[1]s.
 		`, "`"),
+		Example: heredoc.Doc(`
+			# Fork a repository
+			$ gh repo fork owner/repo
+
+			# Fork a repository and clone it locally
+			$ gh repo fork owner/repo --clone
+
+			# Fork a repository without cloning it, even when running interactively
+			$ gh repo fork owner/repo --clone=false
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptOk := opts.IO.CanPrompt()
 			if len(args) > 0 {
