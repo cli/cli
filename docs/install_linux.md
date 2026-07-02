@@ -93,7 +93,7 @@ These packages are supported by the GitHub CLI maintainers with updates powered 
 #### DNF5
 
 > [!IMPORTANT]
-> **These commands apply to DNF5 only**. If you're using DNF4, please use [the DNF4 instructions](#dnf4).
+> **These commands apply to DNF5 only**. If you're using DNF4 (such as Amazon Linux 2023), please use [the DNF4 instructions](#dnf4).
 
 To install:
 
@@ -127,6 +127,10 @@ To upgrade:
 ```bash
 sudo dnf update gh
 ```
+
+### Amazon Linux 2023 (dnf)
+
+Use [the DNF4 instructions](#dnf4).
 
 #### Amazon Linux 2 (yum)
 
