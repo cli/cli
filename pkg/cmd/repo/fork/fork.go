@@ -103,7 +103,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 			# Fork a repository and clone it locally
 			$ gh repo fork owner/repo --clone
 
-			# Fork a repository without cloning it, even when running interactively
+			# Fork a repository without cloning it, skip the prompt
 			$ gh repo fork owner/repo --clone=false
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
