@@ -83,6 +83,18 @@ var Agents = []AgentHost{
 		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".gemini/antigravity/skills",
 	},
+	{
+		ID:         "antigravity-cli",
+		Name:       "Antigravity CLI",
+		ProjectDir: sharedProjectSkillsDir,
+		UserDir:    ".antigravity/skills",
+	},
+	{
+		ID:         "antigravity2.0",
+		Name:       "Antigravity 2.0",
+		ProjectDir: sharedProjectSkillsDir,
+		UserDir:    ".antigravity/skills",
+	},
 
 	// All other supported agents, alphabetical by ID.
 	{
