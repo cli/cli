@@ -915,6 +915,8 @@ func resolveHosts(opts *InstallOptions, canPrompt bool) ([]*registry.AgentHost, 
 		return []*registry.AgentHost{h}, nil
 	}
 
+	// --dir fixes the destination in resolveInstallDir regardless of the agent host,
+	// which then only affects post-install hint output; the default is a safe placeholder.
 	if opts.Dir != "" {
 		h, err := registry.FindByID(registry.DefaultAgentID)
 		if err != nil {
