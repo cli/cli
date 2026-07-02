@@ -77,23 +77,30 @@ var Agents = []AgentHost{
 		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".gemini/skills",
 	},
+
+	// Antigravity documents three surfaces that share the .agents/skills
+	// project dir but each read user-scope skills from a different global
+	// dir. Each UserDir below is the global path from that surface's docs.
 	{
+		// https://antigravity.google/docs/ide/skills
 		ID:         "antigravity",
 		Name:       "Antigravity",
 		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".gemini/antigravity/skills",
 	},
 	{
+		// https://antigravity.google/docs/cli/plugins#agent-skills
 		ID:         "antigravity-cli",
 		Name:       "Antigravity CLI",
 		ProjectDir: sharedProjectSkillsDir,
-		UserDir:    ".antigravity/skills",
+		UserDir:    ".gemini/antigravity-cli/skills",
 	},
 	{
+		// https://antigravity.google/docs/skills
 		ID:         "antigravity2.0",
 		Name:       "Antigravity 2.0",
 		ProjectDir: sharedProjectSkillsDir,
-		UserDir:    ".antigravity/skills",
+		UserDir:    ".gemini/config/skills",
 	},
 
 	// All other supported agents, alphabetical by ID.

@@ -141,7 +141,7 @@ func TestInstallDir(t *testing.T) {
 			scope:   ScopeUser,
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
-			wantDir: filepath.Join("/home/monalisa", ".antigravity", "skills"),
+			wantDir: filepath.Join("/home/monalisa", ".gemini", "antigravity-cli", "skills"),
 		},
 		{
 			name:    "antigravity2.0 project scope",
@@ -157,7 +157,7 @@ func TestInstallDir(t *testing.T) {
 			scope:   ScopeUser,
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
-			wantDir: filepath.Join("/home/monalisa", ".antigravity", "skills"),
+			wantDir: filepath.Join("/home/monalisa", ".gemini", "config", "skills"),
 		},
 		{
 			// Issue #13494: Universal must use the shared .agents/skills dir
