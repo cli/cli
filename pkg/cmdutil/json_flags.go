@@ -29,7 +29,7 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	addJqFlag(f, "q")
 	addTemplateFlag(f, "t")
 
-	setupJsonFlags(cmd, exportTarget, fields)
+	setupJsonFlags(cmd, exportTarget, fields, true)
 }
 
 func AddJSONFlagsWithoutShorthand(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
@@ -38,7 +38,18 @@ func AddJSONFlagsWithoutShorthand(cmd *cobra.Command, exportTarget *Exporter, fi
 	addJqFlag(f, "")
 	addTemplateFlag(f, "")
 
-	setupJsonFlags(cmd, exportTarget, fields)
+	setupJsonFlags(cmd, exportTarget, fields, true)
+}
+
+// AddJSONAndJQFlags adds the `--json` and `--jq` flags to the given command, without
+// the `--template` flag or any shorthands. It is meant for commands where `--template`
+// (or a shorthand) is already taken for another purpose, such as `pr create`.
+func AddJSONAndJQFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
+	f := cmd.Flags()
+	addJsonFlag(f)
+	addJqFlag(f, "")
+
+	setupJsonFlags(cmd, exportTarget, fields, false)
 }
 
 func addJsonFlag(f *pflag.FlagSet) {
@@ -51,7 +62,7 @@ func addTemplateFlag(f *pflag.FlagSet, shorthand string) {
 	f.StringP("template", shorthand, "", "Format JSON output using a Go template; see \"gh help formatting\"")
 }
 
-func setupJsonFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
+func setupJsonFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string, withTemplateFlag bool) {
 
 	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
@@ -77,7 +88,7 @@ func setupJsonFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string)
 				return err
 			}
 		}
-		if export, err := checkJSONFlags(c); err == nil {
+		if export, err := checkJSONFlags(c, withTemplateFlag); err == nil {
 			if export == nil {
 				*exportTarget = nil
 			} else {
@@ -118,12 +129,23 @@ func setupJsonFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string)
 	cmd.Annotations["help:json-fields"] = strings.Join(fields, ",")
 }
 
-func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
+// checkJSONFlags validates the JSON-related flags of the given command and, if
+// `--json` is in use, builds an exporter from their values. When withTemplateFlag
+// is false, the `--template` flag is not part of the JSON flags group and is
+// ignored, even if the host command defines a flag with the same name for
+// another purpose.
+func checkJSONFlags(cmd *cobra.Command, withTemplateFlag bool) (*jsonExporter, error) {
 	f := cmd.Flags()
 	jsonFlag := f.Lookup("json")
 	jqFlag := f.Lookup("jq")
-	tplFlag := f.Lookup("template")
 	webFlag := f.Lookup("web")
+
+	var tplFlag *pflag.Flag
+	var templateValue string
+	if withTemplateFlag {
+		tplFlag = f.Lookup("template")
+		templateValue = tplFlag.Value.String()
+	}
 
 	if jsonFlag.Changed {
 		if webFlag != nil && webFlag.Changed {
@@ -133,11 +155,11 @@ func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
 		return &jsonExporter{
 			fields:   jv.GetSlice(),
 			filter:   jqFlag.Value.String(),
-			template: tplFlag.Value.String(),
+			template: templateValue,
 		}, nil
 	} else if jqFlag.Changed {
 		return nil, errors.New("cannot use `--jq` without specifying `--json`")
-	} else if tplFlag.Changed {
+	} else if tplFlag != nil && tplFlag.Changed {
 		return nil, errors.New("cannot use `--template` without specifying `--json`")
 	}
 	return nil, nil
@@ -217,6 +239,10 @@ func (e *jsonExporter) Fields() []string {
 
 func (e *jsonExporter) SetFields(fields []string) {
 	e.fields = fields
+}
+
+func (e *jsonExporter) SetFilter(filter string) {
+	e.filter = filter
 }
 
 // Write serializes data into JSON output written to w. If the object passed as data implements exportable,
