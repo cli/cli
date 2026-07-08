@@ -199,14 +199,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			}
 			opts.EditorMode = editorMode
 
-			// When editor mode was enabled via config (prefer_editor_prompt)
-			// rather than the --editor flag, silently disable it if the user
-			// provided flags that conflict, so scripted usage isn't broken.
-			editorFlagExplicit := flags.Changed("editor")
-			if opts.EditorMode && !editorFlagExplicit && opts.Editable.Dirty() {
-				opts.EditorMode = false
-			}
-
 			if opts.EditorMode && (bodyProvided || bodyFileProvided) {
 				return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, or `--editor`")
 			}

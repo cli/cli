@@ -319,40 +319,20 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:  "prefer_editor_prompt config with body flag",
+			name:  "prefer_editor_prompt config with body flag errors",
 			input: "23 --body test",
 			config: func() (gh.Config, error) {
 				return config.NewFromString("prefer_editor_prompt: enabled"), nil
 			},
-			output: EditOptions{
-				SelectorArg: "23",
-				EditorMode:  false,
-				Editable: shared.Editable{
-					Body: shared.EditableString{
-						Value:  "test",
-						Edited: true,
-					},
-				},
-			},
-			wantsErr: false,
+			wantsErr: true,
 		},
 		{
-			name:  "prefer_editor_prompt config with body-file flag",
+			name:  "prefer_editor_prompt config with body-file flag errors",
 			input: fmt.Sprintf("23 --body-file '%s'", tmpFile),
 			config: func() (gh.Config, error) {
 				return config.NewFromString("prefer_editor_prompt: enabled"), nil
 			},
-			output: EditOptions{
-				SelectorArg: "23",
-				EditorMode:  false,
-				Editable: shared.Editable{
-					Body: shared.EditableString{
-						Value:  "a body from file",
-						Edited: true,
-					},
-				},
-			},
-			wantsErr: false,
+			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {

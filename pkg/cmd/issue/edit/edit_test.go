@@ -324,58 +324,28 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:  "prefer_editor_prompt config with body flag",
+			name:  "prefer_editor_prompt config with body flag errors",
 			input: "23 --body test",
 			config: func() (gh.Config, error) {
 				return config.NewFromString("prefer_editor_prompt: enabled"), nil
 			},
-			output: EditOptions{
-				IssueNumbers: []int{23},
-				EditorMode:   false,
-				Editable: prShared.Editable{
-					Body: prShared.EditableString{
-						Value:  "test",
-						Edited: true,
-					},
-				},
-			},
-			wantsErr: false,
+			wantsErr: true,
 		},
 		{
-			name:  "prefer_editor_prompt config with body-file flag",
+			name:  "prefer_editor_prompt config with body-file flag errors",
 			input: fmt.Sprintf("23 --body-file '%s'", tmpFile),
 			config: func() (gh.Config, error) {
 				return config.NewFromString("prefer_editor_prompt: enabled"), nil
 			},
-			output: EditOptions{
-				IssueNumbers: []int{23},
-				EditorMode:   false,
-				Editable: prShared.Editable{
-					Body: prShared.EditableString{
-						Value:  "a body from file",
-						Edited: true,
-					},
-				},
-			},
-			wantsErr: false,
+			wantsErr: true,
 		},
 		{
-			name:  "prefer_editor_prompt config with multiple issues and label",
+			name:  "prefer_editor_prompt config with multiple issues and label errors",
 			input: "23 34 --add-label bug",
 			config: func() (gh.Config, error) {
 				return config.NewFromString("prefer_editor_prompt: enabled"), nil
 			},
-			output: EditOptions{
-				IssueNumbers: []int{23, 34},
-				EditorMode:   false,
-				Editable: prShared.Editable{
-					Labels: prShared.EditableSlice{
-						Add:    []string{"bug"},
-						Edited: true,
-					},
-				},
-			},
-			wantsErr: false,
+			wantsErr: true,
 		},
 		{
 			name:  "remove-type flag",
