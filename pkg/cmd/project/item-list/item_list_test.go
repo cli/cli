@@ -61,6 +61,28 @@ func TestNewCmdList(t *testing.T) {
 				query: "assignee:octocat",
 			},
 		},
+		{
+			name: "field",
+			cli:  "--field Status --field Priority",
+			wants: listOpts{
+				limit:  30,
+				fields: []string{"Status", "Priority"},
+			},
+		},
+		{
+			name: "field-id",
+			cli:  "--field-id FIELD_ID",
+			wants: listOpts{
+				limit:    30,
+				fieldIDs: []string{"FIELD_ID"},
+			},
+		},
+		{
+			name:        "field and field-id conflict",
+			cli:         "--field Status --field-id FIELD_ID",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--field` or `--field-id` may be used",
+		},
 	}
 
 	t.Setenv("GH_TOKEN", "auth-token")
@@ -95,6 +117,8 @@ func TestNewCmdList(t *testing.T) {
 			assert.Equal(t, tt.wants.query, gotOpts.query)
 			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 			assert.Equal(t, tt.wants.limit, gotOpts.limit)
+			assert.Equal(t, tt.wants.fields, gotOpts.fields)
+			assert.Equal(t, tt.wants.fieldIDs, gotOpts.fieldIDs)
 		})
 	}
 }
@@ -733,4 +757,270 @@ func TestRunList_QueryUnsupported(t *testing.T) {
 
 	err := runList(config)
 	assert.EqualError(t, err, "the `--query` flag is not supported on this GitHub host")
+}
+
+func TestRunList_FieldColumn(t *testing.T) {
+	defer gock.Off()
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// list project items with fields
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "status ID",
+									"name":       "Status",
+									"dataType":   "SINGLE_SELECT",
+								},
+							},
+						},
+						"items": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"id": "issue ID",
+									"content": map[string]interface{}{
+										"__typename": "Issue",
+										"title":      "an issue",
+										"number":     1,
+										"repository": map[string]string{
+											"nameWithOwner": "cli/go-gh",
+										},
+									},
+									"fieldValues": map[string]interface{}{
+										"nodes": []map[string]interface{}{
+											{
+												"__typename": "ProjectV2ItemFieldSingleSelectValue",
+												"name":       "In Progress",
+												"field": map[string]interface{}{
+													"__typename": "ProjectV2SingleSelectField",
+													"id":         "status ID",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	config := listConfig{
+		opts: listOpts{
+			number: 1,
+			owner:  "monalisa",
+			fields: []string{"Status"},
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Doc(`
+		TYPE   TITLE     NUMBER  REPOSITORY  ID        STATUS
+		Issue  an issue  1       cli/go-gh   issue ID  In Progress
+  `), stdout.String())
+}
+
+func TestRunList_FieldColumn_UnknownName(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "status ID",
+									"name":       "Status",
+									"dataType":   "SINGLE_SELECT",
+								},
+							},
+						},
+						"items": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"id": "issue ID",
+									"content": map[string]interface{}{
+										"__typename": "Issue",
+										"title":      "an issue",
+										"number":     1,
+										"repository": map[string]string{
+											"nameWithOwner": "cli/go-gh",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, _, _ := iostreams.Test()
+	config := listConfig{
+		opts: listOpts{
+			number: 1,
+			owner:  "monalisa",
+			fields: []string{"Statuss"},
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `field "Statuss" not found`)
+	assert.Contains(t, err.Error(), "available fields: Status")
+}
+
+func TestRunList_FieldColumn_UnknownID(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "status ID",
+									"name":       "Status",
+									"dataType":   "SINGLE_SELECT",
+								},
+							},
+						},
+						"items": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"id": "issue ID",
+									"content": map[string]interface{}{
+										"__typename": "Issue",
+										"title":      "an issue",
+										"number":     1,
+										"repository": map[string]string{
+											"nameWithOwner": "cli/go-gh",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, _, _ := iostreams.Test()
+	config := listConfig{
+		opts: listOpts{
+			number:   1,
+			owner:    "monalisa",
+			fieldIDs: []string{"missing ID"},
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `field with ID "missing ID" not found`)
+	assert.Contains(t, err.Error(), "available fields: Status (status ID)")
 }
