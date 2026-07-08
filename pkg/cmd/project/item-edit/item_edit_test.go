@@ -21,16 +21,70 @@ func TestNewCmdeditItem(t *testing.T) {
 		wantsExporter bool
 	}{
 		{
-			name:        "missing-id",
+			name:        "no addressing flags",
 			cli:         "",
 			wantsErr:    true,
-			wantsErrMsg: "required flag(s) \"id\" not set",
+			wantsErrMsg: "specify the item to edit with `--id` or `--url`",
 		},
 		{
 			name:        "invalid-flags",
 			cli:         "--id 123 --text t --date 2023-01-01",
 			wantsErr:    true,
-			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` may be used",
+			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` may be used",
+		},
+		{
+			name:        "field and field-id conflict",
+			cli:         "--url https://github.com/o/r/issues/1 --field Status --field-id FIELD_ID",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--field` or `--field-id` may be used",
+		},
+		{
+			name:        "url and id conflict",
+			cli:         "--id 123 --url https://github.com/o/r/issues/1",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--url` or `--id` may be used",
+		},
+		{
+			name:        "value and single-select-option-id conflict",
+			cli:         "--url https://github.com/o/r/issues/1 --field Status --value Todo --single-select-option-id OPTION_ID",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` may be used",
+		},
+		{
+			name:        "value requires field",
+			cli:         "1 --url https://github.com/o/r/issues/1 --value Todo",
+			wantsErr:    true,
+			wantsErrMsg: "`--value` requires `--field`",
+		},
+		{
+			name:        "value and field-id conflict",
+			cli:         "1 --owner monalisa --url https://github.com/o/r/issues/1 --field-id FIELD_ID --value Todo",
+			wantsErr:    true,
+			wantsErrMsg: "`--value` cannot be used with `--field-id`; name the field with `--field` to use `--value`",
+		},
+		{
+			name:        "field and id conflict",
+			cli:         "1 --owner monalisa --id ITEM_ID --field Status",
+			wantsErr:    true,
+			wantsErrMsg: "`--field` cannot be used with `--id`; use `--url` to address the item when editing by name",
+		},
+		{
+			name:        "name-based flags require project number",
+			cli:         "--owner monalisa --url https://github.com/o/r/issues/1 --field Status --value Todo",
+			wantsErr:    true,
+			wantsErrMsg: "provide the project number as an argument when using `--url`, `--field`, or `--value`",
+		},
+		{
+			name: "name-based flags",
+			cli:  "1 --owner monalisa --url https://github.com/o/r/issues/1 --field Status --value Todo",
+			wants: editItemOpts{
+				number32:     1,
+				owner:        "monalisa",
+				url:          "https://github.com/o/r/issues/1",
+				field:        "Status",
+				value:        "Todo",
+				valueChanged: true,
+			},
 		},
 		{
 			name: "item-id",
@@ -182,6 +236,62 @@ func TestNewCmdeditItem(t *testing.T) {
 			assert.Equal(t, tt.wants.titleChanged, gotOpts.titleChanged)
 			assert.Equal(t, tt.wants.bodyChanged, gotOpts.bodyChanged)
 			assert.Equal(t, tt.wants.body, gotOpts.body)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
+			assert.Equal(t, tt.wants.number32, gotOpts.number32)
+			assert.Equal(t, tt.wants.url, gotOpts.url)
+			assert.Equal(t, tt.wants.field, gotOpts.field)
+			assert.Equal(t, tt.wants.value, gotOpts.value)
+			assert.Equal(t, tt.wants.valueChanged, gotOpts.valueChanged)
+		})
+	}
+}
+
+func TestRunItemEdit_InvalidNameCombosFireNoRequest(t *testing.T) {
+	tests := []struct {
+		name        string
+		cli         string
+		wantsErrMsg string
+	}{
+		{
+			name:        "value with field-id",
+			cli:         "1 --owner monalisa --url https://github.com/o/r/issues/1 --field-id FIELD_ID --value Todo",
+			wantsErrMsg: "`--value` cannot be used with `--field-id`; name the field with `--field` to use `--value`",
+		},
+		{
+			name:        "field with id",
+			cli:         "1 --owner monalisa --id ITEM_ID --field Status",
+			wantsErrMsg: "`--field` cannot be used with `--id`; use `--url` to address the item when editing by name",
+		},
+		{
+			name:        "name-based flags without project number",
+			cli:         "--owner monalisa --url https://github.com/o/r/issues/1 --field Status --value Todo",
+			wantsErrMsg: "provide the project number as an argument when using `--url`, `--field`, or `--value`",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			// No GraphQL requests should be issued; any request would leave a
+			// pending mock and fail gock.IsDone().
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				Reply(200).
+				JSON(map[string]interface{}{})
+
+			ios, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{IOStreams: ios}
+
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+
+			cmd := NewCmdEditItem(f, func(config editItemConfig) error {
+				return runEditItem(config)
+			})
+			cmd.SetArgs(argv)
+			_, err = cmd.ExecuteC()
+
+			assert.EqualError(t, err, tt.wantsErrMsg)
+			assert.False(t, gock.IsDone(), "no GraphQL request should have been made")
 		})
 	}
 }
@@ -809,4 +919,469 @@ func TestRunItemEdit_JSON(t *testing.T) {
 		t,
 		`{"id":"DI_item_id","title":"a title","body":"a new body","type":"DraftIssue"}`,
 		stdout.String())
+}
+
+func TestRunItemEdit_ByName_SingleSelect(t *testing.T) {
+	defer gock.Off()
+
+	// resolve owner
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "user ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// resolve project + fields
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "project ID",
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "status ID",
+									"name":       "Status",
+									"dataType":   "SINGLE_SELECT",
+									"options": []map[string]interface{}{
+										{"id": "opt_todo", "name": "Todo"},
+										{"id": "opt_done", "name": "Done"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	// resolve item by URL
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query GetProjectItemByURL.*",
+			"variables": map[string]interface{}{
+				"url":        "https://github.com/monalisa/repo/issues/1",
+				"firstItems": queries.LimitMax,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"resource": map[string]interface{}{
+					"__typename": "Issue",
+					"projectItems": map[string]interface{}{
+						"nodes": []map[string]interface{}{
+							{"id": "item ID", "project": map[string]interface{}{"id": "project ID"}},
+						},
+					},
+				},
+			},
+		})
+
+	// mutation uses the resolved option ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"status ID","value":{"singleSelectOptionId":"opt_done"}}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"updateProjectV2ItemFieldValue": map[string]interface{}{
+					"projectV2Item": map[string]interface{}{
+						"id": "item ID",
+						"content": map[string]interface{}{
+							"__typename": "Issue",
+							"title":      "an issue",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			owner:        "monalisa",
+			number32:     1,
+			url:          "https://github.com/monalisa/repo/issues/1",
+			field:        "Status",
+			value:        "Done",
+			valueChanged: true,
+		},
+		client: client,
+	}
+
+	err := runEditItem(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "Edited item \"an issue\"\n", stdout.String())
+}
+
+func TestRunItemEdit_ByName_CaseInsensitive(t *testing.T) {
+	defer gock.Off()
+
+	// resolve owner
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "user ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// resolve project + fields
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "project ID",
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "status ID",
+									"name":       "Status",
+									"dataType":   "SINGLE_SELECT",
+									"options": []map[string]interface{}{
+										{"id": "opt_todo", "name": "Todo"},
+										{"id": "opt_inprog", "name": "In Progress"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	// resolve item by URL
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query GetProjectItemByURL.*",
+			"variables": map[string]interface{}{
+				"url":        "https://github.com/monalisa/repo/issues/1",
+				"firstItems": queries.LimitMax,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"resource": map[string]interface{}{
+					"__typename": "Issue",
+					"projectItems": map[string]interface{}{
+						"nodes": []map[string]interface{}{
+							{"id": "item ID", "project": map[string]interface{}{"id": "project ID"}},
+						},
+					},
+				},
+			},
+		})
+
+	// mutation resolves the lowercase field/value inputs to their canonical IDs
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"status ID","value":{"singleSelectOptionId":"opt_inprog"}}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"updateProjectV2ItemFieldValue": map[string]interface{}{
+					"projectV2Item": map[string]interface{}{
+						"id": "item ID",
+						"content": map[string]interface{}{
+							"__typename": "Issue",
+							"title":      "an issue",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			owner:        "monalisa",
+			number32:     1,
+			url:          "https://github.com/monalisa/repo/issues/1",
+			field:        "status",
+			value:        "in progress",
+			valueChanged: true,
+		},
+		client: client,
+	}
+
+	err := runEditItem(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "Edited item \"an issue\"\n", stdout.String())
+	assert.True(t, gock.IsDone())
+}
+
+func TestRunItemEdit_ByName_FieldNotFound(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "user ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "project ID",
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2Field",
+									"id":         "title ID",
+									"name":       "Title",
+									"dataType":   "TITLE",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, _, _ := iostreams.Test()
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			owner:        "monalisa",
+			number32:     1,
+			url:          "https://github.com/monalisa/repo/issues/1",
+			field:        "Status",
+			value:        "Done",
+			valueChanged: true,
+		},
+		client: client,
+	}
+
+	// The field resolves against the project fields, so no item lookup or
+	// mutation should fire; the error must list candidate field names.
+	err := runEditItem(config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `field "Status" not found`)
+	assert.Contains(t, err.Error(), "available fields: Title")
+	assert.True(t, gock.IsDone())
+}
+
+func TestRunItemEdit_ByName_WrongFieldType(t *testing.T) {
+	defer gock.Off()
+
+	// resolve owner
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "user ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// resolve project + fields: the project has a built-in Title field, which
+	// updateProjectV2ItemFieldValue does not support with --value.
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "project ID",
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2Field",
+									"id":         "title ID",
+									"name":       "Title",
+									"dataType":   "TITLE",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	// resolve item by URL: this fires before the value dispatch, but no
+	// mutation should follow.
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query GetProjectItemByURL.*",
+			"variables": map[string]interface{}{
+				"url":        "https://github.com/monalisa/repo/issues/1",
+				"firstItems": queries.LimitMax,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"resource": map[string]interface{}{
+					"__typename": "Issue",
+					"projectItems": map[string]interface{}{
+						"nodes": []map[string]interface{}{
+							{"id": "item ID", "project": map[string]interface{}{"id": "project ID"}},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, _, _ := iostreams.Test()
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			owner:        "monalisa",
+			number32:     1,
+			url:          "https://github.com/monalisa/repo/issues/1",
+			field:        "Title",
+			value:        "a new title",
+			valueChanged: true,
+		},
+		client: client,
+	}
+
+	// The Title field resolves but its data type is not writable with --value,
+	// so a clean error is returned and no mutation fires.
+	err := runEditItem(config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `field "Title" has data type "TITLE"`)
+	assert.Contains(t, err.Error(), "not supported with `--value`")
+	assert.True(t, gock.IsDone())
 }
