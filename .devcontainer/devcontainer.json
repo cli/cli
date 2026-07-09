@@ -1,4 +1,4 @@
-{
+brew install gh{
 	"image": "mcr.microsoft.com/devcontainers/go:1.26",
 	"features": {
 		"ghcr.io/devcontainers/features/sshd:1": {}
