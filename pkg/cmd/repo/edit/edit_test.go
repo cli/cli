@@ -110,6 +110,16 @@ func TestNewCmdEdit(t *testing.T) {
 			wantErr: "--squash-merge-commit-message requires --enable-squash-merge",
 		},
 		{
+			name: "enable release immutability",
+			args: "--enable-release-immutability",
+			wantOpts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					enableReleaseImmutability: bp(true),
+				},
+			},
+		},
+		{
 			name:    "squash merge commit message with invalid value",
 			args:    "--enable-squash-merge --squash-merge-commit-message blah",
 			wantErr: `invalid value for --squash-merge-commit-message: "blah". Valid values are: default, pr-title, pr-title-commits, pr-title-description`,
@@ -281,6 +291,20 @@ func Test_editRun(t *testing.T) {
 						assert.Equal(t, "PR_TITLE", payload["squash_merge_commit_title"])
 						assert.Equal(t, "PR_BODY", payload["squash_merge_commit_message"])
 					}))
+			},
+		},
+		{
+			name: "enable release immutability",
+			opts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					enableReleaseImmutability: bp(true),
+				},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/immutable-releases"),
+					httpmock.StringResponse(`{}`))
 			},
 		},
 		{

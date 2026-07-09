@@ -78,6 +78,7 @@ type EditRepositoryInput struct {
 	enableSecretScanning               *bool
 	enableSecretScanningPushProtection *bool
 	squashMergeCommitMsg               *string
+	enableReleaseImmutability          *bool
 
 	AllowForking             *bool                     `json:"allow_forking,omitempty"`
 	AllowUpdateBranch        *bool                     `json:"allow_update_branch,omitempty"`
@@ -222,6 +223,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.enableSecretScanning, "enable-secret-scanning", "", "Enable secret scanning in the repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.enableSecretScanningPushProtection, "enable-secret-scanning-push-protection", "", "Enable secret scanning push protection in the repository. Secret scanning must be enabled first")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.DeleteBranchOnMerge, "delete-branch-on-merge", "", "Delete head branch when pull requests are merged")
+	cmdutil.NilBoolFlag(cmd, &opts.Edits.enableReleaseImmutability, "enable-release-immutability", "", "Enable release immutability in the repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.AllowForking, "allow-forking", "", "Allow forking of an organization repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.AllowUpdateBranch, "allow-update-branch", "", "Allow a pull request head branch that is behind its base branch to be updated")
 	cmdutil.NilStringFlag(cmd, &opts.Edits.squashMergeCommitMsg, "squash-merge-commit-message", "", "The default value for a squash merge commit message: {default|pr-title|pr-title-commits|pr-title-description}")
@@ -338,6 +340,12 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 				return nil
 			}
 			return setTopics(ctx, opts.HTTPClient, repo, newTopics.ToSlice())
+		})
+	}
+
+	if opts.Edits.enableReleaseImmutability != nil {
+		g.Go(func() error {
+			return setReleaseImmutability(ctx, opts.HTTPClient, repo, *opts.Edits.enableReleaseImmutability)
 		})
 	}
 
@@ -617,6 +625,34 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
+		return api.HandleHTTPError(res)
+	}
+
+	if res.Body != nil {
+		_, _ = io.Copy(io.Discard, res.Body)
+	}
+
+	return nil
+}
+
+func setReleaseImmutability(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, enable bool) error {
+	method := "POST"
+	if !enable {
+		method = "DELETE"
+	}
+	apiPath := fmt.Sprintf("repos/%s/%s/immutable-releases", repo.RepoOwner(), repo.RepoName())
+	req, err := http.NewRequestWithContext(ctx, method, ghinstance.RESTPrefix(repo.RepoHost())+apiPath, nil)
+	if err != nil {
+		return err
+	}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode > 299 {
 		return api.HandleHTTPError(res)
 	}
 
