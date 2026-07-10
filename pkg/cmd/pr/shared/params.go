@@ -133,7 +133,9 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	var teamReviewers []string
 	for _, r := range tb.Reviewers {
 		if strings.ContainsRune(r, '/') {
-			teamReviewers = append(teamReviewers, r)
+			// Team slugs are canonical as "org/team"; tolerate a leading "@"
+			// (e.g. "@org/team") for backwards compatibility. See #13060.
+			teamReviewers = append(teamReviewers, strings.TrimPrefix(r, "@"))
 		} else if r == api.CopilotReviewerLogin {
 			botReviewers = append(botReviewers, r)
 		} else {

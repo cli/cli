@@ -624,3 +624,20 @@ func TestWithPrAndIssueQueryParamsProjectsV1Deprecation(t *testing.T) {
 		)
 	})
 }
+
+func TestAddMetadataToIssueParams_stripsAtPrefixFromTeamReviewerSlugs(t *testing.T) {
+	// Regression test for #13060: a team reviewer passed with a leading "@"
+	// (e.g. "@org/team") must reach requestReviewsByLogin as "org/team".
+	tb := &IssueMetadataState{
+		ApiActorsSupported: true,
+		Reviewers:          []string{"@myorg/my-team", "octocat", "otherorg/other-team"},
+		MetadataResult:     &api.RepoMetadataResult{},
+	}
+	params := map[string]interface{}{}
+
+	err := AddMetadataToIssueParams(nil, ghrepo.New("OWNER", "REPO"), params, tb, gh.ProjectsV1Supported)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"myorg/my-team", "otherorg/other-team"}, params["teamReviewerSlugs"])
+	assert.Equal(t, []string{"octocat"}, params["userReviewerLogins"])
+}
