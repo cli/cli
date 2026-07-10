@@ -174,6 +174,7 @@ type StatusGetter struct {
 	host           string
 	Org            string
 	Exclude        []string
+	excludeSet     map[string]struct{} // O(1) lookup mirror of Exclude
 	AssignedPRs    []StatusItem
 	AssignedIssues []StatusItem
 	Mentions       []StatusItem
@@ -188,10 +189,15 @@ type StatusGetter struct {
 }
 
 func NewStatusGetter(client *http.Client, hostname string, opts *StatusOptions) *StatusGetter {
+	excludeSet := make(map[string]struct{}, len(opts.Exclude))
+	for _, r := range opts.Exclude {
+		excludeSet[r] = struct{}{}
+	}
 	return &StatusGetter{
 		Client:       client,
 		Org:          opts.Org,
 		Exclude:      opts.Exclude,
+		excludeSet:   excludeSet,
 		cachedClient: opts.CachedClient,
 		host:         hostname,
 	}
@@ -206,12 +212,8 @@ func (s *StatusGetter) CachedClient(ttl time.Duration) *http.Client {
 }
 
 func (s *StatusGetter) ShouldExclude(repo string) bool {
-	for _, exclude := range s.Exclude {
-		if repo == exclude {
-			return true
-		}
-	}
-	return false
+	_, ok := s.excludeSet[repo]
+	return ok
 }
 
 func (s *StatusGetter) CurrentUsername() (string, error) {
@@ -415,19 +417,20 @@ query AssignedSearch($searchAssigns: String!, $searchReviews: String!, $limit: I
 func (s *StatusGetter) LoadSearchResults() error {
 	c := api.NewClientFromHTTP(s.Client)
 
-	searchAssigns := `assignee:@me state:open archived:false`
-	searchReviews := `review-requested:@me state:open archived:false`
+	var assignsB, reviewsB strings.Builder
+	assignsB.WriteString(`assignee:@me state:open archived:false`)
+	reviewsB.WriteString(`review-requested:@me state:open archived:false`)
 	if s.Org != "" {
-		searchAssigns += " org:" + s.Org
-		searchReviews += " org:" + s.Org
+		assignsB.WriteString(" org:" + s.Org)
+		reviewsB.WriteString(" org:" + s.Org)
 	}
 	for _, repo := range s.Exclude {
-		searchAssigns += " -repo:" + repo
-		searchReviews += " -repo:" + repo
+		assignsB.WriteString(" -repo:" + repo)
+		reviewsB.WriteString(" -repo:" + repo)
 	}
 	variables := map[string]interface{}{
-		"searchAssigns": searchAssigns,
-		"searchReviews": searchReviews,
+		"searchAssigns": assignsB.String(),
+		"searchReviews": reviewsB.String(),
 	}
 
 	var resp struct {
