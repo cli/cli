@@ -64,7 +64,7 @@ type tagEntry struct {
 
 // rulesetsResponse is a single ruleset from the rulesets API.
 type rulesetsResponse struct {
-	ID          int    `json:"id"`
+	ID          int64  `json:"id"`
 	Name        string `json:"name"`
 	Target      string `json:"target"`
 	Enforcement string `json:"enforcement"`

@@ -55,6 +55,9 @@ func NewCmdCommits(f *cmdutil.Factory, runF func(*CommitsOptions) error) *cobra.
 			# Search commits matching phrase "bug fix"
 			$ gh search commits "bug fix"
 
+			# Search commits using raw search qualifiers as separate arguments
+			$ gh search commits fix author:monalisa merge:false
+
 			# Search commits committed by user "monalisa"
 			$ gh search commits --committer=monalisa
 

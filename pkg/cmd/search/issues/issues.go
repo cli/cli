@@ -50,6 +50,9 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			# Search issues matching phrase "broken feature"
 			$ gh search issues "broken feature"
 
+			# Search issues using raw search qualifiers as separate arguments
+			$ gh search issues label:bug author:monalisa state:open
+
 			# Search issues and pull requests in cli organization
 			$ gh search issues --include-prs --owner=cli
 

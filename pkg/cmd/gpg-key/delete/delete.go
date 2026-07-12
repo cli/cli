@@ -74,7 +74,7 @@ func deleteRun(opts *DeleteOptions) error {
 	id := ""
 	for _, gpgKey := range gpgKeys {
 		if gpgKey.KeyID == opts.KeyID {
-			id = strconv.Itoa(gpgKey.ID)
+			id = strconv.FormatInt(gpgKey.ID, 10)
 			break
 		}
 	}

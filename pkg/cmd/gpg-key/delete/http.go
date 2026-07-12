@@ -11,7 +11,7 @@ import (
 )
 
 type gpgKey struct {
-	ID    int
+	ID    int64
 	KeyID string `json:"key_id"`
 }
 

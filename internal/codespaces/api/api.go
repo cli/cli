@@ -152,7 +152,7 @@ type RepositoryOwner struct {
 
 // Repository represents a GitHub repository.
 type Repository struct {
-	ID            int             `json:"id"`
+	ID            int64           `json:"id"`
 	FullName      string          `json:"full_name"`
 	DefaultBranch string          `json:"default_branch"`
 	Owner         RepositoryOwner `json:"owner"`
@@ -604,7 +604,7 @@ type Machine struct {
 }
 
 // GetCodespacesMachines returns the codespaces machines for the given repo, branch and location.
-func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*Machine, error) {
+func (a *API) GetCodespacesMachines(ctx context.Context, repoID int64, branch, location string, devcontainerPath string) ([]*Machine, error) {
 	reqURL := fmt.Sprintf("%s/repositories/%d/codespaces/machines", a.githubAPI, repoID)
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
@@ -644,7 +644,7 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 }
 
 // GetCodespacesPermissionsCheck returns a bool indicating whether the user has accepted permissions for the given repo and devcontainer path.
-func (a *API) GetCodespacesPermissionsCheck(ctx context.Context, repoID int, branch string, devcontainerPath string) (bool, error) {
+func (a *API) GetCodespacesPermissionsCheck(ctx context.Context, repoID int64, branch string, devcontainerPath string) (bool, error) {
 	reqURL := fmt.Sprintf("%s/repositories/%d/codespaces/permissions_check", a.githubAPI, repoID)
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
@@ -806,7 +806,7 @@ func (a *API) GetCodespaceBillableOwner(ctx context.Context, nwo string) (*User,
 
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
 type CreateCodespaceParams struct {
-	RepositoryID           int
+	RepositoryID           int64
 	IdleTimeoutMinutes     int
 	RetentionPeriodMinutes *int
 	Branch                 string
@@ -857,7 +857,7 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 }
 
 type startCreateRequest struct {
-	RepositoryID           int    `json:"repository_id"`
+	RepositoryID           int64  `json:"repository_id"`
 	IdleTimeoutMinutes     int    `json:"idle_timeout_minutes,omitempty"`
 	RetentionPeriodMinutes *int   `json:"retention_period_minutes,omitempty"`
 	Ref                    string `json:"ref"`
@@ -1011,7 +1011,7 @@ type DevContainerEntry struct {
 
 // ListDevContainers returns a list of valid devcontainer.json files for the repo. Pass a negative limit to request all pages from
 // the API until all devcontainer.json files have been fetched.
-func (a *API) ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []DevContainerEntry, err error) {
+func (a *API) ListDevContainers(ctx context.Context, repoID int64, branch string, limit int) (devcontainers []DevContainerEntry, err error) {
 	perPage := 100
 	if limit > 0 && limit < 100 {
 		perPage = limit

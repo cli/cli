@@ -6,13 +6,13 @@ on:
 jobs:
   label-incoming:
     if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'unlabeled'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-label-incoming.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-label-incoming.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write
 
   close-invalid:
     if: github.event.action == 'labeled'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-invalid.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-invalid.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       contents: read
       issues: write
@@ -20,42 +20,42 @@ jobs:
 
   close-suspected-spam:
     if: github.event.action == 'labeled'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-suspected-spam.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-suspected-spam.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write
 
   close-single-word:
     if: github.event.action == 'opened'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-single-word-issues.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-single-word-issues.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write
 
   close-off-topic:
     if: github.event.action == 'labeled'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-off-topic.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-off-topic.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write
 
   enhancement-comment:
     if: github.event.action == 'labeled'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-enhancement-comment.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-enhancement-comment.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write
 
   unable-to-reproduce:
     if: github.event.action == 'labeled'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-unable-to-reproduce-comment.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-unable-to-reproduce-comment.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write
 
   remove-needs-triage:
     if: github.event.action == 'labeled'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-remove-needs-triage.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-remove-needs-triage.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write
 
   on-issue-close:
     if: github.event.action == 'closed'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-on-issue-close.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-on-issue-close.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write

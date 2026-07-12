@@ -9,11 +9,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func executeParentHooks(cmd *cobra.Command, args []string) error {
-	for cmd.HasParent() {
-		cmd = cmd.Parent()
-		if cmd.PersistentPreRunE != nil {
-			return cmd.PersistentPreRunE(cmd, args)
+// executeParentHook re-runs the nearest ancestor's persistent pre-run hook,
+// which the hook installed by EnableRepoOverride would otherwise shadow. By
+// default cobra runs only the nearest PersistentPreRunE found walking up from
+// the invoked command, so without this the nearest ancestor hook, such as the
+// root auth gate, would never run for a repo-override command.
+//
+// That ancestor hook receives the invoked leaf cmd, not the ancestor, matching
+// how cobra passes the leaf to every persistent hook:
+// https://github.com/spf13/cobra/blob/v1.10.2/command.go#L984-L986
+//
+// cobra's EnableTraverseRunHooks global is the native equivalent and runs the
+// whole root-to-leaf chain for us, but it is global. Enabling it would change
+// pre-run behavior for every command: double-running the parents that issue
+// develop and EnableRepoOverride re-run by hand, and un-suppressing the root
+// gate that agent-task and skills intentionally shadow.
+func executeParentHook(overrideCmd, cmd *cobra.Command, args []string) error {
+	for p := overrideCmd.Parent(); p != nil; p = p.Parent() {
+		if p.PersistentPreRunE != nil {
+			return p.PersistentPreRunE(cmd, args)
 		}
 	}
 	return nil
@@ -47,8 +61,9 @@ func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 		return results, cobra.ShellCompDirectiveNoFileComp
 	})
 
+	overrideCmd := cmd
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		if err := executeParentHooks(cmd, args); err != nil {
+		if err := executeParentHook(overrideCmd, cmd, args); err != nil {
 			return err
 		}
 		repoOverride, _ := cmd.Flags().GetString("repo")

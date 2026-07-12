@@ -41,10 +41,10 @@ import (
 //			GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *codespacesAPI.Codespace, path string) ([]byte, error) {
 //				panic("mock out the GetCodespaceRepositoryContents method")
 //			},
-//			GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*codespacesAPI.Machine, error) {
+//			GetCodespacesMachinesFunc: func(ctx context.Context, repoID int64, branch string, location string, devcontainerPath string) ([]*codespacesAPI.Machine, error) {
 //				panic("mock out the GetCodespacesMachines method")
 //			},
-//			GetCodespacesPermissionsCheckFunc: func(ctx context.Context, repoID int, branch string, devcontainerPath string) (bool, error) {
+//			GetCodespacesPermissionsCheckFunc: func(ctx context.Context, repoID int64, branch string, devcontainerPath string) (bool, error) {
 //				panic("mock out the GetCodespacesPermissionsCheck method")
 //			},
 //			GetOrgMemberCodespaceFunc: func(ctx context.Context, orgName string, userName string, codespaceName string) (*codespacesAPI.Codespace, error) {
@@ -59,7 +59,7 @@ import (
 //			ListCodespacesFunc: func(ctx context.Context, opts codespacesAPI.ListCodespacesOptions) ([]*codespacesAPI.Codespace, error) {
 //				panic("mock out the ListCodespaces method")
 //			},
-//			ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]codespacesAPI.DevContainerEntry, error) {
+//			ListDevContainersFunc: func(ctx context.Context, repoID int64, branch string, limit int) ([]codespacesAPI.DevContainerEntry, error) {
 //				panic("mock out the ListDevContainers method")
 //			},
 //			ServerURLFunc: func() string {
@@ -103,10 +103,10 @@ type apiClientMock struct {
 	GetCodespaceRepositoryContentsFunc func(ctx context.Context, codespace *codespacesAPI.Codespace, path string) ([]byte, error)
 
 	// GetCodespacesMachinesFunc mocks the GetCodespacesMachines method.
-	GetCodespacesMachinesFunc func(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*codespacesAPI.Machine, error)
+	GetCodespacesMachinesFunc func(ctx context.Context, repoID int64, branch string, location string, devcontainerPath string) ([]*codespacesAPI.Machine, error)
 
 	// GetCodespacesPermissionsCheckFunc mocks the GetCodespacesPermissionsCheck method.
-	GetCodespacesPermissionsCheckFunc func(ctx context.Context, repoID int, branch string, devcontainerPath string) (bool, error)
+	GetCodespacesPermissionsCheckFunc func(ctx context.Context, repoID int64, branch string, devcontainerPath string) (bool, error)
 
 	// GetOrgMemberCodespaceFunc mocks the GetOrgMemberCodespace method.
 	GetOrgMemberCodespaceFunc func(ctx context.Context, orgName string, userName string, codespaceName string) (*codespacesAPI.Codespace, error)
@@ -121,7 +121,7 @@ type apiClientMock struct {
 	ListCodespacesFunc func(ctx context.Context, opts codespacesAPI.ListCodespacesOptions) ([]*codespacesAPI.Codespace, error)
 
 	// ListDevContainersFunc mocks the ListDevContainers method.
-	ListDevContainersFunc func(ctx context.Context, repoID int, branch string, limit int) ([]codespacesAPI.DevContainerEntry, error)
+	ListDevContainersFunc func(ctx context.Context, repoID int64, branch string, limit int) ([]codespacesAPI.DevContainerEntry, error)
 
 	// ServerURLFunc mocks the ServerURL method.
 	ServerURLFunc func() string
@@ -203,7 +203,7 @@ type apiClientMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// RepoID is the repoID argument value.
-			RepoID int
+			RepoID int64
 			// Branch is the branch argument value.
 			Branch string
 			// Location is the location argument value.
@@ -216,7 +216,7 @@ type apiClientMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// RepoID is the repoID argument value.
-			RepoID int
+			RepoID int64
 			// Branch is the branch argument value.
 			Branch string
 			// DevcontainerPath is the devcontainerPath argument value.
@@ -257,7 +257,7 @@ type apiClientMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// RepoID is the repoID argument value.
-			RepoID int
+			RepoID int64
 			// Branch is the branch argument value.
 			Branch string
 			// Limit is the limit argument value.
@@ -609,13 +609,13 @@ func (mock *apiClientMock) GetCodespaceRepositoryContentsCalls() []struct {
 }
 
 // GetCodespacesMachines calls GetCodespacesMachinesFunc.
-func (mock *apiClientMock) GetCodespacesMachines(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*codespacesAPI.Machine, error) {
+func (mock *apiClientMock) GetCodespacesMachines(ctx context.Context, repoID int64, branch string, location string, devcontainerPath string) ([]*codespacesAPI.Machine, error) {
 	if mock.GetCodespacesMachinesFunc == nil {
 		panic("apiClientMock.GetCodespacesMachinesFunc: method is nil but apiClient.GetCodespacesMachines was just called")
 	}
 	callInfo := struct {
 		Ctx              context.Context
-		RepoID           int
+		RepoID           int64
 		Branch           string
 		Location         string
 		DevcontainerPath string
@@ -638,14 +638,14 @@ func (mock *apiClientMock) GetCodespacesMachines(ctx context.Context, repoID int
 //	len(mockedapiClient.GetCodespacesMachinesCalls())
 func (mock *apiClientMock) GetCodespacesMachinesCalls() []struct {
 	Ctx              context.Context
-	RepoID           int
+	RepoID           int64
 	Branch           string
 	Location         string
 	DevcontainerPath string
 } {
 	var calls []struct {
 		Ctx              context.Context
-		RepoID           int
+		RepoID           int64
 		Branch           string
 		Location         string
 		DevcontainerPath string
@@ -657,13 +657,13 @@ func (mock *apiClientMock) GetCodespacesMachinesCalls() []struct {
 }
 
 // GetCodespacesPermissionsCheck calls GetCodespacesPermissionsCheckFunc.
-func (mock *apiClientMock) GetCodespacesPermissionsCheck(ctx context.Context, repoID int, branch string, devcontainerPath string) (bool, error) {
+func (mock *apiClientMock) GetCodespacesPermissionsCheck(ctx context.Context, repoID int64, branch string, devcontainerPath string) (bool, error) {
 	if mock.GetCodespacesPermissionsCheckFunc == nil {
 		panic("apiClientMock.GetCodespacesPermissionsCheckFunc: method is nil but apiClient.GetCodespacesPermissionsCheck was just called")
 	}
 	callInfo := struct {
 		Ctx              context.Context
-		RepoID           int
+		RepoID           int64
 		Branch           string
 		DevcontainerPath string
 	}{
@@ -684,13 +684,13 @@ func (mock *apiClientMock) GetCodespacesPermissionsCheck(ctx context.Context, re
 //	len(mockedapiClient.GetCodespacesPermissionsCheckCalls())
 func (mock *apiClientMock) GetCodespacesPermissionsCheckCalls() []struct {
 	Ctx              context.Context
-	RepoID           int
+	RepoID           int64
 	Branch           string
 	DevcontainerPath string
 } {
 	var calls []struct {
 		Ctx              context.Context
-		RepoID           int
+		RepoID           int64
 		Branch           string
 		DevcontainerPath string
 	}
@@ -849,13 +849,13 @@ func (mock *apiClientMock) ListCodespacesCalls() []struct {
 }
 
 // ListDevContainers calls ListDevContainersFunc.
-func (mock *apiClientMock) ListDevContainers(ctx context.Context, repoID int, branch string, limit int) ([]codespacesAPI.DevContainerEntry, error) {
+func (mock *apiClientMock) ListDevContainers(ctx context.Context, repoID int64, branch string, limit int) ([]codespacesAPI.DevContainerEntry, error) {
 	if mock.ListDevContainersFunc == nil {
 		panic("apiClientMock.ListDevContainersFunc: method is nil but apiClient.ListDevContainers was just called")
 	}
 	callInfo := struct {
 		Ctx    context.Context
-		RepoID int
+		RepoID int64
 		Branch string
 		Limit  int
 	}{
@@ -876,13 +876,13 @@ func (mock *apiClientMock) ListDevContainers(ctx context.Context, repoID int, br
 //	len(mockedapiClient.ListDevContainersCalls())
 func (mock *apiClientMock) ListDevContainersCalls() []struct {
 	Ctx    context.Context
-	RepoID int
+	RepoID int64
 	Branch string
 	Limit  int
 } {
 	var calls []struct {
 		Ctx    context.Context
-		RepoID int
+		RepoID int64
 		Branch string
 		Limit  int
 	}

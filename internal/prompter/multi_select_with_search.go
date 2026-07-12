@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
@@ -47,6 +48,13 @@ type multiSelectSearchField struct {
 	theme     huh.Theme
 	hasDarkBg bool
 	position  huh.FieldPosition
+
+	// onSearchDone stores a func() that is called each time an async search
+	// completes. It is unset in production and used only in tests to
+	// synchronize on search completion without relying on fixed-duration
+	// sleeps. atomic.Value is used because the hook is written by the test
+	// goroutine and invoked by bubbletea's event-loop goroutine.
+	onSearchDone atomic.Value
 }
 
 type msMode int
@@ -170,6 +178,10 @@ func (m *multiSelectSearchField) applySearchResult(query string, result MultiSel
 	m.options = options
 	m.cursor = 0
 	m.err = nil
+
+	if hook, ok := m.onSearchDone.Load().(func()); ok {
+		hook()
+	}
 }
 
 func (m *multiSelectSearchField) selectedKeys() []string {

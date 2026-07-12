@@ -56,6 +56,9 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 			# Search repositories matching phrase "vim plugin"
 			$ gh search repos "vim plugin"
 
+			# Search repositories using raw search qualifiers as separate arguments
+			$ gh search repos topic:github 'stars:>5000'
+
 			# Search repositories public repos in the microsoft organization
 			$ gh search repos --owner=microsoft --visibility=public
 

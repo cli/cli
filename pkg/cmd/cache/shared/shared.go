@@ -22,7 +22,7 @@ var CacheFields = []string{
 
 type Cache struct {
 	CreatedAt      time.Time `json:"created_at"`
-	Id             int       `json:"id"`
+	Id             int64     `json:"id"`
 	Key            string    `json:"key"`
 	LastAccessedAt time.Time `json:"last_accessed_at"`
 	Ref            string    `json:"ref"`

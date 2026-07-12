@@ -13,7 +13,7 @@ import (
 )
 
 type deployKey struct {
-	ID        int       `json:"id"`
+	ID        int64     `json:"id"`
 	Key       string    `json:"key"`
 	Title     string    `json:"title"`
 	CreatedAt time.Time `json:"created_at"`

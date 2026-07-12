@@ -474,6 +474,30 @@ func TestInstallRun(t *testing.T) {
 			wantStdout: "Installed git-commit",
 		},
 		{
+			name:  "remote install with --dir bypasses agent selection",
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:          ios,
+					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:   &git.Client{RepoDir: t.TempDir()},
+					Prompter:    &prompter.PrompterMock{},
+					SkillSource: "monalisa/skills-repo",
+					SkillName:   "git-commit",
+					Scope:       "project",
+					Dir:         t.TempDir(),
+				}
+			},
+			wantStdout: "Installed git-commit",
+		},
+		{
 			name:  "remote install with --force overwrites existing skill",
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {

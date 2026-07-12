@@ -52,6 +52,9 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			# Search draft pull requests in cli repository
 			$ gh search prs --repo=cli/cli --draft
 
+			# Search pull requests using raw search qualifiers as separate arguments
+			$ gh search prs is:merged author:monalisa
+
 			# Search open pull requests requesting your review
 			$ gh search prs --review-requested=@me --state=open
 

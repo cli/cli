@@ -147,7 +147,7 @@ func deleteRun(opts *DeleteOptions) error {
 			}
 		}
 		for _, cache := range caches.ActionsCaches {
-			toDelete = append(toDelete, strconv.Itoa(cache.Id))
+			toDelete = append(toDelete, strconv.FormatInt(cache.Id, 10))
 		}
 	} else {
 		toDelete = append(toDelete, opts.Identifier)
@@ -201,7 +201,7 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 	return nil
 }
 
-func deleteCacheByID(client *api.Client, repo ghrepo.Interface, id int) error {
+func deleteCacheByID(client *api.Client, repo ghrepo.Interface, id int64) error {
 	// returns HTTP 204 (NO CONTENT) on success
 	path := fmt.Sprintf("repos/%s/actions/caches/%d", ghrepo.FullName(repo), id)
 	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
@@ -227,7 +227,7 @@ func deleteCacheByKey(client *api.Client, repo ghrepo.Interface, key, ref string
 	return payload.TotalCount, nil
 }
 
-func parseCacheID(arg string) (int, bool) {
-	id, err := strconv.Atoi(arg)
+func parseCacheID(arg string) (int64, bool) {
+	id, err := strconv.ParseInt(arg, 10, 64)
 	return id, err == nil
 }

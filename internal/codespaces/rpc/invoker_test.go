@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
 	rpctest "github.com/cli/cli/v2/internal/codespaces/rpc/test"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -309,5 +310,60 @@ func TestStartSSHServerFailure(t *testing.T) {
 	}
 	if user != "" {
 		t.Fatalf("expected %s, got %s", "", user)
+	}
+}
+
+func TestIsJupyterServerURLValid(t *testing.T) {
+	tests := []struct {
+		name      string
+		serverURL string
+		want      bool
+	}{
+		{
+			name:      "http loopback IPv4 with token",
+			serverURL: "http://127.0.0.1:1234/lab?token=abc",
+			want:      true,
+		},
+		{
+			name:      "https localhost",
+			serverURL: "https://localhost:8888/",
+			want:      true,
+		},
+		{
+			name:      "http loopback IPv6",
+			serverURL: "http://[::1]:9000/lab",
+			want:      true,
+		},
+		{
+			name:      "vscode-insiders scheme",
+			serverURL: "vscode-insiders://ms-vsliveshare.vsliveshare/join?foo=bar",
+			want:      false,
+		},
+		{
+			name:      "vscode scheme",
+			serverURL: "vscode://vscode.git/clone?url=https://example.com",
+			want:      false,
+		},
+		{
+			name:      "non-loopback host",
+			serverURL: "http://cli.github.com/lab",
+			want:      false,
+		},
+		{
+			name:      "file scheme",
+			serverURL: "file:///mona-home/document",
+			want:      false,
+		},
+		{
+			name:      "empty string",
+			serverURL: "",
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, isJupyterServerURLValid(tt.serverURL))
+		})
 	}
 }

@@ -35,12 +35,12 @@ type Job struct {
 }
 
 type JobActor struct {
-	ID    int    `json:"id"`
+	ID    int64  `json:"id"`
 	Login string `json:"login"`
 }
 
 type JobPullRequest struct {
-	ID      int    `json:"id"`
+	ID      int64  `json:"id"`
 	Number  int    `json:"number"`
 	BaseRef string `json:"base_ref,omitempty"`
 }

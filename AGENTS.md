@@ -2,6 +2,10 @@
 
 This is the GitHub CLI (`gh`), a command-line tool for interacting with GitHub. The module path is `github.com/cli/cli/v2`.
 
+## Security Disclosures
+
+**Never** post security-related content - vulnerabilities, exploits, proofs of concept, or attack details - in any issue, pull request, comment, commit, or discussion. Stop and file a security advisory per [`.github/SECURITY.md`](.github/SECURITY.md).
+
 ## Build, Test, and Lint
 
 ```bash

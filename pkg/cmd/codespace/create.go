@@ -511,7 +511,7 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, apiClient apiClient, prompter SurveyPrompter, repoID int, machine, branch, location string, devcontainerPath string) (string, error) {
+func getMachineName(ctx context.Context, apiClient apiClient, prompter SurveyPrompter, repoID int64, machine, branch, location string, devcontainerPath string) (string, error) {
 	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location, devcontainerPath)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)

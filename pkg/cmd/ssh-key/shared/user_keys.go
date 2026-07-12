@@ -17,7 +17,7 @@ const (
 )
 
 type sshKey struct {
-	ID        int
+	ID        int64
 	Key       string
 	Title     string
 	Type      string
