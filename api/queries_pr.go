@@ -55,7 +55,11 @@ type PullRequest struct {
 	PotentialMergeCommit *Commit
 
 	Files struct {
-		Nodes []PullRequestFile
+		Nodes    []PullRequestFile
+		PageInfo struct {
+			HasNextPage bool
+			EndCursor   string
+		}
 	}
 
 	Author              Author
@@ -79,6 +83,10 @@ type PullRequest struct {
 	Commits struct {
 		TotalCount int
 		Nodes      []PullRequestCommit
+		PageInfo   struct {
+			HasNextPage bool
+			EndCursor   string
+		}
 	}
 	StatusCheckRollup struct {
 		Nodes []StatusCheckRollupNode

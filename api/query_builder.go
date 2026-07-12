@@ -151,6 +151,7 @@ var prFiles = shortenQuery(`
 			path,
 			changeType
 		}
+		pageInfo{hasNextPage,endCursor}
 	}
 `)
 
@@ -172,6 +173,7 @@ var prCommits = shortenQuery(`
 				authoredDate
 			}
 		}
+		pageInfo{hasNextPage,endCursor}
 	}
 `)
 
