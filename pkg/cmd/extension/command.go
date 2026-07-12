@@ -379,15 +379,22 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName(), repo.RepoOwner()); err != nil {
 						// If an existing extension was found and --force was specified, attempt to upgrade.
 						if forceFlag && ext != nil {
-							return upgradeFunc(ext.Name(), forceFlag)
-						}
+							if pinFlag != "" {
+								if err := m.Remove(ext.Name()); err != nil {
+									return err
+								}
+								// continue to m.Install below
+							} else {
+								return upgradeFunc(ext.Name(), forceFlag)
+							}
+						} else {
+							if errors.Is(err, alreadyInstalledError) {
+								fmt.Fprintf(io.ErrOut, "%s Extension %s is already installed\n", cs.WarningIcon(), ghrepo.FullName(repo))
+								return nil
+							}
 
-						if errors.Is(err, alreadyInstalledError) {
-							fmt.Fprintf(io.ErrOut, "%s Extension %s is already installed\n", cs.WarningIcon(), ghrepo.FullName(repo))
-							return nil
+							return err
 						}
-
-						return err
 					}
 
 					io.StartProgressIndicator()
