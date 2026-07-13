@@ -79,8 +79,8 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			Checks installed skills for available updates by comparing the local
 			tree SHA (from %[1]sSKILL.md%[1]s frontmatter) against the remote repository.
 
-			Scans all known agent host directories (Copilot, Claude, Cursor, Codex,
-			Gemini, Antigravity) in both project and user scope automatically.
+			Scans all known agent host directories (including Copilot, Claude, Cursor,
+			Gemini, Antigravity, Grok, and others) in both project and user scope automatically.
 
 			Without arguments, checks all installed skills. With skill names,
 			checks only those specific skills.

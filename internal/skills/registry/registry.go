@@ -189,6 +189,12 @@ var Agents = []AgentHost{
 		UserDir:    ".config/goose/skills",
 	},
 	{
+		ID:         "grok",
+		Name:       "Grok",
+		ProjectDir: ".grok/skills",
+		UserDir:    ".grok/skills",
+	},
+	{
 		ID:         "iflow-cli",
 		Name:       "iFlow CLI",
 		ProjectDir: ".iflow/skills",

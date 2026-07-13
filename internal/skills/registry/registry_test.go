@@ -23,6 +23,7 @@ func TestFindByID(t *testing.T) {
 		{name: "antigravity", id: "antigravity", wantName: "Antigravity"},
 		{name: "antigravity-cli", id: "antigravity-cli", wantName: "Antigravity CLI"},
 		{name: "antigravity2.0", id: "antigravity2.0", wantName: "Antigravity 2.0"},
+		{name: "grok", id: "grok", wantName: "Grok"},
 		{name: "unknown agent", id: "nonexistent", wantErr: "unknown agent"},
 	}
 	for _, tt := range tests {
@@ -158,6 +159,22 @@ func TestInstallDir(t *testing.T) {
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
 			wantDir: filepath.Join("/home/monalisa", ".gemini", "config", "skills"),
+		},
+		{
+			name:    "grok project scope",
+			hostID:  "grok",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".grok", "skills"),
+		},
+		{
+			name:    "grok user scope",
+			hostID:  "grok",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".grok", "skills"),
 		},
 		{
 			// Issue #13494: Universal must use the shared .agents/skills dir

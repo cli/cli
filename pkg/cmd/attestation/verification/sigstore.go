@@ -223,6 +223,9 @@ func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.Verifier, 
 		}
 		return v.PublicGood, nil
 	case GitHubIssuerOrg:
+		if v.GitHub == nil {
+			return nil, fmt.Errorf("GitHub verifier is not available (initialization may have failed)")
+		}
 		return v.GitHub, nil
 	default:
 		return nil, fmt.Errorf("leaf certificate issuer is not recognized")
