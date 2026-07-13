@@ -81,9 +81,19 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 		Long: heredoc.Docf(`
 			Edit a draft issue or a project item.
 
-			Identify the item and field either by ID (%[1]s--id%[1]s, %[1]s--field-id%[1]s, %[1]s--project-id%[1]s)
-			or by name (the project %[1]snumber%[1]s with %[1]s--owner%[1]s, %[1]s--url%[1]s and %[1]s--field%[1]s). For
-			single-select fields, %[1]s--value%[1]s is the option name.
+			There are two ways to address the item and field to edit:
+
+			- By ID: pass %[1]s--id%[1]s, %[1]s--field-id%[1]s and %[1]s--project-id%[1]s directly.
+			- By name: select the project the usual way (its %[1]snumber%[1]s plus %[1]s--owner%[1]s),
+			  point at the item with its issue or pull request %[1]s--url%[1]s, and name the field
+			  with %[1]s--field%[1]s. For single-select fields, %[1]s--value%[1]s is the option name.
+
+			The project is always selected by number and %[1]s--owner%[1]s, the same as other
+			%[1]sgh project%[1]s commands. "By name" refers to identifying the field, option and
+			item without having to look up their node IDs first.
+
+			Note that %[1]s--url%[1]s is the issue or pull request URL, not a project URL, so its
+			owner may differ from the project's; %[1]s--owner%[1]s selects the project.
 
 			For non-draft issues, only a single field value can be updated per invocation.
 
@@ -194,8 +204,8 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	editItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to edit")
 	cmdutil.AddFormatFlags(editItemCmd, &opts.exporter)
 
-	editItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user. Used with a project number to resolve `--field` and `--url` by name.")
-	editItemCmd.Flags().StringVar(&opts.url, "url", "", "URL of the issue or pull request to edit (resolves the item by name; conflicts with `--id`)")
+	editItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the project owner (user or organization). Use \"@me\" for the current user. Combined with the project number to select the project.")
+	editItemCmd.Flags().StringVar(&opts.url, "url", "", "URL of the issue or pull request whose project item to edit (an issue/PR URL, not a project URL; conflicts with `--id`)")
 	editItemCmd.Flags().StringVar(&opts.field, "field", "", "Name of the field to update (conflicts with `--field-id`)")
 	editItemCmd.Flags().StringVar(&opts.value, "value", "", "Value for the field named by `--field`; for single-select fields this is the option name (conflicts with `--text`, `--number`, `--date`, `--single-select-option-id` and `--iteration-id`)")
 
