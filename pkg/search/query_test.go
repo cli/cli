@@ -238,6 +238,93 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 	}
 }
 
+func TestCodeSearchString(t *testing.T) {
+	tests := []struct {
+		name  string
+		query Query
+		out   string
+	}{
+		{
+			name: "empty query",
+			out:  "",
+		},
+		{
+			name: "keywords only",
+			query: Query{
+				Keywords: []string{"error", "handling"},
+			},
+			out: `error handling`,
+		},
+		{
+			name: "single repo is not grouped",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Qualifiers: Qualifiers{
+					Repo: []string{"foo/bar"},
+				},
+			},
+			out: `( keyword ) repo:foo/bar`,
+		},
+		{
+			name: "multiple repos are OR-ed",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Qualifiers: Qualifiers{
+					Repo: []string{"foo/bar", "foo/baz"},
+				},
+			},
+			out: `( keyword ) (repo:foo/bar OR repo:foo/baz)`,
+		},
+		{
+			name: "multiple owners are OR-ed",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Qualifiers: Qualifiers{
+					User: []string{"microsoft", "google"},
+				},
+			},
+			out: `( keyword ) (user:google OR user:microsoft)`,
+		},
+		{
+			name: "repos and owners are grouped independently, non-special qualifiers untouched",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Qualifiers: Qualifiers{
+					Repo:     []string{"foo/bar", "foo/baz"},
+					User:     []string{"johndoe", "janedoe"},
+					Language: "go",
+					Path:     "cmd/",
+				},
+			},
+			out: `( keyword ) language:go path:cmd/ (repo:foo/bar OR repo:foo/baz) (user:janedoe OR user:johndoe)`,
+		},
+		{
+			name: "immutable keywords are bracketed with qualifiers",
+			query: Query{
+				ImmutableKeywords: "Note",
+				Qualifiers: Qualifiers{
+					Repo: []string{"jitran/fargate-cdk-deployer", "jitran/kubernetes-grafana-dashboards"},
+				},
+			},
+			out: `( Note ) (repo:jitran/fargate-cdk-deployer OR repo:jitran/kubernetes-grafana-dashboards)`,
+		},
+		{
+			name: "qualifiers only, no keywords",
+			query: Query{
+				Qualifiers: Qualifiers{
+					Repo: []string{"foo/bar", "foo/baz"},
+				},
+			},
+			out: `(repo:foo/bar OR repo:foo/baz)`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.out, tt.query.CodeSearchString())
+		})
+	}
+}
+
 func TestQualifiersMap(t *testing.T) {
 	tests := []struct {
 		name       string
