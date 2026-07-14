@@ -125,6 +125,14 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			request body this way, any parameters specified via field flags are added to the query
 			string of the endpoint URL.
 
+			The %[1]s--cache%[1]s flag enables response caching. The duration accepts %[1]ss%[1]s, %[1]sm%[1]s, and %[1]sh%[1]s
+			units, such as %[1]s3600s%[1]s, %[1]s60m%[1]s, or %[1]s1h%[1]s. Only %[1]sGET%[1]s and %[1]sHEAD%[1]s REST requests and
+			GraphQL queries can be cached. Cached responses are stored on disk and reused until
+			they are older than the specified duration. Responses with status code %[1]s403%[1]s or %[1]s500%[1]s and
+			above are not cached. Changing the request method, URL, %[1]sAccept%[1]s header, authentication
+			token, or request body creates a separate cache entry. Run %[1]sgh config clear-cache%[1]s to
+			remove all cached responses.
+
 			In %[1]s--paginate%[1]s mode, all pages of results will sequentially be requested until
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
