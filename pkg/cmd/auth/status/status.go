@@ -37,6 +37,12 @@ type authEntry struct {
 	Token       string         `json:"token,omitempty"`
 	Scopes      string         `json:"scopes,omitempty"`
 	GitProtocol string         `json:"gitProtocol"`
+
+	// plainTextToken is true when the active token for this host is stored in
+	// plain text in the config file rather than the system keyring. It is used
+	// only to render a security warning and is intentionally excluded from JSON
+	// output so the machine-readable schema is unchanged.
+	plainTextToken bool `json:"-"`
 }
 
 type authStatus struct {
@@ -83,6 +89,12 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 					sb.WriteString(fmt.Sprintf("  - To request missing scopes, run: %s\n", cs.Bold(refreshInstructions)))
 				}
 			}
+		}
+
+		if e.plainTextToken {
+			sb.WriteString(fmt.Sprintf("  %s Token stored in plain text\n", cs.WarningIcon()))
+			loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
+			sb.WriteString(fmt.Sprintf("  - To store your token in the system keyring, run: %s\n", cs.Bold(loginInstructions)))
 		}
 
 	case authEntryStateError:
@@ -363,18 +375,22 @@ type buildEntryOptions struct {
 
 func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 	tokenSource := opts.tokenSource
-	if tokenSource == "oauth_token" {
+	// A source of "oauth_token" means the token was read from the config file in
+	// plain text rather than from the system keyring, so flag it for a warning.
+	plainTextToken := tokenSource == "oauth_token"
+	if plainTextToken {
 		// The go-gh function TokenForHost returns this value as source for tokens read from the
 		// config file, but we want the file path instead. This attempts to reconstruct it.
 		tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
 	}
 	entry := authEntry{
-		Active:      opts.active,
-		Host:        opts.hostname,
-		Login:       opts.username,
-		TokenSource: tokenSource,
-		Token:       opts.token,
-		GitProtocol: opts.gitProtocol,
+		Active:         opts.active,
+		Host:           opts.hostname,
+		Login:          opts.username,
+		TokenSource:    tokenSource,
+		Token:          opts.token,
+		GitProtocol:    opts.gitProtocol,
+		plainTextToken: plainTextToken,
 	}
 
 	// If token is not writeable, then it came from an environment variable and

@@ -145,6 +145,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h ghe.io
 			`),
 		},
 		{
@@ -166,6 +168,8 @@ func Test_statusRun(t *testing.T) {
 				  - Token scopes: 'repo'
 				  ! Missing required token scopes: 'read:org'
 				  - To request missing scopes, run: gh auth refresh -h ghe.io
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h ghe.io
 			`),
 		},
 		{
@@ -208,6 +212,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h ghe.io
 			`),
 		},
 		{
@@ -257,6 +263,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 
 				ghe.io
 				  ✓ Logged in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
@@ -264,6 +272,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: ssh
 				  - Token: gho_******
 				  - Token scopes: none
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h ghe.io
 			`),
 		},
 		{
@@ -306,6 +316,8 @@ func Test_statusRun(t *testing.T) {
 				  - Active account: true
 				  - Git operations protocol: https
 				  - Token: ghs_******
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 			`),
 		},
 		{
@@ -326,6 +338,48 @@ func Test_statusRun(t *testing.T) {
 				  - Active account: true
 				  - Git operations protocol: https
 				  - Token: github_pat_******
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
+			`),
+		},
+		{
+			name: "token stored in plain text warns",
+			opts: StatusOptions{},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				// login stores the token in plain text config (source "oauth_token")
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
+			`),
+		},
+		{
+			name: "token stored in keyring does not warn",
+			opts: StatusOptions{},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				// secureLogin stores the token in the (mock) keyring (source "keyring")
+				secureLogin(t, c, "github.com", "monalisa", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com account monalisa (keyring)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
 			`),
 		},
 		{
@@ -350,6 +404,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_abc123
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 
 				ghe.io
 				  ✓ Logged in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
@@ -357,6 +413,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_xyz456
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h ghe.io
 			`),
 		},
 		{
@@ -389,12 +447,16 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 
 				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: false
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org', 'project:read'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 			`),
 		},
 		{
@@ -428,6 +490,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 
 				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: false
@@ -436,6 +500,8 @@ func Test_statusRun(t *testing.T) {
 				  - Token scopes: 'repo'
 				  ! Missing required token scopes: 'read:org'
 				  - To request missing scopes, run: gh auth refresh -h github.com
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 
 				ghe.io
 				  ✓ Logged in to ghe.io account monalisa-ghe-2 (GH_ENTERPRISE_TOKEN)
@@ -470,6 +536,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 			`),
 		},
 		{
@@ -496,6 +564,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 
 				ghe.io
 				  ✓ Logged in to ghe.io account monalisa-ghe-2 (GH_CONFIG_DIR/hosts.yml)
@@ -503,6 +573,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: ssh
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h ghe.io
 			`),
 		},
 		{
@@ -530,6 +602,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: 'repo', 'read:org'
+				  ! Token stored in plain text
+				  - To store your token in the system keyring, run: gh auth login -h github.com
 
 				ghe.io
 				  X Failed to log in to ghe.io account monalisa-ghe-2 (GH_CONFIG_DIR/hosts.yml)
@@ -765,6 +839,16 @@ func login(t *testing.T, c gh.Config, hostname, username, token, protocol string
 	t.Helper()
 	_, err := c.Authentication().Login(hostname, username, token, protocol, false)
 	require.NoError(t, err)
+}
+
+// secureLogin logs in with secure (keyring) storage rather than plain text
+// config, so the resulting token source is "keyring" instead of "oauth_token".
+// NewIsolatedTestConfig sets up a mock keyring, so this uses it.
+func secureLogin(t *testing.T, c gh.Config, hostname, username, token, protocol string) {
+	t.Helper()
+	insecureUsed, err := c.Authentication().Login(hostname, username, token, protocol, true)
+	require.NoError(t, err)
+	require.False(t, insecureUsed, "expected secure (keyring) storage to be used")
 }
 
 // replaceAll replaces all instances of old with new in s, as well as all instances
