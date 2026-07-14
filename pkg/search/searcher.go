@@ -12,6 +12,7 @@ import (
 
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const (
@@ -270,12 +271,26 @@ func (s searcher) URL(query Query) string {
 	qs := url.Values{}
 	qs.Set("type", query.Kind)
 
+	// On GitHub.com, the code search GUI is powered by the code search backend,
+	// which ANDs repeated qualifiers instead of implicitly OR-ing them, so
+	// repo:/user: must be explicitly OR-grouped; otherwise multiple values
+	// produce an unsatisfiable query. See CodeSearchString.
+	//
+	// This is scoped to non-enterprise hosts because GHES may still serve code
+	// search from the legacy backend (which implicitly ORs those qualifiers and
+	// does not support the advanced syntax), mirroring the github.com-only
+	// handling of the `path` qualifier in the code search command.
+	//
 	// TODO advancedSearchFuture
 	// Currently, the global search GUI does not support the advanced issue
 	// search syntax (even for the issues/PRs tab on the sidebar). When the GUI
 	// is updated, we can use feature detection, and, if available, use the
 	// advanced search syntax.
-	qs.Set("q", query.StandardSearchString())
+	if query.Kind == KindCode && !ghauth.IsEnterprise(s.host) {
+		qs.Set("q", query.CodeSearchString())
+	} else {
+		qs.Set("q", query.StandardSearchString())
+	}
 
 	if query.Order != "" {
 		qs.Set(orderKey, query.Order)
