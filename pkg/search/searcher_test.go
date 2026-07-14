@@ -1256,6 +1256,57 @@ func TestSearcherURL(t *testing.T) {
 			},
 			url: "https://github.com/search?q=%22keyword+with+whitespace%22&type=repositories",
 		},
+		{
+			// https://github.com/cli/cli/issues/9252: the code search backend
+			// ANDs repeated repo: qualifiers, so they must be OR-grouped or the
+			// web query is unsatisfiable.
+			name: "code search OR-groups multiple repos",
+			query: Query{
+				Keywords: []string{"Note"},
+				Kind:     KindCode,
+				Qualifiers: Qualifiers{
+					Repo: []string{"jitran/fargate-cdk-deployer", "jitran/kubernetes-grafana-dashboards"},
+				},
+			},
+			url: "https://github.com/search?q=%28+Note+%29+%28repo%3Ajitran%2Ffargate-cdk-deployer+OR+repo%3Ajitran%2Fkubernetes-grafana-dashboards%29&type=code",
+		},
+		{
+			name: "code search OR-groups multiple owners",
+			query: Query{
+				Keywords: []string{"Note"},
+				Kind:     KindCode,
+				Qualifiers: Qualifiers{
+					User: []string{"microsoft", "google"},
+				},
+			},
+			url: "https://github.com/search?q=%28+Note+%29+%28user%3Agoogle+OR+user%3Amicrosoft%29&type=code",
+		},
+		{
+			name: "code search with a single repo is unchanged apart from keyword bracketing",
+			query: Query{
+				Keywords: []string{"panic"},
+				Kind:     KindCode,
+				Qualifiers: Qualifiers{
+					Repo: []string{"cli/cli"},
+				},
+			},
+			url: "https://github.com/search?q=%28+panic+%29+repo%3Acli%2Fcli&type=code",
+		},
+		{
+			// GHES may still serve code search from the legacy backend, which
+			// implicitly ORs repo:/user:, so we keep the legacy query string
+			// there to avoid regressing enterprise users.
+			name: "code search on an enterprise host keeps the legacy query string",
+			host: "enterprise.com",
+			query: Query{
+				Keywords: []string{"Note"},
+				Kind:     KindCode,
+				Qualifiers: Qualifiers{
+					Repo: []string{"foo/bar", "foo/baz"},
+				},
+			},
+			url: "https://enterprise.com/search?q=Note+repo%3Afoo%2Fbar+repo%3Afoo%2Fbaz&type=code",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
