@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -209,6 +211,10 @@ func Test_deleteRun(t *testing.T) {
 
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
+		}
+
+		tt.opts.Config = func() (gh.Config, error) {
+			return config.NewBlankConfig(), nil
 		}
 
 		reg := &httpmock.Registry{}

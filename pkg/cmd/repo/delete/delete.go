@@ -8,6 +8,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -21,6 +23,7 @@ type iprompter interface {
 
 type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
+	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
 	IO         *iostreams.IOStreams
@@ -32,6 +35,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Prompter:   f.Prompter,
 	}
@@ -89,7 +93,24 @@ func deleteRun(opts *DeleteOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+	authCfg := cfg.Authentication()
+
+	// Prototype of the api_host routing plan: route API traffic to a configured
+	// override host while the token is selected for the canonical hostname.
+	apiClient := api.NewClientFromHTTPWithAPIHost(
+		httpClient,
+		func(host string) string {
+			return config.ResolveAPIHost(cfg, host)
+		},
+		func(host string) string {
+			token, _ := authCfg.ActiveToken(host)
+			return token
+		},
+	)
 
 	var toDelete ghrepo.Interface
 
@@ -121,7 +142,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 	}
 
-	err = deleteRepo(httpClient, toDelete)
+	err = deleteRepo(httpClient, cfg, toDelete)
 	if err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) {
