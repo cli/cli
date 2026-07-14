@@ -1699,9 +1699,8 @@ func RepoLicenses(httpClient *http.Client, hostname string) ([]License, error) {
 
 // RepoLicense fetches an available repository license.
 // It uses API v3 because licenses are not supported by GraphQL.
-func RepoLicense(httpClient *http.Client, hostname string, licenseName string) (*License, error) {
+func RepoLicense(client *Client, hostname string, licenseName string) (*License, error) {
 	var license License
-	client := NewClientFromHTTP(httpClient)
 	path := fmt.Sprintf("licenses/%s", licenseName)
 	err := client.REST(hostname, "GET", path, nil, &license)
 	if err != nil {

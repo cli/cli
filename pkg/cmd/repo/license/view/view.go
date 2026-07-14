@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -93,7 +94,21 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	license, err := api.RepoLicense(client, hostname, opts.License)
+
+	// Prototype of the api_host routing plan: route API traffic to a configured
+	// override host while the token is selected for the canonical hostname.
+	apiClient := api.NewClientFromHTTPWithAPIHost(
+		client,
+		func(host string) string {
+			return config.ResolveAPIHost(cfg, host)
+		},
+		func(host string) string {
+			token, _ := cfg.Authentication().ActiveToken(host)
+			return token
+		},
+	)
+
+	license, err := api.RepoLicense(apiClient, hostname, opts.License)
 	if err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) {

@@ -1092,7 +1092,7 @@ func TestLicenseTemplateReturnsLicense(t *testing.T) {
 	client, _ := httpClient()
 	defer reg.Verify(t)
 
-	gotLicenseTemplate, err := RepoLicense(client, hostname, licenseTemplateName)
+	gotLicenseTemplate, err := RepoLicense(NewClientFromHTTP(client), hostname, licenseTemplateName)
 
 	assert.NoError(t, err, fmt.Sprintf("Expected no error while fetching /licenses/%v", licenseTemplateName))
 	assert.Equal(t, wantLicense, gotLicenseTemplate, fmt.Sprintf("License \"%v\" fetched is not as expected", licenseTemplateName))
@@ -1122,7 +1122,7 @@ func TestLicenseTemplateReturnsErrorWhenLicenseTemplateNotFound(t *testing.T) {
 	client, _ := httpClient()
 	defer reg.Verify(t)
 
-	_, err := RepoLicense(client, hostname, licenseTemplateName)
+	_, err := RepoLicense(NewClientFromHTTP(client), hostname, licenseTemplateName)
 
 	assert.Error(t, err, fmt.Sprintf("Expected error while fetching /licenses/%v", licenseTemplateName))
 }
