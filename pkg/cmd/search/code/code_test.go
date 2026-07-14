@@ -340,7 +340,7 @@ func TestCodeRun(t *testing.T) {
 				Searcher: search.NewSearcher(nil, "github.com", &fd.DisabledDetectorMock{}),
 				WebMode:  true,
 			},
-			wantBrowse: "https://github.com/search?q=map+path%3Atesting.go&type=code",
+			wantBrowse: "https://github.com/search?q=%28+map+%29+path%3Atesting.go&type=code",
 		},
 		{
 			name: "properly handles extension with dot prefix when converting to path qualifier",
@@ -358,7 +358,7 @@ func TestCodeRun(t *testing.T) {
 				Searcher: search.NewSearcher(nil, "github.com", &fd.DisabledDetectorMock{}),
 				WebMode:  true,
 			},
-			wantBrowse: "https://github.com/search?q=map+path%3Atesting.cpp&type=code",
+			wantBrowse: "https://github.com/search?q=%28+map+%29+path%3Atesting.cpp&type=code",
 		},
 		{
 			name: "does not convert filename and extension qualifiers for GHES web search",
