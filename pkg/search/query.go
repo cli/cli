@@ -165,6 +165,52 @@ func (q Query) AdvancedIssueSearchString() string {
 	return qualifiers
 }
 
+// CodeSearchString returns the string representation of the query compatible
+// with the GitHub code search backend, which powers the code search GUI (i.e.
+// github.com/search?type=code).
+//
+// Unlike the legacy search backend used for repositories and commits — which
+// implicitly ORs a handful of repeated qualifiers (e.g. repo:, user:) — the
+// code search backend ANDs repeated qualifiers. Multiple repo: or user:
+// qualifiers must therefore be explicitly grouped with an OR operator;
+// otherwise the query is unsatisfiable, since a file cannot belong to two
+// different repositories (or owners) at once. Code search supports the advanced
+// syntax (nested queries and explicit OR), so the special qualifiers are
+// grouped and keywords are bracketed to avoid operator leakage, mirroring
+// AdvancedIssueSearchString.
+//
+// The syntax is documented at https://docs.github.com/en/search-github/github-code-search/understanding-github-code-search-syntax
+func (q Query) CodeSearchString() string {
+	qualifiers := strings.Join(formatQualifiers(q.Qualifiers, formatCodeSearch), " ")
+	keywords := q.ImmutableKeywords
+	if keywords == "" {
+		keywords = strings.Join(formatKeywords(q.Keywords), " ")
+	}
+
+	if qualifiers == "" && keywords == "" {
+		return ""
+	}
+
+	if qualifiers != "" && keywords != "" {
+		// We should surround keywords with brackets to avoid leaking of any operators, especially "OR"s.
+		return fmt.Sprintf("( %s ) %s", keywords, qualifiers)
+	}
+
+	if keywords != "" {
+		return keywords
+	}
+	return qualifiers
+}
+
+func formatCodeSearch(qualifier string, vs []string) (s []string, applicable bool) {
+	switch qualifier {
+	case "user", "repo":
+		return []string{groupWithOR(qualifier, vs)}, true
+	}
+	// Let the default formatting take over
+	return nil, false
+}
+
 func formatAdvancedIssueSearch(qualifier string, vs []string) (s []string, applicable bool) {
 	switch qualifier {
 	case "in":
