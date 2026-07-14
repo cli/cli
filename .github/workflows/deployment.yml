@@ -126,7 +126,7 @@ jobs:
 
       - name: Add App Store Connect API key to keychain
         if: inputs.environment == 'production'
-        uses: nodeselector/setup-apple-codesign@ab275d0f6fb63ef9e20b12b42ea0d567f935723c
+        uses: nodeselector/setup-apple-codesign@309922bbe4c7277c477635e68d3a1af52d8ad06b
         id: setup-apple-codesign
         with:
           asset-type: "app-store-connect-api-key"
