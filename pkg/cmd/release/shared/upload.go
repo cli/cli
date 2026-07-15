@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -72,7 +74,33 @@ func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
 			MIMEType: typeForFilename(fi.Name()),
 		})
 	}
+
+	if dupes := duplicateAssetNames(assets); len(dupes) > 0 {
+		return nil, fmt.Errorf("multiple assets have the same filename: %s\n\nRelease asset names must be unique. Rename or remove the duplicates and try again.", strings.Join(dupes, ", "))
+	}
+
 	return
+}
+
+// duplicateAssetNames returns the asset names that appear more than once,
+// deduplicated and sorted. A GitHub release cannot hold two assets with the
+// same name, so callers use this to fail early rather than partway through an
+// upload.
+func duplicateAssetNames(assets []*AssetForUpload) []string {
+	counts := make(map[string]int, len(assets))
+	for _, a := range assets {
+		counts[a.Name]++
+	}
+
+	var dupes []string
+	for name, count := range counts {
+		if count > 1 {
+			dupes = append(dupes, name)
+		}
+	}
+
+	sort.Strings(dupes)
+	return dupes
 }
 
 func typeForFilename(fn string) string {
