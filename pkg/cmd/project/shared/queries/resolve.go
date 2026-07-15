@@ -149,7 +149,7 @@ type projectItemByURL struct {
 // resource exists but is not an item on the project.
 //
 // The projectItems connection is read with a bounded page size; very large
-// boards may exceed it (tracked upstream in planning-tracking#3332).
+// boards may exceed it.
 func (c *Client) ProjectItemIDByURL(rawURL, projectID string, projectNumber int32) (string, error) {
 	uri, err := url.Parse(rawURL)
 	if err != nil {

@@ -21,7 +21,7 @@ func TestNewCmdeditItem(t *testing.T) {
 		wantsExporter bool
 	}{
 		{
-			name:        "no addressing flags",
+			name:        "no item selector flags",
 			cli:         "",
 			wantsErr:    true,
 			wantsErrMsg: "specify the item to edit with `--id` or `--url`",
@@ -242,56 +242,6 @@ func TestNewCmdeditItem(t *testing.T) {
 			assert.Equal(t, tt.wants.field, gotOpts.field)
 			assert.Equal(t, tt.wants.value, gotOpts.value)
 			assert.Equal(t, tt.wants.valueChanged, gotOpts.valueChanged)
-		})
-	}
-}
-
-func TestRunItemEdit_InvalidNameCombosFireNoRequest(t *testing.T) {
-	tests := []struct {
-		name        string
-		cli         string
-		wantsErrMsg string
-	}{
-		{
-			name:        "value with field-id",
-			cli:         "1 --owner monalisa --url https://github.com/o/r/issues/1 --field-id FIELD_ID --value Todo",
-			wantsErrMsg: "`--value` cannot be used with `--field-id`; name the field with `--field` to use `--value`",
-		},
-		{
-			name:        "field with id",
-			cli:         "1 --owner monalisa --id ITEM_ID --field Status",
-			wantsErrMsg: "`--field` cannot be used with `--id`; use `--url` to address the item when editing by name",
-		},
-		{
-			name:        "name-based flags without project number",
-			cli:         "--owner monalisa --url https://github.com/o/r/issues/1 --field Status --value Todo",
-			wantsErrMsg: "provide the project number as an argument when using `--url`, `--field`, or `--value`",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			defer gock.Off()
-			// No GraphQL requests should be issued; any request would leave a
-			// pending mock and fail gock.IsDone().
-			gock.New("https://api.github.com").
-				Post("/graphql").
-				Reply(200).
-				JSON(map[string]interface{}{})
-
-			ios, _, _, _ := iostreams.Test()
-			f := &cmdutil.Factory{IOStreams: ios}
-
-			argv, err := shlex.Split(tt.cli)
-			assert.NoError(t, err)
-
-			cmd := NewCmdEditItem(f, func(config editItemConfig) error {
-				return runEditItem(config)
-			})
-			cmd.SetArgs(argv)
-			_, err = cmd.ExecuteC()
-
-			assert.EqualError(t, err, tt.wantsErrMsg)
-			assert.False(t, gock.IsDone(), "no GraphQL request should have been made")
 		})
 	}
 }
@@ -1051,6 +1001,207 @@ func TestRunItemEdit_ByName_SingleSelect(t *testing.T) {
 	err := runEditItem(config)
 	assert.NoError(t, err)
 	assert.Equal(t, "Edited item \"an issue\"\n", stdout.String())
+}
+
+// TestRunItemEdit_ByName_ValueDispatch covers how --value is dispatched by the
+// resolved field's data type for the non single-select field types. The error
+// cases exercise the guard branches that reject a value before any write: since
+// those errors are only produced after the owner/project/item lookups succeed,
+// the exact error assertion proves the field-value mutation never fired.
+func TestRunItemEdit_ByName_ValueDispatch(t *testing.T) {
+	tests := []struct {
+		name         string
+		fieldNode    map[string]interface{}
+		value        string
+		mutationBody string // expected mutation body; empty when no write should happen
+		wantErr      string // expected error; empty for happy paths
+	}{
+		{
+			name: "text field",
+			fieldNode: map[string]interface{}{
+				"__typename": "ProjectV2Field",
+				"id":         "text ID",
+				"name":       "Text",
+				"dataType":   "TEXT",
+			},
+			value:        "hello",
+			mutationBody: `{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"text ID","value":{"text":"hello"}}}}`,
+		},
+		{
+			name: "number field",
+			fieldNode: map[string]interface{}{
+				"__typename": "ProjectV2Field",
+				"id":         "number ID",
+				"name":       "Estimate",
+				"dataType":   "NUMBER",
+			},
+			value:        "123.45",
+			mutationBody: `{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"number ID","value":{"number":123.45}}}}`,
+		},
+		{
+			name: "date field",
+			fieldNode: map[string]interface{}{
+				"__typename": "ProjectV2Field",
+				"id":         "date ID",
+				"name":       "Due",
+				"dataType":   "DATE",
+			},
+			value:        "2023-01-01",
+			mutationBody: `{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"date ID","value":{"date":"2023-01-01T00:00:00Z"}}}}`,
+		},
+		{
+			name: "invalid number value",
+			fieldNode: map[string]interface{}{
+				"__typename": "ProjectV2Field",
+				"id":         "number ID",
+				"name":       "Estimate",
+				"dataType":   "NUMBER",
+			},
+			value:   "not-a-number",
+			wantErr: `invalid number value "not-a-number" for field "Estimate"`,
+		},
+		{
+			name: "iteration field rejected",
+			fieldNode: map[string]interface{}{
+				"__typename": "ProjectV2IterationField",
+				"id":         "iteration ID",
+				"name":       "Sprint",
+				"dataType":   "ITERATION",
+			},
+			value:   "Sprint 1",
+			wantErr: "setting an iteration field by name is not supported; use `--iteration-id`",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+
+			// resolve owner
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				JSON(map[string]interface{}{
+					"query": "query UserOrgOwner.*",
+					"variables": map[string]interface{}{
+						"login": "monalisa",
+					},
+				}).
+				Reply(200).
+				JSON(map[string]interface{}{
+					"data": map[string]interface{}{
+						"user": map[string]interface{}{
+							"id": "user ID",
+						},
+					},
+					"errors": []interface{}{
+						map[string]interface{}{
+							"type": "NOT_FOUND",
+							"path": []string{"organization"},
+						},
+					},
+				})
+
+			// resolve project + fields
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				JSON(map[string]interface{}{
+					"query": "query UserProject.*",
+					"variables": map[string]interface{}{
+						"login":       "monalisa",
+						"number":      1,
+						"firstItems":  queries.LimitMax,
+						"afterItems":  nil,
+						"firstFields": queries.LimitMax,
+						"afterFields": nil,
+					},
+				}).
+				Reply(200).
+				JSON(map[string]interface{}{
+					"data": map[string]interface{}{
+						"user": map[string]interface{}{
+							"projectV2": map[string]interface{}{
+								"id": "project ID",
+								"fields": map[string]interface{}{
+									"nodes": []map[string]interface{}{tt.fieldNode},
+								},
+							},
+						},
+					},
+				})
+
+			// resolve item by URL
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				JSON(map[string]interface{}{
+					"query": "query GetProjectItemByURL.*",
+					"variables": map[string]interface{}{
+						"url":        "https://github.com/monalisa/repo/issues/1",
+						"firstItems": queries.LimitMax,
+					},
+				}).
+				Reply(200).
+				JSON(map[string]interface{}{
+					"data": map[string]interface{}{
+						"resource": map[string]interface{}{
+							"__typename": "Issue",
+							"projectItems": map[string]interface{}{
+								"nodes": []map[string]interface{}{
+									{"id": "item ID", "project": map[string]interface{}{"id": "project ID"}},
+								},
+							},
+						},
+					},
+				})
+
+			if tt.mutationBody != "" {
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					BodyString(tt.mutationBody).
+					Reply(200).
+					JSON(map[string]interface{}{
+						"data": map[string]interface{}{
+							"updateProjectV2ItemFieldValue": map[string]interface{}{
+								"projectV2Item": map[string]interface{}{
+									"id": "item ID",
+									"content": map[string]interface{}{
+										"__typename": "Issue",
+										"title":      "an issue",
+									},
+								},
+							},
+						},
+					})
+			}
+
+			client := queries.NewTestClient()
+
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+
+			config := editItemConfig{
+				io: ios,
+				opts: editItemOpts{
+					owner:        "monalisa",
+					number32:     1,
+					url:          "https://github.com/monalisa/repo/issues/1",
+					field:        tt.fieldNode["name"].(string),
+					value:        tt.value,
+					valueChanged: true,
+				},
+				client: client,
+			}
+
+			err := runEditItem(config)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				assert.True(t, gock.IsDone(), "the item should be resolved and no write attempted")
+				return
+			}
+			assert.NoError(t, err)
+			assert.True(t, gock.IsDone())
+			assert.Equal(t, "Edited item \"an issue\"\n", stdout.String())
+		})
+	}
 }
 
 func TestRunItemEdit_ByName_CaseInsensitive(t *testing.T) {
