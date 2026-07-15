@@ -114,8 +114,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user")
 	listCmd.Flags().StringVar(&opts.query, "query", "", `Filter items using the Projects filter syntax, e.g. "assignee:octocat -status:Done"`)
-	listCmd.Flags().StringArrayVar(&opts.fields, "field", nil, "Name of a field to show as an extra column (repeatable; conflicts with `--field-id`)")
-	listCmd.Flags().StringArrayVar(&opts.fieldIDs, "field-id", nil, "ID of a field to show as an extra column (repeatable; conflicts with `--field`)")
+	listCmd.Flags().StringArrayVar(&opts.fields, "field", nil, "Name of a field to show as an extra column (repeatable)")
+	listCmd.Flags().StringArrayVar(&opts.fieldIDs, "field-id", nil, "ID of a field to show as an extra column (repeatable)")
 	cmdutil.AddFormatFlags(listCmd, &opts.exporter)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of items to fetch")
 
