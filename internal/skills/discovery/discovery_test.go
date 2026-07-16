@@ -1316,6 +1316,32 @@ func TestDiscoverSkillByPath(t *testing.T) {
 			wantNS:   "hashicorp",
 		},
 		{
+			name:      "extra directories after skills are not treated as namespace",
+			skillPath: "catalog/skills/group/sub/lint",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/contents/catalog%2Fskills%2Fgroup%2Fsub"),
+					httpmock.JSONResponse([]map[string]interface{}{
+						{"name": "lint", "path": "catalog/skills/group/sub/lint", "sha": "tree-sha", "type": "dir"},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "tree-sha", "truncated": false,
+						"tree": []map[string]interface{}{
+							{"path": "SKILL.md", "type": "blob", "sha": "blob-sha"},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/blob-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "blob-sha", "encoding": "base64", "content": "IyBTa2lsbA==",
+					}))
+			},
+			wantName:       "lint",
+			wantConvention: "nested",
+		},
+		{
 			name:      "plugins path sets namespace and convention",
 			skillPath: "plugins/hubot/skills/pr-summary",
 			stubs: func(reg *httpmock.Registry) {

@@ -739,25 +739,34 @@ func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commi
 	}
 
 	var namespace, convention string
-	parts := strings.Split(skillPath, "/")
-	for i, p := range parts {
-		if p != "skills" {
-			continue
-		}
+	match := matchSkillConventions(treeEntry{Path: skillPath + "/SKILL.md", Type: "blob"})
+	if match == nil {
+		match = matchHiddenDirConventions(treeEntry{Path: skillPath + "/SKILL.md", Type: "blob"})
+	}
+	if match != nil {
+		namespace = match.namespace
+		convention = match.convention
+	} else {
+		parts := strings.Split(skillPath, "/")
+		for i, p := range parts {
+			if p != "skills" {
+				continue
+			}
 
-		// Plugin convention: .../plugins/<ns>/skills/<name>
-		if i >= 2 && parts[i-2] == "plugins" {
-			namespace = parts[i-1]
-			convention = "plugins"
+			// Plugin convention: .../plugins/<ns>/skills/<name>
+			if i >= 2 && parts[i-2] == "plugins" {
+				namespace = parts[i-1]
+				convention = "plugins"
+				break
+			}
+
+			// Namespaced skill convention: .../skills/<ns>/<name>
+			afterSkills := parts[i+1:]
+			if len(afterSkills) >= 2 {
+				namespace = afterSkills[0]
+			}
 			break
 		}
-
-		// Namespaced skill convention: .../skills/<ns>/<name>
-		afterSkills := parts[i+1:]
-		if len(afterSkills) >= 2 {
-			namespace = afterSkills[0]
-		}
-		break
 	}
 
 	skill := &Skill{

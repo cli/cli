@@ -221,7 +221,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 				return err
 			}
 
-			if opts.Pin != "" && opts.SkillName != "" && strings.Contains(opts.SkillName, "@") {
+			if opts.Pin != "" && opts.SkillName != "" && strings.Contains(opts.SkillName, "@") && !strings.HasSuffix(opts.SkillName, "/SKILL.md") {
 				return cmdutil.FlagErrorf("cannot use --pin with an inline @version in the skill name")
 			}
 
@@ -338,7 +338,7 @@ func installRun(opts *InstallOptions) error {
 	// to the original source repo. If detected, offer to install directly
 	// from upstream instead.
 	if len(selectedSkills) == 1 && selectedSkills[0].BlobSHA != "" {
-		upstreamRepo, detected, err := checkUpstreamProvenance(opts, apiClient, hostname, selectedSkills[0], resolved.SHA)
+		upstreamRepo, upstreamPath, detected, err := checkUpstreamProvenance(opts, apiClient, hostname, selectedSkills[0], resolved.SHA)
 		if err != nil {
 			return err
 		}
@@ -358,6 +358,13 @@ func installRun(opts *InstallOptions) error {
 			})
 			opts.repo = upstreamRepo
 			opts.SkillSource = ghrepo.FullName(upstreamRepo)
+			if discovery.IsSkillPath(opts.SkillName) {
+				if upstreamPath == "" {
+					opts.SkillName = selectedSkills[0].Name
+				} else {
+					opts.SkillName = strings.TrimSuffix(upstreamPath, "/SKILL.md") + "/SKILL.md"
+				}
+			}
 			opts.version = ""
 			opts.Pin = ""
 			return installRun(opts)
@@ -594,7 +601,7 @@ func resolveRepoArg(skillSource string, canPrompt bool, p prompter.Prompter) (gh
 }
 
 func parseSkillFromOpts(opts *InstallOptions) {
-	if opts.SkillName != "" {
+	if opts.SkillName != "" && !strings.HasSuffix(opts.SkillName, "/SKILL.md") {
 		if name, version, ok := cutLast(opts.SkillName, "@"); ok && name != "" {
 			opts.version = version
 			opts.SkillName = name
@@ -796,10 +803,17 @@ func listAvailableSkills(opts *InstallOptions, skills []discovery.Skill, sel ski
 }
 
 func matchSkillByName(opts *InstallOptions, skills []discovery.Skill) ([]discovery.Skill, error) {
+	var displayMatches []discovery.Skill
 	for _, s := range skills {
 		if s.DisplayName() == opts.SkillName {
-			return []discovery.Skill{s}, nil
+			displayMatches = append(displayMatches, s)
 		}
+	}
+	if len(displayMatches) == 1 {
+		return displayMatches, nil
+	}
+	if len(displayMatches) > 1 {
+		return nil, ambiguousSkillNameError(opts.SkillName, displayMatches)
 	}
 
 	var matches []discovery.Skill
@@ -815,24 +829,65 @@ func matchSkillByName(opts *InstallOptions, skills []discovery.Skill) ([]discove
 	case 1:
 		return matches, nil
 	default:
-		names := make([]string, len(matches))
-		for i, m := range matches {
-			names[i] = m.DisplayName()
-		}
-		return nil, fmt.Errorf(
-			"skill name %q is ambiguous, multiple matches found:\n  %s\n  Specify the full name (e.g. %s) to disambiguate",
-			opts.SkillName, strings.Join(names, "\n  "), names[0],
-		)
+		return nil, ambiguousSkillNameError(opts.SkillName, matches)
 	}
 }
 
+func ambiguousSkillNameError(name string, matches []discovery.Skill) error {
+	paths := make([]string, len(matches))
+	for i, match := range matches {
+		paths[i] = strings.TrimSuffix(match.Path, "/SKILL.md") + "/SKILL.md"
+	}
+	return fmt.Errorf(
+		"skill name %q is ambiguous, multiple matches found:\n  %s\n  Specify an exact SKILL.md path (e.g. %s) to disambiguate",
+		name, strings.Join(paths, "\n  "), paths[0],
+	)
+}
+
 func matchLocalSkillByName(opts *InstallOptions, skills []discovery.Skill) ([]discovery.Skill, error) {
-	for _, s := range skills {
-		if s.DisplayName() == opts.SkillName || s.Name == opts.SkillName {
-			return []discovery.Skill{s}, nil
+	skillPath := strings.TrimSuffix(opts.SkillName, "/SKILL.md")
+	for _, skill := range skills {
+		if skill.Path == skillPath {
+			return []discovery.Skill{skill}, nil
 		}
 	}
+
+	var displayMatches []discovery.Skill
+	for _, s := range skills {
+		if s.DisplayName() == opts.SkillName {
+			displayMatches = append(displayMatches, s)
+		}
+	}
+	if len(displayMatches) == 1 {
+		return displayMatches, nil
+	}
+	if len(displayMatches) > 1 {
+		return nil, ambiguousSkillNameError(opts.SkillName, displayMatches)
+	}
+
+	var matches []discovery.Skill
+	for _, skill := range skills {
+		if skill.Name == opts.SkillName {
+			matches = append(matches, skill)
+		}
+	}
+	if len(matches) == 1 {
+		return matches, nil
+	}
+	if len(matches) > 1 {
+		return nil, ambiguousSkillNameError(opts.SkillName, matches)
+	}
+
 	return nil, fmt.Errorf("skill %q not found in local directory", opts.SkillName)
+}
+
+func skillSelectionKey(skill discovery.Skill, skills []discovery.Skill) string {
+	for _, other := range skills {
+		if other.Path != skill.Path && other.DisplayName() == skill.DisplayName() {
+			return strings.TrimSuffix(skill.Path, "/SKILL.md") + "/SKILL.md"
+		}
+	}
+	return skill.DisplayName()
 }
 
 // skillSearchFunc returns a search function for MultiSelectWithSearch that
@@ -861,11 +916,11 @@ func skillSearchFunc(skills []discovery.Skill, descWidth int) func(string) promp
 		keys := make([]string, len(matched))
 		labels := make([]string, len(matched))
 		for i, s := range matched {
-			keys[i] = s.DisplayName()
+			keys[i] = skillSelectionKey(s, skills)
 			if s.Description != "" {
-				labels[i] = fmt.Sprintf("%s - %s", s.DisplayName(), truncateDescription(s.Description, descWidth))
+				labels[i] = fmt.Sprintf("%s - %s", keys[i], truncateDescription(s.Description, descWidth))
 			} else {
-				labels[i] = s.DisplayName()
+				labels[i] = keys[i]
 			}
 		}
 
@@ -886,7 +941,7 @@ func matchSelectedSkills(skills []discovery.Skill, selected []string) ([]discove
 
 	var result []discovery.Skill
 	for _, s := range skills {
-		if _, ok := nameSet[s.DisplayName()]; ok {
+		if _, ok := nameSet[skillSelectionKey(s, skills)]; ok {
 			result = append(result, s)
 		}
 	}
@@ -1295,8 +1350,8 @@ func filterHiddenDirSkills(opts *InstallOptions, allSkills []discovery.Skill) ([
 // In interactive mode, the user is asked whether to install from the
 // re-publisher or redirect to the upstream. Non-interactive mode always
 // installs from the re-publisher.
-// Returns (repo to redirect to, whether upstream was detected, error).
-func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname string, skill discovery.Skill, commitSHA string) (ghrepo.Interface, bool, error) {
+// Returns (repo to redirect to, path in that repo, whether upstream was detected, error).
+func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname string, skill discovery.Skill, commitSHA string) (ghrepo.Interface, string, bool, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/contents/%s?ref=%s",
 		opts.repo.RepoOwner(), opts.repo.RepoName(),
 		skill.Path+"/SKILL.md", commitSHA)
@@ -1305,37 +1360,38 @@ func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname 
 		Encoding string `json:"encoding"`
 	}
 	if err := client.REST(hostname, "GET", apiPath, nil, &fileResp); err != nil {
-		return nil, false, nil //nolint:nilerr // best-effort check; failing to fetch is not fatal
+		return nil, "", false, nil //nolint:nilerr // best-effort check; failing to fetch is not fatal
 	}
 	if fileResp.Encoding != "base64" {
-		return nil, false, nil
+		return nil, "", false, nil
 	}
 	decoded, decodeErr := io.ReadAll(base64.NewDecoder(base64.StdEncoding, strings.NewReader(fileResp.Content)))
 	if decodeErr != nil {
-		return nil, false, nil //nolint:nilerr // best-effort; decode failure is not fatal
+		return nil, "", false, nil //nolint:nilerr // best-effort; decode failure is not fatal
 	}
 	content := string(decoded)
 
 	result, parseErr := frontmatter.Parse(content)
 	if parseErr != nil || result.Metadata.Meta == nil {
 		//nolint:nilerr // unparseable frontmatter means no upstream to detect
-		return nil, false, nil
+		return nil, "", false, nil
 	}
 
 	existingRepo, _ := result.Metadata.Meta["github-repo"].(string)
 	if existingRepo == "" {
-		return nil, false, nil
+		return nil, "", false, nil
 	}
+	upstreamPath, _ := result.Metadata.Meta["github-path"].(string)
 
 	currentRepoURL := source.BuildRepoURL(hostname, opts.repo.RepoOwner(), opts.repo.RepoName())
 	if existingRepo == currentRepoURL {
-		return nil, false, nil
+		return nil, "", false, nil
 	}
 
 	upstreamRepo, parseErr := source.ParseRepoURL(existingRepo)
 	if parseErr != nil {
 		//nolint:nilerr // invalid repo URL means we can't redirect; install normally
-		return nil, false, nil
+		return nil, "", false, nil
 	}
 
 	cs := opts.IO.ColorScheme()
@@ -1346,12 +1402,12 @@ func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname 
 
 	if opts.Upstream {
 		fmt.Fprintf(opts.IO.ErrOut, "Redirecting install to %s...\n", upstreamLabel)
-		return upstreamRepo, true, nil
+		return upstreamRepo, upstreamPath, true, nil
 	}
 
 	if !opts.IO.CanPrompt() {
 		fmt.Fprintf(opts.IO.ErrOut, "  Installing from %s (use --upstream or interactive mode to choose upstream)\n", repoSource)
-		return nil, true, nil
+		return nil, "", true, nil
 	}
 
 	choices := []string{
@@ -1360,13 +1416,13 @@ func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname 
 	}
 	idx, err := opts.Prompter.Select("Install from:", "", choices)
 	if err != nil {
-		return nil, true, err
+		return nil, "", true, err
 	}
 
 	if idx == 1 {
 		fmt.Fprintf(opts.IO.ErrOut, "Redirecting install to %s...\n", upstreamLabel)
-		return upstreamRepo, true, nil
+		return upstreamRepo, upstreamPath, true, nil
 	}
 
-	return nil, true, nil
+	return nil, "", true, nil
 }

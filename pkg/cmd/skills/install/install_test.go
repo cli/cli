@@ -141,6 +141,11 @@ func TestNewCmdInstall(t *testing.T) {
 			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Scope: "project", Upstream: true},
 		},
 		{
+			name:     "exact path containing at sign with pin",
+			cli:      "monalisa/skills-repo packages/@acme/lint/SKILL.md --pin v1.0.0",
+			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "packages/@acme/lint/SKILL.md", Scope: "project", Pin: "v1.0.0"},
+		},
+		{
 			name:    "from-local with --upstream is mutually exclusive",
 			cli:     "--from-local ./local-dir --upstream",
 			wantErr: true,
@@ -209,6 +214,53 @@ func TestNewCmdInstall(t *testing.T) {
 			assert.NotNil(t, cmd.Flags().Lookup(flag), "missing flag: --%s", flag)
 		}
 	})
+}
+
+func TestParseSkillFromOpts(t *testing.T) {
+	tests := []struct {
+		name        string
+		skillName   string
+		pin         string
+		wantName    string
+		wantVersion string
+	}{
+		{
+			name:        "skill name with inline version",
+			skillName:   "lint@v1.0.0",
+			wantName:    "lint",
+			wantVersion: "v1.0.0",
+		},
+		{
+			name:        "exact path with inline version",
+			skillName:   "category/lint/SKILL.md@v1.0.0",
+			wantName:    "category/lint/SKILL.md",
+			wantVersion: "v1.0.0",
+		},
+		{
+			name:        "exact path containing at sign",
+			skillName:   "packages/@acme/lint/SKILL.md",
+			wantName:    "packages/@acme/lint/SKILL.md",
+			wantVersion: "",
+		},
+		{
+			name:        "exact path containing at sign with pin",
+			skillName:   "packages/@acme/lint/SKILL.md",
+			pin:         "v2.0.0",
+			wantName:    "packages/@acme/lint/SKILL.md",
+			wantVersion: "v2.0.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &InstallOptions{SkillName: tt.skillName, Pin: tt.pin}
+
+			parseSkillFromOpts(opts)
+
+			assert.Equal(t, tt.wantName, opts.SkillName)
+			assert.Equal(t, tt.wantVersion, opts.version)
+		})
+	}
 }
 
 // --- HTTP stub helpers ---
@@ -635,7 +687,34 @@ func TestInstallRun(t *testing.T) {
 					Dir:          t.TempDir(),
 				}
 			},
-			wantErr: "ambiguous",
+			wantErr: "Specify an exact SKILL.md path",
+		},
+		{
+			name:  "remote install ambiguous nested skill name errors",
+			isTTY: false,
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				treeJSON := `{"path": "category-a/lint", "type": "tree", "sha": "treeA"}, ` +
+					`{"path": "category-a/lint/SKILL.md", "type": "blob", "sha": "blobA"}, ` +
+					`{"path": "category-b/lint", "type": "tree", "sha": "treeB"}, ` +
+					`{"path": "category-b/lint/SKILL.md", "type": "blob", "sha": "blobB"}`
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123", treeJSON)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "lint",
+					Agent:        "github-copilot",
+					Scope:        "project",
+					ScopeChanged: true,
+					Dir:          t.TempDir(),
+				}
+			},
+			wantErr: "Specify an exact SKILL.md path",
 		},
 		{
 			name:  "remote install namespaced exact match resolves ambiguity",
@@ -2516,6 +2595,37 @@ func Test_selectSkillsWithSelector_noDisclaimer(t *testing.T) {
 	assert.NotContains(t, stderr.String(), "not verified by GitHub")
 }
 
+func TestNestedSkillSelectionUsesExactPaths(t *testing.T) {
+	skills := []discovery.Skill{
+		{Name: "lint", Convention: "nested", Path: "category-a/lint"},
+		{Name: "lint", Convention: "nested", Path: "category-b/lint"},
+	}
+
+	result := skillSearchFunc(skills, 80)("")
+
+	assert.Equal(t, []string{"category-a/lint/SKILL.md", "category-b/lint/SKILL.md"}, result.Keys)
+
+	selected, err := matchSelectedSkills(skills, []string{"category-b/lint/SKILL.md"})
+	require.NoError(t, err)
+	require.Len(t, selected, 1)
+	assert.Equal(t, "category-b/lint", selected[0].Path)
+}
+
+func TestMatchLocalSkillByNameRejectsAmbiguousNestedNames(t *testing.T) {
+	skills := []discovery.Skill{
+		{Name: "lint", Convention: "nested", Path: "category-a/lint"},
+		{Name: "lint", Convention: "nested", Path: "category-b/lint"},
+	}
+
+	_, err := matchLocalSkillByName(&InstallOptions{SkillName: "lint"}, skills)
+	require.ErrorContains(t, err, "Specify an exact SKILL.md path")
+
+	selected, err := matchLocalSkillByName(&InstallOptions{SkillName: "category-b/lint/SKILL.md"}, skills)
+	require.NoError(t, err)
+	require.Len(t, selected, 1)
+	assert.Equal(t, "category-b/lint", selected[0].Path)
+}
+
 func TestInstallRun_TelemetryVisibility(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -2858,6 +2968,46 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 					Telemetry:    &telemetry.NoOpService{},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
+					Agent:        "github-copilot",
+					Scope:        "project",
+					ScopeChanged: true,
+					Dir:          t.TempDir(),
+					Upstream:     true,
+				}
+			},
+			wantStderr: "Redirecting install to monalisa/original-skills",
+			wantStdout: "Installed git-commit",
+		},
+		{
+			name:  "exact path redirect uses upstream metadata path",
+			isTTY: false,
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubSkillByPath(reg, "monalisa", "skills-repo", "abc123",
+					"catalog/git-commit", "git-commit", "treeSHA")
+				stubInstallFiles(reg, "monalisa", "skills-repo",
+					"treeSHA", "blobSHA", republishedContent)
+				stubContentsAPI(reg, "monalisa", "skills-repo",
+					"catalog/git-commit/SKILL.md", republishedContent)
+
+				stubResolveVersion(reg, "monalisa", "original-skills", "v2.0.0", "upstream456")
+				stubSkillByPath(reg, "monalisa", "original-skills", "upstream456",
+					"skills/git-commit", "git-commit", "upTreeSHA")
+				stubInstallFiles(reg, "monalisa", "original-skills",
+					"upTreeSHA", "upBlobSHA", gitCommitContent)
+				stubContentsAPI(reg, "monalisa", "original-skills",
+					"skills/git-commit/SKILL.md", gitCommitContent)
+				stubInstallFiles(reg, "monalisa", "original-skills",
+					"upTreeSHA", "upBlobSHA", gitCommitContent)
+			},
+			opts: func(t *testing.T, ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					Telemetry:    &telemetry.NoOpService{},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "catalog/git-commit/SKILL.md",
 					Agent:        "github-copilot",
 					Scope:        "project",
 					ScopeChanged: true,
