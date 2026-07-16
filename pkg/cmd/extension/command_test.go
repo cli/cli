@@ -898,6 +898,32 @@ func TestNewCmdExtension(t *testing.T) {
 			isTTY:      true,
 			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
+		{
+			name: "force install with pin when present",
+			args: []string{"install", "owner/gh-hello", "--force", "--pin", "v1.2.3"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{
+						&Extension{path: "owner/gh-hello", owner: "owner"},
+					}
+				}
+				em.RemoveFunc = func(name string) error {
+					assert.Equal(t, "hello", name)
+					return nil
+				}
+				em.InstallFunc = func(repo ghrepo.Interface, pin string) error {
+					assert.Equal(t, "gh-hello", repo.RepoName())
+					assert.Equal(t, "v1.2.3", pin)
+					return nil
+				}
+				return func(t *testing.T) {
+					assert.Len(t, em.RemoveCalls(), 1)
+					assert.Len(t, em.InstallCalls(), 1)
+					assert.Empty(t, em.UpgradeCalls())
+				}
+			},
+			wantStdout: "",
+		},
 	}
 
 	for _, tt := range tests {
