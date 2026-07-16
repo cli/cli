@@ -205,7 +205,7 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	editItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	editItemCmd.Flags().StringVar(&opts.url, "url", "", "URL of the issue or pull request whose project item to edit")
 	editItemCmd.Flags().StringVar(&opts.field, "field", "", "Name of the field to update")
-	editItemCmd.Flags().StringVar(&opts.value, "value", "", "Value for the field named by `--field`; for single-select fields this is the option name (conflicts with `--text`, `--number`, `--date`, `--single-select-option-id` and `--iteration-id`)")
+	editItemCmd.Flags().StringVar(&opts.value, "value", "", "Value to set on the field named by `--field`")
 
 	editItemCmd.Flags().StringVar(&opts.title, "title", "", "Title of the draft issue item")
 	editItemCmd.Flags().StringVar(&opts.body, "body", "", "Body of the draft issue item")
