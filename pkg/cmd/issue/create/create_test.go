@@ -822,6 +822,50 @@ func Test_createRun(t *testing.T) {
 			wantsErr: `type "Bugz" not found; available types: Bug, Feature, Task`,
 		},
 		{
+			name: "create with type that cannot be set",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "bug title",
+				Body:      "bug body",
+				IssueType: "Bug",
+			},
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "issueTypes": { "nodes": [
+							{ "id": "IT_1", "name": "Bug", "description": "", "color": "d73a4a" }
+						] } } } }`))
+				// The issue exists by now; the type cannot be applied because
+				// the user lacks permission on the repository.
+				r.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.StringResponse(`
+						{ "errors": [
+							{
+								"type": "FORBIDDEN",
+								"message": "monalisa does not have the correct permissions to execute `+"`UpdateIssueIssueType`"+`"
+							}
+						] }`))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n! Issue created, but not all fields could be set: GraphQL: monalisa does not have the correct permissions to execute `UpdateIssueIssueType`\n",
+		},
+		{
 			name: "create with parent",
 			opts: CreateOptions{
 				Detector: &fd.EnabledDetectorMock{},

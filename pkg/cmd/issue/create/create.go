@@ -417,8 +417,13 @@ func createRun(opts *CreateOptions) (err error) {
 		if err != nil {
 			return
 		}
-		if err = api.DeferredUpdateIssue(apiClient, updateOpts); err != nil {
-			return
+		// The issue exists by now, so failing to apply the deferred fields is
+		// not a failure of the whole operation. Returning the error here would
+		// make PreserveInput write a recovery file and print "operation
+		// failed", implying the issue was never created.
+		if updateErr := api.DeferredUpdateIssue(apiClient, updateOpts); updateErr != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Issue created, but not all fields could be set: %s\n",
+				opts.IO.ColorScheme().WarningIcon(), updateErr)
 		}
 
 		fmt.Fprintln(opts.IO.Out, newIssue.URL)
