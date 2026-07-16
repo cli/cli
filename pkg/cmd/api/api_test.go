@@ -642,6 +642,36 @@ func Test_apiRun(t *testing.T) {
 			isatty: false,
 		},
 		{
+			name: "jq filter when non-JSON error",
+			options: ApiOptions{
+				FilterOutput: `.[].name`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 503,
+				Body:       io.NopCloser(bytes.NewBufferString(`<!DOCTYPE html><html><head><title>Unicorn!</title></head></html>`)),
+				Header:     http.Header{"Content-Type": []string{"text/html; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `<!DOCTYPE html><html><head><title>Unicorn!</title></head></html>`,
+			stderr: "gh: HTTP 503\n",
+			isatty: false,
+		},
+		{
+			name: "output template when non-JSON error",
+			options: ApiOptions{
+				Template: `{{.status}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 503,
+				Body:       io.NopCloser(bytes.NewBufferString(`<!DOCTYPE html><html><head><title>Unicorn!</title></head></html>`)),
+				Header:     http.Header{"Content-Type": []string{"text/html; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `<!DOCTYPE html><html><head><title>Unicorn!</title></head></html>`,
+			stderr: "gh: HTTP 503\n",
+			isatty: false,
+		},
+		{
 			name: "jq filter outputting JSON to a TTY",
 			options: ApiOptions{
 				FilterOutput: `.`,

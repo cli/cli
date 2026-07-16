@@ -484,6 +484,11 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 				return
 			}
 		}
+	} else if !isJSON && resp.StatusCode >= 400 {
+		// A non-JSON error body (e.g. an HTML maintenance page) cannot be
+		// filtered with `--jq` or `--template`; report the HTTP error and
+		// pass the body through raw instead.
+		serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
 
 	var bodyCopy *bytes.Buffer
