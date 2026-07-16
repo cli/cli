@@ -378,6 +378,38 @@ func TestInstallRun(t *testing.T) {
 			wantStdout: "Installed git-commit",
 		},
 		{
+			name:  "remote install discovers nested skill without skills directory",
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				treeJSON := `{"path": "performance/r8-analyzer", "type": "tree", "sha": "treeSHA"}, ` +
+					`{"path": "performance/r8-analyzer/SKILL.md", "type": "blob", "sha": "blobSHA"}`
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123", treeJSON)
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", heredoc.Doc(`
+					---
+					name: r8-analyzer
+					description: Analyzes R8 rules
+					---
+					# R8 Analyzer
+				`))
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "r8-analyzer",
+					Agent:        "github-copilot",
+					Scope:        "project",
+					ScopeChanged: true,
+					Dir:          t.TempDir(),
+				}
+			},
+			wantStdout: "Installed r8-analyzer",
+		},
+		{
 			name:  "remote install with --agent claude-code",
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {

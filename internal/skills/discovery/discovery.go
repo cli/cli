@@ -465,8 +465,12 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 		return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "skills-namespaced"}
 	}
 
-	if parentDir == "." && skillName != "skills" && skillName != "plugins" && !strings.HasPrefix(skillName, ".") {
-		return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: "root"}
+	if !hasHiddenSegment(entry.Path) && !hasPluginsAncestor(entry.Path) && skillName != "skills" && skillName != "plugins" {
+		convention := "nested"
+		if parentDir == "." {
+			convention = "root"
+		}
+		return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: convention}
 	}
 
 	return nil
@@ -539,8 +543,7 @@ func DiscoverSkills(client *api.Client, host, owner, repo, commitSHA string) ([]
 	if len(skills) == 0 {
 		return nil, fmt.Errorf(
 			"no skills found in %s/%s\n"+
-				"  Expected skills in skills/*/SKILL.md, skills/{scope}/*/SKILL.md,\n"+
-				"  */SKILL.md, or plugins/*/skills/*/SKILL.md\n"+
+				"  Expected a SKILL.md file in a non-hidden skill directory\n"+
 				"  This repository may be a curated list rather than a skills publisher",
 			owner, repo,
 		)
@@ -591,9 +594,7 @@ func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA 
 	if len(matches) == 0 {
 		return nil, fmt.Errorf(
 			"no skills found in %s/%s\n"+
-				"  Expected skills in skills/*/SKILL.md, skills/{scope}/*/SKILL.md,\n"+
-				"  {prefix}/skills/*/SKILL.md, {prefix}/skills/{scope}/*/SKILL.md,\n"+
-				"  */SKILL.md, or plugins/*/skills/*/SKILL.md\n"+
+				"  Expected a SKILL.md file in a supported skill directory\n"+
 				"  This repository may be a curated list rather than a skills publisher",
 			owner, repo,
 		)
@@ -911,8 +912,7 @@ func DiscoverLocalSkills(dir string) ([]Skill, error) {
 	if len(skills) == 0 {
 		return nil, fmt.Errorf(
 			"no skills found in %s\n"+
-				"  Expected SKILL.md in the directory, or skills in skills/*/SKILL.md,\n"+
-				"  skills/{scope}/*/SKILL.md, */SKILL.md, or plugins/*/skills/*/SKILL.md",
+				"  Expected the directory or a non-hidden skill subdirectory to contain SKILL.md",
 			dir,
 		)
 	}
@@ -995,10 +995,7 @@ func DiscoverLocalSkillsWithOptions(dir string, opts DiscoverOptions) ([]Skill, 
 	if len(skills) == 0 {
 		return nil, fmt.Errorf(
 			"no skills found in %s\n"+
-				"  Expected SKILL.md in the directory, or skills in skills/*/SKILL.md,\n"+
-				"  skills/{scope}/*/SKILL.md, {prefix}/skills/*/SKILL.md,\n"+
-				"  {prefix}/skills/{scope}/*/SKILL.md, */SKILL.md, or\n"+
-				"  plugins/*/skills/*/SKILL.md",
+				"  Expected the directory or a supported skill subdirectory to contain SKILL.md",
 			dir,
 		)
 	}

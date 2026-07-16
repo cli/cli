@@ -446,8 +446,9 @@ func TestExtractSkillInfo(t *testing.T) {
 		{"my-skill/SKILL.md", "my-skill", ""},
 		// Plugins convention
 		{"plugins/openai/skills/chat/SKILL.md", "chat", "openai"},
-		// Non-matching paths should be filtered out
-		{"random/nested/deep/SKILL.md", "", ""},
+		// Skills may be nested without a skills/ directory
+		{"random/nested/deep/SKILL.md", "deep", ""},
+		// Hidden paths should be filtered out
 		{".hidden/SKILL.md", "", ""},
 		// Same-name skills with different namespaces
 		{"skills/kynan/commit/SKILL.md", "commit", "kynan"},

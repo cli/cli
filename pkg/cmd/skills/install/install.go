@@ -110,11 +110,11 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			repositories, and files are copied (not symlinked) with local-path
 			tracking metadata injected into frontmatter.
 
-			Skills are discovered automatically using the %[1]sskills/*/SKILL.md%[1]s convention
-			defined by the Agent Skills specification, including when the %[1]sskills/%[1]s
-			directory is nested under a prefix (e.g. %[1]sterraform/code-generation/skills/...%[1]s).
-			For more information on the specification,
-			see: https://agentskills.io/specification
+			Skills are discovered automatically by finding %[1]sSKILL.md%[1]s files whose
+			parent skill directories can appear at any depth, including layouts such as
+			%[1]sskills/code-review/SKILL.md%[1]s and
+			%[1]sperformance/r8-analyzer/SKILL.md%[1]s. For more information on the
+			specification, see: https://agentskills.io/specification
 
 			The skill argument can be a name, a namespaced name (%[1]sauthor/skill%[1]s),
 			or an exact path within the repository (%[1]sskills/author/skill%[1]s,
