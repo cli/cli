@@ -2,8 +2,10 @@ package list
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -266,4 +268,70 @@ func TestSearchIssues_rejectsPullRequestQualifiers(t *testing.T) {
 			assert.Len(t, reg.Requests, 0)
 		})
 	}
+}
+
+// nodesJSON builds a JSON array of n minimal issue nodes.
+func nodesJSON(n int) string {
+	parts := make([]string, n)
+	for i := 0; i < n; i++ {
+		parts[i] = fmt.Sprintf(`{"title":"issue-%d"}`, i)
+	}
+	return "[" + strings.Join(parts, ",") + "]"
+}
+
+func TestSearchIssues_reducesPageSizeOnSubsequentPages(t *testing.T) {
+	reg := &httpmock.Registry{}
+
+	var capturedLimits []interface{}
+
+	// Page 1: return a full page of 100 nodes, hasNextPage=true.
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.GraphQLQuery(fmt.Sprintf(`
+			{ "data": { "repository": { "hasIssuesEnabled": true },
+			  "search": {
+			    "issueCount": 250,
+			    "nodes": %s,
+			    "pageInfo": { "hasNextPage": true, "endCursor": "CURSOR1" }
+			  } } }`, nodesJSON(100)),
+			func(query string, vars map[string]interface{}) {
+				capturedLimits = append(capturedLimits, vars["limit"])
+			}),
+	)
+
+	// Page 2: return more nodes, hasNextPage=false so the loop ends.
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.GraphQLQuery(fmt.Sprintf(`
+			{ "data": { "repository": { "hasIssuesEnabled": true },
+			  "search": {
+			    "issueCount": 250,
+			    "nodes": %s,
+			    "pageInfo": { "hasNextPage": false, "endCursor": "CURSOR2" }
+			  } } }`, nodesJSON(100)),
+			func(query string, vars map[string]interface{}) {
+				capturedLimits = append(capturedLimits, vars["limit"])
+			}),
+	)
+
+	httpClient := &http.Client{Transport: reg}
+	client := api.NewClientFromHTTP(httpClient)
+
+	res, err := searchIssues(
+		client,
+		fd.AdvancedIssueSearchSupportedAsOnlyBackend(),
+		ghrepo.New("OWNER", "REPO"),
+		prShared.FilterOptions{State: "open"},
+		150,
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, 150, len(res.Issues))
+
+	// Two requests should have been made.
+	assert.Len(t, capturedLimits, 2)
+	// Page 1 asks for a full page.
+	assert.EqualValues(t, 100, capturedLimits[0])
+	// Page 2 should only ask for the remaining 50 items (150 - 100 already collected),
+	// mirroring listIssues in the same file. With the bug it still asks for 100.
+	assert.EqualValues(t, 50, capturedLimits[1])
 }
