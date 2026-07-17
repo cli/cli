@@ -304,8 +304,10 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		// Interactive issue type selection
-		if opts.IssueType == "" {
+		// Interactive issue type selection. Setting a type requires triage
+		// access, so don't offer the picker to a viewer who cannot apply it:
+		// the mutation would only fail once the issue already exists.
+		if opts.IssueType == "" && repo.ViewerCanTriage() {
 			issueTypes, typesErr := api.RepoIssueTypes(apiClient, baseRepo)
 			if typesErr == nil && len(issueTypes) > 0 {
 				typeNames := make([]string, len(issueTypes))
