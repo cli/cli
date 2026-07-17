@@ -204,6 +204,7 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 			return nil, err
 		}
 		client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
+		client = api.WithConfig(client, cfg)
 		return client, nil
 	}
 }

@@ -290,14 +290,48 @@ func (c Client) clientOptions(hostname string) ghAPI.ClientOptions {
 	// the canonical hostname and go-gh's guard is widened to the override, so
 	// the token stays bound to hostname even though the request is addressed to
 	// the override endpoint.
-	if c.cfg != nil {
-		if apiHost := config.ResolveAPIHost(c.cfg, hostname); apiHost != "" {
+	if cfg := c.resolveConfig(); cfg != nil {
+		if apiHost := config.ResolveAPIHost(cfg, hostname); apiHost != "" {
 			opts.APIHost = apiHost
-			if token, _ := c.cfg.Authentication().ActiveToken(hostname); token != "" {
+			if token, _ := cfg.Authentication().ActiveToken(hostname); token != "" {
 				opts.AuthToken = token
 				delete(opts.Headers, authorization)
 			}
 		}
 	}
 	return opts
+}
+
+// resolveConfig returns the config used for api_host routing. An explicitly
+// provided config wins. Otherwise it looks for a config carried on the HTTP
+// client's transport, which the factory attaches so commands that build a
+// client with NewClientFromHTTP still route without threading config.
+func (c Client) resolveConfig() gh.Config {
+	if c.cfg != nil {
+		return c.cfg
+	}
+	if carrier, ok := c.http.Transport.(apiHostConfigCarrier); ok {
+		return carrier.apiHostConfig()
+	}
+	return nil
+}
+
+type apiHostConfigCarrier interface {
+	apiHostConfig() gh.Config
+}
+
+type configTransport struct {
+	http.RoundTripper
+	cfg gh.Config
+}
+
+func (t *configTransport) apiHostConfig() gh.Config { return t.cfg }
+
+// WithConfig attaches cfg to an HTTP client's transport so that api.Client can
+// resolve a per-host api_host override without every command threading config.
+// The transport is delegated to unchanged; only the config is carried. The
+// factory applies this to the client it builds.
+func WithConfig(client *http.Client, cfg gh.Config) *http.Client {
+	client.Transport = &configTransport{RoundTripper: client.Transport, cfg: cfg}
+	return client
 }
