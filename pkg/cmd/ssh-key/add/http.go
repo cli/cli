@@ -9,14 +9,11 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/shared"
 )
 
 // Uploads the provided SSH key. Returns true if the key was uploaded, false if it was not.
 func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) (bool, error) {
-	url := ghinstance.RESTPrefix(hostname) + "user/keys"
-
 	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
 		return false, err
@@ -46,7 +43,7 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 		"key":   fullUserKey,
 	}
 
-	err = keyUpload(httpClient, url, payload)
+	err = keyUpload(httpClient, hostname, "user/keys", payload)
 
 	if err != nil {
 		return false, err
@@ -57,8 +54,6 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 
 // Uploads the provided SSH Signing key. Returns true if the key was uploaded, false if it was not.
 func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) (bool, error) {
-	url := ghinstance.RESTPrefix(hostname) + "user/ssh_signing_keys"
-
 	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
 		return false, err
@@ -88,7 +83,7 @@ func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Re
 		"key":   fullUserKey,
 	}
 
-	err = keyUpload(httpClient, url, payload)
+	err = keyUpload(httpClient, hostname, "user/ssh_signing_keys", payload)
 
 	if err != nil {
 		return false, err
@@ -97,31 +92,10 @@ func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Re
 	return true, nil
 }
 
-func keyUpload(httpClient *http.Client, url string, payload map[string]string) error {
+func keyUpload(httpClient *http.Client, hostname, path string, payload map[string]string) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		return err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-
-	_, err = io.Copy(io.Discard, resp.Body)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return api.NewClientFromHTTP(httpClient).REST(hostname, "POST", path, bytes.NewReader(payloadBytes), nil)
 }
