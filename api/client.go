@@ -12,6 +12,9 @@ import (
 
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
+
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 )
 
 const (
@@ -31,8 +34,18 @@ func NewClientFromHTTP(httpClient *http.Client) *Client {
 	return client
 }
 
+// NewClientFromHTTPWithConfig builds a Client that honors a per-host api_host
+// override. When a host has an api_host configured, REST and GraphQL requests
+// for that host are routed to the override endpoint while the token stays
+// selected for the canonical host. When cfg is nil, or no override is set, the
+// client behaves exactly as NewClientFromHTTP.
+func NewClientFromHTTPWithConfig(httpClient *http.Client, cfg gh.Config) *Client {
+	return &Client{http: httpClient, cfg: cfg}
+}
+
 type Client struct {
 	http *http.Client
+	cfg  gh.Config
 }
 
 func (c *Client) HTTP() *http.Client {
@@ -55,7 +68,7 @@ func (err HTTPError) ScopesSuggestion() string {
 // GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
+	opts := c.clientOptions(hostname)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
@@ -67,7 +80,7 @@ func (c Client) GraphQL(hostname string, query string, variables map[string]inte
 // Mutate performs a GraphQL mutation based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Mutate(hostname, name string, mutation interface{}, variables map[string]interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
+	opts := c.clientOptions(hostname)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
@@ -79,7 +92,7 @@ func (c Client) Mutate(hostname, name string, mutation interface{}, variables ma
 // Query performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Query(hostname, name string, query interface{}, variables map[string]interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
+	opts := c.clientOptions(hostname)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
@@ -91,7 +104,7 @@ func (c Client) Query(hostname, name string, query interface{}, variables map[st
 // QueryWithContext performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) QueryWithContext(ctx context.Context, hostname, name string, query interface{}, variables map[string]interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
+	opts := c.clientOptions(hostname)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
@@ -102,7 +115,7 @@ func (c Client) QueryWithContext(ctx context.Context, hostname, name string, que
 
 // REST performs a REST request and parses the response.
 func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
+	opts := c.clientOptions(hostname)
 	restClient, err := ghAPI.NewRESTClient(opts)
 	if err != nil {
 		return err
@@ -111,7 +124,7 @@ func (c Client) REST(hostname string, method string, p string, body io.Reader, d
 }
 
 func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data interface{}) (string, error) {
-	opts := clientOptions(hostname, c.http.Transport)
+	opts := c.clientOptions(hostname)
 	restClient, err := ghAPI.NewRESTClient(opts)
 	if err != nil {
 		return "", err
@@ -258,7 +271,7 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 	return ""
 }
 
-func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOptions {
+func (c Client) clientOptions(hostname string) ghAPI.ClientOptions {
 	// AuthToken, and Headers are being handled by transport,
 	// so let go-gh know that it does not need to resolve them.
 	opts := ghAPI.ClientOptions{
@@ -269,8 +282,22 @@ func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOpt
 		},
 		Host:               hostname,
 		SkipDefaultHeaders: true,
-		Transport:          transport,
+		Transport:          c.http.Transport,
 		LogIgnoreEnv:       true,
+	}
+	// When an api_host override is configured for this host, route the request
+	// to the override and let go-gh attach the token. The token is selected for
+	// the canonical hostname and go-gh's guard is widened to the override, so
+	// the token stays bound to hostname even though the request is addressed to
+	// the override endpoint.
+	if c.cfg != nil {
+		if apiHost := config.ResolveAPIHost(c.cfg, hostname); apiHost != "" {
+			opts.APIHost = apiHost
+			if token, _ := c.cfg.Authentication().ActiveToken(hostname); token != "" {
+				opts.AuthToken = token
+				delete(opts.Headers, authorization)
+			}
+		}
 	}
 	return opts
 }
