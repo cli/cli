@@ -123,6 +123,17 @@ func (c Client) REST(hostname string, method string, p string, body io.Reader, d
 	return handleResponse(restClient.Do(method, p, body, data))
 }
 
+// RESTWithContext performs a REST request and parses the response, aborting the
+// request when the context is cancelled.
+func (c Client) RESTWithContext(ctx context.Context, hostname string, method string, p string, body io.Reader, data interface{}) error {
+	opts := c.clientOptions(hostname)
+	restClient, err := ghAPI.NewRESTClient(opts)
+	if err != nil {
+		return err
+	}
+	return handleResponse(restClient.DoWithContext(ctx, method, p, body, data))
+}
+
 func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data interface{}) (string, error) {
 	opts := c.clientOptions(hostname)
 	restClient, err := ghAPI.NewRESTClient(opts)

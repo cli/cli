@@ -264,26 +264,13 @@ func fetchDraftRelease(ctx context.Context, httpClient *http.Client, repo ghrepo
 }
 
 func fetchReleasePath(ctx context.Context, httpClient *http.Client, host string, p string) (*Release, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", ghinstance.RESTPrefix(host)+p, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		return nil, ErrReleaseNotFound
-	} else if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
 	var release Release
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	err := api.NewClientFromHTTP(httpClient).RESTWithContext(ctx, host, "GET", p, nil, &release)
+	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return nil, ErrReleaseNotFound
+		}
 		return nil, err
 	}
 
