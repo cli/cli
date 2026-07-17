@@ -96,7 +96,7 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 		return fmt.Errorf("asset %s not found in release %s", opts.AssetName, release.TagName)
 	}
 
-	err = deleteAsset(httpClient, assetURL)
+	err = deleteAsset(httpClient, baseRepo.RepoHost(), assetURL)
 	if err != nil {
 		return err
 	}
@@ -111,20 +111,6 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 	return nil
 }
 
-func deleteAsset(httpClient *http.Client, assetURL string) error {
-	req, err := http.NewRequest("DELETE", assetURL, nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-	return nil
+func deleteAsset(httpClient *http.Client, host, assetURL string) error {
+	return api.NewClientFromHTTP(httpClient).REST(host, "DELETE", assetURL, nil, nil)
 }
