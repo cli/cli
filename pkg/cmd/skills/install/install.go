@@ -221,7 +221,8 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 				return err
 			}
 
-			if opts.Pin != "" && opts.SkillName != "" && strings.Contains(opts.SkillName, "@") && !strings.HasSuffix(opts.SkillName, "/SKILL.md") {
+			_, _, hasInlineVersion := cutSkillVersion(opts.SkillName)
+			if opts.Pin != "" && hasInlineVersion {
 				return cmdutil.FlagErrorf("cannot use --pin with an inline @version in the skill name")
 			}
 
@@ -601,23 +602,22 @@ func resolveRepoArg(skillSource string, canPrompt bool, p prompter.Prompter) (gh
 }
 
 func parseSkillFromOpts(opts *InstallOptions) {
-	if opts.SkillName != "" && !strings.HasSuffix(opts.SkillName, "/SKILL.md") {
-		if name, version, ok := cutLast(opts.SkillName, "@"); ok && name != "" {
-			opts.version = version
-			opts.SkillName = name
-			return
-		}
+	if name, version, ok := cutSkillVersion(opts.SkillName); ok {
+		opts.version = version
+		opts.SkillName = name
+		return
 	}
 	if opts.Pin != "" {
 		opts.version = opts.Pin
 	}
 }
 
-// cutLast splits s around the last occurrence of sep,
-// returning the text before and after sep, and whether sep was found.
-func cutLast(s, sep string) (before, after string, found bool) {
-	if i := strings.LastIndex(s, sep); i >= 0 {
-		return s[:i], s[i+len(sep):], true
+func cutSkillVersion(s string) (name, version string, found bool) {
+	if i := strings.LastIndex(s, "@"); i > 0 {
+		version = s[i+1:]
+		if version != "" && !strings.Contains(version, "/") {
+			return s[:i], version, true
+		}
 	}
 	return s, "", false
 }

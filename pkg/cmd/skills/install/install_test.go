@@ -146,6 +146,11 @@ func TestNewCmdInstall(t *testing.T) {
 			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "packages/@acme/lint/SKILL.md", Scope: "project", Pin: "v1.0.0"},
 		},
 		{
+			name:     "directory path containing at sign with pin",
+			cli:      "monalisa/skills-repo packages/@acme/lint --pin v1.0.0",
+			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "packages/@acme/lint", Scope: "project", Pin: "v1.0.0"},
+		},
+		{
 			name:    "from-local with --upstream is mutually exclusive",
 			cli:     "--from-local ./local-dir --upstream",
 			wantErr: true,
@@ -247,6 +252,19 @@ func TestParseSkillFromOpts(t *testing.T) {
 			skillName:   "packages/@acme/lint/SKILL.md",
 			pin:         "v2.0.0",
 			wantName:    "packages/@acme/lint/SKILL.md",
+			wantVersion: "v2.0.0",
+		},
+		{
+			name:        "directory path containing at sign with pin",
+			skillName:   "packages/@acme/lint",
+			pin:         "v2.0.0",
+			wantName:    "packages/@acme/lint",
+			wantVersion: "v2.0.0",
+		},
+		{
+			name:        "path containing at sign with inline version",
+			skillName:   "packages/@acme/lint@v2.0.0",
+			wantName:    "packages/@acme/lint",
 			wantVersion: "v2.0.0",
 		},
 	}

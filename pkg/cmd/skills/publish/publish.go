@@ -106,7 +106,7 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 			Skills are discovered using the same conventions as install:
 
 			  - %[1]sSKILL.md%[1]s (single-skill repository)
-			  - %[1]s<skill>/SKILL.md%[1]s in any non-hidden directory
+			  - %[1]sskills/*/SKILL.md%[1]s and nested category layouts such as %[1]s<category>/<skill>/SKILL.md%[1]s
 			  - %[1]splugins/{scope}/skills/*/SKILL.md%[1]s
 
 			Validation checks include:
