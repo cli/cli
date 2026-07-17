@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
 var errScopesMissing = errors.New("insufficient OAuth scopes")
@@ -16,8 +15,6 @@ var errDuplicateKey = errors.New("key already exists")
 var errWrongFormat = errors.New("key in wrong format")
 
 func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) error {
-	url := ghinstance.RESTPrefix(hostname) + "user/gpg_keys"
-
 	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
 		return err
@@ -35,36 +32,25 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
+	err = api.NewClientFromHTTP(httpClient).REST(hostname, "POST", "user/gpg_keys", bytes.NewReader(payloadBytes), nil)
 	if err != nil {
-		return err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		return errScopesMissing
-	} else if resp.StatusCode > 299 {
-		err := api.HandleHTTPError(resp)
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) {
+			if httpError.StatusCode == 404 {
+				return errScopesMissing
+			}
 			for _, e := range httpError.Errors {
-				if resp.StatusCode == 422 && e.Field == "key_id" && e.Message == "key_id already exists" {
+				if httpError.StatusCode == 422 && e.Field == "key_id" && e.Message == "key_id already exists" {
 					return errDuplicateKey
 				}
 			}
-		}
-		if resp.StatusCode == 422 && !isGpgKeyArmored(keyBytes) {
-			return errWrongFormat
+			if httpError.StatusCode == 422 && !isGpgKeyArmored(keyBytes) {
+				return errWrongFormat
+			}
 		}
 		return err
 	}
 
-	_, _ = io.Copy(io.Discard, resp.Body)
 	return nil
 }
 
