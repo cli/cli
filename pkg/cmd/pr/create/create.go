@@ -74,6 +74,9 @@ type CreateOptions struct {
 	Template            string
 
 	DryRun bool
+
+	// Exporter is set when --json or --jq flags are provided.
+	Exporter cmdutil.Exporter
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
@@ -212,7 +215,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Create a pull request on GitHub.
 
-			Upon success, the URL of the created pull request will be printed.
+			Upon success, the URL of the created pull request will be printed to stdout,
+			or – when %[1]s--json%[1]s is given – a JSON object containing the requested fields.
 
 			When the current branch isn't fully pushed to a git remote, a prompt will ask where
 			to push the branch and offer an option to fork the base repository. Any fork created this
@@ -250,6 +254,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
 			$ gh pr create --template "pull_request_template.md"
+			$ gh pr create --title "fix: typo" --body "" --json number,url --jq '.number'
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
@@ -331,6 +336,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
+			// --json / --dry-run are mutually exclusive: a dry-run never calls the
+			// API, so there is no PR object to serialise.
+			if opts.DryRun && opts.Exporter != nil {
+				return cmdutil.FlagErrorf("`--json` is not supported with `--dry-run`")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -359,6 +370,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -1065,15 +1077,31 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.PRRefs.BaseRepo(), params)
 	opts.IO.StopProgressIndicator()
-	if pr != nil {
-		fmt.Fprintln(opts.IO.Out, pr.URL)
-	}
 	if err != nil {
 		if pr != nil {
 			return fmt.Errorf("pull request update failed: %w", err)
 		}
 		return fmt.Errorf("pull request create failed: %w", err)
 	}
+
+	// When --json (and optionally --jq) are provided, serialise the newly
+	// created PR instead of printing its URL.
+	if opts.Exporter != nil {
+		// Re-fetch the PR with the fields the user requested so that the
+		// Exporter has a fully-populated object to serialise.
+		fields := opts.Exporter.Fields()
+		pr, _, err = opts.Finder.Find(shared.FindOptions{
+			Selector: fmt.Sprintf("%d", pr.Number),
+			Fields:   fields,
+			BaseBranch: ctx.PRRefs.BaseRef(),
+		})
+		if err != nil {
+			return fmt.Errorf("could not fetch created pull request for JSON output: %w", err)
+		}
+		return opts.Exporter.Write(opts.IO, pr)
+	}
+
+	fmt.Fprintln(opts.IO.Out, pr.URL)
 	return nil
 }
 
