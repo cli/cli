@@ -215,6 +215,73 @@ func TestSearchIssuesAndAdvancedSearch(t *testing.T) {
 	}
 }
 
+func TestSearchIssues_paginationLimit(t *testing.T) {
+	reg := &httpmock.Registry{}
+	httpClient := &http.Client{}
+	httpmock.ReplaceTripper(httpClient, reg)
+	client := api.NewClientFromHTTP(httpClient)
+
+	issueNode := `{
+		"title": "issue",
+		"labels": { "nodes": [], "totalCount": 0 },
+		"assignees": { "nodes": [], "totalCount": 0 }
+	}`
+	// First page: 100 items, more available
+	firstPageNodes := "[" + issueNode
+	for i := 1; i < 100; i++ {
+		firstPageNodes += "," + issueNode
+	}
+	firstPageNodes += "]"
+
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.StringResponse(`
+			{ "data": {
+				"repository": { "hasIssuesEnabled": true },
+				"search": {
+					"issueCount": 150,
+					"nodes": `+firstPageNodes+`,
+					"pageInfo": {
+						"hasNextPage": true,
+						"endCursor": "ENDCURSOR"
+					}
+				}
+			} }
+		`),
+	)
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.GraphQLQuery(`
+			{ "data": {
+				"repository": { "hasIssuesEnabled": true },
+				"search": {
+					"issueCount": 150,
+					"nodes": [`+issueNode+`],
+					"pageInfo": {
+						"hasNextPage": false,
+						"endCursor": "ENDCURSOR2"
+					}
+				}
+			} }
+		`, func(query string, vars map[string]interface{}) {
+			// Second page must request only the remaining 50, not another full 100.
+			assert.Equal(t, float64(50), vars["limit"])
+			assert.Equal(t, "ENDCURSOR", vars["after"])
+		}),
+	)
+
+	_, err := searchIssues(
+		client,
+		fd.AdvancedIssueSearchUnsupported(),
+		ghrepo.New("OWNER", "REPO"),
+		prShared.FilterOptions{State: "open", Search: "sort:created"},
+		150,
+	)
+	assert.NoError(t, err)
+	assert.Len(t, reg.Requests, 2)
+}
+
+
 func TestSearchIssues_rejectsPullRequestQualifiers(t *testing.T) {
 	tests := []struct {
 		name   string
