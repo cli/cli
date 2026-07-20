@@ -484,10 +484,11 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 				return
 			}
 		}
-	} else if !isJSON && resp.StatusCode >= 400 {
-		// A non-JSON error body (e.g. an HTML maintenance page) cannot be
-		// filtered with `--jq` or `--template`; report the HTTP error and
-		// pass the body through raw instead.
+	} else if !isJSON && resp.StatusCode > 299 {
+		// A non-JSON body on a non-2xx response (e.g. an HTML maintenance
+		// page) cannot be filtered with `--jq` or `--template`; report the
+		// HTTP error and pass the body through raw instead. The threshold
+		// matches the serverError fallback below.
 		serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
 

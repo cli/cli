@@ -657,6 +657,21 @@ func Test_apiRun(t *testing.T) {
 			isatty: false,
 		},
 		{
+			name: "jq filter when non-JSON redirect",
+			options: ApiOptions{
+				FilterOutput: `.[].name`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 301,
+				Body:       io.NopCloser(bytes.NewBufferString(`<html><body>Moved Permanently</body></html>`)),
+				Header:     http.Header{"Content-Type": []string{"text/html; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `<html><body>Moved Permanently</body></html>`,
+			stderr: "gh: HTTP 301\n",
+			isatty: false,
+		},
+		{
 			name: "output template when non-JSON error",
 			options: ApiOptions{
 				Template: `{{.status}}`,
