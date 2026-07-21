@@ -1,0 +1,14 @@
+{
+  "name": "terminal-mockup",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub Copilot terminal mockup canvas extension.",
+  "main": "extension.mjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^1.0.7"
+  }
+}
