@@ -45,6 +45,23 @@ builds:
     ldflags:
       - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
 
+  # android is cross-built on the linux release job (see #build:linux).
+  # Termux and similar environments need GOOS=android; linux/* binaries can
+  # SIGSYS on Android seccomp (see cli/cli#13924).
+  - id: android #build:linux
+    goos: [android]
+    goarch: [arm64]
+    env:
+      - CGO_ENABLED=0
+    hooks:
+      pre:
+        - cmd: bash ./script/licenses {{ .Os }} {{ .Arch }}
+          output: true
+    binary: bin/gh
+    main: ./cmd/gh
+    ldflags:
+      - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
+
   - id: windows #build:windows
     goos: [windows]
     goarch: ["386", amd64, arm64]
@@ -64,6 +81,14 @@ archives:
   - id: linux-archive
     ids: [linux]
     name_template: "gh_{{ .Version }}_linux_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    wrap_in_directory: true
+    formats: [tar.gz]
+    files:
+      - LICENSE
+      - ./share/man/man1/gh*.1
+  - id: android-archive
+    ids: [android]
+    name_template: "gh_{{ .Version }}_android_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     wrap_in_directory: true
     formats: [tar.gz]
     files:

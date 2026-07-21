@@ -3,7 +3,7 @@
 // would fail due to undefined symbols that are expected to be included in the
 // build.
 
-//go:build !(darwin && (amd64 || arm64)) && !(linux && (386 || amd64 || arm || arm64)) && !(windows && (386 || amd64 || arm64))
+//go:build !(darwin && (amd64 || arm64)) && !(linux && !android && (386 || amd64 || arm || arm64)) && !(android && arm64) && !(windows && (386 || amd64 || arm64))
 
 package licenses
 

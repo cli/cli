@@ -61,13 +61,13 @@ generate_licenses() {
 if [ "$1" = "--check" ]; then
     # Verify license generation works for all release platforms.
     # This runs the same go-licenses report command that goreleaser pre-build hooks
-    # will run at release time, for all 9 GOOS/GOARCH combinations. Running this in
+    # will run at release time, for all 10 GOOS/GOARCH combinations. Running this in
     # CI on every PR ensures we catch issues (e.g., template errors, go-licenses
     # incompatibilities, dependency resolution failures) before they block a release.
     TEMPDIR="$(mktemp -d)"
     trap "rm -fr ${TEMPDIR}" EXIT
 
-    for platform in linux/386 linux/arm linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/386 windows/amd64 windows/arm64; do
+    for platform in linux/386 linux/arm linux/amd64 linux/arm64 android/arm64 darwin/amd64 darwin/arm64 windows/386 windows/amd64 windows/arm64; do
         goos="${platform%/*}"
         goarch="${platform#*/}"
         generate_licenses "${goos}" "${goarch}" "${TEMPDIR}/${goos}-${goarch}"

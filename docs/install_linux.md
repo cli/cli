@@ -215,6 +215,8 @@ To install and upgrade:
 pkg install gh
 ```
 
+If you install from [GitHub CLI releases](https://github.com/cli/cli/releases/latest) on Termux (or similar Android environments), use the `android_arm64` archive. The `linux_*` binaries can crash with `SIGSYS` on Android.
+
 ### Arch Linux
 
 The [GitHub CLI package](https://www.archlinux.org/packages/extra/x86_64/github-cli) is supported by the Arch Linux community with updates powered by [Arch Linux packaging](https://gitlab.archlinux.org/archlinux/packaging/packages/github-cli).
