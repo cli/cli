@@ -58,8 +58,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 			# List items with the "bug" label that are not done
 			$ gh project item-list 1 --owner "@me" --query "label:bug -status:Done"
 
-			# Show the "Status" field's value for each item as an extra column
-			$ gh project item-list 1 --owner "@me" --field "Status"
+			# Show the "Status" and "Priority" field values as extra columns
+			$ gh project item-list 1 --owner "@me" --field "Status" --field "Priority"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -114,8 +114,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user")
 	listCmd.Flags().StringVar(&opts.query, "query", "", `Filter items using the Projects filter syntax, e.g. "assignee:octocat -status:Done"`)
-	listCmd.Flags().StringArrayVar(&opts.fields, "field", nil, "Name of a field to show as an extra column (repeatable)")
-	listCmd.Flags().StringArrayVar(&opts.fieldIDs, "field-id", nil, "ID of a field to show as an extra column (repeatable)")
+	listCmd.Flags().StringArrayVar(&opts.fields, "field", nil, "Name of a field to show as an extra column")
+	listCmd.Flags().StringArrayVar(&opts.fieldIDs, "field-id", nil, "ID of a field to show as an extra column")
 	cmdutil.AddFormatFlags(listCmd, &opts.exporter)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of items to fetch")
 

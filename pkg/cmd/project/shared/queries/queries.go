@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -470,6 +471,38 @@ func (v FieldValueNodes) ID() string {
 	}
 
 	return ""
+}
+
+// DisplayValue returns a single-line, human-readable rendering of the field
+// value suitable for a table cell. Multi-value fields (labels, assignees, etc.)
+// are joined with commas, and embedded line breaks are collapsed so a value with
+// newlines cannot corrupt table row alignment. It is used by item-list to show a
+// named field's value without a separate field-ID preflight lookup.
+func (v FieldValueNodes) DisplayValue() string {
+	var value string
+	switch data := projectFieldValueData(v).(type) {
+	case nil:
+		return ""
+	case string:
+		value = data
+	case float64:
+		value = strconv.FormatFloat(data, 'f', -1, 64)
+	case []string:
+		value = strings.Join(data, ", ")
+	case map[string]interface{}:
+		title, _ := data["title"].(string)
+		value = title
+	default:
+		value = fmt.Sprintf("%v", data)
+	}
+	return singleLineFieldValue(value)
+}
+
+// singleLineFieldValue collapses carriage returns and newlines so a multi-line
+// field value stays within a single table cell. Following the convention used by
+// StatusItem.Preview, carriage returns are dropped and newlines become spaces.
+func singleLineFieldValue(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r", ""), "\n", " ")
 }
 
 type DraftIssue struct {

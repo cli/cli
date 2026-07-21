@@ -680,3 +680,103 @@ func TestCamelCase(t *testing.T) {
 	assert.Equal(t, "c", camelCase("C"))
 	assert.Equal(t, "", camelCase(""))
 }
+
+func TestFieldValueNodesDisplayValue(t *testing.T) {
+	textValue := func(text string) FieldValueNodes {
+		v := FieldValueNodes{Type: "ProjectV2ItemFieldTextValue"}
+		v.ProjectV2ItemFieldTextValue.Text = text
+		return v
+	}
+
+	numberValue := FieldValueNodes{Type: "ProjectV2ItemFieldNumberValue"}
+	numberValue.ProjectV2ItemFieldNumberValue.Number = 12
+
+	singleSelectValue := FieldValueNodes{Type: "ProjectV2ItemFieldSingleSelectValue"}
+	singleSelectValue.ProjectV2ItemFieldSingleSelectValue.Name = "In Progress"
+
+	labelValue := FieldValueNodes{Type: "ProjectV2ItemFieldLabelValue"}
+	labelValue.ProjectV2ItemFieldLabelValue.Labels.Nodes = []struct {
+		Name string
+	}{
+		{Name: "bug"},
+		{Name: "help wanted"},
+	}
+
+	tests := []struct {
+		name  string
+		value FieldValueNodes
+		want  string
+	}{
+		{
+			name:  "empty when field has no value",
+			value: FieldValueNodes{Type: "ProjectV2ItemFieldTextValue"},
+			want:  "",
+		},
+		{
+			name:  "unknown field type",
+			value: FieldValueNodes{Type: "SomethingElse"},
+			want:  "",
+		},
+		{
+			name:  "single-line text",
+			value: textValue("hello world"),
+			want:  "hello world",
+		},
+		{
+			name:  "multi-line text collapses newlines to spaces",
+			value: textValue("first line\nsecond line"),
+			want:  "first line second line",
+		},
+		{
+			name:  "CRLF text collapses to a single space",
+			value: textValue("first line\r\nsecond line"),
+			want:  "first line second line",
+		},
+		{
+			name:  "leading and trailing newlines",
+			value: textValue("\nwrapped\n"),
+			want:  " wrapped ",
+		},
+		{
+			name:  "number",
+			value: numberValue,
+			want:  "12",
+		},
+		{
+			name:  "single select",
+			value: singleSelectValue,
+			want:  "In Progress",
+		},
+		{
+			name:  "labels joined with commas",
+			value: labelValue,
+			want:  "bug, help wanted",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.value.DisplayValue())
+		})
+	}
+}
+
+func TestSingleLineFieldValue(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "no line breaks", in: "plain", want: "plain"},
+		{name: "newline becomes space", in: "a\nb", want: "a b"},
+		{name: "CRLF becomes a single space", in: "a\r\nb", want: "a b"},
+		{name: "lone carriage return is dropped", in: "a\rb", want: "ab"},
+		{name: "consecutive newlines", in: "a\n\nb", want: "a  b"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, singleLineFieldValue(tt.in))
+		})
+	}
+}
