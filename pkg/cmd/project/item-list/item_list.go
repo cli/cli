@@ -159,8 +159,20 @@ func runList(config listConfig) error {
 
 	// Resolve any requested extra field columns to (header, fieldID) pairs. Name
 	// columns are resolved against the fields already returned with the items, so
-	// there is no separate field-ID preflight lookup.
-	extraFields, err := resolveFieldColumns(config.opts, project.Fields.Nodes)
+	// there is no separate field-ID preflight lookup. When extra columns are
+	// requested for a project whose field list spans more than one page, fetch the
+	// complete field list first so resolution does not miss fields beyond the
+	// first page.
+	fields := project.Fields.Nodes
+	if (len(config.opts.fields) > 0 || len(config.opts.fieldIDs) > 0) && project.Fields.PageInfo.HasNextPage {
+		withFields, err := config.client.ProjectFields(owner, config.opts.number, project.Fields.TotalCount)
+		if err != nil {
+			return err
+		}
+		fields = withFields.Fields.Nodes
+	}
+
+	extraFields, err := resolveFieldColumns(config.opts, fields)
 	if err != nil {
 		return err
 	}

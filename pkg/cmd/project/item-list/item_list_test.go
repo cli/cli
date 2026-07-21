@@ -1024,3 +1024,146 @@ func TestRunList_FieldColumn_UnknownID(t *testing.T) {
 	assert.Contains(t, err.Error(), `field with ID "missing ID" not found`)
 	assert.Contains(t, err.Error(), "available fields: Status (status ID)")
 }
+
+func TestRunList_FieldColumn_PaginatesFields(t *testing.T) {
+	defer gock.Off()
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// list project items; the fields connection is paginated, so "Priority" is not
+	// on the first page of fields returned alongside the items.
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"fields": map[string]interface{}{
+							"totalCount": 2,
+							"pageInfo": map[string]interface{}{
+								"hasNextPage": true,
+								"endCursor":   "STATUSCURSOR",
+							},
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "status ID",
+									"name":       "Status",
+									"dataType":   "SINGLE_SELECT",
+								},
+							},
+						},
+						"items": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"id": "issue ID",
+									"content": map[string]interface{}{
+										"__typename": "Issue",
+										"title":      "an issue",
+										"number":     1,
+										"repository": map[string]string{
+											"nameWithOwner": "cli/go-gh",
+										},
+									},
+									"fieldValues": map[string]interface{}{
+										"nodes": []map[string]interface{}{
+											{
+												"__typename": "ProjectV2ItemFieldSingleSelectValue",
+												"name":       "High",
+												"field": map[string]interface{}{
+													"__typename": "ProjectV2SingleSelectField",
+													"id":         "priority ID",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	// fallback: fetch the full, paginated field list, which includes "Priority".
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"fields": map[string]interface{}{
+							"totalCount": 2,
+							"pageInfo": map[string]interface{}{
+								"hasNextPage": false,
+								"endCursor":   "PRIORITYCURSOR",
+							},
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "status ID",
+									"name":       "Status",
+									"dataType":   "SINGLE_SELECT",
+								},
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "priority ID",
+									"name":       "Priority",
+									"dataType":   "SINGLE_SELECT",
+								},
+							},
+						},
+						"items": map[string]interface{}{
+							"nodes": []map[string]interface{}{},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	config := listConfig{
+		opts: listOpts{
+			number: 1,
+			owner:  "monalisa",
+			fields: []string{"Priority"},
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Doc(`
+		TYPE   TITLE     NUMBER  REPOSITORY  ID        PRIORITY
+		Issue  an issue  1       cli/go-gh   issue ID  High
+	`), stdout.String())
+}
