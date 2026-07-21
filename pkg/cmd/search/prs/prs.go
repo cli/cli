@@ -181,7 +181,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	cmd.Flags().BoolVar(&noProject, "no-project", false, "Filter on missing project")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Project, "project", "", "Filter on project board `owner/number`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Reactions, "reactions", "", "Filter on `number` of reactions")
-	cmd.Flags().StringSliceVarP(&opts.Query.Qualifiers.Repo, "repo", "R", nil, "Filter on repository")
+	cmd.Flags().StringSliceVarP(&opts.Query.Qualifiers.Repo, "repo", "R", nil, "Filter on repository, in `OWNER/REPO` format")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.State, "state", "", "", []string{"open", "closed"}, "Filter based on state")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Team, "team-mentions", "", "Filter based on team mentions")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Updated, "updated", "", "Filter on last updated at `date`")

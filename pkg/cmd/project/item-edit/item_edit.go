@@ -2,6 +2,7 @@ package itemedit
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +32,13 @@ type editItemOpts struct {
 	singleSelectOptionID string
 	iterationID          string
 	clear                bool
+	// name-based resolution
+	owner        string
+	number32     int32
+	url          string
+	field        string
+	value        string
+	valueChanged bool
 	// format
 	exporter cmdutil.Exporter
 }
@@ -68,43 +76,108 @@ type ClearProjectV2FieldValue struct {
 func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) *cobra.Command {
 	opts := editItemOpts{}
 	editItemCmd := &cobra.Command{
-		Use:   "item-edit",
+		Use:   "item-edit [<number>]",
 		Short: "Edit an item in a project",
 		Long: heredoc.Docf(`
-			Edit either a draft issue or a project item. Both usages require the ID of the item to edit.
+			Edit a draft issue or a project item.
 
-			For non-draft issues, the ID of the project is also required, and only a single field value can be updated per invocation.
+			There are two ways to select the item and field to edit:
 
-			Remove project item field value using %[1]s--clear%[1]s flag.
+			- By ID: pass %[1]s--id%[1]s, %[1]s--field-id%[1]s and %[1]s--project-id%[1]s directly.
+			- By name: pass %[1]snumber%[1]s plus %[1]s--owner%[1]s, point at the item with its
+			  issue or pull request %[1]s--url%[1]s, and name the field with %[1]s--field%[1]s.
+			  For single-select fields, %[1]s--value%[1]s is the option name.
+
+			In either case, the project is always selected by number and %[1]s--owner%[1]s.
+
+			Note that %[1]s--url%[1]s is the issue or pull request URL, not a project URL, so its
+			owner may differ from the project's; %[1]s--owner%[1]s selects the project.
+
+			For non-draft issues, only a single field value can be updated per invocation.
+
+			Remove a project item field value with %[1]s--clear%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# Edit an item's text field value
+			# Edit an item's text field value by node ID
 			$ gh project item-edit --id <item-id> --field-id <field-id> --project-id <project-id> --text "new text"
+
+			# Set the "Status" field to "In Progress" for an issue on monalisa's project 1
+			$ gh project item-edit 1 --owner monalisa --url https://github.com/monalisa/myproject/issues/23 --field "Status" --value "In Progress"
 
 			# Clear an item's field value
 			$ gh project item-edit --id <item-id> --field-id <field-id> --project-id <project-id> --clear
 		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.numberChanged = cmd.Flags().Changed("number")
 			opts.titleChanged = cmd.Flags().Changed("title")
 			opts.bodyChanged = cmd.Flags().Changed("body")
+			opts.valueChanged = cmd.Flags().Changed("value")
+
+			if len(args) == 1 {
+				num, err := strconv.ParseInt(args[0], 10, 32)
+				if err != nil {
+					return cmdutil.FlagErrorf("invalid number: %v", args[0])
+				}
+				opts.number32 = int32(num)
+			}
+
 			if err := cmdutil.MutuallyExclusive(
-				"only one of `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` may be used",
+				"only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` may be used",
 				opts.text != "",
 				opts.numberChanged,
 				opts.date != "",
 				opts.singleSelectOptionID != "",
 				opts.iterationID != "",
+				opts.valueChanged,
 			); err != nil {
 				return err
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"cannot use `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` in conjunction with `--clear`",
-				opts.text != "" || opts.numberChanged || opts.date != "" || opts.singleSelectOptionID != "" || opts.iterationID != "",
+				"only one of `--field` or `--field-id` may be used",
+				opts.field != "",
+				opts.fieldID != "",
+			); err != nil {
+				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--url` or `--id` may be used",
+				opts.url != "",
+				opts.itemID != "",
+			); err != nil {
+				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"cannot use `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` in conjunction with `--clear`",
+				opts.text != "" || opts.numberChanged || opts.date != "" || opts.singleSelectOptionID != "" || opts.iterationID != "" || opts.valueChanged,
 				opts.clear,
 			); err != nil {
 				return err
+			}
+
+			if opts.valueChanged && opts.fieldID != "" {
+				return cmdutil.FlagErrorf("`--value` cannot be used with `--field-id`; name the field with `--field` to use `--value`")
+			}
+
+			if opts.field != "" && opts.itemID != "" {
+				return cmdutil.FlagErrorf("`--field` cannot be used with `--id`; use `--url` to address the item when editing by name")
+			}
+
+			if opts.valueChanged && opts.field == "" {
+				return cmdutil.FlagErrorf("`--value` requires `--field`")
+			}
+
+			if opts.itemID == "" && opts.url == "" {
+				return cmdutil.FlagErrorf("specify the item to edit with `--id` or `--url`")
+			}
+
+			// Name-based flags resolve the field and item within a specific
+			// project, so they require the project number as an argument.
+			if (opts.url != "" || opts.field != "" || opts.valueChanged) && len(args) == 0 {
+				return cmdutil.FlagErrorf("provide the project number as an argument when using `--url`, `--field`, or `--value`")
 			}
 
 			client, err := client.New(f)
@@ -129,6 +202,11 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	editItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to edit")
 	cmdutil.AddFormatFlags(editItemCmd, &opts.exporter)
 
+	editItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
+	editItemCmd.Flags().StringVar(&opts.url, "url", "", "URL of the issue or pull request whose project item to edit")
+	editItemCmd.Flags().StringVar(&opts.field, "field", "", "Name of the field to update")
+	editItemCmd.Flags().StringVar(&opts.value, "value", "", "Value to set on the field named by `--field`")
+
 	editItemCmd.Flags().StringVar(&opts.title, "title", "", "Title of the draft issue item")
 	editItemCmd.Flags().StringVar(&opts.body, "body", "", "Body of the draft issue item")
 
@@ -141,12 +219,20 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	editItemCmd.Flags().StringVar(&opts.iterationID, "iteration-id", "", "ID of the iteration value to set on the field")
 	editItemCmd.Flags().BoolVar(&opts.clear, "clear", false, "Remove field value")
 
-	_ = editItemCmd.MarkFlagRequired("id")
-
 	return editItemCmd
 }
 
 func runEditItem(config editItemConfig) error {
+	// resolve name-based flags (--owner/number/--url/--field/--value) into the
+	// ID-typed fields the mutations use, before any write happens.
+	if config.opts.url != "" || config.opts.field != "" {
+		resolved, err := resolveItemEditNames(config)
+		if err != nil {
+			return err
+		}
+		config = resolved
+	}
+
 	// when clear flag is used, remove value set to the corresponding field ID
 	if config.opts.clear {
 		return clearItemFieldValue(config)
@@ -166,6 +252,77 @@ func runEditItem(config editItemConfig) error {
 		return err
 	}
 	return cmdutil.SilentError
+}
+
+// resolveItemEditNames turns the name-based addressing flags into the node IDs
+// used by the field-value mutations: it resolves the project from
+// owner + number, the item from --url, the field from --field, and (for
+// single-select fields) --value from an option name to an option ID. Resolution
+// happens before the mutation so a bad name fails loudly instead of writing a
+// malformed value.
+func resolveItemEditNames(config editItemConfig) (editItemConfig, error) {
+	canPrompt := config.io.CanPrompt()
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
+	if err != nil {
+		return config, err
+	}
+
+	project, err := config.client.ProjectFields(owner, config.opts.number32, queries.LimitMax)
+	if err != nil {
+		return config, err
+	}
+	config.opts.projectID = project.ID
+
+	// Resolve the field first so a bad field name fails before the item lookup.
+	var field queries.ProjectField
+	if config.opts.field != "" {
+		field, err = queries.ResolveFieldByName(project.Fields.Nodes, config.opts.field)
+		if err != nil {
+			return config, err
+		}
+		config.opts.fieldID = field.ID()
+	}
+
+	if config.opts.url == "" {
+		return config, cmdutil.FlagErrorf("`--url` is required to resolve the item by issue or pull request URL")
+	}
+	itemID, err := config.client.ProjectItemIDByURL(config.opts.url, project.ID, config.opts.number32)
+	if err != nil {
+		return config, err
+	}
+	config.opts.itemID = itemID
+
+	if config.opts.field == "" || !config.opts.valueChanged {
+		return config, nil
+	}
+
+	// Dispatch --value by the resolved field's data type. New enum-like field
+	// types (e.g. MultiSelect) can be added here without reworking callers.
+	switch field.DataType() {
+	case "SINGLE_SELECT":
+		optionID, err := queries.ResolveSingleSelectOptionID(field, config.opts.value)
+		if err != nil {
+			return config, err
+		}
+		config.opts.singleSelectOptionID = optionID
+	case "TEXT":
+		config.opts.text = config.opts.value
+	case "NUMBER":
+		n, err := strconv.ParseFloat(config.opts.value, 64)
+		if err != nil {
+			return config, cmdutil.FlagErrorf("invalid number value %q for field %q", config.opts.value, field.Name())
+		}
+		config.opts.number = n
+		config.opts.numberChanged = true
+	case "DATE":
+		config.opts.date = config.opts.value
+	case "ITERATION":
+		return config, cmdutil.FlagErrorf("setting an iteration field by name is not supported; use `--iteration-id`")
+	default:
+		return config, cmdutil.FlagErrorf("field %q has data type %q which is not supported with `--value`", field.Name(), field.DataType())
+	}
+
+	return config, nil
 }
 
 func fetchDraftIssueByID(config editItemConfig, draftIssueID string) (*queries.DraftIssue, error) {
