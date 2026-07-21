@@ -895,7 +895,7 @@ func Test_createRun(t *testing.T) {
 				Body:      "bug body",
 				IssueType: "Bugz",
 			},
-			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
@@ -904,13 +904,6 @@ func Test_createRun(t *testing.T) {
 							"hasIssuesEnabled": true
 						} } }`))
 				r.Register(
-					httpmock.GraphQL(`mutation IssueCreate\b`),
-					httpmock.StringResponse(`
-						{ "data": { "createIssue": { "issue": {
-							"id": "ISSUE_ID_123",
-							"URL": "https://github.com/OWNER/REPO/issues/123"
-						} } } }`))
-				r.Register(
 					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
 					httpmock.StringResponse(`
 						{ "data": { "repository": { "issueTypes": { "nodes": [
@@ -918,8 +911,37 @@ func Test_createRun(t *testing.T) {
 							{ "id": "IT_2", "name": "Feature", "description": "", "color": "0075ca" },
 							{ "id": "IT_3", "name": "Task", "description": "", "color": "e4e669" }
 						] } } } }`))
+				// An unknown type is user error, so it must fail before the
+				// issue exists rather than leave one behind.
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
 			},
 			wantsErr: `type "Bugz" not found; available types: Bug, Feature, Task`,
+		},
+		{
+			// A reference that cannot be resolved is user error too, and is
+			// resolved in the same pre-create step.
+			name: "create with unresolvable parent",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "child issue",
+				Body:     "child body",
+				Parent:   "999",
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`query IssueNodeID\b`),
+					httpmock.StringResponse(`
+						{ "errors": [ { "type": "NOT_FOUND", "message": "Could not resolve to an Issue with the number of 999." } ] }`))
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
+			},
+			wantsErr: `resolving --parent reference "999": GraphQL: Could not resolve to an Issue with the number of 999.`,
 		},
 		{
 			name: "create with type that cannot be set",

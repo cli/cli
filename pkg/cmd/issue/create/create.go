@@ -395,6 +395,15 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 		return opts.Browser.Browse(openURL)
 	} else if action == prShared.SubmitAction {
+		// Resolve the deferred fields before creating anything. These lookups
+		// can fail on user error (an unknown --type, a bad issue reference) and
+		// such a failure must not leave a created issue behind.
+		var updateOpts api.DeferredUpdateIssueOptions
+		updateOpts, err = resolveDeferredUpdateIssueOptions(apiClient, baseRepo, opts)
+		if err != nil {
+			return
+		}
+
 		params := map[string]interface{}{
 			"title": tb.Title,
 			"body":  tb.Body,
@@ -414,11 +423,7 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		var updateOpts api.DeferredUpdateIssueOptions
-		updateOpts, err = deferredUpdateIssueOptions(apiClient, baseRepo, newIssue, opts)
-		if err != nil {
-			return
-		}
+		updateOpts.IssueID = newIssue.ID
 		// The issue exists by now, so failing to apply the deferred fields is
 		// not a failure of the whole operation. Returning the error here would
 		// make PreserveInput write a recovery file and print "operation
@@ -441,12 +446,12 @@ func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prS
 	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb, projectsV1Support)
 }
 
-// deferredUpdateIssueOptions resolves the user-supplied --type / --parent /
-// --blocked-by / --blocking flags into the IDs that DeferredUpdateIssue
-// expects.
-func deferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, issue *api.Issue, opts *CreateOptions) (api.DeferredUpdateIssueOptions, error) {
+// resolveDeferredUpdateIssueOptions resolves the user-supplied --type /
+// --parent / --blocked-by / --blocking flags into the IDs that
+// DeferredUpdateIssue expects. It performs reads only and needs no issue ID, so
+// callers run it before creating the issue and set IssueID afterwards.
+func resolveDeferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, opts *CreateOptions) (api.DeferredUpdateIssueOptions, error) {
 	updateOpts := api.DeferredUpdateIssueOptions{
-		IssueID:  issue.ID,
 		Hostname: baseRepo.RepoHost(),
 	}
 
