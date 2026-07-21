@@ -944,6 +944,35 @@ func Test_createRun(t *testing.T) {
 			wantsErr: `resolving --parent reference "999": GraphQL: Could not resolve to an Issue with the number of 999.`,
 		},
 		{
+			// Refs are resolved in a loop, so a later ref failing after an
+			// earlier one succeeded must still abort before the issue exists.
+			name: "create with unresolvable blocked-by among several",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "blocked issue",
+				Body:      "blocked body",
+				BlockedBy: []string{"200", "999"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					issueNodeIDByNumberMatcher(200),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "BLOCKER_ID_200" } } } }`))
+				r.Register(
+					issueNodeIDByNumberMatcher(999),
+					httpmock.StringResponse(`
+						{ "errors": [ { "type": "NOT_FOUND", "message": "Could not resolve to an Issue with the number of 999." } ] }`))
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
+			},
+			wantsErr: `resolving --blocked-by reference "999": GraphQL: Could not resolve to an Issue with the number of 999.`,
+		},
+		{
 			name: "create with type that cannot be set",
 			opts: CreateOptions{
 				Detector:  &fd.EnabledDetectorMock{},
