@@ -108,7 +108,7 @@ func (c *CAPIClient) CreateJob(ctx context.Context, owner, repo, problemStatemen
 	if res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusOK { // accept 201 or 200
 		statusText := fmt.Sprintf("%d %s", res.StatusCode, http.StatusText(res.StatusCode))
 
-		// If the response has error embeded, we can use that.
+		// If the response has error embedded, we can use that.
 		// TODO: Does this really ever happen?
 		if j.ErrorInfo != nil {
 			return nil, fmt.Errorf("failed to create job: %s: %s", statusText, j.ErrorInfo.Message)

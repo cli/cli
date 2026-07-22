@@ -4,7 +4,7 @@ set -e
 print_help() {
     cat <<EOF
 To tag a new release:
-  script/release [--staging] <tag-name> [--platform {linux|macos|windows}] [--branch <branch>]
+  script/release [--staging] [--dry-run] <tag-name> [--platform {linux|macos|windows}] [--branch <branch>]
 
 To build staging binaries from the current branch:
   script/release --current [--platform {linux|macos|windows}]
@@ -25,6 +25,7 @@ do_push=""
 platform=""
 branch="trunk"
 deploy_env="production"
+dry_run="false"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -46,6 +47,10 @@ while [ $# -gt 0 ]; do
     ;;
   --staging )
     deploy_env="staging"
+    shift 1
+    ;;
+  --dry-run )
+    dry_run="true"
     shift 1
     ;;
   --current )
@@ -74,7 +79,7 @@ announce() {
 }
 
 trigger_deployment() {
-  announce gh workflow -R cli/cli run deployment.yml --ref "$branch" -f tag_name="$tag_name" -f environment="$deploy_env"
+  announce gh workflow -R cli/cli run deployment.yml --ref "$branch" -f tag_name="$tag_name" -f environment="$deploy_env" -f dry_run="$dry_run"
 }
 
 build_local() {

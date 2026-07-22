@@ -1004,6 +1004,20 @@ func (p ProjectField) Type() string {
 	return p.TypeName
 }
 
+// DataType is the data type of the project field, e.g. TEXT, NUMBER, DATE,
+// SINGLE_SELECT, or ITERATION. It returns an empty string for unknown field types.
+func (p ProjectField) DataType() string {
+	switch p.TypeName {
+	case "ProjectV2Field":
+		return p.Field.DataType
+	case "ProjectV2IterationField":
+		return p.IterationField.DataType
+	case "ProjectV2SingleSelectField":
+		return p.SingleSelectField.DataType
+	}
+	return ""
+}
+
 type SingleSelectFieldOptions struct {
 	ID   string
 	Name string

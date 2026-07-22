@@ -972,7 +972,7 @@ func detectGitHubRemote(gitClient *git.Client, dir string) (*gitHubRemote, error
 func parseGitHubURL(rawURL string) (ghrepo.Interface, error) {
 	u, err := git.ParseURL(rawURL)
 	if err != nil {
-		return nil, nil //nolint:nilerr // unparseable URL means it's not a GitHub remote
+		return nil, nil //nolint:nilerr // unparsable URL means it's not a GitHub remote
 	}
 	r, err := ghrepo.FromURL(u)
 	if err != nil {
