@@ -803,6 +803,24 @@ func TestRunList_FieldColumn(t *testing.T) {
 									"name":       "Status",
 									"dataType":   "SINGLE_SELECT",
 								},
+								{
+									"__typename": "ProjectV2Field",
+									"id":         "est ID",
+									"name":       "Est",
+									"dataType":   "NUMBER",
+								},
+								{
+									"__typename": "ProjectV2Field",
+									"id":         "tags ID",
+									"name":       "Tags",
+									"dataType":   "LABELS",
+								},
+								{
+									"__typename": "ProjectV2IterationField",
+									"id":         "iter ID",
+									"name":       "Iter",
+									"dataType":   "ITERATION",
+								},
 							},
 						},
 						"items": map[string]interface{}{
@@ -827,6 +845,35 @@ func TestRunList_FieldColumn(t *testing.T) {
 													"id":         "status ID",
 												},
 											},
+											{
+												"__typename": "ProjectV2ItemFieldNumberValue",
+												"number":     5,
+												"field": map[string]interface{}{
+													"__typename": "ProjectV2Field",
+													"id":         "est ID",
+												},
+											},
+											{
+												"__typename": "ProjectV2ItemFieldLabelValue",
+												"labels": map[string]interface{}{
+													"nodes": []map[string]interface{}{
+														{"name": "bug"},
+														{"name": "p1"},
+													},
+												},
+												"field": map[string]interface{}{
+													"__typename": "ProjectV2Field",
+													"id":         "tags ID",
+												},
+											},
+											{
+												"__typename": "ProjectV2ItemFieldIterationValue",
+												"title":      "S1",
+												"field": map[string]interface{}{
+													"__typename": "ProjectV2IterationField",
+													"id":         "iter ID",
+												},
+											},
 										},
 									},
 								},
@@ -845,7 +892,7 @@ func TestRunList_FieldColumn(t *testing.T) {
 		opts: listOpts{
 			number: 1,
 			owner:  "monalisa",
-			fields: []string{"Status"},
+			fields: []string{"Status", "Est", "Tags", "Iter"},
 		},
 		client: client,
 		io:     ios,
@@ -854,8 +901,8 @@ func TestRunList_FieldColumn(t *testing.T) {
 	err := runList(config)
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Doc(`
-		TYPE   TITLE     NUMBER  REPOSITORY  ID        STATUS
-		Issue  an issue  1       cli/go-gh   issue ID  In Progress
+		TYPE   TITLE     NUMBER  REPOSITORY  ID        STATUS       EST  TAGS     ITER
+		Issue  an issue  1       cli/go-gh   issue ID  In Progress  5    bug, p1  S1
   `), stdout.String())
 }
 
