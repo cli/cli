@@ -335,7 +335,7 @@ func Test_checkoutRun(t *testing.T) {
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git worktree add --track -b feature /path/to/wt origin/feature`, 0, "")
 			},
-			wantStdout: "✓ Worktree ready for PR #123\n  /path/to/wt\n  To start working: cd \"/path/to/wt\"\n",
+			wantStderr: "✓ Checked out PR #123 in worktree /path/to/wt\n  To start working: cd /path/to/wt\n",
 		},
 		{
 			name: "checkout existing branch into a worktree and sync with merge",
@@ -542,7 +542,7 @@ func Test_checkoutRun(t *testing.T) {
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git worktree add --track -b my-custom-name /path/to/wt origin/feature`, 0, "")
 			},
-			wantStdout: "✓ Worktree ready for PR #123\n  /path/to/wt\n  To start working: cd \"/path/to/wt\"\n",
+			wantStderr: "✓ Checked out PR #123 in worktree /path/to/wt\n  To start working: cd /path/to/wt\n",
 		},
 		{
 			name: "when the PR resolver errors, then that error is bubbled up",

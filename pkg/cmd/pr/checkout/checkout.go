@@ -173,9 +173,8 @@ func checkoutRun(opts *CheckoutOptions) error {
 
 	if opts.Worktree != "" && opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Worktree ready for PR #%d\n", cs.SuccessIcon(), pr.Number)
-		fmt.Fprintf(opts.IO.Out, "  %s\n", opts.Worktree)
-		fmt.Fprintf(opts.IO.Out, "  To start working: cd %q\n", opts.Worktree)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Checked out PR #%d in worktree %s\n", cs.SuccessIcon(), pr.Number, opts.Worktree)
+		fmt.Fprintf(opts.IO.ErrOut, "  To start working: cd %s\n", opts.Worktree)
 	}
 
 	return nil
@@ -198,23 +197,13 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 	remoteBranchRef := fmt.Sprintf("refs/remotes/%s", remoteBranch)
 	fetchCmd := []string{"fetch", remote.Name, refSpec, "--no-tags"}
 
-	// FETCH_HEAD is per-worktree: when reusing an existing linked worktree in
-	// detach mode, fetch inside it so FETCH_HEAD is written there.
-	if opts.Detach && opts.Worktree != "" && isWorktreeAtPath(opts.GitClient, opts.Worktree) {
-		cmds = append(cmds, append([]string{"-C", opts.Worktree}, fetchCmd...))
-		cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "--detach", "FETCH_HEAD"})
-		return cmds
+	if opts.Detach {
+		return append(cmds, detachCmds(fetchCmd, opts.Worktree, opts.GitClient)...)
 	}
 
 	cmds = append(cmds, fetchCmd)
 
 	switch {
-	case opts.Detach:
-		if opts.Worktree != "" {
-			cmds = append(cmds, []string{"worktree", "add", "--detach", opts.Worktree, "FETCH_HEAD"})
-		} else {
-			cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
-		}
 	case opts.Worktree != "":
 		if isWorktreeAtPath(opts.GitClient, opts.Worktree) {
 			cmds = append(cmds, worktreeCheckoutCmds(opts.Worktree, localBranch, remoteBranchRef, opts.Force)...)
@@ -240,19 +229,7 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 
 	if opts.Detach {
 		fetchCmd := []string{"fetch", baseURLOrName, ref, "--no-tags"}
-		if opts.Worktree != "" && isWorktreeAtPath(opts.GitClient, opts.Worktree) {
-			// FETCH_HEAD is per-worktree; fetch inside the linked worktree.
-			cmds = append(cmds, append([]string{"-C", opts.Worktree}, fetchCmd...))
-			cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "--detach", "FETCH_HEAD"})
-		} else {
-			cmds = append(cmds, fetchCmd)
-			if opts.Worktree != "" {
-				cmds = append(cmds, []string{"worktree", "add", "--detach", opts.Worktree, "FETCH_HEAD"})
-			} else {
-				cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
-			}
-		}
-		return cmds
+		return detachCmds(fetchCmd, opts.Worktree, opts.GitClient)
 	}
 
 	localBranch := pr.HeadRefName
@@ -345,6 +322,28 @@ func isWorktreeAtPath(client *git.Client, path string) bool {
 		}
 	}
 	return false
+}
+
+// detachCmds returns the commands for a detached checkout. When reusing an
+// existing linked worktree, FETCH_HEAD must be written inside it (it is
+// per-worktree), so the fetch runs with -C <path>.
+func detachCmds(fetchCmd []string, worktree string, gitClient *git.Client) [][]string {
+	if worktree != "" {
+		if isWorktreeAtPath(gitClient, worktree) {
+			return [][]string{
+				append([]string{"-C", worktree}, fetchCmd...),
+				{"-C", worktree, "checkout", "--detach", "FETCH_HEAD"},
+			}
+		}
+		return [][]string{
+			fetchCmd,
+			{"worktree", "add", "--detach", worktree, "FETCH_HEAD"},
+		}
+	}
+	return [][]string{
+		fetchCmd,
+		{"checkout", "--detach", "FETCH_HEAD"},
+	}
 }
 
 // syncBranchCmds returns commands that sync a branch to ref: a hard reset when
