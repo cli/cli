@@ -702,6 +702,58 @@ func TestFieldValueNodesDisplayValue(t *testing.T) {
 		{Name: "help wanted"},
 	}
 
+	dateValue := FieldValueNodes{Type: "ProjectV2ItemFieldDateValue"}
+	dateValue.ProjectV2ItemFieldDateValue.Date = "2022-05-01"
+
+	iterationValue := FieldValueNodes{Type: "ProjectV2ItemFieldIterationValue"}
+	iterationValue.ProjectV2ItemFieldIterationValue.Title = "Sprint 1"
+
+	milestoneValue := FieldValueNodes{Type: "ProjectV2ItemFieldMilestoneValue"}
+	milestoneValue.ProjectV2ItemFieldMilestoneValue.Milestone.Title = "v1.0"
+
+	pullRequestValue := FieldValueNodes{Type: "ProjectV2ItemFieldPullRequestValue"}
+	pullRequestValue.ProjectV2ItemFieldPullRequestValue.PullRequests.Nodes = []struct {
+		Url string
+	}{
+		{Url: "https://github.com/cli/cli/pull/1"},
+		{Url: "https://github.com/cli/cli/pull/2"},
+	}
+
+	repositoryValue := FieldValueNodes{Type: "ProjectV2ItemFieldRepositoryValue"}
+	repositoryValue.ProjectV2ItemFieldRepositoryValue.Repository.Url = "https://github.com/cli/cli"
+
+	userValue := FieldValueNodes{Type: "ProjectV2ItemFieldUserValue"}
+	userValue.ProjectV2ItemFieldUserValue.Users.Nodes = []struct {
+		Login string
+	}{
+		{Login: "monalisa"},
+		{Login: "hubot"},
+	}
+
+	reviewerValue := FieldValueNodes{Type: "ProjectV2ItemFieldReviewerValue"}
+	reviewerValue.ProjectV2ItemFieldReviewerValue.Reviewers.Nodes = []struct {
+		Type string `graphql:"__typename"`
+		Team struct {
+			Name string
+		} `graphql:"... on Team"`
+		User struct {
+			Login string
+		} `graphql:"... on User"`
+	}{
+		{
+			Type: "User",
+			User: struct {
+				Login string
+			}{Login: "monalisa"},
+		},
+		{
+			Type: "Team",
+			Team: struct {
+				Name string
+			}{Name: "octocat-team"},
+		},
+	}
+
 	tests := []struct {
 		name  string
 		value FieldValueNodes
@@ -751,6 +803,41 @@ func TestFieldValueNodesDisplayValue(t *testing.T) {
 			name:  "labels joined with commas",
 			value: labelValue,
 			want:  "bug, help wanted",
+		},
+		{
+			name:  "date",
+			value: dateValue,
+			want:  "2022-05-01",
+		},
+		{
+			name:  "iteration title",
+			value: iterationValue,
+			want:  "Sprint 1",
+		},
+		{
+			name:  "milestone title",
+			value: milestoneValue,
+			want:  "v1.0",
+		},
+		{
+			name:  "pull requests joined with commas",
+			value: pullRequestValue,
+			want:  "https://github.com/cli/cli/pull/1, https://github.com/cli/cli/pull/2",
+		},
+		{
+			name:  "repository url",
+			value: repositoryValue,
+			want:  "https://github.com/cli/cli",
+		},
+		{
+			name:  "users joined with commas",
+			value: userValue,
+			want:  "monalisa, hubot",
+		},
+		{
+			name:  "reviewers joined with commas for users and teams",
+			value: reviewerValue,
+			want:  "monalisa, octocat-team",
 		},
 	}
 
