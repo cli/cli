@@ -407,29 +407,9 @@ func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cm
 		var cmd *git.Command
 		switch subCmd {
 		case "submodule":
-			// As with fetch, strip a leading -C <path> and apply it as
-			// cmd.Dir so the credential-helper flags AuthenticatedCommand
-			// prepends don't get displaced.
-			if args[0] == "-C" {
-				cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args[2:]...)
-				if err == nil {
-					cmd.Dir = args[1]
-				}
-			} else {
-				cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
-			}
+			cmd, err = authenticatedCommand(client, credentialPattern, args)
 		case "fetch":
-			// AuthenticatedCommand prepends credential-helper flags
-			// before all args. When -C <path> is present, strip it and
-			// apply as cmd.Dir so the flags don't displace it.
-			if args[0] == "-C" {
-				cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args[2:]...)
-				if err == nil {
-					cmd.Dir = args[1]
-				}
-			} else {
-				cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args...)
-			}
+			cmd, err = authenticatedCommand(client, git.AllMatchingCredentialsPattern, args)
 		default:
 			cmd, err = client.Command(context.Background(), args...)
 		}
@@ -441,6 +421,22 @@ func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cm
 		}
 	}
 	return nil
+}
+
+// authenticatedCommand builds an authenticated git command, transparently
+// handling a leading -C <path> prefix. AuthenticatedCommand prepends
+// credential-helper flags before all args, so a -C prefix would be displaced;
+// instead we strip it and apply it as cmd.Dir.
+func authenticatedCommand(client *git.Client, credentialPattern git.CredentialPattern, args []string) (*git.Command, error) {
+	if args[0] == "-C" {
+		cmd, err := client.AuthenticatedCommand(context.Background(), credentialPattern, args[2:]...)
+		if err != nil {
+			return nil, err
+		}
+		cmd.Dir = args[1]
+		return cmd, nil
+	}
+	return client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
 }
 
 type PRResolver interface {
