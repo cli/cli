@@ -1170,3 +1170,39 @@ func TestPRCheckout_detach(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
 }
+
+func Test_authenticatedCommand_stripsWorktreePrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantDir  string
+		wantArgs []string
+	}{
+		{
+			name:     "leading -C prefix is applied as cmd.Dir and stripped from args",
+			args:     []string{"-C", "/path/to/wt", "submodule", "sync", "--recursive"},
+			wantDir:  "/path/to/wt",
+			wantArgs: []string{"submodule", "sync", "--recursive"},
+		},
+		{
+			name:     "without a -C prefix cmd.Dir is left empty",
+			args:     []string{"fetch", "origin", "refs/pull/123/head", "--no-tags"},
+			wantDir:  "",
+			wantArgs: []string{"fetch", "origin", "refs/pull/123/head", "--no-tags"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &git.Client{GhPath: "gh", GitPath: "git"}
+			cmd, err := authenticatedCommand(client, git.AllMatchingCredentialsPattern, tt.args)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantDir, cmd.Dir)
+			// The credential-helper flags are prepended, so assert the tail
+			// carries the real sub-command args and no -C prefix leaked in.
+			require.GreaterOrEqual(t, len(cmd.Args), len(tt.wantArgs))
+			assert.Equal(t, tt.wantArgs, cmd.Args[len(cmd.Args)-len(tt.wantArgs):])
+			assert.NotContains(t, cmd.Args, "-C")
+		})
+	}
+}

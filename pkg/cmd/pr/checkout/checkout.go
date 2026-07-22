@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -166,8 +167,8 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if opts.Worktree != "" {
 			prefix = []string{"-C", opts.Worktree}
 		}
-		cmdQueue = append(cmdQueue, append(prefix, "submodule", "sync", "--recursive"))
-		cmdQueue = append(cmdQueue, append(prefix, "submodule", "update", "--init", "--recursive"))
+		cmdQueue = append(cmdQueue, slices.Concat(prefix, []string{"submodule", "sync", "--recursive"}))
+		cmdQueue = append(cmdQueue, slices.Concat(prefix, []string{"submodule", "update", "--init", "--recursive"}))
 	}
 
 	// Note that although we will probably be fetching from the head, in practice, PR checkout can only
