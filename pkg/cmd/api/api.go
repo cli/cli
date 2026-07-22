@@ -386,14 +386,15 @@ func apiRun(opts *ApiOptions) error {
 				log = opts.IO.Out
 			}
 			opts := api.HTTPClientOptions{
-				AppVersion:     opts.AppVersion,
-				InvokingAgent:  opts.InvokingAgent,
-				CacheTTL:       opts.CacheTTL,
-				Config:         cfg.Authentication(),
-				EnableCache:    opts.CacheTTL > 0,
-				Log:            log,
-				LogColorize:    opts.IO.ColorEnabled(),
-				LogVerboseHTTP: opts.Verbose,
+				AppVersion:      opts.AppVersion,
+				InvokingAgent:   opts.InvokingAgent,
+				CacheTTL:        opts.CacheTTL,
+				GetToken:        cfg.Authentication().ActiveToken,
+				GetBearerConfig: cfg.BearerAuth,
+				EnableCache:     opts.CacheTTL > 0,
+				Log:             log,
+				LogColorize:     opts.IO.ColorEnabled(),
+				LogVerboseHTTP:  opts.Verbose,
 			}
 			return api.NewHTTPClient(opts)
 		}

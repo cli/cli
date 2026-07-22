@@ -6,9 +6,19 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+var disabledBearerConfig = gh.ConfigGetter(func(string) gh.ConfigEntry {
+	return gh.ConfigEntry{Value: "disabled"}
+})
+
+var enabledBearerConfig = gh.ConfigGetter(func(string) gh.ConfigEntry {
+	return gh.ConfigEntry{Value: "enabled"}
+})
 
 func Test_HasMinimumScopes(t *testing.T) {
 	tests := []struct {
@@ -46,7 +56,7 @@ func Test_HasMinimumScopes(t *testing.T) {
 			})
 
 			client := http.Client{Transport: fakehttp}
-			err := HasMinimumScopes(&client, "github.com", "ATOKEN")
+			err := HasMinimumScopes(&client, "github.com", "ATOKEN", disabledBearerConfig)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 			} else {
@@ -55,6 +65,53 @@ func Test_HasMinimumScopes(t *testing.T) {
 			assert.Equal(t, gotAuthorization, "token ATOKEN")
 		})
 	}
+}
+
+func Test_HasMinimumScopes_bearerAuth(t *testing.T) {
+	fakehttp := &httpmock.Registry{}
+	defer fakehttp.Verify(t)
+
+	var gotAuthorization string
+	fakehttp.Register(httpmock.REST("GET", ""), func(req *http.Request) (*http.Response, error) {
+		gotAuthorization = req.Header.Get("authorization")
+		return &http.Response{
+			Request:    req,
+			StatusCode: 200,
+			Body:       io.NopCloser(&bytes.Buffer{}),
+			Header: map[string][]string{
+				"X-Oauth-Scopes": {"repo, read:org"},
+			},
+		}, nil
+	})
+
+	client := http.Client{Transport: fakehttp}
+	err := HasMinimumScopes(&client, "github.com", "ATOKEN", enabledBearerConfig)
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer ATOKEN", gotAuthorization)
+}
+
+func Test_HasMinimumScopes_bearerAuthFromEnv(t *testing.T) {
+	fakehttp := &httpmock.Registry{}
+	defer fakehttp.Verify(t)
+
+	var gotAuthorization string
+	fakehttp.Register(httpmock.REST("GET", ""), func(req *http.Request) (*http.Response, error) {
+		gotAuthorization = req.Header.Get("authorization")
+		return &http.Response{
+			Request:    req,
+			StatusCode: 200,
+			Body:       io.NopCloser(&bytes.Buffer{}),
+			Header: map[string][]string{
+				"X-Oauth-Scopes": {"repo, read:org"},
+			},
+		}, nil
+	})
+
+	t.Setenv("GH_BEARER_AUTH", "1")
+	client := http.Client{Transport: fakehttp}
+	err := HasMinimumScopes(&client, "github.com", "ATOKEN", disabledBearerConfig)
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer ATOKEN", gotAuthorization)
 }
 
 func Test_HeaderHasMinimumScopes(t *testing.T) {

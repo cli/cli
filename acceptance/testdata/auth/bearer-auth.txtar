@@ -1,0 +1,39 @@
+# By default, requests use token authentication scheme
+env GH_DEBUG=api
+exec gh api /user
+stderr '> Authorization: token'
+
+# gh api: bearer_auth config enables Bearer scheme
+exec gh config set bearer_auth enabled
+exec gh api /user
+stderr '> Authorization: Bearer'
+exec gh config set bearer_auth disabled
+
+# gh api: GH_BEARER_AUTH env var enables Bearer scheme
+env GH_BEARER_AUTH=1
+exec gh api /user
+stderr '> Authorization: Bearer'
+env GH_BEARER_AUTH=
+
+# gh repo list (factory HTTP client): bearer_auth config enables Bearer scheme
+exec gh config set bearer_auth enabled
+exec gh repo list --limit 1
+stderr '> Authorization: Bearer'
+exec gh config set bearer_auth disabled
+
+# gh repo list (factory HTTP client): GH_BEARER_AUTH env var enables Bearer scheme
+env GH_BEARER_AUTH=1
+exec gh repo list --limit 1
+stderr '> Authorization: Bearer'
+env GH_BEARER_AUTH=
+
+# gh auth status (manual auth headers): bearer_auth config enables Bearer scheme
+exec gh config set bearer_auth enabled
+exec gh auth status
+stderr '> Authorization: Bearer'
+exec gh config set bearer_auth disabled
+
+# gh auth status (manual auth headers): GH_BEARER_AUTH env var enables Bearer scheme
+env GH_BEARER_AUTH=1
+exec gh auth status
+stderr '> Authorization: Bearer'

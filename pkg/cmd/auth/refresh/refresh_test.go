@@ -471,7 +471,7 @@ func Test_refreshRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ *http.Client, _ *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool) (token, username, error) {
+			tt.opts.AuthFlow = func(_ *http.Client, _ *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool, getBearerConfig gh.ConfigGetter) (token, username, error) {
 				aa.hostname = hostname
 				aa.scopes = scopes
 				aa.interactive = interactive

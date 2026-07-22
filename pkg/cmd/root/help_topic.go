@@ -54,6 +54,10 @@ var HelpTopics = []helpTopic{
 			authenticated with, the stored credentials will be used. Otherwise, setting %[1]sGH_TOKEN%[1]s or
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s is required, depending on the targeted host.
 
+			%[1]sGH_BEARER_AUTH%[1]s: set to a truthy value to use Bearer token authentication instead of the
+			default token authentication scheme. This may be required for enterprise proxy setups. Can
+			also be configured per-host via the %[1]sbearer_auth%[1]s setting.
+
 			%[1]sGH_REPO%[1]s: specify the GitHub repository in the %[1]s[HOST/]OWNER/REPO%[1]s format for commands
 			that otherwise operate on a local repository.
 

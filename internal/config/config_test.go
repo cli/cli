@@ -213,3 +213,41 @@ func TestTelemetry(t *testing.T) {
 		require.Equal(t, gh.ConfigUserProvided, entry.Source)
 	})
 }
+
+func TestBearerAuth(t *testing.T) {
+	t.Run("returns disabled by default", func(t *testing.T) {
+		c := newTestConfig()
+		entry := c.BearerAuth("github.com")
+		require.Equal(t, "disabled", entry.Value)
+		require.Equal(t, gh.ConfigDefaultProvided, entry.Source)
+	})
+
+	t.Run("returns enabled when globally enabled", func(t *testing.T) {
+		c := newTestConfig()
+		c.cfg.Set([]string{bearerAuthKey}, "enabled")
+		entry := c.BearerAuth("github.com")
+		require.Equal(t, "enabled", entry.Value)
+		require.Equal(t, gh.ConfigUserProvided, entry.Source)
+	})
+
+	t.Run("returns enabled when enabled for specific host", func(t *testing.T) {
+		c := newTestConfig()
+		c.cfg.Set([]string{hostsKey, "example.com", bearerAuthKey}, "enabled")
+		entry := c.BearerAuth("example.com")
+		require.Equal(t, "enabled", entry.Value)
+		require.Equal(t, gh.ConfigUserProvided, entry.Source)
+
+		entry = c.BearerAuth("github.com")
+		require.Equal(t, "disabled", entry.Value)
+		require.Equal(t, gh.ConfigDefaultProvided, entry.Source)
+	})
+
+	t.Run("host-level setting overrides global", func(t *testing.T) {
+		c := newTestConfig()
+		c.cfg.Set([]string{bearerAuthKey}, "enabled")
+		c.cfg.Set([]string{hostsKey, "github.com", bearerAuthKey}, "disabled")
+		entry := c.BearerAuth("github.com")
+		require.Equal(t, "disabled", entry.Value)
+		require.Equal(t, gh.ConfigUserProvided, entry.Source)
+	})
+}

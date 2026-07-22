@@ -33,7 +33,7 @@ type RefreshOptions struct {
 	Scopes       []string
 	RemoveScopes []string
 	ResetScopes  bool
-	AuthFlow     func(*http.Client, *iostreams.IOStreams, string, []string, bool, bool) (token, username, error)
+	AuthFlow     func(*http.Client, *iostreams.IOStreams, string, []string, bool, bool, gh.ConfigGetter) (token, username, error)
 
 	Interactive     bool
 	InsecureStorage bool
@@ -44,8 +44,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(httpClient *http.Client, io *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool) (token, username, error) {
-			t, u, err := authflow.AuthFlow(httpClient, hostname, io, "", scopes, interactive, f.Browser, clipboard)
+		AuthFlow: func(httpClient *http.Client, io *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool, getBearerConfig gh.ConfigGetter) (token, username, error) {
+			t, u, err := authflow.AuthFlow(httpClient, hostname, io, scopes, interactive, f.Browser, clipboard, getBearerConfig)
 			return token(t), username(u), err
 		},
 		PlainHttpClient: f.PlainHttpClient,
@@ -176,7 +176,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	if !opts.ResetScopes {
 		if oldToken, _ := authCfg.ActiveToken(hostname); oldToken != "" {
-			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken); err == nil {
+			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken, cfg.BearerAuth); err == nil {
 				for _, s := range strings.Split(oldScopes, ",") {
 					s = strings.TrimSpace(s)
 					if s != "" {
@@ -209,7 +209,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	authedToken, authedUser, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, opts.Clipboard)
+	authedToken, authedUser, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, opts.Clipboard, cfg.BearerAuth)
 	if err != nil {
 		return err
 	}

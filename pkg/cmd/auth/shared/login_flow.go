@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -42,6 +43,7 @@ type LoginOptions struct {
 	SecureStorage    bool
 	SkipSSHKeyPrompt bool
 	CopyToClipboard  bool
+	BearerAuth       gh.ConfigGetter
 
 	sshContext ssh.Context
 }
@@ -51,6 +53,10 @@ func Login(opts *LoginOptions) error {
 	hostname := opts.Hostname
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
+
+	if opts.BearerAuth == nil {
+		opts.BearerAuth = func(string) gh.ConfigEntry { return gh.ConfigEntry{Value: "disabled"} }
+	}
 
 	gitProtocol := strings.ToLower(opts.GitProtocol)
 	if opts.Interactive && gitProtocol == "" {
@@ -150,7 +156,7 @@ func Login(opts *LoginOptions) error {
 
 	if authMode == 0 {
 		var err error
-		authToken, username, err = authflow.AuthFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard)
+		authToken, username, err = authflow.AuthFlow(opts.PlainHTTPClient, hostname, opts.IO, append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard, opts.BearerAuth)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
@@ -168,14 +174,14 @@ func Login(opts *LoginOptions) error {
 			return err
 		}
 
-		if err := HasMinimumScopes(httpClient, hostname, authToken); err != nil {
+		if err := HasMinimumScopes(httpClient, hostname, authToken, opts.BearerAuth); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 	}
 
 	if username == "" {
 		var err error
-		username, err = GetCurrentLogin(httpClient, hostname, authToken)
+		username, err = GetCurrentLogin(httpClient, hostname, authToken, opts.BearerAuth)
 		if err != nil {
 			return fmt.Errorf("error retrieving current user: %w", err)
 		}
@@ -249,7 +255,7 @@ func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title strin
 	return add.SSHKeyUpload(httpClient, hostname, f, title)
 }
 
-func GetCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {
+func GetCurrentLogin(httpClient httpClient, hostname, authToken string, getBearerConfig gh.ConfigGetter) (string, error) {
 	query := `query UserCurrent{viewer{login}}`
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query})
 	if err != nil {
@@ -263,7 +269,7 @@ func GetCurrentLogin(httpClient httpClient, hostname, authToken string) (string,
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", "token "+authToken)
+	req.Header.Set("Authorization", authScheme(getBearerConfig, hostname)+" "+authToken)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
@@ -278,4 +284,12 @@ func GetCurrentLogin(httpClient httpClient, hostname, authToken string) (string,
 		return "", err
 	}
 	return result.Data.Viewer.Login, nil
+}
+
+// authScheme returns "Bearer" or "token" depending on the bearer auth configuration.
+func authScheme(getBearerConfig gh.ConfigGetter, hostname string) string {
+	if api.ShouldUseBearerAuth(getBearerConfig, hostname) {
+		return "Bearer"
+	}
+	return "token"
 }

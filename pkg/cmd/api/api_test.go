@@ -17,7 +17,6 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
-	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -1356,20 +1355,9 @@ func Test_apiRun_cache(t *testing.T) {
 	options := ApiOptions{
 		IO: ios,
 		Config: func() (gh.Config, error) {
-			return &ghmock.ConfigMock{
-				AuthenticationFunc: func() gh.AuthConfig {
-					cfg := &config.AuthConfig{}
-					// Required because the http client tries to get the active token and otherwise
-					// this goes down to to go-gh config and panics. Pretty bad solution, it would
-					// be better if this were black box.
-					cfg.SetActiveToken("token", "stub")
-					return cfg
-				},
-				// Cached responses are stored in a tempdir that gets automatically cleaned up
-				CacheDirFunc: func() string {
-					return t.TempDir()
-				},
-			}, nil
+			cfg, _ := config.NewIsolatedTestConfig(t)
+			cfg.Authentication().SetActiveToken("token", "stub")
+			return cfg, nil
 		},
 		// You might think that we want to set Host: s.URL here, but you'd be wrong.
 		// The host field is later used to evaluate an API URL e.g. https://api.host.com/graphql
@@ -1402,13 +1390,9 @@ func Test_apiRun_invokingAgent(t *testing.T) {
 		AppVersion:    "1.2.3",
 		InvokingAgent: "copilot-cli",
 		Config: func() (gh.Config, error) {
-			return &ghmock.ConfigMock{
-				AuthenticationFunc: func() gh.AuthConfig {
-					cfg := &config.AuthConfig{}
-					cfg.SetActiveToken("token", "stub")
-					return cfg
-				},
-			}, nil
+			cfg, _ := config.NewIsolatedTestConfig(t)
+			cfg.Authentication().SetActiveToken("token", "stub")
+			return cfg, nil
 		},
 		RequestPath: s.URL,
 	}

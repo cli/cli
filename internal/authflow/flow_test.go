@@ -6,9 +6,14 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var stubConfigGetter = func(hostname string) gh.ConfigEntry {
+	return gh.ConfigEntry{Value: "disabled"}
+}
 
 func Test_getViewer_leavesUserAgent(t *testing.T) {
 	var receivedUA string
@@ -28,11 +33,35 @@ func Test_getViewer_leavesUserAgent(t *testing.T) {
 		}},
 	}
 
-	login, err := getViewer(plainClient, "github.com", "test-token")
+	login, err := getViewer(plainClient, "github.com", "test-token", stubConfigGetter)
 	require.NoError(t, err)
 	assert.Equal(t, "monalisa", login)
 	assert.Empty(t, receivedUA, "User-Agent header should be left unset so that downstream transports can set it")
 	assert.Equal(t, "token test-token", receivedAuth)
+}
+
+func Test_getViewer_bearerAuth(t *testing.T) {
+	var receivedAuth string
+
+	plainClient := &http.Client{
+		Transport: &roundTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			receivedAuth = req.Header.Get("Authorization")
+
+			return &http.Response{
+				StatusCode: 200,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(bytes.NewBufferString(`{"data":{"viewer":{"login":"monalisa"}}}`)),
+				Request:    req,
+			}, nil
+		}},
+	}
+
+	login, err := getViewer(plainClient, "github.com", "test-token", func(string) gh.ConfigEntry {
+		return gh.ConfigEntry{Value: "enabled"}
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "monalisa", login)
+	assert.Equal(t, "Bearer test-token", receivedAuth)
 }
 
 type roundTripper struct {

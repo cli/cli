@@ -10,6 +10,7 @@ import (
 	"github.com/atotto/clipboard"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/oauth"
@@ -27,7 +28,7 @@ var (
 // AuthFlow initiates an OAuth device or web application flow to acquire a
 // token. The provided HTTP client should be a plain client that does not set
 // auth or other headers.
-func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, b browser.Browser, isCopyToClipboard bool) (string, string, error) {
+func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams, additionalScopes []string, isInteractive bool, b browser.Browser, isCopyToClipboard bool, getBearerConfig gh.ConfigGetter) (string, string, error) {
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
 
@@ -90,14 +91,12 @@ func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams
 		Stdout:     w,
 	}
 
-	fmt.Fprintln(w, notice)
-
 	token, err := flow.DetectFlow()
 	if err != nil {
 		return "", "", err
 	}
 
-	userLogin, err := getViewer(httpClient, oauthHost, token.Token)
+	userLogin, err := getViewer(httpClient, oauthHost, token.Token, getBearerConfig)
 	if err != nil {
 		return "", "", err
 	}
@@ -115,17 +114,10 @@ func getCallbackURI(oauthHost string) string {
 	return callbackURI
 }
 
-type cfg struct {
-	token string
-}
-
-func (c cfg) ActiveToken(hostname string) (string, string) {
-	return c.token, "oauth_token"
-}
-
-func getViewer(httpClient *http.Client, hostname, token string) (string, error) {
+func getViewer(httpClient *http.Client, hostname, token string, getBearerConfig gh.ConfigGetter) (string, error) {
 	authedClient := *httpClient
-	authedClient.Transport = api.AddAuthTokenHeader(httpClient.Transport, cfg{token: token})
+	var getTokenFn = func(string) (string, string) { return token, "oauth_token" }
+	authedClient.Transport = api.AddAuthTokenHeader(httpClient.Transport, getTokenFn, getBearerConfig)
 	return api.CurrentLoginName(api.NewClientFromHTTP(&authedClient), hostname)
 }
 

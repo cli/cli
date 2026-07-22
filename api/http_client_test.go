@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,8 @@ import (
 
 func TestNewHTTPClient(t *testing.T) {
 	type args struct {
-		config             tokenGetter
+		getToken           getTokenFunc
+		getBearerConfig    gh.ConfigGetter
 		appVersion         string
 		invokingAgent      string
 		logVerboseHTTP     bool
@@ -34,9 +36,10 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "github.com",
 			args: args{
-				config:         tinyConfig{"github.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				logVerboseHTTP: false,
+				getToken:        stubGetToken("github.com", "MYTOKEN"),
+				getBearerConfig: disabledBearerConfig,
+				appVersion:      "v1.2.3",
+				logVerboseHTTP:  false,
 			},
 			host: "github.com",
 			wantHeader: map[string][]string{
@@ -50,8 +53,9 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "GHES",
 			args: args{
-				config:     tinyConfig{"example.com:oauth_token": "GHETOKEN"},
-				appVersion: "v1.2.3",
+				getToken:        stubGetToken("example.com", "GHETOKEN"),
+				getBearerConfig: disabledBearerConfig,
+				appVersion:      "v1.2.3",
 			},
 			host: "example.com",
 			wantHeader: map[string][]string{
@@ -63,11 +67,44 @@ func TestNewHTTPClient(t *testing.T) {
 			wantStderr: "",
 		},
 		{
+			name: "github.com with bearer auth",
+			args: args{
+				getToken:        stubGetToken("github.com", "MYTOKEN"),
+				getBearerConfig: func(string) gh.ConfigEntry { return gh.ConfigEntry{Value: "enabled"} },
+				appVersion:      "v1.2.3",
+			},
+			host: "github.com",
+			wantHeader: map[string][]string{
+				"authorization":        {"Bearer MYTOKEN"},
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+			},
+			wantStderr: "",
+		},
+		{
+			name: "GHES with bearer auth",
+			args: args{
+				getToken:        stubGetToken("example.com", "GHETOKEN"),
+				getBearerConfig: func(string) gh.ConfigEntry { return gh.ConfigEntry{Value: "enabled"} },
+				appVersion:      "v1.2.3",
+			},
+			host: "example.com",
+			wantHeader: map[string][]string{
+				"authorization":        {"Bearer GHETOKEN"},
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+			},
+			wantStderr: "",
+		},
+		{
 			name: "github.com no authentication token",
 			args: args{
-				config:         tinyConfig{"example.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				logVerboseHTTP: false,
+				getToken:        stubGetToken("example.com", "MYTOKEN"),
+				getBearerConfig: disabledBearerConfig,
+				appVersion:      "v1.2.3",
+				logVerboseHTTP:  false,
 			},
 			host: "github.com",
 			wantHeader: map[string][]string{
@@ -81,9 +118,10 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "GHES no authentication token",
 			args: args{
-				config:         tinyConfig{"github.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				logVerboseHTTP: false,
+				getToken:        stubGetToken("github.com", "MYTOKEN"),
+				getBearerConfig: disabledBearerConfig,
+				appVersion:      "v1.2.3",
+				logVerboseHTTP:  false,
 			},
 			host: "example.com",
 			wantHeader: map[string][]string{
@@ -97,9 +135,10 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "github.com in verbose mode",
 			args: args{
-				config:         tinyConfig{"github.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				logVerboseHTTP: true,
+				getToken:        stubGetToken("github.com", "MYTOKEN"),
+				getBearerConfig: disabledBearerConfig,
+				appVersion:      "v1.2.3",
+				logVerboseHTTP:  true,
 			},
 			host: "github.com",
 			wantHeader: map[string][]string{
@@ -183,7 +222,8 @@ func TestNewHTTPClient(t *testing.T) {
 			client, err := NewHTTPClient(HTTPClientOptions{
 				AppVersion:         tt.args.appVersion,
 				InvokingAgent:      tt.args.invokingAgent,
-				Config:             tt.args.config,
+				GetToken:           tt.args.getToken,
+				GetBearerConfig:    tt.args.getBearerConfig,
 				Log:                ios.ErrOut,
 				LogVerboseHTTP:     tt.args.logVerboseHTTP,
 				SkipDefaultHeaders: tt.args.skipDefaultHeaders,
@@ -224,11 +264,20 @@ func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 	}))
 	defer redirectServer.Close()
 
+	redirectHost := strings.TrimPrefix(redirectServer.URL, "http://")
+	serverHost := strings.TrimPrefix(server.URL, "http://")
+
 	client, err := NewHTTPClient(HTTPClientOptions{
-		Config: tinyConfig{
-			fmt.Sprintf("%s:oauth_token", strings.TrimPrefix(redirectServer.URL, "http://")): "REDIRECT-TOKEN",
-			fmt.Sprintf("%s:oauth_token", strings.TrimPrefix(server.URL, "http://")):         "TOKEN",
+		GetToken: func(h string) (string, string) {
+			switch h {
+			case redirectHost:
+				return "REDIRECT-TOKEN", "oauth_token"
+			case serverHost:
+				return "TOKEN", "oauth_token"
+			}
+			return "", ""
 		},
+		GetBearerConfig: disabledBearerConfig,
 	})
 	require.NoError(t, err)
 
@@ -241,6 +290,57 @@ func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 	assert.Equal(t, "token REDIRECT-TOKEN", redirectRequest.Header.Get(authorization))
 	assert.Equal(t, "", request.Header.Get(authorization))
 	assert.Equal(t, 204, res.StatusCode)
+}
+
+func TestShouldUseBearerAuth(t *testing.T) {
+	enabledConfig := gh.ConfigGetter(func(string) gh.ConfigEntry {
+		return gh.ConfigEntry{Value: "enabled"}
+	})
+
+	tests := []struct {
+		name            string
+		getBearerConfig gh.ConfigGetter
+		envValue        string
+		want            bool
+	}{
+		{
+			name:            "disabled config and no env var",
+			getBearerConfig: disabledBearerConfig,
+			want:            false,
+		},
+		{
+			name:            "enabled config",
+			getBearerConfig: enabledConfig,
+			want:            true,
+		},
+		{
+			name:            "disabled config but env var set",
+			getBearerConfig: disabledBearerConfig,
+			envValue:        "1",
+			want:            true,
+		},
+		{
+			name:            "env var overrides disabled config",
+			getBearerConfig: disabledBearerConfig,
+			envValue:        "true",
+			want:            true,
+		},
+		{
+			name:            "env var set to falsey value",
+			getBearerConfig: disabledBearerConfig,
+			envValue:        "0",
+			want:            false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envValue != "" {
+				t.Setenv("GH_BEARER_AUTH", tt.envValue)
+			}
+			assert.Equal(t, tt.want, ShouldUseBearerAuth(tt.getBearerConfig, "github.com"))
+		})
+	}
 }
 
 func TestHTTPClientSanitizeJSONControlCharactersC0(t *testing.T) {
@@ -438,11 +538,20 @@ func (f *fakeTelemetryDisabler) Disable() {
 	f.disabled = true
 }
 
-type tinyConfig map[string]string
-
-func (c tinyConfig) ActiveToken(host string) (string, string) {
-	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], "oauth_token"
+// stubGetToken returns a getTokenFunc that always returns the given token.
+func stubGetToken(host, token string) getTokenFunc {
+	return func(h string) (string, string) {
+		if h == host {
+			return token, "oauth_token"
+		}
+		return "", ""
+	}
 }
+
+// disabledBearerConfig is a ConfigGetter that always returns bearer auth disabled.
+var disabledBearerConfig = gh.ConfigGetter(func(string) gh.ConfigEntry {
+	return gh.ConfigEntry{Value: "disabled"}
+})
 
 var requestAtRE = regexp.MustCompile(`(?m)^\* Request at .+`)
 var dateRE = regexp.MustCompile(`(?m)^< Date: .+`)

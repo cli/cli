@@ -4,10 +4,9 @@
 package ghmock
 
 import (
-	"sync"
-
 	"github.com/cli/cli/v2/internal/gh"
 	o "github.com/cli/cli/v2/pkg/option"
+	"sync"
 )
 
 // Ensure, that ConfigMock does implement gh.Config.
@@ -31,6 +30,9 @@ var _ gh.Config = &ConfigMock{}
 //			},
 //			AuthenticationFunc: func() gh.AuthConfig {
 //				panic("mock out the Authentication method")
+//			},
+//			BearerAuthFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the BearerAuth method")
 //			},
 //			BrowserFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Browser method")
@@ -99,6 +101,9 @@ type ConfigMock struct {
 	// AuthenticationFunc mocks the Authentication method.
 	AuthenticationFunc func() gh.AuthConfig
 
+	// BearerAuthFunc mocks the BearerAuth method.
+	BearerAuthFunc func(hostname string) gh.ConfigEntry
+
 	// BrowserFunc mocks the Browser method.
 	BrowserFunc func(hostname string) gh.ConfigEntry
 
@@ -164,6 +169,11 @@ type ConfigMock struct {
 		}
 		// Authentication holds details about calls to the Authentication method.
 		Authentication []struct {
+		}
+		// BearerAuth holds details about calls to the BearerAuth method.
+		BearerAuth []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
 		}
 		// Browser holds details about calls to the Browser method.
 		Browser []struct {
@@ -248,6 +258,7 @@ type ConfigMock struct {
 	lockAccessiblePrompter sync.RWMutex
 	lockAliases            sync.RWMutex
 	lockAuthentication     sync.RWMutex
+	lockBearerAuth         sync.RWMutex
 	lockBrowser            sync.RWMutex
 	lockCacheDir           sync.RWMutex
 	lockColorLabels        sync.RWMutex
@@ -381,6 +392,38 @@ func (mock *ConfigMock) AuthenticationCalls() []struct {
 	mock.lockAuthentication.RLock()
 	calls = mock.calls.Authentication
 	mock.lockAuthentication.RUnlock()
+	return calls
+}
+
+// BearerAuth calls BearerAuthFunc.
+func (mock *ConfigMock) BearerAuth(hostname string) gh.ConfigEntry {
+	if mock.BearerAuthFunc == nil {
+		panic("ConfigMock.BearerAuthFunc: method is nil but Config.BearerAuth was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockBearerAuth.Lock()
+	mock.calls.BearerAuth = append(mock.calls.BearerAuth, callInfo)
+	mock.lockBearerAuth.Unlock()
+	return mock.BearerAuthFunc(hostname)
+}
+
+// BearerAuthCalls gets all the calls that were made to BearerAuth.
+// Check the length with:
+//
+//	len(mockedConfig.BearerAuthCalls())
+func (mock *ConfigMock) BearerAuthCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockBearerAuth.RLock()
+	calls = mock.calls.BearerAuth
+	mock.lockBearerAuth.RUnlock()
 	return calls
 }
 
