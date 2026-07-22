@@ -83,6 +83,18 @@ func TestNewCmdList(t *testing.T) {
 			wantsErr:    true,
 			wantsErrMsg: "only one of `--field` or `--field-id` may be used",
 		},
+		{
+			name:        "format and field conflict",
+			cli:         "--format json --field Status",
+			wantsErr:    true,
+			wantsErrMsg: "cannot use `--format` with `--field` or `--field-id`",
+		},
+		{
+			name:        "format and field-id conflict",
+			cli:         "--format json --field-id FIELD_ID",
+			wantsErr:    true,
+			wantsErrMsg: "cannot use `--format` with `--field` or `--field-id`",
+		},
 	}
 
 	t.Setenv("GH_TOKEN", "auth-token")

@@ -84,6 +84,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"cannot use `--format` with `--field` or `--field-id`",
+				opts.exporter != nil,
+				len(opts.fields) > 0 || len(opts.fieldIDs) > 0,
+			); err != nil {
+				return err
+			}
+
 			config := listConfig{
 				io:     f.IOStreams,
 				client: client,
