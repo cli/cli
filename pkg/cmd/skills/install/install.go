@@ -1318,7 +1318,7 @@ func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname 
 
 	result, parseErr := frontmatter.Parse(content)
 	if parseErr != nil || result.Metadata.Meta == nil {
-		//nolint:nilerr // unparseable frontmatter means no upstream to detect
+		//nolint:nilerr // unparsable frontmatter means no upstream to detect
 		return nil, false, nil
 	}
 

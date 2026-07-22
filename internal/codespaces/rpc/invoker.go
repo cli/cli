@@ -141,7 +141,7 @@ func connect(ctx context.Context, fwd portforwarder.PortForwarder) (Invoker, err
 	// Send initial connection heartbeat (no need to throw if we fail to get a response from the server)
 	_ = invoker.notifyCodespaceOfClientActivity(ctx, connectedEventName)
 
-	// Start the activity heatbeats
+	// Start the activity heartbeats
 	go invoker.heartbeat(pfctx, 1*time.Minute)
 
 	return invoker, nil

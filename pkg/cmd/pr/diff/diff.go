@@ -310,7 +310,7 @@ func changedFilesNames(w io.Writer, r io.Reader) error {
 	// 9114-triage
 	// "hello-\360\237\230\200-world"
 	//
-	// Note that the b/ is removed but in the second case the preceeding quote remains.
+	// Note that the b/ is removed but in the second case the preceding quote remains.
 	// This is important for how git handles filenames that would be quoted with core.quotePath.
 	// https://git-scm.com/docs/git-config#Documentation/git-config.txt-corequotePath
 	//
