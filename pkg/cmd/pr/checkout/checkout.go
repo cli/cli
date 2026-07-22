@@ -160,8 +160,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	if opts.RecurseSubmodules {
-		cmdQueue = append(cmdQueue, []string{"submodule", "sync", "--recursive"})
-		cmdQueue = append(cmdQueue, []string{"submodule", "update", "--init", "--recursive"})
+		cmdQueue = append(cmdQueue, submoduleCmds(opts.Worktree)...)
 	}
 
 	// Note that although we will probably be fetching from the head, in practice, PR checkout can only
@@ -360,6 +359,23 @@ func syncBranchCmds(path, ref string, force bool) [][]string {
 	return [][]string{append(prefix, "merge", "--ff-only", ref)}
 }
 
+// submoduleCmds returns the commands to sync and update submodules. When
+// worktree is non-empty, the commands are prefixed with -C so they run inside
+// the worktree the PR was checked out into rather than the main worktree.
+func submoduleCmds(worktree string) [][]string {
+	cmds := [][]string{
+		{"submodule", "sync", "--recursive"},
+		{"submodule", "update", "--init", "--recursive"},
+	}
+	if worktree == "" {
+		return cmds
+	}
+	for i, c := range cmds {
+		cmds[i] = append([]string{"-C", worktree}, c...)
+	}
+	return cmds
+}
+
 // worktreeCheckoutCmds returns commands to switch an existing worktree to the
 // given branch and sync it. Git will refuse if there are conflicting local changes.
 func worktreeCheckoutCmds(path, branch, ref string, force bool) [][]string {
@@ -394,7 +410,17 @@ func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cm
 		var cmd *git.Command
 		switch subCmd {
 		case "submodule":
-			cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
+			// As with fetch, strip a leading -C <path> and apply it as
+			// cmd.Dir so the credential-helper flags AuthenticatedCommand
+			// prepends don't get displaced.
+			if args[0] == "-C" {
+				cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args[2:]...)
+				if err == nil {
+					cmd.Dir = args[1]
+				}
+			} else {
+				cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
+			}
 		case "fetch":
 			// AuthenticatedCommand prepends credential-helper flags
 			// before all args. When -C <path> is present, strip it and

@@ -338,6 +338,39 @@ func Test_checkoutRun(t *testing.T) {
 			wantStderr: "✓ Checked out PR #123 in worktree /path/to/wt\n  To start working: cd /path/to/wt\n",
 		},
 		{
+			name: "checkout into a worktree with recurse submodules runs submodule commands inside the worktree",
+			opts: &CheckoutOptions{
+				Worktree:          "/path/to/wt",
+				RecurseSubmodules: true,
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			stdoutTTY: true,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
+				cs.Register(`git worktree add --track -b feature /path/to/wt origin/feature`, 0, "")
+				cs.Register(`git submodule sync --recursive`, 0, "")
+				cs.Register(`git submodule update --init --recursive`, 0, "")
+			},
+			wantStderr: "✓ Checked out PR #123 in worktree /path/to/wt\n  To start working: cd /path/to/wt\n",
+		},
+		{
 			name: "checkout existing branch into a worktree and sync with merge",
 			opts: &CheckoutOptions{
 				Worktree: "/path/to/wt",
@@ -1037,4 +1070,20 @@ func TestPRCheckout_detach(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
+}
+
+func Test_submoduleCmds(t *testing.T) {
+	t.Run("without worktree runs in the current directory", func(t *testing.T) {
+		require.Equal(t, [][]string{
+			{"submodule", "sync", "--recursive"},
+			{"submodule", "update", "--init", "--recursive"},
+		}, submoduleCmds(""))
+	})
+
+	t.Run("with worktree prefixes -C so submodules run inside the worktree", func(t *testing.T) {
+		require.Equal(t, [][]string{
+			{"-C", "/path/to/wt", "submodule", "sync", "--recursive"},
+			{"-C", "/path/to/wt", "submodule", "update", "--init", "--recursive"},
+		}, submoduleCmds("/path/to/wt"))
+	})
 }
