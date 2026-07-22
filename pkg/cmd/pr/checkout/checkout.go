@@ -212,7 +212,14 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 	switch {
 	case opts.Worktree != "":
 		if isWorktreeAtPath(opts.GitClient, opts.Worktree) {
-			cmds = append(cmds, worktreeCheckoutCmds(opts.Worktree, localBranch, remoteBranchRef, opts.Force)...)
+			if localBranchExists(opts.GitClient, localBranch) {
+				cmds = append(cmds, worktreeCheckoutCmds(opts.Worktree, localBranch, remoteBranchRef, opts.Force)...)
+			} else {
+				// Branch does not exist yet (e.g. reusing a worktree for a
+				// different PR with a new --branch name): create it tracking
+				// the remote branch.
+				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-b", localBranch, "--track", remoteBranch})
+			}
 		} else if localBranchExists(opts.GitClient, localBranch) {
 			cmds = append(cmds, []string{"worktree", "add", opts.Worktree, localBranch})
 			cmds = append(cmds, syncBranchCmds(opts.Worktree, remoteBranchRef, opts.Force)...)

@@ -512,10 +512,42 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git worktree list --porcelain`, 0, "worktree /path/to/wt\nHEAD deadbeef\nbranch refs/heads/feature\n")
+				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git -C /path/to/wt checkout feature`, 0, "")
 				cs.Register(`git -C /path/to/wt merge --ff-only refs/remotes/origin/feature`, 0, "")
 			},
+		},
+		{
+			name: "checkout into an existing worktree with a new custom branch name creates the branch",
+			opts: &CheckoutOptions{
+				Worktree:   "/path/to/wt",
+				BranchName: "my-custom-name",
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			stdoutTTY: true,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "worktree /path/to/wt\nHEAD deadbeef\nbranch refs/heads/other\n")
+				cs.Register(`git show-ref --verify -- refs/heads/my-custom-name`, 1, "")
+				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
+				cs.Register(`git -C /path/to/wt checkout -b my-custom-name --track origin/feature`, 0, "")
+			},
+			wantStderr: "✓ Checked out PR #123 in worktree /path/to/wt\n  To start working: cd /path/to/wt\n",
 		},
 		{
 			name: "checkout fork PR without a remote into the same worktree again switches and syncs it",
