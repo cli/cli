@@ -541,9 +541,76 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git worktree list --porcelain`, 0, "worktree /path/to/wt\nHEAD deadbeef\nbranch refs/heads/feature\n")
+				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
 				cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature")
 				cs.Register(`git fetch origin refs/pull/123/head --no-tags`, 0, "")
-				cs.Register(`git -C /path/to/wt checkout -B feature FETCH_HEAD`, 0, "")
+				cs.Register(`git -C /path/to/wt checkout feature`, 0, "")
+				cs.Register(`git -C /path/to/wt merge --ff-only FETCH_HEAD`, 0, "")
+			},
+		},
+		{
+			name: "checkout fork PR without a remote into the same worktree again with force resets",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				Force:    true,
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+					pr.MaintainerCanModify = true
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "worktree /path/to/wt\nHEAD deadbeef\nbranch refs/heads/feature\n")
+				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+				cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature")
+				cs.Register(`git fetch origin refs/pull/123/head --no-tags`, 0, "")
+				cs.Register(`git -C /path/to/wt checkout feature`, 0, "")
+				cs.Register(`git -C /path/to/wt reset --hard FETCH_HEAD`, 0, "")
+			},
+		},
+		{
+			name: "checkout fork PR without a remote into an existing worktree whose branch does not exist yet creates it",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+					pr.MaintainerCanModify = true
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "worktree /path/to/wt\nHEAD deadbeef\nbranch refs/heads/other\n")
+				cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+				cs.Register(`git config branch\.feature\.merge`, 1, "")
+				cs.Register(`git fetch origin refs/pull/123/head --no-tags`, 0, "")
+				cs.Register(`git -C /path/to/wt checkout -b feature FETCH_HEAD`, 0, "")
+				cs.Register(`git config branch\.feature\.remote https://github.com/hubot/REPO.git`, 0, "")
+				cs.Register(`git config branch\.feature\.pushRemote https://github.com/hubot/REPO.git`, 0, "")
+				cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
 			},
 		},
 		{

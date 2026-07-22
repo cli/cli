@@ -254,10 +254,17 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 			// git refuses to update a branch via refspec when it is checked
 			// out in a worktree.
 			cmds = append(cmds, []string{"-C", opts.Worktree, "fetch", baseURLOrName, ref, "--no-tags"})
-			// Use checkout -B to create-or-reset the branch from FETCH_HEAD.
-			// The local branch may not exist yet (e.g. switching the worktree
-			// to a different fork PR).
-			cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-B", localBranch, "FETCH_HEAD"})
+			if localBranchExists(opts.GitClient, localBranch) {
+				// Branch already exists: switch to it and sync, preserving the
+				// no-force safety guarantee used elsewhere (ff-only merge unless
+				// --force, which hard-resets).
+				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", localBranch})
+				cmds = append(cmds, syncBranchCmds(opts.Worktree, "FETCH_HEAD", opts.Force)...)
+			} else {
+				// Branch does not exist yet (e.g. switching the worktree to a
+				// different fork PR): create it from FETCH_HEAD.
+				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-b", localBranch, "FETCH_HEAD"})
+			}
 		} else {
 			fetchCmd := []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--no-tags"}
 			if opts.Force {
