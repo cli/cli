@@ -114,6 +114,45 @@ func ResolveSingleSelectOptionID(field ProjectField, optionName string) (string,
 	}
 }
 
+// ResolveMultiSelectOptionIDs resolves each name in optionNames to its option ID
+// on a multi-select field, preserving order. It returns a *WrongFieldTypeError
+// if the field is not a multi-select field, and a *OptionNotFoundError or
+// *OptionAmbiguousError for the first name that does not resolve to exactly one
+// option. Matching is case-insensitive, mirroring ResolveSingleSelectOptionID.
+func ResolveMultiSelectOptionIDs(field ProjectField, optionNames []string) ([]string, error) {
+	if field.Type() != "ProjectV2MultiSelectField" {
+		return nil, &WrongFieldTypeError{
+			FieldName: field.Name(),
+			DataType:  field.DataType(),
+			Expected:  "MULTI_SELECT",
+		}
+	}
+
+	ids := make([]string, 0, len(optionNames))
+	for _, name := range optionNames {
+		var matches []string
+		for _, o := range field.Options() {
+			if strings.EqualFold(o.Name, name) {
+				matches = append(matches, o.ID)
+			}
+		}
+
+		switch len(matches) {
+		case 1:
+			ids = append(ids, matches[0])
+		case 0:
+			names := make([]string, 0, len(field.Options()))
+			for _, o := range field.Options() {
+				names = append(names, o.Name)
+			}
+			return nil, &OptionNotFoundError{FieldName: field.Name(), Name: name, Candidates: names}
+		default:
+			return nil, &OptionAmbiguousError{FieldName: field.Name(), Name: name, Candidates: matches}
+		}
+	}
+	return ids, nil
+}
+
 // projectItemByURL resolves an issue or pull request URL to the ID of its
 // corresponding item on the project identified by projectID. It is used to let
 // item-edit address an item by issue/PR URL instead of a project item ID.

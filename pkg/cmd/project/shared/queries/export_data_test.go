@@ -365,3 +365,50 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.
 		string(out))
 
 }
+
+func TestJSONProjectItem_ProjectV2ItemFieldMultiSelectValue(t *testing.T) {
+	multiSelectField := ProjectField{TypeName: "ProjectV2MultiSelectField"}
+	multiSelectField.MultiSelectField.ID = "PVTMSF_platforms"
+	multiSelectField.MultiSelectField.Name = "Platforms"
+
+	multiSelectValue := FieldValueNodes{Type: "ProjectV2ItemFieldMultiSelectValue"}
+	multiSelectValue.ProjectV2ItemFieldMultiSelectValue.Field = multiSelectField
+	multiSelectValue.ProjectV2ItemFieldMultiSelectValue.Options = []struct {
+		ID   string
+		Name string
+	}{
+		{ID: "opt_ios", Name: "iOS"},
+		{ID: "opt_android", Name: "Android"},
+	}
+
+	item := ProjectItem{
+		Id: "issueId",
+		Content: ProjectItemContent{
+			TypeName: "Issue",
+			Issue: Issue{
+				Title:  "Issue title",
+				Body:   "a body",
+				Number: 1,
+				URL:    "issue-url",
+				Repository: struct {
+					NameWithOwner string
+				}{
+					NameWithOwner: "cli/go-gh",
+				},
+			},
+		},
+	}
+	item.FieldValues.Nodes = []FieldValueNodes{multiSelectValue}
+
+	p := &Project{}
+	p.Fields.Nodes = []ProjectField{multiSelectField}
+	p.Items.TotalCount = 1
+	p.Items.Nodes = []ProjectItem{item}
+
+	out, err := json.Marshal(p.DetailedItems())
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"items":[{"platforms":["iOS","Android"],"content":{"type":"Issue","body":"a body","title":"Issue title","number":1,"repository":"cli/go-gh","url":"issue-url"},"id":"issueId"}],"totalCount":1}`,
+		string(out))
+}

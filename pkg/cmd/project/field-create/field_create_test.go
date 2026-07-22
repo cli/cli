@@ -724,3 +724,93 @@ func TestRunCreateField_JSON(t *testing.T) {
 		`{"id":"Field ID","name":"a name","type":"ProjectV2Field"}`,
 		stdout.String())
 }
+
+func TestRunCreateField_MULTI_SELECT(t *testing.T) {
+	defer gock.Off()
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// get project ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  0,
+				"afterItems":  nil,
+				"firstFields": 0,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "an ID",
+					},
+				},
+			},
+		})
+
+	// create the multi-select field with its options
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation CreateField.*","variables":{"input":{"projectId":"an ID","dataType":"MULTI_SELECT","name":"a name","multiSelectOptions":\[{"name":"one","color":"GRAY","description":""},{"name":"two","color":"GRAY","description":""}\]}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"createProjectV2Field": map[string]interface{}{
+					"projectV2Field": map[string]interface{}{
+						"id": "Field ID",
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	config := createFieldConfig{
+		opts: createFieldOpts{
+			name:               "a name",
+			owner:              "monalisa",
+			number:             1,
+			dataType:           "MULTI_SELECT",
+			multiSelectOptions: []string{"one", "two"},
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runCreateField(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "Created field\n", stdout.String())
+}

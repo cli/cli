@@ -18,6 +18,7 @@ type createFieldOpts struct {
 	dataType            string
 	owner               string
 	singleSelectOptions []string
+	multiSelectOptions  []string
 	number              int32
 	projectID           string
 	exporter            cmdutil.Exporter
@@ -35,6 +36,21 @@ type createProjectV2FieldMutation struct {
 	} `graphql:"createProjectV2Field(input:$input)"`
 }
 
+// CreateProjectV2FieldInput is defined locally because the vendored githubv4 lacks multiSelectOptions.
+type CreateProjectV2FieldInput struct {
+	ProjectID           githubv4.ID                                       `json:"projectId"`
+	DataType            githubv4.ProjectV2CustomFieldType                 `json:"dataType"`
+	Name                githubv4.String                                   `json:"name"`
+	SingleSelectOptions *[]githubv4.ProjectV2SingleSelectFieldOptionInput `json:"singleSelectOptions,omitempty"`
+	MultiSelectOptions  *[]ProjectV2MultiSelectFieldOptionInput           `json:"multiSelectOptions,omitempty"`
+}
+
+type ProjectV2MultiSelectFieldOptionInput struct {
+	Name        githubv4.String                                `json:"name"`
+	Color       githubv4.ProjectV2SingleSelectFieldOptionColor `json:"color"`
+	Description githubv4.String                                `json:"description"`
+}
+
 func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) error) *cobra.Command {
 	opts := createFieldOpts{}
 	createFieldCmd := &cobra.Command{
@@ -46,6 +62,9 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 
 			# Create a field with three options to select from for owner monalisa
 			$ gh project field-create 1 --owner monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
+
+			# Create a multi-select field with three options for owner monalisa
+			$ gh project field-create 1 --owner monalisa --name "new field" --data-type "MULTI_SELECT" --multi-select-options "one,two,three"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -71,6 +90,9 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 			if config.opts.dataType == "SINGLE_SELECT" && len(config.opts.singleSelectOptions) == 0 {
 				return fmt.Errorf("passing `--single-select-options` is required for SINGLE_SELECT data type")
 			}
+			if config.opts.dataType == "MULTI_SELECT" && len(config.opts.multiSelectOptions) == 0 {
+				return fmt.Errorf("passing `--multi-select-options` is required for MULTI_SELECT data type")
+			}
 
 			// allow testing of the command without actually running it
 			if runF != nil {
@@ -82,8 +104,9 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 
 	createFieldCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	createFieldCmd.Flags().StringVar(&opts.name, "name", "", "Name of the new field")
-	cmdutil.StringEnumFlag(createFieldCmd, &opts.dataType, "data-type", "", "", []string{"TEXT", "SINGLE_SELECT", "DATE", "NUMBER"}, "DataType of the new field.")
+	cmdutil.StringEnumFlag(createFieldCmd, &opts.dataType, "data-type", "", "", []string{"TEXT", "SINGLE_SELECT", "DATE", "NUMBER", "MULTI_SELECT"}, "DataType of the new field.")
 	createFieldCmd.Flags().StringSliceVar(&opts.singleSelectOptions, "single-select-options", []string{}, "Options for SINGLE_SELECT data type")
+	createFieldCmd.Flags().StringSliceVar(&opts.multiSelectOptions, "multi-select-options", []string{}, "Options for MULTI_SELECT data type")
 	cmdutil.AddFormatFlags(createFieldCmd, &opts.exporter)
 
 	_ = createFieldCmd.MarkFlagRequired("name")
@@ -120,7 +143,7 @@ func runCreateField(config createFieldConfig) error {
 }
 
 func createFieldArgs(config createFieldConfig) (*createProjectV2FieldMutation, map[string]interface{}) {
-	input := githubv4.CreateProjectV2FieldInput{
+	input := CreateProjectV2FieldInput{
 		ProjectID: githubv4.ID(config.opts.projectID),
 		DataType:  githubv4.ProjectV2CustomFieldType(config.opts.dataType),
 		Name:      githubv4.String(config.opts.name),
@@ -135,6 +158,17 @@ func createFieldArgs(config createFieldConfig) (*createProjectV2FieldMutation, m
 			})
 		}
 		input.SingleSelectOptions = &opts
+	}
+
+	if len(config.opts.multiSelectOptions) != 0 {
+		opts := make([]ProjectV2MultiSelectFieldOptionInput, 0)
+		for _, opt := range config.opts.multiSelectOptions {
+			opts = append(opts, ProjectV2MultiSelectFieldOptionInput{
+				Name:  githubv4.String(opt),
+				Color: githubv4.ProjectV2SingleSelectFieldOptionColor("GRAY"),
+			})
+		}
+		input.MultiSelectOptions = &opts
 	}
 
 	return &createProjectV2FieldMutation{}, map[string]interface{}{
