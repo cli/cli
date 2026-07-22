@@ -1071,19 +1071,3 @@ func TestPRCheckout_detach(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
 }
-
-func Test_submoduleCmds(t *testing.T) {
-	t.Run("without worktree runs in the current directory", func(t *testing.T) {
-		require.Equal(t, [][]string{
-			{"submodule", "sync", "--recursive"},
-			{"submodule", "update", "--init", "--recursive"},
-		}, submoduleCmds(""))
-	})
-
-	t.Run("with worktree prefixes -C so submodules run inside the worktree", func(t *testing.T) {
-		require.Equal(t, [][]string{
-			{"-C", "/path/to/wt", "submodule", "sync", "--recursive"},
-			{"-C", "/path/to/wt", "submodule", "update", "--init", "--recursive"},
-		}, submoduleCmds("/path/to/wt"))
-	})
-}

@@ -160,7 +160,14 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	if opts.RecurseSubmodules {
-		cmdQueue = append(cmdQueue, submoduleCmds(opts.Worktree)...)
+		// Run submodule commands inside the worktree when checking out into
+		// one, so its submodules (not the main worktree's) get initialized.
+		var prefix []string
+		if opts.Worktree != "" {
+			prefix = []string{"-C", opts.Worktree}
+		}
+		cmdQueue = append(cmdQueue, append(prefix, "submodule", "sync", "--recursive"))
+		cmdQueue = append(cmdQueue, append(prefix, "submodule", "update", "--init", "--recursive"))
 	}
 
 	// Note that although we will probably be fetching from the head, in practice, PR checkout can only
@@ -357,23 +364,6 @@ func syncBranchCmds(path, ref string, force bool) [][]string {
 		return [][]string{append(prefix, "reset", "--hard", ref)}
 	}
 	return [][]string{append(prefix, "merge", "--ff-only", ref)}
-}
-
-// submoduleCmds returns the commands to sync and update submodules. When
-// worktree is non-empty, the commands are prefixed with -C so they run inside
-// the worktree the PR was checked out into rather than the main worktree.
-func submoduleCmds(worktree string) [][]string {
-	cmds := [][]string{
-		{"submodule", "sync", "--recursive"},
-		{"submodule", "update", "--init", "--recursive"},
-	}
-	if worktree == "" {
-		return cmds
-	}
-	for i, c := range cmds {
-		cmds[i] = append([]string{"-C", worktree}, c...)
-	}
-	return cmds
 }
 
 // worktreeCheckoutCmds returns commands to switch an existing worktree to the
