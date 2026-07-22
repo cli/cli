@@ -24,7 +24,7 @@ func TestNewCmdCreateField(t *testing.T) {
 			name:        "missing-name-and-data-type",
 			cli:         "",
 			wantsErr:    true,
-			wantsErrMsg: "required flag(s) \"data-type\", \"name\" not set",
+			wantsErrMsg: "`--name` and `--data-type` are required unless attaching an issue field with `--issue-field-id`",
 		},
 		{
 			name:        "not-a-number",
@@ -723,4 +723,92 @@ func TestRunCreateField_JSON(t *testing.T) {
 		t,
 		`{"id":"Field ID","name":"a name","type":"ProjectV2Field"}`,
 		stdout.String())
+}
+
+func TestRunCreateField_AttachIssueField(t *testing.T) {
+	defer gock.Off()
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// get project ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  0,
+				"afterItems":  nil,
+				"firstFields": 0,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "an ID",
+					},
+				},
+			},
+		})
+
+	// attach the existing issue field as a project column
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation CreateProjectV2IssueField.*","variables":{"input":{"projectId":"an ID","issueFieldId":"issue_field_id"}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"createProjectV2IssueField": map[string]interface{}{
+					"projectV2Field": map[string]interface{}{
+						"id": "Field ID",
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	config := createFieldConfig{
+		opts: createFieldOpts{
+			owner:        "monalisa",
+			number:       1,
+			issueFieldID: "issue_field_id",
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runCreateField(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "Attached issue field\n", stdout.String())
 }

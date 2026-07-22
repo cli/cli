@@ -18,6 +18,7 @@ type createFieldOpts struct {
 	dataType            string
 	owner               string
 	singleSelectOptions []string
+	issueFieldID        string
 	number              int32
 	projectID           string
 	exporter            cmdutil.Exporter
@@ -35,6 +36,19 @@ type createProjectV2FieldMutation struct {
 	} `graphql:"createProjectV2Field(input:$input)"`
 }
 
+// createProjectV2IssueFieldMutation attaches an existing issue field to a project as a new column.
+type createProjectV2IssueFieldMutation struct {
+	CreateProjectV2IssueField struct {
+		Field queries.ProjectField `graphql:"projectV2Field"`
+	} `graphql:"createProjectV2IssueField(input:$input)"`
+}
+
+// CreateProjectV2IssueFieldInput is defined locally because the vendored githubv4 lacks the issue-field types.
+type CreateProjectV2IssueFieldInput struct {
+	ProjectID    string `json:"projectId"`
+	IssueFieldID string `json:"issueFieldId"`
+}
+
 func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) error) *cobra.Command {
 	opts := createFieldOpts{}
 	createFieldCmd := &cobra.Command{
@@ -46,6 +60,9 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 
 			# Create a field with three options to select from for owner monalisa
 			$ gh project field-create 1 --owner monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
+
+			# Attach an existing organization issue field to project 1 as a new column
+			$ gh project field-create 1 --owner monalisa --issue-field-id <issue-field-id>
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -68,8 +85,17 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 				io:     f.IOStreams,
 			}
 
-			if config.opts.dataType == "SINGLE_SELECT" && len(config.opts.singleSelectOptions) == 0 {
-				return fmt.Errorf("passing `--single-select-options` is required for SINGLE_SELECT data type")
+			if config.opts.issueFieldID != "" {
+				if config.opts.name != "" || config.opts.dataType != "" || len(config.opts.singleSelectOptions) > 0 {
+					return cmdutil.FlagErrorf("`--issue-field-id` cannot be combined with `--name`, `--data-type`, or `--single-select-options`")
+				}
+			} else {
+				if config.opts.name == "" || config.opts.dataType == "" {
+					return cmdutil.FlagErrorf("`--name` and `--data-type` are required unless attaching an issue field with `--issue-field-id`")
+				}
+				if config.opts.dataType == "SINGLE_SELECT" && len(config.opts.singleSelectOptions) == 0 {
+					return fmt.Errorf("passing `--single-select-options` is required for SINGLE_SELECT data type")
+				}
 			}
 
 			// allow testing of the command without actually running it
@@ -84,10 +110,8 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 	createFieldCmd.Flags().StringVar(&opts.name, "name", "", "Name of the new field")
 	cmdutil.StringEnumFlag(createFieldCmd, &opts.dataType, "data-type", "", "", []string{"TEXT", "SINGLE_SELECT", "DATE", "NUMBER"}, "DataType of the new field.")
 	createFieldCmd.Flags().StringSliceVar(&opts.singleSelectOptions, "single-select-options", []string{}, "Options for SINGLE_SELECT data type")
+	createFieldCmd.Flags().StringVar(&opts.issueFieldID, "issue-field-id", "", "ID of an existing issue field to attach to the project as a new column")
 	cmdutil.AddFormatFlags(createFieldCmd, &opts.exporter)
-
-	_ = createFieldCmd.MarkFlagRequired("name")
-	_ = createFieldCmd.MarkFlagRequired("data-type")
 
 	return createFieldCmd
 }
@@ -105,6 +129,10 @@ func runCreateField(config createFieldConfig) error {
 	}
 	config.opts.projectID = project.ID
 
+	if config.opts.issueFieldID != "" {
+		return attachIssueField(config)
+	}
+
 	query, variables := createFieldArgs(config)
 
 	err = config.client.Mutate("CreateField", query, variables)
@@ -117,6 +145,32 @@ func runCreateField(config createFieldConfig) error {
 	}
 
 	return printResults(config, query.CreateProjectV2Field.Field)
+}
+
+// attachIssueField surfaces an existing issue field on the project as a new column.
+func attachIssueField(config createFieldConfig) error {
+	mutation := &createProjectV2IssueFieldMutation{}
+	variables := map[string]interface{}{
+		"input": CreateProjectV2IssueFieldInput{
+			ProjectID:    config.opts.projectID,
+			IssueFieldID: config.opts.issueFieldID,
+		},
+	}
+
+	if err := config.client.Mutate("CreateProjectV2IssueField", mutation, variables); err != nil {
+		return err
+	}
+
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, mutation.CreateProjectV2IssueField.Field)
+	}
+
+	if config.io.IsStdoutTTY() {
+		if _, err := fmt.Fprintf(config.io.Out, "Attached issue field\n"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func createFieldArgs(config createFieldConfig) (*createProjectV2FieldMutation, map[string]interface{}) {

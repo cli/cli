@@ -8,6 +8,7 @@ import (
 	cmdDelete "github.com/cli/cli/v2/pkg/cmd/issue/delete"
 	cmdDevelop "github.com/cli/cli/v2/pkg/cmd/issue/develop"
 	cmdEdit "github.com/cli/cli/v2/pkg/cmd/issue/edit"
+	cmdEditField "github.com/cli/cli/v2/pkg/cmd/issue/edit-field"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/issue/list"
 	cmdLock "github.com/cli/cli/v2/pkg/cmd/issue/lock"
 	cmdPin "github.com/cli/cli/v2/pkg/cmd/issue/pin"
@@ -54,6 +55,7 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 		cmdClose.NewCmdClose(f, nil),
 		cmdReopen.NewCmdReopen(f, nil),
 		cmdEdit.NewCmdEdit(f, nil),
+		cmdEditField.NewCmdEditField(f, nil),
 		cmdDevelop.NewCmdDevelop(f, nil),
 		cmdLock.NewCmdLock(f, cmd.Name(), nil),
 		cmdLock.NewCmdUnlock(f, cmd.Name(), nil),

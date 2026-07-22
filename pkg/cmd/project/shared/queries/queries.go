@@ -441,6 +441,27 @@ type FieldValueNodes struct {
 		} `graphql:"reviewers(first: 10)"` // experienced issues with larger limits, 10 seems like enough for now
 		Field ProjectField
 	} `graphql:"... on ProjectV2ItemFieldReviewerValue"`
+	ProjectV2ItemIssueFieldValue struct {
+		Field           ProjectField
+		IssueFieldValue struct {
+			Type                string `graphql:"__typename"`
+			IssueFieldTextValue struct {
+				Value string
+			} `graphql:"... on IssueFieldTextValue"`
+			IssueFieldNumberValue struct {
+				Value float64
+			} `graphql:"... on IssueFieldNumberValue"`
+			IssueFieldDateValue struct {
+				Value string
+			} `graphql:"... on IssueFieldDateValue"`
+			IssueFieldSingleSelectValue struct {
+				Name string
+			} `graphql:"... on IssueFieldSingleSelectValue"`
+			IssueFieldMultiSelectValue struct {
+				Value string
+			} `graphql:"... on IssueFieldMultiSelectValue"`
+		} `graphql:"issueFieldValue"`
+	} `graphql:"... on ProjectV2ItemIssueFieldValue"`
 }
 
 func (v FieldValueNodes) ID() string {
@@ -467,6 +488,8 @@ func (v FieldValueNodes) ID() string {
 		return v.ProjectV2ItemFieldUserValue.Field.ID()
 	case "ProjectV2ItemFieldReviewerValue":
 		return v.ProjectV2ItemFieldReviewerValue.Field.ID()
+	case "ProjectV2ItemIssueFieldValue":
+		return v.ProjectV2ItemIssueFieldValue.Field.ID()
 	}
 
 	return ""
@@ -1767,6 +1790,21 @@ func projectFieldValueData(v FieldValueNodes) interface{} {
 			}
 		}
 		return names
+	case "ProjectV2ItemIssueFieldValue":
+		ifv := v.ProjectV2ItemIssueFieldValue.IssueFieldValue
+		switch ifv.Type {
+		case "IssueFieldTextValue":
+			return ifv.IssueFieldTextValue.Value
+		case "IssueFieldNumberValue":
+			return ifv.IssueFieldNumberValue.Value
+		case "IssueFieldDateValue":
+			return ifv.IssueFieldDateValue.Value
+		case "IssueFieldSingleSelectValue":
+			return ifv.IssueFieldSingleSelectValue.Name
+		case "IssueFieldMultiSelectValue":
+			return ifv.IssueFieldMultiSelectValue.Value
+		}
+		return nil
 
 	}
 
