@@ -85,6 +85,7 @@ func ResolveFieldByName(fields []ProjectField, name string) (ProjectField, error
 		for _, f := range matches {
 			ids = append(ids, f.ID())
 		}
+		sort.Strings(ids)
 		return ProjectField{}, &FieldAmbiguousError{Name: name, Candidates: ids}
 	}
 }
