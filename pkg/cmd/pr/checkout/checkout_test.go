@@ -62,6 +62,18 @@ func TestNewCmdCheckout(t *testing.T) {
 			},
 		},
 		{
+			name: "worktree",
+			args: "--worktree /path/to/wt 123",
+			wantsOpts: CheckoutOptions{
+				Worktree: "/path/to/wt",
+			},
+		},
+		{
+			name:    "when --worktree is given a blank path, returns an error",
+			args:    `--worktree "" 123`,
+			wantErr: cmdutil.FlagErrorf("--worktree cannot be blank"),
+		},
+		{
 			name:    "when there is no selector and no TTY, returns an error",
 			args:    "",
 			wantErr: cmdutil.FlagErrorf("pull request number, URL, or branch required when not running interactively"),
@@ -100,6 +112,7 @@ func TestNewCmdCheckout(t *testing.T) {
 			require.Equal(t, tt.wantsOpts.Force, spiedOpts.Force)
 			require.Equal(t, tt.wantsOpts.Detach, spiedOpts.Detach)
 			require.Equal(t, tt.wantsOpts.BranchName, spiedOpts.BranchName)
+			require.Equal(t, tt.wantsOpts.Worktree, spiedOpts.Worktree)
 		})
 	}
 }
@@ -173,6 +186,7 @@ func Test_checkoutRun(t *testing.T) {
 		promptStubs func(*prompter.MockPrompter)
 
 		remotes    map[string]string
+		stdoutTTY  bool
 		wantStdout string
 		wantStderr string
 		wantErr    bool
@@ -294,6 +308,243 @@ func Test_checkoutRun(t *testing.T) {
 			},
 		},
 		{
+			name: "checkout new branch into a worktree",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			stdoutTTY: true,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
+				cs.Register(`git worktree add --track -b feature /path/to/wt origin/feature`, 0, "")
+			},
+			wantStdout: "✓ Worktree ready for PR #123\n  /path/to/wt\n  To start working: cd \"/path/to/wt\"\n",
+		},
+		{
+			name: "checkout existing branch into a worktree and sync with merge",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
+				cs.Register(`git worktree add /path/to/wt feature`, 0, "")
+				cs.Register(`git -C /path/to/wt merge --ff-only refs/remotes/origin/feature`, 0, "")
+			},
+		},
+		{
+			name: "checkout existing branch into a worktree with force resets",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				Force:    true,
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
+				cs.Register(`git worktree add /path/to/wt feature`, 0, "")
+				cs.Register(`git -C /path/to/wt reset --hard refs/remotes/origin/feature`, 0, "")
+			},
+		},
+		{
+			name: "checkout detached into a worktree",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				Detach:   true,
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git fetch origin \+refs/heads/feature --no-tags`, 0, "")
+				cs.Register(`git worktree add --detach /path/to/wt FETCH_HEAD`, 0, "")
+			},
+		},
+		{
+			name: "checkout fork PR without a remote into a worktree",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+					pr.MaintainerCanModify = true
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git config branch\.feature\.merge`, 1, "")
+				cs.Register(`git fetch origin refs/pull/123/head:feature --no-tags`, 0, "")
+				cs.Register(`git worktree add /path/to/wt feature`, 0, "")
+				cs.Register(`git config branch\.feature\.remote https://github.com/hubot/REPO.git`, 0, "")
+				cs.Register(`git config branch\.feature\.pushRemote https://github.com/hubot/REPO.git`, 0, "")
+				cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
+			},
+		},
+		{
+			name: "checkout existing branch into the same worktree again switches and syncs it",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "worktree /path/to/wt\nHEAD deadbeef\nbranch refs/heads/feature\n")
+				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
+				cs.Register(`git -C /path/to/wt checkout feature`, 0, "")
+				cs.Register(`git -C /path/to/wt merge --ff-only refs/remotes/origin/feature`, 0, "")
+			},
+		},
+		{
+			name: "checkout fork PR without a remote into the same worktree again switches and syncs it",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+					pr.MaintainerCanModify = true
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "worktree /path/to/wt\nHEAD deadbeef\nbranch refs/heads/feature\n")
+				cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature")
+				cs.Register(`git fetch origin refs/pull/123/head --no-tags`, 0, "")
+				cs.Register(`git -C /path/to/wt checkout -B feature FETCH_HEAD`, 0, "")
+			},
+		},
+		{
+			name: "checkout with custom branch name into a worktree",
+			opts: &CheckoutOptions{
+				Worktree:   "/path/to/wt",
+				BranchName: "my-custom-name",
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			stdoutTTY: true,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git show-ref --verify -- refs/heads/my-custom-name`, 1, "")
+				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
+				cs.Register(`git worktree add --track -b my-custom-name /path/to/wt origin/feature`, 0, "")
+			},
+			wantStdout: "✓ Worktree ready for PR #123\n  /path/to/wt\n  To start working: cd \"/path/to/wt\"\n",
+		},
+		{
 			name: "when the PR resolver errors, then that error is bubbled up",
 			opts: &CheckoutOptions{
 				PRResolver: &stubPRResolver{
@@ -309,6 +560,7 @@ func Test_checkoutRun(t *testing.T) {
 			opts := tt.opts
 
 			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.stdoutTTY)
 
 			opts.IO = ios
 			httpReg := &httpmock.Registry{}

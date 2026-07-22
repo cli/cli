@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -33,6 +34,7 @@ type CheckoutOptions struct {
 	Force             bool
 	Detach            bool
 	BranchName        string
+	Worktree          string
 }
 
 func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobra.Command {
@@ -60,6 +62,10 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 		Args:    cobra.MaximumNArgs(1),
 		Aliases: []string{"co"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("worktree") && opts.Worktree == "" {
+				return cmdutil.FlagErrorf("--worktree cannot be blank")
+			}
+
 			if len(args) > 0 {
 				opts.PRResolver = &specificPRResolver{
 					prFinder: shared.NewFinder(f),
@@ -97,6 +103,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Reset the existing local branch to the latest state of the pull request")
 	cmd.Flags().BoolVarP(&opts.Detach, "detach", "", false, "Checkout PR with a detached HEAD")
 	cmd.Flags().StringVarP(&opts.BranchName, "branch", "b", "", "Local branch name to use (default [the name of the head branch])")
+	cmd.Flags().StringVar(&opts.Worktree, "worktree", "", "Check out the pull request into a new worktree at the given `path`")
 
 	return cmd
 }
@@ -164,6 +171,13 @@ func checkoutRun(opts *CheckoutOptions) error {
 		return err
 	}
 
+	if opts.Worktree != "" && opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out, "%s Worktree ready for PR #%d\n", cs.SuccessIcon(), pr.Number)
+		fmt.Fprintf(opts.IO.Out, "  %s\n", opts.Worktree)
+		fmt.Fprintf(opts.IO.Out, "  To start working: cd %q\n", opts.Worktree)
+	}
+
 	return nil
 }
 
@@ -176,24 +190,43 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 		refSpec += fmt.Sprintf(":refs/remotes/%s", remoteBranch)
 	}
 
-	cmds = append(cmds, []string{"fetch", remote.Name, refSpec, "--no-tags"})
-
 	localBranch := pr.HeadRefName
 	if opts.BranchName != "" {
 		localBranch = opts.BranchName
 	}
 
+	remoteBranchRef := fmt.Sprintf("refs/remotes/%s", remoteBranch)
+	fetchCmd := []string{"fetch", remote.Name, refSpec, "--no-tags"}
+
+	// FETCH_HEAD is per-worktree: when reusing an existing linked worktree in
+	// detach mode, fetch inside it so FETCH_HEAD is written there.
+	if opts.Detach && opts.Worktree != "" && isWorktreeAtPath(opts.GitClient, opts.Worktree) {
+		cmds = append(cmds, append([]string{"-C", opts.Worktree}, fetchCmd...))
+		cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "--detach", "FETCH_HEAD"})
+		return cmds
+	}
+
+	cmds = append(cmds, fetchCmd)
+
 	switch {
 	case opts.Detach:
-		cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
+		if opts.Worktree != "" {
+			cmds = append(cmds, []string{"worktree", "add", "--detach", opts.Worktree, "FETCH_HEAD"})
+		} else {
+			cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
+		}
+	case opts.Worktree != "":
+		if isWorktreeAtPath(opts.GitClient, opts.Worktree) {
+			cmds = append(cmds, worktreeCheckoutCmds(opts.Worktree, localBranch, remoteBranchRef, opts.Force)...)
+		} else if localBranchExists(opts.GitClient, localBranch) {
+			cmds = append(cmds, []string{"worktree", "add", opts.Worktree, localBranch})
+			cmds = append(cmds, syncBranchCmds(opts.Worktree, remoteBranchRef, opts.Force)...)
+		} else {
+			cmds = append(cmds, []string{"worktree", "add", "--track", "-b", localBranch, opts.Worktree, remoteBranch})
+		}
 	case localBranchExists(opts.GitClient, localBranch):
 		cmds = append(cmds, []string{"checkout", localBranch})
-		if opts.Force {
-			cmds = append(cmds, []string{"reset", "--hard", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
-		} else {
-			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
-		}
+		cmds = append(cmds, syncBranchCmds("", remoteBranchRef, opts.Force)...)
 	default:
 		cmds = append(cmds, []string{"checkout", "-b", localBranch, "--track", remoteBranch})
 	}
@@ -206,8 +239,19 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
 
 	if opts.Detach {
-		cmds = append(cmds, []string{"fetch", baseURLOrName, ref, "--no-tags"})
-		cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
+		fetchCmd := []string{"fetch", baseURLOrName, ref, "--no-tags"}
+		if opts.Worktree != "" && isWorktreeAtPath(opts.GitClient, opts.Worktree) {
+			// FETCH_HEAD is per-worktree; fetch inside the linked worktree.
+			cmds = append(cmds, append([]string{"-C", opts.Worktree}, fetchCmd...))
+			cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "--detach", "FETCH_HEAD"})
+		} else {
+			cmds = append(cmds, fetchCmd)
+			if opts.Worktree != "" {
+				cmds = append(cmds, []string{"worktree", "add", "--detach", opts.Worktree, "FETCH_HEAD"})
+			} else {
+				cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
+			}
+		}
 		return cmds
 	}
 
@@ -220,15 +264,29 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	}
 
 	currentBranch, _ := opts.Branch()
-	if localBranch == currentBranch {
+	if opts.Worktree != "" {
+		if isWorktreeAtPath(opts.GitClient, opts.Worktree) {
+			// FETCH_HEAD is per-worktree; fetch inside the linked worktree
+			// rather than the main worktree. We fetch to FETCH_HEAD because
+			// git refuses to update a branch via refspec when it is checked
+			// out in a worktree.
+			cmds = append(cmds, []string{"-C", opts.Worktree, "fetch", baseURLOrName, ref, "--no-tags"})
+			// Use checkout -B to create-or-reset the branch from FETCH_HEAD.
+			// The local branch may not exist yet (e.g. switching the worktree
+			// to a different fork PR).
+			cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-B", localBranch, "FETCH_HEAD"})
+		} else {
+			fetchCmd := []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--no-tags"}
+			if opts.Force {
+				fetchCmd = append(fetchCmd, "--force")
+			}
+			cmds = append(cmds, fetchCmd)
+			cmds = append(cmds, []string{"worktree", "add", opts.Worktree, localBranch})
+		}
+	} else if localBranch == currentBranch {
 		// PR head matches currently checked out branch
 		cmds = append(cmds, []string{"fetch", baseURLOrName, ref, "--no-tags"})
-		if opts.Force {
-			cmds = append(cmds, []string{"reset", "--hard", "FETCH_HEAD"})
-		} else {
-			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"merge", "--ff-only", "FETCH_HEAD"})
-		}
+		cmds = append(cmds, syncBranchCmds("", "FETCH_HEAD", opts.Force)...)
 	} else {
 		// TODO: check if non-fast-forward and suggest to use `--force`
 		fetchCmd := []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--no-tags"}
@@ -268,15 +326,88 @@ func localBranchExists(client *git.Client, b string) bool {
 	return err == nil
 }
 
+// isWorktreeAtPath reports whether the given path is a registered git worktree.
+func isWorktreeAtPath(client *git.Client, path string) bool {
+	cmd, err := client.Command(context.Background(), "worktree", "list", "--porcelain")
+	if err != nil {
+		return false
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	resolved := resolvePath(path)
+	for _, line := range strings.Split(string(out), "\n") {
+		if p, ok := strings.CutPrefix(line, "worktree "); ok {
+			if resolvePath(p) == resolved {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// syncBranchCmds returns commands that sync a branch to ref: a hard reset when
+// force is set, otherwise a fast-forward-only merge. If path is non-empty, the
+// commands are prefixed with -C to run inside that directory.
+func syncBranchCmds(path, ref string, force bool) [][]string {
+	var prefix []string
+	if path != "" {
+		prefix = []string{"-C", path}
+	}
+	if force {
+		return [][]string{append(prefix, "reset", "--hard", ref)}
+	}
+	return [][]string{append(prefix, "merge", "--ff-only", ref)}
+}
+
+// worktreeCheckoutCmds returns commands to switch an existing worktree to the
+// given branch and sync it. Git will refuse if there are conflicting local changes.
+func worktreeCheckoutCmds(path, branch, ref string, force bool) [][]string {
+	cmds := [][]string{{"-C", path, "checkout", branch}}
+	cmds = append(cmds, syncBranchCmds(path, ref, force)...)
+	return cmds
+}
+
+// resolvePath canonicalizes a path for comparison against git-reported worktree
+// paths. Git resolves symlinks internally, so on systems where common directories
+// are symlinks (e.g. macOS /tmp -> /private/tmp), the user-provided path and the
+// path git reports would otherwise not match.
+func resolvePath(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		p = abs
+	}
+	if resolved, err := filepath.EvalSymlinks(p); err == nil {
+		return resolved
+	}
+	return p
+}
+
 func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cmdQueue [][]string) error {
 	for _, args := range cmdQueue {
+		// Determine the git sub-command, skipping any -C <path> prefix.
+		subCmd := args[0]
+		if len(args) >= 3 && args[0] == "-C" {
+			subCmd = args[2]
+		}
+
 		var err error
 		var cmd *git.Command
-		switch args[0] {
+		switch subCmd {
 		case "submodule":
 			cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
 		case "fetch":
-			cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args...)
+			// AuthenticatedCommand prepends credential-helper flags
+			// before all args. When -C <path> is present, strip it and
+			// apply as cmd.Dir so the flags don't displace it.
+			if args[0] == "-C" {
+				cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args[2:]...)
+				if err == nil {
+					cmd.Dir = args[1]
+				}
+			} else {
+				cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args...)
+			}
 		default:
 			cmd, err = client.Command(context.Background(), args...)
 		}
