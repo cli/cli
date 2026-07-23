@@ -404,11 +404,33 @@ func (m *mergeContext) deleteLocalBranch() error {
 		return err
 	}
 
-	switchedToBranch := ""
-
 	ctx := context.Background()
 
-	// branch the command was run on is the same as the pull request branch
+	worktrees, _ := m.opts.GitClient.Worktrees(ctx)
+	currentWorkdir, _ := m.opts.GitClient.ToplevelDir(ctx)
+
+	// worktrees[0] is always the main worktree (the initially cloned repo).
+	// If our workdir differs we are inside a linked worktree.
+	isInLinkedWorktree := len(worktrees) > 1 && worktrees[0].Path != currentWorkdir
+
+	if currentBranch == m.pr.HeadRefName && isInLinkedWorktree {
+		_ = m.warnf("%s Branch %s is checked out in the current worktree (%s); skipping local delete\n",
+			m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), currentWorkdir)
+		_ = m.warnf("  To finish cleanup, first navigate out of the worktree, then run:\n")
+		_ = m.warnf("  git worktree remove %s && git branch -D %s\n",
+			currentWorkdir, m.pr.HeadRefName)
+		return nil
+	}
+
+	if prHeadWorktree := linkedWorktreeForBranch(worktrees, m.pr.HeadRefName); prHeadWorktree != "" {
+		if err := m.opts.GitClient.WorktreeRemove(ctx, prHeadWorktree); err != nil {
+			_ = m.warnf("%s Could not remove worktree %s; skipping local branch delete: %s\n", m.cs.WarningIcon(), prHeadWorktree, err)
+			return nil
+		}
+		_ = m.infof("%s Removed worktree %s\n", m.cs.SuccessIconWithColor(m.cs.Red), prHeadWorktree)
+	}
+
+	switchedToBranch := ""
 	if currentBranch == m.pr.HeadRefName {
 		remotes, err := m.opts.Remotes()
 		if err != nil {
@@ -486,6 +508,23 @@ func (m *mergeContext) deleteRemoteBranch() error {
 // Admins can bypass the queue and merge directly
 func (m *mergeContext) shouldAddToMergeQueue() bool {
 	return m.mergeQueueRequired && !m.opts.UseAdmin
+}
+
+// linkedWorktreeForBranch returns the path of a linked worktree that has the
+// given branch checked out. It skips worktrees[0] (always the main worktree)
+// so only linked worktrees are considered. Returns empty string if no linked
+// worktree uses the branch.
+func linkedWorktreeForBranch(worktrees []git.Worktree, branch string) string {
+	if len(worktrees) <= 1 {
+		return ""
+	}
+	branchRef := "refs/heads/" + branch
+	for _, wt := range worktrees[1:] {
+		if wt.Branch == branchRef {
+			return wt.Path
+		}
+	}
+	return ""
 }
 
 func (m *mergeContext) warnf(format string, args ...interface{}) error {
