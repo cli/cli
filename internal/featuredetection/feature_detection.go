@@ -391,7 +391,7 @@ func (d *detector) SearchFeatures() (SearchFeatures, error) {
 	//
 	// Since there's no schema-wise difference between pre-deprecation and
 	// deprecation periods (i.e. `ISSUE_ADVANCED` is available during both),
-	// we cannot figure out the exact time period. The consensus is to to use
+	// we cannot figure out the exact time period. The consensus is to use
 	// the advanced search syntax during both periods.
 
 	var feature SearchFeatures
