@@ -33,6 +33,7 @@ type DownloadOptions struct {
 	FilePatterns      []string
 	Destination       string
 	OutputFile        string
+	ChecksumFile      string
 
 	// maximum number of simultaneous downloads
 	Concurrency int
@@ -68,6 +69,9 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 
 			# Download the archive of the source code for a release
 			$ gh release download v1.2.3 --archive=zip
+
+			# Download assets and verify them against a checksum file from the same release
+			$ gh release download v1.2.3 --checksum-file checksums.txt
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -95,6 +99,10 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive("specify only one of `--archive` or `--checksum-file`", opts.ArchiveType != "", opts.ChecksumFile != ""); err != nil {
+				return err
+			}
+
 			opts.Concurrency = 5
 
 			if runF != nil {
@@ -110,6 +118,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
 	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing files of the same name")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip downloading when files of the same name exist")
+	cmd.Flags().StringVar(&opts.ChecksumFile, "checksum-file", "", "Verify downloaded assets against a checksum `file` from the same release")
 
 	cmdutil.DisableAuthCheck(cmd)
 
@@ -210,6 +219,14 @@ func downloadRun(opts *DownloadOptions) error {
 		return errors.New("no assets to download")
 	}
 
+	if opts.ChecksumFile != "" {
+		var err error
+		toDownload, err = addChecksumAsset(release.Assets, toDownload, opts.ChecksumFile)
+		if err != nil {
+			return err
+		}
+	}
+
 	if len(toDownload) > 1 && opts.OutputFile != "" {
 		return fmt.Errorf("unable to write more than one asset with `--output`, got %d assets", len(toDownload))
 	}
@@ -222,7 +239,46 @@ func downloadRun(opts *DownloadOptions) error {
 		stdout:       opts.IO.Out,
 	}
 
-	return downloadAssets(&dest, httpClient, toDownload, opts.Concurrency, isArchive, opts.IO)
+	if err := downloadAssets(&dest, httpClient, toDownload, opts.Concurrency, isArchive, opts.IO); err != nil {
+		return err
+	}
+
+	if opts.ChecksumFile == "" {
+		return nil
+	}
+	return verifyChecksums(&dest, opts.ChecksumFile, assetNamesExcept(toDownload, opts.ChecksumFile), opts.IO)
+}
+
+// addChecksumAsset ensures the named checksum file asset is included in toDownload,
+// appending it if it wasn't already selected by a file pattern.
+func addChecksumAsset(releaseAssets, toDownload []shared.ReleaseAsset, checksumFileName string) ([]shared.ReleaseAsset, error) {
+	for _, a := range toDownload {
+		if a.Name == checksumFileName {
+			return toDownload, nil
+		}
+	}
+
+	for _, a := range releaseAssets {
+		if a.Name != checksumFileName {
+			continue
+		}
+		if runtime.GOOS == "windows" && isWindowsReservedFilename(a.Name) {
+			return nil, fmt.Errorf("unable to download release due to asset with reserved filename %q", a.Name)
+		}
+		return append(toDownload, a), nil
+	}
+
+	return nil, fmt.Errorf("checksum file %q not found among release assets", checksumFileName)
+}
+
+func assetNamesExcept(assets []shared.ReleaseAsset, exclude string) []string {
+	names := make([]string, 0, len(assets))
+	for _, a := range assets {
+		if a.Name != exclude {
+			names = append(names, a.Name)
+		}
+	}
+	return names
 }
 
 func matchAny(patterns []string, name string) bool {

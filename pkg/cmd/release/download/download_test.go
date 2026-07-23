@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -130,6 +131,24 @@ func Test_NewCmdDownload(t *testing.T) {
 			isTTY:   true,
 			wantErr: "specify only one of `--dir` or `--output`",
 		},
+		{
+			name:  "version and checksum file",
+			args:  "v1.2.3 --checksum-file checksums.txt",
+			isTTY: true,
+			want: DownloadOptions{
+				TagName:      "v1.2.3",
+				FilePatterns: []string(nil),
+				Destination:  ".",
+				ChecksumFile: "checksums.txt",
+				Concurrency:  5,
+			},
+		},
+		{
+			name:    "simultaneous archive and checksum file",
+			args:    "v1.2.3 -A zip --checksum-file checksums.txt",
+			isTTY:   true,
+			wantErr: "specify only one of `--archive` or `--checksum-file`",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -169,6 +188,7 @@ func Test_NewCmdDownload(t *testing.T) {
 			assert.Equal(t, tt.want.Destination, opts.Destination)
 			assert.Equal(t, tt.want.Concurrency, opts.Concurrency)
 			assert.Equal(t, tt.want.OutputFile, opts.OutputFile)
+			assert.Equal(t, tt.want.ChecksumFile, opts.ChecksumFile)
 		})
 	}
 }
@@ -308,6 +328,132 @@ func Test_downloadRun(t *testing.T) {
 			wantStdout: ``,
 			wantStderr: ``,
 			wantErr:    "no assets match the file pattern",
+		},
+		{
+			name:  "download all assets and verify checksums",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:      "v1.2.3",
+				Destination:  ".",
+				Concurrency:  2,
+				ChecksumFile: "checksums.txt",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 12,
+						"url": "https://api.github.com/assets/1234" },
+						{ "name": "windows-64bit.zip", "size": 34,
+						"url": "https://api.github.com/assets/3456" },
+						{ "name": "linux.tgz", "size": 56,
+						"url": "https://api.github.com/assets/5678" },
+						{ "name": "checksums.txt", "size": 200,
+						"url": "https://api.github.com/assets/9999" }
+					],
+					"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+					"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+				}`)
+
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse(`1234`))
+				reg.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse(`3456`))
+				reg.Register(httpmock.REST("GET", "assets/5678"), httpmock.StringResponse(`5678`))
+				reg.Register(httpmock.REST("GET", "assets/9999"), httpmock.StringResponse(strings.Join([]string{
+					"03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4  windows-32bit.zip",
+					"ceaa28bba4caba687dc31b1bbe79eca3c70c33f871f1ce8f528cf9ab5cfd76dd  windows-64bit.zip",
+					"f8638b979b2f4f793ddb6dbd197e0ee25a7a6ea32b0ae22f5e3c5d119d839e75  linux.tgz",
+				}, "\n")))
+			},
+			wantStdout: "Verified checksums for 3 asset(s) against checksums.txt\n",
+			wantStderr: ``,
+			wantFiles: []string{
+				"checksums.txt",
+				"linux.tgz",
+				"windows-32bit.zip",
+				"windows-64bit.zip",
+			},
+		},
+		{
+			name:  "download assets fails when a checksum does not match",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:      "v1.2.3",
+				Destination:  ".",
+				Concurrency:  2,
+				ChecksumFile: "checksums.txt",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 12,
+						"url": "https://api.github.com/assets/1234" },
+						{ "name": "checksums.txt", "size": 200,
+						"url": "https://api.github.com/assets/9999" }
+					],
+					"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+					"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+				}`)
+
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse(`1234`))
+				reg.Register(httpmock.REST("GET", "assets/9999"), httpmock.StringResponse(
+					"0000000000000000000000000000000000000000000000000000000000000000  windows-32bit.zip\n",
+				))
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr: "checksum verification failed:\n" +
+				"windows-32bit.zip: checksum mismatch (expected 0000000000000000000000000000000000000000000000000000000000000000, " +
+				"got 03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4)",
+		},
+		{
+			name:  "download assets fails when checksum file is missing an entry",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:      "v1.2.3",
+				Destination:  ".",
+				Concurrency:  2,
+				ChecksumFile: "checksums.txt",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 12,
+						"url": "https://api.github.com/assets/1234" },
+						{ "name": "checksums.txt", "size": 200,
+						"url": "https://api.github.com/assets/9999" }
+					],
+					"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+					"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+				}`)
+
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse(`1234`))
+				reg.Register(httpmock.REST("GET", "assets/9999"), httpmock.StringResponse(""))
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr:    "checksum verification failed:\nwindows-32bit.zip: no checksum entry found in checksums.txt",
+		},
+		{
+			name:  "download fails when checksum file is not among release assets",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:      "v1.2.3",
+				Destination:  ".",
+				Concurrency:  2,
+				ChecksumFile: "checksums.txt",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 12,
+						"url": "https://api.github.com/assets/1234" }
+					],
+					"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+					"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+				}`)
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr:    `checksum file "checksums.txt" not found among release assets`,
 		},
 		{
 			name:  "download archive in zip format into destination directory",
