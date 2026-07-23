@@ -212,7 +212,8 @@ loop:
 			break
 		}
 		variables["after"] = resp.Search.PageInfo.EndCursor
-		variables["perPage"] = min(perPage, limit-len(ic.Issues))
+		// IssueSearch declares $limit (not $perPage); write the reduced page size back to the variable the query actually uses (#13906).
+		variables["limit"] = min(perPage, limit-len(ic.Issues))
 	}
 
 	return &ic, nil

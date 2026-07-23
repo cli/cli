@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -197,7 +198,7 @@ func getRepoVariables(client *http.Client, repo ghrepo.Interface) ([]shared.Vari
 }
 
 func getEnvVariables(client *http.Client, repo ghrepo.Interface, envName string) ([]shared.Variable, error) {
-	path := fmt.Sprintf("repos/%s/environments/%s/variables", ghrepo.FullName(repo), envName)
+	path := fmt.Sprintf("repos/%s/environments/%s/variables", ghrepo.FullName(repo), url.PathEscape(envName))
 	return getVariables(client, repo.RepoHost(), path)
 }
 

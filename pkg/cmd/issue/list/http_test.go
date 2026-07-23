@@ -1,6 +1,7 @@
 package list
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -266,4 +267,75 @@ func TestSearchIssues_rejectsPullRequestQualifiers(t *testing.T) {
 			assert.Len(t, reg.Requests, 0)
 		})
 	}
+}
+
+func TestSearchIssues_reducesLimitOnSubsequentPages(t *testing.T) {
+	// Regression for #13906: subsequent IssueSearch pages must shrink $limit,
+	// not write a dead $perPage variable the operation does not declare.
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	page := 0
+	respond := func(req *http.Request) (*http.Response, error) {
+		var bodyData struct {
+			Query     string
+			Variables map[string]interface{}
+		}
+		if err := json.NewDecoder(req.Body).Decode(&bodyData); err != nil {
+			return nil, err
+		}
+		page++
+		switch page {
+		case 1:
+			assert.Equal(t, float64(100), bodyData.Variables["limit"])
+			nodes := make([]map[string]interface{}, 100)
+			for i := range nodes {
+				nodes[i] = map[string]interface{}{"number": i + 1, "title": "x", "url": "https://example.com"}
+			}
+			payload, _ := json.Marshal(map[string]interface{}{
+				"data": map[string]interface{}{
+					"repository": map[string]interface{}{"hasIssuesEnabled": true},
+					"search": map[string]interface{}{
+						"issueCount": 150,
+						"nodes":      nodes,
+						"pageInfo":   map[string]interface{}{"hasNextPage": true, "endCursor": "CURSOR"},
+					},
+				},
+			})
+			return &http.Response{StatusCode: 200, Request: req, Body: io.NopCloser(bytes.NewReader(payload)), Header: make(http.Header)}, nil
+		case 2:
+			assert.Equal(t, float64(50), bodyData.Variables["limit"])
+			_, hasPerPage := bodyData.Variables["perPage"]
+			assert.False(t, hasPerPage, "must not set undeclared $perPage")
+			nodes := make([]map[string]interface{}, 50)
+			for i := range nodes {
+				nodes[i] = map[string]interface{}{"number": 101 + i, "title": "y", "url": "https://example.com"}
+			}
+			payload, _ := json.Marshal(map[string]interface{}{
+				"data": map[string]interface{}{
+					"repository": map[string]interface{}{"hasIssuesEnabled": true},
+					"search": map[string]interface{}{
+						"issueCount": 150,
+						"nodes":      nodes,
+						"pageInfo":   map[string]interface{}{"hasNextPage": false, "endCursor": ""},
+					},
+				},
+			})
+			return &http.Response{StatusCode: 200, Request: req, Body: io.NopCloser(bytes.NewReader(payload)), Header: make(http.Header)}, nil
+		default:
+			t.Fatalf("unexpected extra page %d", page)
+			return nil, nil
+		}
+	}
+	// httpmock stubs are one-shot; register one responder per expected page.
+	reg.Register(httpmock.GraphQL(`query IssueSearch\b`), respond)
+	reg.Register(httpmock.GraphQL(`query IssueSearch\b`), respond)
+
+	httpClient := &http.Client{Transport: reg}
+	client := api.NewClientFromHTTP(httpClient)
+
+	res, err := searchIssues(client, fd.AdvancedIssueSearchSupportedAsOnlyBackend(), ghrepo.New("OWNER", "REPO"), prShared.FilterOptions{State: "open"}, 150)
+	assert.NoError(t, err)
+	assert.Len(t, res.Issues, 150)
+	assert.Equal(t, 2, page)
 }

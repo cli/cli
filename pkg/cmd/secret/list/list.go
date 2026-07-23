@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -279,7 +280,7 @@ func getUserSecrets(client *http.Client, host string, showSelectedRepoInfo bool)
 }
 
 func getEnvSecrets(client *http.Client, repo ghrepo.Interface, envName string) ([]Secret, error) {
-	path := fmt.Sprintf("repos/%s/environments/%s/secrets", ghrepo.FullName(repo), envName)
+	path := fmt.Sprintf("repos/%s/environments/%s/secrets", ghrepo.FullName(repo), url.PathEscape(envName))
 	return getSecrets(client, repo.RepoHost(), path)
 }
 

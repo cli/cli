@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/cli/cli/v2/api"
@@ -54,7 +55,7 @@ func getRepoPubKey(client *api.Client, repo ghrepo.Interface, app shared.App) (*
 
 func getEnvPubKey(client *api.Client, repo ghrepo.Interface, envName string) (*PubKey, error) {
 	return getPubKey(client, repo.RepoHost(), fmt.Sprintf("repos/%s/environments/%s/secrets/public-key",
-		ghrepo.FullName(repo), envName))
+		ghrepo.FullName(repo), url.PathEscape(envName)))
 }
 
 func putSecret(client *api.Client, host, path string, payload interface{}) error {
@@ -111,7 +112,7 @@ func putEnvSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, envName
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,
 	}
-	path := fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(repo), envName, secretName)
+	path := fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(repo), url.PathEscape(envName), secretName)
 	return putSecret(client, repo.RepoHost(), path, payload)
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -107,7 +108,7 @@ func postEnvVariable(client *api.Client, host string, repoID int64, envName, var
 		Name:  variableName,
 		Value: value,
 	}
-	path := fmt.Sprintf(`repositories/%d/environments/%s/variables`, repoID, envName)
+	path := fmt.Sprintf(`repositories/%d/environments/%s/variables`, repoID, url.PathEscape(envName))
 	return postVariable(client, host, path, payload)
 }
 
@@ -143,7 +144,7 @@ func patchEnvVariable(client *api.Client, host string, repoID int64, envName, va
 	payload := setPayload{
 		Value: value,
 	}
-	path := fmt.Sprintf(`repositories/%d/environments/%s/variables/%s`, repoID, envName, variableName)
+	path := fmt.Sprintf(`repositories/%d/environments/%s/variables/%s`, repoID, url.PathEscape(envName), variableName)
 	return patchVariable(client, host, path, payload)
 }
 

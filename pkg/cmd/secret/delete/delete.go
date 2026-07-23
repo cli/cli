@@ -3,6 +3,7 @@ package delete
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/MakeNowJust/heredoc"
@@ -130,7 +131,7 @@ func removeRun(opts *DeleteOptions) error {
 		path = fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, secretApp, opts.SecretName)
 		host, _ = cfg.Authentication().DefaultHost()
 	case shared.Environment:
-		path = fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(baseRepo), envName, opts.SecretName)
+		path = fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(baseRepo), url.PathEscape(envName), opts.SecretName)
 		host = baseRepo.RepoHost()
 	case shared.User:
 		path = fmt.Sprintf("user/codespaces/secrets/%s", opts.SecretName)
