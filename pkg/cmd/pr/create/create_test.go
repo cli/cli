@@ -270,6 +270,19 @@ func TestNewCmdCreate(t *testing.T) {
 				MaintainerCanModify: true,
 			},
 		},
+		{
+			name:     "json and jq flags",
+			tty:      false,
+			cli:      "--title mytitle --body '' --json number,url --jq .number",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "",
+				BodyProvided:        true,
+				MaintainerCanModify: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

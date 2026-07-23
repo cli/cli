@@ -26,8 +26,20 @@ type JSONFlagError struct {
 func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	f := cmd.Flags()
 	addJsonFlag(f)
-	addJqFlag(f, "q")
-	addTemplateFlag(f, "t")
+	if f.Lookup("jq") == nil {
+		shorthand := "q"
+		if f.ShorthandLookup("q") != nil {
+			shorthand = ""
+		}
+		addJqFlag(f, shorthand)
+	}
+	if f.Lookup("template") == nil {
+		shorthand := "t"
+		if f.ShorthandLookup("t") != nil {
+			shorthand = ""
+		}
+		addTemplateFlag(f, shorthand)
+	}
 
 	setupJsonFlags(cmd, exportTarget, fields)
 }
@@ -130,14 +142,21 @@ func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
 			return nil, errors.New("cannot use `--web` with `--json`")
 		}
 		jv := jsonFlag.Value.(pflag.SliceValue)
+		var jqVal, tplVal string
+		if jqFlag != nil {
+			jqVal = jqFlag.Value.String()
+		}
+		if tplFlag != nil && (tplFlag.Shorthand == "t" || tplFlag.Shorthand == "") {
+			tplVal = tplFlag.Value.String()
+		}
 		return &jsonExporter{
 			fields:   jv.GetSlice(),
-			filter:   jqFlag.Value.String(),
-			template: tplFlag.Value.String(),
+			filter:   jqVal,
+			template: tplVal,
 		}, nil
-	} else if jqFlag.Changed {
+	} else if jqFlag != nil && jqFlag.Changed {
 		return nil, errors.New("cannot use `--jq` without specifying `--json`")
-	} else if tplFlag.Changed {
+	} else if tplFlag != nil && (tplFlag.Shorthand == "t" || tplFlag.Shorthand == "") && tplFlag.Changed {
 		return nil, errors.New("cannot use `--template` without specifying `--json`")
 	}
 	return nil, nil

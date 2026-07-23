@@ -73,6 +73,8 @@ type CreateOptions struct {
 	MaintainerCanModify bool
 	Template            string
 
+	Exporter cmdutil.Exporter
+
 	DryRun bool
 }
 
@@ -369,6 +371,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		}
 		return results, cobra.ShellCompDirectiveNoFileComp
 	})
+
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
 }
@@ -1065,14 +1069,17 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.PRRefs.BaseRepo(), params)
 	opts.IO.StopProgressIndicator()
-	if pr != nil {
-		fmt.Fprintln(opts.IO.Out, pr.URL)
-	}
 	if err != nil {
 		if pr != nil {
 			return fmt.Errorf("pull request update failed: %w", err)
 		}
 		return fmt.Errorf("pull request create failed: %w", err)
+	}
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, pr)
+	}
+	if pr != nil {
+		fmt.Fprintln(opts.IO.Out, pr.URL)
 	}
 	return nil
 }
