@@ -54,6 +54,10 @@ type CreateOptions struct {
 	Parent      string
 	BlockedBy   []string
 	Blocking    []string
+
+	IssueFieldName  string
+	IssueFieldID    string
+	IssueFieldValue string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -95,6 +99,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --parent 100
 			$ gh issue create --parent https://github.com/cli/go-gh/issues/42
 			$ gh issue create --blocked-by 200,201 --blocking 300
+			$ gh issue create --field "Team" --value "Platform"
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
@@ -134,6 +139,20 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
 			}
 
+			if opts.IssueFieldName != "" && opts.IssueFieldID != "" {
+				return cmdutil.FlagErrorf("specify only one of `--field` or `--field-id`")
+			}
+			issueFieldSelected := opts.IssueFieldName != "" || opts.IssueFieldID != ""
+			if issueFieldSelected && !cmd.Flags().Changed("value") {
+				return cmdutil.FlagErrorf("`--value` is required with `--field` or `--field-id`")
+			}
+			if cmd.Flags().Changed("value") && !issueFieldSelected {
+				return cmdutil.FlagErrorf("`--value` requires `--field` or `--field-id`")
+			}
+			if issueFieldSelected && opts.WebMode {
+				return cmdutil.FlagErrorf("`--field` is not supported with `--web`")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -156,6 +175,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVar(&opts.Parent, "parent", "", "Add the new issue as a sub-issue of the specified parent `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.BlockedBy, "blocked-by", nil, "Mark the new issue as blocked by these issue `numbers` or URLs")
 	cmd.Flags().StringSliceVar(&opts.Blocking, "blocking", nil, "Mark the new issue as blocking these issue `numbers` or URLs")
+	cmd.Flags().StringVar(&opts.IssueFieldName, "field", "", "Set an issue field value by field `name`")
+	cmd.Flags().StringVar(&opts.IssueFieldID, "field-id", "", "Set an issue field value by field `id`")
+	cmd.Flags().StringVar(&opts.IssueFieldValue, "value", "", "Value for the issue field set with `--field` or `--field-id`")
 
 	return cmd
 }
@@ -419,6 +441,17 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 		if err = api.DeferredUpdateIssue(apiClient, updateOpts); err != nil {
 			return
+		}
+
+		if opts.IssueFieldName != "" || opts.IssueFieldID != "" {
+			var input issueShared.IssueFieldCreateOrUpdateInput
+			input, err = issueShared.BuildIssueFieldValueInput(httpClient, baseRepo, opts.IssueFieldName, opts.IssueFieldID, opts.IssueFieldValue)
+			if err != nil {
+				return
+			}
+			if err = issueShared.UpdateIssueFieldValue(httpClient, baseRepo, newIssue.ID, input); err != nil {
+				return
+			}
 		}
 
 		fmt.Fprintln(opts.IO.Out, newIssue.URL)
