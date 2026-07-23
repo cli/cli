@@ -1014,15 +1014,8 @@ func parseWorktrees(output []byte) []Worktree {
 		if current == nil {
 			continue
 		}
-		switch {
-		case strings.HasPrefix(line, "HEAD "):
-			current.Head = strings.TrimPrefix(line, "HEAD ")
-		case strings.HasPrefix(line, "branch "):
-			current.Branch = strings.TrimPrefix(line, "branch ")
-		case line == "detached":
-			current.Detached = true
-		case line == "bare":
-			current.Bare = true
+		if b, ok := strings.CutPrefix(line, "branch "); ok {
+			current.Branch = b
 		}
 	}
 	flush()

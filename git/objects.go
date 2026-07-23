@@ -58,15 +58,10 @@ type Ref struct {
 type Worktree struct {
 	// Path is the absolute path to the worktree's working directory.
 	Path string
-	// Head is the SHA of the commit checked out in the worktree.
-	Head string
 	// Branch is the fully qualified ref checked out in the worktree
-	// (e.g. "refs/heads/main"). It is empty when the worktree is detached or bare.
+	// (e.g. "refs/heads/main"). It is empty when the worktree has a detached
+	// HEAD or is the bare main worktree.
 	Branch string
-	// Detached reports whether the worktree has a detached HEAD.
-	Detached bool
-	// Bare reports whether this is the bare main worktree.
-	Bare bool
 }
 
 type Commit struct {

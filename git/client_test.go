@@ -411,8 +411,8 @@ func TestClientWorktrees(t *testing.T) {
 			`),
 			wantCmdArgs: `path/to/git worktree list --porcelain`,
 			wantWorktrees: []Worktree{
-				{Path: "/path/to/main", Head: "abc123", Branch: "refs/heads/trunk"},
-				{Path: "/path/to/feature", Head: "def456", Branch: "refs/heads/feature"},
+				{Path: "/path/to/main", Branch: "refs/heads/trunk"},
+				{Path: "/path/to/feature", Branch: "refs/heads/feature"},
 			},
 		},
 		{
@@ -876,7 +876,7 @@ func Test_parseWorktrees(t *testing.T) {
 				branch refs/heads/trunk
 			`),
 			want: []Worktree{
-				{Path: "/path/to/main", Head: "abc123", Branch: "refs/heads/trunk"},
+				{Path: "/path/to/main", Branch: "refs/heads/trunk"},
 			},
 		},
 		{
@@ -891,8 +891,8 @@ func Test_parseWorktrees(t *testing.T) {
 				branch refs/heads/feature
 			`),
 			want: []Worktree{
-				{Path: "/path/to/main", Head: "abc123", Branch: "refs/heads/trunk"},
-				{Path: "/path/to/feature", Head: "def456", Branch: "refs/heads/feature"},
+				{Path: "/path/to/main", Branch: "refs/heads/trunk"},
+				{Path: "/path/to/feature", Branch: "refs/heads/feature"},
 			},
 		},
 		{
@@ -903,7 +903,7 @@ func Test_parseWorktrees(t *testing.T) {
 				detached
 			`),
 			want: []Worktree{
-				{Path: "/path/to/detached", Head: "abc123", Detached: true},
+				{Path: "/path/to/detached"},
 			},
 		},
 		{
@@ -917,15 +917,15 @@ func Test_parseWorktrees(t *testing.T) {
 				branch refs/heads/feature
 			`),
 			want: []Worktree{
-				{Path: "/path/to/bare", Bare: true},
-				{Path: "/path/to/feature", Head: "def456", Branch: "refs/heads/feature"},
+				{Path: "/path/to/bare"},
+				{Path: "/path/to/feature", Branch: "refs/heads/feature"},
 			},
 		},
 		{
 			name:   "no trailing blank line",
 			output: "worktree /path/to/main\nHEAD abc123\nbranch refs/heads/trunk",
 			want: []Worktree{
-				{Path: "/path/to/main", Head: "abc123", Branch: "refs/heads/trunk"},
+				{Path: "/path/to/main", Branch: "refs/heads/trunk"},
 			},
 		},
 	}
