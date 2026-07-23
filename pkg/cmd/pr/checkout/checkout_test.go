@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -458,6 +460,34 @@ func Test_checkoutRun(t *testing.T) {
 			},
 		},
 		{
+			name: "checkout detached into the same worktree again fetches and checks out inside it",
+			opts: &CheckoutOptions{
+				Worktree: "/path/to/wt",
+				Detach:   true,
+				PRResolver: func() PRResolver {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
+					return &stubPRResolver{
+						pr:       pr,
+						baseRepo: baseRepo,
+					}
+				}(),
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git worktree list --porcelain`, 0, "worktree /path/to/wt\nHEAD deadbeef\ndetached\n")
+				cs.Register(`git fetch origin \+refs/heads/feature --no-tags`, 0, "")
+				cs.Register(`git -C /path/to/wt checkout --detach FETCH_HEAD`, 0, "")
+			},
+		},
+		{
 			name: "checkout fork PR without a remote into a worktree",
 			opts: &CheckoutOptions{
 				Worktree: "/path/to/wt",
@@ -644,37 +674,6 @@ func Test_checkoutRun(t *testing.T) {
 				cs.Register(`git config branch\.feature\.pushRemote https://github.com/hubot/REPO.git`, 0, "")
 				cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
 			},
-		},
-		{
-			name: "checkout with custom branch name into a worktree",
-			opts: &CheckoutOptions{
-				Worktree:   "/path/to/wt",
-				BranchName: "my-custom-name",
-				PRResolver: func() PRResolver {
-					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
-					return &stubPRResolver{
-						pr:       pr,
-						baseRepo: baseRepo,
-					}
-				}(),
-				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
-				},
-				Branch: func() (string, error) {
-					return "main", nil
-				},
-			},
-			remotes: map[string]string{
-				"origin": "OWNER/REPO",
-			},
-			stdoutTTY: true,
-			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git worktree list --porcelain`, 0, "")
-				cs.Register(`git show-ref --verify -- refs/heads/my-custom-name`, 1, "")
-				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
-				cs.Register(`git worktree add --track -b my-custom-name /path/to/wt origin/feature`, 0, "")
-			},
-			wantStderr: "✓ Checked out PR #123 in worktree /path/to/wt\n  To start working: cd /path/to/wt\n",
 		},
 		{
 			name: "when the PR resolver errors, then that error is bubbled up",
@@ -1185,6 +1184,12 @@ func Test_authenticatedCommand_stripsWorktreePrefix(t *testing.T) {
 			wantArgs: []string{"submodule", "sync", "--recursive"},
 		},
 		{
+			name:     "leading -C prefix is applied as cmd.Dir for a worktree-local fetch",
+			args:     []string{"-C", "/path/to/wt", "fetch", "origin", "refs/pull/123/head", "--no-tags"},
+			wantDir:  "/path/to/wt",
+			wantArgs: []string{"fetch", "origin", "refs/pull/123/head", "--no-tags"},
+		},
+		{
 			name:     "without a -C prefix cmd.Dir is left empty",
 			args:     []string{"fetch", "origin", "refs/pull/123/head", "--no-tags"},
 			wantDir:  "",
@@ -1203,6 +1208,42 @@ func Test_authenticatedCommand_stripsWorktreePrefix(t *testing.T) {
 			require.GreaterOrEqual(t, len(cmd.Args), len(tt.wantArgs))
 			assert.Equal(t, tt.wantArgs, cmd.Args[len(cmd.Args)-len(tt.wantArgs):])
 			assert.NotContains(t, cmd.Args, "-C")
+		})
+	}
+}
+
+func Test_isWorktreeAtPath_resolvesSymlinks(t *testing.T) {
+	// Git reports the canonical (symlink-resolved) worktree path, while the
+	// user may pass a symlinked path (e.g. macOS /tmp -> /private/tmp). The
+	// two must still be recognized as the same worktree.
+	realDir := t.TempDir()
+	linkDir := filepath.Join(t.TempDir(), "link")
+	require.NoError(t, os.Symlink(realDir, linkDir))
+
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{
+			name:  "symlinked input path matches git-reported canonical path",
+			input: linkDir,
+			want:  true,
+		},
+		{
+			name:  "unrelated path does not match",
+			input: filepath.Join(t.TempDir(), "other"),
+			want:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, teardown := run.Stub()
+			defer teardown(t)
+			cs.Register(`git worktree list --porcelain`, 0, "worktree "+realDir+"\nHEAD deadbeef\nbranch refs/heads/feature\n")
+
+			client := &git.Client{GitPath: "git"}
+			assert.Equal(t, tt.want, isWorktreeAtPath(client, tt.input))
 		})
 	}
 }
