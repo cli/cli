@@ -388,6 +388,60 @@ func TestClientShowRefs(t *testing.T) {
 	}
 }
 
+func TestClientWorktrees(t *testing.T) {
+	tests := []struct {
+		name          string
+		cmdExitStatus int
+		cmdStdout     string
+		cmdStderr     string
+		wantCmdArgs   string
+		wantWorktrees []Worktree
+		wantErr       bool
+	}{
+		{
+			name: "lists worktrees",
+			cmdStdout: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/trunk
+
+				worktree /path/to/feature
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			wantCmdArgs: `path/to/git worktree list --porcelain`,
+			wantWorktrees: []Worktree{
+				{Path: "/path/to/main", Head: "abc123", Branch: "refs/heads/trunk"},
+				{Path: "/path/to/feature", Head: "def456", Branch: "refs/heads/feature"},
+			},
+		},
+		{
+			name:          "propagates command error",
+			cmdExitStatus: 128,
+			cmdStderr:     "fatal: not a git repository",
+			wantCmdArgs:   `path/to/git worktree list --porcelain`,
+			wantErr:       true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
+			client := Client{
+				GitPath:        "path/to/git",
+				commandContext: cmdCtx,
+			}
+			worktrees, err := client.Worktrees(context.Background())
+			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantWorktrees, worktrees)
+		})
+	}
+}
+
 func TestClientConfig(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -799,6 +853,85 @@ func TestClientReadBranchConfig(t *testing.T) {
 				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.wantBranchConfig, branchConfig)
+		})
+	}
+}
+
+func Test_parseWorktrees(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   []Worktree
+	}{
+		{
+			name:   "empty output",
+			output: "",
+			want:   nil,
+		},
+		{
+			name: "single branch worktree",
+			output: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/trunk
+			`),
+			want: []Worktree{
+				{Path: "/path/to/main", Head: "abc123", Branch: "refs/heads/trunk"},
+			},
+		},
+		{
+			name: "multiple worktrees",
+			output: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/trunk
+
+				worktree /path/to/feature
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			want: []Worktree{
+				{Path: "/path/to/main", Head: "abc123", Branch: "refs/heads/trunk"},
+				{Path: "/path/to/feature", Head: "def456", Branch: "refs/heads/feature"},
+			},
+		},
+		{
+			name: "detached worktree",
+			output: heredoc.Doc(`
+				worktree /path/to/detached
+				HEAD abc123
+				detached
+			`),
+			want: []Worktree{
+				{Path: "/path/to/detached", Head: "abc123", Detached: true},
+			},
+		},
+		{
+			name: "bare main worktree",
+			output: heredoc.Doc(`
+				worktree /path/to/bare
+				bare
+
+				worktree /path/to/feature
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			want: []Worktree{
+				{Path: "/path/to/bare", Bare: true},
+				{Path: "/path/to/feature", Head: "def456", Branch: "refs/heads/feature"},
+			},
+		},
+		{
+			name:   "no trailing blank line",
+			output: "worktree /path/to/main\nHEAD abc123\nbranch refs/heads/trunk",
+			want: []Worktree{
+				{Path: "/path/to/main", Head: "abc123", Branch: "refs/heads/trunk"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, parseWorktrees([]byte(tt.output)))
 		})
 	}
 }

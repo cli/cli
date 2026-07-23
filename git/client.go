@@ -263,6 +263,20 @@ func (c *Client) ShowRefs(ctx context.Context, refs []string) ([]Ref, error) {
 	return verified, err
 }
 
+// Worktrees lists the repository's worktrees by parsing the output of
+// `git worktree list --porcelain`.
+func (c *Client) Worktrees(ctx context.Context) ([]Worktree, error) {
+	cmd, err := c.Command(ctx, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	return parseWorktrees(out), nil
+}
+
 func (c *Client) Config(ctx context.Context, name string) (string, error) {
 	args := []string{"config", name}
 	cmd, err := c.Command(ctx, args...)
@@ -973,6 +987,46 @@ func parseRemotes(remotesStr []string) RemoteSet {
 		}
 	}
 	return remotes
+}
+
+// parseWorktrees parses the output of `git worktree list --porcelain` into a
+// slice of Worktree. Records are separated by blank lines; each record begins
+// with a "worktree <path>" line followed by attribute lines.
+func parseWorktrees(output []byte) []Worktree {
+	var worktrees []Worktree
+	var current *Worktree
+	flush := func() {
+		if current != nil {
+			worktrees = append(worktrees, *current)
+			current = nil
+		}
+	}
+	for _, line := range strings.Split(string(output), "\n") {
+		if line == "" {
+			flush()
+			continue
+		}
+		if p, ok := strings.CutPrefix(line, "worktree "); ok {
+			flush()
+			current = &Worktree{Path: p}
+			continue
+		}
+		if current == nil {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, "HEAD "):
+			current.Head = strings.TrimPrefix(line, "HEAD ")
+		case strings.HasPrefix(line, "branch "):
+			current.Branch = strings.TrimPrefix(line, "branch ")
+		case line == "detached":
+			current.Detached = true
+		case line == "bare":
+			current.Bare = true
+		}
+	}
+	flush()
+	return worktrees
 }
 
 func parseRemoteURLOrName(value string) (*url.URL, string) {

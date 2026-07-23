@@ -311,20 +311,14 @@ func localBranchExists(client *git.Client, b string) bool {
 
 // isWorktreeAtPath reports whether the given path is a registered git worktree.
 func isWorktreeAtPath(client *git.Client, path string) bool {
-	cmd, err := client.Command(context.Background(), "worktree", "list", "--porcelain")
-	if err != nil {
-		return false
-	}
-	out, err := cmd.Output()
+	worktrees, err := client.Worktrees(context.Background())
 	if err != nil {
 		return false
 	}
 	resolved := resolvePath(path)
-	for _, line := range strings.Split(string(out), "\n") {
-		if p, ok := strings.CutPrefix(line, "worktree "); ok {
-			if resolvePath(p) == resolved {
-				return true
-			}
+	for _, wt := range worktrees {
+		if resolvePath(wt.Path) == resolved {
+			return true
 		}
 	}
 	return false
