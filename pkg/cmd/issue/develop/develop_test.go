@@ -106,6 +106,33 @@ func TestNewCmdDevelop(t *testing.T) {
 			wantErr: true,
 			errMsg:  "specify only one of `--list` or `--name`",
 		},
+		{
+			name:  "worktree flag with checkout",
+			input: "1 --checkout --worktree ../issue-1",
+			output: DevelopOptions{
+				IssueNumber: 1,
+				Checkout:    true,
+				Worktree:    "../issue-1",
+			},
+		},
+		{
+			name:    "worktree flag without checkout",
+			input:   "1 --worktree ../issue-1",
+			wantErr: true,
+			errMsg:  "`--worktree` requires `--checkout`",
+		},
+		{
+			name:    "list and worktree flags",
+			input:   "1 --list --worktree ../issue-1 --checkout",
+			wantErr: true,
+			errMsg:  "specify only one of `--list` or `--checkout`",
+		},
+		{
+			name:    "worktree flag blank",
+			input:   `1 --checkout --worktree ""`,
+			wantErr: true,
+			errMsg:  "--worktree cannot be blank",
+		},
 	}
 
 	for _, tt := range tests {
@@ -138,6 +165,7 @@ func TestNewCmdDevelop(t *testing.T) {
 			assert.Equal(t, tt.output.BaseBranch, gotOpts.BaseBranch)
 			assert.Equal(t, tt.output.Checkout, gotOpts.Checkout)
 			assert.Equal(t, tt.output.List, gotOpts.List)
+			assert.Equal(t, tt.output.Worktree, gotOpts.Worktree)
 			assert.Equal(t, tt.wantStdout, stdOut.String())
 			assert.Equal(t, tt.wantStderr, stdErr.String())
 			if tt.expectedBaseRepo != nil {
@@ -676,7 +704,221 @@ func TestDevelopRun(t *testing.T) {
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
 		{
-			name: "develop with base branch which does not exist",
+			name: "develop new branch with worktree when local branch does not exist",
+			opts: &DevelopOptions{
+				Name:        "my-branch",
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "../issue-123",
+			},
+			tty: true,
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.StringResponse(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
+				cs.Register(`git worktree add --track -b my-branch \.\./issue-123 origin/my-branch`, 0, "")
+			},
+			expectedOut:    "github.com/OWNER/REPO/tree/my-branch\n",
+			expectedErrOut: "✓ Checked out branch \"my-branch\" in worktree ../issue-123\n  To start working: cd ../issue-123\n",
+		},
+		{
+			name: "develop new branch with worktree when local branch exists",
+			opts: &DevelopOptions{
+				Name:        "my-branch",
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "../issue-123",
+			},
+			tty: true,
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.StringResponse(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
+				cs.Register(`git worktree add \.\./issue-123 my-branch`, 0, "")
+			},
+			expectedOut:    "github.com/OWNER/REPO/tree/my-branch\n",
+			expectedErrOut: "✓ Checked out branch \"my-branch\" in worktree ../issue-123\n  To start working: cd ../issue-123\n",
+		},
+		{
+			name: "develop existing linked branch with name and worktree",
+			opts: &DevelopOptions{
+				Name:        "my-branch",
+				BaseBranch:  "main",
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "../issue-123",
+			},
+			tty: true,
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.StringResponse(`
+		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"my-branch","repository":{"url":"https://github.com/OWNER/REPO"}}}]}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config branch\.my-branch\.gh-merge-base main`, 0, "")
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
+				cs.Register(`git worktree add --track -b my-branch \.\./issue-123 origin/my-branch`, 0, "")
+			},
+			expectedOut:    "github.com/OWNER/REPO/tree/my-branch\n",
+			expectedErrOut: "Using existing linked branch \"my-branch\"\n✓ Checked out branch \"my-branch\" in worktree ../issue-123\n  To start working: cd ../issue-123\n",
+		},
+		{
+			name: "develop worktree with existing worktree at path",
+			opts: &DevelopOptions{
+				Name:        "my-branch",
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "/tmp/issue-123",
+			},
+			tty: true,
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.StringResponse(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git worktree list --porcelain`, 0, "worktree /tmp/issue-123\nHEAD abc123\nbranch refs/heads/other-branch\n\n")
+				cs.Register(`git -C /tmp/issue-123 checkout my-branch`, 0, "")
+			},
+			expectedOut:    "github.com/OWNER/REPO/tree/my-branch\n",
+			expectedErrOut: "✓ Checked out branch \"my-branch\" in worktree /tmp/issue-123\n  To start working: cd /tmp/issue-123\n",
+		},
+		{
+			name: "develop worktree with cross-repo branch",
+			opts: &DevelopOptions{
+				Name:        "my-branch",
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "../issue-123",
+				BranchRepo:  "FORK/REPO",
+			},
+			tty: true,
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+				"fork":   "FORK/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.StringResponse(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch fork \+refs/heads/my-branch:refs/remotes/fork/my-branch`, 0, "")
+				cs.Register(`git worktree list --porcelain`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
+				cs.Register(`git worktree add --track -b my-branch \.\./issue-123 fork/my-branch`, 0, "")
+			},
+			expectedOut:    "github.com/FORK/REPO/tree/my-branch\n",
+			expectedErrOut: "✓ Checked out branch \"my-branch\" in worktree ../issue-123\n  To start working: cd ../issue-123\n",
+		},
+		{
 			opts: &DevelopOptions{
 				IssueNumber: 123,
 				BaseBranch:  "does-not-exist-branch",

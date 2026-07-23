@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -32,6 +33,7 @@ type DevelopOptions struct {
 	BaseBranch  string
 	Checkout    bool
 	List        bool
+	Worktree    string
 }
 
 func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.Command {
@@ -66,6 +68,9 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			# Create a branch for issue 123 and check it out
 			$ gh issue develop 123 --checkout
 
+			# Create a branch for issue 123 and check it out in a new worktree
+			$ gh issue develop 123 --checkout --worktree ../issue-123
+
 			# Create a branch in repo monalisa/cli for issue 123 in repo cli/cli
 			$ gh issue develop 123 --repo cli/cli --branch-repo monalisa/cli
 		`),
@@ -91,6 +96,13 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("worktree") && opts.Worktree == "" {
+				return cmdutil.FlagErrorf("--worktree cannot be blank")
+			}
+			if opts.Worktree != "" && !opts.Checkout {
+				return cmdutil.FlagErrorf("`--worktree` requires `--checkout`")
+			}
+
 			issueNumber, baseRepo, err := shared.ParseIssueFromArg(args[0])
 			if err != nil {
 				return err
@@ -117,6 +129,9 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			if err := cmdutil.MutuallyExclusive("specify only one of `--list` or `--checkout`", opts.List, opts.Checkout); err != nil {
 				return err
 			}
+			if err := cmdutil.MutuallyExclusive("specify only one of `--list` or `--worktree`", opts.List, opts.Worktree != ""); err != nil {
+				return err
+			}
 			if err := cmdutil.MutuallyExclusive("specify only one of `--list` or `--name`", opts.List, opts.Name != ""); err != nil {
 				return err
 			}
@@ -133,6 +148,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 	fl.BoolVarP(&opts.Checkout, "checkout", "c", false, "Checkout the branch after creating it")
 	fl.BoolVarP(&opts.List, "list", "l", false, "List linked branches for the issue")
 	fl.StringVarP(&opts.Name, "name", "n", "", "Name of the branch to create")
+	fl.StringVar(&opts.Worktree, "worktree", "", "Check out the branch in a new worktree at the given `path`")
 
 	var issueRepoSelector string
 	fl.StringVarP(&issueRepoSelector, "issue-repo", "i", "", "Name or URL of the issue's repository")
@@ -321,31 +337,28 @@ func printLinkedBranches(io *iostreams.IOStreams, branches []api.LinkedBranch) {
 func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutBranch string) (err error) {
 	remotes, err := opts.Remotes()
 	if err != nil {
-		// If the user specified the branch to be checked out and no remotes are found
-		// display an error. Otherwise bail out silently, likely the command was not
-		// run from inside a git directory.
-		if opts.Checkout {
+		if opts.Checkout || opts.Worktree != "" {
 			return err
-		} else {
-			return nil
 		}
+		return nil
 	}
 
 	baseRemote, err := remotes.FindByRepo(branchRepo.RepoOwner(), branchRepo.RepoName())
 	if err != nil {
-		// If the user specified the branch to be checked out and no remote matches the
-		// base repo, then display an error. Otherwise bail out silently.
-		if opts.Checkout {
+		if opts.Checkout || opts.Worktree != "" {
 			return err
-		} else {
-			return nil
 		}
+		return nil
 	}
 
 	gc := opts.GitClient
 
 	if err := gc.Fetch(ctx.Background(), baseRemote.Name, fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/%[2]s/%[1]s", checkoutBranch, baseRemote.Name)); err != nil {
 		return err
+	}
+
+	if opts.Worktree != "" {
+		return checkoutWorktree(opts, baseRemote.Name, checkoutBranch)
 	}
 
 	if !opts.Checkout {
@@ -367,4 +380,72 @@ func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutB
 	}
 
 	return nil
+}
+
+func checkoutWorktree(opts *DevelopOptions, remoteName, branchName string) error {
+	gc := opts.GitClient
+	remoteBranch := fmt.Sprintf("%s/%s", remoteName, branchName)
+
+	if isWorktreeAtPath(gc, opts.Worktree) {
+		// Worktree already exists at the path - switch it to the target branch.
+		cmd, err := gc.Command(ctx.Background(), "-C", opts.Worktree, "checkout", branchName)
+		if err != nil {
+			return err
+		}
+		if _, err := cmd.Output(); err != nil {
+			return err
+		}
+	} else if gc.HasLocalBranch(ctx.Background(), branchName) {
+		// Local branch exists but no worktree at the path yet.
+		cmd, err := gc.Command(ctx.Background(), "worktree", "add", opts.Worktree, branchName)
+		if err != nil {
+			return err
+		}
+		if _, err := cmd.Output(); err != nil {
+			return err
+		}
+	} else {
+		// No existing worktree or local branch - create both.
+		cmd, err := gc.Command(ctx.Background(), "worktree", "add", "--track", "-b", branchName, opts.Worktree, remoteBranch)
+		if err != nil {
+			return err
+		}
+		if _, err := cmd.Output(); err != nil {
+			return err
+		}
+	}
+
+	if opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.ErrOut, "%s Checked out branch %q in worktree %s\n", cs.SuccessIcon(), branchName, opts.Worktree)
+		fmt.Fprintf(opts.IO.ErrOut, "  To start working: cd %s\n", opts.Worktree)
+	}
+
+	return nil
+}
+
+// isWorktreeAtPath reports whether the given path is a registered git worktree.
+func isWorktreeAtPath(client *git.Client, path string) bool {
+	worktrees, err := client.Worktrees(ctx.Background())
+	if err != nil {
+		return false
+	}
+	resolved := resolvePath(path)
+	for _, wt := range worktrees {
+		if resolvePath(wt.Path) == resolved {
+			return true
+		}
+	}
+	return false
+}
+
+// resolvePath canonicalizes a path for comparison against git-reported worktree paths.
+func resolvePath(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		p = abs
+	}
+	if resolved, err := filepath.EvalSymlinks(p); err == nil {
+		return resolved
+	}
+	return p
 }
