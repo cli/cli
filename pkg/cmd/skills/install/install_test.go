@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/registry"
 	"github.com/cli/cli/v2/internal/telemetry"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -2482,6 +2483,33 @@ func Test_selectSkillsWithSelector_noDisclaimer(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.NotContains(t, stderr.String(), "not verified by GitHub")
+}
+
+func TestSkillSearchFuncTruncatesLabelsToAvailableWidth(t *testing.T) {
+	skills := []discovery.Skill{
+		{
+			Name:        "telemetry-instrumentation",
+			Namespace:   "octocat",
+			Convention:  "plugins",
+			Description: "Add tracing, logging, resource attributes, metrics, dashboards, alerts, sampling, or instrumentation to an application",
+		},
+		{
+			Name: "achievement-badges",
+		},
+	}
+
+	for _, terminalWidth := range []int{40, 60, 80, 120} {
+		t.Run(fmt.Sprintf("terminal width %d", terminalWidth), func(t *testing.T) {
+			labelWidth := terminalWidth - multiSelectLabelMargin
+			result := skillSearchFunc(skills, labelWidth)("")
+
+			require.Len(t, result.Labels, 2)
+			assert.Less(t, text.DisplayWidth("> [ ] "+result.Labels[0]), terminalWidth)
+			assert.Equal(t, "[plugins] octocat/telemetry-instrumentation", result.Keys[0])
+			assert.True(t, strings.HasSuffix(result.Labels[0], "..."))
+			assert.Equal(t, "achievement-badges", result.Labels[1])
+		})
+	}
 }
 
 func TestInstallRun_TelemetryVisibility(t *testing.T) {
