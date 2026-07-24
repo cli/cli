@@ -18,11 +18,7 @@ Keyring support is provided by the [zalando/go-keyring](https://github.com/zalan
 
 Access to keyring items is protected via an ACL (Access Control List). When an application attempts to access an item, the user is prompted to `allow`, `deny`, or `always allow`. In the case of `always allow`, this decision is persisted for future access attempts by the same application.
 
-Since the binary accessing the `gh` keyring items is `/usr/bin/security`, this means that calling `/usr/bin/security` directly from a terminal provides access to the `gh` tokens, for example:
-
-```sh
-/usr/bin/security find-generic-password -s "gh:github.com" -a "<github-username>" -w
-```
+Since the binary accessing the `gh` keyring items is `/usr/bin/security`, calling `security` directly from a terminal can also access the stored `gh` tokens for a given host and user.
 
 Historically, this has not been a significant concern with downsides to the alternatives (see below), primarily because `gh` offers direct access to the token via `gh auth token`. There is an argument to be made that `gh` should be less _surprising_ in this behaviour, and with the rise in agentic development, this probably has more merit.
 
