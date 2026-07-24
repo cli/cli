@@ -250,9 +250,15 @@ func updateRun(opts *UpdateOptions) error {
 	var pinned []installedSkill
 
 	type repoKey struct{ host, owner, repo string }
+	type skillPathKey struct {
+		repoKey
+		path string
+	}
 	repoSkills := make(map[repoKey][]discovery.Skill)
 	repoRefs := make(map[repoKey]*discovery.ResolvedRef)
 	repoErrors := make(map[repoKey]bool)
+	pathSkills := make(map[skillPathKey]*discovery.Skill)
+	pathErrors := make(map[skillPathKey]error)
 
 	for _, s := range installed {
 		if s.owner == "" || s.repo == "" {
@@ -269,7 +275,7 @@ func updateRun(opts *UpdateOptions) error {
 			continue
 		}
 
-		// Resolve ref and discover skills once per repo
+		// Resolve ref once per repo.
 		if _, ok := repoRefs[key]; !ok {
 			resolved, resolveErr := discovery.ResolveRef(apiClient, s.repoHost, s.owner, s.repo, "")
 			if resolveErr != nil {
@@ -280,35 +286,77 @@ func updateRun(opts *UpdateOptions) error {
 				continue
 			}
 			repoRefs[key] = resolved
-
-			skills, discoverErr := discovery.DiscoverSkills(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA)
-			if discoverErr != nil {
-				repoErrors[key] = true
-				opts.IO.StopProgressIndicator()
-				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, discoverErr)
-				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
-				continue
-			}
-			repoSkills[key] = skills
 		}
 
 		resolved := repoRefs[key]
-		for _, remote := range repoSkills[key] {
-			matched := false
-			if s.sourcePath != "" {
-				matched = remote.Path == s.sourcePath
-			} else {
-				matched = remote.InstallName() == s.name
+		var remoteSkill *discovery.Skill
+
+		if s.sourcePath != "" && hasHiddenPathSegment(s.sourcePath) {
+			pathKey := skillPathKey{repoKey: key, path: s.sourcePath}
+			if pathErr, ok := pathErrors[pathKey]; ok {
+				opts.IO.StopProgressIndicator()
+				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, pathErr)
+				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+				continue
 			}
-			if matched && (remote.TreeSHA != s.treeSHA || opts.Force) {
-				updates = append(updates, pendingUpdate{
-					local:    s,
-					newSHA:   remote.TreeSHA,
-					resolved: resolved,
-					skill:    remote,
-				})
-				break
+
+			skill, ok := pathSkills[pathKey]
+			if !ok {
+				var discoverErr error
+				skill, discoverErr = discovery.DiscoverSkillByPathWithOptions(
+					apiClient,
+					s.repoHost,
+					s.owner,
+					s.repo,
+					resolved.SHA,
+					s.sourcePath,
+					discovery.DiscoverSkillByPathOptions{SkipDescription: true},
+				)
+				if discoverErr != nil {
+					pathErrors[pathKey] = discoverErr
+					opts.IO.StopProgressIndicator()
+					fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, discoverErr)
+					opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+					continue
+				}
+				pathSkills[pathKey] = skill
 			}
+			remoteSkill = skill
+		} else {
+			if _, ok := repoSkills[key]; !ok {
+				skills, discoverErr := discovery.DiscoverSkills(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA)
+				if discoverErr != nil {
+					repoErrors[key] = true
+					opts.IO.StopProgressIndicator()
+					fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, discoverErr)
+					opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+					continue
+				}
+				repoSkills[key] = skills
+			}
+
+			for i := range repoSkills[key] {
+				remote := &repoSkills[key][i]
+				matched := false
+				if s.sourcePath != "" {
+					matched = remote.Path == s.sourcePath
+				} else {
+					matched = remote.InstallName() == s.name
+				}
+				if matched {
+					remoteSkill = remote
+					break
+				}
+			}
+		}
+
+		if remoteSkill != nil && (remoteSkill.TreeSHA != s.treeSHA || opts.Force) {
+			updates = append(updates, pendingUpdate{
+				local:    s,
+				newSHA:   remoteSkill.TreeSHA,
+				resolved: resolved,
+				skill:    *remoteSkill,
+			})
 		}
 	}
 
@@ -636,6 +684,15 @@ func parseInstalledSkill(data []byte, name, dir string, host *registry.AgentHost
 	}
 
 	return s, true
+}
+
+func hasHiddenPathSegment(p string) bool {
+	for _, segment := range strings.Split(p, "/") {
+		if strings.HasPrefix(segment, ".") {
+			return true
+		}
+	}
+	return false
 }
 
 // promptForSkillOrigin asks the user for the source repository of a skill

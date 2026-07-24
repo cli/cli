@@ -555,6 +555,64 @@ func TestUpdateRun(t *testing.T) {
 			wantStderr: "All skills are up to date.",
 		},
 		{
+			name: "path-based update finds hidden source path",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "gh-address-comments")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				skillContent := `---
+name: gh-address-comments
+metadata:
+  github-repo: https://github.com/openai/skills
+  github-tree-sha: oldtree123
+  github-path: skills/.curated/gh-address-comments
+---
+Installed content
+`
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillContent), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/openai/skills/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/openai/skills/git/ref/tags/v1.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "commitsha123", "type": "commit"}}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/openai/skills/contents/skills%2F.curated"),
+					httpmock.JSONResponse([]map[string]interface{}{
+						{"name": "gh-address-comments", "path": "skills/.curated/gh-address-comments", "sha": "newtree456", "type": "dir"},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/openai/skills/git/trees/newtree456"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "newtree456", "truncated": false,
+						"tree": []map[string]interface{}{
+							{"path": "SKILL.md", "type": "blob", "sha": "blobsha2"},
+						},
+					}))
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(true)
+				ios.SetStderrTTY(true)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					Prompter:  &prompter.PrompterMock{},
+					GitClient: &git.Client{RepoDir: dir},
+					Dir:       dir,
+					DryRun:    true,
+				}
+			},
+			wantStderr: "1 update(s) available:",
+			wantStdout: "gh-address-comments",
+		},
+		{
 			name: "dry run reports available updates",
 			setup: func(t *testing.T, dir string) {
 				t.Helper()
