@@ -1,6 +1,6 @@
-## MacOS Keyring Security
+# macOS Keyring Security
 
-This document describes how the GitHub CLI uses the MacOS keyring, and related security notes.
+This document describes how the GitHub CLI uses the macOS keyring, and related security notes.
 
 The GitHub CLI updates the keyring on the following commands:
  * `gh auth login` (store a new token)
