@@ -78,7 +78,7 @@ type ExtensionManagerMock struct {
 	UpdateDirFunc func(name string) string
 
 	// UpgradeFunc mocks the Upgrade method.
-	UpgradeFunc func(name string, force bool) error
+	UpgradeFunc func(name string, opts UpgradeOptions) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -132,8 +132,8 @@ type ExtensionManagerMock struct {
 		Upgrade []struct {
 			// Name is the name argument value.
 			Name string
-			// Force is the force argument value.
-			Force bool
+			// Opts is the opts argument value.
+			Opts UpgradeOptions
 		}
 	}
 	lockCreate           sync.RWMutex
@@ -414,21 +414,21 @@ func (mock *ExtensionManagerMock) UpdateDirCalls() []struct {
 }
 
 // Upgrade calls UpgradeFunc.
-func (mock *ExtensionManagerMock) Upgrade(name string, force bool) error {
+func (mock *ExtensionManagerMock) Upgrade(name string, opts UpgradeOptions) error {
 	if mock.UpgradeFunc == nil {
 		panic("ExtensionManagerMock.UpgradeFunc: method is nil but ExtensionManager.Upgrade was just called")
 	}
 	callInfo := struct {
-		Name  string
-		Force bool
+		Name string
+		Opts UpgradeOptions
 	}{
-		Name:  name,
-		Force: force,
+		Name: name,
+		Opts: opts,
 	}
 	mock.lockUpgrade.Lock()
 	mock.calls.Upgrade = append(mock.calls.Upgrade, callInfo)
 	mock.lockUpgrade.Unlock()
-	return mock.UpgradeFunc(name, force)
+	return mock.UpgradeFunc(name, opts)
 }
 
 // UpgradeCalls gets all the calls that were made to Upgrade.
@@ -436,12 +436,12 @@ func (mock *ExtensionManagerMock) Upgrade(name string, force bool) error {
 //
 //	len(mockedExtensionManager.UpgradeCalls())
 func (mock *ExtensionManagerMock) UpgradeCalls() []struct {
-	Name  string
-	Force bool
+	Name string
+	Opts UpgradeOptions
 } {
 	var calls []struct {
-		Name  string
-		Force bool
+		Name string
+		Opts UpgradeOptions
 	}
 	mock.lockUpgrade.RLock()
 	calls = mock.calls.Upgrade

@@ -59,9 +59,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		Aliases: []string{"extensions", "ext"},
 	}
 
-	upgradeFunc := func(name string, flagForce bool) error {
+	upgradeFunc := func(name string, opts extensions.UpgradeOptions) error {
 		cs := io.ColorScheme()
-		err := m.Upgrade(name, flagForce)
+		err := m.Upgrade(name, opts)
 		if err != nil {
 			if name != "" {
 				fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
@@ -379,7 +379,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName(), repo.RepoOwner()); err != nil {
 						// If an existing extension was found and --force was specified, attempt to upgrade.
 						if forceFlag && ext != nil {
-							return upgradeFunc(ext.Name(), forceFlag)
+							return upgradeFunc(ext.Name(), extensions.UpgradeOptions{Force: forceFlag})
 						}
 
 						if errors.Is(err, alreadyInstalledError) {
@@ -426,6 +426,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			var flagAll bool
 			var flagForce bool
 			var flagDryRun bool
+			var flagLatestPreRelease bool
+			var flagPin string
+
 			cmd := &cobra.Command{
 				Use:   "upgrade {<name> | --all}",
 				Short: "Upgrade installed extensions",
@@ -439,6 +442,12 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if len(args) > 1 {
 						return cmdutil.FlagErrorf("too many arguments")
 					}
+					if flagPin != "" && flagAll {
+						return cmdutil.FlagErrorf("cannot use `--pin` with `--all`")
+					}
+					if flagPin != "" && flagLatestPreRelease {
+						return cmdutil.FlagErrorf("cannot use `--pin` with `--latest-pre-release`")
+					}
 					return nil
 				},
 				RunE: func(cmd *cobra.Command, args []string) error {
@@ -449,12 +458,18 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if flagDryRun {
 						m.EnableDryRunMode()
 					}
-					return upgradeFunc(name, flagForce)
+					return upgradeFunc(name, extensions.UpgradeOptions{
+						Force:            flagForce,
+						LatestPreRelease: flagLatestPreRelease,
+						PinVersion:       flagPin,
+					})
 				},
 			}
 			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")
 			cmd.Flags().BoolVar(&flagForce, "force", false, "Force upgrade extension")
 			cmd.Flags().BoolVar(&flagDryRun, "dry-run", false, "Only display upgrades")
+			cmd.Flags().BoolVar(&flagLatestPreRelease, "latest-pre-release", false, "Upgrade to the latest release, including pre-releases (binary extensions only)")
+			cmd.Flags().StringVar(&flagPin, "pin", "", "Upgrade to and pin a specific release tag (binary extensions only)")
 			return cmd
 		}(),
 		&cobra.Command{

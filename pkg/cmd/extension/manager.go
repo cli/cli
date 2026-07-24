@@ -287,6 +287,13 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 		return err
 	}
 
+	return m.installBinRelease(repo, r, isPinned)
+}
+
+// installBinRelease downloads and installs the appropriate asset from an
+// already-resolved release, writing a manifest that records whether the
+// extension is pinned to that release.
+func (m *Manager) installBinRelease(repo ghrepo.Interface, r *release, isPinned bool) error {
 	platform, ext := m.platform()
 	isMacARM := platform == "darwin-arm64"
 	trueARMBinary := false
@@ -339,14 +346,14 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	}
 
 	targetDir := filepath.Join(m.installDir(), name)
-	if err = os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("failed to create installation directory: %w", err)
 	}
 
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	err = downloadAsset(m.client, *asset, binPath)
+	err := downloadAsset(m.client, *asset, binPath)
 	if err != nil {
 		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
 	}
@@ -451,7 +458,7 @@ var localExtensionUpgradeError = errors.New("local extensions can not be upgrade
 var upToDateError = errors.New("already up to date")
 var noExtensionsInstalledError = errors.New("no extensions installed")
 
-func (m *Manager) Upgrade(name string, force bool) error {
+func (m *Manager) Upgrade(name string, opts extensions.UpgradeOptions) error {
 	// Fetch metadata during list only when upgrading all extensions.
 	// This is a performance improvement so that we don't make a
 	// bunch of unnecessary network requests when trying to upgrade a single extension.
@@ -461,7 +468,7 @@ func (m *Manager) Upgrade(name string, force bool) error {
 		return noExtensionsInstalledError
 	}
 	if name == "" {
-		return m.upgradeExtensions(exts, force)
+		return m.upgradeExtensions(exts, opts)
 	}
 	for _, f := range exts {
 		if f.Name() != name {
@@ -471,15 +478,19 @@ func (m *Manager) Upgrade(name string, force bool) error {
 			return localExtensionUpgradeError
 		}
 		// For single extensions manually retrieve latest version since we forgo doing it during list.
-		if latestVersion := f.LatestVersion(); latestVersion == "" {
-			return fmt.Errorf("unable to retrieve latest version for extension %q", name)
+		// When resolving a pin or the latest pre-release we defer version resolution to the upgrade
+		// itself, so the stable "latest" lookup is not required (and may not exist).
+		if opts.PinVersion == "" && !opts.LatestPreRelease {
+			if latestVersion := f.LatestVersion(); latestVersion == "" {
+				return fmt.Errorf("unable to retrieve latest version for extension %q", name)
+			}
 		}
-		return m.upgradeExtensions([]*Extension{f}, force)
+		return m.upgradeExtensions([]*Extension{f}, opts)
 	}
 	return fmt.Errorf("no extension matched %q", name)
 }
 
-func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
+func (m *Manager) upgradeExtensions(exts []*Extension, opts extensions.UpgradeOptions) error {
 	var longestExt = slices.MaxFunc(exts, func(a, b *Extension) int {
 		return len(a.Name()) - len(b.Name())
 	})
@@ -489,7 +500,7 @@ func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
 	for _, f := range exts {
 		fmt.Fprintf(m.io.Out, "[%*s]: ", longestExtName, f.Name())
 		currentVersion := displayExtensionVersion(f, f.CurrentVersion())
-		err := m.upgradeExtension(f, force)
+		err := m.upgradeExtension(f, opts)
 		if err != nil {
 			if !errors.Is(err, localExtensionUpgradeError) &&
 				!errors.Is(err, upToDateError) &&
@@ -512,35 +523,42 @@ func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
 	return nil
 }
 
-func (m *Manager) upgradeExtension(ext *Extension, force bool) error {
+func (m *Manager) upgradeExtension(ext *Extension, opts extensions.UpgradeOptions) error {
 	if ext.IsLocal() {
 		return localExtensionUpgradeError
 	}
-	if !force && ext.IsPinned() {
+	// Pinned extensions are only upgraded with --force or when explicitly
+	// re-pinned to a new version via --pin.
+	if !opts.Force && opts.PinVersion == "" && ext.IsPinned() {
 		return pinnedExtensionUpgradeError
 	}
+
+	if ext.IsBinary() {
+		return m.upgradeBinExtension(ext, opts)
+	}
+
+	// Release-based selection is only meaningful for binary extensions.
+	if opts.LatestPreRelease || opts.PinVersion != "" {
+		return errors.New("the --pin and --latest-pre-release flags are only supported for binary extensions")
+	}
+
 	if !ext.UpdateAvailable() {
 		return upToDateError
 	}
-	var err error
-	if ext.IsBinary() {
-		err = m.upgradeBinExtension(ext)
-	} else {
-		// Check if git extension has changed to a binary extension
-		var isBin bool
-		repo, repoErr := repoFromPath(m.gitClient, filepath.Join(ext.Path(), ".."))
-		if repoErr == nil {
-			isBin, _ = isBinExtension(m.client, repo)
-		}
-		if isBin {
-			if err := m.Remove(ext.Name()); err != nil {
-				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
-			}
-			return m.installBin(repo, "")
-		}
-		err = m.upgradeGitExtension(ext, force)
+
+	// Check if git extension has changed to a binary extension
+	var isBin bool
+	repo, repoErr := repoFromPath(m.gitClient, filepath.Join(ext.Path(), ".."))
+	if repoErr == nil {
+		isBin, _ = isBinExtension(m.client, repo)
 	}
-	return err
+	if isBin {
+		if err := m.Remove(ext.Name()); err != nil {
+			return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
+		}
+		return m.installBin(repo, "")
+	}
+	return m.upgradeGitExtension(ext, opts.Force)
 }
 
 func (m *Manager) upgradeGitExtension(ext *Extension, force bool) error {
@@ -562,12 +580,45 @@ func (m *Manager) upgradeGitExtension(ext *Extension, force bool) error {
 	return scopedClient.Pull("", "")
 }
 
-func (m *Manager) upgradeBinExtension(ext *Extension) error {
+func (m *Manager) upgradeBinExtension(ext *Extension, opts extensions.UpgradeOptions) error {
 	repo, err := ghrepo.FromFullName(ext.URL())
 	if err != nil {
 		return fmt.Errorf("failed to parse URL %s: %w", ext.URL(), err)
 	}
-	return m.installBin(repo, "")
+
+	// Pinning installs the requested release regardless of the currently
+	// installed version, allowing intentional pinning to (or downgrading to) a
+	// specific release.
+	if opts.PinVersion != "" {
+		if ext.CurrentVersion() == opts.PinVersion && ext.IsPinned() {
+			return upToDateError
+		}
+		if err := m.installBin(repo, opts.PinVersion); err != nil {
+			return err
+		}
+		ext.latestVersion = opts.PinVersion
+		return nil
+	}
+
+	var target *release
+	if opts.LatestPreRelease {
+		target, err = fetchLatestPrerelease(m.client, repo)
+	} else {
+		target, err = fetchLatestRelease(m.client, repo)
+	}
+	if err != nil {
+		return err
+	}
+
+	if ext.CurrentVersion() == target.Tag {
+		return upToDateError
+	}
+
+	if err := m.installBinRelease(repo, target, false); err != nil {
+		return err
+	}
+	ext.latestVersion = target.Tag
+	return nil
 }
 
 func (m *Manager) Remove(name string) error {

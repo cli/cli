@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/hashicorp/go-version"
 )
 
 func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
@@ -69,8 +70,10 @@ type releaseAsset struct {
 }
 
 type release struct {
-	Tag    string `json:"tag_name"`
-	Assets []releaseAsset
+	Tag          string `json:"tag_name"`
+	IsPrerelease bool   `json:"prerelease"`
+	IsDraft      bool   `json:"draft"`
+	Assets       []releaseAsset
 }
 
 // downloadAsset downloads a single asset to the given file path.
@@ -145,6 +148,68 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 	}
 
 	return &r, nil
+}
+
+// fetchLatestPrerelease finds the highest-versioned published release for a
+// repository, including pre-releases. Releases are compared by version order so
+// that a stable release still wins when it is newer than any pre-release.
+func fetchLatestPrerelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
+	path := fmt.Sprintf("repos/%s/%s/releases", baseRepo.RepoOwner(), baseRepo.RepoName())
+	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, releaseNotFoundErr
+	}
+	if resp.StatusCode > 299 {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var releases []release
+	if err := json.Unmarshal(b, &releases); err != nil {
+		return nil, err
+	}
+
+	var best *release
+	var bestVersion *version.Version
+	var bestParsed bool
+	for i := range releases {
+		r := &releases[i]
+		if r.IsDraft {
+			continue
+		}
+		if best == nil {
+			best = r
+		}
+		v, verr := version.NewVersion(r.Tag)
+		if verr != nil {
+			continue
+		}
+		if !bestParsed || v.GreaterThan(bestVersion) {
+			best = r
+			bestVersion = v
+			bestParsed = true
+		}
+	}
+
+	if best == nil {
+		return nil, releaseNotFoundErr
+	}
+	return best, nil
 }
 
 // fetchReleaseFromTag finds release by tag name for a repository
