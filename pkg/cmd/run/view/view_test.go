@@ -2799,6 +2799,14 @@ func TestCopyLogWithLinePrefix_TerminalEscapeSequences(t *testing.T) {
 	}
 }
 
+func TestCopyLogWithLinePrefix_StripsCSISequences(t *testing.T) {
+	var buf bytes.Buffer
+	err := copyLogWithLinePrefix(&buf, strings.NewReader("\x1b[1;93mcolored text\x1b[0m normal text \x1b[21tafter\n"), "jobname\tstep\t")
+	require.NoError(t, err)
+
+	assert.Equal(t, "jobname\tstep\tcolored text normal text after\n", buf.String())
+}
+
 func TestRunLog(t *testing.T) {
 	t.Run("when the cache dir doesn't exist, exists return false", func(t *testing.T) {
 		cacheDir := t.TempDir() + "/non-existent-dir"

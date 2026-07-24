@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	termansi "github.com/charmbracelet/x/ansi"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -581,10 +582,14 @@ func displayLogSegments(w io.Writer, segments []logSegment) error {
 }
 
 func copyLogWithLinePrefix(w io.Writer, r io.Reader, prefix string) error {
-	sanitized := transform.NewReader(r, &asciisanitizer.Sanitizer{})
-	scanner := bufio.NewScanner(sanitized)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
+		stripped := termansi.Strip(scanner.Text())
+		sanitized, _, err := transform.String(&asciisanitizer.Sanitizer{}, stripped)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%s%s\n", prefix, sanitized)
 	}
-	return nil
+	return scanner.Err()
 }
