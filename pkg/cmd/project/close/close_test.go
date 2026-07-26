@@ -792,7 +792,7 @@ func matchCloseProjectV2Request(projectID string, closed bool) gock.MatchFunc {
 			} `json:"variables"`
 		}
 		if err := json.Unmarshal(body, &payload); err != nil {
-			return false, nil
+			return false, err
 		}
 
 		return strings.Contains(payload.Query, "mutation CloseProjectV2") &&
