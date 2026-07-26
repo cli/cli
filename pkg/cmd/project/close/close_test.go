@@ -1,6 +1,10 @@
 package close
 
 import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/prompter"
@@ -612,7 +616,7 @@ func TestRunClose_PromptFiltersOpenProjects(t *testing.T) {
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		BodyString(`{"query":"mutation CloseProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"open-project-ID","closed":true}}}`).
+		AddMatcher(matchCloseProjectV2Request("open-project-ID", true)).
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
@@ -720,7 +724,7 @@ func TestRunClose_PromptFiltersClosedProjectsOnUndo(t *testing.T) {
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		BodyString(`{"query":"mutation CloseProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"closed-project-ID","closed":false}}}`).
+		AddMatcher(matchCloseProjectV2Request("closed-project-ID", false)).
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
@@ -765,4 +769,38 @@ func TestRunClose_PromptFiltersClosedProjectsOnUndo(t *testing.T) {
 	err := runClose(config)
 	assert.NoError(t, err)
 	assert.Equal(t, "http://closed-url.com\n", stdout.String())
+}
+
+func matchCloseProjectV2Request(projectID string, closed bool) gock.MatchFunc {
+	return func(req *http.Request, _ *gock.Request) (bool, error) {
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return false, err
+		}
+
+		var payload struct {
+			Query     string `json:"query"`
+			Variables struct {
+				AfterFields *string `json:"afterFields"`
+				AfterItems  *string `json:"afterItems"`
+				FirstFields int     `json:"firstFields"`
+				FirstItems  int     `json:"firstItems"`
+				Input       struct {
+					ProjectID string `json:"projectId"`
+					Closed    bool   `json:"closed"`
+				} `json:"input"`
+			} `json:"variables"`
+		}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return false, nil
+		}
+
+		return strings.Contains(payload.Query, "mutation CloseProjectV2") &&
+			payload.Variables.AfterFields == nil &&
+			payload.Variables.AfterItems == nil &&
+			payload.Variables.FirstFields == 0 &&
+			payload.Variables.FirstItems == 0 &&
+			payload.Variables.Input.ProjectID == projectID &&
+			payload.Variables.Input.Closed == closed, nil
+	}
 }
