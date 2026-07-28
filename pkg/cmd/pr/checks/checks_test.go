@@ -60,6 +60,15 @@ func TestNewCmdChecks(t *testing.T) {
 			},
 		},
 		{
+			name: "quiet watch flag",
+			cli:  "--watch --quiet",
+			wants: ChecksOptions{
+				Watch:    true,
+				Quiet:    true,
+				Interval: time.Duration(10000000000),
+			},
+		},
+		{
 			name:       "interval flag without watch flag",
 			cli:        "--interval 5",
 			wantsError: "cannot use `--interval` flag without `--watch` flag",
@@ -123,6 +132,7 @@ func TestNewCmdChecks(t *testing.T) {
 			assert.Equal(t, tt.wants.Watch, gotOpts.Watch)
 			assert.Equal(t, tt.wants.Interval, gotOpts.Interval)
 			assert.Equal(t, tt.wants.Required, gotOpts.Required)
+			assert.Equal(t, tt.wants.Quiet, gotOpts.Quiet)
 			assert.Equal(t, tt.wants.FailFast, gotOpts.FailFast)
 		})
 	}
@@ -133,6 +143,8 @@ func Test_checksRun(t *testing.T) {
 		name            string
 		tty             bool
 		watch           bool
+		quiet           bool
+		interval        time.Duration
 		failFast        bool
 		required        bool
 		disableDetector bool
@@ -271,6 +283,33 @@ func Test_checksRun(t *testing.T) {
 				✓  cool tests                  1m26s    sweet link
 				✓  rad tests                   1m26s    sweet link
 			`, "\x1b"),
+			wantErr: "",
+		},
+		{
+			name:     "quiet watch until checks finish",
+			tty:      true,
+			watch:    true,
+			quiet:    true,
+			interval: time.Nanosecond,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/somePending.json"),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/allPassing.json"),
+				)
+			},
+			wantOut: heredoc.Doc(`
+				All checks were successful
+				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
+
+				   NAME           DESCRIPTION  ELAPSED  URL
+				✓  awesome tests               1m26s    sweet link
+				✓  cool tests                  1m26s    sweet link
+				✓  rad tests                   1m26s    sweet link
+			`),
 			wantErr: "",
 		},
 		{
@@ -600,6 +639,8 @@ func Test_checksRun(t *testing.T) {
 				Finder:      shared.NewMockFinder("123", response, ghrepo.New("OWNER", "REPO")),
 				Detector:    detector,
 				Watch:       tt.watch,
+				Quiet:       tt.quiet,
+				Interval:    tt.interval,
 				FailFast:    tt.failFast,
 				Required:    tt.required,
 			}

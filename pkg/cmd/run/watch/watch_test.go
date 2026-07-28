@@ -66,6 +66,15 @@ func TestNewCmdWatch(t *testing.T) {
 				Compact:  true,
 			},
 		},
+		{
+			name: "quiet status",
+			cli:  "1234 --quiet",
+			wants: WatchOptions{
+				Interval: defaultInterval,
+				RunID:    "1234",
+				Quiet:    true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -103,6 +112,7 @@ func TestNewCmdWatch(t *testing.T) {
 			assert.Equal(t, tt.wants.Prompt, gotOpts.Prompt)
 			assert.Equal(t, tt.wants.ExitStatus, gotOpts.ExitStatus)
 			assert.Equal(t, tt.wants.Interval, gotOpts.Interval)
+			assert.Equal(t, tt.wants.Quiet, gotOpts.Quiet)
 		})
 	}
 }
@@ -287,6 +297,24 @@ func TestWatchRun(t *testing.T) {
 					})
 			},
 			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[?1049l✓ trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run CI (2) completed with 'success'\n",
+		},
+		{
+			name: "quiet until run completes",
+			tty:  true,
+			opts: &WatchOptions{
+				Interval: 0,
+				Prompt:   true,
+				Quiet:    true,
+			},
+			httpStubs: successfulRunStubs,
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"* commit1, CI [trunk] Feb 23, 2021", "* commit2, CI [trunk] Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "* commit2, CI [trunk] Feb 23, 2021")
+					})
+			},
+			wantOut: "✓ trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run CI (2) completed with 'success'\n",
 		},
 		{
 			name: "exit status respected",

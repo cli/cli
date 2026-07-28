@@ -29,6 +29,7 @@ type WatchOptions struct {
 	Interval   int
 	ExitStatus bool
 	Compact    bool
+	Quiet      bool
 
 	Prompt bool
 
@@ -86,6 +87,7 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	}
 	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run fails")
 	cmd.Flags().BoolVar(&opts.Compact, "compact", false, "Show only relevant/failed steps")
+	cmd.Flags().BoolVar(&opts.Quiet, "quiet", false, "Suppress intermediate progress updates and print only the final status")
 	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", defaultInterval, "Refresh interval in seconds")
 
 	return cmd
@@ -157,7 +159,9 @@ func watchRun(opts *WatchOptions) error {
 	}
 
 	out := &bytes.Buffer{}
-	opts.IO.StartAlternateScreenBuffer()
+	if !opts.Quiet {
+		opts.IO.StartAlternateScreenBuffer()
+	}
 	for run.Status != shared.Completed {
 		// Write to a temporary buffer to reduce total number of fetches
 		run, err = renderRun(out, *opts, client, repo, run, prNumber, annotationCache)
@@ -169,17 +173,22 @@ func watchRun(opts *WatchOptions) error {
 			break
 		}
 
-		// If not completed, refresh the screen buffer and write the temporary buffer to stdout
-		opts.IO.RefreshScreen()
+		if !opts.Quiet {
+			// If not completed, refresh the screen buffer and write the temporary buffer to stdout
+			opts.IO.RefreshScreen()
 
-		fmt.Fprintln(opts.IO.Out, cs.Boldf("Refreshing run status every %d seconds. Press Ctrl+C to quit.", opts.Interval))
-		fmt.Fprintln(opts.IO.Out)
+			fmt.Fprintln(opts.IO.Out, cs.Boldf("Refreshing run status every %d seconds. Press Ctrl+C to quit.", opts.Interval))
+			fmt.Fprintln(opts.IO.Out)
 
-		_, err = io.Copy(opts.IO.Out, out)
-		out.Reset()
+			_, err = io.Copy(opts.IO.Out, out)
+			out.Reset()
 
-		if err != nil {
-			break
+			if err != nil {
+				break
+			}
+		} else {
+			// Discard intermediate output so only the final status is printed.
+			out.Reset()
 		}
 
 		time.Sleep(duration)

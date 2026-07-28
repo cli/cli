@@ -45,6 +45,7 @@ type ChecksOptions struct {
 	WebMode     bool
 	Interval    time.Duration
 	Watch       bool
+	Quiet       bool
 	FailFast    bool
 	Required    bool
 }
@@ -116,6 +117,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
 	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks until they finish")
+	cmd.Flags().BoolVar(&opts.Quiet, "quiet", false, "Suppress intermediate status logs and progress indicators during execution or watch mode")
 	cmd.Flags().BoolVarP(&opts.FailFast, "fail-fast", "", false, "Exit watch mode on first check failure")
 	cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds in watch mode")
 	cmd.Flags().BoolVar(&opts.Required, "required", false, "Only show checks that are required")
@@ -190,9 +192,10 @@ func checksRun(opts *ChecksOptions) error {
 		return opts.Exporter.Write(opts.IO, checks)
 	}
 
-	if opts.Watch {
+	quietWatch := opts.Watch && opts.Quiet
+	if opts.Watch && !quietWatch {
 		opts.IO.StartAlternateScreenBuffer()
-	} else {
+	} else if !opts.Watch {
 		// Only start pager in non-watch mode
 		if err := opts.IO.StartPager(); err == nil {
 			defer opts.IO.StopPager()
@@ -203,16 +206,18 @@ func checksRun(opts *ChecksOptions) error {
 
 	// Do not return err until we can StopAlternateScreenBuffer()
 	for {
-		if counts.Pending != 0 && opts.Watch {
-			opts.IO.RefreshScreen()
-			cs := opts.IO.ColorScheme()
-			fmt.Fprintln(opts.IO.Out, cs.Boldf("Refreshing checks status every %v seconds. Press Ctrl+C to quit.\n", opts.Interval.Seconds()))
-		}
+		if !quietWatch {
+			if counts.Pending != 0 && opts.Watch {
+				opts.IO.RefreshScreen()
+				cs := opts.IO.ColorScheme()
+				fmt.Fprintln(opts.IO.Out, cs.Boldf("Refreshing checks status every %v seconds. Press Ctrl+C to quit.\n", opts.Interval.Seconds()))
+			}
 
-		printSummary(opts.IO, counts)
-		err = printTable(opts.IO, checks)
-		if err != nil {
-			break
+			printSummary(opts.IO, counts)
+			err = printTable(opts.IO, checks)
+			if err != nil {
+				break
+			}
 		}
 
 		if counts.Pending == 0 || !opts.Watch {
