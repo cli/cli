@@ -240,6 +240,17 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	}
 	token, source := ghauth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
+		// GH_USER selects an already-authenticated account for this invocation,
+		// without mutating the stored active account (no `gh auth switch`), so
+		// concurrent shells/agents can act as different accounts from one shared
+		// config. GH_TOKEN still takes precedence above. Scoped to token
+		// resolution so it never corrupts the stored active user in switch/logout.
+		if envUser := os.Getenv("GH_USER"); envUser != "" {
+			if t, err := c.TokenFromKeyringForUser(hostname, envUser); err == nil {
+				return t, "keyring"
+			}
+			return "", ""
+		}
 		var user string
 		var err error
 		if user, err = c.ActiveUser(hostname); err == nil {

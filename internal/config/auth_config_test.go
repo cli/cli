@@ -947,3 +947,83 @@ func preMigrationLogin(c *AuthConfig, hostname, username, token, gitProtocol str
 	}
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
+
+func TestActiveTokenRespectsGHUser(t *testing.T) {
+	// Given two users authenticated in the keyring (test-user-2 active)
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
+	require.NoError(t, err)
+
+	// When GH_USER selects the non-active user
+	t.Setenv("GH_USER", "test-user-1")
+
+	// Then ActiveToken returns that user's token from the keyring
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "test-token-1", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestActiveTokenGHUserDoesNotChangeStoredActiveUser(t *testing.T) {
+	// Given two users, test-user-2 active
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
+	require.NoError(t, err)
+
+	// When GH_USER points at the other user
+	t.Setenv("GH_USER", "test-user-1")
+
+	// Then the stored active user is unchanged (GH_USER is invocation-scoped)
+	activeUser, err := authCfg.ActiveUser("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "test-user-2", activeUser)
+}
+
+func TestActiveTokenGHTokenTakesPrecedenceOverGHUser(t *testing.T) {
+	// Given a keyring user and both env vars set
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+	t.Setenv("GH_TOKEN", "env-token")
+	t.Setenv("GH_USER", "test-user-1")
+
+	// Then GH_TOKEN wins
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "env-token", token)
+	require.Equal(t, "GH_TOKEN", source)
+}
+
+func TestActiveTokenGHUserUnauthenticatedReturnsNoToken(t *testing.T) {
+	// Given one authenticated user
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+
+	// When GH_USER names an account with no stored token
+	t.Setenv("GH_USER", "nobody")
+
+	// Then no token is returned, rather than silently falling back to another account
+	token, _ := authCfg.ActiveToken("github.com")
+	require.Empty(t, token)
+}
+
+func TestSwitchUserStillWorksWithGHUserSet(t *testing.T) {
+	// Given two users and GH_USER pointing at one of them
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
+	require.NoError(t, err)
+	t.Setenv("GH_USER", "test-user-1")
+
+	// When we switch the stored active user
+	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
+
+	// Then the stored active user reflects the real switch (GH_USER never leaks in)
+	activeUser, err := authCfg.ActiveUser("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "test-user-1", activeUser)
+}
