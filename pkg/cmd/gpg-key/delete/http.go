@@ -1,12 +1,9 @@
 package delete
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -16,59 +13,30 @@ type gpgKey struct {
 }
 
 func deleteGPGKey(httpClient *http.Client, host, id string) error {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "user", "gpg_keys", id)
+	path, err := safeurl.JoinPath("user", "gpg_keys", id)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("DELETE", url.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-
-	return nil
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	return api.NewClientFromHTTP(httpClient).REST(host, "DELETE", path.String(), nil, nil)
 }
 
 func getGPGKeys(httpClient *http.Client, host string) ([]gpgKey, error) {
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "user", "gpg_keys")
+	u, err := safeurl.JoinPath("user", "gpg_keys")
 	if err != nil {
 		return nil, err
 	}
 	u.SetQuery("per_page", "100")
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 
 	var keys []gpgKey
-	err = json.Unmarshal(b, &keys)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(host, "GET", u.String(), nil, &keys)
 	if err != nil {
 		return nil, err
 	}
-
 	return keys, nil
 }
