@@ -1057,3 +1057,124 @@ func TestActiveTokenGHUserDoesNotLeakLegacyTokenToOtherUser(t *testing.T) {
 	token, _ := authCfg.ActiveToken("github.com")
 	require.Empty(t, token)
 }
+
+func TestActiveTokenGHUserEmptyStringIsIgnored(t *testing.T) {
+	// Given an authenticated user
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "", true)
+	require.NoError(t, err)
+
+	// When GH_USER is set but empty (as `unset` in most shells)
+	t.Setenv("GH_USER", "")
+
+	// Then it is ignored and the stored active user's token is returned
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "test-token-1", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestActiveTokenGHUserSelectsCorrectAccountAmongThree(t *testing.T) {
+	// Given three authenticated users (test-user-3 active)
+	authCfg := newTestAuthConfig(t)
+	for _, u := range []struct{ name, token string }{
+		{"test-user-1", "token-1"}, {"test-user-2", "token-2"}, {"test-user-3", "token-3"},
+	} {
+		_, err := authCfg.Login("github.com", u.name, u.token, "", true)
+		require.NoError(t, err)
+	}
+
+	// When GH_USER selects the middle account
+	t.Setenv("GH_USER", "test-user-2")
+
+	// Then exactly that account's token is returned
+	token, _ := authCfg.ActiveToken("github.com")
+	require.Equal(t, "token-2", token)
+}
+
+func TestActiveTokenGHUserOverridesInsecureActiveUserToken(t *testing.T) {
+	// Given the active user is stored insecurely (token in config), and a
+	// different account is stored securely in the keyring
+	authCfg := newTestAuthConfig(t)
+	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "insecure-user")
+	authCfg.cfg.Set([]string{hostsKey, "github.com", oauthTokenKey}, "insecure-token")
+	require.NoError(t, keyring.Set(keyringServiceName("github.com"), "secure-user", "secure-token"))
+
+	// When GH_USER selects the secure account
+	t.Setenv("GH_USER", "secure-user")
+
+	// Then the keyring token wins over the active user's config token
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "secure-token", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestActiveTokenGHUserForInsecureActiveUserReturnsConfigToken(t *testing.T) {
+	// Given only an insecurely-stored active user (token in config, not keyring)
+	authCfg := newTestAuthConfig(t)
+	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "insecure-user")
+	authCfg.cfg.Set([]string{hostsKey, "github.com", oauthTokenKey}, "insecure-token")
+
+	// When GH_USER names that same active user
+	t.Setenv("GH_USER", "insecure-user")
+
+	// Then its config token is still returned (fall-through to normal resolution)
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "insecure-token", token)
+	require.Equal(t, oauthTokenKey, source)
+}
+
+func TestHasActiveTokenReflectsGHUser(t *testing.T) {
+	// Given two authenticated users
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "", true)
+	require.NoError(t, err)
+
+	// Then HasActiveToken is true for an authenticated GH_USER
+	t.Setenv("GH_USER", "test-user-1")
+	require.True(t, authCfg.HasActiveToken("github.com"))
+
+	// And false for an unauthenticated GH_USER
+	t.Setenv("GH_USER", "nobody")
+	require.False(t, authCfg.HasActiveToken("github.com"))
+}
+
+func TestActiveTokenGHUserResolvesPerHost(t *testing.T) {
+	// Given user-a on github.com and user-b on an enterprise host
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "user-a", "gh-token-a", "", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("ghe.example.com", "user-b", "ghe-token-b", "", true)
+	require.NoError(t, err)
+
+	// When GH_USER=user-b
+	t.Setenv("GH_USER", "user-b")
+
+	// Then the enterprise host resolves user-b's token
+	token, _ := authCfg.ActiveToken("ghe.example.com")
+	require.Equal(t, "ghe-token-b", token)
+
+	// And github.com (where user-b doesn't exist) yields no token, rather than
+	// leaking github.com's active user's (user-a's) token
+	token, _ = authCfg.ActiveToken("github.com")
+	require.Empty(t, token)
+}
+
+func TestActiveTokenGHUserSelectsPerHostAccountWithSameName(t *testing.T) {
+	// Given the same username authenticated on two hosts with different tokens
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "shared", "gh-token", "", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("ghe.example.com", "shared", "ghe-token", "", true)
+	require.NoError(t, err)
+
+	// When GH_USER=shared
+	t.Setenv("GH_USER", "shared")
+
+	// Then each host resolves its own token
+	tok1, _ := authCfg.ActiveToken("github.com")
+	require.Equal(t, "gh-token", tok1)
+	tok2, _ := authCfg.ActiveToken("ghe.example.com")
+	require.Equal(t, "ghe-token", tok2)
+}

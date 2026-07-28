@@ -239,28 +239,32 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 		return c.tokenOverride(hostname)
 	}
 	token, source := ghauth.TokenFromEnvOrConfig(hostname)
-	if token == "" {
-		// GH_USER selects an already-authenticated account for this invocation,
-		// without mutating the stored active account (no `gh auth switch`), so
-		// concurrent shells/agents can act as different accounts from one shared
-		// config. GH_TOKEN still takes precedence above. Scoped to token
-		// resolution so it never corrupts the stored active user in switch/logout.
-		if envUser := os.Getenv("GH_USER"); envUser != "" {
-			token, err := c.TokenFromKeyringForUser(hostname, envUser)
-			if err != nil {
-				// Legacy keyrings (set up by a very old CLI) store the active
-				// user's token in an unkeyed slot. Fall back to it only when
-				// GH_USER is that stored active user, so a different requested
-				// account never receives the active user's token.
-				if activeUser, activeErr := c.ActiveUser(hostname); activeErr == nil && activeUser == envUser {
-					token, err = c.TokenFromKeyring(hostname)
-				}
-			}
-			if err == nil {
-				return token, "keyring"
-			}
+
+	// A token supplied via the environment (GH_TOKEN/GITHUB_TOKEN) always wins.
+	if token != "" && source != oauthTokenKey {
+		return token, source
+	}
+
+	// GH_USER selects an already-authenticated account for this invocation,
+	// without mutating the stored active account (no `gh auth switch`), so
+	// concurrent shells/agents can act as different accounts from one shared
+	// config. It overrides the stored active account's config or keyring token,
+	// but not an environment token (handled above). Scoped here so it never
+	// corrupts the stored active user that switch/login/logout read and write.
+	if envUser := os.Getenv("GH_USER"); envUser != "" {
+		if userToken, err := c.TokenFromKeyringForUser(hostname, envUser); err == nil {
+			return userToken, "keyring"
+		}
+		// GH_USER's own token is not in the keyring. When GH_USER is the stored
+		// active user, fall through to normal resolution (its config token, or a
+		// legacy unkeyed keyring token). When it names a different account,
+		// return nothing rather than that account's stored active token.
+		if activeUser, err := c.ActiveUser(hostname); err != nil || activeUser != envUser {
 			return "", ""
 		}
+	}
+
+	if token == "" {
 		var user string
 		var err error
 		if user, err = c.ActiveUser(hostname); err == nil {
