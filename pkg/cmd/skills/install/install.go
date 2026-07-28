@@ -89,7 +89,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 
 			A wide range of AI coding agents are supported, including GitHub
 			Copilot, Claude Code, Cursor, Codex, Gemini CLI, Antigravity, Amp,
-			Goose, Grok, Junie, OpenCode, Windsurf, and many more.
+			Devin, Goose, Grok, Junie, OpenCode, and many more.
 
 			Supported %[1]s--agent%[1]s values:
 
