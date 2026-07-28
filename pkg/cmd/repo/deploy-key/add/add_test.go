@@ -2,11 +2,15 @@ package add
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_addRun(t *testing.T) {
@@ -82,4 +86,27 @@ func Test_addRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUploadDeployKeyHTTPError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("POST", "repos/OWNER/REPO/keys"),
+		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+	)
+
+	err := uploadDeployKey(
+		&http.Client{Transport: reg},
+		ghrepo.New("OWNER", "REPO"),
+		strings.NewReader("PUBKEY\n"),
+		"my sacred key",
+		false,
+	)
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
+	assert.Contains(t, err.Error(), "HTTP 404")
 }
