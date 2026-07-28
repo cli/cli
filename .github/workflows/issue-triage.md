@@ -45,6 +45,7 @@ safe-outputs:
     client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
     private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
   add-labels:
+    issue-intent: true
     max: 3
     allowed:
       - bug
