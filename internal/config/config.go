@@ -246,8 +246,18 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 		// config. GH_TOKEN still takes precedence above. Scoped to token
 		// resolution so it never corrupts the stored active user in switch/logout.
 		if envUser := os.Getenv("GH_USER"); envUser != "" {
-			if t, err := c.TokenFromKeyringForUser(hostname, envUser); err == nil {
-				return t, "keyring"
+			token, err := c.TokenFromKeyringForUser(hostname, envUser)
+			if err != nil {
+				// Legacy keyrings (set up by a very old CLI) store the active
+				// user's token in an unkeyed slot. Fall back to it only when
+				// GH_USER is that stored active user, so a different requested
+				// account never receives the active user's token.
+				if activeUser, activeErr := c.ActiveUser(hostname); activeErr == nil && activeUser == envUser {
+					token, err = c.TokenFromKeyring(hostname)
+				}
+			}
+			if err == nil {
+				return token, "keyring"
 			}
 			return "", ""
 		}

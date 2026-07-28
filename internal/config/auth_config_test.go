@@ -1027,3 +1027,33 @@ func TestSwitchUserStillWorksWithGHUserSet(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "test-user-1", activeUser)
 }
+
+func TestActiveTokenGHUserFallsBackToLegacyTokenForActiveUser(t *testing.T) {
+	// Given a legacy keyring: the active user's token lives only in the unkeyed
+	// slot (no per-user entry), as set up by a very old CLI
+	authCfg := newTestAuthConfig(t)
+	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user-1")
+	require.NoError(t, keyring.Set(keyringServiceName("github.com"), "", "legacy-token"))
+
+	// When GH_USER names that same stored active user
+	t.Setenv("GH_USER", "test-user-1")
+
+	// Then the legacy unkeyed token is still returned (fallback preserved)
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "legacy-token", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestActiveTokenGHUserDoesNotLeakLegacyTokenToOtherUser(t *testing.T) {
+	// Given a legacy keyring whose unkeyed token belongs to the active user
+	authCfg := newTestAuthConfig(t)
+	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user-1")
+	require.NoError(t, keyring.Set(keyringServiceName("github.com"), "", "legacy-token"))
+
+	// When GH_USER names a different account
+	t.Setenv("GH_USER", "test-user-2")
+
+	// Then no token is returned - the legacy token is not handed to another user
+	token, _ := authCfg.ActiveToken("github.com")
+	require.Empty(t, token)
+}
