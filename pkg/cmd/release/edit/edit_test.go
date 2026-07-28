@@ -2,12 +2,14 @@ package edit
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -444,7 +446,8 @@ func Test_editRun(t *testing.T) {
 			defer fakeHTTP.Verify(t)
 			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", "v1.2.3", `{
 				"id": 12345,
-				"tag_name": "v1.2.3"
+				"tag_name": "v1.2.3",
+				"url": "https://api.github.com/repos/OWNER/REPO/releases/12345"
 			}`)
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, fakeHTTP)
@@ -479,6 +482,99 @@ func mockSuccessfulEditResponse(reg *httpmock.Registry, cb func(params map[strin
 	}`, cb)
 	reg.Register(matcher, responder)
 }
+
+func Test_editRelease_httpError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		func(req *http.Request) bool {
+			return req.Method == http.MethodPatch &&
+				req.URL.EscapedPath() == "/repos/OWNER/REPO/releases/12345" &&
+				req.URL.Host == "api.github.com"
+		},
+		httpmock.StatusStringResponse(404, `{"message":"Not Found"}`),
+	)
+
+	httpClient := &http.Client{Transport: reg}
+	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]interface{}{"tag_name": "v1.2.3"})
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
+	assert.Contains(t, err.Error(), "HTTP 404")
+	assert.Nil(t, release)
+}
+
+func Test_editRelease_decodeError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		func(req *http.Request) bool {
+			return req.Method == http.MethodPatch &&
+				req.URL.EscapedPath() == "/repos/OWNER/REPO/releases/12345" &&
+				req.URL.Host == "api.github.com"
+		},
+		httpmock.StatusStringResponse(200, `{`),
+	)
+
+	httpClient := &http.Client{Transport: reg}
+	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]interface{}{"tag_name": "v1.2.3"})
+
+	require.Error(t, err)
+	assert.NotNil(t, release) // decode was attempted - non-nil pointer even on decode error
+}
+
+func Test_editRelease_204(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		func(req *http.Request) bool {
+			return req.Method == http.MethodPatch &&
+				req.URL.EscapedPath() == "/repos/OWNER/REPO/releases/12345" &&
+				req.URL.Host == "api.github.com"
+		},
+		httpmock.StatusStringResponse(204, ""),
+	)
+
+	httpClient := &http.Client{Transport: reg}
+	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]interface{}{"tag_name": "v1.2.3"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unexpected end of JSON input")
+	assert.NotNil(t, release)
+}
+
+func Test_editRelease_bodyReadError(t *testing.T) {
+	readErr := errors.New("read: connection reset by peer")
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		func(req *http.Request) bool {
+			return req.Method == http.MethodPatch &&
+				req.URL.EscapedPath() == "/repos/OWNER/REPO/releases/12345" &&
+				req.URL.Host == "api.github.com"
+		},
+		func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(errorReader{err: readErr}),
+				Header:     http.Header{},
+			}, nil
+		},
+	)
+
+	httpClient := &http.Client{Transport: reg}
+	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]interface{}{"tag_name": "v1.2.3"})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, readErr)
+	assert.Nil(t, release)
+}
+
+// errorReader always returns the given error on Read, used to simulate body read failures.
+type errorReader struct{ err error }
+
+func (e errorReader) Read(_ []byte) (int, error) { return 0, e.err }
 
 func boolPtr(b bool) *bool {
 	return &b
