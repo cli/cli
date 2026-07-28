@@ -22,6 +22,7 @@ import (
 	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
+	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -74,7 +75,41 @@ func TestJSONFields(t *testing.T) {
 		"title",
 		"updatedAt",
 		"url",
+		"viewerSubscription",
 	})
+}
+
+func TestPRView_json_ViewerSubscription(t *testing.T) {
+	subscribed := githubv4.SubscriptionStateSubscribed
+	tests := []struct {
+		name               string
+		viewerSubscription *githubv4.SubscriptionState
+		want               string
+	}{
+		{
+			name:               "subscribed",
+			viewerSubscription: &subscribed,
+			want:               `{"viewerSubscription":"SUBSCRIBED"}`,
+		},
+		{
+			name: "not reported",
+			want: `{"viewerSubscription":null}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			pr := &api.PullRequest{ViewerSubscription: tt.viewerSubscription}
+			shared.StubFinderForRunCommandStyleTests(t, "12", pr, ghrepo.New("OWNER", "REPO"))
+
+			output, err := runCommand(reg, "", false, `12 --json viewerSubscription`)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want, output.String())
+		})
+	}
 }
 
 func Test_NewCmdView(t *testing.T) {

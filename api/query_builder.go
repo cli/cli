@@ -330,6 +330,7 @@ var sharedIssuePRFields = []string{
 	"title",
 	"updatedAt",
 	"url",
+	"viewerSubscription",
 }
 
 // Some fields are only valid in the context of issues.

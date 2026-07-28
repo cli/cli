@@ -24,30 +24,32 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
-	Typename         string `json:"__typename"`
-	ID               string
-	Number           int
-	Title            string
-	URL              string
-	State            string
-	StateReason      string
-	Closed           bool
-	Body             string
-	ActiveLockReason string
-	Locked           bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	ClosedAt         *time.Time
-	Comments         Comments
-	Author           Author
-	Assignees        Assignees
-	AssignedActors   AssignedActors
-	Labels           Labels
-	ProjectCards     ProjectCards
-	ProjectItems     ProjectItems
-	Milestone        *Milestone
-	ReactionGroups   ReactionGroups
-	IsPinned         bool
+	Typename           string `json:"__typename"`
+	ID                 string
+	Number             int
+	Title              string
+	URL                string
+	State              string
+	StateReason        string
+	Closed             bool
+	Body               string
+	ActiveLockReason   string
+	Locked             bool
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	ClosedAt           *time.Time
+	Comments           Comments
+	Author             Author
+	Assignees          Assignees
+	AssignedActors     AssignedActors
+	Labels             Labels
+	ProjectCards       ProjectCards
+	ProjectItems       ProjectItems
+	Milestone          *Milestone
+	ReactionGroups     ReactionGroups
+	IsPinned           bool
+	ViewerCanSubscribe bool
+	ViewerSubscription *githubv4.SubscriptionState
 
 	IssueType        *IssueType
 	Parent           *LinkedIssue

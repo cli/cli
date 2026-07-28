@@ -3,6 +3,7 @@ package view
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -46,6 +47,7 @@ func TestJSONFields(t *testing.T) {
 		"title",
 		"updatedAt",
 		"url",
+		"viewerSubscription",
 		"isPinned",
 		"stateReason",
 		"issueType",
@@ -940,6 +942,51 @@ func TestIssueView_json_IssueType(t *testing.T) {
 	assert.Equal(t, "Bug", issueType["name"])
 	assert.Equal(t, "Something is not working", issueType["description"])
 	assert.Equal(t, "d73a4a", issueType["color"])
+}
+
+func TestIssueView_json_ViewerSubscription(t *testing.T) {
+	tests := []struct {
+		name                   string
+		viewerSubscription     string
+		wantViewerSubscription any
+	}{
+		{
+			name:                   "subscribed",
+			viewerSubscription:     `"SUBSCRIBED"`,
+			wantViewerSubscription: "SUBSCRIBED",
+		},
+		{
+			name:                   "not reported",
+			viewerSubscription:     "null",
+			wantViewerSubscription: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpReg := &httpmock.Registry{}
+			defer httpReg.Verify(t)
+
+			httpReg.Register(
+				httpmock.GraphQL(`query IssueByNumber\b`),
+				httpmock.StringResponse(fmt.Sprintf(`{
+					"data": {
+						"repository": {
+							"hasIssuesEnabled": true,
+							"issue": {"viewerSubscription": %s}
+						}
+					}
+				}`, tt.viewerSubscription)),
+			)
+
+			output, err := runCommand(httpReg, false, `123 --json viewerSubscription`)
+			require.NoError(t, err)
+
+			var data map[string]interface{}
+			require.NoError(t, json.Unmarshal(output.OutBuf.Bytes(), &data))
+			assert.Equal(t, tt.wantViewerSubscription, data["viewerSubscription"])
+		})
+	}
 }
 
 func TestIssueView_json_ParentSubIssues(t *testing.T) {

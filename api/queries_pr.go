@@ -66,6 +66,8 @@ type PullRequest struct {
 	IsCrossRepository   bool
 	IsDraft             bool
 	MaintainerCanModify bool
+	ViewerCanSubscribe  bool
+	ViewerSubscription  *githubv4.SubscriptionState
 
 	BaseRef struct {
 		BranchProtectionRule struct {
