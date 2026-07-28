@@ -74,6 +74,11 @@ Add `--json`, `--jq`, `--template` flags via `cmdutil.AddJSONFlags(cmd, &opts.Ex
 
 ## Testing
 
+Test architecture for commands should generally follow this pattern:
+
+- One table test for the command constructor (`NewCmdFoo`) to verify flag parsing and `Opts` curation.
+- One table test for the run function (`fooRun`) to verify business logic, output, and mocked HTTP/Git interactions.
+
 ### HTTP Mocking
 
 Use `httpmock.Registry` with `defer reg.Verify(t)` to ensure all stubs are called:
@@ -138,6 +143,7 @@ for _, tt := range tests {
 
 - Add godoc comments to all exported functions, types, and constants
 - Avoid unnecessary code comments — only comment when the *why* isn't obvious from the code
+- Comments that imbue sanitized and summarized context from your conversation with a human are very valuable. For example, if you found during development that without the code something downstream would break, that's good context to include.
 - Do not comment just to restate what the code does
 - Never use em dashes (—) in code, comments, or documentation; use regular dashes (-) or rewrite the sentence instead
 
@@ -165,6 +171,8 @@ if features.SomeCapability {
 }
 ```
 
+Use feature detection only when an API is not GA on all supported GHES versions; skip it for long-established APIs.
+
 ## API Patterns
 
 ```go
@@ -174,3 +182,9 @@ client.REST(hostname, "GET", "repos/owner/repo", nil, &data)
 ```
 
 For host resolution, use `cfg.Authentication().DefaultHost()` — not `ghinstance.Default()` which always returns `github.com`.
+
+Avoid extra round-trips.
+
+## Code Review
+
+Review pull requests with the [`cli-code-reviewer` skill](.github/skills/cli-code-reviewer/SKILL.md).
