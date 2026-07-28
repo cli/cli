@@ -119,14 +119,9 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 
 	resp, err := restClient.Request(method, p, body)
 	if err != nil {
-		return "", err
+		return "", handleResponse(err)
 	}
 	defer resp.Body.Close()
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return "", HandleHTTPError(resp)
-	}
 
 	if resp.StatusCode == http.StatusNoContent {
 		return "", nil

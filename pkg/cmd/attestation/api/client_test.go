@@ -1,11 +1,14 @@
 package api
 
 import (
+	"net/http"
 	"testing"
 
+	cliAPI "github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -377,6 +380,44 @@ func TestGetAttestationsRetries(t *testing.T) {
 	require.Equal(t, len(attestations), 10)
 	bundle := (attestations)[0].Bundle
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
+}
+
+func TestGetAttestationsRetriesRESTWithNextError(t *testing.T) {
+	originalRetryInterval := getAttestationRetryInterval
+	getAttestationRetryInterval = 0
+	t.Cleanup(func() {
+		getAttestationRetryInterval = originalRetryInterval
+	})
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.MatchAny,
+		httpmock.StatusStringResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`),
+	)
+	reg.Register(
+		httpmock.MatchAny,
+		httpmock.JSONResponse(map[string]any{
+			"attestations": []any{
+				map[string]any{"bundle_url": "https://example.com/bundle"},
+			},
+		}),
+	)
+
+	c := &LiveClient{
+		githubAPI: cliAPI.NewClientFromHTTP(&http.Client{Transport: reg}),
+		host:      "github.com",
+		logger:    io.NewTestHandler(),
+	}
+	attestations, err := c.getAttestations(FetchParams{
+		Digest: testDigest,
+		Limit:  1,
+		Repo:   testRepo,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, attestations, 1)
+	require.Len(t, reg.Requests, 2)
 }
 
 // test total retries
