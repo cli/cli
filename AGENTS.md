@@ -181,7 +181,7 @@ client.GraphQL(hostname, query, variables, &data)
 client.REST(hostname, "GET", "repos/owner/repo", nil, &data)
 ```
 
-For host resolution, use `cfg.Authentication().DefaultHost()` — not `ghinstance.Default()` which always returns `github.com`.
+For host resolution, use `cfg.Authentication().DefaultHost()`; do not use `ghinstance.Default()` which always returns `github.com`.
 
 Avoid extra round-trips.
 

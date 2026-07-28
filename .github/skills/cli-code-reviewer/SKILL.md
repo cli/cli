@@ -99,7 +99,7 @@ Write each finding with this style guide:
 - Describing behavior changes from a user perspective is a helpful framing tool; "A user who runs `gh foo bar` will have this problem".
 - Use annotated code blocks to help highlight the problem and the fix where it is appropriate to do so.
 - Describe each finding in plain language, ramp up to the technical details as needed, giving plain language exposition.
-- Avoid inline code-fences referring to type names, functions, etc.; prefer annotated code blocks.
+- Avoid inline code spans referring to type names, functions, etc.; prefer annotated code blocks.
 - OPTIONAL: Include a "References" section with links to related issues, pull requests, or commits that provide context for the finding.
     - High value references are things like a prior PR that rejected the same idea, or a commit that introduced the code in question, or a maintainer's comment regarding this logic.
 
