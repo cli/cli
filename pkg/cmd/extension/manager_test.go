@@ -854,7 +854,7 @@ func TestManager_Install_git(t *testing.T) {
 			}))
 	reg.Register(
 		httpmock.REST("GET", "repos/owner/gh-some-ext/contents/gh-some-ext"),
-		httpmock.StringResponse("script"))
+		httpmock.JSONResponse(map[string]string{"type": "file"}))
 
 	repo := ghrepo.New("owner", fakeExtensionName)
 
@@ -934,7 +934,7 @@ func TestManager_Install_git_pinned(t *testing.T) {
 		httpmock.StringResponse("abcd1234"))
 	reg.Register(
 		httpmock.REST("GET", "repos/owner/gh-cool-ext/contents/gh-cool-ext"),
-		httpmock.StringResponse("script"))
+		httpmock.JSONResponse(map[string]string{"type": "file"}))
 
 	_ = os.MkdirAll(filepath.Join(m.installDir(), "gh-cool-ext"), 0700)
 	repo := ghrepo.New("owner", "gh-cool-ext")
