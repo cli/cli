@@ -354,15 +354,15 @@ func resolveWorktreeTarget(client *git.Client, path string) (worktreeTarget, err
 		return wt, err
 	}
 
-	current, err := revParseFacts(client, "", "--show-toplevel", "--git-common-dir")
-	if err != nil || len(current) < 2 {
+	current, ok := revParseFacts(client, "", "--show-toplevel", "--git-common-dir")
+	if !ok || len(current) < 2 {
 		return wt, nil
 	}
 	currentToplevel, currentCommonDir := current[0], current[len(current)-1]
 
-	// A non-existent or non-git target errors out here, leaving both flags false.
-	target, err := revParseFacts(client, abs, "--show-toplevel", "--show-prefix", "--git-common-dir")
-	if err != nil || len(target) < 3 {
+	// A non-existent or non-git target fails here, leaving both flags false.
+	target, ok := revParseFacts(client, abs, "--show-toplevel", "--show-prefix", "--git-common-dir")
+	if !ok || len(target) < 3 {
 		return wt, nil
 	}
 	targetToplevel, targetPrefix, targetCommonDir := target[0], target[1], target[2]
@@ -375,21 +375,22 @@ func resolveWorktreeTarget(client *git.Client, path string) (worktreeTarget, err
 
 // revParseFacts runs `git rev-parse --path-format=absolute <flags...>` and
 // returns one absolute path per flag, in flag order (an empty --show-prefix
-// yields an empty string). When dir is non-empty the query is scoped there with -C.
-func revParseFacts(client *git.Client, dir string, flags ...string) ([]string, error) {
+// yields an empty string), with ok=false if git fails. When dir is non-empty
+// the query is scoped there with -C.
+func revParseFacts(client *git.Client, dir string, flags ...string) (fields []string, ok bool) {
 	args := append([]string{"rev-parse", "--path-format=absolute"}, flags...)
 	if dir != "" {
 		args = append([]string{"-C", dir}, args...)
 	}
 	cmd, err := client.Command(context.Background(), args...)
 	if err != nil {
-		return nil, err
+		return nil, false
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, false
 	}
-	return strings.Split(strings.TrimRight(string(out), "\n"), "\n"), nil
+	return strings.Split(strings.TrimRight(string(out), "\n"), "\n"), true
 }
 
 // detachCmds returns the commands for a detached checkout. When reusing an
