@@ -2498,13 +2498,23 @@ func TestSkillSearchFuncTruncatesLabelsToAvailableWidth(t *testing.T) {
 		},
 	}
 
-	for _, terminalWidth := range []int{40, 60, 80, 120} {
-		t.Run(fmt.Sprintf("terminal width %d", terminalWidth), func(t *testing.T) {
-			labelWidth := terminalWidth - multiSelectLabelMargin
+	tests := []struct {
+		terminalWidth      int
+		expectedLabelWidth int
+	}{
+		{terminalWidth: 40, expectedLabelWidth: 32},
+		{terminalWidth: 60, expectedLabelWidth: 52},
+		{terminalWidth: 80, expectedLabelWidth: 72},
+		{terminalWidth: 120, expectedLabelWidth: 112},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("terminal width %d", tt.terminalWidth), func(t *testing.T) {
+			labelWidth := tt.terminalWidth - multiSelectLabelMargin
 			result := skillSearchFunc(skills, labelWidth)("")
 
 			require.Len(t, result.Labels, 2)
-			assert.Less(t, text.DisplayWidth("> [ ] "+result.Labels[0]), terminalWidth)
+			assert.Equal(t, tt.expectedLabelWidth, text.DisplayWidth(result.Labels[0]))
 			assert.Equal(t, "[plugins] octocat/telemetry-instrumentation", result.Keys[0])
 			assert.True(t, strings.HasSuffix(result.Labels[0], "..."))
 			assert.Equal(t, "achievement-badges", result.Labels[1])

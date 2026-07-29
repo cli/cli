@@ -35,9 +35,9 @@ const (
 	// allSkillsKey is the persistent option label for selecting all skills.
 	allSkillsKey = "(all skills)"
 
-	// multiSelectLabelMargin accounts for the cursor and checkbox before each
-	// option, plus one column to avoid triggering terminal auto-wrap.
-	multiSelectLabelMargin = 7
+	// multiSelectLabelMargin reserves columns for the widest option prefix used
+	// by the available prompters: huh's border, padding, cursor, and checkbox.
+	multiSelectLabelMargin = 8
 
 	// maxSearchResults caps how many skills are shown per search page in
 	// interactive selection, keeping the prompt readable.
