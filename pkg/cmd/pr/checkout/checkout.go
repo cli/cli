@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -113,6 +114,12 @@ func checkoutRun(opts *CheckoutOptions) error {
 	pr, baseRepo, err := opts.PRResolver.Resolve()
 	if err != nil {
 		return err
+	}
+
+	if opts.Worktree != "" {
+		if err := ensureWorktreePathSafe(opts.Worktree); err != nil {
+			return err
+		}
 	}
 
 	cfg, err := opts.Config()
@@ -349,21 +356,22 @@ func isWorktreeAtPath(client *git.Client, path string) bool {
 // existing linked worktree, FETCH_HEAD must be written inside it (it is
 // per-worktree), so the fetch runs with -C <path>.
 func detachCmds(fetchCmd []string, worktree string, gitClient *git.Client) [][]string {
-	if worktree != "" {
-		if isWorktreeAtPath(gitClient, worktree) {
-			return [][]string{
-				append([]string{"-C", worktree}, fetchCmd...),
-				{"-C", worktree, "checkout", "--detach", "FETCH_HEAD"},
-			}
-		}
+	if worktree == "" {
 		return [][]string{
 			fetchCmd,
-			{"worktree", "add", "--detach", worktree, "FETCH_HEAD"},
+			{"checkout", "--detach", "FETCH_HEAD"},
+		}
+	}
+
+	if isWorktreeAtPath(gitClient, worktree) {
+		return [][]string{
+			append([]string{"-C", worktree}, fetchCmd...),
+			{"-C", worktree, "checkout", "--detach", "FETCH_HEAD"},
 		}
 	}
 	return [][]string{
 		fetchCmd,
-		{"checkout", "--detach", "FETCH_HEAD"},
+		{"worktree", "add", "--detach", worktree, "FETCH_HEAD"},
 	}
 }
 
@@ -378,6 +386,7 @@ func syncBranchCmds(path, ref string, force bool) [][]string {
 	if force {
 		return [][]string{append(prefix, "reset", "--hard", ref)}
 	}
+	// TODO: check if non-fast-forward and suggest to use `--force`
 	return [][]string{append(prefix, "merge", "--ff-only", ref)}
 }
 
@@ -401,6 +410,27 @@ func resolvePath(p string) string {
 		return resolved
 	}
 	return p
+}
+
+// ensureWorktreePathSafe validates a --worktree target before we write to it.
+// The path must be either non-existent (git will create the worktree) or an
+// existing directory, and never a symlink at its final component. A symlinked
+// ancestor (e.g. macOS /tmp -> /private/tmp) is allowed; only the leaf is
+// checked, using os.Lstat so a leaf symlink is not followed. Rejecting a leaf
+// symlink is defense-in-depth against writing PR content through a planted link.
+func ensureWorktreePathSafe(path string) error {
+	fi, err := os.Lstat(path)
+	switch {
+	case os.IsNotExist(err):
+		return nil
+	case err != nil:
+		return err
+	case fi.Mode()&os.ModeSymlink != 0:
+		return fmt.Errorf("--worktree path must not be a symlink: %s", path)
+	case !fi.IsDir():
+		return fmt.Errorf("--worktree path must be a directory: %s", path)
+	}
+	return nil
 }
 
 func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cmdQueue [][]string) error {

@@ -1247,3 +1247,52 @@ func Test_isWorktreeAtPath_resolvesSymlinks(t *testing.T) {
 		})
 	}
 }
+
+func Test_ensureWorktreePathSafe(t *testing.T) {
+	base := t.TempDir()
+
+	existingDir := filepath.Join(base, "dir")
+	require.NoError(t, os.Mkdir(existingDir, 0o755))
+
+	regularFile := filepath.Join(base, "file")
+	require.NoError(t, os.WriteFile(regularFile, []byte("x"), 0o644))
+
+	symlink := filepath.Join(base, "link")
+	require.NoError(t, os.Symlink(existingDir, symlink))
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr string
+	}{
+		{
+			name: "non-existent path is allowed",
+			path: filepath.Join(base, "does-not-exist"),
+		},
+		{
+			name: "existing directory is allowed",
+			path: existingDir,
+		},
+		{
+			name:    "leaf symlink is rejected",
+			path:    symlink,
+			wantErr: "--worktree path must not be a symlink",
+		},
+		{
+			name:    "existing non-directory is rejected",
+			path:    regularFile,
+			wantErr: "--worktree path must be a directory",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ensureWorktreePathSafe(tt.path)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
