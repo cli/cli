@@ -126,7 +126,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 			return err
 		}
 		if target.isCurrentWorktree {
-			return fmt.Errorf("--worktree path is the current worktree; omit --worktree to check out here")
+			return fmt.Errorf("--worktree path points to the repository you're already in; omit --worktree to check out here")
 		}
 		reuseWorktree = target.isExistingWorktree
 	}
