@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -114,6 +116,15 @@ func checkoutRun(opts *CheckoutOptions) error {
 		return err
 	}
 
+	if opts.Worktree != "" {
+		if err := ensureWorktreePathSafe(opts.Worktree); err != nil {
+			return err
+		}
+		if isCurrentWorktree(opts.GitClient, opts.Worktree) {
+			return fmt.Errorf("--worktree path is the current worktree; omit --worktree to check out here")
+		}
+	}
+
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -166,8 +177,8 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if opts.Worktree != "" {
 			prefix = []string{"-C", opts.Worktree}
 		}
-		cmdQueue = append(cmdQueue, append(prefix, "submodule", "sync", "--recursive"))
-		cmdQueue = append(cmdQueue, append(prefix, "submodule", "update", "--init", "--recursive"))
+		cmdQueue = append(cmdQueue, slices.Concat(prefix, []string{"submodule", "sync", "--recursive"}))
+		cmdQueue = append(cmdQueue, slices.Concat(prefix, []string{"submodule", "update", "--init", "--recursive"}))
 	}
 
 	// Note that although we will probably be fetching from the head, in practice, PR checkout can only
@@ -212,7 +223,14 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 	switch {
 	case opts.Worktree != "":
 		if isWorktreeAtPath(opts.GitClient, opts.Worktree) {
-			cmds = append(cmds, worktreeCheckoutCmds(opts.Worktree, localBranch, remoteBranchRef, opts.Force)...)
+			if localBranchExists(opts.GitClient, localBranch) {
+				cmds = append(cmds, worktreeCheckoutCmds(opts.Worktree, localBranch, remoteBranchRef, opts.Force)...)
+			} else {
+				// Branch does not exist yet (e.g. reusing a worktree for a
+				// different PR with a new --branch name): create it tracking
+				// the remote branch.
+				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-b", localBranch, "--track", remoteBranch})
+			}
 		} else if localBranchExists(opts.GitClient, localBranch) {
 			cmds = append(cmds, []string{"worktree", "add", opts.Worktree, localBranch})
 			cmds = append(cmds, syncBranchCmds(opts.Worktree, remoteBranchRef, opts.Force)...)
@@ -254,10 +272,17 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 			// git refuses to update a branch via refspec when it is checked
 			// out in a worktree.
 			cmds = append(cmds, []string{"-C", opts.Worktree, "fetch", baseURLOrName, ref, "--no-tags"})
-			// Use checkout -B to create-or-reset the branch from FETCH_HEAD.
-			// The local branch may not exist yet (e.g. switching the worktree
-			// to a different fork PR).
-			cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-B", localBranch, "FETCH_HEAD"})
+			if localBranchExists(opts.GitClient, localBranch) {
+				// Branch already exists: switch to it and sync, preserving the
+				// no-force safety guarantee used elsewhere (ff-only merge unless
+				// --force, which hard-resets).
+				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", localBranch})
+				cmds = append(cmds, syncBranchCmds(opts.Worktree, "FETCH_HEAD", opts.Force)...)
+			} else {
+				// Branch does not exist yet (e.g. switching the worktree to a
+				// different fork PR): create it from FETCH_HEAD.
+				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-b", localBranch, "FETCH_HEAD"})
+			}
 		} else {
 			fetchCmd := []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--no-tags"}
 			if opts.Force {
@@ -309,40 +334,128 @@ func localBranchExists(client *git.Client, b string) bool {
 	return err == nil
 }
 
-// isWorktreeAtPath reports whether the given path is a registered git worktree.
+// isWorktreeAtPath reports whether path is the root of a git worktree belonging
+// to this repository. Rather than enumerating and normalizing worktree paths, it
+// asks git about the single directory and lets git resolve symlinks (in any path
+// component), "..", case, and trailing slashes for us.
 func isWorktreeAtPath(client *git.Client, path string) bool {
-	worktrees, err := client.Worktrees(context.Background())
+	abs, err := filepath.Abs(path)
 	if err != nil {
 		return false
 	}
-	resolved := resolvePath(path)
-	for _, wt := range worktrees {
-		if resolvePath(wt.Path) == resolved {
-			return true
-		}
+	prefix, commonDir, err := worktreeInfoAtPath(client, abs)
+	if err != nil {
+		// Non-existent and non-git directories error out here.
+		return false
 	}
-	return false
+	// A non-empty prefix means path is a subdirectory of a worktree, not its root.
+	if prefix != "" {
+		return false
+	}
+	repoCommonDir, err := repoCommonDir(client)
+	if err != nil {
+		return false
+	}
+	// Confirm the worktree belongs to this repo and not an unrelated one.
+	return commonDir == repoCommonDir
+}
+
+// worktreeInfoAtPath asks git about absPath and returns its prefix within the
+// containing worktree (empty exactly when absPath is the worktree root) and the
+// worktree's shared git common directory. Both are absolute, canonical paths.
+// It returns an error for non-existent or non-git directories.
+func worktreeInfoAtPath(client *git.Client, absPath string) (prefix, commonDir string, err error) {
+	cmd, err := client.Command(context.Background(),
+		"-C", absPath,
+		"rev-parse", "--path-format=absolute", "--show-prefix", "--git-common-dir")
+	if err != nil {
+		return "", "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", "", err
+	}
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(lines) < 2 {
+		return "", "", fmt.Errorf("unexpected rev-parse output: %q", string(out))
+	}
+	return lines[0], lines[len(lines)-1], nil
+}
+
+// repoCommonDir returns the shared git common directory for the client's
+// repository, as an absolute, canonical path.
+func repoCommonDir(client *git.Client) (string, error) {
+	cmd, err := client.Command(context.Background(),
+		"rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// isCurrentWorktree reports whether path resolves to the worktree the command is
+// already running in. Checking a PR out there would silently switch the current
+// tree's branch, defeating the purpose of --worktree, so callers reject it.
+// Detection is best-effort: if either toplevel cannot be determined (e.g. the
+// path does not exist yet), it returns false so normal flow proceeds.
+func isCurrentWorktree(client *git.Client, path string) bool {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	current, err := worktreeToplevel(client, "")
+	if err != nil {
+		return false
+	}
+	target, err := worktreeToplevel(client, abs)
+	if err != nil {
+		return false
+	}
+	return current == target
+}
+
+// worktreeToplevel returns the absolute, canonical root of the worktree
+// containing dir. When dir is empty, the client's working directory is used.
+func worktreeToplevel(client *git.Client, dir string) (string, error) {
+	args := []string{"rev-parse", "--path-format=absolute", "--show-toplevel"}
+	if dir != "" {
+		args = append([]string{"-C", dir}, args...)
+	}
+	cmd, err := client.Command(context.Background(), args...)
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // detachCmds returns the commands for a detached checkout. When reusing an
 // existing linked worktree, FETCH_HEAD must be written inside it (it is
 // per-worktree), so the fetch runs with -C <path>.
 func detachCmds(fetchCmd []string, worktree string, gitClient *git.Client) [][]string {
-	if worktree != "" {
-		if isWorktreeAtPath(gitClient, worktree) {
-			return [][]string{
-				append([]string{"-C", worktree}, fetchCmd...),
-				{"-C", worktree, "checkout", "--detach", "FETCH_HEAD"},
-			}
-		}
+	if worktree == "" {
 		return [][]string{
 			fetchCmd,
-			{"worktree", "add", "--detach", worktree, "FETCH_HEAD"},
+			{"checkout", "--detach", "FETCH_HEAD"},
+		}
+	}
+
+	if isWorktreeAtPath(gitClient, worktree) {
+		return [][]string{
+			append([]string{"-C", worktree}, fetchCmd...),
+			{"-C", worktree, "checkout", "--detach", "FETCH_HEAD"},
 		}
 	}
 	return [][]string{
 		fetchCmd,
-		{"checkout", "--detach", "FETCH_HEAD"},
+		{"worktree", "add", "--detach", worktree, "FETCH_HEAD"},
 	}
 }
 
@@ -357,6 +470,7 @@ func syncBranchCmds(path, ref string, force bool) [][]string {
 	if force {
 		return [][]string{append(prefix, "reset", "--hard", ref)}
 	}
+	// TODO: check if non-fast-forward and suggest to use `--force`
 	return [][]string{append(prefix, "merge", "--ff-only", ref)}
 }
 
@@ -368,18 +482,25 @@ func worktreeCheckoutCmds(path, branch, ref string, force bool) [][]string {
 	return cmds
 }
 
-// resolvePath canonicalizes a path for comparison against git-reported worktree
-// paths. Git resolves symlinks internally, so on systems where common directories
-// are symlinks (e.g. macOS /tmp -> /private/tmp), the user-provided path and the
-// path git reports would otherwise not match.
-func resolvePath(p string) string {
-	if abs, err := filepath.Abs(p); err == nil {
-		p = abs
+// ensureWorktreePathSafe validates a --worktree target before we write to it.
+// The path must be either non-existent (git will create the worktree) or an
+// existing directory, and never a symlink at its final component. A symlinked
+// ancestor (e.g. macOS /tmp -> /private/tmp) is allowed; only the leaf is
+// checked, using os.Lstat so a leaf symlink is not followed. Rejecting a leaf
+// symlink is defense-in-depth against writing PR content through a planted link.
+func ensureWorktreePathSafe(path string) error {
+	fi, err := os.Lstat(path)
+	switch {
+	case os.IsNotExist(err):
+		return nil
+	case err != nil:
+		return err
+	case fi.Mode()&os.ModeSymlink != 0:
+		return fmt.Errorf("--worktree path must not be a symlink: %s", path)
+	case !fi.IsDir():
+		return fmt.Errorf("--worktree path must be a directory: %s", path)
 	}
-	if resolved, err := filepath.EvalSymlinks(p); err == nil {
-		return resolved
-	}
-	return p
+	return nil
 }
 
 func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cmdQueue [][]string) error {
@@ -394,29 +515,9 @@ func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cm
 		var cmd *git.Command
 		switch subCmd {
 		case "submodule":
-			// As with fetch, strip a leading -C <path> and apply it as
-			// cmd.Dir so the credential-helper flags AuthenticatedCommand
-			// prepends don't get displaced.
-			if args[0] == "-C" {
-				cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args[2:]...)
-				if err == nil {
-					cmd.Dir = args[1]
-				}
-			} else {
-				cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
-			}
+			cmd, err = authenticatedCommand(client, credentialPattern, args)
 		case "fetch":
-			// AuthenticatedCommand prepends credential-helper flags
-			// before all args. When -C <path> is present, strip it and
-			// apply as cmd.Dir so the flags don't displace it.
-			if args[0] == "-C" {
-				cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args[2:]...)
-				if err == nil {
-					cmd.Dir = args[1]
-				}
-			} else {
-				cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args...)
-			}
+			cmd, err = authenticatedCommand(client, git.AllMatchingCredentialsPattern, args)
 		default:
 			cmd, err = client.Command(context.Background(), args...)
 		}
@@ -428,6 +529,22 @@ func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cm
 		}
 	}
 	return nil
+}
+
+// authenticatedCommand builds an authenticated git command, transparently
+// handling a leading -C <path> prefix. AuthenticatedCommand prepends
+// credential-helper flags before all args, so a -C prefix would be displaced;
+// instead we strip it and apply it as cmd.Dir.
+func authenticatedCommand(client *git.Client, credentialPattern git.CredentialPattern, args []string) (*git.Command, error) {
+	if args[0] == "-C" {
+		cmd, err := client.AuthenticatedCommand(context.Background(), credentialPattern, args[2:]...)
+		if err != nil {
+			return nil, err
+		}
+		cmd.Dir = args[1]
+		return cmd, nil
+	}
+	return client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
 }
 
 type PRResolver interface {

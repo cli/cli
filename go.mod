@@ -26,7 +26,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea
 	github.com/distribution/reference v0.6.0
-	github.com/gabriel-vasile/mimetype v1.4.13
+	github.com/gabriel-vasile/mimetype v1.4.14
 	github.com/gdamore/tcell/v2 v2.13.10
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.21.7
@@ -40,7 +40,7 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/klauspost/compress v1.19.0
 	github.com/mattn/go-colorable v0.1.15
-	github.com/mattn/go-isatty v0.0.22
+	github.com/mattn/go-isatty v0.0.23
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/microsoft/dev-tunnels v0.1.27
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0
@@ -62,7 +62,7 @@ require (
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
 	golang.org/x/text v0.40.0
-	google.golang.org/grpc v1.82.0
+	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v3 v3.0.1

@@ -1360,7 +1360,7 @@ func Test_apiRun_cache(t *testing.T) {
 				AuthenticationFunc: func() gh.AuthConfig {
 					cfg := &config.AuthConfig{}
 					// Required because the http client tries to get the active token and otherwise
-					// this goes down to to go-gh config and panics. Pretty bad solution, it would
+					// this goes down to go-gh config and panics. Pretty bad solution, it would
 					// be better if this were black box.
 					cfg.SetActiveToken("token", "stub")
 					return cfg

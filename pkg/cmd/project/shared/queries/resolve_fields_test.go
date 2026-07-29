@@ -60,14 +60,14 @@ func TestResolveFieldByName(t *testing.T) {
 		assert.Contains(t, err.Error(), "available fields: Priority, Status, Title")
 	})
 
-	t.Run("ambiguous name lists candidate ids", func(t *testing.T) {
+	t.Run("ambiguous name lists candidate ids in sorted order", func(t *testing.T) {
 		dup := append([]ProjectField{}, fields...)
 		dup = append(dup, textField("PVTF_status2", "Status"))
 		_, err := ResolveFieldByName(dup, "Status")
 		require.Error(t, err)
 		var amb *FieldAmbiguousError
 		require.True(t, errors.As(err, &amb))
-		assert.ElementsMatch(t, []string{"PVTSSF_status", "PVTF_status2"}, amb.Candidates)
+		assert.Equal(t, []string{"PVTF_status2", "PVTSSF_status"}, amb.Candidates)
 		assert.Contains(t, err.Error(), "is ambiguous")
 	})
 }
