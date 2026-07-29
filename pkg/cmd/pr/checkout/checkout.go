@@ -415,9 +415,8 @@ func detachCmds(fetchCmd []string, worktree string, reuseWorktree bool) [][]stri
 	}
 }
 
-// syncBranchCmds returns commands that sync a branch to ref: a hard reset when
-// force is set, otherwise a fast-forward-only merge. If path is non-empty, the
-// commands are prefixed with -C to run inside that directory.
+// syncBranchCmds syncs a branch to ref: a hard reset when force is set,
+// otherwise a fast-forward-only merge. A non-empty path runs the commands there.
 func syncBranchCmds(path, ref string, force bool) [][]string {
 	var prefix []string
 	if path != "" {
@@ -430,8 +429,6 @@ func syncBranchCmds(path, ref string, force bool) [][]string {
 	return [][]string{append(prefix, "merge", "--ff-only", ref)}
 }
 
-// worktreeCheckoutCmds returns commands to switch an existing worktree to the
-// given branch and sync it. Git will refuse if there are conflicting local changes.
 func worktreeCheckoutCmds(path, branch, ref string, force bool) [][]string {
 	cmds := [][]string{{"-C", path, "checkout", branch}}
 	cmds = append(cmds, syncBranchCmds(path, ref, force)...)
