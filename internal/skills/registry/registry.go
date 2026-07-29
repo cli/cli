@@ -171,6 +171,12 @@ var Agents = []AgentHost{
 		UserDir:    ".deepagents/agent/skills",
 	},
 	{
+		ID:         "devin",
+		Name:       "Devin",
+		ProjectDir: ".devin/skills",
+		UserDir:    ".devin/skills",
+	},
+	{
 		ID:         "droid",
 		Name:       "Droid",
 		ProjectDir: ".factory/skills",
@@ -331,12 +337,6 @@ var Agents = []AgentHost{
 		Name:       "Warp",
 		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".agents/skills",
-	},
-	{
-		ID:         "windsurf",
-		Name:       "Windsurf",
-		ProjectDir: ".windsurf/skills",
-		UserDir:    ".codeium/windsurf/skills",
 	},
 	{
 		ID:         "zencoder",

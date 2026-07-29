@@ -23,7 +23,9 @@ func TestFindByID(t *testing.T) {
 		{name: "antigravity", id: "antigravity", wantName: "Antigravity"},
 		{name: "antigravity-cli", id: "antigravity-cli", wantName: "Antigravity CLI"},
 		{name: "antigravity2.0", id: "antigravity2.0", wantName: "Antigravity 2.0"},
+		{name: "devin", id: "devin", wantName: "Devin"},
 		{name: "grok", id: "grok", wantName: "Grok"},
+		{name: "windsurf is no longer supported", id: "windsurf", wantErr: "unknown agent"},
 		{name: "unknown agent", id: "nonexistent", wantErr: "unknown agent"},
 	}
 	for _, tt := range tests {
@@ -159,6 +161,22 @@ func TestInstallDir(t *testing.T) {
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
 			wantDir: filepath.Join("/home/monalisa", ".gemini", "config", "skills"),
+		},
+		{
+			name:    "devin project scope",
+			hostID:  "devin",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".devin", "skills"),
+		},
+		{
+			name:    "devin user scope",
+			hostID:  "devin",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".devin", "skills"),
 		},
 		{
 			name:    "grok project scope",
