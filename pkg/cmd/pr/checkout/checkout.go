@@ -121,14 +121,10 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if err := ensureWorktreePathSafe(opts.Worktree); err != nil {
 			return err
 		}
-		target, err := resolveWorktreeTarget(opts.GitClient, opts.Worktree)
+		reuseWorktree, err = resolveWorktreeTarget(opts.GitClient, opts.Worktree)
 		if err != nil {
 			return err
 		}
-		if target.isCurrentWorktree {
-			return fmt.Errorf("--worktree path points to the repository you're already in; omit --worktree to check out here")
-		}
-		reuseWorktree = target.isExistingWorktree
 	}
 
 	cfg, err := opts.Config()
@@ -331,46 +327,44 @@ func localBranchExists(client *git.Client, b string) bool {
 	return err == nil
 }
 
-// worktreeTarget describes a --worktree path, resolved once up front so the
-// command builders stay pure instead of each re-querying git.
-type worktreeTarget struct {
-	// isCurrentWorktree means the path is the worktree we are already running
-	// in. Checking out there would silently switch its branch, so callers reject it.
-	isCurrentWorktree bool
-	// isExistingWorktree means the path is the root of an existing linked
-	// worktree of this repo, so we reuse it rather than creating a new one.
-	isExistingWorktree bool
-}
-
-// resolveWorktreeTarget asks git about path and the current worktree, letting
-// git resolve symlinks, "..", case, and trailing slashes for us instead of
-// comparing paths ourselves. Detection is best-effort: if either worktree
-// cannot be determined (e.g. the path does not exist yet), the flags stay false
-// so normal flow proceeds and git worktree add handles the path.
-func resolveWorktreeTarget(client *git.Client, path string) (worktreeTarget, error) {
-	var wt worktreeTarget
+// resolveWorktreeTarget asks git where path lives, letting git resolve symlinks,
+// "..", case, and trailing slashes for us instead of comparing paths ourselves.
+// It returns whether an existing linked worktree there should be reused, and
+// errors when the path cannot host a new worktree: a path inside a different
+// repository, a subdirectory of another worktree, or the worktree we are already
+// running in. Detection is best-effort: if git cannot resolve the current or
+// target worktree (e.g. the path does not exist yet), reuse is false so git
+// worktree add handles the path.
+func resolveWorktreeTarget(client *git.Client, path string) (reuseWorktree bool, err error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
-		return wt, err
+		return false, err
 	}
 
+	// git emits one line per flag, so we expect exactly two lines here.
 	current, ok := revParseFacts(client, "", "--show-toplevel", "--git-common-dir")
-	if !ok || len(current) < 2 {
-		return wt, nil
+	if !ok || len(current) != 2 {
+		return false, nil
 	}
-	currentToplevel, currentCommonDir := current[0], current[len(current)-1]
+	currentToplevel, currentCommonDir := current[0], current[1]
 
-	// A non-existent or non-git target fails here, leaving both flags false.
+	// A non-existent or non-git target fails here: it is a fresh path for a new worktree.
 	target, ok := revParseFacts(client, abs, "--show-toplevel", "--show-prefix", "--git-common-dir")
-	if !ok || len(target) < 3 {
-		return wt, nil
+	if !ok || len(target) != 3 {
+		return false, nil
 	}
 	targetToplevel, targetPrefix, targetCommonDir := target[0], target[1], target[2]
 
-	wt.isCurrentWorktree = targetToplevel == currentToplevel
-	// A worktree root of this repo has an empty prefix and shares our common dir.
-	wt.isExistingWorktree = targetPrefix == "" && targetCommonDir == currentCommonDir
-	return wt, nil
+	switch {
+	case targetCommonDir != currentCommonDir:
+		return false, fmt.Errorf("--worktree path is inside a different repository")
+	case targetToplevel == currentToplevel:
+		return false, fmt.Errorf("--worktree path points to the repository you're already in; omit --worktree to check out here")
+	case targetPrefix != "":
+		return false, fmt.Errorf("--worktree path is inside an existing worktree")
+	}
+	// The path is the root of another linked worktree of this repo; reuse it.
+	return true, nil
 }
 
 // revParseFacts runs `git rev-parse --path-format=absolute <flags...>` and

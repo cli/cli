@@ -1228,9 +1228,10 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 	dir := t.TempDir()
 
 	tests := []struct {
-		name  string
-		stubs func(*run.CommandStubber)
-		want  worktreeTarget
+		name      string
+		stubs     func(*run.CommandStubber)
+		wantReuse bool
+		wantErr   string
 	}{
 		{
 			name: "path is the current worktree",
@@ -1238,7 +1239,15 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/repo/main\n\n/repo/.git\n")
 			},
-			want: worktreeTarget{isCurrentWorktree: true, isExistingWorktree: true},
+			wantErr: "--worktree path points to the repository you're already in; omit --worktree to check out here",
+		},
+		{
+			name: "path is a subdirectory of the current worktree",
+			stubs: func(cs *run.CommandStubber) {
+				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
+				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/repo/main\nsub/\n/repo/.git\n")
+			},
+			wantErr: "--worktree path points to the repository you're already in; omit --worktree to check out here",
 		},
 		{
 			name: "path is a different worktree of this repo",
@@ -1246,23 +1255,23 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
 			},
-			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: true},
+			wantReuse: true,
 		},
 		{
-			name: "path is a subdirectory of a worktree",
+			name: "path is a subdirectory of another worktree",
 			stubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\nsub/\n/repo/.git\n")
 			},
-			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: false},
+			wantErr: "--worktree path is inside an existing worktree",
 		},
 		{
-			name: "path is a worktree of an unrelated repo",
+			name: "path is inside a different repository",
 			stubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/other/wt\n\n/other/.git\n")
 			},
-			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: false},
+			wantErr: "--worktree path is inside a different repository",
 		},
 		{
 			name: "target is non-git or non-existent",
@@ -1270,14 +1279,14 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
 			},
-			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: false},
+			wantReuse: false,
 		},
 		{
 			name: "current worktree cannot be determined",
 			stubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 128, "")
 			},
-			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: false},
+			wantReuse: false,
 		},
 	}
 	for _, tt := range tests {
@@ -1287,9 +1296,13 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 			tt.stubs(cs)
 
 			client := &git.Client{GitPath: "git"}
-			got, err := resolveWorktreeTarget(client, dir)
+			reuse, err := resolveWorktreeTarget(client, dir)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.wantReuse, reuse)
 		})
 	}
 }
