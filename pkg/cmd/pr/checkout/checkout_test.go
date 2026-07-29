@@ -1238,7 +1238,7 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/repo/main\n\n/repo/.git\n")
 			},
-			want: worktreeTarget{isCurrent: true, isRepoRoot: true},
+			want: worktreeTarget{isCurrentWorktree: true, isExistingWorktree: true},
 		},
 		{
 			name: "path is a different worktree of this repo",
@@ -1246,7 +1246,7 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
 			},
-			want: worktreeTarget{isCurrent: false, isRepoRoot: true},
+			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: true},
 		},
 		{
 			name: "path is a subdirectory of a worktree",
@@ -1254,7 +1254,7 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\nsub/\n/repo/.git\n")
 			},
-			want: worktreeTarget{isCurrent: false, isRepoRoot: false},
+			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: false},
 		},
 		{
 			name: "path is a worktree of an unrelated repo",
@@ -1262,7 +1262,7 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/other/wt\n\n/other/.git\n")
 			},
-			want: worktreeTarget{isCurrent: false, isRepoRoot: false},
+			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: false},
 		},
 		{
 			name: "target is non-git or non-existent",
@@ -1270,14 +1270,14 @@ func Test_resolveWorktreeTarget(t *testing.T) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
 			},
-			want: worktreeTarget{isCurrent: false, isRepoRoot: false},
+			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: false},
 		},
 		{
 			name: "current worktree cannot be determined",
 			stubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 128, "")
 			},
-			want: worktreeTarget{isCurrent: false, isRepoRoot: false},
+			want: worktreeTarget{isCurrentWorktree: false, isExistingWorktree: false},
 		},
 	}
 	for _, tt := range tests {

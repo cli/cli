@@ -125,10 +125,10 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if err != nil {
 			return err
 		}
-		if target.isCurrent {
+		if target.isCurrentWorktree {
 			return fmt.Errorf("--worktree path is the current worktree; omit --worktree to check out here")
 		}
-		reuseWorktree = target.isRepoRoot
+		reuseWorktree = target.isExistingWorktree
 	}
 
 	cfg, err := opts.Config()
@@ -232,9 +232,7 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 			if localBranchExists(opts.GitClient, localBranch) {
 				cmds = append(cmds, worktreeCheckoutCmds(opts.Worktree, localBranch, remoteBranchRef, opts.Force)...)
 			} else {
-				// Branch does not exist yet (e.g. reusing a worktree for a
-				// different PR with a new --branch name): create it tracking
-				// the remote branch.
+				// New --branch name while reusing a worktree: create it tracking the remote.
 				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-b", localBranch, "--track", remoteBranch})
 			}
 		} else if localBranchExists(opts.GitClient, localBranch) {
@@ -273,20 +271,13 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	currentBranch, _ := opts.Branch()
 	if opts.Worktree != "" {
 		if reuseWorktree {
-			// FETCH_HEAD is per-worktree; fetch inside the linked worktree
-			// rather than the main worktree. We fetch to FETCH_HEAD because
-			// git refuses to update a branch via refspec when it is checked
-			// out in a worktree.
+			// FETCH_HEAD is per-worktree, and git refuses to update a branch via
+			// refspec while it is checked out, so fetch to FETCH_HEAD inside the worktree.
 			cmds = append(cmds, []string{"-C", opts.Worktree, "fetch", baseURLOrName, ref, "--no-tags"})
 			if localBranchExists(opts.GitClient, localBranch) {
-				// Branch already exists: switch to it and sync, preserving the
-				// no-force safety guarantee used elsewhere (ff-only merge unless
-				// --force, which hard-resets).
 				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", localBranch})
 				cmds = append(cmds, syncBranchCmds(opts.Worktree, "FETCH_HEAD", opts.Force)...)
 			} else {
-				// Branch does not exist yet (e.g. switching the worktree to a
-				// different fork PR): create it from FETCH_HEAD.
 				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-b", localBranch, "FETCH_HEAD"})
 			}
 		} else {
@@ -340,27 +331,22 @@ func localBranchExists(client *git.Client, b string) bool {
 	return err == nil
 }
 
-// worktreeTarget holds what checkoutRun needs to know about a --worktree path,
-// resolved once up front so the command builders stay pure and we avoid asking
-// git the same questions repeatedly.
+// worktreeTarget describes a --worktree path, resolved once up front so the
+// command builders stay pure instead of each re-querying git.
 type worktreeTarget struct {
-	// isCurrent is true when the path resolves to the worktree the command is
-	// already running in. Checking a PR out there would silently switch the
-	// current tree's branch, defeating the purpose of --worktree, so callers
-	// reject it.
-	isCurrent bool
-	// isRepoRoot is true when the path is the root of an existing linked
-	// worktree belonging to this repository, meaning we reuse it rather than
-	// creating a new one.
-	isRepoRoot bool
+	// isCurrentWorktree means the path is the worktree we are already running
+	// in. Checking out there would silently switch its branch, so callers reject it.
+	isCurrentWorktree bool
+	// isExistingWorktree means the path is the root of an existing linked
+	// worktree of this repo, so we reuse it rather than creating a new one.
+	isExistingWorktree bool
 }
 
 // resolveWorktreeTarget asks git about path and the current worktree, letting
-// git resolve symlinks (in any path component), "..", case, and trailing
-// slashes for us instead of comparing paths ourselves. Detection is
-// best-effort: if the current or target worktree cannot be determined (e.g. the
-// path does not exist yet or is not a git directory), the corresponding flags
-// stay false so normal flow proceeds and git worktree add handles the path.
+// git resolve symlinks, "..", case, and trailing slashes for us instead of
+// comparing paths ourselves. Detection is best-effort: if either worktree
+// cannot be determined (e.g. the path does not exist yet), the flags stay false
+// so normal flow proceeds and git worktree add handles the path.
 func resolveWorktreeTarget(client *git.Client, path string) (worktreeTarget, error) {
 	var wt worktreeTarget
 	abs, err := filepath.Abs(path)
@@ -368,31 +354,28 @@ func resolveWorktreeTarget(client *git.Client, path string) (worktreeTarget, err
 		return wt, err
 	}
 
-	// Current worktree: toplevel then git-common-dir.
 	current, err := revParseFacts(client, "", "--show-toplevel", "--git-common-dir")
 	if err != nil || len(current) < 2 {
 		return wt, nil
 	}
 	currentToplevel, currentCommonDir := current[0], current[len(current)-1]
 
-	// Target worktree: toplevel, prefix (empty exactly at a worktree root),
-	// then git-common-dir. Non-existent and non-git directories error out here.
+	// A non-existent or non-git target errors out here, leaving both flags false.
 	target, err := revParseFacts(client, abs, "--show-toplevel", "--show-prefix", "--git-common-dir")
 	if err != nil || len(target) < 3 {
 		return wt, nil
 	}
 	targetToplevel, targetPrefix, targetCommonDir := target[0], target[1], target[2]
 
-	wt.isCurrent = targetToplevel == currentToplevel
+	wt.isCurrentWorktree = targetToplevel == currentToplevel
 	// A worktree root of this repo has an empty prefix and shares our common dir.
-	wt.isRepoRoot = targetPrefix == "" && targetCommonDir == currentCommonDir
+	wt.isExistingWorktree = targetPrefix == "" && targetCommonDir == currentCommonDir
 	return wt, nil
 }
 
 // revParseFacts runs `git rev-parse --path-format=absolute <flags...>` and
-// returns one output line per flag, in flag order. When dir is non-empty the
-// query is scoped to that directory with -C. Results are absolute, canonical
-// paths (an empty --show-prefix yields an empty line).
+// returns one absolute path per flag, in flag order (an empty --show-prefix
+// yields an empty string). When dir is non-empty the query is scoped there with -C.
 func revParseFacts(client *git.Client, dir string, flags ...string) ([]string, error) {
 	args := append([]string{"rev-parse", "--path-format=absolute"}, flags...)
 	if dir != "" {
@@ -455,12 +438,12 @@ func worktreeCheckoutCmds(path, branch, ref string, force bool) [][]string {
 	return cmds
 }
 
-// ensureWorktreePathSafe validates a --worktree target before we write to it.
-// The path must be either non-existent (git will create the worktree) or an
-// existing directory, and never a symlink at its final component. A symlinked
-// ancestor (e.g. macOS /tmp -> /private/tmp) is allowed; only the leaf is
-// checked, using os.Lstat so a leaf symlink is not followed. Rejecting a leaf
-// symlink is defense-in-depth against writing PR content through a planted link.
+// ensureWorktreePathSafe validates a --worktree target before we write to it:
+// it must be a non-existent path (git will create it) or an existing directory,
+// and never a symlink at its final component. A symlinked ancestor (e.g. macOS
+// /tmp -> /private/tmp) is fine; os.Lstat checks only the leaf so it is not
+// followed. Rejecting a leaf symlink guards against writing PR content through a
+// planted link.
 func ensureWorktreePathSafe(path string) error {
 	fi, err := os.Lstat(path)
 	switch {
