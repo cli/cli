@@ -1218,6 +1218,113 @@ func TestSearcherIssuesAdvancedSyntax(t *testing.T) {
 	}
 }
 
+func TestSearcherIssuesSemanticSearch(t *testing.T) {
+	tests := []struct {
+		name       string
+		searchType string
+		detector   fd.Detector
+		wantValues url.Values
+		wantErr    string
+	}{
+		{
+			name:       "semantic search sends search_type=semantic",
+			searchType: "semantic",
+			detector:   fd.SemanticSearchSupported(),
+			wantValues: url.Values{"search_type": []string{"semantic"}},
+		},
+		{
+			name:       "hybrid search sends search_type=hybrid",
+			searchType: "hybrid",
+			detector:   fd.SemanticSearchSupported(),
+			wantValues: url.Values{"search_type": []string{"hybrid"}},
+		},
+		{
+			name:       "lexical search sends no search_type param",
+			searchType: "",
+			detector:   fd.SemanticSearchSupported(),
+			wantValues: url.Values{"search_type": nil}, // assert absence
+		},
+		{
+			name:       "semantic search not supported on host",
+			searchType: "semantic",
+			detector:   fd.SemanticSearchUnsupported(),
+			wantErr:    "semantic search is not supported on this host: github.com",
+		},
+		{
+			name:       "hybrid search not supported on host",
+			searchType: "hybrid",
+			detector:   fd.SemanticSearchUnsupported(),
+			wantErr:    "hybrid search is not supported on this host: github.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			if tt.wantErr == "" {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/issues", tt.wantValues),
+					httpmock.JSONResponse(IssuesResult{}),
+				)
+			}
+
+			query := Query{
+				Kind:       KindIssues,
+				Limit:      30,
+				Keywords:   []string{"keyword"},
+				SearchType: tt.searchType,
+			}
+
+			client := &http.Client{Transport: reg}
+			searcher := NewSearcher(client, "github.com", tt.detector)
+
+			_, err := searcher.Issues(query)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSearcherIssuesSemanticSearchIsBoundedToSinglePage(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	// The response advertises a next page via the Link header. Only the first
+	// page is registered, so if fetching were to paginate it would request an
+	// unregistered second page and fail.
+	firstRes := httpmock.JSONResponse(map[string]interface{}{
+		"incomplete_results": false,
+		"total_count":        2,
+		"items": []interface{}{
+			map[string]interface{}{"number": 1234},
+		},
+	})
+	firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/issues?page=2&per_page=30&q=org%3Agithub>; rel="next"`)
+	reg.Register(
+		httpmock.QueryMatcher("GET", "search/issues", url.Values{"search_type": []string{"semantic"}}),
+		firstRes,
+	)
+
+	query := Query{
+		Kind:       KindIssues,
+		Limit:      100,
+		Keywords:   []string{"keyword"},
+		SearchType: "semantic",
+	}
+
+	client := &http.Client{Transport: reg}
+	searcher := NewSearcher(client, "github.com", fd.SemanticSearchSupported())
+
+	result, err := searcher.Issues(query)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(result.Items))
+}
+
 func TestSearcherURL(t *testing.T) {
 	query := Query{
 		Keywords: []string{"keyword"},

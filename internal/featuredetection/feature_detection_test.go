@@ -445,6 +445,24 @@ func TestAdvancedIssueSearchSupport(t *testing.T) {
 	withIssueAdvanced := `{"data":{"SearchType":{"enumValues":[{"name":"ISSUE"},{"name":"ISSUE_ADVANCED"},{"name":"REPOSITORY"},{"name":"USER"},{"name":"DISCUSSION"}]}}}`
 	withoutIssueAdvanced := `{"data":{"SearchType":{"enumValues":[{"name":"ISSUE"},{"name":"REPOSITORY"},{"name":"USER"},{"name":"DISCUSSION"}]}}}`
 
+	// Dotcom hosts (github.com and ghe.com data residency) additionally expose
+	// ISSUE_SEMANTIC and ISSUE_HYBRID on the SearchType enum. Single-tenant GHES
+	// does not.
+	withIssueAdvancedAndSemantic := `{"data":{"SearchType":{"enumValues":[{"name":"ISSUE"},{"name":"ISSUE_ADVANCED"},{"name":"ISSUE_SEMANTIC"},{"name":"ISSUE_HYBRID"},{"name":"REPOSITORY"},{"name":"USER"},{"name":"DISCUSSION"}]}}}`
+	withoutIssueAdvancedWithSemantic := `{"data":{"SearchType":{"enumValues":[{"name":"ISSUE"},{"name":"ISSUE_SEMANTIC"},{"name":"ISSUE_HYBRID"},{"name":"REPOSITORY"},{"name":"USER"},{"name":"DISCUSSION"}]}}}`
+
+	dotcomSupportedAsOptIn := SearchFeatures{
+		AdvancedIssueSearchAPI:      true,
+		AdvancedIssueSearchAPIOptIn: true,
+		SemanticSearch:              true,
+		HybridSearch:                true,
+	}
+	dotcomSupportedAsOnlyBackend := SearchFeatures{
+		AdvancedIssueSearchAPI: true,
+		SemanticSearch:         true,
+		HybridSearch:           true,
+	}
+
 	tests := []struct {
 		name         string
 		hostname     string
@@ -457,10 +475,10 @@ func TestAdvancedIssueSearchSupport(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query SearchType_enumValues\b`),
-					httpmock.StringResponse(withIssueAdvanced),
+					httpmock.StringResponse(withIssueAdvancedAndSemantic),
 				)
 			},
-			wantFeatures: advancedIssueSearchSupportedAsOptIn,
+			wantFeatures: dotcomSupportedAsOptIn,
 		},
 		{
 			name:     "github.com, after ISSUE_ADVANCED cleanup",
@@ -468,10 +486,10 @@ func TestAdvancedIssueSearchSupport(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query SearchType_enumValues\b`),
-					httpmock.StringResponse(withoutIssueAdvanced),
+					httpmock.StringResponse(withoutIssueAdvancedWithSemantic),
 				)
 			},
-			wantFeatures: advancedIssueSearchSupportedAsOnlyBackend,
+			wantFeatures: dotcomSupportedAsOnlyBackend,
 		},
 		{
 			name:     "ghec data residency (ghe.com), before ISSUE_ADVANCED cleanup",
@@ -479,10 +497,10 @@ func TestAdvancedIssueSearchSupport(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query SearchType_enumValues\b`),
-					httpmock.StringResponse(withIssueAdvanced),
+					httpmock.StringResponse(withIssueAdvancedAndSemantic),
 				)
 			},
-			wantFeatures: advancedIssueSearchSupportedAsOptIn,
+			wantFeatures: dotcomSupportedAsOptIn,
 		},
 		{
 			name:     "ghec data residency (ghe.com), after ISSUE_ADVANCED cleanup",
@@ -490,10 +508,10 @@ func TestAdvancedIssueSearchSupport(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query SearchType_enumValues\b`),
-					httpmock.StringResponse(withoutIssueAdvanced),
+					httpmock.StringResponse(withoutIssueAdvancedWithSemantic),
 				)
 			},
-			wantFeatures: advancedIssueSearchSupportedAsOnlyBackend,
+			wantFeatures: dotcomSupportedAsOnlyBackend,
 		},
 		{
 			name:     "GHE 3.18, before ISSUE_ADVANCED cleanup",

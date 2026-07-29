@@ -36,6 +36,10 @@ type Query struct {
 	Order      string
 	Page       int
 	Qualifiers Qualifiers
+	// SearchType selects the issue search backend ("semantic" or "hybrid");
+	// empty uses the default lexical search. Maps to the REST search_type
+	// parameter, not the q string.
+	SearchType string
 	Sort       string
 }
 
