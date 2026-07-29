@@ -120,6 +120,9 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if err := ensureWorktreePathSafe(opts.Worktree); err != nil {
 			return err
 		}
+		if isCurrentWorktree(opts.GitClient, opts.Worktree) {
+			return fmt.Errorf("--worktree path is the current worktree; omit --worktree to check out here")
+		}
 	}
 
 	cfg, err := opts.Config()
@@ -331,25 +334,106 @@ func localBranchExists(client *git.Client, b string) bool {
 	return err == nil
 }
 
-// isWorktreeAtPath reports whether the given path is a registered git worktree.
+// isWorktreeAtPath reports whether path is the root of a git worktree belonging
+// to this repository. Rather than enumerating and normalizing worktree paths, it
+// asks git about the single directory and lets git resolve symlinks (in any path
+// component), "..", case, and trailing slashes for us.
 func isWorktreeAtPath(client *git.Client, path string) bool {
-	cmd, err := client.Command(context.Background(), "worktree", "list", "--porcelain")
+	abs, err := filepath.Abs(path)
 	if err != nil {
 		return false
+	}
+	prefix, commonDir, err := worktreeInfoAtPath(client, abs)
+	if err != nil {
+		// Non-existent and non-git directories error out here.
+		return false
+	}
+	// A non-empty prefix means path is a subdirectory of a worktree, not its root.
+	if prefix != "" {
+		return false
+	}
+	repoCommonDir, err := repoCommonDir(client)
+	if err != nil {
+		return false
+	}
+	// Confirm the worktree belongs to this repo and not an unrelated one.
+	return commonDir == repoCommonDir
+}
+
+// worktreeInfoAtPath asks git about absPath and returns its prefix within the
+// containing worktree (empty exactly when absPath is the worktree root) and the
+// worktree's shared git common directory. Both are absolute, canonical paths.
+// It returns an error for non-existent or non-git directories.
+func worktreeInfoAtPath(client *git.Client, absPath string) (prefix, commonDir string, err error) {
+	cmd, err := client.Command(context.Background(),
+		"-C", absPath,
+		"rev-parse", "--path-format=absolute", "--show-prefix", "--git-common-dir")
+	if err != nil {
+		return "", "", err
 	}
 	out, err := cmd.Output()
 	if err != nil {
+		return "", "", err
+	}
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(lines) < 2 {
+		return "", "", fmt.Errorf("unexpected rev-parse output: %q", string(out))
+	}
+	return lines[0], lines[len(lines)-1], nil
+}
+
+// repoCommonDir returns the shared git common directory for the client's
+// repository, as an absolute, canonical path.
+func repoCommonDir(client *git.Client) (string, error) {
+	cmd, err := client.Command(context.Background(),
+		"rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// isCurrentWorktree reports whether path resolves to the worktree the command is
+// already running in. Checking a PR out there would silently switch the current
+// tree's branch, defeating the purpose of --worktree, so callers reject it.
+// Detection is best-effort: if either toplevel cannot be determined (e.g. the
+// path does not exist yet), it returns false so normal flow proceeds.
+func isCurrentWorktree(client *git.Client, path string) bool {
+	abs, err := filepath.Abs(path)
+	if err != nil {
 		return false
 	}
-	resolved := resolvePath(path)
-	for _, line := range strings.Split(string(out), "\n") {
-		if p, ok := strings.CutPrefix(line, "worktree "); ok {
-			if resolvePath(p) == resolved {
-				return true
-			}
-		}
+	current, err := worktreeToplevel(client, "")
+	if err != nil {
+		return false
 	}
-	return false
+	target, err := worktreeToplevel(client, abs)
+	if err != nil {
+		return false
+	}
+	return current == target
+}
+
+// worktreeToplevel returns the absolute, canonical root of the worktree
+// containing dir. When dir is empty, the client's working directory is used.
+func worktreeToplevel(client *git.Client, dir string) (string, error) {
+	args := []string{"rev-parse", "--path-format=absolute", "--show-toplevel"}
+	if dir != "" {
+		args = append([]string{"-C", dir}, args...)
+	}
+	cmd, err := client.Command(context.Background(), args...)
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // detachCmds returns the commands for a detached checkout. When reusing an
@@ -396,20 +480,6 @@ func worktreeCheckoutCmds(path, branch, ref string, force bool) [][]string {
 	cmds := [][]string{{"-C", path, "checkout", branch}}
 	cmds = append(cmds, syncBranchCmds(path, ref, force)...)
 	return cmds
-}
-
-// resolvePath canonicalizes a path for comparison against git-reported worktree
-// paths. Git resolves symlinks internally, so on systems where common directories
-// are symlinks (e.g. macOS /tmp -> /private/tmp), the user-provided path and the
-// path git reports would otherwise not match.
-func resolvePath(p string) string {
-	if abs, err := filepath.Abs(p); err == nil {
-		p = abs
-	}
-	if resolved, err := filepath.EvalSymlinks(p); err == nil {
-		return resolved
-	}
-	return p
 }
 
 // ensureWorktreePathSafe validates a --worktree target before we write to it.
