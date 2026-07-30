@@ -35,6 +35,10 @@ const (
 	// allSkillsKey is the persistent option label for selecting all skills.
 	allSkillsKey = "(all skills)"
 
+	// multiSelectLabelMargin reserves columns for the widest option prefix used
+	// by the available prompters: huh's border, padding, cursor, and checkbox.
+	multiSelectLabelMargin = 8
+
 	// maxSearchResults caps how many skills are shown per search page in
 	// interactive selection, keeping the prompt readable.
 	maxSearchResults = 30
@@ -721,10 +725,9 @@ func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, ca
 		sel.fetchDescriptions()
 	}
 
-	tw := opts.IO.TerminalWidth()
-	descWidth := tw - 35
-	if descWidth < 20 {
-		descWidth = 20
+	labelWidth := opts.IO.TerminalWidth() - multiSelectLabelMargin
+	if labelWidth < 1 {
+		labelWidth = 1
 	}
 
 	selected, err := opts.Prompter.MultiSelectWithSearch(
@@ -732,7 +735,7 @@ func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, ca
 		"Filter skills",
 		nil,
 		[]string{allSkillsKey},
-		skillSearchFunc(skills, descWidth),
+		skillSearchFunc(skills, labelWidth),
 	)
 	if err != nil {
 		return nil, err
@@ -837,7 +840,7 @@ func matchLocalSkillByName(opts *InstallOptions, skills []discovery.Skill) ([]di
 
 // skillSearchFunc returns a search function for MultiSelectWithSearch that
 // filters skills by case-insensitive substring match on name and description.
-func skillSearchFunc(skills []discovery.Skill, descWidth int) func(string) prompter.MultiSelectSearchResult {
+func skillSearchFunc(skills []discovery.Skill, labelWidth int) func(string) prompter.MultiSelectSearchResult {
 	return func(query string) prompter.MultiSelectSearchResult {
 		var matched []discovery.Skill
 		if query == "" {
@@ -862,11 +865,11 @@ func skillSearchFunc(skills []discovery.Skill, descWidth int) func(string) promp
 		labels := make([]string, len(matched))
 		for i, s := range matched {
 			keys[i] = s.DisplayName()
+			label := s.DisplayName()
 			if s.Description != "" {
-				labels[i] = fmt.Sprintf("%s - %s", s.DisplayName(), truncateDescription(s.Description, descWidth))
-			} else {
-				labels[i] = s.DisplayName()
+				label = fmt.Sprintf("%s - %s", label, text.RemoveExcessiveWhitespace(s.Description))
 			}
+			labels[i] = text.Truncate(labelWidth, label)
 		}
 
 		return prompter.MultiSelectSearchResult{
@@ -1036,10 +1039,6 @@ func formatPlanHosts(hosts []*registry.AgentHost) string {
 		names[i] = host.Name
 	}
 	return strings.Join(names, ", ")
-}
-
-func truncateDescription(s string, maxWidth int) string {
-	return text.Truncate(maxWidth, text.RemoveExcessiveWhitespace(s))
 }
 
 func checkOverwrite(opts *InstallOptions, skills []discovery.Skill, targetDir string, canPrompt bool) ([]discovery.Skill, error) {
