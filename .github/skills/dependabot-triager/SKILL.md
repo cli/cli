@@ -104,17 +104,24 @@ There is no server-side author filter, so filter the results yourself:
   the PR, no matter what it contains. A comment from any other author is not
   your state, even if it carries a marker that looks like yours.
 
-Among your own comments, look for the hidden marker of the exact form:
+Among your own comments, look for the state marker, which is the last line of
+the comment and has the exact form:
 
 ```
-<!-- dependabot-triage: head=<sha> -->
+_Assessed at head commit `<sha>`._
 ```
+
+where `<sha>` is a full 40-character commit SHA.
 
 - If a marker exists in one of **your** comments and its `<sha>` **equals** the
   current head SHA from Step 1 → you have already reviewed this exact state.
   **Skip this PR and post nothing.**
 - If no such marker exists, or the marked `<sha>` **differs** from the current
   head SHA → continue to Step 4 and post a fresh assessment.
+
+The marker is deliberately visible text rather than an HTML comment: the
+safe-output pipeline strips HTML comments from comment bodies, so a hidden
+marker would never survive to be read back on the next run.
 
 ### Step 4 — Assess merge confidence
 
@@ -194,14 +201,17 @@ Include, in this order:
    and a one-line note on the upstream diff you reviewed.
 4. A closing line: _"Advisory only — this bot never merges, approves, or labels;
    a maintainer decides."_
-5. On its own line at the very end, the hidden state marker with the current
-   head SHA:
+5. On its own line at the very end, the state marker carrying the current head
+   SHA:
 
    ```
-   <!-- dependabot-triage: head=<sha> -->
+   _Assessed at head commit `<sha>`._
    ```
 
-   Use the exact head SHA from Step 1 so the next run can dedup correctly.
+   Use the exact, full 40-character head SHA from Step 1 so the next run can
+   dedup correctly. Do not abbreviate it and do not wrap it in an HTML comment -
+   the safe-output pipeline strips HTML comments, which would silently break
+   dedup and make this workflow re-comment on every run.
 
 Because the safe-output is configured with `hide-older-comments: true`, posting
 this comment collapses your previous triage comment on the same PR, leaving one

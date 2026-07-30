@@ -7,11 +7,13 @@ description: |
   comment per PR head commit and re-comments only when that commit changes. It
   is advisory only and NEVER merges, approves, or labels a PR.
 
-# NOTE: do not put literal HTML comments in this file's body. The prompt
-# renderer strips them, so a marker written inline here reaches the agent as an
-# empty string. The dedup marker's literal form lives in
-# .github/skills/dependabot-triager/SKILL.md, which the agent reads verbatim
-# from the checkout.
+# NOTE: the dedup marker is deliberately visible markdown, not an HTML comment.
+# Two separate gh-aw layers strip HTML comments: the prompt renderer erases them
+# from this file's body (so the agent would be told to look for an empty
+# string), and the safe-output sanitizer erases them from posted comment bodies
+# (so the marker would never survive to be read back). Either one silently
+# breaks dedup and makes this workflow re-comment on every run. Both were
+# observed in a trial run. Do not "tidy" the marker into an HTML comment.
 #
 # Scheduled reconciler ONLY. This workflow intentionally has no pull_request or
 # pull_request_target trigger: it never runs in a pull-request-authored context,
@@ -97,22 +99,20 @@ reconcile protocol precisely:
 1. Read the PR head commit SHA (the change key).
 2. Check CI status; **skip and post nothing** if any check is still pending.
 3. Fetch the PR's conversation comments, keep only those authored by
-   `cli-triage[bot]` (your own posting identity), and look for the hidden state
-   marker in them - an HTML comment whose content is
-   `dependabot-triage: head=<sha>`. The skill file shows its exact literal form;
-   use that. **Skip and post nothing** if the marked SHA equals the current head
-   SHA (already reviewed this exact state). Never treat another author's comment
-   as your state.
+   `cli-triage[bot]` (your own posting identity), and look for the state marker
+   in them - a final line of the form ``_Assessed at head commit `<sha>`._``.
+   **Skip and post nothing** if the marked SHA equals the current head SHA
+   (already reviewed this exact state). Never treat another author's comment as
+   your state.
 4. Otherwise assess merge confidence (including validating against the upstream
    source diff) and post exactly one comment.
 
 ## Step 4: Post the assessment
 
 When a PR needs a fresh assessment, use `add-comment` with `item_number` set to
-that PR's number. Follow the skill's comment format, ending with the hidden
-state marker described above carrying the current head SHA, in the exact literal
-form given in the skill file. Posting collapses any previous triage comment on
-that PR (`hide-older-comments`).
+that PR's number. Follow the skill's comment format, ending with the state
+marker described above carrying the current, full head SHA. Posting collapses
+any previous triage comment on that PR (`hide-older-comments`).
 
 ## Constraints
 
