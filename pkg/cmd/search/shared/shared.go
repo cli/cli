@@ -126,10 +126,12 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 			issueNum = "#" + issueNum
 		}
 		if issue.IsPullRequest() {
-			color := tableprinter.WithColor(cs.ColorFromString(colorForPRState(issue.State())))
+			color := tableprinter.WithColor(cs.WithHyperlink(issue.URL,
+				cs.ColorFromString(colorForPRState(issue.State()))))
 			tp.AddField(issueNum, color)
 		} else {
-			color := tableprinter.WithColor(cs.ColorFromString(colorForIssueState(issue.State(), issue.StateReason)))
+			color := tableprinter.WithColor(cs.WithHyperlink(issue.URL,
+				cs.ColorFromString(colorForIssueState(issue.State(), issue.StateReason))))
 			tp.AddField(issueNum, color)
 		}
 		if !tp.IsTTY() {

@@ -143,6 +143,9 @@ func listRun(opts *ListOptions) error {
 	if features.VisibilityField {
 		fields = append(defaultFields, "visibility")
 	}
+	if opts.IO.IsLinkEnabled() {
+		fields = append(fields, "url")
+	}
 
 	filter := FilterOptions{
 		Visibility:  opts.Visibility,
@@ -193,7 +196,7 @@ func listRun(opts *ListOptions) error {
 			t = &repo.CreatedAt
 		}
 
-		tp.AddField(repo.NameWithOwner, tableprinter.WithColor(cs.Bold))
+		tp.AddField(repo.NameWithOwner, tableprinter.WithColor(cs.WithHyperlink(repo.URL, cs.Bold)))
 		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description))
 		tp.AddField(info, tableprinter.WithColor(infoColor))
 		tp.AddTimeField(opts.Now(), *t, cs.Muted)

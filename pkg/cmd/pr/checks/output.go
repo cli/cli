@@ -10,6 +10,7 @@ import (
 
 func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 	cs := io.ColorScheme()
+	isLinkEnabled := io.IsLinkEnabled()
 	elapsed := ""
 
 	if !o.StartedAt.IsZero() && !o.CompletedAt.IsZero() {
@@ -43,10 +44,12 @@ func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 			name += fmt.Sprintf(" (%s)", o.Event)
 		}
 		tp.AddField(mark, tableprinter.WithColor(markColor))
-		tp.AddField(name)
+		tp.AddField(name, tableprinter.WithColor(cs.WithHyperlink(o.Link, nil)))
 		tp.AddField(o.Description)
 		tp.AddField(elapsed)
-		tp.AddField(o.Link)
+		if !isLinkEnabled {
+			tp.AddField(o.Link)
+		}
 	} else {
 		tp.AddField(o.Name)
 		if o.Bucket == "cancel" {
@@ -94,7 +97,10 @@ func printSummary(io *iostreams.IOStreams, counts checkCounts) {
 func printTable(io *iostreams.IOStreams, checks []check) error {
 	var headers []string
 	if io.IsStdoutTTY() {
-		headers = []string{"", "NAME", "DESCRIPTION", "ELAPSED", "URL"}
+		headers = []string{"", "NAME", "DESCRIPTION", "ELAPSED"}
+		if !io.IsLinkEnabled() {
+			headers = append(headers, "URL")
+		}
 	} else {
 		headers = []string{"NAME", "STATUS", "ELAPSED", "URL", "DESCRIPTION"}
 	}

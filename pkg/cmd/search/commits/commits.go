@@ -162,8 +162,8 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Commi
 	cs := io.ColorScheme()
 	tp := tableprinter.New(io, tableprinter.WithHeader("Repo", "SHA", "Message", "Author", "Created"))
 	for _, commit := range results.Items {
-		tp.AddField(commit.Repo.FullName)
-		tp.AddField(commit.Sha)
+		tp.AddField(commit.Repo.FullName, tableprinter.WithColor(cs.WithHyperlink(commit.Repo.URL, nil)))
+		tp.AddField(commit.Sha, tableprinter.WithColor(cs.WithHyperlink(commit.URL, nil)))
 		tp.AddField(text.RemoveExcessiveWhitespace(commit.Info.Message))
 		tp.AddField(commit.Author.Login)
 		tp.AddTimeField(now, commit.Info.Author.Date, cs.Muted)
