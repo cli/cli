@@ -7,6 +7,12 @@ description: |
   comment per PR head commit and re-comments only when that commit changes. It
   is advisory only and NEVER merges, approves, or labels a PR.
 
+# NOTE: do not put literal HTML comments in this file's body. The prompt
+# renderer strips them, so a marker written inline here reaches the agent as an
+# empty string. The dedup marker's literal form lives in
+# .github/skills/dependabot-triager/SKILL.md, which the agent reads verbatim
+# from the checkout.
+#
 # Scheduled reconciler ONLY. This workflow intentionally has no pull_request or
 # pull_request_target trigger: it never runs in a pull-request-authored context,
 # so it never checks out or executes untrusted PR head code, and it can hold
@@ -91,10 +97,12 @@ reconcile protocol precisely:
 1. Read the PR head commit SHA (the change key).
 2. Check CI status; **skip and post nothing** if any check is still pending.
 3. Fetch the PR's conversation comments, keep only those authored by
-   `cli-triage[bot]` (your own posting identity), and look for the
-   `<!-- dependabot-triage: head=<sha> -->` marker in them; **skip and post
-   nothing** if the marked SHA equals the current head SHA (already reviewed
-   this exact state). Never treat another author's comment as your state.
+   `cli-triage[bot]` (your own posting identity), and look for the hidden state
+   marker in them - an HTML comment whose content is
+   `dependabot-triage: head=<sha>`. The skill file shows its exact literal form;
+   use that. **Skip and post nothing** if the marked SHA equals the current head
+   SHA (already reviewed this exact state). Never treat another author's comment
+   as your state.
 4. Otherwise assess merge confidence (including validating against the upstream
    source diff) and post exactly one comment.
 
@@ -102,9 +110,9 @@ reconcile protocol precisely:
 
 When a PR needs a fresh assessment, use `add-comment` with `item_number` set to
 that PR's number. Follow the skill's comment format, ending with the hidden
-`<!-- dependabot-triage: head=<sha> -->` marker carrying the current head SHA.
-Posting collapses any previous triage comment on that PR
-(`hide-older-comments`).
+state marker described above carrying the current head SHA, in the exact literal
+form given in the skill file. Posting collapses any previous triage comment on
+that PR (`hide-older-comments`).
 
 ## Constraints
 
