@@ -96,6 +96,41 @@ func Test_NewCmdDownload(t *testing.T) {
 				DestinationDir: ".",
 			},
 		},
+		{
+			name:  "single stream flag",
+			args:  "2345 --single-stream",
+			isTTY: true,
+			want: DownloadOptions{
+				RunID:          "2345",
+				DoPrompt:       false,
+				Names:          []string(nil),
+				DestinationDir: ".",
+				SingleStream:   true,
+			},
+		},
+		{
+			name:  "artifact id flag",
+			args:  "-a 6384611797",
+			isTTY: true,
+			want: DownloadOptions{
+				ArtifactID:     6384611797,
+				DoPrompt:       false,
+				Names:          []string(nil),
+				DestinationDir: ".",
+			},
+		},
+		{
+			name:    "artifact id with run id is rejected",
+			args:    "2345 -a 6384611797",
+			isTTY:   true,
+			wantErr: "--artifact-id cannot be combined with a run ID argument",
+		},
+		{
+			name:    "artifact id with name is rejected",
+			args:    "-a 6384611797 -n large",
+			isTTY:   true,
+			wantErr: "--artifact-id cannot be combined with --name or --pattern",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -142,6 +177,8 @@ func Test_NewCmdDownload(t *testing.T) {
 			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
 			assert.Equal(t, tt.want.DestinationDir, opts.DestinationDir)
 			assert.Equal(t, tt.want.DoPrompt, opts.DoPrompt)
+			assert.Equal(t, tt.want.SingleStream, opts.SingleStream)
+			assert.Equal(t, tt.want.ArtifactID, opts.ArtifactID)
 		})
 	}
 }
@@ -157,7 +194,8 @@ type testArtifact struct {
 }
 
 type fakePlatform struct {
-	runs []run
+	runs      []run
+	byIDFiles map[int64][]string
 }
 
 func (f *fakePlatform) List(runID string) ([]shared.Artifact, error) {
@@ -207,6 +245,23 @@ func (f *fakePlatform) Download(url string, dir safepaths.Absolute) error {
 	}
 
 	return errors.New("no artifact matches the provided URL")
+}
+
+func (f *fakePlatform) DownloadByID(id int64, dir safepaths.Absolute) error {
+	if err := os.MkdirAll(dir.String(), 0755); err != nil {
+		return err
+	}
+	files, ok := f.byIDFiles[id]
+	if !ok {
+		return fmt.Errorf("no artifact with id %d", id)
+	}
+	for _, file := range files {
+		path := filepath.Join(dir.String(), file)
+		if err := os.WriteFile(path, []byte{}, 0600); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func Test_runDownload(t *testing.T) {
@@ -710,6 +765,12 @@ func Test_runDownload(t *testing.T) {
 			},
 			expectedFiles: []string{},
 			wantErr:       "error downloading ..: would result in path traversal",
+		},
+		{
+			name:          "download by artifact id",
+			opts:          DownloadOptions{ArtifactID: 6384611797},
+			platform:      &fakePlatform{byIDFiles: map[int64][]string{6384611797: {"result.txt"}}},
+			expectedFiles: []string{"result.txt"},
 		},
 	}
 	for _, tt := range tests {
