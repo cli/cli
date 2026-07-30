@@ -45,6 +45,7 @@ Severity: blocking
 Severity: non-blocking
 
 - Go modernization the toolchain would apply, such as what `go fix` would change.
+- Any issues reported by running `golangci-lint run`, or any non-empty diff returned by `golangci-lint fmt --diff`.
 - A refactor that meaningfully cuts lines of code.
 - An alternative approach with different trade-offs.
 - Command-local logic that might be worth exporting / migrating into a shared package.
@@ -79,6 +80,7 @@ Flag a change to the non-interactive contract as a requirement:
 - Changing a default value or behavior on the non-interactive path.
 - Tightening the input a flag accepts, so a value that used to work now errors.
 - Changing an exit code, or erroring where the command used to succeed.
+- Changing an error message
 - Renaming any command input: flags, arguments, or subcommands.
 
 ## How to report
