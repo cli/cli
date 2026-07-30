@@ -54,6 +54,8 @@ type TemplateOption struct {
 // markdown with YAML front-matter), Discussion Category Forms have no fixed
 // shape: "attributes" means something different for every element type.
 func (e *TemplateElement) UnmarshalYAML(value *yaml.Node) error {
+	*e = TemplateElement{}
+
 	var shape struct {
 		Type        string    `yaml:"type"`
 		Attributes  yaml.Node `yaml:"attributes"`

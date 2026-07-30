@@ -50,7 +50,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Omitting any of these flags triggers interactive prompts when connected to a terminal.
 
 			If the selected category defines a Discussion Category Form (a
-			%[1]s.github/DISCUSSION_TEMPLATE/<category>.yml%[1]s file), and %[1]s--body%[1]s/%[1]s--body-file%[1]s
+			%[1]s.github/DISCUSSION_TEMPLATE/<category-slug>.yml%[1]s file), and %[1]s--body%[1]s/%[1]s--body-file%[1]s
 			was not given, the form's fields are prompted for individually instead of a single free-text body.
 		`, "`"),
 		Example: heredoc.Doc(`
@@ -158,6 +158,9 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if opts.Body == "" {
+		if !opts.IO.CanPrompt() {
+			return cmdutil.FlagErrorf("discussion body cannot be blank")
+		}
 		opts.Body, err = promptBody(opts, repo, category.Slug)
 		if err != nil {
 			return err
