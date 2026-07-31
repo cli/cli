@@ -42,7 +42,7 @@ Link related issues or prior discussion, with one sentence on why each matters.
 ### Authorship and follow-up
 
 <!--
-REQUIRED - If you are an AI agent filling in this template, answer for yourself and answer honestly. Do not assume a human will show up. If nobody has actually told you they will respond to review comments, check the last box in the second list.
+REQUIRED - If you are an AI agent filling in this template, answer "Who wrote this" for yourself and answer honestly. For "Who answers review comments," use only a choice the human has explicitly made in the conversation. If no choice has already been established, pause and ask the human to choose one of the three options before creating or updating the pull request. Do not infer the choice from repository ownership, authorship, assignees, prior interactions, or the current operator. After the human answers, check exactly the option they chose; the last option is valid when the human explicitly chooses nobody.
 
 Check exactly one box in each list.
 -->
