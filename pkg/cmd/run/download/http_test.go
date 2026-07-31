@@ -67,12 +67,12 @@ func Test_Download(t *testing.T) {
 
 	reg.Register(
 		httpmock.REST("GET", "repos/OWNER/REPO/actions/artifacts/12345/zip"),
-		httpmock.FileResponse("./fixtures/myproject.zip"))
+		httpmock.WithHeader(httpmock.FileResponse("./fixtures/myproject.zip"), "Content-Type", "application/zip"))
 
 	api := &apiPlatform{
 		client: &http.Client{Transport: reg},
 	}
-	require.NoError(t, api.Download("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", destDir))
+	require.NoError(t, api.Download("myproject.zip", "https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", destDir))
 
 	var paths []string
 	parentPrefix := tmpDir + string(filepath.Separator)
@@ -103,5 +103,49 @@ func Test_Download(t *testing.T) {
 		filepath.Join("artifact", "src") + "/",
 		filepath.Join("artifact", "src", "main.go"),
 		filepath.Join("artifact", "src", "util.go"),
+	}, paths)
+}
+
+func Test_NonZippedDownload(t *testing.T) {
+	tmpDir := t.TempDir()
+	destDir, err := safepaths.ParseAbsolute(filepath.Join(tmpDir, "artifact"))
+	require.NoError(t, err)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/actions/artifacts/12345/zip"),
+		httpmock.WithHeader(httpmock.FileResponse("./fixtures/mytest.json"), "Content-Type", "application/json"))
+
+	api := &apiPlatform{
+		client: &http.Client{Transport: reg},
+	}
+	require.NoError(t, api.Download("mytest.json", "https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", destDir))
+
+	var paths []string
+	parentPrefix := tmpDir + string(filepath.Separator)
+	err = filepath.Walk(tmpDir, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if p == tmpDir {
+			return nil
+		}
+		entry := strings.TrimPrefix(p, parentPrefix)
+		if info.IsDir() {
+			entry += "/"
+		} else if info.Mode()&0111 != 0 {
+			entry += "(X)"
+		}
+		paths = append(paths, entry)
+		return nil
+	})
+	require.NoError(t, err)
+
+	sort.Strings(paths)
+	assert.Equal(t, []string{
+		"artifact/",
+		filepath.Join("artifact", "mytest.json"),
 	}, paths)
 }
