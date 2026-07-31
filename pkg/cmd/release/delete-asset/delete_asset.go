@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -96,7 +97,7 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 		return fmt.Errorf("asset %s not found in release %s", opts.AssetName, release.TagName)
 	}
 
-	err = deleteAsset(httpClient, assetURL)
+	err = deleteAsset(httpClient, safeurl.NewImmutableSafeURL(assetURL))
 	if err != nil {
 		return err
 	}
@@ -111,8 +112,8 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 	return nil
 }
 
-func deleteAsset(httpClient *http.Client, assetURL string) error {
-	req, err := http.NewRequest("DELETE", assetURL, nil)
+func deleteAsset(httpClient *http.Client, assetURL safeurl.SafeURL) error {
+	req, err := http.NewRequest("DELETE", assetURL.String(), nil)
 	if err != nil {
 		return err
 	}

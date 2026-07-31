@@ -448,7 +448,7 @@ func TestResolveRef(t *testing.T) {
 			version: "main",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/main"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fmain"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "branch-sha"},
 					}))
@@ -461,10 +461,10 @@ func TestResolveRef(t *testing.T) {
 			version: "v1.0",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/v1.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fv1.0"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv1.0"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "abc123", "type": "commit"},
 					}))
@@ -477,10 +477,10 @@ func TestResolveRef(t *testing.T) {
 			version: "v2.0",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/v2.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fv2.0"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v2.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv2.0"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "tag-obj-sha", "type": "tag"},
 					}))
@@ -498,10 +498,10 @@ func TestResolveRef(t *testing.T) {
 			version: "deadbeef",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/deadbeef"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fdeadbeef"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/deadbeef"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fdeadbeef"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/commits/deadbeef"),
@@ -515,10 +515,10 @@ func TestResolveRef(t *testing.T) {
 			version: "nonexistent",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/nonexistent"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fnonexistent"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/nonexistent"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fnonexistent"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/commits/nonexistent"),
@@ -531,7 +531,7 @@ func TestResolveRef(t *testing.T) {
 			version: "release",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/release"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Frelease"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "branch-sha"},
 					}))
@@ -545,7 +545,7 @@ func TestResolveRef(t *testing.T) {
 			version: "refs/tags/v1.0",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv1.0"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "tag-sha", "type": "commit"},
 					}))
@@ -558,7 +558,7 @@ func TestResolveRef(t *testing.T) {
 			version: "refs/heads/feature",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/feature"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Ffeature"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "feature-sha"},
 					}))
@@ -571,7 +571,7 @@ func TestResolveRef(t *testing.T) {
 			version: "refs/tags/nonexistent",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/nonexistent"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fnonexistent"),
 					httpmock.StatusStringResponse(404, "not found"))
 			},
 			wantErr: `tag "nonexistent" not found in monalisa/octocat-skills`,
@@ -581,7 +581,7 @@ func TestResolveRef(t *testing.T) {
 			version: "refs/heads/nonexistent",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/nonexistent"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fnonexistent"),
 					httpmock.StatusStringResponse(404, "not found"))
 			},
 			wantErr: `branch "nonexistent" not found in monalisa/octocat-skills`,
@@ -593,7 +593,7 @@ func TestResolveRef(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.JSONResponse(map[string]interface{}{"tag_name": "v3.0"}))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "release-sha", "type": "commit"},
 					}))
@@ -611,7 +611,7 @@ func TestResolveRef(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills"),
 					httpmock.JSONResponse(map[string]interface{}{"default_branch": "main"}))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/main"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fmain"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "branch-sha"},
 					}))
@@ -624,7 +624,7 @@ func TestResolveRef(t *testing.T) {
 			version: "refs/tags/v4.0",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v4.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv4.0"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "tag-obj-sha", "type": "tag"},
 					}))
@@ -662,7 +662,7 @@ func TestResolveRef(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills"),
 					httpmock.JSONResponse(map[string]interface{}{"default_branch": "main"}))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/main"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fmain"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "fallback-sha"},
 					}))
@@ -687,7 +687,7 @@ func TestResolveRef(t *testing.T) {
 			version: "main",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/main"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fmain"),
 					httpmock.StatusStringResponse(500, "server error"))
 			},
 			wantErr: `branch "main" not found in monalisa/octocat-skills`,
@@ -697,7 +697,7 @@ func TestResolveRef(t *testing.T) {
 			version: "develop",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/develop"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fdevelop"),
 					httpmock.StatusStringResponse(403, "forbidden"))
 			},
 			wantErr: `branch "develop" not found in monalisa/octocat-skills`,
@@ -707,10 +707,10 @@ func TestResolveRef(t *testing.T) {
 			version: "v5.0",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/v5.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads%2Fv5.0"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v5.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv5.0"),
 					httpmock.StatusStringResponse(500, "server error"))
 			},
 			wantErr: `tag "v5.0" not found in monalisa/octocat-skills`,
@@ -789,7 +789,7 @@ func TestFetchBlob(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want, got.Raw())
 		})
 	}
 }

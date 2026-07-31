@@ -2,12 +2,12 @@ package delete
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type gpgKey struct {
@@ -16,8 +16,11 @@ type gpgKey struct {
 }
 
 func deleteGPGKey(httpClient *http.Client, host, id string) error {
-	url := fmt.Sprintf("%suser/gpg_keys/%s", ghinstance.RESTPrefix(host), id)
-	req, err := http.NewRequest("DELETE", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "user", "gpg_keys", id)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("DELETE", url.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -36,9 +39,12 @@ func deleteGPGKey(httpClient *http.Client, host, id string) error {
 }
 
 func getGPGKeys(httpClient *http.Client, host string) ([]gpgKey, error) {
-	resource := "user/gpg_keys"
-	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
-	req, err := http.NewRequest("GET", url, nil)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "user", "gpg_keys")
+	if err != nil {
+		return nil, err
+	}
+	u.SetQuery("per_page", "100")
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}

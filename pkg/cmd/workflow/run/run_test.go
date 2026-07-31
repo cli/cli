@@ -764,7 +764,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/minimal.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fminimal.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedNoInputsYAMLContent,
 					}))
@@ -808,7 +808,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/minimal.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fminimal.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedNoInputsYAMLContent,
 					}))
@@ -861,7 +861,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContent,
 					}))
@@ -914,7 +914,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContent,
 					}))
@@ -976,7 +976,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContentChoiceIp,
 					}))
@@ -1030,7 +1030,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContentChoiceIp,
 					}))
@@ -1091,7 +1091,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContentMissingChoiceIp,
 					}))

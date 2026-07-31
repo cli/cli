@@ -2,12 +2,12 @@ package delete
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type sshKey struct {
@@ -15,8 +15,11 @@ type sshKey struct {
 }
 
 func deleteSSHKey(httpClient *http.Client, host string, keyID string) error {
-	url := fmt.Sprintf("%suser/keys/%s", ghinstance.RESTPrefix(host), keyID)
-	req, err := http.NewRequest("DELETE", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "user", "keys", keyID)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("DELETE", url.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -35,8 +38,11 @@ func deleteSSHKey(httpClient *http.Client, host string, keyID string) error {
 }
 
 func getSSHKey(httpClient *http.Client, host string, keyID string) (*sshKey, error) {
-	url := fmt.Sprintf("%suser/keys/%s", ghinstance.RESTPrefix(host), keyID)
-	req, err := http.NewRequest("GET", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "user", "keys", keyID)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}

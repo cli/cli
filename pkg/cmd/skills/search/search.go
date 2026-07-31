@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/registry"
@@ -747,10 +748,15 @@ const rateLimitErrorMessage = "GitHub API rate limit exceeded. Please wait a min
 
 // executeSearch performs a single GitHub Code Search API call.
 func executeSearch(client *api.Client, host, query string, page, pageSize int) (*codeSearchResult, error) {
-	apiPath := fmt.Sprintf("search/code?q=%s&per_page=%d&page=%d",
-		url.QueryEscape(query), pageSize, page)
+	apiPath, err := safeurl.JoinPath("search", "code")
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("q", query)
+	apiPath.SetQuery("per_page", strconv.Itoa(pageSize))
+	apiPath.SetQuery("page", strconv.Itoa(page))
 	var result codeSearchResult
-	err := client.REST(host, "GET", apiPath, nil, &result)
+	err = client.REST(host, "GET", apiPath.String(), nil, &result)
 	if err != nil && isRateLimitError(err) {
 		return nil, fmt.Errorf("%s", rateLimitErrorMessage)
 	}
@@ -865,7 +871,7 @@ func fetchDescriptions(client *api.Client, host string, skills []skillResult) ma
 			if err != nil {
 				return
 			}
-			result, err := frontmatter.Parse(content)
+			result, err := frontmatter.Parse(content.Raw())
 			if err != nil {
 				return
 			}
@@ -924,9 +930,12 @@ func fetchRepoStars(client *api.Client, host string, skills []skillResult) map[i
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			apiPath := fmt.Sprintf("repos/%s/%s", owner, repo)
+			apiPath, err := safeurl.JoinPath("repos", owner, repo)
+			if err != nil {
+				return
+			}
 			var info repoInfo
-			if err := client.REST(host, "GET", apiPath, nil, &info); err != nil {
+			if err := client.REST(host, "GET", apiPath.String(), nil, &info); err != nil {
 				return
 			}
 			mu.Lock()

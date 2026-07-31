@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
 	ghTerm "github.com/cli/go-gh/v2/pkg/term"
 	"github.com/cli/safeexec"
 	"github.com/google/shlex"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
+	"golang.org/x/text/transform"
 )
 
 const DefaultWidth = 80
@@ -52,6 +54,15 @@ type IOStreams struct {
 	In     fileReader
 	Out    fileWriter
 	ErrOut fileWriter
+
+	// ContentOut is the writer for external content (HTTP response bodies,
+	// gist files, etc.) where the application is not the author of the bytes.
+	// By default it sanitizes ANSI escape sequences before they reach the
+	// underlying stdout. SetContentSanitization toggles the sanitization at
+	// the command layer (e.g. via an --allow-escape-sequences flag).
+	ContentOut io.Writer
+
+	sanitizeContent bool
 
 	terminalTheme string
 
@@ -241,6 +252,7 @@ func (s *IOStreams) StartPager() error {
 		fd:          s.Out.Fd(),
 		WriteCloser: &pagerWriter{pagedOut},
 	}
+	s.ContentOut = newContentWriter(s.Out, s.sanitizeContent)
 	err = pagerCmd.Start()
 	if err != nil {
 		return err
@@ -346,7 +358,7 @@ func (s *IOStreams) startTextualProgressIndicator(label string) {
 }
 
 // StopProgressIndicator stops the progress indicator if it is running.
-// Note that a textual progess indicator does not create a progress indicator,
+// Note that a textual progress indicator does not create a progress indicator,
 // so this method is a no-op in that case.
 func (s *IOStreams) StopProgressIndicator() {
 	s.progressIndicatorMu.Lock()
@@ -475,6 +487,26 @@ func (s *IOStreams) ExperimentalPrompterEnabled() bool {
 	return s.experimentalPrompterEnabled
 }
 
+// SetContentSanitization toggles ANSI escape sanitization on ContentOut.
+// Commands should call this with false when an explicit opt-out flag (e.g.
+// --allow-escape-sequences) is set, so subsequent writes of external content
+// pass through unmodified.
+func (s *IOStreams) SetContentSanitization(enabled bool) {
+	s.sanitizeContent = enabled
+	s.ContentOut = newContentWriter(s.Out, enabled)
+}
+
+// newContentWriter returns the writer to wire up as ContentOut. When
+// sanitize is true it inserts an asciisanitizer in front of the underlying
+// writer; otherwise it returns the underlying writer directly so writes
+// reach stdout unchanged.
+func newContentWriter(out io.Writer, sanitize bool) io.Writer {
+	if !sanitize {
+		return out
+	}
+	return transform.NewWriter(out, &asciisanitizer.Sanitizer{})
+}
+
 func System() *IOStreams {
 	terminal := ghTerm.FromEnv()
 
@@ -501,12 +533,14 @@ func System() *IOStreams {
 	}
 
 	io := &IOStreams{
-		In:           os.Stdin,
-		Out:          stdout,
-		ErrOut:       stderr,
-		pagerCommand: os.Getenv("PAGER"),
-		term:         &terminal,
+		In:              os.Stdin,
+		Out:             stdout,
+		ErrOut:          stderr,
+		pagerCommand:    os.Getenv("PAGER"),
+		term:            &terminal,
+		sanitizeContent: true,
 	}
+	io.ContentOut = newContentWriter(io.Out, io.sanitizeContent)
 
 	stdoutIsTTY := io.IsStdoutTTY()
 	stderrIsTTY := io.IsStderrTTY()
@@ -557,10 +591,12 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 			fd:         0,
 			ReadCloser: io.NopCloser(in),
 		},
-		Out:    &fdWriter{fd: 1, Writer: out},
-		ErrOut: &fdWriter{fd: 2, Writer: errOut},
-		term:   &fakeTerm{},
+		Out:             &fdWriter{fd: 1, Writer: out},
+		ErrOut:          &fdWriter{fd: 2, Writer: errOut},
+		term:            &fakeTerm{},
+		sanitizeContent: true,
 	}
+	io.ContentOut = newContentWriter(io.Out, io.sanitizeContent)
 	io.SetStdinTTY(false)
 	io.SetStdoutTTY(false)
 	io.SetStderrTTY(false)

@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
 )
 
@@ -24,8 +24,10 @@ type AutolinkCreateRequest struct {
 }
 
 func (a *AutolinkCreator) Create(repo ghrepo.Interface, request AutolinkCreateRequest) (*shared.Autolink, error) {
-	path := fmt.Sprintf("repos/%s/%s/autolinks", repo.RepoOwner(), repo.RepoName())
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "autolinks")
+	if err != nil {
+		return nil, err
+	}
 
 	requestByte, err := json.Marshal(request)
 	if err != nil {
@@ -33,7 +35,7 @@ func (a *AutolinkCreator) Create(repo ghrepo.Interface, request AutolinkCreateRe
 	}
 	requestBody := bytes.NewReader(requestByte)
 
-	req, err := http.NewRequest(http.MethodPost, url, requestBody)
+	req, err := http.NewRequest(http.MethodPost, url.String(), requestBody)
 	if err != nil {
 		return nil, err
 	}

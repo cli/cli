@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/installer"
@@ -34,6 +35,10 @@ import (
 const (
 	// allSkillsKey is the persistent option label for selecting all skills.
 	allSkillsKey = "(all skills)"
+
+	// multiSelectLabelMargin reserves columns for the widest option prefix used
+	// by the available prompters: huh's border, padding, cursor, and checkbox.
+	multiSelectLabelMargin = 8
 
 	// maxSearchResults caps how many skills are shown per search page in
 	// interactive selection, keeping the prompt readable.
@@ -89,7 +94,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 
 			A wide range of AI coding agents are supported, including GitHub
 			Copilot, Claude Code, Cursor, Codex, Gemini CLI, Antigravity, Amp,
-			Goose, Grok, Junie, OpenCode, Windsurf, and many more.
+			Devin, Goose, Grok, Junie, OpenCode, and many more.
 
 			Supported %[1]s--agent%[1]s values:
 
@@ -728,10 +733,9 @@ func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, ca
 		sel.fetchDescriptions()
 	}
 
-	tw := opts.IO.TerminalWidth()
-	descWidth := tw - 35
-	if descWidth < 20 {
-		descWidth = 20
+	labelWidth := opts.IO.TerminalWidth() - multiSelectLabelMargin
+	if labelWidth < 1 {
+		labelWidth = 1
 	}
 
 	selected, err := opts.Prompter.MultiSelectWithSearch(
@@ -739,7 +743,7 @@ func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, ca
 		"Filter skills",
 		nil,
 		[]string{allSkillsKey},
-		skillSearchFunc(skills, descWidth),
+		skillSearchFunc(skills, labelWidth),
 	)
 	if err != nil {
 		return nil, err
@@ -892,7 +896,7 @@ func skillSelectionKey(skill discovery.Skill, skills []discovery.Skill) string {
 
 // skillSearchFunc returns a search function for MultiSelectWithSearch that
 // filters skills by case-insensitive substring match on name and description.
-func skillSearchFunc(skills []discovery.Skill, descWidth int) func(string) prompter.MultiSelectSearchResult {
+func skillSearchFunc(skills []discovery.Skill, labelWidth int) func(string) prompter.MultiSelectSearchResult {
 	return func(query string) prompter.MultiSelectSearchResult {
 		var matched []discovery.Skill
 		if query == "" {
@@ -917,11 +921,11 @@ func skillSearchFunc(skills []discovery.Skill, descWidth int) func(string) promp
 		labels := make([]string, len(matched))
 		for i, s := range matched {
 			keys[i] = skillSelectionKey(s, skills)
+			label := keys[i]
 			if s.Description != "" {
-				labels[i] = fmt.Sprintf("%s - %s", keys[i], truncateDescription(s.Description, descWidth))
-			} else {
-				labels[i] = keys[i]
+				label = fmt.Sprintf("%s - %s", label, text.RemoveExcessiveWhitespace(s.Description))
 			}
+			labels[i] = text.Truncate(labelWidth, label)
 		}
 
 		return prompter.MultiSelectSearchResult{
@@ -1091,10 +1095,6 @@ func formatPlanHosts(hosts []*registry.AgentHost) string {
 		names[i] = host.Name
 	}
 	return strings.Join(names, ", ")
-}
-
-func truncateDescription(s string, maxWidth int) string {
-	return text.Truncate(maxWidth, text.RemoveExcessiveWhitespace(s))
 }
 
 func checkOverwrite(opts *InstallOptions, skills []discovery.Skill, targetDir string, canPrompt bool) ([]discovery.Skill, error) {
@@ -1352,14 +1352,16 @@ func filterHiddenDirSkills(opts *InstallOptions, allSkills []discovery.Skill) ([
 // installs from the re-publisher.
 // Returns (repo to redirect to, path in that repo, whether upstream was detected, error).
 func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname string, skill discovery.Skill, commitSHA string) (ghrepo.Interface, string, bool, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s/contents/%s?ref=%s",
-		opts.repo.RepoOwner(), opts.repo.RepoName(),
-		skill.Path+"/SKILL.md", commitSHA)
+	u, err := safeurl.JoinPath("repos", opts.repo.RepoOwner(), opts.repo.RepoName(), "contents", skill.Path+"/SKILL.md")
+	if err != nil {
+		return nil, "", false, err
+	}
+	u.SetQuery("ref", commitSHA)
 	var fileResp struct {
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
 	}
-	if err := client.REST(hostname, "GET", apiPath, nil, &fileResp); err != nil {
+	if err := client.REST(hostname, "GET", u.String(), nil, &fileResp); err != nil {
 		return nil, "", false, nil //nolint:nilerr // best-effort check; failing to fetch is not fatal
 	}
 	if fileResp.Encoding != "base64" {

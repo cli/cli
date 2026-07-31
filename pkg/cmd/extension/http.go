@@ -3,7 +3,6 @@ package extension
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -11,11 +10,15 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	url := fmt.Sprintf("%srepos/%s/%s", ghinstance.RESTPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
-	req, err := http.NewRequest("GET", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return false, err
+	}
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return false, err
 	}
@@ -37,10 +40,11 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 }
 
 func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	path := fmt.Sprintf("repos/%s/%s/contents/%s",
-		repo.RepoOwner(), repo.RepoName(), repo.RepoName())
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "contents", repo.RepoName())
+	if err != nil {
+		return false, err
+	}
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return false, err
 	}
@@ -74,9 +78,9 @@ type release struct {
 }
 
 // downloadAsset downloads a single asset to the given file path.
-func downloadAsset(httpClient *http.Client, asset releaseAsset, destPath string) (downloadErr error) {
+func downloadAsset(httpClient *http.Client, assetURL safeurl.SafeURL, destPath string) (downloadErr error) {
 	var req *http.Request
-	if req, downloadErr = http.NewRequest("GET", asset.APIURL, nil); downloadErr != nil {
+	if req, downloadErr = http.NewRequest("GET", assetURL.String(), nil); downloadErr != nil {
 		return
 	}
 
@@ -113,9 +117,11 @@ var repositoryNotFoundErr = errors.New("repository not found")
 
 // fetchLatestRelease finds the latest published release for a repository.
 func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
-	path := fmt.Sprintf("repos/%s/%s/releases/latest", baseRepo.RepoOwner(), baseRepo.RepoName())
-	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "latest")
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -149,10 +155,11 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 
 // fetchReleaseFromTag finds release by tag name for a repository
 func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*release, error) {
-	fullRepoName := fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), baseRepo.RepoName())
-	path := fmt.Sprintf("repos/%s/releases/tags/%s", fullRepoName, tagName)
-	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "tags", tagName)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -186,9 +193,11 @@ func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tag
 
 // fetchCommitSHA finds full commit SHA from a target ref in a repo
 func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRef string) (string, error) {
-	path := fmt.Sprintf("repos/%s/%s/commits/%s", baseRepo.RepoOwner(), baseRepo.RepoName(), targetRef)
-	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "commits", targetRef)
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return "", err
 	}

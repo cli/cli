@@ -23,7 +23,7 @@ func TestBranchDeleteRemote(t *testing.T) {
 			branch: "owner/branch#123",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/owner%2Fbranch%23123"),
+					httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fowner%2Fbranch%23123"),
 					httpmock.StatusStringResponse(204, ""))
 			},
 			expectError: false,
@@ -33,7 +33,7 @@ func TestBranchDeleteRemote(t *testing.T) {
 			branch: "my-branch",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/my-branch"),
+					httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fmy-branch"),
 					httpmock.StatusStringResponse(500, `{"message": "oh no"}`))
 			},
 			expectError: true,
