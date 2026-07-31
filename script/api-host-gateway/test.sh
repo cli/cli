@@ -233,7 +233,13 @@ fi
 expect_gateway_request "gateway recorded the authenticated REST request for /user" GET /user
 expect_gateway_request "gateway recorded the authenticated REST request for the repository" GET /repos/cli/cli
 expect_gateway_request "gateway recorded the authenticated GraphQL requests" POST /graphql
-expect_gateway_request_matching "gateway recorded the second page of labels" '"path":"[^"]*page=2'
+expect_gateway_request_matching "gateway recorded the second page of labels" \
+	'"path":"[^"]*page=2[^"]*","host":"'"$GATEWAY_HOST"'"'
+# Requests to a gateway-provided URL still have to carry the token, or
+# paginating anything private would break. go-gh permits authorization for the
+# configured API host for exactly this reason.
+expect_gateway_request_matching "second page request carried the token" \
+	'"path":"[^"]*page=2[^"]*","host":"'"$GATEWAY_HOST"'","auth_header":true'
 
 heading "Gateway log for phase 1"
 if [ -s "$LOG" ]; then
