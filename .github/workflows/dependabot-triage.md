@@ -35,7 +35,7 @@ description: |
 # tool, or a secret in the agent job's environment - re-evaluate both. The
 # scheduled trigger does not make additions safe by itself.
 on:
-  schedule: every 6h # fuzzy: compiler scatters the minute to avoid load spikes
+  schedule: every 1h # fuzzy: compiler scatters the minute to avoid load spikes
   workflow_dispatch:
     inputs:
       pr_number:
