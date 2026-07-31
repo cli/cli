@@ -142,7 +142,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -185,7 +185,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -229,7 +229,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -274,7 +274,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -311,7 +311,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -340,7 +340,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -368,11 +368,11 @@ func TestPreviewRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				// ResolveRef with explicit version tries branch first, then tag, then commit
 				reg.Register(
-					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/heads/abc123def456"),
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/heads%2Fabc123def456"),
 					httpmock.StatusStringResponse(404, "not found"),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/tags/abc123def456"),
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/tags%2Fabc123def456"),
 					httpmock.StatusStringResponse(404, "not found"),
 				)
 				reg.Register(
@@ -464,7 +464,7 @@ func TestPreviewRun_Interactive(t *testing.T) {
 		httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 	)
 	reg.Register(
-		httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+		httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 		httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 	)
 	reg.Register(
@@ -539,7 +539,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -628,7 +628,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -777,7 +777,7 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -916,7 +916,7 @@ func TestPreviewRun_InteractiveTelemetryCapturesSelectedSkillName(t *testing.T) 
 		httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 	)
 	reg.Register(
-		httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+		httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 		httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 	)
 	reg.Register(
@@ -1028,7 +1028,7 @@ func TestPreviewRun_TelemetryVisibility(t *testing.T) {
 				httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 			)
 			reg.Register(
-				httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+				httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 				httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 			)
 			reg.Register(
@@ -1223,7 +1223,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -1271,7 +1271,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -1329,7 +1329,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(

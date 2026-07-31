@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 var errScopesMissing = errors.New("insufficient OAuth scopes")
@@ -16,7 +17,10 @@ var errDuplicateKey = errors.New("key already exists")
 var errWrongFormat = errors.New("key in wrong format")
 
 func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) error {
-	url := ghinstance.RESTPrefix(hostname) + "user/gpg_keys"
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname), "user", "gpg_keys")
+	if err != nil {
+		return err
+	}
 
 	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
@@ -35,7 +39,7 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequest("POST", u.String(), bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return err
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -233,7 +234,15 @@ func downloadRun(opts *DownloadOptions) error {
 		isTTY:        opts.IO.IsStdoutTTY(),
 	}
 
-	return downloadAssets(&dest, httpClient, toDownload, opts.Concurrency, isArchive, opts.IO)
+	targets := make([]downloadTarget, len(toDownload))
+	for i, a := range toDownload {
+		targets[i] = downloadTarget{
+			url:  safeurl.NewImmutableSafeURL(a.APIURL),
+			name: a.Name,
+		}
+	}
+
+	return downloadAssets(&dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -245,12 +254,17 @@ func matchAny(patterns []string, name string) bool {
 	return false
 }
 
-func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []shared.ReleaseAsset, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
+type downloadTarget struct {
+	url  safeurl.SafeURL
+	name string
+}
+
+func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []downloadTarget, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
 
-	jobs := make(chan shared.ReleaseAsset, len(toDownload))
+	jobs := make(chan downloadTarget, len(toDownload))
 	results := make(chan error, len(toDownload))
 
 	if len(toDownload) < numWorkers {
@@ -260,8 +274,8 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
-				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.Name))
-				results <- downloadAsset(dest, httpClient, a.APIURL, a.Name, isArchive)
+				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.name))
+				results <- downloadAsset(dest, httpClient, a.url, a.name, isArchive)
 			}
 		}()
 	}
@@ -283,12 +297,12 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	return downloadError
 }
 
-func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL, fileName string, isArchive bool) error {
+func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL safeurl.SafeURL, fileName string, isArchive bool) error {
 	if err := dest.Check(fileName); err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("GET", assetURL, nil)
+	req, err := http.NewRequest("GET", assetURL.String(), nil)
 	if err != nil {
 		return err
 	}

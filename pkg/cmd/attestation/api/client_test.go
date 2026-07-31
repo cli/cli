@@ -3,6 +3,7 @@ package api
 import (
 	"testing"
 
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
 	"github.com/stretchr/testify/require"
@@ -261,7 +262,7 @@ func TestGetBundle(t *testing.T) {
 		logger:             io.NewTestHandler(),
 	}
 
-	b, err := c.getBundle("https://mybundleurl.com")
+	b, err := c.getBundle(safeurl.NewImmutableSafeURL("https://mybundleurl.com"))
 	require.NoError(t, err)
 	require.Equal(t, "application/vnd.dev.sigstore.bundle.v0.3+json", b.GetMediaType())
 	mockHTTPClient.AssertNumberOfCalls(t, "OnGetSuccess", 1)
@@ -280,7 +281,7 @@ func TestGetBundle_SuccessfulRetry(t *testing.T) {
 		logger:             io.NewTestHandler(),
 	}
 
-	b, err := c.getBundle("mybundleurl")
+	b, err := c.getBundle(safeurl.NewImmutableSafeURL("mybundleurl"))
 	require.NoError(t, err)
 	require.Equal(t, "application/vnd.dev.sigstore.bundle.v0.3+json", b.GetMediaType())
 	mockHTTPClient.AssertNumberOfCalls(t, "OnGetFailAfterNCalls", 2)
@@ -294,7 +295,7 @@ func TestGetBundle_PermanentBackoffFail(t *testing.T) {
 		logger:             io.NewTestHandler(),
 	}
 
-	b, err := c.getBundle("mybundleurl")
+	b, err := c.getBundle(safeurl.NewImmutableSafeURL("mybundleurl"))
 	// var permanent *backoff.PermanentError
 	//require.IsType(t, &backoff.PermanentError{}, err)
 	require.Error(t, err)
@@ -311,7 +312,7 @@ func TestGetBundle_RequestFail(t *testing.T) {
 		logger:             io.NewTestHandler(),
 	}
 
-	b, err := c.getBundle("mybundleurl")
+	b, err := c.getBundle(safeurl.NewImmutableSafeURL("mybundleurl"))
 	require.Error(t, err)
 	require.Nil(t, b)
 	mockHTTPClient.AssertNumberOfCalls(t, "OnGetReqFail", 4)

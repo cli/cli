@@ -10,12 +10,16 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/shared"
 )
 
 // Uploads the provided SSH key. Returns true if the key was uploaded, false if it was not.
 func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) (bool, error) {
-	url := ghinstance.RESTPrefix(hostname) + "user/keys"
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname), "user", "keys")
+	if err != nil {
+		return false, err
+	}
 
 	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
@@ -46,7 +50,7 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 		"key":   fullUserKey,
 	}
 
-	err = keyUpload(httpClient, url, payload)
+	err = keyUpload(httpClient, u, payload)
 
 	if err != nil {
 		return false, err
@@ -57,7 +61,10 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 
 // Uploads the provided SSH Signing key. Returns true if the key was uploaded, false if it was not.
 func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) (bool, error) {
-	url := ghinstance.RESTPrefix(hostname) + "user/ssh_signing_keys"
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname), "user", "ssh_signing_keys")
+	if err != nil {
+		return false, err
+	}
 
 	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
@@ -88,7 +95,7 @@ func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Re
 		"key":   fullUserKey,
 	}
 
-	err = keyUpload(httpClient, url, payload)
+	err = keyUpload(httpClient, u, payload)
 
 	if err != nil {
 		return false, err
@@ -97,13 +104,13 @@ func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Re
 	return true, nil
 }
 
-func keyUpload(httpClient *http.Client, url string, payload map[string]string) error {
+func keyUpload(httpClient *http.Client, u safeurl.SafeURL, payload map[string]string) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequest("POST", u.String(), bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return err
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/installer"
@@ -1296,14 +1297,16 @@ func filterHiddenDirSkills(opts *InstallOptions, allSkills []discovery.Skill) ([
 // installs from the re-publisher.
 // Returns (repo to redirect to, whether upstream was detected, error).
 func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname string, skill discovery.Skill, commitSHA string) (ghrepo.Interface, bool, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s/contents/%s?ref=%s",
-		opts.repo.RepoOwner(), opts.repo.RepoName(),
-		skill.Path+"/SKILL.md", commitSHA)
+	u, err := safeurl.JoinPath("repos", opts.repo.RepoOwner(), opts.repo.RepoName(), "contents", skill.Path+"/SKILL.md")
+	if err != nil {
+		return nil, false, err
+	}
+	u.SetQuery("ref", commitSHA)
 	var fileResp struct {
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
 	}
-	if err := client.REST(hostname, "GET", apiPath, nil, &fileResp); err != nil {
+	if err := client.REST(hostname, "GET", u.String(), nil, &fileResp); err != nil {
 		return nil, false, nil //nolint:nilerr // best-effort check; failing to fetch is not fatal
 	}
 	if fileResp.Encoding != "base64" {

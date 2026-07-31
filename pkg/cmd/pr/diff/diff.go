@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -16,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -209,18 +211,16 @@ func diffRun(opts *DiffOptions) error {
 }
 
 func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int, asPatch bool) (io.ReadCloser, error) {
-	url := fmt.Sprintf(
-		"%srepos/%s/pulls/%d",
-		ghinstance.RESTPrefix(baseRepo.RepoHost()),
-		ghrepo.FullName(baseRepo),
-		prNumber,
-	)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "pulls", strconv.Itoa(prNumber))
+	if err != nil {
+		return nil, err
+	}
 	acceptType := "application/vnd.github.v3.diff"
 	if asPatch {
 		acceptType = "application/vnd.github.v3.patch"
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}

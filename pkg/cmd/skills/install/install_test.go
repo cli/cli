@@ -221,7 +221,7 @@ func stubResolveVersion(reg *httpmock.Registry, owner, repo, tag, sha string) {
 		httpmock.StringResponse(fmt.Sprintf(`{"tag_name": %q}`, tag)),
 	)
 	reg.Register(
-		httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/git/ref/tags/%s", owner, repo, tag)),
+		httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/git/ref/tags%%2F%s", owner, repo, tag)),
 		httpmock.StringResponse(fmt.Sprintf(`{"object": {"sha": %q, "type": "commit"}}`, sha)),
 	)
 }
@@ -656,10 +656,10 @@ func TestInstallRun(t *testing.T) {
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads/v2.0.0"),
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads%2Fv2.0.0"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "def456", "type": "commit"}}`),
 				)
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "def456",
@@ -766,10 +766,10 @@ func TestInstallRun(t *testing.T) {
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads/v1.2.0"),
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads%2Fv1.2.0"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags/v1.2.0"),
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags%2Fv1.2.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
@@ -2716,7 +2716,7 @@ var republishedContent = heredoc.Doc(`
 func stubContentsAPI(reg *httpmock.Registry, owner, repo, path, content string) {
 	encoded := base64.StdEncoding.EncodeToString([]byte(content))
 	reg.Register(
-		httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/contents/%s", owner, repo, path)),
+		httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/contents/%s", owner, repo, url.PathEscape(path))),
 		httpmock.StringResponse(fmt.Sprintf(`{"content": %q, "encoding": "base64"}`, encoded)),
 	)
 }

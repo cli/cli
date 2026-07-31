@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type AutolinkDeleter struct {
@@ -14,9 +15,11 @@ type AutolinkDeleter struct {
 }
 
 func (a *AutolinkDeleter) Delete(repo ghrepo.Interface, id string) error {
-	path := fmt.Sprintf("repos/%s/%s/autolinks/%s", repo.RepoOwner(), repo.RepoName(), id)
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "autolinks", id)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodDelete, url.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -28,7 +31,7 @@ func (a *AutolinkDeleter) Delete(repo ghrepo.Interface, id string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("error deleting autolink: HTTP 404: Perhaps you are missing admin rights to the repository? (https://api.github.com/%s)", path)
+		return fmt.Errorf("error deleting autolink: HTTP 404: Perhaps you are missing admin rights to the repository? (%s)", url)
 	} else if resp.StatusCode > 299 {
 		return api.HandleHTTPError(resp)
 	}

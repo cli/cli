@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -149,7 +150,7 @@ func viewRun(opts *ViewOptions) error {
 		// path fetches the full content from the raw URL.
 		content := iostreams.NewUntrusted(gf.Content)
 		if gf.Truncated {
-			fullContent, err := shared.GetRawGistFile(client, gf.RawURL)
+			fullContent, err := shared.GetRawGistFile(client, safeurl.NewImmutableSafeURL(gf.RawURL))
 			if err != nil {
 				return err
 			}

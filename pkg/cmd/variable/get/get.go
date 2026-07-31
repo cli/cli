@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -97,22 +98,25 @@ func getRun(opts *GetOptions) error {
 		return err
 	}
 
-	var path string
+	var path *safeurl.MutableSafeURL
 	var host string
 	switch variableEntity {
 	case shared.Organization:
-		path = fmt.Sprintf("orgs/%s/actions/variables/%s", orgName, opts.VariableName)
+		path, err = safeurl.JoinPath("orgs", orgName, "actions", "variables", opts.VariableName)
 		host, _ = cfg.Authentication().DefaultHost()
 	case shared.Environment:
-		path = fmt.Sprintf("repos/%s/environments/%s/variables/%s", ghrepo.FullName(baseRepo), envName, opts.VariableName)
+		path, err = safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "environments", envName, "variables", opts.VariableName)
 		host = baseRepo.RepoHost()
 	case shared.Repository:
-		path = fmt.Sprintf("repos/%s/actions/variables/%s", ghrepo.FullName(baseRepo), opts.VariableName)
+		path, err = safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "actions", "variables", opts.VariableName)
 		host = baseRepo.RepoHost()
+	}
+	if err != nil {
+		return err
 	}
 
 	var variable shared.Variable
-	if err = client.REST(host, "GET", path, nil, &variable); err != nil {
+	if err = client.REST(host, "GET", path.String(), nil, &variable); err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return fmt.Errorf("variable %s was not found", opts.VariableName)
@@ -122,8 +126,12 @@ func getRun(opts *GetOptions) error {
 	}
 
 	if opts.Exporter != nil {
-		if err := shared.PopulateSelectedRepositoryInformation(client, host, &variable); err != nil {
-			return err
+		if variable.SelectedReposURL != "" {
+			count, err := shared.SelectedRepositoryCount(client, host, safeurl.NewImmutableSafeURL(variable.SelectedReposURL))
+			if err != nil {
+				return fmt.Errorf("failed determining selected repositories for %s: %w", variable.Name, err)
+			}
+			variable.NumSelectedRepos = count
 		}
 		return opts.Exporter.Write(opts.IO, &variable)
 	}

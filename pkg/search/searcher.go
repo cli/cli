@@ -12,6 +12,7 @@ import (
 
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 const (
@@ -197,10 +198,12 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 //
 // For more information, see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28.
 func (s searcher) search(query Query, result interface{}) (string, error) {
-	path := fmt.Sprintf("%ssearch/%s", ghinstance.RESTPrefix(s.host), query.Kind)
-	qs := url.Values{}
-	qs.Set("page", strconv.Itoa(query.Page))
-	qs.Set("per_page", strconv.Itoa(query.Limit))
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(s.host), "search", string(query.Kind))
+	if err != nil {
+		return "", err
+	}
+	u.SetQuery("page", strconv.Itoa(query.Page))
+	u.SetQuery("per_page", strconv.Itoa(query.Limit))
 
 	if query.Kind == KindIssues {
 		// TODO advancedIssueSearchCleanup
@@ -213,28 +216,27 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 		}
 
 		if !features.AdvancedIssueSearchAPI {
-			qs.Set("q", query.StandardSearchString())
+			u.SetQuery("q", query.StandardSearchString())
 		} else {
-			qs.Set("q", query.AdvancedIssueSearchString())
+			u.SetQuery("q", query.AdvancedIssueSearchString())
 
 			// TODO advancedIssueSearchCleanup
 			if features.AdvancedIssueSearchAPIOptIn {
 				// Advanced syntax should be explicitly enabled
-				qs.Set("advanced_search", "true")
+				u.SetQuery("advanced_search", "true")
 			}
 		}
 	} else {
-		qs.Set("q", query.StandardSearchString())
+		u.SetQuery("q", query.StandardSearchString())
 	}
 
 	if query.Order != "" {
-		qs.Set(orderKey, query.Order)
+		u.SetQuery(orderKey, query.Order)
 	}
 	if query.Sort != "" {
-		qs.Set(sortKey, query.Sort)
+		u.SetQuery(sortKey, query.Sort)
 	}
-	url := fmt.Sprintf("%s?%s", path, qs.Encode())
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return "", err
 	}

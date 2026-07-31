@@ -13,6 +13,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/gabriel-vasile/mimetype"
@@ -62,10 +63,13 @@ var NotFoundErr = errors.New("not found")
 
 func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
 	gist := Gist{}
-	path := fmt.Sprintf("gists/%s", gistID)
+	path, err := safeurl.JoinPath("gists", gistID)
+	if err != nil {
+		return nil, err
+	}
 
 	apiClient := api.NewClientFromHTTP(client)
-	err := apiClient.REST(hostname, "GET", path, nil, &gist)
+	err = apiClient.REST(hostname, "GET", path.String(), nil, &gist)
 	if err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
@@ -251,8 +255,8 @@ func PromptGists(prompter prompter.Prompter, client *http.Client, host string, c
 // GetRawGistFile fetches the full content of a gist file from its raw URL. The
 // bytes are external content, so they are returned as iostreams.Untrusted to
 // force callers to choose between sanitized display and raw round-tripping.
-func GetRawGistFile(httpClient *http.Client, rawURL string) (iostreams.Untrusted, error) {
-	req, err := http.NewRequest("GET", rawURL, nil)
+func GetRawGistFile(httpClient *http.Client, rawURL safeurl.SafeURL) (iostreams.Untrusted, error) {
+	req, err := http.NewRequest("GET", rawURL.String(), nil)
 	if err != nil {
 		return iostreams.Untrusted{}, err
 	}

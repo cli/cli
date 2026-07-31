@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -287,7 +288,7 @@ func editRun(opts *EditOptions) error {
 		file := gist.Files[filename]
 		if file.Truncated {
 			if _, alreadyEdited := filesToUpdate[filename]; !alreadyEdited {
-				fullContent, err := shared.GetRawGistFile(client, file.RawURL)
+				fullContent, err := shared.GetRawGistFile(client, safeurl.NewImmutableSafeURL(file.RawURL))
 				if err != nil {
 					return err
 				}
@@ -404,8 +405,11 @@ func updateGist(apiClient *api.Client, hostname string, gist gistToUpdate) error
 	requestBody := bytes.NewReader(requestByte)
 	result := shared.Gist{}
 
-	path := "gists/" + gist.id
-	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
+	path, err := safeurl.JoinPath("gists", gist.id)
+	if err != nil {
+		return err
+	}
+	err = apiClient.REST(hostname, "POST", path.String(), requestBody, &result)
 	if err != nil {
 		return err
 	}

@@ -751,8 +751,9 @@ func Test_contentsAPIPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := contentsAPIPath(repo, tt.filePath, tt.ref)
-			assert.Equal(t, tt.want, got)
+			got, err := contentsAPIPath(repo, tt.filePath, tt.ref)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got.String())
 		})
 	}
 }

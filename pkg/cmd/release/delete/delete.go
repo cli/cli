@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -92,7 +93,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 	}
 
-	err = deleteRelease(httpClient, release.APIURL)
+	err = deleteRelease(httpClient, safeurl.NewImmutableSafeURL(release.APIURL))
 	if err != nil {
 		return err
 	}
@@ -121,8 +122,8 @@ func deleteRun(opts *DeleteOptions) error {
 	return nil
 }
 
-func deleteRelease(httpClient *http.Client, releaseURL string) error {
-	req, err := http.NewRequest("DELETE", releaseURL, nil)
+func deleteRelease(httpClient *http.Client, releaseURL safeurl.SafeURL) error {
+	req, err := http.NewRequest("DELETE", releaseURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -140,10 +141,11 @@ func deleteRelease(httpClient *http.Client, releaseURL string) error {
 }
 
 func deleteTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) error {
-	path := fmt.Sprintf("repos/%s/%s/git/refs/tags/%s", baseRepo.RepoOwner(), baseRepo.RepoName(), tagName)
-	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
-
-	req, err := http.NewRequest("DELETE", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "git", "refs", fmt.Sprintf("tags/%s", tagName))
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("DELETE", url.String(), nil)
 	if err != nil {
 		return err
 	}
