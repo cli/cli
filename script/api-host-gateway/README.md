@@ -80,8 +80,24 @@ clients straight back off its route. It asks the upstream for an identity
 content encoding so the body is rewritable, and fixes `Content-Length`
 afterwards.
 
-## Expected result today
+## Debugging the gateway on its own
 
+The gateway does not need root or a container if you give it an unprivileged
+port, which makes it easy to poke at with `curl`:
+
+```console
+$ go build -o /tmp/gateway ./script/api-host-gateway/gateway
+$ /tmp/gateway -listen 127.0.0.1:8443 \
+    -upstream-addr "$(dig +short api.github.com | head -1):443" \
+    -ca-out /tmp/ca.pem -log /tmp/gateway.jsonl &
+$ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
+    -H "Authorization: token $(gh auth token)" \
+    https://gh-gateway.internal:8443/user
+```
+
+`gh` itself cannot be pointed at that, because `api_host` cannot carry a port.
+
+## Expected result today
 Phase 1 fails and phases 2 and 3 pass. `gh` builds its own REST and GraphQL
 endpoints in `internal/ghinstance` and passes `Host: "none"` to go-gh's
 `NewHTTPClient`, so it never consults `api_host` and cannot reach the blackholed

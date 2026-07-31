@@ -82,14 +82,6 @@ func run(listen, gatewayHost, upstreamHost, upstreamAddr, caOut, logOut, readyOu
 		}
 	}
 
-	caPEM, serverCert, err := generateCertificates(gatewayHost)
-	if err != nil {
-		return fmt.Errorf("generating certificates: %w", err)
-	}
-	if err := os.WriteFile(caOut, caPEM, 0o600); err != nil {
-		return fmt.Errorf("writing CA certificate: %w", err)
-	}
-
 	rec, err := newRecorder(logOut)
 	if err != nil {
 		return fmt.Errorf("opening log: %w", err)
@@ -98,9 +90,19 @@ func run(listen, gatewayHost, upstreamHost, upstreamAddr, caOut, logOut, readyOu
 
 	proxy := newProxy(gatewayHost, &url.URL{Scheme: "https", Host: upstreamHost}, upstreamAddr, rec)
 
+	// Bind before writing the CA out, so a gateway that cannot start does not
+	// replace the CA that a running one is serving with.
 	tcpListener, err := net.Listen("tcp", listen)
 	if err != nil {
 		return fmt.Errorf("listening on %s: %w", listen, err)
+	}
+
+	caPEM, serverCert, err := generateCertificates(gatewayHost)
+	if err != nil {
+		return fmt.Errorf("generating certificates: %w", err)
+	}
+	if err := os.WriteFile(caOut, caPEM, 0o600); err != nil {
+		return fmt.Errorf("writing CA certificate: %w", err)
 	}
 
 	tlsListener := tls.NewListener(tcpListener, &tls.Config{
