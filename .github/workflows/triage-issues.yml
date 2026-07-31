@@ -24,12 +24,6 @@ jobs:
     permissions:
       issues: write
 
-  close-single-word:
-    if: github.event.action == 'opened'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-single-word-issues.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
-    permissions:
-      issues: write
-
   close-off-topic:
     if: github.event.action == 'labeled'
     uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-off-topic.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
