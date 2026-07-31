@@ -124,7 +124,7 @@ The marker is deliberately visible text rather than an HTML comment: the
 safe-output pipeline strips HTML comments from comment bodies, so a hidden
 marker would never survive to be read back on the next run.
 
-### Step 4 - Assess recommendation and confidence
+### Step 4 - Decide the recommendation and confidence
 
 Apply the rubric below, then post exactly one comment (Step 5).
 
