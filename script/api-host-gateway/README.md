@@ -59,7 +59,11 @@ of `gh api user`, `gh api repos/cli/cli`, `gh api graphql`, `gh repo view` and
 recorded the matching request with `Host: gh-gateway.internal` and an
 `Authorization` header. The paginated case additionally proves the gateway's
 `Link` header rewriting works, because the second page can only be fetched if
-`gh` was sent back to the gateway rather than to `api.github.com`.
+`gh` was sent back to the gateway rather than to `api.github.com`, and that the
+follow-up request still carries the token. That last assertion is easy to fail:
+`gh` attaches tokens by request host, and the gateway host has no token of its
+own, so a naive implementation paginates anonymously and only appears to work
+against public resources.
 
 **Phase 2, control.** No `api_host` and no blackhole. The same commands must
 still work and the gateway must record nothing, so the override is what causes
@@ -103,3 +107,8 @@ endpoints in `internal/ghinstance` and passes `Host: "none"` to go-gh's
 `NewHTTPClient`, so it never consults `api_host` and cannot reach the blackholed
 canonical host. That red result is the point: it is the acceptance criterion for
 teaching `gh` itself about `api_host`.
+
+The assertions have been confirmed to be satisfiable. A throwaway spike that
+swapped the request host in `api.NewHTTPClient` and attached the canonical
+host's token for the configured API host turned all of phase 1 green, including
+the paginated case.
