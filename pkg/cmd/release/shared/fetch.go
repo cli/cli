@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
@@ -136,8 +138,11 @@ type fetchResult struct {
 }
 
 func FetchRefSHA(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (string, error) {
-	path := fmt.Sprintf("repos/%s/%s/git/ref/tags/%s", repo.RepoOwner(), repo.RepoName(), tagName)
-	req, err := http.NewRequestWithContext(ctx, "GET", ghinstance.RESTPrefix(repo.RepoHost())+path, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "git", "ref", fmt.Sprintf("tags/%s", tagName))
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	if err != nil {
 		return "", err
 	}
@@ -185,13 +190,17 @@ func DigestAlgForRef(digest string) string {
 
 // FetchRelease finds a published repository release by its tagName, or a draft release by its pending tag name.
 func FetchRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (*Release, error) {
+	publishedURL, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
+	if err != nil {
+		return nil, err
+	}
+
 	cc, cancel := context.WithCancel(ctx)
 	results := make(chan fetchResult, 2)
 
 	// published release lookup
 	go func() {
-		path := fmt.Sprintf("repos/%s/%s/releases/tags/%s", repo.RepoOwner(), repo.RepoName(), tagName)
-		release, err := fetchReleasePath(cc, httpClient, repo.RepoHost(), path)
+		release, err := fetchReleasePath(cc, httpClient, publishedURL)
 		results <- fetchResult{release: release, error: err}
 	}()
 
@@ -226,8 +235,11 @@ func FetchRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Inte
 
 // FetchLatestRelease finds the latest published release for a repository.
 func FetchLatestRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) (*Release, error) {
-	path := fmt.Sprintf("repos/%s/%s/releases/latest", repo.RepoOwner(), repo.RepoName())
-	return fetchReleasePath(ctx, httpClient, repo.RepoHost(), path)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "latest")
+	if err != nil {
+		return nil, err
+	}
+	return fetchReleasePath(ctx, httpClient, url)
 }
 
 // fetchDraftRelease returns the first draft release that has tagName as its pending tag.
@@ -259,12 +271,15 @@ func fetchDraftRelease(ctx context.Context, httpClient *http.Client, repo ghrepo
 
 	// Then, use REST to get information about the draft release. In theory, we could have fetched
 	// all the necessary information via GraphQL, but REST is safer for backwards compatibility.
-	path := fmt.Sprintf("repos/%s/%s/releases/%d", repo.RepoOwner(), repo.RepoName(), query.Repository.Release.DatabaseID)
-	return fetchReleasePath(ctx, httpClient, repo.RepoHost(), path)
+	path, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", strconv.FormatInt(query.Repository.Release.DatabaseID, 10))
+	if err != nil {
+		return nil, err
+	}
+	return fetchReleasePath(ctx, httpClient, path)
 }
 
-func fetchReleasePath(ctx context.Context, httpClient *http.Client, host string, p string) (*Release, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", ghinstance.RESTPrefix(host)+p, nil)
+func fetchReleasePath(ctx context.Context, httpClient *http.Client, url safeurl.SafeURL) (*Release, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +327,7 @@ func StubFetchRelease(t *testing.T, reg *httpmock.Registry, owner, repoName, tag
 }
 
 func StubFetchRefSHA(t *testing.T, reg *httpmock.Registry, owner, repoName, tagName, sha string) {
-	path := fmt.Sprintf("repos/%s/%s/git/ref/tags/%s", owner, repoName, tagName)
+	path := fmt.Sprintf("repos/%s/%s/git/ref/tags%%2F%s", owner, repoName, tagName)
 	reg.Register(
 		httpmock.REST("GET", path),
 		httpmock.StringResponse(fmt.Sprintf(`{"object": {"sha": "%s"}}`, sha)),

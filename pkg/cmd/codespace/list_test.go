@@ -35,6 +35,11 @@ func TestListCmdFlagError(t *testing.T) {
 			args:     "--limit -1",
 			wantsErr: fmt.Errorf("invalid limit: -1"),
 		},
+		{
+			name:     "list codespaces, --repo not in owner/repo format",
+			args:     "--repo foo",
+			wantsErr: fmt.Errorf(`invalid value for --repo: expected the "OWNER/REPO" format, got "foo"`),
+		},
 	}
 
 	for _, tt := range tests {

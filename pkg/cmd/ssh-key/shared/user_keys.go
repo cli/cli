@@ -2,13 +2,13 @@ package shared
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 const (
@@ -25,13 +25,19 @@ type sshKey struct {
 }
 
 func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error) {
-	resource := "user/keys"
-	if userHandle != "" {
-		resource = fmt.Sprintf("users/%s/keys", userHandle)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "user", "keys")
+	if err != nil {
+		return nil, err
 	}
-	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
+	if userHandle != "" {
+		u, err = safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "users", userHandle, "keys")
+		if err != nil {
+			return nil, err
+		}
+	}
+	u.SetQuery("per_page", "100")
 
-	keys, err := getUserKeys(httpClient, url)
+	keys, err := getUserKeys(httpClient, u)
 
 	if err != nil {
 		return nil, err
@@ -45,13 +51,19 @@ func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error
 }
 
 func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error) {
-	resource := "user/ssh_signing_keys"
-	if userHandle != "" {
-		resource = fmt.Sprintf("users/%s/ssh_signing_keys", userHandle)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "user", "ssh_signing_keys")
+	if err != nil {
+		return nil, err
 	}
-	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
+	if userHandle != "" {
+		u, err = safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "users", userHandle, "ssh_signing_keys")
+		if err != nil {
+			return nil, err
+		}
+	}
+	u.SetQuery("per_page", "100")
 
-	keys, err := getUserKeys(httpClient, url)
+	keys, err := getUserKeys(httpClient, u)
 
 	if err != nil {
 		return nil, err
@@ -64,8 +76,8 @@ func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey
 	return keys, nil
 }
 
-func getUserKeys(httpClient *http.Client, url string) ([]sshKey, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func getUserKeys(httpClient *http.Client, u safeurl.SafeURL) ([]sshKey, error) {
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}

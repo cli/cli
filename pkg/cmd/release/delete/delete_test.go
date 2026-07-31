@@ -210,7 +210,7 @@ func Test_deleteRun(t *testing.T) {
 			}`)
 
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
-			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags/v1.2.3"), httpmock.StatusStringResponse(204, ""))
+			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags%2Fv1.2.3"), httpmock.StatusStringResponse(204, ""))
 
 			rs, teardown := run.Stub()
 			defer teardown(t)

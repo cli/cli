@@ -1,20 +1,22 @@
 package delete
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 func deleteDeployKey(httpClient *http.Client, repo ghrepo.Interface, id string) error {
-	path := fmt.Sprintf("repos/%s/%s/keys/%s", repo.RepoOwner(), repo.RepoName(), id)
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "keys", id)
+	if err != nil {
+		return err
+	}
 
-	req, err := http.NewRequest("DELETE", url, nil)
+	req, err := http.NewRequest("DELETE", url.String(), nil)
 	if err != nil {
 		return err
 	}

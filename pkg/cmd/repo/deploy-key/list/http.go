@@ -2,7 +2,6 @@ package list
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type deployKey struct {
@@ -21,9 +21,12 @@ type deployKey struct {
 }
 
 func repoKeys(httpClient *http.Client, repo ghrepo.Interface) ([]deployKey, error) {
-	path := fmt.Sprintf("repos/%s/%s/keys?per_page=100", repo.RepoOwner(), repo.RepoName())
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "keys")
+	if err != nil {
+		return nil, err
+	}
+	u.SetQuery("per_page", "100")
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}

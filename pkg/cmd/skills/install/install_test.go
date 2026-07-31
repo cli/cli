@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/registry"
 	"github.com/cli/cli/v2/internal/telemetry"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -220,7 +221,7 @@ func stubResolveVersion(reg *httpmock.Registry, owner, repo, tag, sha string) {
 		httpmock.StringResponse(fmt.Sprintf(`{"tag_name": %q}`, tag)),
 	)
 	reg.Register(
-		httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/git/ref/tags/%s", owner, repo, tag)),
+		httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/git/ref/tags%%2F%s", owner, repo, tag)),
 		httpmock.StringResponse(fmt.Sprintf(`{"object": {"sha": %q, "type": "commit"}}`, sha)),
 	)
 }
@@ -474,6 +475,30 @@ func TestInstallRun(t *testing.T) {
 			wantStdout: "Installed git-commit",
 		},
 		{
+			name:  "remote install with --dir bypasses agent selection",
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:          ios,
+					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:   &git.Client{RepoDir: t.TempDir()},
+					Prompter:    &prompter.PrompterMock{},
+					SkillSource: "monalisa/skills-repo",
+					SkillName:   "git-commit",
+					Scope:       "project",
+					Dir:         t.TempDir(),
+				}
+			},
+			wantStdout: "Installed git-commit",
+		},
+		{
 			name:  "remote install with --force overwrites existing skill",
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
@@ -631,10 +656,10 @@ func TestInstallRun(t *testing.T) {
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads/v2.0.0"),
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads%2Fv2.0.0"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "def456", "type": "commit"}}`),
 				)
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "def456",
@@ -741,10 +766,10 @@ func TestInstallRun(t *testing.T) {
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads/v1.2.0"),
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads%2Fv1.2.0"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags/v1.2.0"),
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags%2Fv1.2.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
@@ -2460,6 +2485,43 @@ func Test_selectSkillsWithSelector_noDisclaimer(t *testing.T) {
 	assert.NotContains(t, stderr.String(), "not verified by GitHub")
 }
 
+func TestSkillSearchFuncTruncatesLabelsToAvailableWidth(t *testing.T) {
+	skills := []discovery.Skill{
+		{
+			Name:        "telemetry-instrumentation",
+			Namespace:   "octocat",
+			Convention:  "plugins",
+			Description: "Add tracing, logging, resource attributes, metrics, dashboards, alerts, sampling, or instrumentation to an application",
+		},
+		{
+			Name: "achievement-badges",
+		},
+	}
+
+	tests := []struct {
+		terminalWidth      int
+		expectedLabelWidth int
+	}{
+		{terminalWidth: 40, expectedLabelWidth: 32},
+		{terminalWidth: 60, expectedLabelWidth: 52},
+		{terminalWidth: 80, expectedLabelWidth: 72},
+		{terminalWidth: 120, expectedLabelWidth: 112},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("terminal width %d", tt.terminalWidth), func(t *testing.T) {
+			labelWidth := tt.terminalWidth - multiSelectLabelMargin
+			result := skillSearchFunc(skills, labelWidth)("")
+
+			require.Len(t, result.Labels, 2)
+			assert.Equal(t, tt.expectedLabelWidth, text.DisplayWidth(result.Labels[0]))
+			assert.Equal(t, "[plugins] octocat/telemetry-instrumentation", result.Keys[0])
+			assert.True(t, strings.HasSuffix(result.Labels[0], "..."))
+			assert.Equal(t, "achievement-badges", result.Labels[1])
+		})
+	}
+}
+
 func TestInstallRun_TelemetryVisibility(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -2654,7 +2716,7 @@ var republishedContent = heredoc.Doc(`
 func stubContentsAPI(reg *httpmock.Registry, owner, repo, path, content string) {
 	encoded := base64.StdEncoding.EncodeToString([]byte(content))
 	reg.Register(
-		httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/contents/%s", owner, repo, path)),
+		httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/contents/%s", owner, repo, url.PathEscape(path))),
 		httpmock.StringResponse(fmt.Sprintf(`{"content": %q, "encoding": "base64"}`, encoded)),
 	)
 }

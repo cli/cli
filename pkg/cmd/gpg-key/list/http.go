@@ -3,7 +3,6 @@ package list
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 var errScopes = errors.New("insufficient OAuth scopes")
@@ -38,12 +38,18 @@ type gpgKey struct {
 }
 
 func userKeys(httpClient *http.Client, host, userHandle string) ([]gpgKey, error) {
-	resource := "user/gpg_keys"
-	if userHandle != "" {
-		resource = fmt.Sprintf("users/%s/gpg_keys", userHandle)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "user", "gpg_keys")
+	if err != nil {
+		return nil, err
 	}
-	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
-	req, err := http.NewRequest("GET", url, nil)
+	if userHandle != "" {
+		u, err = safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(host), "users", userHandle, "gpg_keys")
+		if err != nil {
+			return nil, err
+		}
+	}
+	u.SetQuery("per_page", "100")
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}

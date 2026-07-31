@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,7 +16,9 @@ import (
 	"sync/atomic"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 // specNamePattern matches the strict agentskills.io name spec:
@@ -188,11 +189,14 @@ func parseRepoVisibility(s string) (RepoVisibility, error) {
 
 // FetchRepoVisibility returns the repository visibility: "public", "private", or "internal".
 func FetchRepoVisibility(client *api.Client, host, owner, repo string) (RepoVisibility, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s", url.PathEscape(owner), url.PathEscape(repo))
+	apiPath, err := safeurl.JoinPath("repos", owner, repo)
+	if err != nil {
+		return "", err
+	}
 	var resp struct {
 		Visibility string `json:"visibility"`
 	}
-	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
 		return "", err
 	}
 	return parseRepoVisibility(resp.Visibility)
@@ -251,11 +255,14 @@ func resolveExplicitRef(client *api.Client, host, owner, repo, ref string) (*Res
 		return nil, err
 	}
 
-	commitPath := fmt.Sprintf("repos/%s/%s/commits/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(ref))
+	commitPath, err := safeurl.JoinPath("repos", owner, repo, "commits", ref)
+	if err != nil {
+		return nil, err
+	}
 	var commitResp struct {
 		SHA string `json:"sha"`
 	}
-	if err := client.REST(host, "GET", commitPath, nil, &commitResp); err == nil {
+	if err := client.REST(host, "GET", commitPath.String(), nil, &commitResp); err == nil {
 		return &ResolvedRef{Ref: commitResp.SHA, SHA: commitResp.SHA}, nil
 	} else if !isNotFound(err) {
 		return nil, err
@@ -267,25 +274,31 @@ func resolveExplicitRef(client *api.Client, host, owner, repo, ref string) (*Res
 // resolveTagRef looks up a tag by short name and returns a fully qualified ref.
 // For annotated tags, the tag object is dereferenced to obtain the commit SHA.
 func resolveTagRef(client *api.Client, host, owner, repo, tag string) (*ResolvedRef, error) {
-	tagPath := fmt.Sprintf("repos/%s/%s/git/ref/tags/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(tag))
+	tagPath, err := safeurl.JoinPath("repos", owner, repo, "git", "ref", fmt.Sprintf("tags/%s", tag))
+	if err != nil {
+		return nil, err
+	}
 	var refResp struct {
 		Object struct {
 			SHA  string `json:"sha"`
 			Type string `json:"type"`
 		} `json:"object"`
 	}
-	if err := client.REST(host, "GET", tagPath, nil, &refResp); err != nil {
+	if err := client.REST(host, "GET", tagPath.String(), nil, &refResp); err != nil {
 		return nil, fmt.Errorf("tag %q not found in %s/%s: %w", tag, owner, repo, err)
 	}
 	sha := refResp.Object.SHA
 	if refResp.Object.Type == "tag" {
-		derefPath := fmt.Sprintf("repos/%s/%s/git/tags/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(sha))
+		derefPath, err := safeurl.JoinPath("repos", owner, repo, "git", "tags", sha)
+		if err != nil {
+			return nil, err
+		}
 		var tagResp struct {
 			Object struct {
 				SHA string `json:"sha"`
 			} `json:"object"`
 		}
-		if err := client.REST(host, "GET", derefPath, nil, &tagResp); err != nil {
+		if err := client.REST(host, "GET", derefPath.String(), nil, &tagResp); err != nil {
 			return nil, fmt.Errorf("could not dereference annotated tag %q: %w", tag, err)
 		}
 		sha = tagResp.Object.SHA
@@ -295,13 +308,16 @@ func resolveTagRef(client *api.Client, host, owner, repo, tag string) (*Resolved
 
 // resolveBranchRef looks up a branch by short name and returns a fully qualified ref.
 func resolveBranchRef(client *api.Client, host, owner, repo, branch string) (*ResolvedRef, error) {
-	refPath := fmt.Sprintf("repos/%s/%s/git/ref/heads/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(branch))
+	refPath, err := safeurl.JoinPath("repos", owner, repo, "git", "ref", fmt.Sprintf("heads/%s", branch))
+	if err != nil {
+		return nil, err
+	}
 	var refResp struct {
 		Object struct {
 			SHA string `json:"sha"`
 		} `json:"object"`
 	}
-	if err := client.REST(host, "GET", refPath, nil, &refResp); err != nil {
+	if err := client.REST(host, "GET", refPath.String(), nil, &refResp); err != nil {
 		return nil, fmt.Errorf("branch %q not found in %s/%s: %w", branch, owner, repo, err)
 	}
 	return &ResolvedRef{Ref: "refs/heads/" + branch, SHA: refResp.Object.SHA}, nil
@@ -323,11 +339,14 @@ type noReleasesError struct {
 func (e *noReleasesError) Error() string { return e.reason }
 
 func resolveLatestRelease(client *api.Client, host, owner, repo string) (*ResolvedRef, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s/releases/latest", url.PathEscape(owner), url.PathEscape(repo))
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "releases", "latest")
+	if err != nil {
+		return nil, err
+	}
 	var resp struct {
 		TagName string `json:"tag_name"`
 	}
-	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
 		// A 404 means the repository has no releases. This is the
 		// only case where falling back to the default branch is safe.
 		// Any other HTTP error (403, 500, …) or network failure is
@@ -345,11 +364,14 @@ func resolveLatestRelease(client *api.Client, host, owner, repo string) (*Resolv
 }
 
 func resolveDefaultBranch(client *api.Client, host, owner, repo string) (*ResolvedRef, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s", url.PathEscape(owner), url.PathEscape(repo))
+	apiPath, err := safeurl.JoinPath("repos", owner, repo)
+	if err != nil {
+		return nil, err
+	}
 	var resp struct {
 		DefaultBranch string `json:"default_branch"`
 	}
-	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
 		return nil, fmt.Errorf("could not determine default branch: %w", err)
 	}
 	branch := resp.DefaultBranch
@@ -551,9 +573,13 @@ func DiscoverSkills(client *api.Client, host, owner, repo, commitSHA string) ([]
 // DiscoverSkillsWithOptions finds all skills in a repository at the given
 // commit SHA, with configurable discovery behavior.
 func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA string, opts DiscoverOptions) ([]Skill, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s?recursive=true", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(commitSHA))
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", commitSHA)
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("recursive", "true")
 	var tree treeResponse
-	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
 		return nil, fmt.Errorf("could not fetch repository tree: %w", err)
 	}
 
@@ -627,7 +653,7 @@ func fetchDescription(client *api.Client, host, owner, repo string, skill *Skill
 	if err != nil {
 		return ""
 	}
-	result, err := frontmatter.Parse(content)
+	result, err := frontmatter.Parse(content.Raw())
 	if err != nil {
 		return ""
 	}
@@ -697,7 +723,11 @@ func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commi
 	}
 
 	parentPath := path.Dir(skillPath)
-	apiPath := fmt.Sprintf("repos/%s/%s/contents/%s?ref=%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(parentPath), commitSHA)
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "contents", parentPath)
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("ref", commitSHA)
 
 	var contents []struct {
 		Name string `json:"name"`
@@ -705,7 +735,7 @@ func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commi
 		SHA  string `json:"sha"`
 		Type string `json:"type"`
 	}
-	if err := client.REST(host, "GET", apiPath, nil, &contents); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &contents); err != nil {
 		return nil, fmt.Errorf("path %q not found in %s/%s: %w", parentPath, owner, repo, err)
 	}
 
@@ -720,9 +750,12 @@ func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commi
 		return nil, fmt.Errorf("skill directory %q not found in %s/%s", skillPath, owner, repo)
 	}
 
-	skillTreePath := fmt.Sprintf("repos/%s/%s/git/trees/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(treeSHA))
+	skillTreePath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", treeSHA)
+	if err != nil {
+		return nil, err
+	}
 	var skillTree treeResponse
-	if err := client.REST(host, "GET", skillTreePath, nil, &skillTree); err != nil {
+	if err := client.REST(host, "GET", skillTreePath.String(), nil, &skillTree); err != nil {
 		return nil, fmt.Errorf("could not read skill directory: %w", err)
 	}
 
@@ -778,9 +811,13 @@ func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commi
 // DiscoverSkillFiles returns all file paths belonging to a skill directory
 // by fetching the skill's subtree directly using its tree SHA.
 func DiscoverSkillFiles(client *api.Client, host, owner, repo, treeSHA, skillPath string) ([]SkillFile, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s?recursive=true", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(treeSHA))
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", treeSHA)
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("recursive", "true")
 	var tree treeResponse
-	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
 		return nil, fmt.Errorf("could not fetch skill tree: %w", err)
 	}
 
@@ -806,9 +843,13 @@ func DiscoverSkillFiles(client *api.Client, host, owner, repo, treeSHA, skillPat
 // ListSkillFiles returns all files in a skill directory as public SkillFile
 // structs with paths relative to the skill root.
 func ListSkillFiles(client *api.Client, host, owner, repo, treeSHA string) ([]SkillFile, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s?recursive=true", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(treeSHA))
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", treeSHA)
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("recursive", "true")
 	var tree treeResponse
-	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
 		return nil, fmt.Errorf("could not fetch skill tree: %w", err)
 	}
 
@@ -841,9 +882,12 @@ func walkTree(client *api.Client, host, owner, repo, sha, prefix string, depth i
 	if depth > maxTreeDepth {
 		return nil, fmt.Errorf("tree depth exceeds %d levels at %s", maxTreeDepth, prefix)
 	}
-	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(sha))
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", sha)
+	if err != nil {
+		return nil, err
+	}
 	var tree treeResponse
-	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
 		return nil, fmt.Errorf("could not fetch tree %s: %w", prefix, err)
 	}
 
@@ -867,30 +911,36 @@ func walkTree(client *api.Client, host, owner, repo, sha, prefix string, depth i
 	return files, nil
 }
 
-// FetchBlob retrieves the content of a blob by SHA.
-func FetchBlob(client *api.Client, host, owner, repo, sha string) (string, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s/git/blobs/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(sha))
+// FetchBlob retrieves the content of a blob by SHA. The blob is base64-encoded
+// inside the JSON response and decoded here, so it is returned as
+// iostreams.Untrusted and callers must choose sanitized display or raw
+// round-tripping.
+func FetchBlob(client *api.Client, host, owner, repo, sha string) (iostreams.Untrusted, error) {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "blobs", sha)
+	if err != nil {
+		return iostreams.Untrusted{}, err
+	}
 	var resp struct {
 		SHA      string `json:"sha"`
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
 	}
-	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
-		return "", fmt.Errorf("could not fetch blob: %w", err)
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+		return iostreams.Untrusted{}, fmt.Errorf("could not fetch blob: %w", err)
 	}
 
 	if resp.Encoding != "base64" {
-		return "", fmt.Errorf("unexpected blob encoding: %s", resp.Encoding)
+		return iostreams.Untrusted{}, fmt.Errorf("unexpected blob encoding: %s", resp.Encoding)
 	}
 
 	// GitHub API returns base64 with embedded newlines; use the StdEncoding
 	// decoder via a reader to handle them transparently.
 	decoded, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, strings.NewReader(resp.Content)))
 	if err != nil {
-		return "", fmt.Errorf("could not decode blob content: %w", err)
+		return iostreams.Untrusted{}, fmt.Errorf("could not decode blob content: %w", err)
 	}
 
-	return string(decoded), nil
+	return iostreams.NewUntrustedBytes(decoded), nil
 }
 
 // DiscoverLocalSkills finds non-hidden-dir skills in a local directory using

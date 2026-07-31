@@ -26,6 +26,7 @@ This section will deep dive into each job in the [`deployment.yml` workflow](htt
 Although this workflow is used to do our production releases for Linux, MacOS and Windows, it is also possible to run subsets of the workflow. Specifically:
  * The workflow can be triggered with `inputs.release` set to `false`, resulting in the entire [release job](#release) being skipped. This is not exposed via `./script/release`.
  * Many sections are guarded by `if: inputs.environment == 'production'`. These guards protect sections that require secrets (e.g. signing) or that result in mutations (e.g. creating a GitHub release). `./script/release` accepts the `--staging` flag for this purpose. This differs from the previous bullet point as some steps in the [release job](#release) print debug information such as [`git` diffs](https://github.com/cli/cli/blob/5d2eadef8cccf2671f68aad05cd93215a4c01b48/.github/workflows/deployment.yml#L380-L384).
+ * The workflow can be triggered with `inputs.dry_run` set to `true` (the default for the `workflow_dispatch` form). Unlike `inputs.environment`, a dry run still exercises the `production` signing and packaging steps, but it does **not** publish anything: creating GitHub attestations, creating the GitHub Release, and pushing to the `cli.github.com` site repository are all skipped. This makes it possible to validate a full production build, including signing, without mutating anything externally visible. See [Publishing behaviour and dry runs](#dry-run) for details.
  * The workflow can be triggered for only `linux`, `MacOS` or `Windows` which allows for debugging single jobs. This is not exposed via `./script/release`. The [release job](#release) should not run in this case as it [requires all OS specific builds.](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L252)
 
 ## <a id="validate-tag-name">[validate-tag-name](https://github.com/cli/cli/blob/537a22228cd6b42b740d7f1c09f47c45bb1dab30/.github/workflows/deployment.yml#L31-L39)</a>
@@ -52,7 +53,7 @@ The purpose of this job is to [prevent incorrectly tagged releases](https://gith
 
 ## <a id="os-builds">[OS Builds](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L40-L248)</a>
 
-After validating the tag name, the workflow parallelises across `ubuntu`, `macos` and `windows` runners. The primary purpose of these jobs is to build and sign release artifacts. These artifacts are made available to the `release` job via `actions/upload-artifact` and `actions/download-artifact` respectively.
+After validating the tag name, the workflow parallelises across `ubuntu`, `macos` and `windows` runners. The primary purpose of these jobs is to build and sign release artifacts. These artifacts are made available to the `release` job via `actions/upload-artifact` and `actions/download-artifact` respectively. Each of these jobs (as well as `release`) checks out the ref that triggered the `workflow_dispatch` (i.e. the `--ref` passed to `gh workflow run`, which `./script/release` sets from `--branch`) and sets `timeout-minutes: 20` so a hung build (for example, a code-signing step waiting on a remote service) fails fast rather than consuming the full default job timeout.
 
 ### <a id="linux">[linux](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L40-L73)</a>
 
@@ -123,24 +124,43 @@ There is no signing of linux artifacts in this job. See the [release job](#relea
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-      - name: Configure macOS signing
+      - name: Install code signing certificate
         if: inputs.environment == 'production'
+        shell: bash
         env:
-          APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
-          APPLE_APPLICATION_CERT: ${{ secrets.APPLE_APPLICATION_CERT }}
-          APPLE_APPLICATION_CERT_PASSWORD: ${{ secrets.APPLE_APPLICATION_CERT_PASSWORD }}
+          DEVELOPER_ID_CERT: ${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.GATEWATCHER_DEVELOPER_ID_PASSWORD }}
         run: |
-          keychain="$RUNNER_TEMP/buildagent.keychain"
-          keychain_password="password1"
+          # create a keychain for the certificate
+          PW=pwd.${{ github.run_number }}
+          security create-keychain -p $PW $RUNNER_TEMP/build.keychain
+          security set-keychain-settings -lut 21600 "$RUNNER_TEMP/build.keychain"
+          security default-keychain -s $RUNNER_TEMP/build.keychain
+          security unlock-keychain -p $PW $RUNNER_TEMP/build.keychain
 
-          security create-keychain -p "$keychain_password" "$keychain"
-          security default-keychain -s "$keychain"
-          security unlock-keychain -p "$keychain_password" "$keychain"
-
-          base64 -D <<<"$APPLE_APPLICATION_CERT" > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_APPLICATION_CERT_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
-          rm "$RUNNER_TEMP/cert.p12"
+          # import the certificate
+          base64 -d <<<"$DEVELOPER_ID_CERT" > $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $PW $RUNNER_TEMP/build.keychain
+          rm $RUNNER_TEMP/cert.p12
+      - name: Add App Store Connect API key to keychain
+        if: inputs.environment == 'production'
+        uses: nodeselector/setup-apple-codesign@ab275d0f6fb63ef9e20b12b42ea0d567f935723c
+        id: setup-apple-codesign
+        with:
+          asset-type: "app-store-connect-api-key"
+          app-store-connect-api-key-key-id: ${{ secrets.GATEWATCHER_APP_STORE_CONNECT_API_KEY_ID }}
+          app-store-connect-api-key-issuer-id: ${{ secrets.GATEWATCHER_APP_STORE_CONNECT_API_ISSUER_ID }}
+          app-store-connect-api-key-base64-private-key: ${{ secrets.GATEWATCHER_APP_STORE_CONNECT_API_BASE64_PRIVATE_KEY }}
+      - name: Configure notarization credentials
+        if: inputs.environment == 'production'
+        shell: bash
+        run: |
+          xcrun notarytool store-credentials "notarytool-password" \
+            --key "${{ steps.setup-apple-codesign.outputs.app-store-connect-api-key-key-path }}" \
+            --key-id "${{ steps.setup-apple-codesign.outputs.app-store-connect-api-key-key-id }}" \
+            --issuer "${{ steps.setup-apple-codesign.outputs.app-store-connect-api-key-issuer-id }}" \
+            --keychain $RUNNER_TEMP/build.keychain
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -149,14 +169,16 @@ There is no signing of linux artifacts in this job. See the [release job](#relea
       - name: Build release binaries
         env:
           TAG_NAME: ${{ inputs.tag_name }}
-          APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
+          KEYCHAIN: ${{ runner.temp }}/build.keychain
+          DEVELOPER_ID_CERT_IDENTIFIER: ${{ vars.MAC_APP_SIGNING_IDENTITY }}
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
         run: script/release --local "$TAG_NAME" --platform macos
       - name: Notarize macOS archives
         if: inputs.environment == 'production'
         env:
-          APPLE_ID: ${{ vars.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
+          DEVELOPER_ID_CERT_IDENTIFIER: ${{ vars.MAC_APP_SIGNING_IDENTITY }}
+          KEYCHAIN: ${{ runner.temp }}/build.keychain
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
         run: |
           shopt -s failglob
           script/sign dist/gh_*_macOS_*.zip
@@ -203,33 +225,46 @@ There are three levels of "signing" that occur in this job:
  > [!WARNING]
 > Although the job title is `Build & notarize universal macOS pkg installer`, the [`productbuild` docs](https://www.unix.com/man_page/osx/1/productbuild/) only refer to signing, thus notarization may not be the correct term here.
 
-> [!WARNING]
-> Although it appears as if signing the `.pkg` installer can occur if `inputs.environment == 'production'`, in practice, I don't believe we ever set `${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}`, thus we always [skip signing](https://github.com/cli/cli/actions/runs/13271193192/job/37050749548#step:9:11).
+> [!NOTE]
+> Historically the `.pkg` installer was never actually signed because `${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}` was [never set](https://github.com/cli/cli/actions/runs/13271193192/job/37050749548#step:9:11). The `Build & notarize universal macOS pkg installer` step still passes `APPLE_DEVELOPER_INSTALLER_ID: ${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}`, so `productbuild` signing will run once that repository variable is populated.
 
 Signing of MacOS artifacts uses `codesign` and notarization uses `xcrun notarytool`, which submits the artifact to the Apple servers for additional checks.
+
+Signing and notarization are set up across three steps that run only when `inputs.environment == 'production'`:
+
+1. **Install code signing certificate** creates a dedicated keychain and imports the Developer ID Application certificate used by `codesign`.
+2. **Add App Store Connect API key to keychain** uses the [`nodeselector/setup-apple-codesign`](https://github.com/nodeselector/setup-apple-codesign) action to materialise the App Store Connect API key (`.p8`) that `notarytool` authenticates with, exposing its key path, key id and issuer id as step outputs.
+3. **Configure notarization credentials** runs `xcrun notarytool store-credentials` to persist those API key details into the keychain under the profile name `notarytool-password`, so later `notarytool submit` calls can reference the profile instead of passing credentials directly.
 
 In order to perform signing, a keychain must be configured with the signing certificate. Comments have been added to provide clarity to the script:
 
 ```sh
-keychain="$RUNNER_TEMP/buildagent.keychain"
-keychain_password="password1"
+# Derive a per-run keychain password so it is not hard-coded.
+PW=pwd.${{ github.run_number }}
 
 # Create a new keychain for credentials to be stored in.
-security create-keychain -p "$keychain_password" "$keychain"
+security create-keychain -p $PW "$RUNNER_TEMP/build.keychain"
+# Raise the keychain auto-lock timeout (6 hours) so it does not lock mid-build.
+security set-keychain-settings -lut 21600 "$RUNNER_TEMP/build.keychain"
 # Mark the keychain as the system default so that a later signing step doesn't require
 # referencing the keychain by name.
-security default-keychain -s "$keychain"
+security default-keychain -s "$RUNNER_TEMP/build.keychain"
 # Unlock the keychain so that future operations can access the secrets without user interaction.
-security unlock-keychain -p "$keychain_password" "$keychain"
+security unlock-keychain -p $PW "$RUNNER_TEMP/build.keychain"
 
-base64 -D <<<"$APPLE_APPLICATION_CERT" > "$RUNNER_TEMP/cert.p12"
+# Decode the base64-encoded certificate secret into a .p12 file. The
+# certificate and password are passed in via the DEVELOPER_ID_CERT and
+# DEVELOPER_ID_CERT_PASSWORD env vars (mapped from secrets) rather than
+# interpolated into the script, so a password containing shell
+# metacharacters cannot break quoting or be injected.
+base64 -d <<<"$DEVELOPER_ID_CERT" > "$RUNNER_TEMP/cert.p12"
 
 # Import the certificate into the keychain so that a later signing step can use it.
 # `man security` snippet:
 # -k keychain     Specify keychain into which item(s) will be imported.
 # -P passphrase   Specify the unwrapping passphrase immediately. The default is to obtain a secure passphrase via GUI.
 # -T appPath      Specify an application which may access the imported key (multiple -T options are allowed)
-security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_APPLICATION_CERT_PASSWORD" -T /usr/bin/codesign
+security import "$RUNNER_TEMP/cert.p12" -k "$RUNNER_TEMP/build.keychain" -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
 
 # Enforce additional security requirements that only the applications used for signing can access the keychain. This allows for signing applications to access the keychain without user interaction.
 # The three values:
@@ -245,18 +280,26 @@ security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_APPLICATION_CE
 #                       Comma-separated partition list. See output of "security dump-keychain" for examples.
 #       -k password     Password for keychain
 #       -s              Match keys that can sign
-security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
-# Clean up the certificate so that it's not lying around for later jobs to leak.
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $PW "$RUNNER_TEMP/build.keychain"
+# Clean up the certificate so that it's not lying around for later steps to leak.
 rm "$RUNNER_TEMP/cert.p12"
 ```
 
-When we execute `codesign --timestamp --options=runtime -s "${APPLE_DEVELOPER_ID?}" -v "$1"` in `./script/sign`, `codesign` inspects into the default keychain to find a certificate that matches the `APPLE_DEVELOPER_ID` environment variable. The `--timestamp` and `--options=runtime` flags are required for Notarization, described below.
+> [!NOTE]
+> The certificate and its password come from the `GATEWATCHER_DEVELOPER_ID_CERT` and `GATEWATCHER_DEVELOPER_ID_PASSWORD` secrets, replacing the previous `APPLE_APPLICATION_CERT` / `APPLE_APPLICATION_CERT_PASSWORD` secrets. They are mapped into the step's `env:` and referenced as `"$DEVELOPER_ID_CERT"` / `"$DEVELOPER_ID_CERT_PASSWORD"` rather than being interpolated directly into the `run:` script, so a password containing shell metacharacters cannot break quoting or inject commands. The keychain is now named `build.keychain` (previously `buildagent.keychain`) and is passed explicitly to the signing scripts via the `KEYCHAIN` environment variable.
+
+When we execute `codesign --timestamp --options=runtime -s "${DEVELOPER_ID_CERT_IDENTIFIER?}" -v "$1"` in `./script/sign`, `codesign` searches the keychain for a certificate that matches the `DEVELOPER_ID_CERT_IDENTIFIER` environment variable (sourced from the `MAC_APP_SIGNING_IDENTITY` repository variable). The `--timestamp` and `--options=runtime` flags are required for Notarization, described below.
+
+`./script/sign` only signs when `DO_SIGN_ARTIFACTS` is set to a value other than `false`; the `Build release binaries` and `Notarize macOS archives` steps set `DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}` (mirroring the Windows job). This ensures non-production (staging) macOS builds skip signing gracefully rather than failing when `codesign` runs against a keychain that was never provisioned, regardless of whether `MAC_APP_SIGNING_IDENTITY` happens to be defined at repository scope.
+
+> [!TIP]
+> A `***: no identity found` failure from `codesign` means the value of `DEVELOPER_ID_CERT_IDENTIFIER` (i.e. `vars.MAC_APP_SIGNING_IDENTITY`) does not match any identity imported into the keychain. Run `security find-identity -v -p codesigning "$KEYCHAIN"` to list the available identities and their common names, then update the repository variable to match exactly.
 
 ---
 
 [Code signing certifies that a `gh` executable was created by GitHub](https://developer.apple.com/documentation/security/code-signing-services). On the other hand, [Notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) is an additional security step upon which software is submitted to Apple for automated scanning. If passed, Apple generates a `ticket` that can be `stapled` to the software, and Apple's [Gatekeeper](https://support.apple.com/en-gb/guide/security/sec5599b66df/web) software is made aware of it.
 
-When we execute `xcrun notarytool submit "$1" --apple-id "${APPLE_ID?}" --team-id "${APPLE_DEVELOPER_ID?}" --password "${APPLE_ID_PASSWORD?}"` in `./script/sign` no keychain access should be required as the `APPLE_ID_PASSWORD` environment variable is used to authenticate.
+When we execute `xcrun notarytool submit "$1" --keychain "$KEYCHAIN" --keychain-profile "notarytool-password" --wait` in `./script/sign`, `notarytool` authenticates using the App Store Connect API key stored under the `notarytool-password` profile by the earlier `Configure notarization credentials` step. This replaces the previous Apple ID / app-specific password flow (`--apple-id` / `--team-id` / `--password`).
 
 ### <a id="windows">[windows](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L147-L248)</a>
 
@@ -312,6 +355,7 @@ windows:
           DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
           TAG_NAME: ${{ inputs.tag_name }}
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
         run: script/release --local "$TAG_NAME" --platform windows
       - name: Set up MSBuild
         id: setupmsbuild
@@ -353,6 +397,7 @@ windows:
           AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
           DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
         run: |
           Get-ChildItem -Path .\dist -Filter *.msi | ForEach-Object {
             .\script\sign.ps1 $_.FullName
@@ -385,6 +430,8 @@ This references a number of [pretty inscrutable files](https://github.com/cli/cl
 There are two levels of signing that occur in this job:
  * Signing of Go executables created by `GoReleaser` is performed in a [`GoReleaser` hook](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L43).
  * Signing of the MSI installers by executing `.\script\sign.ps1 $_.FullName`
+
+Both the `Build release binaries` and `Sign .msi release binaries` steps set `DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}`, which the signing scripts consult to skip Azure Code Signing outside of production deploys. The value is passed to both steps for consistency, even though the `Sign .msi release binaries` step is already guarded by `if: inputs.environment == 'production'`.
 
 Signing of the Windows artifacts uses `signtool.exe` to request signing from [Azure HSM](https://azure.microsoft.com/en-us/products/azure-dedicated-hsm). This takes the following steps:
 
@@ -442,14 +489,25 @@ release:
         uses: actions/checkout@v4
       - name: Merge built artifacts
         uses: actions/download-artifact@v4
+      - name: Generate site deploy token
+        id: site-deploy-token
+        if: inputs.environment == 'production'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.SITE_DEPLOY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SITE_DEPLOY_APP_PRIVATE_KEY }}
+          owner: github
+          repositories: cli.github.com
       - name: Checkout documentation site
+        if: ${{ inputs.environment == 'production' }}
         uses: actions/checkout@v4
         with:
           repository: github/cli.github.com
           path: site
           fetch-depth: 0
-          token: ${{ secrets.SITE_DEPLOY_PAT }}
+          token: ${{ steps.site-deploy-token.outputs.token }}
       - name: Update site man pages
+        if: ${{ inputs.environment == 'production' }}
         env:
           GIT_COMMITTER_NAME: cli automation
           GIT_AUTHOR_NAME: cli automation
@@ -493,31 +551,29 @@ release:
           cp script/rpmmacros ~/.rpmmacros
           rpmsign --addsign dist/*.rpm
       - name: Attest release artifacts
-        if: inputs.environment == 'production'
+        if: inputs.environment == 'production' && !inputs.dry_run
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-path: "dist/gh_*"
       - name: Run createrepo
-        env:
-          GPG_SIGN: ${{ inputs.environment == 'production' }}
+        if: ${{ inputs.environment == 'production' }}
         run: |
           mkdir -p site/packages/rpm
           cp dist/*.rpm site/packages/rpm/
           ./script/createrepo.sh
           cp -r dist/repodata site/packages/rpm/
           pushd site/packages/rpm
-          [ "$GPG_SIGN" = "false" ] || gpg --yes --detach-sign --armor repodata/repomd.xml
+          gpg --yes --detach-sign --armor repodata/repomd.xml
           popd
       - name: Run reprepro
+        if: ${{ inputs.environment == 'production' }}
         env:
-          GPG_SIGN: ${{ inputs.environment == 'production' }}
           # We are no longer adding to the distribution list.
           # All apt distributions should use "stable" according to our install documentation.
           # In the future we will remove legacy distributions listed here.
           RELEASES: "cosmic eoan disco groovy focal stable oldstable testing sid unstable buster bullseye stretch jessie bionic trusty precise xenial hirsute impish kali-rolling"
         run: |
           mkdir -p upload
-          [ "$GPG_SIGN" = "true" ] || sed -i.bak '/^SignWith:/d' script/distributions
           for release in $RELEASES; do
             for file in dist/*.deb; do
               reprepro --confdir="+b/script" includedeb "$release" "$file"
@@ -529,7 +585,7 @@ release:
       - name: Create the release
         env:
           # In non-production environments, the assets will not have been signed
-          DO_PUBLISH: ${{ inputs.environment == 'production' }}
+          DO_PUBLISH: ${{ inputs.environment == 'production' && !inputs.dry_run }}
           TAG_NAME: ${{ inputs.tag_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -552,7 +608,7 @@ release:
           script/label-assets dist/gh_* | xargs $guard gh release create "${release_args[@]}" --
       - name: Publish site
         env:
-          DO_PUBLISH: ${{ inputs.environment == 'production' && !contains(inputs.tag_name, '-') }}
+          DO_PUBLISH: ${{ inputs.environment == 'production' && !contains(inputs.tag_name, '-') && !inputs.dry_run }}
           TAG_NAME: ${{ inputs.tag_name }}
           GIT_COMMITTER_NAME: cli automation
           GIT_AUTHOR_NAME: cli automation
@@ -576,6 +632,8 @@ The following sections are not strictly in the same order as the workflow but in
 ### Site Manual
 
 A git commit is created in the `cli.github.com` site repository containing the contents of the CLI Manual uploaded by the [`linux`](#linux) job. This is not pushed until the package repository artifacts are set up later.
+
+The `cli.github.com` repository is checked out using a short-lived GitHub App installation token rather than a long-lived PAT. The `Generate site deploy token` step (which only runs when `inputs.environment == 'production'`) uses [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token) with the `SITE_DEPLOY_APP_CLIENT_ID` / `SITE_DEPLOY_APP_PRIVATE_KEY` secrets to mint a token scoped to the `github/cli.github.com` repository, replacing the previous `SITE_DEPLOY_PAT` secret. The site-related steps (`Checkout documentation site`, `Update site man pages`, `Run createrepo`, `Run reprepro`, and `Publish site`) are all guarded by `if: inputs.environment == 'production'`, so in non-production environments the site is neither checked out nor mutated. Even in production, pushing to the site is gated separately on `DO_PUBLISH` (see [Publishing behaviour and dry runs](#dry-run)).
 
 ### Site Package Repositories
 
@@ -612,6 +670,8 @@ The `.deb` files uploaded by the [`linux`](#linux) job are iterated per Debian r
 
 [Attestations](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds) are created for each of the release artifacts. For an example see: https://github.com/cli/cli/attestations/4920729
 
+Attestation creation is skipped on dry runs (`if: inputs.environment == 'production' && !inputs.dry_run`), since attestations are externally visible provenance records that should only be produced for real releases.
+
 ### Publish Release
 
 After all release artifacts have been created, and signed, there are a number of steps taken to make them available to our users.
@@ -632,7 +692,7 @@ $ gh release create v1.2.3 '/path/to/asset.zip#My display label'
 
 #### Site
 
-In previous steps, a git commit was made for the manual, and files had moved into place for the RPM and Debian package repositories. The package repository structure is committed and pushed, which kicks off a deployment workflow in site repository.
+In previous steps, a git commit was made for the manual, and files had moved into place for the RPM and Debian package repositories. The package repository structure is committed and pushed, which kicks off a deployment workflow in site repository. The push only happens when `DO_PUBLISH` is `true` (production, non-prerelease tag, and not a dry run); otherwise the step prints the pending commits and diff for inspection instead of pushing.
 
 Occasionally, the repository can become unwieldy due to hosting so many large binary artifacts. Instructions can be found in the README for that repository.
 
@@ -641,6 +701,23 @@ Occasionally, the repository can become unwieldy due to hosting so many large bi
 Historically, we used [`mislav/bump-homebrew-formula-action`](https://github.com/mislav/bump-homebrew-formula-action). It created a PR for the `gh` [`homebrew-core` formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/g/gh.rb). The fork repository was owned by `williammartin` because PRs are [not accepted from organizations.](https://github.com/cli/cli/pull/7953)
 
 However, since this required a legacy PAT token to open a PR between these repositories, it was deemed too much risk for our security. As such, we now rely on [Homebrew's autobump](https://docs.brew.sh/Autobump).
+
+### <a id="dry-run">Publishing behaviour and dry runs</a>
+
+The `dry_run` input (a boolean that defaults to `true` on the `workflow_dispatch` form) provides a final safety valve on top of the `environment` guard. When `dry_run` is `true`, the workflow still performs a full production build, including code signing, notarization and package repository generation, but skips every step that mutates externally visible state:
+
+| Step | Guard |
+| --- | --- |
+| [Attest release artifacts](#attest-artifacts) | `inputs.environment == 'production' && !inputs.dry_run` |
+| Create the release (`gh release create`) | `DO_PUBLISH: inputs.environment == 'production' && !inputs.dry_run` |
+| [Publish site](#site) (push to `cli.github.com`) | `DO_PUBLISH: inputs.environment == 'production' && !contains(inputs.tag_name, '-') && !inputs.dry_run` |
+
+The `Create the release` and `Publish site` steps consult their `DO_PUBLISH` environment variable: when it is `false` the release command is prefixed with `echo` (so the `gh release create` invocation is only printed, not executed) and the site push is replaced with a `git log` / `git diff` of the pending changes. This means a dry run exercises the entire pipeline end-to-end, making it a safe way to validate signing and packaging changes without creating a GitHub Release, publishing attestations, or pushing to the site repository.
+
+To make dry runs easy to spot in the Actions UI, the workflow's `run-name` appends a `(dry run)` suffix when `inputs.dry_run` is `true` (`run-name: ${{ inputs.tag_name }} / ${{ inputs.environment }}${{ inputs.dry_run == true && ' (dry run)' || '' }}`).
+
+> [!IMPORTANT]
+> The default value of `dry_run` differs depending on how the workflow is triggered. On the `workflow_dispatch` form it defaults to `true`, so a manually triggered run is a dry run unless you explicitly untick the box. `./script/release` takes the opposite default: it defaults `dry_run` to `false` and only forwards `dry_run=true` when invoked with the `--dry-run` flag (`script/release [--staging] [--dry-run] <tag-name> ...`). In other words, `./script/release <tag-name>` performs a real release, while `./script/release --dry-run <tag-name>` exercises the full pipeline without publishing.
 
 ## <a id="deepest-dive">Deepest Dive</a>
 

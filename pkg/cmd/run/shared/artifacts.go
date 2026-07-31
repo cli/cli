@@ -2,13 +2,14 @@ package shared
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type Artifact struct {
@@ -25,17 +26,24 @@ type artifactsPayload struct {
 func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string) ([]Artifact, error) {
 	var results []Artifact
 
+	restPrefix := ghinstance.RESTPrefix(repo.RepoHost())
 	perPage := 100
-	path := fmt.Sprintf("repos/%s/%s/actions/artifacts?per_page=%d", repo.RepoOwner(), repo.RepoName(), perPage)
-	if runID != "" {
-		path = fmt.Sprintf("repos/%s/%s/actions/runs/%s/artifacts?per_page=%d", repo.RepoOwner(), repo.RepoName(), runID, perPage)
+	u, err := safeurl.JoinPathWithHostPrefix(restPrefix, "repos", repo.RepoOwner(), repo.RepoName(), "actions", "artifacts")
+	if err != nil {
+		return nil, err
 	}
-
-	url := fmt.Sprintf("%s%s", ghinstance.RESTPrefix(repo.RepoHost()), path)
+	if runID != "" {
+		u, err = safeurl.JoinPathWithHostPrefix(restPrefix, "repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", runID, "artifacts")
+		if err != nil {
+			return nil, err
+		}
+	}
+	u.SetQuery("per_page", strconv.Itoa(perPage))
+	var pageURL safeurl.SafeURL = u
 
 	for {
 		var payload artifactsPayload
-		nextURL, err := apiGet(httpClient, url, &payload)
+		nextURL, err := apiGet(httpClient, pageURL, &payload)
 		if err != nil {
 			return nil, err
 		}
@@ -44,14 +52,14 @@ func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string)
 		if nextURL == "" {
 			break
 		}
-		url = nextURL
+		pageURL = safeurl.NewImmutableSafeURL(nextURL)
 	}
 
 	return results, nil
 }
 
-func apiGet(httpClient *http.Client, url string, data interface{}) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func apiGet(httpClient *http.Client, url safeurl.SafeURL, data interface{}) (string, error) {
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return "", err
 	}
