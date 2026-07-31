@@ -428,6 +428,7 @@ func Test_apiRun(t *testing.T) {
 		options      ApiOptions
 		httpResponse *http.Response
 		err          error
+		errMsg       string
 		stdout       string
 		stderr       string
 		isatty       bool
@@ -656,6 +657,81 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 			isatty: true,
 		},
+		{
+			name: "refuses escape sequences in non-JSON body on a TTY",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString("\x1b[31mred\x1b[m")),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			errMsg: "the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway",
+			stdout: ``,
+			stderr: ``,
+			isatty: true,
+		},
+		{
+			name: "passes escape sequences through with --allow-escape-sequences on a TTY",
+			options: ApiOptions{
+				AllowEscapeSequences: true,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString("\x1b[31mred\x1b[m")),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			err:    nil,
+			stdout: "\x1b[31mred\x1b[m",
+			stderr: ``,
+			isatty: true,
+		},
+		{
+			name: "refuses escape sequences in non-JSON body when piped",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString("\x1b[31mred\x1b[m")),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			errMsg: "the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway",
+			stdout: ``,
+			stderr: ``,
+			isatty: false,
+		},
+		{
+			name: "outputs clean non-JSON text on a TTY",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString("plain readme text\n")),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			err:    nil,
+			stdout: "plain readme text\n",
+			stderr: ``,
+			isatty: true,
+		},
+		{
+			name: "streams binary non-JSON body when piped",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...))),
+				Header:     http.Header{"Content-Type": []string{"application/octet-stream"}},
+			},
+			err:    nil,
+			stdout: string(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...)),
+			stderr: ``,
+			isatty: false,
+		},
+		{
+			name: "refuses binary non-JSON body on a TTY",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...))),
+				Header:     http.Header{"Content-Type": []string{"application/octet-stream"}},
+			},
+			errMsg: "refusing to output binary content (image/png) to the terminal; redirect or pipe stdout to save it, or pass --allow-escape-sequences to output it anyway",
+			stdout: ``,
+			stderr: ``,
+			isatty: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -675,7 +751,11 @@ func Test_apiRun(t *testing.T) {
 			}
 
 			err := apiRun(&tt.options)
-			if err != tt.err {
+			if tt.errMsg != "" {
+				if err == nil || err.Error() != tt.errMsg {
+					t.Errorf("expected error %q, got %v", tt.errMsg, err)
+				}
+			} else if err != tt.err {
 				t.Errorf("expected error %v, got %v", tt.err, err)
 			}
 

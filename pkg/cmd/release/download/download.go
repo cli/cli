@@ -38,6 +38,8 @@ type DownloadOptions struct {
 	Concurrency int
 
 	ArchiveType string
+
+	AllowEscapeSequences bool
 }
 
 func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobra.Command {
@@ -110,6 +112,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
 	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing files of the same name")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip downloading when files of the same name exist")
+	cmd.Flags().BoolVar(&opts.AllowEscapeSequences, "allow-escape-sequences", false, "Allow printing terminal escape sequences when writing an asset to standard output")
 
 	cmdutil.DisableAuthCheck(cmd)
 
@@ -214,12 +217,20 @@ func downloadRun(opts *DownloadOptions) error {
 		return fmt.Errorf("unable to write more than one asset with `--output`, got %d assets", len(toDownload))
 	}
 
+	// An asset written to standard output is external content. It funnels through
+	// ContentOut so the sink is auditable; the safety decision (refuse binary bound
+	// for a terminal or escape sequences in text, unless --allow-escape-sequences)
+	// is made per copy below. Writing to a file keeps the raw bytes.
+	opts.IO.SetContentSanitization(false)
+
 	dest := destinationWriter{
 		file:         opts.OutputFile,
 		dir:          opts.Destination,
 		skipExisting: opts.SkipExisting,
 		overwrite:    opts.OverwriteExisting,
-		stdout:       opts.IO.Out,
+		stdout:       opts.IO.ContentOut,
+		allowEscapes: opts.AllowEscapeSequences,
+		isTTY:        opts.IO.IsStdoutTTY(),
 	}
 
 	return downloadAssets(&dest, httpClient, toDownload, opts.Concurrency, isArchive, opts.IO)
@@ -347,6 +358,8 @@ type destinationWriter struct {
 	skipExisting bool
 	overwrite    bool
 	stdout       io.Writer
+	allowEscapes bool
+	isTTY        bool
 }
 
 func (w destinationWriter) makePath(name string) string {
@@ -389,7 +402,16 @@ func (w destinationWriter) check(fp string) error {
 func (w destinationWriter) Copy(name string, r io.Reader) (copyErr error) {
 	fp := w.makePath(name)
 	if fp == "-" {
-		_, copyErr = io.Copy(w.stdout, r)
+		if w.allowEscapes {
+			_, copyErr = io.Copy(w.stdout, r)
+			return
+		}
+		copyErr = iostreams.CopyGuardedContent(w.stdout, r, w.isTTY)
+		if binErr, ok := errors.AsType[iostreams.BinaryTerminalError](copyErr); ok {
+			copyErr = fmt.Errorf("%w; use `--output` to save it to a file, or pass --allow-escape-sequences to output it anyway", binErr)
+		} else if errors.Is(copyErr, iostreams.ErrEscapeSequence) {
+			copyErr = errors.New("the asset contains terminal escape sequences; use `--output` to save it to a file, or pass --allow-escape-sequences to output it anyway")
+		}
 		return
 	}
 	if copyErr = w.check(fp); copyErr != nil {

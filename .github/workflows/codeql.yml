@@ -9,6 +9,7 @@ on:
       - '**/*.md'
   schedule:
     - cron: "0 0 * * 0"
+  workflow_dispatch:
 
 permissions:
   actions: read  # for github/codeql-action/init to get workflow details
@@ -21,7 +22,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['go', 'actions']
+        include:
+          # Go uses our custom config, which extends `security-and-quality`
+          # with the project-specific queries under `.github/codeql/queries/`.
+          # `build-mode: manual` runs our own build below so extraction is scoped
+          # to the main module and never co-extracts the nested query-test module.
+          - language: go
+            build-mode: manual
+            config-file: ./.github/codeql/codeql-config.yml
+          # Actions uses the stock `security-and-quality` suite.
+          - language: actions
+            build-mode: none
+            queries: security-and-quality
 
     steps:
       - name: Check out code
@@ -37,7 +49,15 @@ jobs:
         uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           languages: ${{ matrix.language }}
-          queries: security-and-quality
+          build-mode: ${{ matrix.build-mode }}
+          config-file: ${{ matrix.config-file }}
+          queries: ${{ matrix.queries }}
+
+      # Mirror the shipped build (see go.yml integration-tests) so the analyzed
+      # code matches what we release.
+      - name: Build Go
+        if: matrix.language == 'go'
+        run: make
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3

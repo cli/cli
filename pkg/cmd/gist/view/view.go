@@ -1,6 +1,7 @@
 package view
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -33,6 +34,8 @@ type ViewOptions struct {
 	Raw       bool
 	Web       bool
 	ListFiles bool
+
+	AllowEscapeSequences bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -69,12 +72,18 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open gist in the browser")
 	cmd.Flags().BoolVar(&opts.ListFiles, "files", false, "List file names from the gist")
 	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "Display a single file from the gist")
+	cmd.Flags().BoolVar(&opts.AllowEscapeSequences, "allow-escape-sequences", false, "Allow printing terminal escape sequences")
 
 	return cmd
 }
 
 func viewRun(opts *ViewOptions) error {
 	gistID := opts.Selector
+
+	if opts.AllowEscapeSequences {
+		opts.IO.SetContentSanitization(false)
+	}
+
 	client, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -136,17 +145,19 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	render := func(gf *shared.GistFile) error {
+		// Treat the file content as untrusted external bytes. The truncated
+		// path fetches the full content from the raw URL.
+		content := iostreams.NewUntrusted(gf.Content)
 		if gf.Truncated {
 			fullContent, err := shared.GetRawGistFile(client, gf.RawURL)
-
 			if err != nil {
 				return err
 			}
 
-			gf.Content = fullContent
+			content = fullContent
 		}
 
-		if shared.IsBinaryContents([]byte(gf.Content)) {
+		if shared.IsBinaryContents(content.RawBytes()) {
 			if len(gist.Files) == 1 || opts.Filename != "" {
 				return fmt.Errorf("error: file is binary")
 			}
@@ -155,7 +166,10 @@ func viewRun(opts *ViewOptions) error {
 		}
 
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
-			rendered, err := markdown.Render(gf.Content,
+			// Markdown rendering emits application-styled output to Out, so its
+			// input is sanitized here; --allow-escape-sequences applies to the
+			// raw dump below.
+			rendered, err := markdown.Render(content.String(),
 				markdown.WithTheme(opts.IO.TerminalTheme()),
 				markdown.WithWrap(opts.IO.TerminalWidth()))
 			if err != nil {
@@ -165,11 +179,22 @@ func viewRun(opts *ViewOptions) error {
 			return err
 		}
 
-		if _, err := fmt.Fprint(opts.IO.Out, gf.Content); err != nil {
+		// Raw dump. On a terminal, ContentOut renders escape sequences inert.
+		// When the output is piped, refuse content carrying escape sequences
+		// rather than silently rewriting the bytes; --allow-escape-sequences
+		// forces raw.
+		if !opts.AllowEscapeSequences && !opts.IO.IsStdoutTTY() {
+			if iostreams.ContainsEscapeSequence(content.RawBytes()) {
+				return errors.New("gist file contains terminal escape sequences; pass --allow-escape-sequences to view it anyway")
+			}
+			opts.IO.SetContentSanitization(false)
+		}
+		raw := content.Raw()
+		if _, err := fmt.Fprint(opts.IO.ContentOut, raw); err != nil {
 			return err
 		}
-		if !strings.HasSuffix(gf.Content, "\n") {
-			_, err := fmt.Fprint(opts.IO.Out, "\n")
+		if !strings.HasSuffix(raw, "\n") {
+			_, err := fmt.Fprint(opts.IO.ContentOut, "\n")
 			return err
 		}
 

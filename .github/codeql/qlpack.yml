@@ -1,0 +1,9 @@
+name: cli/cli-custom-security
+version: 0.0.1
+library: false
+extractor: go
+tests: tests
+dependencies:
+  codeql/go-all: ^7.1.1
+default-suite:
+  - queries: queries

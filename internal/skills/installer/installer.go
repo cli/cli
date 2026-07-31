@@ -266,10 +266,14 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 	}
 
 	for _, file := range files {
-		content, err := discovery.FetchBlob(opts.Client, opts.Host, opts.Owner, opts.Repo, file.SHA)
+		fetchedContent, err := discovery.FetchBlob(opts.Client, opts.Host, opts.Owner, opts.Repo, file.SHA)
 		if err != nil {
 			return fmt.Errorf("could not fetch %s: %w", file.Path, err)
 		}
+
+		// Install path: the blob is written to disk verbatim, so the raw bytes
+		// must be preserved.
+		content := fetchedContent.Raw()
 
 		relPath := strings.TrimPrefix(file.Path, skill.Path+"/")
 

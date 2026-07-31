@@ -292,7 +292,9 @@ func editRun(opts *EditOptions) error {
 					return err
 				}
 
-				gistFile.Content = fullContent
+				// Round-trip path: the content is opened in an editor and sent
+				// back to the API, so the raw bytes must be preserved verbatim.
+				gistFile.Content = fullContent.Raw()
 			}
 		}
 

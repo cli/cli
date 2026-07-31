@@ -248,28 +248,31 @@ func PromptGists(prompter prompter.Prompter, client *http.Client, host string, c
 	return &gists[result], nil
 }
 
-func GetRawGistFile(httpClient *http.Client, rawURL string) (string, error) {
+// GetRawGistFile fetches the full content of a gist file from its raw URL. The
+// bytes are external content, so they are returned as iostreams.Untrusted to
+// force callers to choose between sanitized display and raw round-tripping.
+func GetRawGistFile(httpClient *http.Client, rawURL string) (iostreams.Untrusted, error) {
 	req, err := http.NewRequest("GET", rawURL, nil)
 	if err != nil {
-		return "", err
+		return iostreams.Untrusted{}, err
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return iostreams.Untrusted{}, err
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", api.HandleHTTPError(resp)
+		return iostreams.Untrusted{}, api.HandleHTTPError(resp)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
-		return "", err
+		return iostreams.Untrusted{}, err
 	}
 
-	return string(body), nil
+	return iostreams.NewUntrustedBytes(body), nil
 }

@@ -855,7 +855,7 @@ func fetchDescriptions(client *api.Client, host string, skills []skillResult) ma
 			if err != nil {
 				return
 			}
-			result, err := frontmatter.Parse(content)
+			result, err := frontmatter.Parse(content.Raw())
 			if err != nil {
 				return
 			}

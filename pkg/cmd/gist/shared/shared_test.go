@@ -307,7 +307,7 @@ func TestGetRawGistFile(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.want, result)
+				assert.Equal(t, tt.want, result.Raw())
 			}
 
 			reg.Verify(t)

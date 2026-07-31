@@ -18,6 +18,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 // specNamePattern matches the strict agentskills.io name spec:
@@ -627,7 +628,7 @@ func fetchDescription(client *api.Client, host, owner, repo string, skill *Skill
 	if err != nil {
 		return ""
 	}
-	result, err := frontmatter.Parse(content)
+	result, err := frontmatter.Parse(content.Raw())
 	if err != nil {
 		return ""
 	}
@@ -867,8 +868,11 @@ func walkTree(client *api.Client, host, owner, repo, sha, prefix string, depth i
 	return files, nil
 }
 
-// FetchBlob retrieves the content of a blob by SHA.
-func FetchBlob(client *api.Client, host, owner, repo, sha string) (string, error) {
+// FetchBlob retrieves the content of a blob by SHA. The blob is base64-encoded
+// inside the JSON response and decoded here, so it is returned as
+// iostreams.Untrusted and callers must choose sanitized display or raw
+// round-tripping.
+func FetchBlob(client *api.Client, host, owner, repo, sha string) (iostreams.Untrusted, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/git/blobs/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(sha))
 	var resp struct {
 		SHA      string `json:"sha"`
@@ -876,21 +880,21 @@ func FetchBlob(client *api.Client, host, owner, repo, sha string) (string, error
 		Encoding string `json:"encoding"`
 	}
 	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
-		return "", fmt.Errorf("could not fetch blob: %w", err)
+		return iostreams.Untrusted{}, fmt.Errorf("could not fetch blob: %w", err)
 	}
 
 	if resp.Encoding != "base64" {
-		return "", fmt.Errorf("unexpected blob encoding: %s", resp.Encoding)
+		return iostreams.Untrusted{}, fmt.Errorf("unexpected blob encoding: %s", resp.Encoding)
 	}
 
 	// GitHub API returns base64 with embedded newlines; use the StdEncoding
 	// decoder via a reader to handle them transparently.
 	decoded, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, strings.NewReader(resp.Content)))
 	if err != nil {
-		return "", fmt.Errorf("could not decode blob content: %w", err)
+		return iostreams.Untrusted{}, fmt.Errorf("could not decode blob content: %w", err)
 	}
 
-	return string(decoded), nil
+	return iostreams.NewUntrustedBytes(decoded), nil
 }
 
 // DiscoverLocalSkills finds non-hidden-dir skills in a local directory using

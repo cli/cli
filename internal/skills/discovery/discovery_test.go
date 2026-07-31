@@ -772,7 +772,7 @@ func TestFetchBlob(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want, got.Raw())
 		})
 	}
 }
