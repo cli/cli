@@ -85,13 +85,8 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 
 		metadataResult, err := api.RepoMetadata(client, baseRepo, input)
 		if err != nil {
-			if missingScopes := api.GraphQLMissingScopes(err); len(missingScopes) > 0 {
-				return fmt.Errorf(
-					"error: your authentication token is missing required scopes %v\n"+
-						"To request it, run:  gh auth refresh -s %s",
-					missingScopes,
-					strings.Join(missingScopes, ","),
-				)
+			if missingScopesErr := api.GraphQLMissingScopesError(err); missingScopesErr != nil {
+				return missingScopesErr
 			}
 			return err
 		}

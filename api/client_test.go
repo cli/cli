@@ -67,7 +67,9 @@ func TestGraphQLMissingScopes(t *testing.T) {
 
 	err := client.GraphQL("github.com", "", nil, &struct{}{})
 	assert.Equal(t, []string{"read:discussion", "read:project"}, GraphQLMissingScopes(err))
+	assert.EqualError(t, GraphQLMissingScopesError(err), "error: your authentication token is missing required scopes [read:discussion read:project]\nUpdate your authentication token to include: read:discussion,read:project")
 	assert.Empty(t, GraphQLMissingScopes(errors.New("not a GraphQL error")))
+	assert.NoError(t, GraphQLMissingScopesError(errors.New("not a GraphQL error")))
 }
 
 func TestGraphQLError(t *testing.T) {
