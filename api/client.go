@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
@@ -25,6 +26,7 @@ const (
 )
 
 var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
+var requiredScopesRE = regexp.MustCompile(`one of the following scopes: \[(.+?)]`)
 
 func NewClientFromHTTP(httpClient *http.Client) *Client {
 	client := &Client{http: httpClient}
@@ -41,6 +43,35 @@ func (c *Client) HTTP() *http.Client {
 
 type GraphQLError struct {
 	*ghAPI.GraphQLError
+}
+
+// GraphQLMissingScopes returns the OAuth scopes reported as missing by a GraphQL response.
+func GraphQLMissingScopes(err error) []string {
+	var gerr GraphQLError
+	if !errors.As(err, &gerr) {
+		return nil
+	}
+
+	missing := make(map[string]struct{})
+	for _, graphQLError := range gerr.Errors {
+		if graphQLError.Type != "INSUFFICIENT_SCOPES" {
+			continue
+		}
+		m := requiredScopesRE.FindStringSubmatch(graphQLError.Message)
+		if m == nil {
+			continue
+		}
+		for _, scope := range strings.Split(m[1], ",") {
+			missing[strings.Trim(scope, "' ")] = struct{}{}
+		}
+	}
+
+	scopes := make([]string, 0, len(missing))
+	for scope := range missing {
+		scopes = append(scopes, scope)
+	}
+	sort.Strings(scopes)
+	return scopes
 }
 
 type HTTPError struct {

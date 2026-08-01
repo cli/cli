@@ -293,11 +293,6 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 		expectOut bool
 	}{
 		{
-			name:      "read scope error",
-			errMsg:    "field requires one of the following scopes: ['read:project']",
-			expectOut: true,
-		},
-		{
 			name:      "repository projectsV2 field error",
 			errMsg:    "Field 'projectsV2' doesn't exist on type 'Repository'",
 			expectOut: true,

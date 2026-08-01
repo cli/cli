@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	errorProjectsV2ReadScope             = "field requires one of the following scopes: ['read:project']"
 	errorProjectsV2UserField             = "Field 'projectsV2' doesn't exist on type 'User'"
 	errorProjectsV2RepositoryField       = "Field 'projectsV2' doesn't exist on type 'Repository'"
 	errorProjectsV2OrganizationField     = "Field 'projectsV2' doesn't exist on type 'Organization'"
@@ -329,8 +328,7 @@ func CurrentUserProjectsV2(client *Client, hostname string) ([]ProjectV2, error)
 // against the known error strings.
 func ProjectsV2IgnorableError(err error) bool {
 	msg := err.Error()
-	if strings.Contains(msg, errorProjectsV2ReadScope) ||
-		strings.Contains(msg, errorProjectsV2UserField) ||
+	if strings.Contains(msg, errorProjectsV2UserField) ||
 		strings.Contains(msg, errorProjectsV2RepositoryField) ||
 		strings.Contains(msg, errorProjectsV2OrganizationField) ||
 		strings.Contains(msg, errorProjectsV2IssueField) ||

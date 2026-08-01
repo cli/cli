@@ -45,6 +45,31 @@ func TestGraphQL(t *testing.T) {
 	assert.Equal(t, `{"query":"QUERY","variables":{"name":"Mona"}}`, string(reqBody))
 }
 
+func TestGraphQLMissingScopes(t *testing.T) {
+	reg := &httpmock.Registry{}
+	client := newTestClient(reg)
+
+	reg.Register(
+		httpmock.GraphQL(""),
+		httpmock.StringResponse(`{
+			"errors": [
+				{
+					"type": "INSUFFICIENT_SCOPES",
+					"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'read:discussion']."
+				},
+				{
+					"type": "INSUFFICIENT_SCOPES",
+					"message": "The 'other' field requires one of the following scopes: ['read:project']."
+				}
+			]
+		}`),
+	)
+
+	err := client.GraphQL("github.com", "", nil, &struct{}{})
+	assert.Equal(t, []string{"read:discussion", "read:project"}, GraphQLMissingScopes(err))
+	assert.Empty(t, GraphQLMissingScopes(errors.New("not a GraphQL error")))
+}
+
 func TestGraphQLError(t *testing.T) {
 	reg := &httpmock.Registry{}
 	client := newTestClient(reg)
