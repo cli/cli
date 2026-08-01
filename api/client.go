@@ -45,6 +45,20 @@ type GraphQLError struct {
 	*ghAPI.GraphQLError
 }
 
+// MissingScopesError reports OAuth scopes required by an API operation.
+type MissingScopesError struct {
+	Scopes []string
+}
+
+func (err MissingScopesError) Error() string {
+	return fmt.Sprintf(
+		"error: your authentication token is missing required scopes %v\n"+
+			"Update your authentication token to include: %s",
+		err.Scopes,
+		strings.Join(err.Scopes, ","),
+	)
+}
+
 // GraphQLMissingScopes returns the OAuth scopes reported as missing by a GraphQL response.
 func GraphQLMissingScopes(err error) []string {
 	var gerr GraphQLError
@@ -72,6 +86,15 @@ func GraphQLMissingScopes(err error) []string {
 	}
 	sort.Strings(scopes)
 	return scopes
+}
+
+// GraphQLMissingScopesError returns a user-facing error when a GraphQL response reports missing OAuth scopes.
+func GraphQLMissingScopesError(err error) error {
+	scopes := GraphQLMissingScopes(err)
+	if len(scopes) == 0 {
+		return nil
+	}
+	return MissingScopesError{Scopes: scopes}
 }
 
 type HTTPError struct {

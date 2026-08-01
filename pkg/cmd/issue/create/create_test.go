@@ -1091,8 +1091,8 @@ func TestIssueCreate_projectMissingReadScope(t *testing.T) {
 		)
 	}
 
-	_, err := runCommand(http, true, `-t hello -b body -p roadmap`, nil)
-	require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project]\nTo request it, run:  gh auth refresh -s read:project")
+	_, err := runCommand(http, false, `-t hello -b body -p roadmap`, nil)
+	require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project]\nUpdate your authentication token to include: read:project")
 }
 
 func TestIssueCreate_recover(t *testing.T) {
