@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"slices"
@@ -114,6 +115,10 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 
 	projectIDs, projectV2IDs, err := tb.MetadataResult.ProjectsTitlesToIDs(tb.ProjectTitles)
 	if err != nil {
+		var missingScopesErr api.MissingScopesError
+		if errors.As(err, &missingScopesErr) {
+			return missingScopesErr
+		}
 		return fmt.Errorf("could not add to project: %w", err)
 	}
 	params["projectIds"] = projectIDs

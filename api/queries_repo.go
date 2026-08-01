@@ -746,6 +746,8 @@ type RepoMetadataResult struct {
 	ProjectsV2       []ProjectV2
 	Milestones       []RepoMilestone
 	Teams            []OrgTeam
+
+	missingProjectsV2Scopes []string
 }
 
 func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
@@ -841,6 +843,10 @@ func (m *RepoMetadataResult) ProjectsTitlesToIDs(titles []string) ([]string, []s
 			continue
 		}
 
+		if len(m.missingProjectsV2Scopes) > 0 {
+			return nil, nil, MissingScopesError{Scopes: m.missingProjectsV2Scopes}
+		}
+
 		return nil, nil, fmt.Errorf("'%s' not found", title)
 	}
 	return ids, idsV2, nil
@@ -901,7 +907,7 @@ func ProjectTitlesToPaths(client *Client, repo ghrepo.Interface, titles []string
 	}
 
 	// Then we'll try to match against v2 projects
-	v2Projects, err := v2Projects(client, repo)
+	v2Projects, missingScopes, err := v2Projects(client, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -929,6 +935,9 @@ func ProjectTitlesToPaths(client *Client, repo ghrepo.Interface, titles []string
 		}
 
 		if !found {
+			if len(missingScopes) > 0 {
+				return nil, MissingScopesError{Scopes: missingScopes}
+			}
 			return nil, fmt.Errorf("'%s' not found", title)
 		}
 	}
@@ -1065,7 +1074,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if input.ProjectsV2 {
 		g.Go(func() error {
 			var err error
-			result.ProjectsV2, err = v2Projects(client, repo)
+			result.ProjectsV2, result.missingProjectsV2Scopes, err = v2Projects(client, repo)
 			return err
 		})
 	}
@@ -1551,47 +1560,44 @@ func v1Projects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 // - ProjectsV2 owned by current user
 // - ProjectsV2 linked to repository
 // - ProjectsV2 owned by repository organization, if it belongs to one
-func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, error) {
+func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, []string, error) {
 	var userProjectsV2 []ProjectV2
 	var repoProjectsV2 []ProjectV2
 	var orgProjectsV2 []ProjectV2
+	var userErr error
+	var repoErr error
+	var orgErr error
 
 	g, _ := errgroup.WithContext(context.Background())
 
 	g.Go(func() error {
-		var err error
-		userProjectsV2, err = CurrentUserProjectsV2(client, repo.RepoHost())
-		if err != nil && !ProjectsV2IgnorableError(err) {
-			err = fmt.Errorf("error fetching user projects: %w", err)
-			return err
+		userProjectsV2, userErr = CurrentUserProjectsV2(client, repo.RepoHost())
+		if userErr != nil && !ProjectsV2IgnorableError(userErr) {
+			return fmt.Errorf("error fetching user projects: %w", userErr)
 		}
 		return nil
 	})
 
 	g.Go(func() error {
-		var err error
-		repoProjectsV2, err = RepoProjectsV2(client, repo)
-		if err != nil && !ProjectsV2IgnorableError(err) {
-			err = fmt.Errorf("error fetching repo projects: %w", err)
-			return err
+		repoProjectsV2, repoErr = RepoProjectsV2(client, repo)
+		if repoErr != nil && !ProjectsV2IgnorableError(repoErr) {
+			return fmt.Errorf("error fetching repo projects: %w", repoErr)
 		}
 		return nil
 	})
 
 	g.Go(func() error {
-		var err error
-		orgProjectsV2, err = OrganizationProjectsV2(client, repo)
-		if err != nil &&
-			!ProjectsV2IgnorableError(err) &&
-			!strings.Contains(err.Error(), errorResolvingOrganization) {
-			err = fmt.Errorf("error fetching organization projects: %w", err)
-			return err
+		orgProjectsV2, orgErr = OrganizationProjectsV2(client, repo)
+		if orgErr != nil &&
+			!ProjectsV2IgnorableError(orgErr) &&
+			!strings.Contains(orgErr.Error(), errorResolvingOrganization) {
+			return fmt.Errorf("error fetching organization projects: %w", orgErr)
 		}
 		return nil
 	})
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// ProjectV2 might appear across multiple queries so use a map to keep them deduplicated.
@@ -1610,7 +1616,19 @@ func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, error) {
 		projectsV2 = append(projectsV2, p)
 	}
 
-	return projectsV2, nil
+	missingScopes := make(map[string]struct{})
+	for _, err := range []error{userErr, repoErr, orgErr} {
+		for _, scope := range GraphQLMissingScopes(err) {
+			missingScopes[scope] = struct{}{}
+		}
+	}
+	scopes := make([]string, 0, len(missingScopes))
+	for scope := range missingScopes {
+		scopes = append(scopes, scope)
+	}
+	sort.Strings(scopes)
+
+	return projectsV2, scopes, nil
 }
 
 func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path safeurl.SafeURL, body io.Reader) (*Repository, error) {
