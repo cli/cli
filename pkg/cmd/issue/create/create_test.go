@@ -1055,6 +1055,46 @@ func TestIssueCreate(t *testing.T) {
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
 }
 
+func TestIssueCreate_projectMissingReadScope(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`{ "data": { "repository": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`{ "data": { "organization": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`),
+	)
+	for _, query := range []string{
+		`query RepositoryProjectV2List\b`,
+		`query OrganizationProjectV2List\b`,
+		`query UserProjectV2List\b`,
+	} {
+		http.Register(
+			httpmock.GraphQL(query),
+			httpmock.StringResponse(`{
+				"errors": [{
+					"type": "INSUFFICIENT_SCOPES",
+					"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
+				}]
+			}`),
+		)
+	}
+
+	_, err := runCommand(http, true, `-t hello -b body -p roadmap`, nil)
+	require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project]\nTo request it, run:  gh auth refresh -s read:project")
+}
+
 func TestIssueCreate_recover(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)

@@ -3,7 +3,6 @@ package queries
 import (
 	"io"
 	"net/http"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -562,37 +561,6 @@ func TestProjectFields_NoLimit(t *testing.T) {
 	project, err := client.ProjectFields(owner, 1, 0)
 	assert.NoError(t, err)
 	assert.Len(t, project.Fields.Nodes, 3)
-}
-
-func Test_requiredScopesFromServerMessage(t *testing.T) {
-	tests := []struct {
-		name string
-		msg  string
-		want []string
-	}{
-		{
-			name: "no scopes",
-			msg:  "SERVER OOPSIE",
-			want: []string(nil),
-		},
-		{
-			name: "one scope",
-			msg:  "Your token has not been granted the required scopes to execute this query. The 'dataType' field requires one of the following scopes: ['read:project'], but your token has only been granted the: ['codespace', repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
-			want: []string{"read:project"},
-		},
-		{
-			name: "multiple scopes",
-			msg:  "Your token has not been granted the required scopes to execute this query. The 'dataType' field requires one of the following scopes: ['read:project', 'read:discussion', 'codespace'], but your token has only been granted the: [repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
-			want: []string{"read:project", "read:discussion", "codespace"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := requiredScopesFromServerMessage(tt.msg); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("requiredScopesFromServerMessage() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }
 
 func TestNewProject_nonTTY(t *testing.T) {
