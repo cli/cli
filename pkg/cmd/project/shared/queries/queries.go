@@ -1709,8 +1709,12 @@ func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) error {
 }
 
 func handleError(err error) error {
-	if missingScopesErr := api.GraphQLMissingScopesError(err); missingScopesErr != nil {
-		return missingScopesErr
+	if missingScopes := api.GraphQLMissingScopes(err); len(missingScopes) > 0 {
+		return fmt.Errorf(
+			"error: your authentication token is missing required scopes %v\n"+
+				"To request it, run:  gh auth refresh -s %s",
+			missingScopes,
+			strings.Join(missingScopes, ","))
 	}
 	return err
 }

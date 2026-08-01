@@ -342,6 +342,24 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 	}
 }
 
+func TestProjectsV2IgnorableError_missingProjectScope(t *testing.T) {
+	reg := &httpmock.Registry{}
+	client := newTestClient(reg)
+
+	reg.Register(
+		httpmock.GraphQL(""),
+		httpmock.StringResponse(`{
+			"errors": [{
+				"type": "INSUFFICIENT_SCOPES",
+				"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
+			}]
+		}`),
+	)
+
+	err := client.GraphQL("github.com", "", nil, &struct{}{})
+	assert.True(t, ProjectsV2IgnorableError(err))
+}
+
 func stripSpace(str string) string {
 	var b strings.Builder
 	b.Grow(len(str))

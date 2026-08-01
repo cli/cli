@@ -327,6 +327,12 @@ func CurrentUserProjectsV2(client *Client, hostname string) ([]ProjectV2, error)
 // return multiple types of errors this uses brittle string comparison to check
 // against the known error strings.
 func ProjectsV2IgnorableError(err error) bool {
+	for _, scope := range GraphQLMissingScopes(err) {
+		if scope == "read:project" {
+			return true
+		}
+	}
+
 	msg := err.Error()
 	if strings.Contains(msg, errorProjectsV2UserField) ||
 		strings.Contains(msg, errorProjectsV2RepositoryField) ||

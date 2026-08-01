@@ -381,6 +381,25 @@ func Test_RepoMetadata(t *testing.T) {
 	}
 }
 
+func TestRepoMetadataResultProjectsTitlesToIDsWithMissingProjectsV2Scopes(t *testing.T) {
+	result := RepoMetadataResult{
+		Projects: []RepoProject{{Name: "Classic", ID: "CLASSICID"}},
+		missingProjectsV2Scopes: []string{
+			"read:project",
+		},
+	}
+
+	projectIDs, projectV2IDs, err := result.ProjectsTitlesToIDs([]string{"classic"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"CLASSICID"}, projectIDs)
+	assert.Empty(t, projectV2IDs)
+
+	_, _, err = result.ProjectsTitlesToIDs([]string{"ProjectV2"})
+	var missingScopesErr MissingScopesError
+	require.ErrorAs(t, err, &missingScopesErr)
+	assert.Equal(t, []string{"read:project"}, missingScopesErr.Scopes)
+}
+
 // Test that RepoMetadata only fetches teams if the input specifies it
 func Test_RepoMetadata_TeamsAreConditionallyFetched(t *testing.T) {
 	http := &httpmock.Registry{}
