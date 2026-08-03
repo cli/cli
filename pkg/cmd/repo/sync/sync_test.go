@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/context"
@@ -14,6 +18,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdSync(t *testing.T) {
@@ -98,6 +103,42 @@ func TestNewCmdSync(t *testing.T) {
 			assert.Equal(t, tt.output.Force, gotOpts.Force)
 		})
 	}
+}
+
+func TestExecuteLocalRepoSyncBranchCheckedOutInOtherWorktree(t *testing.T) {
+	repoDir := t.TempDir()
+	worktreeDir := filepath.Join(t.TempDir(), "trunk-worktree")
+
+	runGit(t, repoDir, "init", "--quiet", "--initial-branch=trunk")
+	runGit(t, repoDir, "config", "user.name", "Test User")
+	runGit(t, repoDir, "config", "user.email", "test@example.com")
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("old\n"), 0o600))
+	runGit(t, repoDir, "add", "file.txt")
+	runGit(t, repoDir, "commit", "--quiet", "--message=initial")
+	runGit(t, repoDir, "switch", "--quiet", "--create", "test")
+	runGit(t, repoDir, "worktree", "add", "--quiet", worktreeDir, "trunk")
+
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("new\n"), 0o600))
+	runGit(t, repoDir, "commit", "--quiet", "--all", "--message=upstream")
+	runGit(t, repoDir, "fetch", "--quiet", ".", "test")
+
+	gitClient := &git.Client{RepoDir: repoDir}
+	opts := &SyncOptions{
+		Branch: "trunk",
+		Git:    &gitExecuter{client: gitClient},
+	}
+
+	err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
+	require.NoError(t, err)
+	require.Empty(t, runGit(t, worktreeDir, "status", "--porcelain"))
+}
+
+func runGit(t *testing.T, repoDir string, args ...string) string {
+	t.Helper()
+	cmdArgs := append([]string{"-C", repoDir}, args...)
+	output, err := exec.Command("git", cmdArgs...).CombinedOutput()
+	require.NoErrorf(t, err, "git %s failed: %s", strings.Join(args, " "), output)
+	return strings.TrimSpace(string(output))
 }
 
 func Test_SyncRun(t *testing.T) {
