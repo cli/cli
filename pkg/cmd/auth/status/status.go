@@ -30,6 +30,7 @@ const (
 type authEntry struct {
 	State       authEntryState `json:"state"`
 	Error       string         `json:"error,omitempty"`
+	StatusCode  int            `json:"statusCode,omitempty"`
 	Active      bool           `json:"active"`
 	Host        string         `json:"host"`
 	Login       string         `json:"login"`
@@ -93,8 +94,14 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		}
 		activeStr := fmt.Sprintf("%v", e.Active)
 		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
-		sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.TokenSource))
-		if authTokenWriteable(e.TokenSource) {
+		if e.StatusCode == http.StatusUnauthorized {
+			sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.TokenSource))
+		} else if e.Error != "" {
+			sb.WriteString(fmt.Sprintf("  - Could not verify token in %s: %s\n", e.TokenSource, e.Error))
+		} else {
+			sb.WriteString(fmt.Sprintf("  - Could not verify token in %s.\n", e.TokenSource))
+		}
+		if authTokenWriteable(e.TokenSource) && e.StatusCode == http.StatusUnauthorized {
 			loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
 			if shared.AuthTokenRefreshable(e.Token, e.TokenSource) {
 				loginInstructions = fmt.Sprintf("gh auth refresh -h %s", e.Host)
@@ -411,6 +418,10 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 
 		entry.State = authEntryStateError
 		entry.Error = err.Error()
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) {
+			entry.StatusCode = httpErr.StatusCode
+		}
 		return entry
 	}
 	entry.Scopes = scopesHeader
