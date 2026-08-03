@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -538,4 +539,35 @@ func TestRunAddItem_JSON(t *testing.T) {
 		t,
 		`{"id":"item ID","title":"a title","body":"","type":"Issue"}`,
 		stdout.String())
+}
+
+func TestPrintResults(t *testing.T) {
+	tests := []struct {
+		name      string
+		stdoutTTY bool
+		want      string
+	}{
+		{
+			name:      "tty",
+			stdoutTTY: true,
+			want:      "Added item\n",
+		},
+		{
+			name: "non-tty",
+			want: "item ID\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.stdoutTTY)
+			config := addItemConfig{io: ios}
+
+			err := printResults(config, queries.ProjectItem{Id: "item ID"})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, stdout.String())
+		})
+	}
 }
