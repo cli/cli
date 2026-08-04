@@ -233,10 +233,10 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-b", localBranch, "--track", remoteBranch})
 			}
 		} else if localBranchExists(opts.GitClient, localBranch) {
-			cmds = append(cmds, []string{"worktree", "add", opts.Worktree, localBranch})
+			cmds = append(cmds, []string{"worktree", "add", "--", opts.Worktree, localBranch})
 			cmds = append(cmds, syncBranchCmds(opts.Worktree, remoteBranchRef, opts.Force)...)
 		} else {
-			cmds = append(cmds, []string{"worktree", "add", "--track", "-b", localBranch, opts.Worktree, remoteBranch})
+			cmds = append(cmds, []string{"worktree", "add", "--track", "-b", localBranch, "--", opts.Worktree, remoteBranch})
 		}
 	case localBranchExists(opts.GitClient, localBranch):
 		cmds = append(cmds, []string{"checkout", localBranch})
@@ -283,7 +283,7 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 				fetchCmd = append(fetchCmd, "--force")
 			}
 			cmds = append(cmds, fetchCmd)
-			cmds = append(cmds, []string{"worktree", "add", opts.Worktree, localBranch})
+			cmds = append(cmds, []string{"worktree", "add", "--", opts.Worktree, localBranch})
 		}
 	} else if localBranch == currentBranch {
 		// PR head matches currently checked out branch
@@ -407,7 +407,7 @@ func detachCmds(fetchCmd []string, worktree string, reuseWorktree bool) [][]stri
 	}
 	return [][]string{
 		fetchCmd,
-		{"worktree", "add", "--detach", worktree, "FETCH_HEAD"},
+		{"worktree", "add", "--detach", "--", worktree, "FETCH_HEAD"},
 	}
 }
 
