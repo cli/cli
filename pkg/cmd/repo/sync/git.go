@@ -2,7 +2,6 @@ package sync
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cli/cli/v2/git"
 )
@@ -24,7 +23,7 @@ type gitExecuter struct {
 }
 
 func (g *gitExecuter) UpdateBranch(branch, ref string) error {
-	cmd, err := g.client.Command(context.Background(), "update-ref", fmt.Sprintf("refs/heads/%s", branch), ref)
+	cmd, err := g.client.Command(context.Background(), "branch", "--force", "--", branch, ref)
 	if err != nil {
 		return err
 	}
