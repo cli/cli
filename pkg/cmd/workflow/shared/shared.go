@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"path"
 	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
@@ -69,9 +69,14 @@ func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workf
 		}
 		var result WorkflowsPayload
 
-		path := fmt.Sprintf("repos/%s/actions/workflows?per_page=%d&page=%d", ghrepo.FullName(repo), perPage, page)
+		u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "workflows")
+		if err != nil {
+			return nil, err
+		}
+		u.SetQuery("per_page", strconv.Itoa(perPage))
+		u.SetQuery("page", strconv.Itoa(page))
 
-		err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+		err = client.REST(repo.RepoHost(), "GET", u.String(), nil, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -159,8 +164,11 @@ func isWorkflowFile(f string) bool {
 func getWorkflowByID(client *api.Client, repo ghrepo.Interface, ID string) (*Workflow, error) {
 	var workflow Workflow
 
-	path := fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), url.PathEscape(ID))
-	if err := client.REST(repo.RepoHost(), "GET", path, nil, &workflow); err != nil {
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "workflows", ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := client.REST(repo.RepoHost(), "GET", path.String(), nil, &workflow); err != nil {
 		return nil, err
 	}
 
@@ -233,10 +241,12 @@ func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, r
 }
 
 func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Workflow, ref string) ([]byte, error) {
-	path := fmt.Sprintf("repos/%s/contents/%s", ghrepo.FullName(repo), workflow.Path)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "contents", workflow.Path)
+	if err != nil {
+		return nil, err
+	}
 	if ref != "" {
-		q := fmt.Sprintf("?ref=%s", url.QueryEscape(ref))
-		path = path + q
+		path.SetQuery("ref", ref)
 	}
 
 	type Result struct {
@@ -244,7 +254,7 @@ func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Work
 	}
 
 	var result Result
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	err = client.REST(repo.RepoHost(), "GET", path.String(), nil, &result)
 	if err != nil {
 		return nil, err
 	}

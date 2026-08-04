@@ -3,10 +3,10 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -845,8 +845,11 @@ func ConvertPullRequestToDraft(client *Client, repo ghrepo.Interface, pr *PullRe
 }
 
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
-	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(branch))
-	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "git", "refs", fmt.Sprintf("heads/%s", branch))
+	if err != nil {
+		return err
+	}
+	return client.REST(repo.RepoHost(), "DELETE", path.String(), nil, nil)
 }
 
 type RefComparison struct {

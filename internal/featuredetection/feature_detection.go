@@ -5,6 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/hashicorp/go-version"
 	"golang.org/x/sync/errgroup"
 
@@ -541,7 +542,11 @@ func resolveEnterpriseVersion(httpClient *http.Client, host string) (*version.Ve
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
-	err := apiClient.REST(host, "GET", "meta", nil, &metaResponse)
+	u, err := safeurl.JoinPath("meta")
+	if err != nil {
+		return nil, err
+	}
+	err = apiClient.REST(host, "GET", u.String(), nil, &metaResponse)
 	if err != nil {
 		return nil, err
 	}

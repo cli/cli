@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"time"
+
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 const defaultEventType = "gh_cli"
@@ -66,7 +67,10 @@ func (c *CAPIClient) CreateJob(ctx context.Context, owner, repo, problemStatemen
 		return nil, errors.New("problem statement is required")
 	}
 
-	url := fmt.Sprintf("%s/%s/%s", c.jobsBasePathV1(), url.PathEscape(owner), url.PathEscape(repo))
+	u, err := safeurl.JoinPathWithHostPrefix(c.jobsBasePathV1(), owner, repo)
+	if err != nil {
+		return nil, err
+	}
 
 	prOpts := JobPullRequest{}
 	if baseBranch != "" {
@@ -82,7 +86,7 @@ func (c *CAPIClient) CreateJob(ctx context.Context, owner, repo, problemStatemen
 
 	b, _ := json.Marshal(payload)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -132,8 +136,11 @@ func (c *CAPIClient) GetJob(ctx context.Context, owner, repo, jobID string) (*Jo
 	if owner == "" || repo == "" || jobID == "" {
 		return nil, errors.New("owner, repo, and jobID are required")
 	}
-	url := fmt.Sprintf("%s/%s/%s/%s", c.jobsBasePathV1(), url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(jobID))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	u, err := safeurl.JoinPathWithHostPrefix(c.jobsBasePathV1(), owner, repo, jobID)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}

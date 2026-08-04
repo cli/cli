@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -84,8 +86,11 @@ func runDisable(opts *DisableOptions) error {
 		return err
 	}
 
-	path := fmt.Sprintf("repos/%s/actions/workflows/%d/disable", ghrepo.FullName(repo), workflow.ID)
-	err = client.REST(repo.RepoHost(), "PUT", path, nil, nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "workflows", strconv.FormatInt(workflow.ID, 10), "disable")
+	if err != nil {
+		return err
+	}
+	err = client.REST(repo.RepoHost(), "PUT", path.String(), nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to disable workflow: %w", err)
 	}

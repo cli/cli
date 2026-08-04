@@ -209,7 +209,7 @@ func previewRun(opts *PreviewOptions) error {
 		return err
 	}
 
-	rendered := opts.renderFile("SKILL.md", content)
+	rendered := opts.renderFile("SKILL.md", content.String())
 
 	// Collect extra files (everything that isn't SKILL.md)
 	var extraFiles []discovery.SkillFile
@@ -304,10 +304,11 @@ func renderAllFiles(opts *PreviewOptions, cs *iostreams.ColorScheme, skill disco
 			continue
 		}
 		fetched++
-		totalBytes += len(fileContent)
+		sanitized := fileContent.String()
+		totalBytes += len(sanitized)
 		fmt.Fprintf(out, "\n%s\n\n", cs.Bold("── "+f.Path+" ──"))
-		fmt.Fprint(out, fileContent)
-		if !strings.HasSuffix(fileContent, "\n") {
+		fmt.Fprint(out, sanitized)
+		if !strings.HasSuffix(sanitized, "\n") {
 			fmt.Fprintln(out)
 		}
 	}
@@ -358,7 +359,7 @@ func renderInteractive(opts *PreviewOptions, cs *iostreams.ColorScheme, skill di
 				fmt.Fprintf(opts.IO.ErrOut, "%s could not fetch %s: %v\n", cs.Red("!"), selectedFile.Path, fetchErr)
 				continue
 			}
-			content = renderSelectedFilePreview(opts, selectedFile.Path, fileContent)
+			content = renderSelectedFilePreview(opts, selectedFile.Path, fileContent.String())
 			if !strings.HasSuffix(content, "\n") {
 				content += "\n"
 			}

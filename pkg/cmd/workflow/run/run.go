@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -319,7 +320,10 @@ func runRun(opts *RunOptions) error {
 		return err
 	}
 
-	path := fmt.Sprintf("repos/%s/%s/actions/workflows/%d/dispatches", url.PathEscape(repo.RepoOwner()), url.PathEscape(repo.RepoName()), workflow.ID)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "workflows", strconv.FormatInt(workflow.ID, 10), "dispatches")
+	if err != nil {
+		return err
+	}
 
 	requestBody := map[string]interface{}{
 		"ref":    ref,
@@ -358,7 +362,7 @@ func runRun(opts *RunOptions) error {
 	//
 	// As a related note, the new REST API version (which will come with breaking
 	// changes) will probably default to return 200 + run details.
-	err = client.REST(repo.RepoHost(), "POST", path, body, &response)
+	err = client.REST(repo.RepoHost(), "POST", path.String(), body, &response)
 	if err != nil {
 		return fmt.Errorf("could not create workflow dispatch event: %w", err)
 	}

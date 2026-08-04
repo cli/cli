@@ -329,10 +329,17 @@ func statusRun(opts *StatusOptions) error {
 	return finalErr
 }
 
+// knownTokenPrefixes contains GitHub's token format prefixes.
+// See [GitHub token formats].
+//
+// [GitHub token formats]: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github#githubs-token-formats
+var knownTokenPrefixes = []string{"github_pat_", "ghp_", "gho_", "ghu_", "ghs_", "ghr_"}
+
 func maskToken(token string) string {
-	if idx := strings.LastIndexByte(token, '_'); idx > -1 {
-		prefix := token[0 : idx+1]
-		return prefix + strings.Repeat("*", len(token)-len(prefix))
+	for _, prefix := range knownTokenPrefixes {
+		if strings.HasPrefix(token, prefix) {
+			return prefix + strings.Repeat("*", len(token)-len(prefix))
+		}
 	}
 	return strings.Repeat("*", len(token))
 }

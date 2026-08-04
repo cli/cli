@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/shurcooL/githubv4"
 
@@ -60,9 +61,12 @@ func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName str
 }
 
 func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, error) {
-	path := fmt.Sprintf("repos/%s/%s/tags?per_page=%d", repo.RepoOwner(), repo.RepoName(), limit)
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "tags")
+	if err != nil {
+		return nil, err
+	}
+	u.SetQuery("per_page", strconv.Itoa(limit))
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -106,9 +110,11 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 		return nil, err
 	}
 
-	path := fmt.Sprintf("repos/%s/%s/releases/generate-notes", repo.RepoOwner(), repo.RepoName())
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bodyBytes))
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "generate-notes")
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -142,9 +148,11 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 }
 
 func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
-	path := fmt.Sprintf("repos/%s/%s/releases/tags/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(tagName))
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("HEAD", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
+	if err != nil {
+		return false, err
+	}
+	req, err := http.NewRequest("HEAD", url.String(), nil)
 	if err != nil {
 		return false, err
 	}
@@ -172,9 +180,11 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 		return nil, err
 	}
 
-	path := fmt.Sprintf("repos/%s/%s/releases", repo.RepoOwner(), repo.RepoName())
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bodyBytes))
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases")
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +230,7 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	return &newRelease, err
 }
 
-func publishRelease(httpClient *http.Client, releaseURL string, discussionCategory string, isLatest *bool) (*shared.Release, error) {
+func publishRelease(httpClient *http.Client, releaseURL safeurl.SafeURL, discussionCategory string, isLatest *bool) (*shared.Release, error) {
 	params := map[string]interface{}{"draft": false}
 	if discussionCategory != "" {
 		params["discussion_category_name"] = discussionCategory
@@ -234,7 +244,7 @@ func publishRelease(httpClient *http.Client, releaseURL string, discussionCatego
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("PATCH", releaseURL, bytes.NewBuffer(bodyBytes))
+	req, err := http.NewRequest("PATCH", releaseURL.String(), bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -261,8 +271,8 @@ func publishRelease(httpClient *http.Client, releaseURL string, discussionCatego
 	return &release, err
 }
 
-func deleteRelease(httpClient *http.Client, release *shared.Release) error {
-	req, err := http.NewRequest("DELETE", release.APIURL, nil)
+func deleteRelease(httpClient *http.Client, releaseURL safeurl.SafeURL) error {
+	req, err := http.NewRequest("DELETE", releaseURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -314,14 +324,18 @@ func isNewRelease(httpClient *http.Client, repo ghrepo.Interface) (bool, error) 
 	}
 
 	tagName := release.TagName
-	path := fmt.Sprintf("repos/%s/%s/compare/%s...HEAD?per_page=1", repo.RepoOwner(), repo.RepoName(), tagName)
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "compare", tagName+"...HEAD")
+	if err != nil {
+		return false, err
+	}
+	u.SetQuery("per_page", "1")
 
 	var comparisonStatus struct {
 		Status string `json:"status"`
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
-	if err := apiClient.REST(repo.RepoHost(), "GET", path, nil, &comparisonStatus); err != nil {
+	if err := apiClient.REST(repo.RepoHost(), "GET", u.String(), nil, &comparisonStatus); err != nil {
 		return false, err
 	}
 

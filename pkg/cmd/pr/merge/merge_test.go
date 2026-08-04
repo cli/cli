@@ -635,7 +635,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -703,7 +703,7 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 				✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 				✓ Deleted local branch blueberries and switched to branch main
 			`),
-			wantErr: "failed to delete remote branch blueberries: HTTP 500: blah blah (https://api.github.com/repos/OWNER/REPO/git/refs/heads/blueberries)",
+			wantErr: "failed to delete remote branch blueberries: HTTP 500: blah blah (https://api.github.com/repos/OWNER/REPO/git/refs/heads%2Fblueberries)",
 		},
 	}
 
@@ -734,7 +734,7 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 					assert.NotContains(t, input, "commitHeadline")
 				}))
 			http.Register(
-				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 				httpmock.JSONErrorResponse(tt.apiError.StatusCode, tt.apiError))
 
 			cs, cmdTeardown := run.Stub()
@@ -810,7 +810,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -913,7 +913,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -965,7 +965,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -1451,7 +1451,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()

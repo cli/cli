@@ -8,6 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -142,14 +143,18 @@ func runCancel(opts *CancelOptions) error {
 }
 
 func cancelWorkflowRun(client *api.Client, repo ghrepo.Interface, runID string, force bool) error {
-	var path string
+	var path *safeurl.MutableSafeURL
+	var err error
 	if force {
-		path = fmt.Sprintf("repos/%s/actions/runs/%s/force-cancel", ghrepo.FullName(repo), runID)
+		path, err = safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", runID, "force-cancel")
 	} else {
-		path = fmt.Sprintf("repos/%s/actions/runs/%s/cancel", ghrepo.FullName(repo), runID)
+		path, err = safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", runID, "cancel")
+	}
+	if err != nil {
+		return err
 	}
 
-	err := client.REST(repo.RepoHost(), "POST", path, nil, nil)
+	err = client.REST(repo.RepoHost(), "POST", path.String(), nil, nil)
 	if err != nil {
 		return err
 	}
