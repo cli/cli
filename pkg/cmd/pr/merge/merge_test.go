@@ -2215,6 +2215,63 @@ func TestPrMerge_deleteBranch_headInMainWorktree(t *testing.T) {
 	assert.NotContains(t, output.Stderr(), "Deleted local branch")
 }
 
+func TestPrMerge_deleteBranch_baseInSiblingWorktree(t *testing.T) {
+	// When we are on the PR head branch and the base branch is checked out in
+	// another worktree, git cannot check out the base branch here, so we warn
+	// and skip local delete instead of failing.
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "The title of the PR",
+			HeadRefName:      "feature",
+			MergeStateStatus: "CLEAN",
+			BaseRefName:      "main",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+		}))
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/feature"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
+	// We are on feature in the main worktree; base branch main lives in a
+	// sibling worktree, so checking it out here would fail.
+	cs.Register(`git worktree list --porcelain`, 0, heredoc.Doc(`
+		worktree /path/to/main
+		HEAD abc123
+		branch refs/heads/feature
+
+		worktree /path/to/base-wt
+		HEAD def456
+		branch refs/heads/main
+	`))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/main")
+
+	output, err := runCommand(http, nil, "feature", true, "pr merge --merge -d")
+	require.NoError(t, err)
+
+	assert.Equal(t, "", output.String())
+	assert.Contains(t, output.Stderr(), "Base branch main is checked out in another worktree (/path/to/base-wt); skipping local delete")
+	assert.Contains(t, output.Stderr(), "git branch -D feature")
+	assert.Contains(t, output.Stderr(), "Deleted remote branch feature")
+	assert.NotContains(t, output.Stderr(), "Deleted local branch")
+}
+
 func TestPrMerge_deleteBranch_dirtyWorktreeSkips(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
@@ -2301,7 +2358,7 @@ func TestPrMerge_deleteBranch_noWorktreeConflict(t *testing.T) {
 	cs.Register(`git worktree list --porcelain`, 0, heredoc.Doc(`
 		worktree /path/to/main
 		HEAD abc123
-		branch refs/heads/main
+		branch refs/heads/feature
 	`))
 	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/main")
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")

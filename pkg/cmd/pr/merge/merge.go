@@ -446,6 +446,19 @@ func (m *mergeContext) deleteLocalBranch() error {
 
 	switchedToBranch := ""
 	if currentBranch == m.pr.HeadRefName {
+		// git refuses to delete the branch we are currently on, so we normally
+		// check out the base branch first. If the base branch is checked out in
+		// another worktree, that checkout would fail with a fatal error. The
+		// checkout is only a convenience, so warn and skip rather than failing
+		// solely due to local worktree cleanup.
+		if baseWorktree := worktreeForBranch(worktrees, m.pr.BaseRefName); baseWorktree != "" {
+			_ = m.warnf("%s Base branch %s is checked out in another worktree (%s); skipping local delete\n",
+				m.cs.WarningIcon(), m.cs.Cyan(m.pr.BaseRefName), baseWorktree)
+			_ = m.warnf("  To finish cleanup, switch off %s in another worktree, then run:\n", m.cs.Cyan(m.pr.HeadRefName))
+			_ = m.warnf("  git branch -D %s\n", m.pr.HeadRefName)
+			return nil
+		}
+
 		remotes, err := m.opts.Remotes()
 		if err != nil {
 			return err
@@ -534,6 +547,18 @@ func linkedWorktreeForBranch(worktrees []git.Worktree, branch string) string {
 	}
 	branchRef := "refs/heads/" + branch
 	for _, wt := range worktrees[1:] {
+		if wt.Branch == branchRef {
+			return wt.Path
+		}
+	}
+	return ""
+}
+
+// worktreeForBranch returns the path of any worktree (including the main
+// worktree) that has the given branch checked out, or "" if none does.
+func worktreeForBranch(worktrees []git.Worktree, branch string) string {
+	branchRef := "refs/heads/" + branch
+	for _, wt := range worktrees {
 		if wt.Branch == branchRef {
 			return wt.Path
 		}
