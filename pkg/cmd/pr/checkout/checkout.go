@@ -60,6 +60,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 			$ gh pr checkout 32
 			$ gh pr checkout https://github.com/OWNER/REPO/pull/32
 			$ gh pr checkout feature
+			$ gh pr checkout 32 --branch feature --worktree /path/to/wt-feature
 		`),
 		Args:    cobra.MaximumNArgs(1),
 		Aliases: []string{"co"},
