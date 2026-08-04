@@ -422,6 +422,20 @@ func (m *mergeContext) deleteLocalBranch() error {
 		return nil
 	}
 
+	// The head branch may be checked out in the main worktree while the command
+	// runs from a different worktree. git refuses to delete a branch checked out
+	// elsewhere, and the main worktree cannot be removed, so warn and skip rather
+	// than failing solely due to local worktree cleanup.
+	if len(worktrees) > 0 &&
+		worktrees[0].Branch == "refs/heads/"+m.pr.HeadRefName &&
+		worktrees[0].Path != currentWorkdir {
+		_ = m.warnf("%s Branch %s is checked out in the main worktree (%s); skipping local delete\n",
+			m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), worktrees[0].Path)
+		_ = m.warnf("  To finish cleanup, switch the main worktree off %s, then run:\n", m.cs.Cyan(m.pr.HeadRefName))
+		_ = m.warnf("  git branch -D %s\n", m.pr.HeadRefName)
+		return nil
+	}
+
 	if prHeadWorktree := linkedWorktreeForBranch(worktrees, m.pr.HeadRefName); prHeadWorktree != "" {
 		if err := m.opts.GitClient.WorktreeRemove(ctx, prHeadWorktree); err != nil {
 			_ = m.warnf("%s Could not remove worktree %s; skipping local branch delete: %s\n", m.cs.WarningIcon(), prHeadWorktree, err)

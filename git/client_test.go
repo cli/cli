@@ -2284,3 +2284,88 @@ func TestShortSHA(t *testing.T) {
 	assert.Equal(t, "abc123de", ShortSHA("abc123def456789"))
 	assert.Equal(t, "short", ShortSHA("short"))
 }
+
+func TestParseWorktrees(t *testing.T) {
+	tests := []struct {
+		name string
+		out  string
+		want []Worktree
+	}{
+		{
+			name: "empty output",
+			out:  "",
+			want: nil,
+		},
+		{
+			name: "single worktree",
+			out: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+			`),
+			want: []Worktree{
+				{Path: "/path/to/main", Branch: "refs/heads/main"},
+			},
+		},
+		{
+			name: "multiple worktrees",
+			out: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/feature-wt
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			want: []Worktree{
+				{Path: "/path/to/main", Branch: "refs/heads/main"},
+				{Path: "/path/to/feature-wt", Branch: "refs/heads/feature"},
+			},
+		},
+		{
+			name: "detached HEAD has no branch",
+			out: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/detached
+				HEAD def456
+				detached
+			`),
+			want: []Worktree{
+				{Path: "/path/to/main", Branch: "refs/heads/main"},
+				{Path: "/path/to/detached", Branch: ""},
+			},
+		},
+		{
+			name: "no trailing blank line",
+			out:  "worktree /path/to/main\nHEAD abc123\nbranch refs/heads/main",
+			want: []Worktree{
+				{Path: "/path/to/main", Branch: "refs/heads/main"},
+			},
+		},
+		{
+			name: "bare main worktree has no branch",
+			out: heredoc.Doc(`
+				worktree /path/to/bare
+				bare
+
+				worktree /path/to/feature-wt
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			want: []Worktree{
+				{Path: "/path/to/bare", Branch: ""},
+				{Path: "/path/to/feature-wt", Branch: "refs/heads/feature"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseWorktrees([]byte(tt.out))
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

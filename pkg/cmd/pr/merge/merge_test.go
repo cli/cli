@@ -2158,6 +2158,63 @@ func TestPrMerge_deleteBranch_headInSiblingWorktree(t *testing.T) {
 	assert.Contains(t, output.Stderr(), "Deleted remote branch feature")
 }
 
+func TestPrMerge_deleteBranch_headInMainWorktree(t *testing.T) {
+	// When the PR head branch is checked out in the main worktree but the
+	// command runs from a different worktree, git cannot delete the branch and
+	// the main worktree cannot be removed, so we warn and skip local delete.
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "The title of the PR",
+			HeadRefName:      "feature",
+			MergeStateStatus: "CLEAN",
+			BaseRefName:      "main",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+		}))
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/feature"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
+	// The head branch lives in the main worktree; we run from a linked worktree
+	// that is on some other branch.
+	cs.Register(`git worktree list --porcelain`, 0, heredoc.Doc(`
+		worktree /path/to/main
+		HEAD abc123
+		branch refs/heads/feature
+
+		worktree /path/to/other-wt
+		HEAD def456
+		branch refs/heads/other
+	`))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/other-wt")
+
+	output, err := runCommand(http, nil, "other", true, "pr merge --merge -d")
+	require.NoError(t, err)
+
+	assert.Equal(t, "", output.String())
+	assert.Contains(t, output.Stderr(), "checked out in the main worktree (/path/to/main); skipping local delete")
+	assert.Contains(t, output.Stderr(), "git branch -D feature")
+	assert.Contains(t, output.Stderr(), "Deleted remote branch feature")
+	assert.NotContains(t, output.Stderr(), "Deleted local branch")
+}
+
 func TestPrMerge_deleteBranch_dirtyWorktreeSkips(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

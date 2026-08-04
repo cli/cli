@@ -289,35 +289,25 @@ func (c *Client) WorktreeRemove(ctx context.Context, path string) error {
 }
 
 // parseWorktrees parses the output of `git worktree list --porcelain` into a
-// slice of Worktree. Records are separated by blank lines; each record begins
-// with a "worktree <path>" line followed by attribute lines.
+// slice of Worktree. Each record begins with a "worktree <path>" line followed
+// by attribute lines; attributes other than "branch" are ignored.
 func parseWorktrees(output []byte) []Worktree {
 	var worktrees []Worktree
-	var current *Worktree
-	flush := func() {
-		if current != nil {
-			worktrees = append(worktrees, *current)
-			current = nil
+	for _, record := range strings.Split(string(output), "\n\n") {
+		var worktree Worktree
+		for _, line := range strings.Split(record, "\n") {
+			key, value, _ := strings.Cut(line, " ")
+			switch key {
+			case "worktree":
+				worktree.Path = value
+			case "branch":
+				worktree.Branch = value
+			}
+		}
+		if worktree.Path != "" {
+			worktrees = append(worktrees, worktree)
 		}
 	}
-	for _, line := range strings.Split(string(output), "\n") {
-		if line == "" {
-			flush()
-			continue
-		}
-		if p, ok := strings.CutPrefix(line, "worktree "); ok {
-			flush()
-			current = &Worktree{Path: p}
-			continue
-		}
-		if current == nil {
-			continue
-		}
-		if b, ok := strings.CutPrefix(line, "branch "); ok {
-			current.Branch = b
-		}
-	}
-	flush()
 	return worktrees
 }
 
