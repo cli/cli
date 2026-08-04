@@ -33,8 +33,6 @@ func downloadArtifact(httpClient *http.Client, url safeurl.SafeURL, destDir safe
 	if err != nil {
 		return err
 	}
-	// The server rejects this :(
-	//req.Header.Set("Accept", "application/zip")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -57,7 +55,34 @@ func downloadArtifact(httpClient *http.Client, url safeurl.SafeURL, destDir safe
 
 	size, err := io.Copy(tmpfile, resp.Body)
 	if err != nil {
-		return fmt.Errorf("error writing zip archive: %w", err)
+		return fmt.Errorf("error writing artifact: %w", err)
+	}
+
+	if _, readErr := zip.NewReader(tmpfile, size); readErr != nil {
+		if _, err := tmpfile.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("error resetting temporary file: %w", err)
+		}
+		if err := os.MkdirAll(destDir.String(), 0755); err != nil {
+			return fmt.Errorf("error creating destination directory: %w", err)
+		}
+		destFile, err := destDir.Join("artifact.tar")
+		if err != nil {
+			return fmt.Errorf("error creating destination path: %w", err)
+		}
+		out, err := os.Create(destFile.String())
+		if err != nil {
+			return fmt.Errorf("error creating file: %w", err)
+		}
+		defer out.Close()
+		_, err = io.Copy(out, tmpfile)
+		if err != nil {
+			return fmt.Errorf("error saving artifact: %w", err)
+		}
+		return nil
+	}
+
+	if _, err := tmpfile.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("error resetting temporary file: %w", err)
 	}
 
 	zipfile, err := zip.NewReader(tmpfile, size)

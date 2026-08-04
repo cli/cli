@@ -106,3 +106,27 @@ func Test_Download(t *testing.T) {
 		filepath.Join("artifact", "src", "util.go"),
 	}, paths)
 }
+
+func Test_Download_NonZippedArtifact(t *testing.T) {
+	tmpDir := t.TempDir()
+	destDir, err := safepaths.ParseAbsolute(filepath.Join(tmpDir, "artifact"))
+	require.NoError(t, err)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/actions/artifacts/12345/zip"),
+		httpmock.FileResponse("./fixtures/artifact_plain.txt"))
+
+	api := &apiPlatform{
+		client: &http.Client{Transport: reg},
+	}
+	require.NoError(t, api.Download(safeurl.NewImmutableSafeURL("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip"), destDir))
+
+	destFile, err := destDir.Join("artifact.tar")
+	require.NoError(t, err)
+	content, err := os.ReadFile(destFile.String())
+	require.NoError(t, err)
+	assert.Equal(t, "This is a plain artifact file not zipped.", string(content))
+}
