@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
@@ -19,7 +20,21 @@ func deleteSSHKey(httpClient *http.Client, host string, keyID string) error {
 	// TODO(api-client-rollout)
 	// This line of code is part of a mechanical roll out of the api client.
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	return api.NewClientFromHTTP(httpClient).REST(host, http.MethodDelete, path.String(), nil, nil)
+	err = api.NewClientFromHTTP(httpClient).REST(host, http.MethodDelete, path.String(), nil, nil)
+	if err == nil {
+		return nil
+	}
+
+	var httpErr api.HTTPError
+	if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		path, err = safeurl.JoinPath("user", "ssh_signing_keys", keyID)
+		if err != nil {
+			return err
+		}
+		return api.NewClientFromHTTP(httpClient).REST(host, http.MethodDelete, path.String(), nil, nil)
+	}
+
+	return err
 }
 
 func getSSHKey(httpClient *http.Client, host string, keyID string) (*sshKey, error) {
@@ -29,12 +44,22 @@ func getSSHKey(httpClient *http.Client, host string, keyID string) (*sshKey, err
 		return nil, err
 	}
 	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	err = api.NewClientFromHTTP(httpClient).REST(host, http.MethodGet, path.String(), nil, &key)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return &key, nil
 	}
 
-	return &key, nil
+	var httpErr api.HTTPError
+	if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		path, err = safeurl.JoinPath("user", "ssh_signing_keys", keyID)
+		if err != nil {
+			return nil, err
+		}
+		err = api.NewClientFromHTTP(httpClient).REST(host, http.MethodGet, path.String(), nil, &key)
+		if err == nil {
+			return &key, nil
+		}
+	}
+
+	return nil, err
 }
