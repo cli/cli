@@ -160,6 +160,8 @@ Sometimes useful data isn't on the typed commands. Examples:
 
 - `gh pr checkout <n>` switches branches. Use `gh pr diff <n>` or
   `gh pr view <n>` if you only need to read.
+- `gh pr checkout <n> --worktree <path>` checks the PR out into a git worktree
+  at `<path>` instead of switching the current branch.
 - `NO_COLOR`, `CLICOLOR_FORCE`, and `GH_FORCE_TTY` are honored. Set
   `GH_FORCE_TTY=1` if you want TTY-style output (colors, tables, the
   pager, interactivity) inside an agent harness; leave it unset unless needed.
