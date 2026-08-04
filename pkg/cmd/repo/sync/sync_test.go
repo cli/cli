@@ -117,6 +117,7 @@ func TestExecuteLocalRepoSyncBranchCheckedOutInOtherWorktree(t *testing.T) {
 	runGit(t, repoDir, "commit", "--quiet", "--message=initial")
 	runGit(t, repoDir, "switch", "--quiet", "--create", "test")
 	runGit(t, repoDir, "worktree", "add", "--quiet", worktreeDir, "trunk")
+	originalBranch := runGit(t, repoDir, "rev-parse", "trunk")
 
 	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("new\n"), 0o600))
 	runGit(t, repoDir, "commit", "--quiet", "--all", "--message=upstream")
@@ -130,6 +131,7 @@ func TestExecuteLocalRepoSyncBranchCheckedOutInOtherWorktree(t *testing.T) {
 
 	err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
 	require.Error(t, err)
+	require.Equal(t, originalBranch, runGit(t, repoDir, "rev-parse", "trunk"))
 	require.Empty(t, runGit(t, worktreeDir, "status", "--porcelain"))
 }
 
