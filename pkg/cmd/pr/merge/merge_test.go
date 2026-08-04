@@ -2196,7 +2196,7 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 					assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 				}))
 			http.Register(
-				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/feature"),
+				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Ffeature"),
 				httpmock.StringResponse(`{}`))
 
 			cs, cmdTeardown := run.Stub()
@@ -2247,7 +2247,7 @@ func TestPrMerge_deleteBranch_noWorktreeConflict(t *testing.T) {
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/feature"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Ffeature"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
