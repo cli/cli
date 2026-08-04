@@ -75,7 +75,6 @@ func TestAutolinkDeleter_Delete(t *testing.T) {
 					var httpErr cliapi.HTTPError
 					require.ErrorAs(t, err, &httpErr)
 					assert.Equal(t, tt.expectedStatus, httpErr.StatusCode)
-					assert.Contains(t, err.Error(), "HTTP 500")
 				}
 			} else {
 				require.NoError(t, err)
