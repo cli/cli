@@ -44,8 +44,7 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 	apiClient := api.NewClientFromHTTP(httpClient)
 	err = apiClient.REST(hostname, "POST", path.String(), bytes.NewBuffer(payloadBytes), nil)
 	if err != nil {
-		var httpError api.HTTPError
-		if errors.As(err, &httpError) {
+		if httpError, ok := errors.AsType[api.HTTPError](err); ok {
 			if httpError.StatusCode == 404 {
 				return errScopesMissing
 			}
