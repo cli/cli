@@ -446,8 +446,7 @@ func Test_editRun(t *testing.T) {
 			defer fakeHTTP.Verify(t)
 			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", "v1.2.3", `{
 				"id": 12345,
-				"tag_name": "v1.2.3",
-				"url": "https://api.github.com/repos/OWNER/REPO/releases/12345"
+				"tag_name": "v1.2.3"
 			}`)
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, fakeHTTP)
