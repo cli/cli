@@ -48,11 +48,12 @@ func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 		return false, err
 	}
 
-	var data struct{}
+	// The response body is not decoded, because a script is considered present for any
+	// successful response regardless of the content type reported.
 	// TODO(api-client-rollout)
 	// This line of code is part of a mechanical roll out of the api client.
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodGet, path.String(), nil, &data)
+	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodGet, path.String(), nil, nil)
 	if err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {

@@ -95,6 +95,27 @@ func TestHasScript(t *testing.T) {
 		assert.True(t, hasScript)
 	})
 
+	// The contents endpoint returns an array when the requested path is a directory, and
+	// objects with a non-file type for symlinks and submodules. None of these are treated as
+	// a missing script, so they must not surface a decoding error.
+	t.Run("success for non-file content", func(t *testing.T) {
+		for name, body := range map[string]string{
+			"directory listing": `[{"type":"file","name":"REPO"}]`,
+			"directory":         `{"type":"dir"}`,
+			"symlink":           `{"type":"symlink"}`,
+			"submodule":         `{"type":"submodule"}`,
+		} {
+			t.Run(name, func(t *testing.T) {
+				client := extensionHTTPClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusOK, body)
+
+				hasScript, err := hasScript(client, repo)
+
+				require.NoError(t, err)
+				assert.True(t, hasScript)
+			})
+		}
+	})
+
 	t.Run("not found", func(t *testing.T) {
 		client := extensionHTTPClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusNotFound, `{"message":"Not Found"}`)
 
