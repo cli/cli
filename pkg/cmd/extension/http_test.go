@@ -38,14 +38,20 @@ func requireExtensionHTTPError(t *testing.T, err error, status int) {
 func TestRepoExists(t *testing.T) {
 	repo := ghrepo.New("OWNER", "REPO")
 
-	t.Run("success", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO", http.StatusOK, `{}`)
+	for name, body := range map[string]string{
+		"JSON body":     `{}`,
+		"empty body":    "",
+		"non-JSON body": "repository",
+	} {
+		t.Run("success with "+name, func(t *testing.T) {
+			client := extensionHTTPClient(t, "repos/OWNER/REPO", http.StatusOK, body)
 
-		exists, err := repoExists(client, repo)
+			exists, err := repoExists(client, repo)
 
-		require.NoError(t, err)
-		assert.True(t, exists)
-	})
+			require.NoError(t, err)
+			assert.True(t, exists)
+		})
+	}
 
 	t.Run("not found", func(t *testing.T) {
 		client := extensionHTTPClient(t, "repos/OWNER/REPO", http.StatusNotFound, `{"message":"Not Found"}`)
@@ -64,6 +70,17 @@ func TestRepoExists(t *testing.T) {
 		assert.False(t, exists)
 		requireExtensionHTTPError(t, err, http.StatusInternalServerError)
 	})
+
+	for _, status := range []int{http.StatusCreated, http.StatusNoContent} {
+		t.Run("unexpected "+http.StatusText(status), func(t *testing.T) {
+			client := extensionHTTPClient(t, "repos/OWNER/REPO", status, `{"message":"Unexpected status"}`)
+
+			exists, err := repoExists(client, repo)
+
+			assert.False(t, exists)
+			requireExtensionHTTPError(t, err, status)
+		})
+	}
 }
 
 func TestHasScript(t *testing.T) {

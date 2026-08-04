@@ -14,25 +14,30 @@ import (
 )
 
 func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
 	if err != nil {
 		return false, err
 	}
 
-	var data struct{}
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodGet, path.String(), nil, &data)
+	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
-			return false, nil
-		}
 		return false, err
 	}
 
-	return true, nil
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, api.HandleHTTPError(resp)
+	}
 }
 
 func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
