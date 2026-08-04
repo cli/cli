@@ -3,14 +3,17 @@ package extension
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
+	"github.com/hashicorp/go-version"
 )
 
 func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
@@ -73,8 +76,11 @@ type releaseAsset struct {
 }
 
 type release struct {
-	Tag    string `json:"tag_name"`
-	Assets []releaseAsset
+	Tag          string    `json:"tag_name"`
+	IsPrerelease bool      `json:"prerelease"`
+	IsDraft      bool      `json:"draft"`
+	PublishedAt  time.Time `json:"published_at"`
+	Assets       []releaseAsset
 }
 
 // downloadAsset downloads a single asset to the given file path.
@@ -114,6 +120,7 @@ func downloadAsset(httpClient *http.Client, assetURL safeurl.SafeURL, destPath s
 var commitNotFoundErr = errors.New("commit not found")
 var releaseNotFoundErr = errors.New("release not found")
 var repositoryNotFoundErr = errors.New("repository not found")
+var noPrereleasesFoundErr = errors.New("no pre-releases found")
 
 // fetchLatestRelease finds the latest published release for a repository.
 func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
@@ -151,6 +158,94 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 	}
 
 	return &r, nil
+}
+
+// fetchLatestPrerelease finds the highest-versioned pre-release for a
+// repository. It only considers releases marked as pre-releases, selecting the
+// one with the highest version. If the repository has no pre-releases it
+// returns noPrereleasesFoundErr.
+//
+// When a stable (non-pre-release) release beats the chosen pre-release, either
+// by a higher version or by a more recent publish date, it is returned as
+// newerStable so the caller can warn the user that a newer stable release is
+// available.
+//
+// Note that if the latest pre-release is not on the first page of 100, it is
+// possible that this will not find it; for performance reasons in busy
+// repositories it is not safe or efficient to iterate over every page of
+// releases. In those cases, the user should specify a tag with --pin.
+func fetchLatestPrerelease(httpClient *http.Client, baseRepo ghrepo.Interface) (prerelease *release, newerStable *release, err error) {
+	path := fmt.Sprintf("repos/%s/%s/releases?per_page=100", baseRepo.RepoOwner(), baseRepo.RepoName())
+	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, nil, releaseNotFoundErr
+	}
+	if resp.StatusCode > 299 {
+		return nil, nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var releases []release
+	if err := json.Unmarshal(b, &releases); err != nil {
+		return nil, nil, err
+	}
+
+	var bestPre *release
+	var bestPreVersion *version.Version
+	var bestStable *release
+	var bestStableVersion *version.Version
+	for i := range releases {
+		r := &releases[i]
+		if r.IsDraft {
+			continue
+		}
+		// Tags that are not valid semver cannot be ordered against other
+		// releases, so they are skipped. This means a repository whose newest
+		// pre-release uses an unparseable tag (e.g. v1.0.0.beta.2) may resolve
+		// to an older pre-release; users can reach such a release with --pin.
+		v, verr := version.NewVersion(r.Tag)
+		if verr != nil {
+			continue
+		}
+		if r.IsPrerelease {
+			if bestPre == nil || v.GreaterThan(bestPreVersion) {
+				bestPre = r
+				bestPreVersion = v
+			}
+			continue
+		}
+		if bestStable == nil || v.GreaterThan(bestStableVersion) {
+			bestStable = r
+			bestStableVersion = v
+		}
+	}
+
+	if bestPre == nil {
+		return nil, nil, noPrereleasesFoundErr
+	}
+
+	if bestStable != nil {
+		if bestStableVersion.GreaterThan(bestPreVersion) || bestStable.PublishedAt.After(bestPre.PublishedAt) {
+			newerStable = bestStable
+		}
+	}
+
+	return bestPre, newerStable, nil
 }
 
 // fetchReleaseFromTag finds release by tag name for a repository

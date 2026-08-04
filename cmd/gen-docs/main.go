@@ -111,7 +111,7 @@ func (e *em) InstallLocal(_ string) error {
 	return nil
 }
 
-func (e *em) Upgrade(_ string, _ bool) error {
+func (e *em) Upgrade(_ string, _ extensions.UpgradeOptions) error {
 	return nil
 }
 

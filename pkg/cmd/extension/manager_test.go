@@ -216,7 +216,7 @@ func TestManager_Upgrade_NoExtensions(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 
 	m := newTestManager(dataDir, updateDir, nil, nil, ios)
-	err := m.Upgrade("", false)
+	err := m.Upgrade("", extensions.UpgradeOptions{})
 	assert.EqualError(t, err, "no extensions installed")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -232,7 +232,7 @@ func TestManager_Upgrade_NoMatchingExtension(t *testing.T) {
 	gc.On("ForRepo", extDir).Return(gcOne).Once()
 
 	m := newTestManager(dataDir, updateDir, nil, gc, ios)
-	err := m.Upgrade("invalid", false)
+	err := m.Upgrade("invalid", extensions.UpgradeOptions{})
 	assert.EqualError(t, err, `no extension matched "invalid"`)
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -265,7 +265,7 @@ func TestManager_UpgradeExtensions(t *testing.T) {
 		exts[i].currentVersion = "old version"
 		exts[i].latestVersion = "new version"
 	}
-	err = m.upgradeExtensions(exts, false)
+	err = m.upgradeExtensions(exts, extensions.UpgradeOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Doc(
 		`
@@ -304,7 +304,7 @@ func TestManager_UpgradeExtensions_DryRun(t *testing.T) {
 		exts[i].currentVersion = fmt.Sprintf("%d", i)
 		exts[i].latestVersion = fmt.Sprintf("%d", i+1)
 	}
-	err = m.upgradeExtensions(exts, false)
+	err = m.upgradeExtensions(exts, extensions.UpgradeOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Doc(
 		`
@@ -329,7 +329,7 @@ func TestManager_UpgradeExtension_LocalExtension(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
-	err = m.upgradeExtension(exts[0], false)
+	err = m.upgradeExtension(exts[0], extensions.UpgradeOptions{})
 	assert.EqualError(t, err, "local extensions can not be upgraded")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -346,7 +346,7 @@ func TestManager_UpgradeExtension_LocalExtension_DryRun(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
-	err = m.upgradeExtension(exts[0], false)
+	err = m.upgradeExtension(exts[0], extensions.UpgradeOptions{})
 	assert.EqualError(t, err, "local extensions can not be upgraded")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -370,7 +370,7 @@ func TestManager_UpgradeExtension_GitExtension(t *testing.T) {
 	ext := exts[0]
 	ext.currentVersion = "old version"
 	ext.latestVersion = "new version"
-	err = m.upgradeExtension(ext, false)
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -396,7 +396,7 @@ func TestManager_UpgradeExtension_GitExtension_DryRun(t *testing.T) {
 	ext := exts[0]
 	ext.currentVersion = "old version"
 	ext.latestVersion = "new version"
-	err = m.upgradeExtension(ext, false)
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -423,7 +423,7 @@ func TestManager_UpgradeExtension_GitExtension_Force(t *testing.T) {
 	ext := exts[0]
 	ext.currentVersion = "old version"
 	ext.latestVersion = "new version"
-	err = m.upgradeExtension(ext, true)
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{Force: true})
 	assert.NoError(t, err)
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -484,7 +484,7 @@ func TestManager_MigrateToBinaryExtension(t *testing.T) {
 		httpmock.REST("GET", "release/cool"),
 		httpmock.StringResponse("FAKE UPGRADED BINARY"))
 
-	err = m.upgradeExtension(ext, false)
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -550,7 +550,7 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 	assert.Equal(t, 1, len(exts))
 	ext := exts[0]
 	ext.latestVersion = "v1.0.2"
-	err = m.upgradeExtension(ext, false)
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{})
 	assert.NoError(t, err)
 
 	manifest, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext", manifestName))
@@ -616,7 +616,7 @@ func TestManager_UpgradeExtension_BinaryExtension_Pinned_Force(t *testing.T) {
 	assert.Equal(t, 1, len(exts))
 	ext := exts[0]
 	ext.latestVersion = "v1.0.2"
-	err = m.upgradeExtension(ext, true)
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{Force: true})
 	assert.NoError(t, err)
 
 	manifest, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext", manifestName))
@@ -640,6 +640,339 @@ func TestManager_UpgradeExtension_BinaryExtension_Pinned_Force(t *testing.T) {
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_UpgradeExtension_BinaryExtension_LatestPreRelease(t *testing.T) {
+	dataDir := t.TempDir()
+	updateDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(dataDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.1",
+		}))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(dataDir, updateDir, &http.Client{Transport: &reg}, nil, ios)
+	// The releases list is returned in reverse-chronological order; the highest
+	// version (a pre-release) should win over both the older stable release and
+	// an even older pre-release.
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases"),
+		httpmock.JSONResponse(
+			[]release{
+				{
+					Tag:          "v1.1.0-pre",
+					IsPrerelease: true,
+					Assets: []releaseAsset{
+						{
+							Name:   "gh-bin-ext-windows-amd64.exe",
+							APIURL: "https://example.com/release/pre",
+						},
+					},
+				},
+				{
+					Tag: "v1.0.1",
+					Assets: []releaseAsset{
+						{
+							Name:   "gh-bin-ext-windows-amd64.exe",
+							APIURL: "https://example.com/release/stable",
+						},
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "release/pre"),
+		httpmock.StringResponse("FAKE PRERELEASE BINARY"))
+
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{LatestPreRelease: true})
+	assert.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext", manifestName))
+	assert.NoError(t, err)
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, binManifest{
+		Name:  "gh-bin-ext",
+		Owner: "owner",
+		Host:  "example.com",
+		Tag:   "v1.1.0-pre",
+		Path:  filepath.Join(dataDir, "extensions/gh-bin-ext/gh-bin-ext.exe"),
+	}, bm)
+
+	fakeBin, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
+	assert.NoError(t, err)
+	assert.Equal(t, "FAKE PRERELEASE BINARY", string(fakeBin))
+
+	assert.Equal(t, "v1.1.0-pre", ext.LatestVersion())
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_UpgradeExtension_BinaryExtension_LatestPreRelease_UpToDate(t *testing.T) {
+	dataDir := t.TempDir()
+	updateDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(dataDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.1.0-pre",
+		}))
+
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(dataDir, updateDir, &http.Client{Transport: &reg}, nil, ios)
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases"),
+		httpmock.JSONResponse(
+			[]release{
+				{
+					Tag:          "v1.1.0-pre",
+					IsPrerelease: true,
+					Assets: []releaseAsset{
+						{
+							Name:   "gh-bin-ext-windows-amd64.exe",
+							APIURL: "https://example.com/release/pre",
+						},
+					},
+				},
+			}))
+
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	err = m.upgradeExtension(exts[0], extensions.UpgradeOptions{LatestPreRelease: true})
+	assert.ErrorIs(t, err, upToDateError)
+}
+
+func TestManager_UpgradeExtension_BinaryExtension_LatestPreRelease_WarnsNewerStable(t *testing.T) {
+	dataDir := t.TempDir()
+	updateDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(dataDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.0-pre",
+		}))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(dataDir, updateDir, &http.Client{Transport: &reg}, nil, ios)
+	// The highest pre-release is older than the newest stable release, so the
+	// pre-release is still installed but the user is warned about the newer
+	// stable release.
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases"),
+		httpmock.JSONResponse(
+			[]release{
+				{
+					Tag: "v2.0.0",
+					Assets: []releaseAsset{
+						{
+							Name:   "gh-bin-ext-windows-amd64.exe",
+							APIURL: "https://example.com/release/stable",
+						},
+					},
+				},
+				{
+					Tag:          "v1.1.0-pre",
+					IsPrerelease: true,
+					Assets: []releaseAsset{
+						{
+							Name:   "gh-bin-ext-windows-amd64.exe",
+							APIURL: "https://example.com/release/pre",
+						},
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "release/pre"),
+		httpmock.StringResponse("FAKE PRERELEASE BINARY"))
+
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	err = m.upgradeExtension(exts[0], extensions.UpgradeOptions{LatestPreRelease: true})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "v1.1.0-pre", exts[0].LatestVersion())
+	assert.Equal(t, "", stdout.String())
+	assert.Contains(t, stderr.String(), "a newer stable release (v2.0.0) is available for bin-ext")
+	assert.Contains(t, stderr.String(), "installing pre-release v1.1.0-pre")
+}
+
+func TestManager_UpgradeExtension_BinaryExtension_LatestPreRelease_NoPrereleases(t *testing.T) {
+	dataDir := t.TempDir()
+	updateDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(dataDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.0",
+		}))
+
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(dataDir, updateDir, &http.Client{Transport: &reg}, nil, ios)
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases"),
+		httpmock.JSONResponse(
+			[]release{
+				{Tag: "v1.0.0"},
+			}))
+
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	err = m.upgradeExtension(exts[0], extensions.UpgradeOptions{LatestPreRelease: true})
+	assert.EqualError(t, err, "no pre-releases found for bin-ext")
+}
+
+// TestManager_UpgradeExtension_BinaryExtension_UpToDate_NoNetwork verifies that
+// an up-to-date binary extension resolves to upToDateError using the cached
+// latest version, without making a second network request. No HTTP responder is
+// registered, so any network call would fail the test.
+func TestManager_UpgradeExtension_BinaryExtension_UpToDate_NoNetwork(t *testing.T) {
+	dataDir := t.TempDir()
+	updateDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(dataDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.0",
+		}))
+
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(dataDir, updateDir, &http.Client{Transport: &reg}, nil, ios)
+
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+	// Simulate the cached latest version already resolved during list(),
+	// matching the installed version so no upgrade is available.
+	ext.latestVersion = "v1.0.0"
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{})
+	assert.ErrorIs(t, err, upToDateError)
+}
+
+func TestManager_UpgradeExtension_BinaryExtension_Pin(t *testing.T) {
+	dataDir := t.TempDir()
+	updateDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(dataDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.2",
+		}))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(dataDir, updateDir, &http.Client{Transport: &reg}, nil, ios)
+	// Pinning to an older pre-release should install exactly that release even
+	// though it is a downgrade, and mark the extension as pinned.
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/tags/v1.0.1-pre"),
+		httpmock.JSONResponse(
+			release{
+				Tag:          "v1.0.1-pre",
+				IsPrerelease: true,
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64.exe",
+						APIURL: "https://example.com/release/pin",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "release/pin"),
+		httpmock.StringResponse("FAKE PINNED BINARY"))
+
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{PinVersion: "v1.0.1-pre"})
+	assert.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext", manifestName))
+	assert.NoError(t, err)
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, binManifest{
+		Name:     "gh-bin-ext",
+		Owner:    "owner",
+		Host:     "example.com",
+		Tag:      "v1.0.1-pre",
+		IsPinned: true,
+		Path:     filepath.Join(dataDir, "extensions/gh-bin-ext/gh-bin-ext.exe"),
+	}, bm)
+
+	fakeBin, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
+	assert.NoError(t, err)
+	assert.Equal(t, "FAKE PINNED BINARY", string(fakeBin))
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_UpgradeExtension_GitExtension_ReleaseFlagsUnsupported(t *testing.T) {
+	tempDir := t.TempDir()
+	ext := &Extension{
+		path: filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote"),
+		kind: GitKind,
+		// Set currentVersion so the pinned check does not reach the git client.
+		currentVersion: "old version",
+	}
+	m := newTestManager(tempDir, t.TempDir(), nil, nil, nil)
+
+	err := m.upgradeExtension(ext, extensions.UpgradeOptions{LatestPreRelease: true})
+	assert.EqualError(t, err, "the --pin and --latest-pre-release flags are only supported for binary extensions")
+
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{PinVersion: "v1.0.0"})
+	assert.EqualError(t, err, "the --pin and --latest-pre-release flags are only supported for binary extensions")
 }
 
 func TestManager_UpgradeExtension_BinaryExtension_DryRun(t *testing.T) {
@@ -676,7 +1009,7 @@ func TestManager_UpgradeExtension_BinaryExtension_DryRun(t *testing.T) {
 	assert.Equal(t, 1, len(exts))
 	ext := exts[0]
 	ext.latestVersion = "v1.0.2"
-	err = m.upgradeExtension(ext, false)
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{})
 	assert.NoError(t, err)
 
 	manifest, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext", manifestName))
@@ -717,7 +1050,7 @@ func TestManager_UpgradeExtension_BinaryExtension_Pinned(t *testing.T) {
 	assert.Equal(t, 1, len(exts))
 	ext := exts[0]
 
-	err = m.upgradeExtension(ext, false)
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{})
 	assert.NotNil(t, err)
 	assert.Equal(t, err, pinnedExtensionUpgradeError)
 }
@@ -744,7 +1077,7 @@ func TestManager_UpgradeExtension_GitExtension_Pinned(t *testing.T) {
 	ext.isPinned = &pinnedTrue
 	ext.latestVersion = "new version"
 
-	err = m.upgradeExtension(ext, false)
+	err = m.upgradeExtension(ext, extensions.UpgradeOptions{})
 	assert.NotNil(t, err)
 	assert.Equal(t, err, pinnedExtensionUpgradeError)
 	gc.AssertExpectations(t)
