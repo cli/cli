@@ -133,6 +133,32 @@ func TestExecuteLocalRepoSyncBranchCheckedOutInOtherWorktree(t *testing.T) {
 	require.Empty(t, runGit(t, worktreeDir, "status", "--porcelain"))
 }
 
+func TestExecuteLocalRepoSyncFastForwardsNonCurrentBranch(t *testing.T) {
+	repoDir := t.TempDir()
+
+	runGit(t, repoDir, "init", "--quiet", "--initial-branch=trunk")
+	runGit(t, repoDir, "config", "user.name", "Test User")
+	runGit(t, repoDir, "config", "user.email", "test@example.com")
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("old\n"), 0o600))
+	runGit(t, repoDir, "add", "file.txt")
+	runGit(t, repoDir, "commit", "--quiet", "--message=initial")
+	runGit(t, repoDir, "switch", "--quiet", "--create", "test")
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("new\n"), 0o600))
+	runGit(t, repoDir, "commit", "--quiet", "--all", "--message=upstream")
+	runGit(t, repoDir, "fetch", "--quiet", ".", "test")
+
+	gitClient := &git.Client{RepoDir: repoDir}
+	opts := &SyncOptions{
+		Branch: "trunk",
+		Git:    &gitExecuter{client: gitClient},
+	}
+
+	err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
+	require.NoError(t, err)
+	require.Equal(t, runGit(t, repoDir, "rev-parse", "FETCH_HEAD"), runGit(t, repoDir, "rev-parse", "trunk"))
+	require.Equal(t, "test", runGit(t, repoDir, "branch", "--show-current"))
+}
+
 func runGit(t *testing.T, repoDir string, args ...string) string {
 	t.Helper()
 	cmdArgs := append([]string{"-C", repoDir}, args...)
