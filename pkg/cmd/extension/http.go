@@ -24,6 +24,8 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 		return false, err
 	}
 
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to its exact-status contract and body-blind response handling.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return false, err
@@ -82,6 +84,8 @@ func downloadAsset(httpClient *http.Client, assetURL safeurl.SafeURL, destPath s
 	req.Header.Set("Accept", "application/octet-stream")
 
 	var resp *http.Response
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to its custom Accept header and binary response streaming.
 	if resp, downloadErr = httpClient.Do(req); downloadErr != nil {
 		return
 	}
@@ -178,6 +182,8 @@ func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRe
 	}
 
 	req.Header.Set("Accept", "application/vnd.github.v3.sha")
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to its custom Accept header and bare SHA response body.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
