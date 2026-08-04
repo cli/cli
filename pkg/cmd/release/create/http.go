@@ -119,6 +119,8 @@ func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagN
 		return false, err
 	}
 
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to HEAD responses having no body while REST decodes non-204/205 2xx responses as JSON.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return false, err
