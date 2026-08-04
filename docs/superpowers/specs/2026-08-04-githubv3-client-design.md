@@ -31,6 +31,8 @@ so it can pass `ClientOptions.Headers`. That is a workaround for gap 1, not a de
 - Close all three gaps above without changing any existing behaviour.
 - Keep `api.Client.REST` working unchanged for the majority of callers.
 - Consolidate the three copies of the OAuth-scopes-suggestion logic onto one implementation.
+- Resolve API host and token once, at client construction, in a single place, so that
+  API-host routing can later become configuration-driven without touching client code.
 
 ## Non-goals
 
@@ -63,21 +65,65 @@ package githubv3
 
 ```go
 type Client struct {
-    host string
-    http *http.Client
+    apiBaseURL *url.URL
+    token      string
+    http       *http.Client
 }
 
-func NewClient(host string, httpClient *http.Client) *Client
+func NewClient(apiBaseURL *url.URL, token string, httpClient *http.Client) *Client
 ```
 
-`host` is a client field rather than a per-call argument. This is safe because authentication
-does not depend on it: `api.NewHTTPClient` deliberately builds the underlying client with
-`Host: "none"` and `AuthToken: "none"` so go-gh will not resolve them, and installs
-`AddAuthTokenHeader`, a `RoundTripper` that derives the hostname **from the request URL** and
-looks up that host's token. The client field therefore only affects URL construction.
+The client holds an **already-resolved** API base URL and token. It does not import
+`ghinstance`, does not read configuration, and has no opinion about how a canonical host such
+as `github.example.com` becomes an API host. Resolution happens once, at construction, in the
+factory:
 
-`CAPIClient` already pairs an `*http.Client` with a `host` field, so this is an established
-shape in the codebase.
+```go
+func (f *Factory) GitHubClient(host string) (*githubv3.Client, error)
+```
+
+which reads config, maps canonical host to API host, fetches the token, and returns a ready
+client. It must be called lazily inside `RunE`, since `BaseRepo` is itself lazy.
+
+This keeps the config-driven parts in one place. When API-host routing becomes
+configuration-driven rather than the rule-based `ghinstance.RESTPrefix`, the change lands
+entirely in the factory's resolver; `githubv3` is unaffected and its tests need only a URL.
+It also resolves an existing inconsistency in which `AddAuthTokenHeader` normalizes the
+hostname via `ghauth.NormalizeHostname` but `ghinstance.RESTPrefix` does not, so the two
+disagree for inputs such as `GITHUB.COM` and `subdomain.github.com`.
+
+The factory has everything it needs except the host itself, which stays a parameter exactly as
+it is for `api.Client.REST(hostname, ...)` today. Hostnames come from `RepoHost()` (282 call
+sites), `DefaultHost()` (69), `ghinstance.Default()` (5) and `--hostname` flags (10); the
+first and last are known to the caller, the rest come from config.
+
+A token is passed as a value rather than a getter. It cannot change during a client's
+lifetime, since configuration is read once. An empty token means an unauthenticated request.
+
+`CAPIClient` already pairs an `*http.Client` with a `host` field, so a client that carries its
+own host is an established shape in the codebase.
+
+#### Relationship to `AddAuthTokenHeader`
+
+Today the token is attached by `AddAuthTokenHeader`, a `RoundTripper` that derives the
+hostname from the request URL and looks up that host's token, because `api.NewHTTPClient`
+deliberately builds the underlying client with `Host: "none"` and `AuthToken: "none"` so go-gh
+will not resolve them. That indirection exists to support a host-agnostic `*http.Client` that
+is passed around generically.
+
+`githubv3` sets `Authorization` itself, and the two coexist safely without removing the
+transport:
+
+- The transport skips when the header is already set, so it never overwrites ours.
+- On a cross-host redirect, Go's `http.Client` strips `Authorization` before the transport
+  runs. This was verified empirically: a same-host redirect preserves the header, a
+  cross-host redirect drops it. That is the same protection the transport's own
+  `redirectHostnameChange` branch provides by hand, so the guarantee does not depend on which
+  mechanism is in play.
+- On such a redirect the transport then looks up a token for the new host, for example a CDN
+  host serving a release asset, and finds none.
+
+Removing `AddAuthTokenHeader` is therefore not required by this design and is out of scope.
 
 ### Requests
 
@@ -85,13 +131,19 @@ shape in the codebase.
 type RequestOption func(*http.Request)
 
 func WithHeader(name, value string) RequestOption
+func WithToken(token string) RequestOption
 
 func (c *Client) NewRequest(ctx context.Context, method, path string, body io.Reader, opts ...RequestOption) (*http.Request, error)
 ```
 
-`path` may be a path relative to the host's REST prefix, or an absolute URL, matching go-gh's
-existing `restURL` behaviour. Absolute URLs are required by call sites that follow
-server-supplied URLs, such as release asset uploads.
+`path` may be a path relative to the client's API base URL, or an absolute URL. Absolute URLs
+are required by call sites that follow server-supplied URLs, such as release asset uploads.
+
+`NewRequest` sets `Authorization` from the client's token and then applies options, so an
+option can override it. This makes token overrides explicit at the call site rather than
+implicit in the transport's "do not overwrite" rule. `gh auth status` and
+`auth/shared/login_flow.go` need this: they check a *specific* user's token rather than the
+host's active one.
 
 Options are applied **after** the client's own defaults, so a per-request header overrides a
 default. Because a `RequestOption` receives the `*http.Request` itself, it is not limited to
@@ -178,10 +230,10 @@ of the shape: the type holds the response's *content*, destructured.
 
 | go-gh component | used by `githubv3` |
 | --- | --- |
-| transport, auth plumbing, caching, logging | yes |
+| transport, caching, logging | yes |
 | `ClientOptions` | yes |
 | `HandleHTTPError` (error payload parsing) | yes |
-| `restURL` / `restPrefix` (~15 lines) | no, replaced |
+| `restURL` / `restPrefix` (~15 lines) | no, the factory's resolver replaces it |
 | `RESTClient.RequestWithContext` (~20 lines) | no, replaced |
 
 `RESTClient` is not used, because it cannot support this design. Its only header mechanism is
@@ -190,11 +242,9 @@ requiring a fresh client per call. It builds the `*http.Request` internally and 
 it, so a `RequestOption func(*http.Request)` is impossible, and `ctx` must be threaded through
 every method instead of riding on the request.
 
-Owning URL derivation also resolves an existing inconsistency. `AddAuthTokenHeader` calls
-`ghauth.NormalizeHostname` before resolving a token, but `ghinstance.RESTPrefix` does not
-normalize, so the two disagree for inputs such as `GITHUB.COM` and `subdomain.github.com`.
-These are unlikely to be reachable through `gh auth login`, but today the derived URL depends
-on which client built the request. `githubv3` normalizes once.
+URL derivation moves to the factory's resolver rather than being duplicated per client, which
+is what lets API-host routing become configuration-driven later. The normalization
+inconsistency this resolves is described under Client above.
 
 The gaps this works around are real for extension authors too, who have no `api.Client` to
 hide behind. Proposing per-request options upstream to go-gh should be tracked separately.
@@ -204,36 +254,50 @@ hide behind. Proposing per-request options upstream to go-gh should be tracked s
 Each step is independently shippable and behaviour-preserving.
 
 1. Add `internal/githubv3` with no callers.
-2. Reimplement `api.Client.REST` and `RESTWithNext` on top of it. The current `RESTWithNext`
+2. Add `Factory.GitHubClient(host)`, which owns config lookup, canonical-host to API-host
+   mapping, and token resolution.
+3. Reimplement `api.Client.REST` and `RESTWithNext` on top of it. The current `RESTWithNext`
    contains a dead `if !success` branch, because go-gh's `RESTClient.Request` already returns
    `(nil, err)` on non-2xx and so a response only ever reaches that check on success; the
    reimplementation drops it.
-3. Replace `api.HTTPError` with `githubv3.ErrorResponse`. There are 63 references to
+4. Replace `api.HTTPError` with `githubv3.ErrorResponse`. There are 63 references to
    `api.HTTPError` across 30 production files. Each declaration changes type, and because
    go-gh returns a pointer where the current type is used as a value, `errors.As` sites also
    gain a `*`. Field reads such as `.StatusCode` and `.Message` are unchanged, and the two
    `ScopesSuggestion()` call sites keep working because the method is retained. Every change
    is compiler-caught.
-4. Migrate the eight deferred `httpClient.Do` sites, which are the ones that need the new
+5. Migrate the eight deferred `httpClient.Do` sites, which are the ones that need the new
    surface: `repoExists`, `downloadAsset`, `fetchCommitSHA`, `publishedReleaseExists`,
    `editRelease`, `downloadArtifact`, `apiLogFetcher.GetLog` and `getLog`.
-5. Opportunistically move the remaining custom-header sites off raw `httpClient.Do`.
+6. Convert `gh auth status` to construct one client per host inside its existing host loop,
+   sharing the underlying `*http.Client`. Today it uses a single host-agnostic client across
+   every configured host and every user within a host, which works only because
+   `auth/shared/oauth_scopes.go` sets `Authorization` itself. Making the per-host client
+   explicit removes the reliance on that generic behaviour.
+7. Opportunistically move the remaining custom-header sites off raw `httpClient.Do`.
 
 ## Testing
 
 Unchanged in mechanism. `httpmock.Registry` is an `http.RoundTripper` and is injected through
-the `*http.Client`, exactly as it is for `api.Client` today.
+the `*http.Client`, exactly as it is for `api.Client` today. Because `githubv3` takes a
+resolved base URL and token, its own tests need neither configuration nor a factory.
 
-New tests for `githubv3` cover: relative and absolute paths; header defaults being overridable
-by a `RequestOption`; `Send` leaving the body open and `Do` closing it; `Do` with a nil `v`
-discarding the body; 2xx status reaching the caller via `Response.StatusCode`; non-2xx
-producing an `*ErrorResponse` with the decoded `message` and `errors`; `ScopesSuggestion`
-across the 4xx range including 401 and excluding 422; and `NextPage` with a `Link` header
-present, absent, and containing multiple relations.
+New tests for `githubv3` cover: relative and absolute paths; `Authorization` set from the
+client token, omitted when the token is empty, and overridden by `WithToken`; header defaults
+being overridable by a `RequestOption`; `Send` leaving the body open and `Do` closing it; `Do`
+with a nil `v` discarding the body; 2xx status reaching the caller via `Response.StatusCode`;
+non-2xx producing an `*ErrorResponse` with the decoded `message` and `errors`;
+`ScopesSuggestion` across the 4xx range including 401 and excluding 422; and `NextPage` with a
+`Link` header present, absent, and containing multiple relations.
 
-Existing `api` tests are the regression suite for step 2, and must pass unmodified.
+Factory tests cover canonical-host to API-host mapping for github.com, enterprise, tenancy,
+garage and localhost, matching the existing `ghinstance.RESTPrefix` rules.
 
-## Known issue found while designing
+Existing `api` tests are the regression suite for step 3, and must pass unmodified.
+
+## Known issues found while designing
+
+### Scopes suggestion dropped on 401
 
 `internal/ghcmd/cmd.go` renders a scopes suggestion only in the final branch of an
 `else if` chain:
@@ -252,3 +316,15 @@ a suggestion never prints it. That last branch also calls a method on `httpErr` 
 
 This is pre-existing and out of scope here, but making `ScopesSuggestion` a computed method
 is a prerequisite for fixing it. It should be tracked separately.
+
+### Parallel authenticated-request implementation in `oauth_scopes.go`
+
+`pkg/cmd/auth/shared/oauth_scopes.go` hand-builds a request, sets `Authorization` itself, and
+sends it purely to read the `X-Oauth-Scopes` response header. It is a second implementation of
+"make an authenticated GitHub request", independent of `api.Client`. It works, and it is what
+currently allows `gh auth status` to check several users' tokens through one host-agnostic
+client.
+
+Once `githubv3` exists it reduces to constructing a per-host client and calling `Send`, but
+converting it is a follow-up rather than part of this work.
+
