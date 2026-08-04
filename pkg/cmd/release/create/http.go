@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -308,7 +307,14 @@ func tokenHasWorkflowScope(resp *http.Response) bool {
 		return true
 	}
 
-	return slices.Contains(strings.Split(scopes, ","), "workflow")
+	// The API returns scopes separated by a comma and a space, so each element
+	// must be trimmed before comparison.
+	for _, s := range strings.Split(scopes, ",") {
+		if strings.TrimSpace(s) == "workflow" {
+			return true
+		}
+	}
+	return false
 }
 
 // isNewRelease checks if there are new commits since the latest release.
