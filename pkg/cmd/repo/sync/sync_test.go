@@ -129,7 +129,7 @@ func TestExecuteLocalRepoSyncBranchCheckedOutInOtherWorktree(t *testing.T) {
 	}
 
 	err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.Empty(t, runGit(t, worktreeDir, "status", "--porcelain"))
 }
 
