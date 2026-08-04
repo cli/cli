@@ -2,10 +2,10 @@ package sync
 
 import (
 	"bytes"
+	stdctx "context"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -217,9 +217,11 @@ func TestUpdateBranchInSingleWorktreeRepository(t *testing.T) {
 
 func runGit(t *testing.T, repoDir string, args ...string) string {
 	t.Helper()
-	cmdArgs := append([]string{"-C", repoDir}, args...)
-	output, err := exec.Command("git", cmdArgs...).CombinedOutput()
-	require.NoErrorf(t, err, "git %s failed: %s", strings.Join(args, " "), output)
+	client := &git.Client{RepoDir: repoDir}
+	cmd, err := client.Command(stdctx.Background(), args...)
+	require.NoError(t, err)
+	output, err := cmd.Output()
+	require.NoErrorf(t, err, "git %s failed", strings.Join(args, " "))
 	return strings.TrimSpace(string(output))
 }
 
