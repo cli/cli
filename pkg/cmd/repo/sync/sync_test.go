@@ -159,6 +159,36 @@ func TestExecuteLocalRepoSyncFastForwardsNonCurrentBranch(t *testing.T) {
 	require.Equal(t, "test", runGit(t, repoDir, "branch", "--show-current"))
 }
 
+func TestExecuteLocalRepoSyncForceUpdatesDivergedNonCurrentBranch(t *testing.T) {
+	repoDir := t.TempDir()
+
+	runGit(t, repoDir, "init", "--quiet", "--initial-branch=trunk")
+	runGit(t, repoDir, "config", "user.name", "Test User")
+	runGit(t, repoDir, "config", "user.email", "test@example.com")
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("initial\n"), 0o600))
+	runGit(t, repoDir, "add", "file.txt")
+	runGit(t, repoDir, "commit", "--quiet", "--message=initial")
+	runGit(t, repoDir, "branch", "test")
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("local\n"), 0o600))
+	runGit(t, repoDir, "commit", "--quiet", "--all", "--message=local")
+	runGit(t, repoDir, "switch", "--quiet", "test")
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("upstream\n"), 0o600))
+	runGit(t, repoDir, "commit", "--quiet", "--all", "--message=upstream")
+	runGit(t, repoDir, "fetch", "--quiet", ".", "test")
+
+	gitClient := &git.Client{RepoDir: repoDir}
+	opts := &SyncOptions{
+		Branch: "trunk",
+		Force:  true,
+		Git:    &gitExecuter{client: gitClient},
+	}
+
+	err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
+	require.NoError(t, err)
+	require.Equal(t, runGit(t, repoDir, "rev-parse", "FETCH_HEAD"), runGit(t, repoDir, "rev-parse", "trunk"))
+	require.Equal(t, "test", runGit(t, repoDir, "branch", "--show-current"))
+}
+
 func runGit(t *testing.T, repoDir string, args ...string) string {
 	t.Helper()
 	cmdArgs := append([]string{"-C", repoDir}, args...)
