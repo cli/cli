@@ -690,10 +690,10 @@ func TestDo(t *testing.T) {
 		}
 	})
 
-	// api.Client.REST and go-gh both surface this as an error today.
-	// google/go-github swallows it instead, and matching that would silently
-	// change behaviour at every existing call site.
-	t.Run("an empty body with a non-nil v is an error", func(t *testing.T) {
+	// JSON can already say "nothing" as null, so an empty body is a malformed
+	// response rather than an empty answer, and a caller that asked for a value
+	// is better served by an error than by a zero-valued struct.
+	t.Run("an empty body with a non-nil v is an error naming the cause", func(t *testing.T) {
 		client, _ := stubClient(t, "https://api.github.com/", WithoutToken(), func(req *http.Request) *http.Response {
 			return stubResponse(req, http.StatusOK, io.NopCloser(strings.NewReader("")), nil)
 		})
@@ -703,8 +703,30 @@ func TestDo(t *testing.T) {
 
 		var target struct{}
 		resp, err := client.Do(req, &target)
-		require.EqualError(t, err, "unexpected end of JSON input")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "empty body")
+		assert.Contains(t, err.Error(), "200", "the status is worth knowing, since a 2xx with no body is the surprise")
 		require.NotNil(t, resp)
+	})
+
+	// null is valid JSON and means the answer really is nothing, so it decodes
+	// rather than erroring, which is what distinguishes it from an empty body.
+	t.Run("a null body decodes to the zero value", func(t *testing.T) {
+		client, _ := stubClient(t, "https://api.github.com/", WithoutToken(), func(req *http.Request) *http.Response {
+			return stubResponse(req, http.StatusOK, io.NopCloser(strings.NewReader("null")), nil)
+		})
+
+		req, err := client.NewRequest(context.Background(), http.MethodGet, "repos/OWNER/REPO", nil)
+		require.NoError(t, err)
+
+		target := struct {
+			Name string `json:"name"`
+		}{Name: "untouched"}
+		resp, err := client.Do(req, &target)
+
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, "untouched", target.Name)
 	})
 
 	t.Run("skips decoding on statuses without content", func(t *testing.T) {
