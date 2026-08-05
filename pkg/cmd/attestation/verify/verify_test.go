@@ -57,6 +57,7 @@ func TestNewVerifyCmd(t *testing.T) {
 		ExternalHttpClient: func() (*http.Client, error) {
 			return nil, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(&testReg),
 	}
 
 	testcases := []struct {

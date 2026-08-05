@@ -1,10 +1,10 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
-	cliAPI "github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
@@ -404,8 +404,11 @@ func TestGetAttestationsRetriesRESTWithNextError(t *testing.T) {
 		}),
 	)
 
+	restClient, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+
 	c := &LiveClient{
-		githubAPI: cliAPI.NewClientFromHTTP(&http.Client{Transport: reg}),
+		githubAPI: restAPIClient{ctx: context.Background(), client: restClient},
 		host:      "github.com",
 		logger:    io.NewTestHandler(),
 	}

@@ -92,7 +92,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *co
 			}
 
 			io := f.IOStreams
-			attClient := api.NewLiveClient(httpClient, externalClient, baseRepo.RepoHost(), att_io.NewHandler(io))
+			attClient := api.NewLiveClient(cmd.Context(), restClient, externalClient, baseRepo.RepoHost(), att_io.NewHandler(io))
 
 			attVerifier := &shared.AttestationVerifier{
 				AttClient:          attClient,

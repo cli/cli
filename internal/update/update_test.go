@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -78,8 +77,8 @@ func TestCheckForUpdate(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.Name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			httpClient := &http.Client{}
-			httpmock.ReplaceTripper(httpClient, reg)
+			client, err := httpmock.RESTClientFuncAnonymous(reg)("github.com")
+			require.NoError(t, err)
 
 			reg.Register(
 				httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"),
@@ -89,7 +88,7 @@ func TestCheckForUpdate(t *testing.T) {
 				}`, s.LatestVersion, s.LatestURL)),
 			)
 
-			rel, err := CheckForUpdate(context.TODO(), httpClient, tempFilePath(), "OWNER/REPO", s.CurrentVersion)
+			rel, err := CheckForUpdate(context.TODO(), client, tempFilePath(), "OWNER/REPO", s.CurrentVersion)
 			if err != nil {
 				t.Fatal(err)
 			}

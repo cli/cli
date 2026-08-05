@@ -37,6 +37,7 @@ func TestNewTrustedRootCmd(t *testing.T) {
 		ExternalHttpClient: func() (*http.Client, error) {
 			return nil, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(&httpmock.Registry{}),
 	}
 
 	testcases := []struct {
@@ -126,6 +127,7 @@ func TestNewTrustedRootWithTenancy(t *testing.T) {
 			ExternalHttpClient: func() (*http.Client, error) {
 				return nil, nil
 			},
+			GitHubREST: httpmock.RESTClientFunc(&testReg),
 		}
 
 		cmd := NewTrustedRootCmd(f, func(_ *Options) error {
@@ -157,6 +159,7 @@ func TestNewTrustedRootWithTenancy(t *testing.T) {
 			ExternalHttpClient: func() (*http.Client, error) {
 				return nil, nil
 			},
+			GitHubREST: httpmock.RESTClientFunc(&testReg),
 		}
 
 		cmd := NewTrustedRootCmd(f, func(_ *Options) error {

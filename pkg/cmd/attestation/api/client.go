@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	ioconfig "github.com/cli/cli/v2/pkg/cmd/attestation/io"
@@ -76,9 +76,9 @@ type LiveClient struct {
 	logger             *ioconfig.Handler
 }
 
-func NewLiveClient(hc *http.Client, externalClient *http.Client, host string, l *ioconfig.Handler) *LiveClient {
+func NewLiveClient(ctx context.Context, restClient *githubrest.Client, externalClient *http.Client, host string, l *ioconfig.Handler) *LiveClient {
 	return &LiveClient{
-		githubAPI:          api.NewClientFromHTTP(hc),
+		githubAPI:          restAPIClient{ctx: ctx, client: restClient},
 		host:               strings.TrimSuffix(host, "/"),
 		externalHttpClient: externalClient,
 		logger:             l,

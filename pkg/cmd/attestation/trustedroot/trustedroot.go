@@ -67,7 +67,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 				return err
 			}
 
-			hc, err := f.HttpClient()
+			restClient, err := f.GitHubREST(opts.Hostname)
 			if err != nil {
 				return err
 			}
@@ -87,7 +87,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 					return fmt.Errorf("not authenticated with %s", opts.Hostname)
 				}
 				logger := io.NewHandler(f.IOStreams)
-				apiClient := api.NewLiveClient(hc, externalClient, opts.Hostname, logger)
+				apiClient := api.NewLiveClient(cmd.Context(), restClient, externalClient, opts.Hostname, logger)
 				td, err := apiClient.GetTrustDomain()
 				if err != nil {
 					return err

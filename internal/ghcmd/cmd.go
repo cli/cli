@@ -325,12 +325,15 @@ func checkForUpdate(ctx context.Context, f *cmdutil.Factory, currentVersion stri
 	if updaterEnabled == "" || !update.ShouldCheckForUpdate() {
 		return nil, nil
 	}
-	httpClient, err := f.HttpClient()
+	// Anonymous, because the release check reads a public repository and runs
+	// alongside whatever command the user actually asked for; sending their
+	// token would spend rate limit on it for no benefit.
+	client, err := f.GitHubRESTAnonymous("github.com")
 	if err != nil {
 		return nil, err
 	}
 	stateFilePath := filepath.Join(config.StateDir(), "state.yml")
-	return update.CheckForUpdate(ctx, httpClient, stateFilePath, updaterEnabled, currentVersion)
+	return update.CheckForUpdate(ctx, client, stateFilePath, updaterEnabled, currentVersion)
 }
 
 func isRecentRelease(publishedAt time.Time) bool {

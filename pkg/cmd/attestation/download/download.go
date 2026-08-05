@@ -79,11 +79,6 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			hc, err := f.HttpClient()
-			if err != nil {
-				return err
-			}
-
 			externalClient, err := f.ExternalHttpClient()
 			if err != nil {
 				return err
@@ -96,7 +91,12 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 				return err
 			}
 
-			opts.APIClient = api.NewLiveClient(hc, externalClient, opts.Hostname, opts.Logger)
+			restClient, err := f.GitHubREST(opts.Hostname)
+			if err != nil {
+				return err
+			}
+
+			opts.APIClient = api.NewLiveClient(cmd.Context(), restClient, externalClient, opts.Hostname, opts.Logger)
 			opts.OCIClient = oci.NewLiveClient()
 			opts.Store = NewLiveStore("")
 

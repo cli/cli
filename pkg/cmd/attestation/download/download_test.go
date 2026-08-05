@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -43,6 +44,7 @@ func TestNewDownloadCmd(t *testing.T) {
 		ExternalHttpClient: func() (*http.Client, error) {
 			return nil, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(&httpmock.Registry{}),
 	}
 
 	store := &LiveStore{

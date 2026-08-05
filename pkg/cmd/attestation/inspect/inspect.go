@@ -81,7 +81,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 				return err
 			}
 
-			hc, err := f.HttpClient()
+			restClient, err := f.GitHubREST(opts.Hostname)
 			if err != nil {
 				return err
 			}
@@ -97,7 +97,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 			}
 
 			if ghauth.IsTenancy(opts.Hostname) {
-				apiClient := api.NewLiveClient(hc, externalClient, opts.Hostname, opts.Logger)
+				apiClient := api.NewLiveClient(cmd.Context(), restClient, externalClient, opts.Hostname, opts.Logger)
 				td, err := apiClient.GetTrustDomain()
 				if err != nil {
 					return fmt.Errorf("error getting trust domain, make sure you are authenticated against the host: %w", err)

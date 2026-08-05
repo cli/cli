@@ -2,9 +2,7 @@ package update
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/ci"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/hashicorp/go-version"
@@ -89,7 +88,7 @@ func ShouldCheckForUpdate() bool {
 }
 
 // CheckForUpdate checks whether an update exists for the GitHub CLI based on recency of last check within past 24 hours.
-func CheckForUpdate(ctx context.Context, client *http.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
+func CheckForUpdate(ctx context.Context, client *githubrest.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
 	stateEntry, _ := getStateEntry(stateFilePath)
 	if stateEntry != nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
 		return nil, nil
@@ -112,7 +111,7 @@ func CheckForUpdate(ctx context.Context, client *http.Client, stateFilePath, rep
 	return nil, nil
 }
 
-func getLatestReleaseInfo(ctx context.Context, client *http.Client, repo string) (*ReleaseInfo, error) {
+func getLatestReleaseInfo(ctx context.Context, client *githubrest.Client, repo string) (*ReleaseInfo, error) {
 	owner, name, err := safeurl.RepoPartsFromNWO(repo)
 	if err != nil {
 		return nil, err
@@ -121,24 +120,13 @@ func getLatestReleaseInfo(ctx context.Context, client *http.Client, repo string)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		res.Body.Close()
-	}()
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("unexpected HTTP %d", res.StatusCode)
-	}
-	dec := json.NewDecoder(res.Body)
+
 	var latestRelease ReleaseInfo
-	if err := dec.Decode(&latestRelease); err != nil {
+	if _, err := client.Do(req, &latestRelease); err != nil {
 		return nil, err
 	}
 	return &latestRelease, nil
