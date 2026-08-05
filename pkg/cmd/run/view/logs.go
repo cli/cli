@@ -2,6 +2,7 @@ package view
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,9 +14,9 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 )
@@ -33,7 +34,8 @@ func (f *zipLogFetcher) GetLog() (io.ReadCloser, error) {
 }
 
 type apiLogFetcher struct {
-	httpClient *http.Client
+	ctx    context.Context
+	client *githubrest.Client
 
 	repo  ghrepo.Interface
 	jobID int64
@@ -45,20 +47,22 @@ func (f *apiLogFetcher) GetLog() (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", logURL.String(), nil)
+	req, err := f.client.NewRequest(f.ctx, http.MethodGet, logURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := f.httpClient.Do(req)
+	// Send rather than Do, because the caller reads the log as a stream.
+	resp, err := f.client.Send(req)
 	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("log not found: %v", f.jobID)
+		}
 		return nil, err
-	}
-
-	if resp.StatusCode == 404 {
-		return nil, fmt.Errorf("log not found: %v", f.jobID)
-	} else if resp.StatusCode != 200 {
-		return nil, api.HandleHTTPError(resp)
 	}
 
 	return resp.Body, nil
@@ -90,7 +94,7 @@ var errTooManyAPILogFetchers = errors.New("too many missing logs")
 // Note that, as heuristic approach, we only allow a limited number of API log
 // fetchers to be assigned. This is to avoid overwhelming the API with too many
 // requests.
-func populateLogSegments(httpClient *http.Client, repo ghrepo.Interface, jobs []shared.Job, zlm *zipLogMap, onlyFailed bool) ([]logSegment, error) {
+func populateLogSegments(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, jobs []shared.Job, zlm *zipLogMap, onlyFailed bool) ([]logSegment, error) {
 	segments := make([]logSegment, 0, len(jobs))
 
 	apiLogFetcherCount := 0
@@ -139,9 +143,10 @@ func populateLogSegments(httpClient *http.Client, repo ghrepo.Interface, jobs []
 			segment.fetcher = &zipLogFetcher{File: zf}
 		} else {
 			segment.fetcher = &apiLogFetcher{
-				httpClient: httpClient,
-				repo:       repo,
-				jobID:      job.ID,
+				ctx:    ctx,
+				client: client,
+				repo:   repo,
+				jobID:  job.ID,
 			}
 			apiLogFetcherCount++
 		}

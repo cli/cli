@@ -1,7 +1,7 @@
 package download
 
 import (
-	"net/http"
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -31,7 +32,8 @@ func Test_List(t *testing.T) {
 		}`))
 
 	api := &apiPlatform{
-		client: &http.Client{Transport: reg},
+		ctx:    context.Background(),
+		client: mustRESTClient(t, reg),
 		repo:   ghrepo.New("OWNER", "REPO"),
 	}
 	artifacts, err := api.List("123")
@@ -51,7 +53,8 @@ func Test_List_perRepository(t *testing.T) {
 		httpmock.StringResponse(`{}`))
 
 	api := &apiPlatform{
-		client: &http.Client{Transport: reg},
+		ctx:    context.Background(),
+		client: mustRESTClient(t, reg),
 		repo:   ghrepo.New("OWNER", "REPO"),
 	}
 	_, err := api.List("")
@@ -71,7 +74,8 @@ func Test_Download(t *testing.T) {
 		httpmock.FileResponse("./fixtures/myproject.zip"))
 
 	api := &apiPlatform{
-		client: &http.Client{Transport: reg},
+		ctx:    context.Background(),
+		client: mustRESTClient(t, reg),
 	}
 	require.NoError(t, api.Download(safeurl.NewImmutableSafeURL("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip"), destDir))
 
@@ -105,4 +109,11 @@ func Test_Download(t *testing.T) {
 		filepath.Join("artifact", "src", "main.go"),
 		filepath.Join("artifact", "src", "util.go"),
 	}, paths)
+}
+
+func mustRESTClient(t *testing.T, reg *httpmock.Registry) *githubrest.Client {
+	t.Helper()
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	return client
 }

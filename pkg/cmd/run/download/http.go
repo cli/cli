@@ -2,13 +2,14 @@ package download
 
 import (
 	"archive/zip"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/safeurl"
 	ghzip "github.com/cli/cli/v2/internal/zip"
@@ -16,35 +17,37 @@ import (
 )
 
 type apiPlatform struct {
-	client *http.Client
+	ctx    context.Context
+	client *githubrest.Client
 	repo   ghrepo.Interface
 }
 
 func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
-	return shared.ListArtifacts(p.client, p.repo, runID)
+	return shared.ListArtifacts(p.ctx, p.client, p.repo, runID)
 }
 
 func (p *apiPlatform) Download(url safeurl.SafeURL, dir safepaths.Absolute) error {
-	return downloadArtifact(p.client, url, dir)
+	return downloadArtifact(p.ctx, p.client, url, dir)
 }
 
-func downloadArtifact(httpClient *http.Client, url safeurl.SafeURL, destDir safepaths.Absolute) error {
-	req, err := http.NewRequest("GET", url.String(), nil)
+func downloadArtifact(ctx context.Context, client *githubrest.Client, url safeurl.SafeURL, destDir safepaths.Absolute) error {
+	// The server rejects an Accept of application/zip, so the request asks for
+	// nothing in particular and takes what it is given.
+	req, err := client.NewRequest(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return err
 	}
-	// The server rejects this :(
-	//req.Header.Set("Accept", "application/zip")
 
-	resp, err := httpClient.Do(req)
+	// Send rather than Do, because the archive is streamed to a temporary file
+	// so it can be read back as a zip, which needs a ReaderAt.
+	resp, err := client.Send(req)
 	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
 		return err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
 
 	tmpfile, err := os.CreateTemp("", "gh-artifact.*.zip")
 	if err != nil {

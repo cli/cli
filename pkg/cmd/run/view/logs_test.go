@@ -3,6 +3,7 @@ package view
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -104,12 +105,14 @@ func TestApiLogFetcher(t *testing.T) {
 
 			tt.httpStubs(reg)
 
-			httpClient := &http.Client{Transport: reg}
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
 			fetcher := &apiLogFetcher{
-				httpClient: httpClient,
-				repo:       ghrepo.New("OWNER", "REPO"),
-				jobID:      123,
+				ctx:    context.Background(),
+				client: client,
+				repo:   ghrepo.New("OWNER", "REPO"),
+				jobID:  123,
 			}
 
 			rc, err := fetcher.GetLog()

@@ -1,14 +1,15 @@
 package shared
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDownloadWorkflowArtifactsPageinates(t *testing.T) {
@@ -57,10 +58,11 @@ func TestDownloadWorkflowArtifactsPageinates(t *testing.T) {
 	reg.Register(firstReq, firstRes)
 	reg.Register(secondReq, secondRes)
 
-	httpClient := &http.Client{Transport: reg}
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
 	repo := ghrepo.New(testRepoOwner, testRepoName)
 
-	result, err := ListArtifacts(httpClient, repo, testRunId)
+	result, err := ListArtifacts(context.Background(), client, repo, testRunId)
 	assert.NoError(t, err)
 	assert.Equal(t, []Artifact{firstArtifact, secondArtifact}, result)
 }

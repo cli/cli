@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -79,6 +81,7 @@ func (c RunLogCache) filepath(key string) string {
 
 type ViewOptions struct {
 	HttpClient  func() (*http.Client, error)
+	GitHubREST  func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO          *iostreams.IOStreams
 	BaseRepo    func() (ghrepo.Interface, error)
 	Browser     browser.Browser
@@ -104,6 +107,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 		Now:        time.Now,
 		Browser:    f.Browser,
@@ -188,7 +192,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return runView(opts)
+			return runView(cmd.Context(), opts)
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "Show job steps")
@@ -204,7 +208,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
-func runView(opts *ViewOptions) error {
+func runView(ctx context.Context, opts *ViewOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %w", err)
@@ -214,6 +218,11 @@ func runView(opts *ViewOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("failed to determine base repo: %w", err)
+	}
+
+	restClient, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return fmt.Errorf("failed to create REST client: %w", err)
 	}
 
 	jobID := opts.JobID
@@ -320,7 +329,7 @@ func runView(opts *ViewOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		runLogZip, err := getRunLog(opts.RunLogCache, httpClient, repo, run, attempt)
+		runLogZip, err := getRunLog(ctx, opts.RunLogCache, restClient, repo, run, attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get run log: %w", err)
@@ -328,7 +337,7 @@ func runView(opts *ViewOptions) error {
 		defer runLogZip.Close()
 
 		zlm := getZipLogMap(&runLogZip.Reader, jobs)
-		segments, err := populateLogSegments(httpClient, repo, jobs, zlm, opts.LogFailed)
+		segments, err := populateLogSegments(ctx, restClient, repo, jobs, zlm, opts.LogFailed)
 		if err != nil {
 			if errors.Is(err, errTooManyAPILogFetchers) {
 				return fmt.Errorf("too many API requests needed to fetch logs; try narrowing down to a specific job with the `--job` option")
@@ -354,7 +363,7 @@ func runView(opts *ViewOptions) error {
 
 	var artifacts []shared.Artifact
 	if selectedJob == nil {
-		artifacts, err = shared.ListArtifacts(httpClient, repo, strconv.FormatInt(int64(run.ID), 10))
+		artifacts, err = shared.ListArtifacts(ctx, restClient, repo, strconv.FormatInt(int64(run.ID), 10))
 		if err != nil {
 			return fmt.Errorf("failed to get artifacts: %w", err)
 		}
@@ -470,27 +479,30 @@ func shouldFetchJobs(opts *ViewOptions) bool {
 	return false
 }
 
-func getLog(httpClient *http.Client, logURL safeurl.SafeURL) (io.ReadCloser, error) {
-	req, err := http.NewRequest("GET", logURL.String(), nil)
+func getLog(ctx context.Context, client *githubrest.Client, logURL safeurl.SafeURL) (io.ReadCloser, error) {
+	req, err := client.NewRequest(ctx, http.MethodGet, logURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
+	// Send rather than Do, because the archive is read into memory by the
+	// caller so it can be validated as a zip before it is cached.
+	resp, err := client.Send(req)
 	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return nil, errors.New("log not found")
+		}
 		return nil, err
-	}
-
-	if resp.StatusCode == 404 {
-		return nil, errors.New("log not found")
-	} else if resp.StatusCode != 200 {
-		return nil, api.HandleHTTPError(resp)
 	}
 
 	return resp.Body, nil
 }
 
-func getRunLog(cache RunLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
+func getRunLog(ctx context.Context, cache RunLogCache, client *githubrest.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
 	cacheKey := fmt.Sprintf("%d-%d", run.ID, run.StartedTime().Unix())
 	isCached, err := cache.Exists(cacheKey)
 	if err != nil {
@@ -511,7 +523,7 @@ func getRunLog(cache RunLogCache, httpClient *http.Client, repo ghrepo.Interface
 			}
 		}
 
-		resp, err := getLog(httpClient, logURL)
+		resp, err := getLog(ctx, client, logURL)
 		if err != nil {
 			return nil, err
 		}

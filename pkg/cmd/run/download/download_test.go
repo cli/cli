@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -106,12 +106,10 @@ func Test_NewCmdDownload(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: ios,
-				HttpClient: func() (*http.Client, error) {
-					return nil, nil
-				},
+				IOStreams:  ios,
+				GitHubREST: httpmock.RESTClientFunc(&httpmock.Registry{}),
 				BaseRepo: func() (ghrepo.Interface, error) {
-					return nil, nil
+					return ghrepo.New("OWNER", "REPO"), nil
 				},
 			}
 

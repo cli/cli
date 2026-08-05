@@ -1,14 +1,15 @@
 package shared
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"regexp"
 	"strconv"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -23,7 +24,7 @@ type artifactsPayload struct {
 	Artifacts []Artifact
 }
 
-func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string) ([]Artifact, error) {
+func ListArtifacts(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, runID string) ([]Artifact, error) {
 	var results []Artifact
 
 	restPrefix := ghinstance.RESTPrefix(repo.RepoHost())
@@ -43,7 +44,7 @@ func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string)
 
 	for {
 		var payload artifactsPayload
-		nextURL, err := apiGet(httpClient, pageURL, &payload)
+		nextURL, err := apiGet(ctx, client, pageURL, &payload)
 		if err != nil {
 			return nil, err
 		}
@@ -58,28 +59,29 @@ func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string)
 	return results, nil
 }
 
-func apiGet(httpClient *http.Client, url safeurl.SafeURL, data interface{}) (string, error) {
-	req, err := http.NewRequest("GET", url.String(), nil)
+func apiGet(ctx context.Context, client *githubrest.Client, url safeurl.SafeURL, data interface{}) (string, error) {
+	req, err := client.NewRequest(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return "", err
 	}
 
-	resp, err := httpClient.Do(req)
+	// Send rather than Do, because pagination is driven by the Link header,
+	// which only the response carries.
+	resp, err := client.Send(req)
 	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
 		return "", err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return "", api.HandleHTTPError(resp)
-	}
 
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(data); err != nil {
 		return "", err
 	}
 
-	return findNextPage(resp), nil
+	return findNextPage(resp.Response), nil
 }
 
 var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)

@@ -83,12 +83,13 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			if err != nil {
 				return err
 			}
-			httpClient, err := f.HttpClient()
+			client, err := f.GitHubREST(baseRepo.RepoHost())
 			if err != nil {
 				return err
 			}
 			opts.Platform = &apiPlatform{
-				client: httpClient,
+				ctx:    cmd.Context(),
+				client: client,
 				repo:   baseRepo,
 			}
 
