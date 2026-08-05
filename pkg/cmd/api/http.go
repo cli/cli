@@ -2,28 +2,31 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 )
 
-func httpRequest(client *http.Client, hostname string, method string, p string, params interface{}, headers []string) (*http.Response, error) {
+// httpRequest issues the request the user described.
+//
+// The path is passed to the client verbatim, exactly as it arrived from the
+// user: gh api is the one command whose whole job is to send what it was asked
+// to send, so it is deliberately not routed through safeurl and not escaped.
+// The client resolves a relative path against its API base URL, which is how
+// hostname stops being a per-request argument; only the GraphQL endpoint still
+// needs it, because it does not sit under the REST prefix.
+func httpRequest(ctx context.Context, client *githubrest.Client, hostname string, method string, p string, params interface{}, headers []string) (*githubrest.Response, error) {
 	isGraphQL := p == "graphql"
-	var requestURL string
-	if strings.Contains(p, "://") {
-		requestURL = p
-	} else if isGraphQL {
+	requestURL := p
+	if isGraphQL && !strings.Contains(p, "://") {
 		requestURL = ghinstance.GraphQLEndpoint(hostname)
-	} else {
-		// Note that the gh api command takes the path verbatim from the user, so we
-		// intentionally do not route it through safeurl and do not escape it here.
-		requestURL = ghinstance.RESTPrefix(hostname) + strings.TrimPrefix(p, "/")
 	}
 
 	var body io.Reader
@@ -52,7 +55,7 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 		return nil, fmt.Errorf("unrecognized parameters type: %v", params)
 	}
 
-	req, err := http.NewRequest(strings.ToUpper(method), requestURL, body)
+	req, err := client.NewRequest(ctx, strings.ToUpper(method), requestURL, body)
 	if err != nil {
 		return nil, err
 	}
@@ -76,11 +79,14 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 	if bodyIsJSON && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	}
+	// Set rather than left to the transport's default of application/vnd.github+json,
+	// because gh api has always accepted anything and users rely on that for
+	// diffs, patches and raw file content.
 	if req.Header.Get("Accept") == "" {
 		req.Header.Set("Accept", "*/*")
 	}
 
-	return client.Do(req)
+	return client.Send(req)
 }
 
 func groupGraphQLVariables(params map[string]interface{}) map[string]interface{} {

@@ -2,11 +2,13 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,14 +18,15 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/cli/go-gh/v2/pkg/jq"
 	"github.com/cli/go-gh/v2/pkg/template"
 	"github.com/spf13/cobra"
@@ -39,7 +42,7 @@ type ApiOptions struct {
 	BaseRepo      func() (ghrepo.Interface, error)
 	Branch        func() (string, error)
 	Config        func() (gh.Config, error)
-	HttpClient    func() (*http.Client, error)
+	GitHubREST    func(apiBaseURL, tokenHost string) (*githubrest.Client, error)
 	IO            *iostreams.IOStreams
 
 	Hostname            string
@@ -281,7 +284,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			if runF != nil {
 				return runF(&opts)
 			}
-			return apiRun(&opts)
+			return apiRun(c.Context(), &opts)
 		},
 	}
 
@@ -304,7 +307,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	return cmd
 }
 
-func apiRun(opts *ApiOptions) error {
+func apiRun(ctx context.Context, opts *ApiOptions) error {
 	params, err := parseFields(opts)
 	if err != nil {
 		return err
@@ -388,34 +391,61 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	if opts.HttpClient == nil {
-		opts.HttpClient = func() (*http.Client, error) {
+	host, _ := cfg.Authentication().DefaultHost()
+	if opts.Hostname != "" {
+		host = opts.Hostname
+	}
+	apiBaseURL := ghinstance.RESTPrefix(host)
+
+	// An absolute URL names its own origin, and that origin decides both where
+	// the request goes and which token it may carry. Building the client from it
+	// keeps the token bound to the destination, which the old transport did per
+	// request by looking at the URL it was handed. It also means a plaintext
+	// local server stays reachable, since the client is not pinned to https by a
+	// base URL the request never uses.
+	if u, urlErr := url.Parse(requestPath); urlErr == nil && u.Scheme != "" && u.Host != "" {
+		host = ghauth.NormalizeHostname(u.Hostname())
+		apiBaseURL = u.Scheme + "://" + u.Host + "/"
+	}
+
+	if opts.GitHubREST == nil {
+		// gh api builds its own transport rather than taking the factory's,
+		// because --cache and --verbose are per-invocation transport settings
+		// that no other command has.
+		opts.GitHubREST = func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 			log := opts.IO.ErrOut
 			if opts.Verbose {
 				log = opts.IO.Out
 			}
-			opts := api.HTTPClientOptions{
+			httpClient, err := githubrest.NewHTTPClient(githubrest.HTTPClientOptions{
 				AppVersion:     opts.AppVersion,
 				InvokingAgent:  opts.InvokingAgent,
 				CacheTTL:       opts.CacheTTL,
-				Config:         cfg.Authentication(),
 				EnableCache:    opts.CacheTTL > 0,
 				Log:            log,
 				LogColorize:    opts.IO.ColorEnabled(),
 				LogVerboseHTTP: opts.Verbose,
+			})
+			if err != nil {
+				return nil, err
 			}
-			return api.NewHTTPClient(opts)
+
+			auth := githubrest.WithoutToken()
+			if token, _ := cfg.Authentication().ActiveToken(tokenHost); token != "" {
+				auth = githubrest.WithToken(token)
+			}
+
+			var clientOpts []githubrest.ClientOption
+			if tokenHost == ghinstance.Default() {
+				clientOpts = append(clientOpts, githubrest.WithCredentialedHost(ghinstance.UploadHost(tokenHost)))
+			}
+			return githubrest.NewClient(apiBaseURL, httpClient, auth, clientOpts...)
 		}
 	}
-	httpClient, err := opts.HttpClient()
+
+	restClient, err := opts.GitHubREST(apiBaseURL, host)
 	if err != nil {
 		return err
-	}
-
-	host, _ := cfg.Authentication().DefaultHost()
-
-	if opts.Hostname != "" {
-		host = opts.Hostname
 	}
 
 	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
@@ -427,13 +457,17 @@ func apiRun(opts *ApiOptions) error {
 	isFirstPage := true
 	hasNextPage := true
 	for hasNextPage {
-		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
-		if err != nil {
+		resp, err := httpRequest(ctx, restClient, host, method, requestPath, requestBody, requestHeaders)
+		// A non-2xx is reported as an error but still carries the response, and
+		// printing what the server sent is the whole point of gh api, so only a
+		// failure with no response at all stops here.
+		var errResp *githubrest.ErrorResponse
+		if err != nil && !errors.As(err, &errResp) {
 			return err
 		}
 
 		if !isGraphQL {
-			requestPath, hasNextPage = findNextPage(resp)
+			requestPath, hasNextPage = findNextPage(resp.Response)
 			requestBody = nil // prevent repeating GET parameters
 		}
 
@@ -443,7 +477,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, tmpl, isFirstPage, !hasNextPage)
+		endCursor, err := processResponse(resp.Response, errResp, opts, bodyWriter, headersWriter, tmpl, isFirstPage, !hasNextPage)
 		if err != nil {
 			return err
 		}
@@ -470,7 +504,7 @@ func apiRun(opts *ApiOptions) error {
 
 var jsonContentTypeRE = regexp.MustCompile(`[/+]json(;|$)`)
 
-func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template, isFirstPage, isLastPage bool) (endCursor string, err error) {
+func processResponse(resp *http.Response, errResp *githubrest.ErrorResponse, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template, isFirstPage, isLastPage bool) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
 		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
@@ -551,7 +585,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	}
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		if msg := api.ScopesSuggestion(resp); msg != "" {
+		if msg := errResp.ScopesSuggestion(); msg != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
 		}
 		if u := factory.SSOURL(); u != "" {

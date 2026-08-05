@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/template"
@@ -741,16 +743,16 @@ func Test_apiRun(t *testing.T) {
 
 			tt.options.IO = ios
 			tt.options.Config = func() (gh.Config, error) { return config.NewBlankConfig(), nil }
-			tt.options.HttpClient = func() (*http.Client, error) {
+			tt.options.GitHubREST = func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 					resp := tt.httpResponse
 					resp.Request = req
 					return resp, nil
 				}
-				return &http.Client{Transport: tr}, nil
+				return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 			}
 
-			err := apiRun(&tt.options)
+			err := apiRun(context.Background(), &tt.options)
 			if tt.errMsg != "" {
 				if err == nil || err.Error() != tt.errMsg {
 					t.Errorf("expected error %q, got %v", tt.errMsg, err)
@@ -810,14 +812,14 @@ func Test_apiRun_paginationREST(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		GitHubREST: func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
 				requestCount++
 				return resp, nil
 			}
-			return &http.Client{Transport: tr}, nil
+			return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 		},
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
@@ -830,7 +832,7 @@ func Test_apiRun_paginationREST(t *testing.T) {
 		RawFields:           []string{"per_page=50", "page=1"},
 	}
 
-	err := apiRun(&options)
+	err := apiRun(context.Background(), &options)
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"page":1}{"page":2}{"page":3}`, stdout.String(), "stdout")
@@ -882,14 +884,14 @@ func Test_apiRun_arrayPaginationREST(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		GitHubREST: func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
 				requestCount++
 				return resp, nil
 			}
-			return &http.Client{Transport: tr}, nil
+			return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 		},
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
@@ -902,7 +904,7 @@ func Test_apiRun_arrayPaginationREST(t *testing.T) {
 		RawFields:           []string{"per_page=50", "page=1"},
 	}
 
-	err := apiRun(&options)
+	err := apiRun(context.Background(), &options)
 	assert.NoError(t, err)
 
 	assert.Equal(t, `[{"item":1},{"item":2},{"item":3},{"item":4},{"item":5} ]`, stdout.String(), "stdout")
@@ -954,14 +956,14 @@ func Test_apiRun_arrayPaginationREST_with_headers(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		GitHubREST: func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
 				requestCount++
 				return resp, nil
 			}
-			return &http.Client{Transport: tr}, nil
+			return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 		},
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
@@ -975,7 +977,7 @@ func Test_apiRun_arrayPaginationREST_with_headers(t *testing.T) {
 		ShowResponseHeaders: true,
 	}
 
-	err := apiRun(&options)
+	err := apiRun(context.Background(), &options)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "HTTP/1.1 200 OK\nContent-Type: application/json\r\nLink: <https://api.github.com/repositories/1227/issues?page=2>; rel=\"next\", <https://api.github.com/repositories/1227/issues?page=3>; rel=\"last\"\r\nX-Github-Request-Id: 1\r\n\r\n[{\"page\":1}]\nHTTP/1.1 200 OK\nContent-Type: application/json\r\nLink: <https://api.github.com/repositories/1227/issues?page=3>; rel=\"next\", <https://api.github.com/repositories/1227/issues?page=3>; rel=\"last\"\r\nX-Github-Request-Id: 2\r\n\r\n[{\"page\":2}]\nHTTP/1.1 200 OK\nContent-Type: application/json\r\nX-Github-Request-Id: 3\r\n\r\n[{\"page\":3}]", stdout.String(), "stdout")
@@ -1023,14 +1025,14 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		GitHubREST: func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
 				requestCount++
 				return resp, nil
 			}
-			return &http.Client{Transport: tr}, nil
+			return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 		},
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
@@ -1042,7 +1044,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 		Paginate:      true,
 	}
 
-	err := apiRun(&options)
+	err := apiRun(context.Background(), &options)
 	require.NoError(t, err)
 
 	assert.Equal(t, heredoc.Doc(`
@@ -1122,14 +1124,14 @@ func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		GitHubREST: func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
 				requestCount++
 				return resp, nil
 			}
-			return &http.Client{Transport: tr}, nil
+			return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 		},
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
@@ -1142,7 +1144,7 @@ func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
 		Slurp:         true,
 	}
 
-	err := apiRun(&options)
+	err := apiRun(context.Background(), &options)
 	require.NoError(t, err)
 
 	assert.JSONEq(t, stdout.String(), `[
@@ -1234,14 +1236,14 @@ func Test_apiRun_paginated_template(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		GitHubREST: func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
 				requestCount++
 				return resp, nil
 			}
-			return &http.Client{Transport: tr}, nil
+			return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 		},
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
@@ -1255,7 +1257,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 		Template: `{{range .data.nodes}}{{tablerow .page .caption}}{{end}}`,
 	}
 
-	err := apiRun(&options)
+	err := apiRun(context.Background(), &options)
 	require.NoError(t, err)
 
 	assert.Equal(t, heredoc.Doc(`
@@ -1288,17 +1290,17 @@ func Test_apiRun_DELETE(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 
 	var gotRequest *http.Request
-	err := apiRun(&ApiOptions{
+	err := apiRun(context.Background(), &ApiOptions{
 		IO: ios,
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
-		HttpClient: func() (*http.Client, error) {
+		GitHubREST: func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				gotRequest = req
 				return &http.Response{StatusCode: 204, Request: req}, nil
 			}
-			return &http.Client{Transport: tr}, nil
+			return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 		},
 		MagicFields:         []string(nil),
 		RawFields:           []string(nil),
@@ -1317,12 +1319,12 @@ func Test_apiRun_DELETE(t *testing.T) {
 func Test_apiRun_HEAD(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 
-	err := apiRun(&ApiOptions{
+	err := apiRun(context.Background(), &ApiOptions{
 		IO: ios,
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
-		HttpClient: func() (*http.Client, error) {
+		GitHubREST: func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: 422,
@@ -1331,7 +1333,7 @@ func Test_apiRun_HEAD(t *testing.T) {
 						"Content-Type": {"application/json"},
 					}}, nil
 			}
-			return &http.Client{Transport: tr}, nil
+			return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 		},
 		MagicFields:         []string(nil),
 		RawFields:           []string(nil),
@@ -1393,7 +1395,7 @@ func Test_apiRun_inputFile(t *testing.T) {
 				RawFields:        []string{"a=b", "c=d"},
 
 				IO: ios,
-				HttpClient: func() (*http.Client, error) {
+				GitHubREST: func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 					var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 						var err error
 						if bodyBytes, err = io.ReadAll(req.Body); err != nil {
@@ -1402,14 +1404,14 @@ func Test_apiRun_inputFile(t *testing.T) {
 						resp.Request = req
 						return resp, nil
 					}
-					return &http.Client{Transport: tr}, nil
+					return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 				},
 				Config: func() (gh.Config, error) {
 					return config.NewBlankConfig(), nil
 				},
 			}
 
-			err := apiRun(&options)
+			err := apiRun(context.Background(), &options)
 			if err != nil {
 				t.Errorf("got error %v", err)
 			}
@@ -1459,8 +1461,8 @@ func Test_apiRun_cache(t *testing.T) {
 	}
 
 	// When we run the API behaviour twice
-	require.NoError(t, apiRun(&options))
-	require.NoError(t, apiRun(&options))
+	require.NoError(t, apiRun(context.Background(), &options))
+	require.NoError(t, apiRun(context.Background(), &options))
 
 	// We only get one request to the http server because it uses the cached response
 	assert.Equal(t, 1, requestCount)
@@ -1493,7 +1495,7 @@ func Test_apiRun_invokingAgent(t *testing.T) {
 		RequestPath: s.URL,
 	}
 
-	require.NoError(t, apiRun(&options))
+	require.NoError(t, apiRun(context.Background(), &options))
 	assert.Contains(t, receivedUA, "GitHub CLI 1.2.3")
 	assert.Contains(t, receivedUA, "Agent/copilot-cli")
 }
@@ -1758,7 +1760,7 @@ func Test_processResponse_template(t *testing.T) {
 	tmpl := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
 	err := tmpl.Parse(opts.Template)
 	require.NoError(t, err)
-	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, tmpl, true, true)
+	_, err = processResponse(&resp, nil, &opts, ios.Out, io.Discard, tmpl, true, true)
 	require.NoError(t, err)
 	err = tmpl.Flush()
 	require.NoError(t, err)
@@ -1889,7 +1891,7 @@ func Test_apiRun_acceptHeader(t *testing.T) {
 			}
 
 			var gotReq *http.Request
-			tt.options.HttpClient = func() (*http.Client, error) {
+			tt.options.GitHubREST = func(apiBaseURL, tokenHost string) (*githubrest.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 					gotReq = req
 					resp := &http.Response{
@@ -1899,10 +1901,10 @@ func Test_apiRun_acceptHeader(t *testing.T) {
 					}
 					return resp, nil
 				}
-				return &http.Client{Transport: tr}, nil
+				return githubrest.NewClient(apiBaseURL, &http.Client{Transport: tr}, githubrest.WithoutToken())
 			}
 
-			assert.NoError(t, apiRun(&tt.options))
+			assert.NoError(t, apiRun(context.Background(), &tt.options))
 			assert.Equal(t, tt.wantAcceptHeader, gotReq.Header.Get("Accept"))
 		})
 	}

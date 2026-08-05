@@ -2,10 +2,13 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -87,12 +90,11 @@ func (f roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func Test_httpRequest(t *testing.T) {
 	var tr roundTripper = func(req *http.Request) (*http.Response, error) {
-		return &http.Response{Request: req}, nil
+		return &http.Response{StatusCode: http.StatusOK, Request: req}, nil
 	}
 	httpClient := http.Client{Transport: tr}
 
 	type args struct {
-		client  *http.Client
 		host    string
 		method  string
 		p       string
@@ -114,7 +116,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "simple GET",
 			args: args{
-				client:  &httpClient,
 				host:    "github.com",
 				method:  "GET",
 				p:       "repos/octocat/spoon-knife",
@@ -132,7 +133,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "GET with accept header",
 			args: args{
-				client:  &httpClient,
 				host:    "github.com",
 				method:  "GET",
 				p:       "repos/octocat/spoon-knife",
@@ -150,7 +150,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "lowercase HTTP method",
 			args: args{
-				client:  &httpClient,
 				host:    "github.com",
 				method:  "get",
 				p:       "repos/octocat/spoon-knife",
@@ -168,7 +167,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "GET with leading slash",
 			args: args{
-				client:  &httpClient,
 				host:    "github.com",
 				method:  "GET",
 				p:       "/repos/octocat/spoon-knife",
@@ -186,7 +184,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "Enterprise REST",
 			args: args{
-				client:  &httpClient,
 				host:    "example.org",
 				method:  "GET",
 				p:       "repos/octocat/spoon-knife",
@@ -204,7 +201,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "GET with params",
 			args: args{
-				client: &httpClient,
 				host:   "github.com",
 				method: "GET",
 				p:      "repos/octocat/spoon-knife",
@@ -224,7 +220,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "POST with params",
 			args: args{
-				client: &httpClient,
 				host:   "github.com",
 				method: "POST",
 				p:      "repos",
@@ -244,7 +239,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "POST GraphQL",
 			args: args{
-				client: &httpClient,
 				host:   "github.com",
 				method: "POST",
 				p:      "graphql",
@@ -264,7 +258,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "Enterprise GraphQL",
 			args: args{
-				client:  &httpClient,
 				host:    "example.org",
 				method:  "POST",
 				p:       "graphql",
@@ -282,7 +275,6 @@ func Test_httpRequest(t *testing.T) {
 		{
 			name: "POST with body and type",
 			args: args{
-				client: &httpClient,
 				host:   "github.com",
 				method: "POST",
 				p:      "repos",
@@ -303,7 +295,12 @@ func Test_httpRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := httpRequest(tt.args.client, tt.args.host, tt.args.method, tt.args.p, tt.args.params, tt.args.headers)
+			client, err := githubrest.NewClient(ghinstance.RESTPrefix(tt.args.host), &httpClient, githubrest.WithoutToken())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got, err := httpRequest(context.Background(), client, tt.args.host, tt.args.method, tt.args.p, tt.args.params, tt.args.headers)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("httpRequest() error = %v, wantErr %v", err, tt.wantErr)
 				return
