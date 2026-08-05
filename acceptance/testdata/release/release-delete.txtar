@@ -26,6 +26,7 @@ exec gh release delete v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --yes --cl
 
 # Verify the release is gone
 ! exec gh release view v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING
+stderr 'release not found'
 
 # Verify the tag is gone
 ! exec gh api repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING/git/ref/tags/v1.2.3
