@@ -338,3 +338,57 @@ func TestNewErrorResponse(t *testing.T) {
 			"an empty URL would read as a real but blank URL, which is why nil is kept")
 	})
 }
+
+func TestRequireScopes(t *testing.T) {
+	// gh repo delete and gh gist create hit endpoints that never report the
+	// scope they need, so without this the user is told only that they lack
+	// access.
+	t.Run("produces a suggestion for an endpoint that reports no scopes", func(t *testing.T) {
+		errResp := &ErrorResponse{
+			StatusCode: http.StatusForbidden,
+			Headers:    http.Header{"X-Oauth-Scopes": []string{"repo"}},
+			RequestURL: mustParseURL(t, "https://api.github.com/repos/OWNER/REPO"),
+		}
+
+		assert.Empty(t, errResp.ScopesSuggestion())
+
+		errResp.RequireScopes("delete_repo")
+		assert.Equal(
+			t,
+			"This API operation needs the \"delete_repo\" scope. To request it, run:  gh auth refresh -h github.com -s delete_repo",
+			errResp.ScopesSuggestion(),
+		)
+	})
+
+	t.Run("adds to scopes the endpoint did report", func(t *testing.T) {
+		errResp := &ErrorResponse{
+			StatusCode: http.StatusForbidden,
+			Headers: http.Header{
+				"X-Accepted-Oauth-Scopes": []string{"repo"},
+				"X-Oauth-Scopes":          []string{"repo"},
+			},
+			RequestURL: mustParseURL(t, "https://api.github.com/gists"),
+		}
+
+		errResp.RequireScopes("gist")
+		assert.Contains(t, errResp.ScopesSuggestion(), "gh auth refresh -h github.com -s gist")
+	})
+
+	t.Run("returns the receiver so it can be used inline", func(t *testing.T) {
+		errResp := &ErrorResponse{StatusCode: http.StatusForbidden}
+		assert.Same(t, errResp, errResp.RequireScopes("gist"))
+	})
+
+	// Callers reach this holding a nil pointer after a failed errors.As.
+	t.Run("is safe on a nil receiver", func(t *testing.T) {
+		var errResp *ErrorResponse
+		assert.Nil(t, errResp.RequireScopes("gist"))
+	})
+}
+
+func mustParseURL(t *testing.T, s string) *url.URL {
+	t.Helper()
+	u, err := url.Parse(s)
+	require.NoError(t, err)
+	return u
+}

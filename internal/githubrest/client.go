@@ -8,6 +8,7 @@
 package githubrest
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,7 +16,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
+	"time"
 
 	o "github.com/cli/cli/v2/pkg/option"
 )
@@ -23,7 +26,14 @@ import (
 const (
 	authorizationHeader = "Authorization"
 	contentTypeHeader   = "Content-Type"
+
+	// cacheTTLHeader is go-gh's cache control header, which its caching
+	// transport reads and strips before the request leaves.
+	cacheTTLHeader = "X-GH-CACHE-TTL"
 )
+
+// ErrPathTraversal is returned when a request path contains a ".." segment.
+var ErrPathTraversal = errors.New("githubrest: path must not contain a .. segment")
 
 // Client sends requests to a single GitHub REST API host.
 //
@@ -34,6 +44,11 @@ type Client struct {
 	apiBaseURL *url.URL
 	token      o.Option[string]
 	http       *http.Client
+
+	// noRedirect is http with a policy that stops at the first redirect. It is
+	// built at construction rather than on demand so that SendIgnoringRedirects
+	// never mutates shared state, and so a caller cannot forget to copy.
+	noRedirect *http.Client
 
 	// credentialedHosts are the hosts this client will send an Authorization
 	// header to, lowercased and including any port.
@@ -97,26 +112,14 @@ func WithCredentialedHost(host string) ClientOption {
 
 // WithCheckRedirect sets the redirect policy for the client's requests.
 //
-// It is needed by callers that rewrite a redirect target, such as gh release
-// download avoiding legacy Codeload paths, and by callers that halt redirects
-// with http.ErrUseLastResponse, such as gh repo delete. Neither is expressible
-// through a RequestOption, since a redirect policy belongs to the http.Client
-// rather than to a request.
-//
-// The http.Client is shallow-copied and the policy set on the copy. This is not
-// ceremony: NewClient stores the caller's *http.Client, and the CLI hands the
-// same one to every command, so setting the field in place would install this
-// policy process-wide for unrelated commands. Both call sites named above
-// already hand-roll the same copy for the same reason.
+// Stopping at the first redirect has a method of its own in
+// SendIgnoringRedirects, so this is for the one caller that rewrites a redirect
+// target rather than refusing it: gh release download, avoiding legacy Codeload
+// paths. A redirect policy belongs to the http.Client rather than to a request,
+// so it cannot be a RequestOption.
 func WithCheckRedirect(fn func(*http.Request, []*http.Request) error) ClientOption {
 	return func(c *Client) {
-		httpClient := &http.Client{}
-		if c.http != nil {
-			copied := *c.http
-			httpClient = &copied
-		}
-		httpClient.CheckRedirect = fn
-		c.http = httpClient
+		c.http = withRedirectPolicy(c.http, fn)
 	}
 }
 
@@ -160,7 +163,28 @@ func NewClient(apiBaseURL string, httpClient *http.Client, auth AuthStrategy, op
 		opt(client)
 	}
 
+	// Derived after opts, because WithCheckRedirect replaces client.http.
+	client.noRedirect = withRedirectPolicy(client.http, func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	})
+
 	return client, nil
+}
+
+// withRedirectPolicy returns a shallow copy of httpClient carrying fn as its
+// redirect policy.
+//
+// The copy is not ceremony: the CLI hands one *http.Client to every command, so
+// setting the field in place would install the policy process-wide for
+// unrelated commands.
+func withRedirectPolicy(httpClient *http.Client, fn func(*http.Request, []*http.Request) error) *http.Client {
+	copied := &http.Client{}
+	if httpClient != nil {
+		c := *httpClient
+		copied = &c
+	}
+	copied.CheckRedirect = fn
+	return copied
 }
 
 // RequestOption modifies a request built by NewRequest.
@@ -177,8 +201,19 @@ func WithHeader(name, value string) RequestOption {
 	}
 }
 
-// WithSingleRequestToken overrides the client's token for one request.
+// WithCacheTTL asks go-gh's caching transport to serve this request from cache
+// for up to ttl.
 //
+// The CLI's existing mechanism, api.NewCachedHTTPClient, derives a whole
+// *http.Client to set one header, which forces a caching decision to be made
+// where the client is assembled rather than where the request is made. Caching
+// is a property of the request, so it is expressed as one.
+func WithCacheTTL(ttl time.Duration) RequestOption {
+	return func(req *http.Request) {
+		req.Header.Set(cacheTTLHeader, ttl.String())
+	}
+}
+
 // Like WithToken, an empty token still sets the header. This exists for callers
 // that hold one client but need a particular request to carry different
 // credentials; a caller whose every request uses the same token should say so
@@ -290,13 +325,41 @@ func (c *Client) NewUploadRequest(ctx context.Context, path string, open func() 
 }
 
 // Send issues req and returns the response with its body still open, so the
-// caller must close it.
+// caller must always close it.
 //
-// A non-2xx status yields a nil *Response and an *ErrorResponse. The body is
-// closed on that path, because a caller holding no response has nothing to
-// close.
+// A non-2xx status yields both the *Response and an *ErrorResponse. Returning
+// the response alongside the error is what google/go-github does, and it is
+// what lets a caller that cares about a failure's details reach them without a
+// second, parallel send method. The cases that need it are real: gh api streams
+// an error body to stdout verbatim, gh repo delete and gh gist create attach
+// accepted scopes to the error, and repoExists and publishedReleaseExists read
+// a 404 as a false rather than a failure.
+//
+// Unlike go-github, the body is not closed on the error path and its content is
+// not truncated. go-github caps an error body at 1 MiB because it has already
+// consumed it into the error; here the body is restored so a caller can read it
+// again, which gh api depends on to print exactly what the server sent. Leaving
+// it open in every case also means one rule rather than two: if Send returned a
+// response, close it.
 func (c *Client) Send(req *http.Request) (*Response, error) {
-	resp, err := c.http.Do(req)
+	return c.send(c.http, req)
+}
+
+// SendIgnoringRedirects issues req without following redirects, returning the
+// redirect response itself.
+//
+// A redirect policy belongs to an http.Client rather than to a request, so it
+// cannot be a RequestOption, and mutating the shared client would install the
+// policy process-wide. google/go-github resolves this the same way: it builds a
+// second http.Client at construction and exposes a method that uses it. A named
+// method also says what the caller wants, where a general policy setter would
+// only say how they intend to get it.
+func (c *Client) SendIgnoringRedirects(req *http.Request) (*Response, error) {
+	return c.send(c.noRedirect, req)
+}
+
+func (c *Client) send(httpClient *http.Client, req *http.Request) (*Response, error) {
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -310,33 +373,73 @@ func (c *Client) Send(req *http.Request) (*Response, error) {
 	}
 
 	if !isSuccess(resp.StatusCode) {
-		defer resp.Body.Close()
-		return nil, NewErrorResponse(resp)
+		errResp, err := newErrorResponsePreservingBody(resp)
+		if err != nil {
+			return nil, err
+		}
+		return &Response{Response: resp}, errResp
 	}
 
 	return &Response{Response: resp}, nil
 }
 
-// Do issues req, decodes the JSON body into v, and closes the body.
+// newErrorResponsePreservingBody parses resp into an *ErrorResponse and leaves
+// resp.Body readable from the start.
 //
-// A nil v discards the body without decoding it. Statuses 204 and 205 skip
-// decoding, since they carry no content.
+// Parsing consumes the body, so it is buffered and replaced. Buffering is
+// bounded by what the server sent, and only on a failure, which is the price of
+// letting a caller both read a structured error and print the raw one.
+func newErrorResponsePreservingBody(resp *http.Response) (*ErrorResponse, error) {
+	b, err := io.ReadAll(resp.Body)
+	closeErr := resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+
+	resp.Body = io.NopCloser(bytes.NewReader(b))
+	errResp := NewErrorResponse(resp)
+	resp.Body = io.NopCloser(bytes.NewReader(b))
+
+	return errResp, nil
+}
+
+// Do issues req, reads the response body into v, and closes the body.
 //
-// Once a response has been received successfully it is always returned, even
-// alongside an error: the request succeeded and the status and headers are
-// known good, so only body handling failed and the caller should keep them.
-// The body of such a response is already closed, since Do closes it
-// unconditionally, so only its metadata is readable.
+// v decides how the body is read. An io.Writer receives it verbatim, which is
+// what diffs, patches, logs and downloaded archives need; anything else is a
+// JSON decode target; and a nil v discards it. The io.Writer case follows
+// google/go-github, and it is why callers that want raw bytes do not need a
+// separate method.
 //
-// A non-2xx status yields a nil *Response and an *ErrorResponse.
+// Statuses 204 and 205 skip reading, since they carry no content.
+//
+// Once a response has been received it is always returned, even alongside an
+// error, including the *ErrorResponse for a non-2xx status. The request
+// succeeded and the status and headers are known good. The body of such a
+// response is already closed, since Do closes it unconditionally, so only its
+// metadata is readable.
 func (c *Client) Do(req *http.Request, v any) (*Response, error) {
 	resp, err := c.Send(req)
-	if err != nil {
+	if resp == nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	if err != nil {
+		return resp, err
+	}
+
 	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusResetContent {
+		return resp, nil
+	}
+
+	if w, ok := v.(io.Writer); ok {
+		if _, err := io.Copy(w, resp.Body); err != nil {
+			return resp, err
+		}
 		return resp, nil
 	}
 
@@ -386,6 +489,10 @@ func (c *Client) Do(req *http.Request, v any) (*Response, error) {
 // "issues%3Fstate=open", silently breaking every filtered and paginated call
 // site. go-gh concatenates for the same reason.
 func (c *Client) resolveURL(path string) (string, error) {
+	if err := checkPathTraversal(path); err != nil {
+		return "", err
+	}
+
 	if !strings.HasPrefix(path, "https://") && !strings.HasPrefix(path, "http://") {
 		return strings.TrimSuffix(c.apiBaseURL.String(), "/") + "/" + strings.TrimPrefix(path, "/"), nil
 	}
@@ -410,4 +517,23 @@ func (c *Client) resolveURL(path string) (string, error) {
 
 func isSuccess(statusCode int) bool {
 	return statusCode >= 200 && statusCode < 300
+}
+
+// checkPathTraversal rejects a path containing a ".." segment.
+//
+// A traversal segment can climb out of the endpoint a caller named, turning
+// "repos/OWNER/REPO/../../user" into a request nobody at the call site intended
+// and, worse, one that still carries the token. google/go-github rejects the
+// same shape. Percent-encoded forms are covered because url.Parse decodes them
+// before the check runs. ".." inside a segment, as in "file..txt", is a
+// legitimate name and is left alone.
+func checkPathTraversal(path string) error {
+	parsed, err := url.Parse(path)
+	if err != nil {
+		return fmt.Errorf("githubrest: parsing path %q: %w", path, err)
+	}
+	if slices.Contains(strings.Split(parsed.Path, "/"), "..") {
+		return ErrPathTraversal
+	}
+	return nil
 }

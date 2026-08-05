@@ -34,6 +34,10 @@ type ErrorResponse struct {
 	Message    string
 	RequestURL *url.URL
 	StatusCode int
+
+	// requiredScopes are scopes the endpoint needs but did not report, as
+	// declared by RequireScopes.
+	requiredScopes []string
 }
 
 // Error allows ErrorResponse to satisfy the error interface.
@@ -64,12 +68,37 @@ func (e *ErrorResponse) ScopesSuggestion() string {
 		hostname = e.RequestURL.Hostname()
 	}
 
+	accepted := e.Headers.Get(acceptedScopesHeader)
+	if len(e.requiredScopes) > 0 {
+		accepted = strings.TrimPrefix(accepted+", "+strings.Join(e.requiredScopes, ", "), ", ")
+	}
+
 	return generateScopesSuggestion(
 		e.StatusCode,
-		e.Headers.Get(acceptedScopesHeader),
+		accepted,
 		e.Headers.Get(tokenScopesHeader),
 		hostname,
 	)
+}
+
+// RequireScopes declares scopes the endpoint needs but does not report in
+// X-Accepted-Oauth-Scopes, and returns the receiver so it can be used inline.
+//
+// Some endpoints simply do not list the scopes they require, so a 4xx from them
+// produces no suggestion at all and the user is told only that they lack
+// access. The CLI's existing answer, api.EndpointNeedsScopes, forges the header
+// on the response as though the server had sent it. Recording it on the error
+// instead keeps the response an honest record of what arrived, and puts the
+// claim where the thing that consumes it already lives.
+//
+// It is safe to call on a nil receiver, because callers reach it holding a nil
+// pointer after a failed errors.As.
+func (e *ErrorResponse) RequireScopes(scopes ...string) *ErrorResponse {
+	if e == nil {
+		return nil
+	}
+	e.requiredScopes = append(e.requiredScopes, scopes...)
+	return e
 }
 
 // NewErrorResponse parses a non-2xx response into an *ErrorResponse.

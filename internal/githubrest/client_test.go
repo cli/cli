@@ -560,7 +560,7 @@ func TestSend(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	})
 
-	t.Run("closes the body on the error path", func(t *testing.T) {
+	t.Run("returns the response alongside the error, with the body readable", func(t *testing.T) {
 		body := newTrackedBody(`{"message":"Not Found"}`)
 		client, _ := stubClient(t, "https://api.github.com/", WithoutToken(), func(req *http.Request) *http.Response {
 			header := http.Header{"Content-Type": []string{"application/json"}}
@@ -570,10 +570,24 @@ func TestSend(t *testing.T) {
 		req, err := client.NewRequest(context.Background(), http.MethodGet, "repos/OWNER/REPO", nil)
 		require.NoError(t, err)
 
-		resp, err := client.Send(req)
-		require.Error(t, err)
-		assert.Nil(t, resp)
-		assert.True(t, body.isClosed(), "Send must close the body when the caller gets no response to close")
+		resp, sendErr := client.Send(req)
+		require.Error(t, sendErr)
+		require.NotNil(t, resp, "callers that read a 404 as a false, or print the raw body, need the response")
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+		// gh api prints exactly what the server sent, so parsing the error must
+		// not have consumed the body.
+		read, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, `{"message":"Not Found"}`, string(read))
+
+		assert.True(t, body.isClosed(), "the original body is closed once buffered")
+
+		var errResp *ErrorResponse
+		require.ErrorAs(t, sendErr, &errResp)
+		assert.Equal(t, "Not Found", errResp.Message)
 	})
 
 	t.Run("returns transport errors unchanged", func(t *testing.T) {
@@ -774,7 +788,8 @@ func TestDo(t *testing.T) {
 		var target struct{}
 		resp, err := client.Do(req, &target)
 		require.Error(t, err)
-		assert.Nil(t, resp)
+		require.NotNil(t, resp, "the status and headers are known good even when the status is not")
+		assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
 
 		var errResp *ErrorResponse
 		require.ErrorAs(t, err, &errResp)
@@ -874,9 +889,8 @@ func TestWithCheckRedirect(t *testing.T) {
 		assert.Equal(t, "rewritten", target.Name, "the policy's rewrite must take effect")
 	})
 
-	// gh repo delete halts redirects this way, and then treats anything over
-	// 299 as an error. Send reports the halted 302 as an *ErrorResponse because
-	// isSuccess is 200-299, which is the same outcome by a different route.
+	// gh release download rewrites a redirect target this way. Halting them
+	// outright has its own method, SendIgnoringRedirects.
 	t.Run("the policy can halt redirects, and a halted 302 is an ErrorResponse", func(t *testing.T) {
 		server := newRedirectServer(t)
 
@@ -890,7 +904,8 @@ func TestWithCheckRedirect(t *testing.T) {
 
 		resp, err := client.Send(req)
 		require.Error(t, err)
-		assert.Nil(t, resp)
+		require.NotNil(t, resp)
+		defer resp.Body.Close()
 
 		var errResp *ErrorResponse
 		require.ErrorAs(t, err, &errResp)
@@ -1127,4 +1142,156 @@ type recordingCloser struct {
 func (r *recordingCloser) Close() error {
 	r.closed = true
 	return nil
+}
+
+func TestSendIgnoringRedirects(t *testing.T) {
+	newRedirectServer := func(t *testing.T) *httptest.Server {
+		t.Helper()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/repos/OWNER/REPO", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/repos/OWNER/RENAMED", http.StatusMovedPermanently)
+		})
+		mux.HandleFunc("/repos/OWNER/RENAMED", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})
+
+		server := httptest.NewServer(mux)
+		t.Cleanup(server.Close)
+		return server
+	}
+
+	// gh repo delete must not follow a rename redirect, because deleting
+	// whatever a redirect points at is not what the user asked for.
+	t.Run("stops at the first redirect and reports it as an ErrorResponse", func(t *testing.T) {
+		server := newRedirectServer(t)
+		client := newTestClient(t, server.URL, server.Client(), WithoutToken())
+
+		req, err := client.NewRequest(context.Background(), http.MethodDelete, "repos/OWNER/REPO", nil)
+		require.NoError(t, err)
+
+		resp, err := client.SendIgnoringRedirects(req)
+		require.Error(t, err)
+		require.NotNil(t, resp)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusMovedPermanently, resp.StatusCode)
+
+		var errResp *ErrorResponse
+		require.ErrorAs(t, err, &errResp)
+		assert.Equal(t, "/repos/OWNER/RENAMED", errResp.Headers.Get("Location"))
+	})
+
+	t.Run("leaves the client's own redirect behaviour alone", func(t *testing.T) {
+		server := newRedirectServer(t)
+		client := newTestClient(t, server.URL, server.Client(), WithoutToken())
+
+		ignoring, err := client.NewRequest(context.Background(), http.MethodDelete, "repos/OWNER/REPO", nil)
+		require.NoError(t, err)
+		_, err = client.SendIgnoringRedirects(ignoring)
+		require.Error(t, err)
+
+		following, err := client.NewRequest(context.Background(), http.MethodDelete, "repos/OWNER/REPO", nil)
+		require.NoError(t, err)
+
+		resp, err := client.Send(following)
+		require.NoError(t, err, "Send must still follow redirects after SendIgnoringRedirects was used")
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+	})
+
+	// The CLI hands one *http.Client to every command, so a policy set in place
+	// rather than on a copy would leak into unrelated commands.
+	t.Run("does not mutate the caller's http.Client", func(t *testing.T) {
+		server := newRedirectServer(t)
+		httpClient := server.Client()
+		client := newTestClient(t, server.URL, httpClient, WithoutToken())
+
+		req, err := client.NewRequest(context.Background(), http.MethodDelete, "repos/OWNER/REPO", nil)
+		require.NoError(t, err)
+		_, err = client.SendIgnoringRedirects(req)
+		require.Error(t, err)
+
+		assert.Nil(t, httpClient.CheckRedirect)
+	})
+}
+
+func TestDoIntoWriter(t *testing.T) {
+	// gh pr diff, gh run view --log and artifact downloads all want the bytes
+	// the server sent, not a JSON document.
+	t.Run("copies the raw body into an io.Writer", func(t *testing.T) {
+		body := newTrackedBody("diff --git a/f b/f\n")
+		client, _ := stubClient(t, "https://api.github.com/", WithoutToken(), func(req *http.Request) *http.Response {
+			return stubResponse(req, http.StatusOK, body, nil)
+		})
+
+		req, err := client.NewRequest(context.Background(), http.MethodGet, "repos/OWNER/REPO/pulls/1", nil)
+		require.NoError(t, err)
+
+		var out strings.Builder
+		resp, err := client.Do(req, &out)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "diff --git a/f b/f\n", out.String())
+		assert.True(t, body.isClosed())
+	})
+
+	// The empty-body error exists to catch a JSON endpoint returning nothing.
+	// A writer has no such expectation, so an empty body is simply no bytes.
+	t.Run("an empty body is not an error for a writer", func(t *testing.T) {
+		client, _ := stubClient(t, "https://api.github.com/", WithoutToken(), func(req *http.Request) *http.Response {
+			return stubResponse(req, http.StatusOK, io.NopCloser(strings.NewReader("")), nil)
+		})
+
+		req, err := client.NewRequest(context.Background(), http.MethodGet, "repos/OWNER/REPO/logs", nil)
+		require.NoError(t, err)
+
+		var out strings.Builder
+		_, err = client.Do(req, &out)
+		require.NoError(t, err)
+		assert.Empty(t, out.String())
+	})
+}
+
+func TestWithCacheTTL(t *testing.T) {
+	client, captured := stubClient(t, "https://api.github.com/", WithoutToken(), func(req *http.Request) *http.Response {
+		return stubResponse(req, http.StatusOK, io.NopCloser(strings.NewReader("{}")), nil)
+	})
+
+	req, err := client.NewRequest(context.Background(), http.MethodGet, "user", nil, WithCacheTTL(time.Hour))
+	require.NoError(t, err)
+
+	_, err = client.Do(req, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "1h0m0s", (*captured).Header.Get("X-GH-CACHE-TTL"))
+}
+
+func TestPathTraversal(t *testing.T) {
+	client := newTestClient(t, "https://api.github.com/", &http.Client{}, WithoutToken())
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{name: "a relative path with a traversal segment", path: "repos/OWNER/REPO/../../user", wantErr: true},
+		{name: "a percent-encoded traversal segment", path: "repos/OWNER/%2e%2e/user", wantErr: true},
+		{name: "a leading traversal segment", path: "../user", wantErr: true},
+		{name: "an absolute URL with a traversal segment", path: "https://api.github.com/repos/../user", wantErr: true},
+		{name: "dots inside a segment are a legitimate name", path: "repos/OWNER/REPO/contents/file..txt", wantErr: false},
+		{name: "a query string is not a path", path: "search/issues?q=a..b", wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := client.NewRequest(context.Background(), http.MethodGet, tt.path, nil)
+			if tt.wantErr {
+				require.ErrorIs(t, err, ErrPathTraversal)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }
