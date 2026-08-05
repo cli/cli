@@ -6,7 +6,6 @@ import (
 	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strings"
-
 )
 
 type MissingScopesError struct {

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -647,7 +647,7 @@ func RenameRepo(client *Client, repo ghrepo.Interface, newRepoName string) (*Rep
 		return nil, err
 	}
 
-	path, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
 	if err != nil {
 		return nil, err
 	}
@@ -1671,26 +1671,32 @@ func GetRepoIDs(client *Client, host string, repositories []ghrepo.Interface) ([
 }
 
 func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+	restClient, err := client.restClient(repo.RepoHost())
 	if err != nil {
 		return false, err
 	}
 
-	resp, err := client.HTTP().Head(u.String())
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
 	if err != nil {
 		return false, err
 	}
 
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case 200:
-		return true, nil
-	case 404:
-		return false, nil
-	default:
-		return false, ghAPI.HandleHTTPError(resp)
+	req, err := restClient.NewRequest(context.Background(), http.MethodHead, u.String(), nil)
+	if err != nil {
+		return false, err
 	}
+
+	// This used client.HTTP().Head, which skipped every header the transport
+	// chain applies to a request built through the client. Going through
+	// NewRequest means a HEAD now carries the same headers as any other call.
+	if _, err := restClient.Do(req, nil); err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // RepoLicenses fetches available repository licenses.

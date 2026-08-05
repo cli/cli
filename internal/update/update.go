@@ -2,9 +2,9 @@ package update
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -117,28 +117,30 @@ func getLatestReleaseInfo(ctx context.Context, client *http.Client, repo string)
 	if err != nil {
 		return nil, err
 	}
-	u, err := safeurl.JoinPathWithHostPrefix("https://api.github.com", "repos", owner, name, "releases", "latest")
+	// The release check is deliberately anonymous, and WithoutToken is what
+	// makes that a guarantee rather than an accident of which client was
+	// passed in.
+	restClient, err := githubrest.NewClient(githubrest.APIBaseURL("github.com"), client, githubrest.WithoutToken())
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+
+	u, err := safeurl.JoinPath("repos", owner, name, "releases", "latest")
 	if err != nil {
 		return nil, err
 	}
-	res, err := client.Do(req)
+
+	req, err := restClient.NewRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		res.Body.Close()
-	}()
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("unexpected HTTP %d", res.StatusCode)
-	}
-	dec := json.NewDecoder(res.Body)
+
 	var latestRelease ReleaseInfo
-	if err := dec.Decode(&latestRelease); err != nil {
+	if _, err := restClient.Do(req, &latestRelease); err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) {
+			return nil, fmt.Errorf("unexpected HTTP %d", errResp.StatusCode)
+		}
 		return nil, err
 	}
 	return &latestRelease, nil
