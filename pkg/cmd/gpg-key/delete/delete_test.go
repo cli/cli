@@ -2,18 +2,17 @@ package delete
 
 import (
 	"bytes"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"net/url"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,7 +31,7 @@ func Test_deleteGPGKeyHTTPError(t *testing.T) {
 
 	err := deleteGPGKey(&http.Client{Transport: reg}, "github.com", "123")
 
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 500")
@@ -53,7 +52,7 @@ func Test_getGPGKeysHTTPError(t *testing.T) {
 	keys, err := getGPGKeys(&http.Client{Transport: reg}, "github.com")
 
 	assert.Nil(t, keys)
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 500")
@@ -221,7 +220,7 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{KeyID: "ABC123", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "user/gpg_keys"), httpmock.StatusStringResponse(200, keysResp))
-				reg.Register(httpmock.REST("DELETE", "user/gpg_keys/123"), httpmock.JSONErrorResponse(404, ghAPI.HTTPError{
+				reg.Register(httpmock.REST("DELETE", "user/gpg_keys/123"), httpmock.JSONErrorResponse(404, githubrest.ErrorResponse{
 					StatusCode: 404,
 					Message:    "GPG key 123 not found",
 				}))

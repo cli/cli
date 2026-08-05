@@ -3,6 +3,7 @@ package search
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"math"
 	"net/http"
 	"os"
@@ -711,7 +712,7 @@ func couldBeOwner(s string) bool {
 //   - HTTP 403 with x-ratelimit-remaining: 0 (primary rate limit)
 //   - HTTP 403 with a retry-after header (secondary rate limit)
 func isRateLimitError(err error) bool {
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	if !errors.As(err, &httpErr) {
 		return false
 	}

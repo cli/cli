@@ -2,6 +2,7 @@ package watch
 
 import (
 	"bytes"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"testing"
@@ -14,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -325,7 +325,7 @@ func TestWatchRun(t *testing.T) {
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
-					httpmock.JSONErrorResponse(404, api.HTTPError{
+					httpmock.JSONErrorResponse(404, githubrest.ErrorResponse{
 						StatusCode: 404,
 						Message:    "run 1234 not found",
 					}),

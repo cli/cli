@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"strconv"
 
 	"github.com/cli/cli/v2/api"
@@ -44,7 +45,7 @@ type setResult struct {
 
 func setVariable(client *api.Client, host string, opts setOptions) setResult {
 	var err error
-	var postErr api.HTTPError
+	var postErr *githubrest.ErrorResponse
 	result := setResult{Operation: createdOperation, Key: opts.Key}
 	switch opts.Entity {
 	case shared.Organization:

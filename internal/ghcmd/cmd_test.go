@@ -4,16 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net"
 	"net/url"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -572,11 +571,9 @@ func Test_authRecoveryCommand(t *testing.T) {
 				}
 			}
 
-			httpErr := api.HTTPError{
-				HTTPError: &ghAPI.HTTPError{
-					RequestURL: requestURL,
-					StatusCode: 401,
-				},
+			httpErr := &githubrest.ErrorResponse{
+				RequestURL: requestURL,
+				StatusCode: 401,
 			}
 
 			got := authRecoveryCommand(cfg, httpErr)

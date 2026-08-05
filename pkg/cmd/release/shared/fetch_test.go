@@ -2,10 +2,9 @@ package shared
 
 import (
 	"context"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"testing"
-
-	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -65,7 +64,7 @@ func TestFetchRefSHA(t *testing.T) {
 			if tt.responseStatus == 404 || tt.responseStatus == 500 {
 				fakeHTTP.Register(
 					httpmock.REST("GET", path),
-					httpmock.JSONErrorResponse(tt.responseStatus, api.HTTPError{
+					httpmock.JSONErrorResponse(tt.responseStatus, githubrest.ErrorResponse{
 						StatusCode: tt.responseStatus,
 						Message:    tt.responseMessage,
 					}),

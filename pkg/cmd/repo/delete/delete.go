@@ -3,6 +3,7 @@ package delete
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strings"
 
@@ -123,9 +124,9 @@ func deleteRun(opts *DeleteOptions) error {
 
 	err = deleteRepo(httpClient, toDelete)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
-			statusCode := httpErr.HTTPError.StatusCode
+			statusCode := httpErr.StatusCode
 			if statusCode == http.StatusMovedPermanently ||
 				statusCode == http.StatusTemporaryRedirect ||
 				statusCode == http.StatusPermanentRedirect {

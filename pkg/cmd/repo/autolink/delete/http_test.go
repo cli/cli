@@ -2,12 +2,12 @@ package delete
 
 import (
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,7 +38,7 @@ func TestAutolinkDeleter_Delete(t *testing.T) {
 		{
 			name: "500 unexpected error",
 			id:   "123",
-			stubResp: api.HTTPError{
+			stubResp: githubrest.ErrorResponse{
 				Message: "arbitrary error",
 			},
 			stubStatus:     http.StatusInternalServerError,

@@ -3,12 +3,12 @@ package list
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/shared"
@@ -120,7 +120,7 @@ func truncateMiddle(maxWidth int, t string) string {
 
 func printError(w io.Writer, err error) {
 	fmt.Fprintln(w, "warning: ", err)
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	if errors.As(err, &httpErr) {
 		if msg := httpErr.ScopesSuggestion(); msg != "" {
 			fmt.Fprintln(w, msg)

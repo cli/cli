@@ -3,14 +3,13 @@ package httpmock
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
-
-	"github.com/cli/go-gh/v2/pkg/api"
 )
 
 type Matcher func(req *http.Request) bool
@@ -184,7 +183,7 @@ func StatusJSONResponse(status int, body interface{}) Responder {
 
 // JSONErrorResponse is a type-safe helper to avoid confusion around the
 // provided argument.
-func JSONErrorResponse(status int, err api.HTTPError) Responder {
+func JSONErrorResponse(status int, err githubrest.ErrorResponse) Responder {
 	return StatusJSONResponse(status, err)
 }
 

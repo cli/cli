@@ -3,6 +3,7 @@ package rerun
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"testing"
@@ -14,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -393,7 +393,7 @@ func TestRerun(t *testing.T) {
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/3/rerun"),
-					httpmock.JSONErrorResponse(403, api.HTTPError{
+					httpmock.JSONErrorResponse(403, githubrest.ErrorResponse{
 						StatusCode: 403,
 						Message:    "blah blah",
 					}),
@@ -421,7 +421,7 @@ func TestRerun(t *testing.T) {
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/3/rerun"),
-					httpmock.JSONErrorResponse(500, api.HTTPError{
+					httpmock.JSONErrorResponse(500, githubrest.ErrorResponse{
 						StatusCode: 500,
 						Message:    "blah blah",
 					}),

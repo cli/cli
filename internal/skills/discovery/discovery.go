@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"os"
@@ -325,7 +326,7 @@ func resolveBranchRef(client *api.Client, host, owner, repo, branch string) (*Re
 
 // isNotFound returns true if the error is an HTTP 404 response.
 func isNotFound(err error) bool {
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
 }
 

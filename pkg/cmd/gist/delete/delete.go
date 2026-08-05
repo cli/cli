@@ -3,6 +3,7 @@ package delete
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strings"
 
@@ -149,7 +150,7 @@ func deleteGist(apiClient *api.Client, hostname string, gistID string) error {
 	}
 	err = apiClient.REST(hostname, "DELETE", path.String(), nil, nil)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
 			return shared.NotFoundErr
 		}

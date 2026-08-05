@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"mime"
 	"net/http"
@@ -136,7 +137,7 @@ func shouldRetry(err error) bool {
 	if errors.As(err, &networkError) {
 		return true
 	}
-	var httpError api.HTTPError
+	var httpError *githubrest.ErrorResponse
 	return errors.As(err, &httpError) && httpError.StatusCode >= 500
 }
 

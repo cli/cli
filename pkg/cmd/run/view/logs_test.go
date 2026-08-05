@@ -3,6 +3,7 @@ package view
 import (
 	"archive/zip"
 	"bytes"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"testing"
@@ -10,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/httpmock"
-	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,7 +87,7 @@ func TestApiLogFetcher(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/123/logs"),
-					httpmock.JSONErrorResponse(http.StatusInternalServerError, ghAPI.HTTPError{
+					httpmock.JSONErrorResponse(http.StatusInternalServerError, githubrest.ErrorResponse{
 						Message:    "blah blah",
 						StatusCode: http.StatusInternalServerError,
 					}),

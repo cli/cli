@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"strconv"
@@ -280,7 +281,7 @@ func (c *LiveClient) getBundle(url safeurl.SafeURL) (*bundle.Bundle, error) {
 }
 
 func shouldRetry(err error) bool {
-	var httpError api.HTTPError
+	var httpError *githubrest.ErrorResponse
 	if errors.As(err, &httpError) {
 		if httpError.StatusCode >= 500 && httpError.StatusCode <= 599 {
 			return true

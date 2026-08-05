@@ -3,6 +3,7 @@ package view
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strings"
 
@@ -87,7 +88,7 @@ func viewRun(opts *ViewOptions) error {
 	hostname, _ := cfg.Authentication().DefaultHost()
 	gitIgnore, err := api.RepoGitIgnoreTemplate(client, hostname, opts.Template)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
 			if httpErr.StatusCode == 404 {
 				return fmt.Errorf("'%s' is not a valid gitignore template. Run `gh repo gitignore list` for options", opts.Template)

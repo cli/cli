@@ -3,6 +3,7 @@ package delete
 import (
 	"bytes"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"testing"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -364,7 +364,7 @@ func Test_gistDelete(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("DELETE", "gists/1234"),
-					httpmock.JSONErrorResponse(500, ghAPI.HTTPError{
+					httpmock.JSONErrorResponse(500, githubrest.ErrorResponse{
 						StatusCode: 500,
 						Message:    "arbitrary error",
 					}),

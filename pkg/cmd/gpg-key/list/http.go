@@ -2,6 +2,7 @@ package list
 
 import (
 	"errors"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strings"
 	"time"
@@ -53,7 +54,7 @@ func userKeys(httpClient *http.Client, host, userHandle string) ([]gpgKey, error
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	err = api.NewClientFromHTTP(httpClient).REST(host, "GET", u.String(), nil, &keys)
 	if err != nil {
-		if httpErr, ok := errors.AsType[api.HTTPError](err); ok && httpErr.StatusCode == 404 {
+		if httpErr, ok := errors.AsType[*githubrest.ErrorResponse](err); ok && httpErr.StatusCode == 404 {
 			return nil, errScopes
 		}
 		return nil, err

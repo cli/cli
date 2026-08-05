@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"os"
@@ -24,7 +25,6 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/test"
-	ghapi "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -663,13 +663,13 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 	tests := []struct {
 		name       string
-		apiError   ghapi.HTTPError
+		apiError   *githubrest.ErrorResponse
 		wantErr    string
 		wantStderr string
 	}{
 		{
 			name: "branch already deleted (422: Reference does not exist)",
-			apiError: ghapi.HTTPError{
+			apiError: &githubrest.ErrorResponse{
 				Message:    "Reference does not exist",
 				StatusCode: http.StatusUnprocessableEntity, // 422
 			},
@@ -681,7 +681,7 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 		},
 		{
 			name: "branch already deleted (404: Reference does not exist) (#11187)",
-			apiError: ghapi.HTTPError{
+			apiError: &githubrest.ErrorResponse{
 				Message:    "Reference does not exist",
 				StatusCode: http.StatusNotFound, // 404
 			},
@@ -693,7 +693,7 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 		},
 		{
 			name: "unknown API error",
-			apiError: ghapi.HTTPError{
+			apiError: &githubrest.ErrorResponse{
 				Message:    "blah blah",
 				StatusCode: http.StatusInternalServerError, // 500
 			},
@@ -733,7 +733,7 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 				}))
 			http.Register(
 				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
-				httpmock.JSONErrorResponse(tt.apiError.StatusCode, tt.apiError))
+				httpmock.JSONErrorResponse(tt.apiError.StatusCode, *tt.apiError))
 
 			cs, cmdTeardown := run.Stub()
 			defer cmdTeardown(t)

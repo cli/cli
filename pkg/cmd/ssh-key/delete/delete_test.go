@@ -2,10 +2,10 @@ package delete
 
 import (
 	"bytes"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -222,7 +222,7 @@ func TestDeleteSSHKeyHTTPError(t *testing.T) {
 
 	err := deleteSSHKey(&http.Client{Transport: reg}, "github.com", "1234")
 
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 404")
@@ -239,7 +239,7 @@ func TestGetSSHKeyHTTPError(t *testing.T) {
 	key, err := getSSHKey(&http.Client{Transport: reg}, "github.com", "1234")
 
 	assert.Nil(t, key)
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 404")

@@ -3,6 +3,7 @@ package delete
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strconv"
 
@@ -173,7 +174,7 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 		}
 
 		if err != nil {
-			var httpErr api.HTTPError
+			var httpErr *githubrest.ErrorResponse
 			if errors.As(err, &httpErr) {
 				if httpErr.StatusCode == http.StatusNotFound {
 					if opts.Ref == "" {

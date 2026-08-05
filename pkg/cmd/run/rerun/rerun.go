@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"strconv"
@@ -205,7 +206,7 @@ func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFa
 
 	err = client.REST(repo.RepoHost(), "POST", path.String(), body, nil)
 	if err != nil {
-		var httpError api.HTTPError
+		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
 			return fmt.Errorf("run %d cannot be rerun; %s", run.ID, httpError.Message)
 		}
@@ -227,7 +228,7 @@ func rerunJob(client *api.Client, repo ghrepo.Interface, job *shared.Job, debug 
 
 	err = client.REST(repo.RepoHost(), "POST", path.String(), body, nil)
 	if err != nil {
-		var httpError api.HTTPError
+		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
 			return fmt.Errorf("job %d cannot be rerun", job.ID)
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net"
 	"os"
@@ -16,7 +17,6 @@ import (
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/ci"
@@ -230,8 +230,16 @@ func Main() exitCode {
 			return exitError
 		}
 
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
+		// isAPIError is kept rather than calling errors.As once inline, because
+		// the last branch is reached whether or not the error was one and used
+		// to call a method on httpErr regardless. That was safe only while the
+		// error was a value type holding a precomputed string; httpErr is now a
+		// pointer that is nil when errors.As failed, and ScopesSuggestion is
+		// computed from its fields.
+		var httpErr *githubrest.ErrorResponse
+		isAPIError := errors.As(err, &httpErr)
+
+		if isAPIError && httpErr.StatusCode == 401 {
 			authCommand := "gh auth login"
 			if cfg, cfgErr := cmdFactory.Config(); cfgErr == nil {
 				authCommand = authRecoveryCommand(cfg, httpErr)
@@ -240,8 +248,10 @@ func Main() exitCode {
 		} else if u := factory.SSOURL(); u != "" {
 			// handles organization SAML enforcement error
 			fmt.Fprintf(stderr, "Authorize in your web browser:  %s\n", u)
-		} else if msg := httpErr.ScopesSuggestion(); msg != "" {
-			fmt.Fprintln(stderr, msg)
+		} else if isAPIError {
+			if msg := httpErr.ScopesSuggestion(); msg != "" {
+				fmt.Fprintln(stderr, msg)
+			}
 		}
 
 		return exitError
@@ -300,7 +310,7 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 	}
 }
 
-func authRecoveryCommand(cfg gh.Config, httpErr api.HTTPError) string {
+func authRecoveryCommand(cfg gh.Config, httpErr *githubrest.ErrorResponse) string {
 	if httpErr.RequestURL == nil {
 		return "gh auth login"
 	}

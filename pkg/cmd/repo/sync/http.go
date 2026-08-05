@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"regexp"
 
@@ -56,7 +57,7 @@ func triggerUpstreamMerge(client *api.Client, repo ghrepo.Interface, branch stri
 	if err != nil {
 		return "", err
 	}
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	if err := client.REST(repo.RepoHost(), "POST", path.String(), &payload, &response); err != nil {
 		if errors.As(err, &httpErr) {
 			switch httpErr.StatusCode {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"os"
@@ -157,7 +158,7 @@ func createRun(opts *CreateOptions) error {
 	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		var httpError api.HTTPError
+		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) {
 			if httpError.StatusCode == http.StatusUnprocessableEntity {
 				if detectEmptyFiles(files) {

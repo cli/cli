@@ -1,10 +1,10 @@
 package shared
 
 import (
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,7 @@ func TestUserKeysHTTPError(t *testing.T) {
 	keys, err := UserKeys(&http.Client{Transport: reg}, "github.com", "")
 
 	assert.Nil(t, keys)
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 404")

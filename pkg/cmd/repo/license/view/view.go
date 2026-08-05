@@ -3,6 +3,7 @@ package view
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strings"
 
@@ -95,7 +96,7 @@ func viewRun(opts *ViewOptions) error {
 	hostname, _ := cfg.Authentication().DefaultHost()
 	license, err := api.RepoLicense(client, hostname, opts.License)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
 			if httpErr.StatusCode == 404 {
 				return fmt.Errorf("'%s' is not a valid license name or SPDX ID.\n\nRun `gh repo license list` to see available commonly used licenses. For even more licenses, visit %s", opts.License, text.DisplayURL("https://choosealicense.com/appendix"))

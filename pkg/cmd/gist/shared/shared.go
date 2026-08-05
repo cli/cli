@@ -3,6 +3,7 @@ package shared
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"net/url"
@@ -71,7 +72,7 @@ func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
 	apiClient := api.NewClientFromHTTP(client)
 	err = apiClient.REST(hostname, "GET", path.String(), nil, &gist)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
 			return nil, NotFoundErr
 		}

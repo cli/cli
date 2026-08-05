@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 
@@ -38,7 +39,7 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string)
 
 	err = apiClient.REST(repo.RepoHost(), "GET", readmePath.String(), nil, &response)
 	if err != nil {
-		var httpError api.HTTPError
+		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
 			return nil, NotFoundError
 		}

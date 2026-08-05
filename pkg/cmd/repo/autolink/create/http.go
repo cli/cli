@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
@@ -69,7 +70,7 @@ func handleAutolinkCreateError(resp *http.Response) error {
 		return nil
 	case http.StatusNotFound:
 		err := api.HandleHTTPError(resp)
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
 			httpErr.Message = "Must have admin rights to Repository."
 			return httpErr

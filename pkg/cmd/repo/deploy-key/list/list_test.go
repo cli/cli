@@ -2,12 +2,12 @@ package list
 
 import (
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -149,7 +149,7 @@ func TestRepoKeysHTTPError(t *testing.T) {
 		ghrepo.New("OWNER", "REPO"),
 	)
 
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 404")

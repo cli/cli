@@ -3,6 +3,7 @@ package shared
 import (
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -289,7 +290,7 @@ func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annot
 
 	err = client.REST(repo.RepoHost(), "GET", path.String(), nil, &result)
 	if err != nil {
-		var httpError api.HTTPError
+		var httpError *githubrest.ErrorResponse
 		if !errors.As(err, &httpError) {
 			return nil, err
 		}
@@ -468,7 +469,7 @@ func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run)
 			// to an empty string.
 			// Deciding to put this here instead of in GetWorkflow to allow
 			// the caller to decide what a 404 means.
-			if httpErr, ok := err.(api.HTTPError); ok && httpErr.StatusCode == 404 {
+			if httpErr, ok := err.(*githubrest.ErrorResponse); ok && httpErr.StatusCode == 404 {
 				workflowMap[run.WorkflowID] = ""
 				continue
 			}

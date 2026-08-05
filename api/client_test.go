@@ -3,9 +3,11 @@ package api
 import (
 	"bytes"
 	"errors"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -102,12 +104,29 @@ func TestRESTWithFullURL(t *testing.T) {
 		httpmock.StatusStringResponse(200, "{}"))
 
 	err := client.REST("example.com", "GET", "user/repos", nil, nil)
-	assert.NoError(t, err)
-	err = client.REST("example.com", "GET", "https://another.net/user/repos", nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	err = client.REST("example.com", "GET", "https://example.com/user/repos", nil, nil)
+	require.NoError(t, err)
 
 	assert.Equal(t, "example.com", http.Requests[0].URL.Hostname())
-	assert.Equal(t, "another.net", http.Requests[1].URL.Hostname())
+	assert.Equal(t, "example.com", http.Requests[1].URL.Hostname())
+}
+
+// TestRESTRefusesForeignAbsoluteURL records a deliberate behaviour change. This
+// test previously asserted that REST would follow an absolute URL to an
+// unrelated host, sending that host the user's token. githubrest refuses any
+// absolute URL outside the client's credentialed hosts, and the only absolute
+// URLs the CLI passes to REST are Link header pages and *_url fields from API
+// responses, all of which are on the API host.
+func TestRESTRefusesForeignAbsoluteURL(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+
+	err := client.REST("example.com", "GET", "https://another.net/user/repos", nil, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `refusing to send credentials to "another.net"`)
+	assert.Empty(t, http.Requests)
 }
 
 func TestRESTError(t *testing.T) {
@@ -125,7 +144,7 @@ func TestRESTError(t *testing.T) {
 		}, nil
 	})
 
-	var httpErr HTTPError
+	var httpErr *githubrest.ErrorResponse
 	err := client.REST("github.com", "DELETE", "repos/branch", nil, nil)
 	if err == nil || !errors.As(err, &httpErr) {
 		t.Fatalf("got %v", err)
@@ -159,7 +178,7 @@ func TestRESTWithNextError(t *testing.T) {
 
 	_, err := client.RESTWithNext("github.com", http.MethodGet, "repos/owner/repo/items", nil, nil)
 
-	var httpErr HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 404")
@@ -312,8 +331,8 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			httpError := HandleHTTPError(tt.resp)
-			if got := httpError.(HTTPError).ScopesSuggestion(); got != tt.want {
-				t.Errorf("HTTPError.ScopesSuggestion() = %v, want %v", got, tt.want)
+			if got := httpError.(*githubrest.ErrorResponse).ScopesSuggestion(); got != tt.want {
+				t.Errorf("ErrorResponse.ScopesSuggestion() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -330,14 +349,23 @@ func TestHTTPHeaders(t *testing.T) {
 	ios, _, _, stderr := iostreams.Test()
 	httpClient, err := NewHTTPClient(HTTPClientOptions{
 		AppVersion: "v1.2.3",
-		Config:     tinyConfig{ts.URL[7:] + ":oauth_token": "MYTOKEN"},
+		Config:     tinyConfig{"github.com:oauth_token": "MYTOKEN"},
 		Log:        ios.ErrOut,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
+
+	// The request is addressed to github.com and redirected to the test server
+	// at the last moment. This used to be expressed by passing the test server
+	// URL as both hostname and path, which worked only because go-gh's REST
+	// client passed an absolute path straight through. githubrest resolves
+	// paths against the client's base URL and refuses absolute URLs on other
+	// hosts, so the redirection moves to the transport, below every layer whose
+	// headers this test is checking.
+	httpClient.Transport = redirectTransport(httpClient.Transport, ts.URL)
 	client := NewClientFromHTTP(httpClient)
 
-	err = client.REST(ts.URL, "GET", ts.URL+"/user/repos", nil, nil)
-	assert.NoError(t, err)
+	err = client.REST("github.com", "GET", "user/repos", nil, nil)
+	require.NoError(t, err)
 
 	wantHeader := map[string]string{
 		"Accept":               "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
@@ -350,4 +378,20 @@ func TestHTTPHeaders(t *testing.T) {
 		assert.Equal(t, value, gotReq.Header.Get(name), name)
 	}
 	assert.Equal(t, "", stderr.String())
+}
+
+// redirectTransport sends every request to target, keeping its path, so a test
+// can address a request to a real GitHub hostname and still have it served
+// locally.
+func redirectTransport(rt http.RoundTripper, target string) http.RoundTripper {
+	parsed, err := url.Parse(target)
+	if err != nil {
+		panic(err)
+	}
+	return funcTripper{inner: rt, roundTrip: func(req *http.Request) (*http.Response, error) {
+		req.URL.Scheme = parsed.Scheme
+		req.URL.Host = parsed.Host
+		req.Host = ""
+		return rt.RoundTrip(req)
+	}}
 }

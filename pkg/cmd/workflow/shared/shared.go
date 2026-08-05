@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"path"
 	"strconv"
@@ -136,7 +137,7 @@ func FindWorkflow(client *api.Client, repo ghrepo.Interface, workflowSelector st
 	if _, err := strconv.Atoi(workflowSelector); err == nil || isWorkflowFile(workflowSelector) {
 		workflow, err := getWorkflowByID(client, repo, workflowSelector)
 		if err != nil {
-			var httpErr api.HTTPError
+			var httpErr *githubrest.ErrorResponse
 			if errors.As(err, &httpErr) {
 				if httpErr.StatusCode == 404 {
 					httpErr.Message = fmt.Sprintf("workflow %s not found on the default branch", workflowSelector)
@@ -205,7 +206,7 @@ func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, r
 		}
 
 		if err != nil {
-			var httpErr api.HTTPError
+			var httpErr *githubrest.ErrorResponse
 			if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
 				err = errors.New("no workflows are enabled")
 			}
