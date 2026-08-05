@@ -53,6 +53,12 @@ permissions:
   # Read-only. The pre-flight gate reads PR conversation comments through the
   # issues API (PR comments live there) to find its own dedup marker.
   issues: read
+  # The gate reads `statusCheckRollup`, whose contexts are CheckRun objects
+  # (Actions) and StatusContext objects (commit statuses). Those sit behind
+  # separate scopes, and without them the rollup comes back unreadable rather
+  # than empty, which the gate treats as "CI still pending" so it fails safe.
+  checks: read
+  statuses: read
   copilot-requests: write
 
 engine: copilot
@@ -115,32 +121,47 @@ steps:
               --author app/dependabot --limit 100 \
               --json number,headRefOid,statusCheckRollup)
 
+      # gh truncates silently at --limit, and the listing order is stable, so
+      # anything past the cap would never be reached on a later run either. The
+      # cap is well above both the realistic number of open Dependabot PRs and
+      # the safe-output comment cap, so say so rather than paginate for a case
+      # that would already be degenerate.
+      if [ "$(printf '%s' "$prs" | jq length)" -ge 100 ]; then
+        echo "::warning::Open Dependabot PRs hit the 100 listing cap; any beyond it are not being triaged."
+      fi
+
       if [ -n "$single" ]; then
         prs=$(printf '%s' "$prs" | jq --argjson n "$single" '[.[] | select(.number == $n)]')
       fi
 
       # A PR is ready to assess only when every check has reached a terminal
       # state. statusCheckRollup mixes CheckRun (has .status) and StatusContext
-      # (has .state) shapes, so both are handled.
-      ready=$(printf '%s' "$prs" | jq -c '
+      # (has .state) shapes, so both are handled. A null rollup means the checks
+      # could not be read at all rather than that there are none - a dropped
+      # `checks:`/`statuses:` permission would look like this - so count it as
+      # pending. Treating it as ready would silently assess PRs mid-CI.
+      jq_pending='
         def pending:
           if has("status") then (.status != "COMPLETED")
           else ((.state // "SUCCESS") as $s | $s == "PENDING" or $s == "EXPECTED")
           end;
+        def pending_names:
+          if .statusCheckRollup == null then ["<check status unreadable>"]
+          else [.statusCheckRollup[] | select(pending) | (.name // .context // "unnamed")]
+          end;
+      '
+
+      ready=$(printf '%s' "$prs" | jq -c "$jq_pending"'
         [ .[]
-          | select([.statusCheckRollup[]? | select(pending)] | length == 0)
+          | select((pending_names | length) == 0)
           | {number: .number, head_sha: .headRefOid} ]')
 
       # Name the PRs this gate excluded. A check that never reaches a terminal
       # state would otherwise keep a PR out of triage forever, silently.
-      printf '%s' "$prs" | jq -r '
-        def pending:
-          if has("status") then (.status != "COMPLETED")
-          else ((.state // "SUCCESS") as $s | $s == "PENDING" or $s == "EXPECTED")
-          end;
+      printf '%s' "$prs" | jq -r "$jq_pending"'
         .[]
         | . as $pr
-        | [.statusCheckRollup[]? | select(pending) | (.name // .context // "unnamed")]
+        | pending_names
         | select(length > 0)
         | "PR #\($pr.number): skipped, checks still pending: \(join(", "))"'
 
