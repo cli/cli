@@ -87,8 +87,13 @@ one exists because guessing it has produced a wrong assessment in the past.
 
 2. **The dependency's position.** Read the manifest in the checkout - `go.mod`
    for Go dependencies - and determine whether the dependency is a direct
-   requirement or an indirect one. A dependency in the first `require` block is
-   direct; one marked `// indirect` is not. State this only after reading it.
+   requirement or an indirect one. What decides this is the trailing
+   `// indirect` comment on that module's own `require` line: present means
+   indirect, absent means direct. Do not judge by which `require` block the line
+   sits in. `go mod tidy` conventionally groups direct requirements into the
+   first block and indirect ones into a second, but that is formatting, not
+   meaning, and a reorganised or hand-edited file can mix them freely. State
+   this only after reading the line.
 
 3. **The repository's usage.** Grep the checkout for the dependency's import
    paths and record which packages the repository actually imports. An upstream
