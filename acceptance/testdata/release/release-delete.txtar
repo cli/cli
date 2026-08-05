@@ -24,9 +24,6 @@ stderr 'no assets to download'
 # Delete the release and its tag
 exec gh release delete v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --yes --cleanup-tag
 
-# Give the tag cleanup time to propagate
-sleep 5
-
 # Verify the release is gone
 ! exec gh release view v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING
 
