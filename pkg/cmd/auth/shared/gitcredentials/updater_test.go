@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
+	"github.com/cli/cli/v2/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +44,7 @@ func fillCredentials(t *testing.T) string {
 func TestUpdateAddsNewCredentials(t *testing.T) {
 	// Given we have an isolated git config and we're using the built in store credential helper
 	// https://git-scm.com/docs/git-credential-store
-	withIsolatedGitConfig(t)
+	test.IsolateGitConfig(t)
 	configureStoreCredentialHelper(t)
 
 	// When we add new credentials
@@ -65,7 +66,7 @@ func TestUpdateReplacesOldCredentials(t *testing.T) {
 	// Given we have an isolated git config and we're using the built in store credential helper
 	// https://git-scm.com/docs/git-credential-store
 	// and we have existing credentials
-	withIsolatedGitConfig(t)
+	test.IsolateGitConfig(t)
 	configureStoreCredentialHelper(t)
 
 	// When we replace old credentials
