@@ -9,7 +9,6 @@ import (
 	"net/url"
 
 	"github.com/cli/cli/v2/internal/githubrest"
-	o "github.com/cli/cli/v2/pkg/option"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 )
 
@@ -23,67 +22,36 @@ const (
 	userAgent       = "User-Agent"
 )
 
-// NewClientFromHTTP returns a Client that resolves each host's token from the
-// token carrier on httpClient's transport chain, when it has one.
 func NewClientFromHTTP(httpClient *http.Client) *Client {
 	client := &Client{http: httpClient}
 	return client
 }
 
-// NewClientWithToken returns a Client that authenticates every request as
-// exactly the given token, rather than resolving one per host.
-//
-// It exists for callers checking a specific user's credentials rather than the
-// host's active ones, which used to be expressed by wrapping the transport in
-// AddAuthTokenHeader with a one-token config.
-func NewClientWithToken(httpClient *http.Client, token string) *Client {
-	return &Client{http: httpClient, token: o.Some(token)}
-}
-
 type Client struct {
 	http *http.Client
-
-	// token, when present, overrides per-host resolution for every request.
-	token o.Option[string]
 }
 
 func (c *Client) HTTP() *http.Client {
 	return c.http
 }
 
-// tokenFor returns the token this client authenticates as on hostname.
+// restClient builds a githubrest.Client for one host over this client's
+// transport.
 //
-// The token used to be applied by the AddAuthTokenHeader transport, so
-// api.Client never had to hold one. Now that requests carry it explicitly, the
-// client has to resolve it, which it does from the transport chain unless it
-// was constructed with a fixed token.
-func (c Client) tokenFor(hostname string) string {
-	if token, ok := c.token.Value(); ok {
-		return token
-	}
-	if c.http == nil || c.http.Transport == nil {
-		return ""
-	}
-	return tokenForHost(c.http.Transport, hostname)
-}
-
-// restClient builds a githubrest.Client for one host.
+// The auth strategy is WithoutToken because the token is applied by the
+// AddAuthTokenHeader transport that api.NewHTTPClient installs, exactly as it
+// was before this package's REST calls moved onto githubrest. That transport
+// does not overwrite an Authorization header that is already present, so a
+// caller can still override per request.
 //
-// It is constructed per call because githubrest.Client holds a host and
-// api.Client.REST takes one per call. That was already true of the go-gh
-// RESTClient this replaces, but the cost changes from rebuilding a layered
-// transport chain to allocating a small struct.
+// A githubrest client built over githubrest.NewHTTPClient carries no such
+// transport, and there WithoutToken means what it says.
 func (c Client) restClient(hostname string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
-	auth := githubrest.WithoutToken()
-	if token := c.tokenFor(hostname); token != "" {
-		auth = githubrest.WithToken(token)
-	}
-
 	opts = append([]githubrest.ClientOption{
 		githubrest.WithCredentialedHost(githubrest.UploadHost(hostname)),
 	}, opts...)
 
-	return githubrest.NewClient(githubrest.APIBaseURL(hostname), c.http, auth, opts...)
+	return githubrest.NewClient(githubrest.APIBaseURL(hostname), c.http, githubrest.WithoutToken(), opts...)
 }
 
 // NewRESTClient returns a githubrest.Client for one host, built from an
@@ -92,8 +60,8 @@ func (c Client) restClient(hostname string, opts ...githubrest.ClientOption) (*g
 // It exists for the call sites that used to hand-build an *http.Request and
 // call httpClient.Do, which need the request and the response rather than the
 // decode-into-a-value shape of REST. Those call sites hold an *http.Client and
-// a hostname and nothing else, so resolving the base URL and the token has to
-// happen for them somewhere, and doing it here keeps one implementation.
+// a hostname and nothing else, so deriving the base URL has to happen for them
+// somewhere, and doing it here keeps one implementation.
 func NewRESTClient(httpClient *http.Client, hostname string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 	return NewClientFromHTTP(httpClient).restClient(hostname, opts...)
 }
@@ -105,7 +73,7 @@ type GraphQLError struct {
 // GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
-	opts := clientOptions(hostname, c.tokenFor(hostname), c.http.Transport)
+	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
@@ -117,7 +85,7 @@ func (c Client) GraphQL(hostname string, query string, variables map[string]inte
 // Mutate performs a GraphQL mutation based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Mutate(hostname, name string, mutation interface{}, variables map[string]interface{}) error {
-	opts := clientOptions(hostname, c.tokenFor(hostname), c.http.Transport)
+	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
@@ -129,7 +97,7 @@ func (c Client) Mutate(hostname, name string, mutation interface{}, variables ma
 // Query performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Query(hostname, name string, query interface{}, variables map[string]interface{}) error {
-	opts := clientOptions(hostname, c.tokenFor(hostname), c.http.Transport)
+	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
@@ -141,7 +109,7 @@ func (c Client) Query(hostname, name string, query interface{}, variables map[st
 // QueryWithContext performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) QueryWithContext(ctx context.Context, hostname, name string, query interface{}, variables map[string]interface{}) error {
-	opts := clientOptions(hostname, c.tokenFor(hostname), c.http.Transport)
+	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
@@ -265,31 +233,16 @@ func ErrorNeedsScopes(err error, s string) error {
 
 // clientOptions builds go-gh client options for one host.
 //
-// AuthToken used to be "none" with an empty Authorization header, because the
-// AddAuthTokenHeader transport applied the token instead. That transport no
-// longer sets headers, so the token is passed here and go-gh's header round
-// tripper applies it, still only for requests to a host in the same domain as
-// Host. An empty token leaves the header unset, which is the unauthenticated
-// case.
-//
-// Only GraphQL uses this now. REST is built on githubrest.
-func clientOptions(hostname, token string, transport http.RoundTripper) ghAPI.ClientOptions {
-	headers := map[string]string{
-		apiVersion: apiVersionValue,
-	}
-
-	// An empty AuthToken makes go-gh resolve one from the environment and fail
-	// when there is none, so the placeholder it was always given is kept for
-	// the unauthenticated case. The empty Authorization header then stops the
-	// header round tripper from sending "token none", exactly as before.
-	if token == "" {
-		token = "none"
-		headers[authorization] = ""
-	}
-
+// Only GraphQL uses this now, since REST is built on githubrest. AuthToken and
+// the Authorization header are still handled by the AddAuthTokenHeader
+// transport, so go-gh is told not to resolve them.
+func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOptions {
 	opts := ghAPI.ClientOptions{
-		AuthToken:          token,
-		Headers:            headers,
+		AuthToken: "none",
+		Headers: map[string]string{
+			authorization: "",
+			apiVersion:    apiVersionValue,
+		},
 		Host:               hostname,
 		SkipDefaultHeaders: true,
 		Transport:          transport,

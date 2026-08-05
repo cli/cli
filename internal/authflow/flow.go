@@ -115,14 +115,18 @@ func getCallbackURI(oauthHost string) string {
 	return callbackURI
 }
 
-// getViewer resolves the login of whoever the given token belongs to.
-//
-// The token is the one just obtained from the OAuth flow rather than the host's
-// active one, so the client is built to authenticate as exactly it. This used
-// to be expressed by wrapping the transport in AddAuthTokenHeader with a
-// single-token config, which no longer exists.
+type cfg struct {
+	token string
+}
+
+func (c cfg) ActiveToken(hostname string) (string, string) {
+	return c.token, "oauth_token"
+}
+
 func getViewer(httpClient *http.Client, hostname, token string) (string, error) {
-	return api.CurrentLoginName(api.NewClientWithToken(httpClient, token), hostname)
+	authedClient := *httpClient
+	authedClient.Transport = api.AddAuthTokenHeader(httpClient.Transport, cfg{token: token})
+	return api.CurrentLoginName(api.NewClientFromHTTP(&authedClient), hostname)
 }
 
 func waitForEnter(r io.Reader) error {

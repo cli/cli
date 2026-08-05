@@ -383,15 +383,19 @@ func TestHTTPHeaders(t *testing.T) {
 // redirectTransport sends every request to target, keeping its path, so a test
 // can address a request to a real GitHub hostname and still have it served
 // locally.
+//
+// The original host is preserved on Request.Host so that the transports below
+// this one, which is every transport whose headers these tests care about,
+// still see the request as addressed to GitHub.
 func redirectTransport(rt http.RoundTripper, target string) http.RoundTripper {
 	parsed, err := url.Parse(target)
 	if err != nil {
 		panic(err)
 	}
-	return funcTripper{inner: rt, roundTrip: func(req *http.Request) (*http.Response, error) {
+	return funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		req.Host = req.URL.Host
 		req.URL.Scheme = parsed.Scheme
 		req.URL.Host = parsed.Host
-		req.Host = ""
 		return rt.RoundTrip(req)
 	}}
 }

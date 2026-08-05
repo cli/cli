@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -41,9 +40,7 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "github.com",
 			wantHeader: map[string][]string{
-				// Never set: the token carrier resolves tokens but does not
-				// apply them, so requests carry one only if a caller put it there.
-				"authorization":        nil,
+				"authorization":        {"token MYTOKEN"},
 				"user-agent":           {"GitHub CLI v1.2.3"},
 				"x-github-api-version": {"2022-11-28"},
 				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
@@ -58,7 +55,7 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "example.com",
 			wantHeader: map[string][]string{
-				"authorization":        nil,
+				"authorization":        {"token GHETOKEN"},
 				"user-agent":           {"GitHub CLI v1.2.3"},
 				"x-github-api-version": {"2022-11-28"},
 				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
@@ -106,9 +103,7 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "github.com",
 			wantHeader: map[string][]string{
-				// Never set: the token carrier resolves tokens but does not
-				// apply them, so requests carry one only if a caller put it there.
-				"authorization":        nil,
+				"authorization":        {"token MYTOKEN"},
 				"user-agent":           {"GitHub CLI v1.2.3"},
 				"x-github-api-version": {"2022-11-28"},
 				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
@@ -119,6 +114,7 @@ func TestNewHTTPClient(t *testing.T) {
 				> GET / HTTP/1.1
 				> Host: github.com
 				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
+				> Authorization: token ████████████████████
 				> Content-Type: application/json; charset=utf-8
 				> Time-Zone: <timezone>
 				> User-Agent: GitHub CLI v1.2.3
@@ -213,12 +209,7 @@ func TestNewHTTPClient(t *testing.T) {
 	}
 }
 
-// TestHTTPClientDoesNotApplyTokens replaces a test of AddAuthTokenHeader's
-// redirect handling. That transport injected the token for the request's host
-// and stood down when a redirect changed hostname; nothing injects a token now,
-// so there is no redirect case left to cover. Go's own http.Client still strips
-// Authorization across a hostname change for whoever does set one.
-func TestHTTPClientDoesNotApplyTokens(t *testing.T) {
+func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 	var request *http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		request = r
@@ -226,83 +217,30 @@ func TestHTTPClientDoesNotApplyTokens(t *testing.T) {
 	}))
 	defer server.Close()
 
+	var redirectRequest *http.Request
+	redirectServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redirectRequest = r
+		http.Redirect(w, r, server.URL, http.StatusFound)
+	}))
+	defer redirectServer.Close()
+
 	client, err := NewHTTPClient(HTTPClientOptions{
 		Config: tinyConfig{
-			fmt.Sprintf("%s:oauth_token", strings.TrimPrefix(server.URL, "http://")): "TOKEN",
+			fmt.Sprintf("%s:oauth_token", strings.TrimPrefix(redirectServer.URL, "http://")): "REDIRECT-TOKEN",
+			fmt.Sprintf("%s:oauth_token", strings.TrimPrefix(server.URL, "http://")):         "TOKEN",
 		},
 	})
 	require.NoError(t, err)
 
-	req, err := http.NewRequest("GET", server.URL, nil)
+	req, err := http.NewRequest("GET", redirectServer.URL, nil)
 	require.NoError(t, err)
 
 	res, err := client.Do(req)
 	require.NoError(t, err)
 
-	assert.Equal(t, "", request.Header.Get("Authorization"))
+	assert.Equal(t, "token REDIRECT-TOKEN", redirectRequest.Header.Get(authorization))
+	assert.Equal(t, "", request.Header.Get(authorization))
 	assert.Equal(t, 204, res.StatusCode)
-}
-
-func TestTokenForHost(t *testing.T) {
-	cfg := tinyConfig{
-		"github.com:oauth_token":  "GITHUB-TOKEN",
-		"example.com:oauth_token": "GHES-TOKEN",
-	}
-
-	tests := []struct {
-		name      string
-		transport func() http.RoundTripper
-		hostname  string
-		want      string
-	}{
-		{
-			name:      "no carrier in the chain",
-			transport: func() http.RoundTripper { return http.DefaultTransport },
-			hostname:  "github.com",
-			want:      "",
-		},
-		{
-			name: "carrier at the end of the chain",
-			transport: func() http.RoundTripper {
-				return AddTokenCarrier(http.DefaultTransport, cfg)
-			},
-			hostname: "github.com",
-			want:     "GITHUB-TOKEN",
-		},
-		{
-			name: "carrier found through wrapping transports",
-			transport: func() http.RoundTripper {
-				var sso string
-				rt := AddTokenCarrier(http.DefaultTransport, cfg)
-				rt = AddCacheTTLHeader(rt, time.Hour)
-				return ExtractHeader("X-GitHub-SSO", &sso)(rt)
-			},
-			hostname: "example.com",
-			want:     "GHES-TOKEN",
-		},
-		{
-			name: "hostname is normalized before lookup",
-			transport: func() http.RoundTripper {
-				return AddTokenCarrier(http.DefaultTransport, cfg)
-			},
-			hostname: "subdomain.github.com",
-			want:     "GITHUB-TOKEN",
-		},
-		{
-			name: "unknown host has no token",
-			transport: func() http.RoundTripper {
-				return AddTokenCarrier(http.DefaultTransport, cfg)
-			},
-			hostname: "unknown.example.org",
-			want:     "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tokenForHost(tt.transport(), tt.hostname))
-		})
-	}
 }
 
 func TestHTTPClientSanitizeJSONControlCharactersC0(t *testing.T) {
