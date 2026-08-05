@@ -25,7 +25,6 @@ const (
 
 var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
 var pageRE = regexp.MustCompile(`(\?|&)page=(\d*)`)
-var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 
 //go:generate moq -rm -out searcher_mock.go . Searcher
 type Searcher interface {

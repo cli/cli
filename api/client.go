@@ -7,12 +7,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/cli/cli/v2/internal/githubrest"
 	o "github.com/cli/cli/v2/pkg/option"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
-	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const (
@@ -232,23 +230,22 @@ func handleResponse(err error) error {
 	return err
 }
 
-// ScopesSuggestion is an error messaging utility that prints the suggestion to request additional OAuth
-// scopes in case a server response indicates that there are missing scopes.
+// ScopesSuggestion is an error messaging utility that prints the suggestion to
+// request additional OAuth scopes in case a server response indicates that
+// there are missing scopes.
+//
+// It exists for gh api, which holds a raw *http.Response rather than an error,
+// and it borrows githubrest's implementation rather than keeping a second copy
+// of the scope-grouping rules.
 func ScopesSuggestion(resp *http.Response) string {
-	return generateScopesSuggestion(resp.StatusCode,
-		resp.Header.Get("X-Accepted-Oauth-Scopes"),
-		resp.Header.Get("X-Oauth-Scopes"),
-		resp.Request.URL.Hostname())
-}
-
-// EndpointNeedsScopes adds additional OAuth scopes to an HTTP response as if they were returned from the
-// server endpoint. This improves HTTP 4xx error messaging for endpoints that don't explicitly list the
-// OAuth scopes they need.
-func EndpointNeedsScopes(resp *http.Response, s string) {
-	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-		oldScopes := resp.Header.Get("X-Accepted-Oauth-Scopes")
-		resp.Header.Set("X-Accepted-Oauth-Scopes", fmt.Sprintf("%s, %s", oldScopes, s))
+	errResp := &githubrest.ErrorResponse{
+		Headers:    resp.Header,
+		StatusCode: resp.StatusCode,
 	}
+	if resp.Request != nil {
+		errResp.RequestURL = resp.Request.URL
+	}
+	return errResp.ScopesSuggestion()
 }
 
 // ErrorNeedsScopes annotates a REST error with an OAuth scope the endpoint
@@ -264,58 +261,6 @@ func ErrorNeedsScopes(err error, s string) error {
 		errResp.Headers.Set("X-Accepted-Oauth-Scopes", fmt.Sprintf("%s, %s", oldScopes, s))
 	}
 	return err
-}
-
-func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScopes, hostname string) string {
-	if statusCode < 400 || statusCode > 499 || statusCode == 422 {
-		return ""
-	}
-
-	if tokenHasScopes == "" {
-		return ""
-	}
-
-	gotScopes := map[string]struct{}{}
-	for _, s := range strings.Split(tokenHasScopes, ",") {
-		s = strings.TrimSpace(s)
-		gotScopes[s] = struct{}{}
-
-		// Certain scopes may be grouped under a single "top-level" scope. The following branch
-		// statements include these grouped/implied scopes when the top-level scope is encountered.
-		// See https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps.
-		if s == "repo" {
-			gotScopes["repo:status"] = struct{}{}
-			gotScopes["repo_deployment"] = struct{}{}
-			gotScopes["public_repo"] = struct{}{}
-			gotScopes["repo:invite"] = struct{}{}
-			gotScopes["security_events"] = struct{}{}
-		} else if s == "user" {
-			gotScopes["read:user"] = struct{}{}
-			gotScopes["user:email"] = struct{}{}
-			gotScopes["user:follow"] = struct{}{}
-		} else if s == "codespace" {
-			gotScopes["codespace:secrets"] = struct{}{}
-		} else if strings.HasPrefix(s, "admin:") {
-			gotScopes["read:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
-			gotScopes["write:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
-		} else if strings.HasPrefix(s, "write:") {
-			gotScopes["read:"+strings.TrimPrefix(s, "write:")] = struct{}{}
-		}
-	}
-
-	for _, s := range strings.Split(endpointNeedsScopes, ",") {
-		s = strings.TrimSpace(s)
-		if _, gotScope := gotScopes[s]; s == "" || gotScope {
-			continue
-		}
-		return fmt.Sprintf(
-			"This API operation needs the %[1]q scope. To request it, run:  gh auth refresh -h %[2]s -s %[1]s",
-			s,
-			ghauth.NormalizeHostname(hostname),
-		)
-	}
-
-	return ""
 }
 
 // clientOptions builds go-gh client options for one host.
