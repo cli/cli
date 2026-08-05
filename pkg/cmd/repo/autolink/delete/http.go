@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -25,7 +26,7 @@ func (a *AutolinkDeleter) Delete(repo ghrepo.Interface, id string) error {
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	err = api.NewClientFromHTTP(a.HTTPClient).REST(repo.RepoHost(), http.MethodDelete, path.String(), nil, nil)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return fmt.Errorf("error deleting autolink: HTTP 404: Perhaps you are missing admin rights to the repository? (%s)", httpErr.RequestURL)
 		}

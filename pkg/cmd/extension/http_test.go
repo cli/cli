@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +29,7 @@ func extensionHTTPClient(t *testing.T, path string, status int, body string) *ht
 func requireExtensionHTTPError(t *testing.T, err error, status int) {
 	t.Helper()
 
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, status, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), fmt.Sprintf("HTTP %d", status))

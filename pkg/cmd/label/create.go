@@ -13,6 +13,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -143,7 +144,7 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions
 	requestBody := bytes.NewReader(requestByte)
 	err = apiClient.REST(repo.RepoHost(), "POST", path.String(), requestBody, nil)
 
-	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
+	if httpError, ok := err.(*githubrest.ErrorResponse); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists
 	}
 
@@ -181,13 +182,13 @@ func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions
 	requestBody := bytes.NewReader(requestByte)
 	err = apiClient.REST(repo.RepoHost(), "PATCH", path.String(), requestBody, nil)
 
-	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
+	if httpError, ok := err.(*githubrest.ErrorResponse); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists
 	}
 
 	return err
 }
 
-func isLabelAlreadyExistsError(err api.HTTPError) bool {
+func isLabelAlreadyExistsError(err *githubrest.ErrorResponse) bool {
 	return err.StatusCode == 422 && len(err.Errors) == 1 && err.Errors[0].Field == "name" && err.Errors[0].Code == "already_exists"
 }

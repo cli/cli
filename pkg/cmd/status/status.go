@@ -15,6 +15,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
@@ -286,7 +287,7 @@ func (s *StatusGetter) LoadNotifications() error {
 					actual, err := s.ActualMention(safeurl.NewImmutableSafeURL(n.Subject.LatestCommentURL))
 
 					if err != nil {
-						var httpErr api.HTTPError
+						var httpErr *githubrest.ErrorResponse
 						httpStatusCode := -1
 
 						if errors.As(err, &httpErr) {
@@ -345,7 +346,7 @@ func (s *StatusGetter) LoadNotifications() error {
 		var resp []Notification
 		next, err := c.RESTWithNext(s.hostname(), "GET", p.String(), nil, &resp)
 		if err != nil {
-			var httpErr api.HTTPError
+			var httpErr *githubrest.ErrorResponse
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
 				return fmt.Errorf("could not get notifications: %w", err)
 			}
@@ -552,7 +553,7 @@ func (s *StatusGetter) LoadEvents() error {
 	for pages < 2 {
 		next, err := c.RESTWithNext(s.hostname(), "GET", p.String(), nil, &resp)
 		if err != nil {
-			var httpErr api.HTTPError
+			var httpErr *githubrest.ErrorResponse
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
 				return fmt.Errorf("could not get events: %w", err)
 			}

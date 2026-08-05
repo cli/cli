@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	runShared "github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -159,7 +160,7 @@ func runView(opts *ViewOptions) error {
 func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow, ref string) error {
 	yamlBytes, err := shared.GetWorkflowContent(client, repo, *workflow, ref)
 	if err != nil {
-		if s, ok := err.(api.HTTPError); ok && s.StatusCode == 404 {
+		if s, ok := err.(*githubrest.ErrorResponse); ok && s.StatusCode == 404 {
 			if ref != "" {
 				return fmt.Errorf("could not find workflow file %s on %s, try specifying a different ref", workflow.Base(), ref)
 			}

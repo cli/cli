@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/context"
 	gitpkg "github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -315,7 +316,7 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 	// endpoint but unfortunately the API returns 422 for many reasons so we must
 	// interpret the message provide better error messaging for our users.
 	err = syncFork(client, destRepo, branchName, commit.Object.SHA, opts.Force)
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	if err != nil {
 		if errors.As(err, &httpErr) {
 			switch httpErr.Message {

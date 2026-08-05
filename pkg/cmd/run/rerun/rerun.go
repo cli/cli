@@ -12,6 +12,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -205,7 +206,7 @@ func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFa
 
 	err = client.REST(repo.RepoHost(), "POST", path.String(), body, nil)
 	if err != nil {
-		var httpError api.HTTPError
+		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
 			return fmt.Errorf("run %d cannot be rerun; %s", run.ID, httpError.Message)
 		}
@@ -227,7 +228,7 @@ func rerunJob(client *api.Client, repo ghrepo.Interface, job *shared.Job, debug 
 
 	err = client.REST(repo.RepoHost(), "POST", path.String(), body, nil)
 	if err != nil {
-		var httpError api.HTTPError
+		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
 			return fmt.Errorf("job %d cannot be rerun", job.ID)
 		}

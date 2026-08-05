@@ -11,6 +11,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	ioconfig "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/klauspost/compress/snappy"
@@ -280,7 +281,7 @@ func (c *LiveClient) getBundle(url safeurl.SafeURL) (*bundle.Bundle, error) {
 }
 
 func shouldRetry(err error) bool {
-	var httpError api.HTTPError
+	var httpError *githubrest.ErrorResponse
 	if errors.As(err, &httpError) {
 		if httpError.StatusCode >= 500 && httpError.StatusCode <= 599 {
 			return true

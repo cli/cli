@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/shurcooL/githubv4"
@@ -100,7 +101,7 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes), &rn)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return nil, notImplementedError
 		}
@@ -166,7 +167,7 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes), &newRelease)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) &&
 			httpErr.StatusCode == http.StatusNotFound &&
 			!tokenHasWorkflowScope(httpErr.Headers) {

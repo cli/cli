@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/githubrest"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
@@ -41,15 +42,6 @@ func (c *Client) HTTP() *http.Client {
 
 type GraphQLError struct {
 	*ghAPI.GraphQLError
-}
-
-type HTTPError struct {
-	*ghAPI.HTTPError
-	scopesSuggestion string
-}
-
-func (err HTTPError) ScopesSuggestion() string {
-	return err.scopesSuggestion
 }
 
 // GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
@@ -147,15 +139,19 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 	return next, nil
 }
 
-// HandleHTTPError parses a http.Response into a HTTPError.
+// HandleHTTPError parses a http.Response into a *githubrest.ErrorResponse.
 //
 // The caller is responsible to close the response body stream.
 func HandleHTTPError(resp *http.Response) error {
-	return handleResponse(ghAPI.HandleHTTPError(resp))
+	return githubrest.NewErrorResponse(resp)
 }
 
-// handleResponse takes a ghAPI.HTTPError or ghAPI.GraphQLError and converts it into an
-// HTTPError or GraphQLError respectively.
+// handleResponse takes a ghAPI.HTTPError or ghAPI.GraphQLError and converts it into a
+// *githubrest.ErrorResponse or GraphQLError respectively.
+//
+// Returning githubrest's error type from the api package is interop scaffolding:
+// it means migrated and unmigrated call sites agree on one error type while the
+// REST migration is in flight, so no call site has to handle both.
 func handleResponse(err error) error {
 	if err == nil {
 		return nil
@@ -163,13 +159,16 @@ func handleResponse(err error) error {
 
 	var restErr *ghAPI.HTTPError
 	if errors.As(err, &restErr) {
-		return HTTPError{
-			HTTPError: restErr,
-			scopesSuggestion: generateScopesSuggestion(restErr.StatusCode,
-				restErr.Headers.Get("X-Accepted-Oauth-Scopes"),
-				restErr.Headers.Get("X-Oauth-Scopes"),
-				restErr.RequestURL.Hostname()),
+		errResp := &githubrest.ErrorResponse{
+			Headers:    restErr.Headers,
+			Message:    restErr.Message,
+			RequestURL: restErr.RequestURL,
+			StatusCode: restErr.StatusCode,
 		}
+		for _, item := range restErr.Errors {
+			errResp.Errors = append(errResp.Errors, githubrest.ErrorItem(item))
+		}
+		return errResp
 	}
 
 	var gqlErr *ghAPI.GraphQLError

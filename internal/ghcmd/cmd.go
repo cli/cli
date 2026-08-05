@@ -16,7 +16,6 @@ import (
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/ci"
@@ -24,6 +23,7 @@ import (
 	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
@@ -230,18 +230,25 @@ func Main() exitCode {
 			return exitError
 		}
 
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
+		// The scopes suggestion is only meaningful when the error really is an
+		// API error, so the chain tests that explicitly rather than reaching the
+		// last branch holding whatever errors.As left behind.
+		var httpErr *githubrest.ErrorResponse
+		isAPIErr := errors.As(err, &httpErr)
+		switch {
+		case isAPIErr && httpErr.StatusCode == 401:
 			authCommand := "gh auth login"
 			if cfg, cfgErr := cmdFactory.Config(); cfgErr == nil {
 				authCommand = authRecoveryCommand(cfg, httpErr)
 			}
 			fmt.Fprintf(stderr, "Try authenticating with:  %s\n", authCommand)
-		} else if u := factory.SSOURL(); u != "" {
+		case factory.SSOURL() != "":
 			// handles organization SAML enforcement error
-			fmt.Fprintf(stderr, "Authorize in your web browser:  %s\n", u)
-		} else if msg := httpErr.ScopesSuggestion(); msg != "" {
-			fmt.Fprintln(stderr, msg)
+			fmt.Fprintf(stderr, "Authorize in your web browser:  %s\n", factory.SSOURL())
+		case isAPIErr:
+			if msg := httpErr.ScopesSuggestion(); msg != "" {
+				fmt.Fprintln(stderr, msg)
+			}
 		}
 
 		return exitError
@@ -300,7 +307,7 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 	}
 }
 
-func authRecoveryCommand(cfg gh.Config, httpErr api.HTTPError) string {
+func authRecoveryCommand(cfg gh.Config, httpErr *githubrest.ErrorResponse) string {
 	if httpErr.RequestURL == nil {
 		return "gh auth login"
 	}

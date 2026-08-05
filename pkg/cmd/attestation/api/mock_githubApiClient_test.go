@@ -7,8 +7,7 @@ import (
 	"io"
 	"strings"
 
-	cliAPI "github.com/cli/cli/v2/api"
-	ghAPI "github.com/cli/go-gh/v2/pkg/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -58,7 +57,7 @@ func (m *mockDataGenerator) FlakyOnRESTSuccessWithNextPageHandler() func(hostnam
 			m.MethodCalled("FlakyOnRESTSuccessWithNextPage:error")
 
 			count = count + 1
-			return "", cliAPI.HTTPError{HTTPError: &ghAPI.HTTPError{StatusCode: 500}}
+			return "", &githubrest.ErrorResponse{StatusCode: 500}
 		} else {
 			count = count + 1
 			return m.OnRESTSuccessWithNextPage(hostname, method, p, body, data)
@@ -72,7 +71,7 @@ func (m *mockDataGenerator) OnREST500ErrorHandler() func(hostname, method, p str
 	return func(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
 		m.MethodCalled("OnREST500Error")
 
-		return "", cliAPI.HTTPError{HTTPError: &ghAPI.HTTPError{StatusCode: 500}}
+		return "", &githubrest.ErrorResponse{StatusCode: 500}
 	}
 }
 

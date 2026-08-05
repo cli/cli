@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -173,7 +173,7 @@ func TestSSHKeyUploadHTTPError(t *testing.T) {
 	)
 
 	assert.False(t, uploaded)
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusUnprocessableEntity, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 422")

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -164,7 +164,7 @@ func TestTokenHasWorkflowScope(t *testing.T) {
 func requireAPIHTTPError(t *testing.T, err error, statusCode int) {
 	t.Helper()
 
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, statusCode, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), fmt.Sprintf("HTTP %d", statusCode))

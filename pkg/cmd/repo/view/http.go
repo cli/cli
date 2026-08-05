@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
 	"golang.org/x/text/transform"
@@ -38,7 +39,7 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string)
 
 	err = apiClient.REST(repo.RepoHost(), "GET", readmePath.String(), nil, &response)
 	if err != nil {
-		var httpError api.HTTPError
+		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
 			return nil, NotFoundError
 		}

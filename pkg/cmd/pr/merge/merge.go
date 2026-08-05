@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -467,7 +468,8 @@ func (m *mergeContext) deleteRemoteBranch() error {
 			// error because the goal is already achieved.
 
 			var isAlreadyDeletedError bool
-			if httpErr := (api.HTTPError{}); errors.As(err, &httpErr) {
+			var httpErr *githubrest.ErrorResponse
+			if errors.As(err, &httpErr) {
 				// TODO: since the API returns 422 for a couple of other reasons, for more accuracy
 				// we might want to check the error message against "Reference does not exist".
 				isAlreadyDeletedError = httpErr.StatusCode == http.StatusUnprocessableEntity || httpErr.StatusCode == http.StatusNotFound

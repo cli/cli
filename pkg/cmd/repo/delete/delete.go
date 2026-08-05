@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
@@ -123,9 +124,9 @@ func deleteRun(opts *DeleteOptions) error {
 
 	err = deleteRepo(httpClient, toDelete)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
-			statusCode := httpErr.HTTPError.StatusCode
+			statusCode := httpErr.StatusCode
 			if statusCode == http.StatusMovedPermanently ||
 				statusCode == http.StatusTemporaryRedirect ||
 				statusCode == http.StatusPermanentRedirect {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 )
@@ -44,7 +45,7 @@ type setResult struct {
 
 func setVariable(client *api.Client, host string, opts setOptions) setResult {
 	var err error
-	var postErr api.HTTPError
+	var postErr *githubrest.ErrorResponse
 	result := setResult{Operation: createdOperation, Key: opts.Key}
 	switch opts.Entity {
 	case shared.Organization:

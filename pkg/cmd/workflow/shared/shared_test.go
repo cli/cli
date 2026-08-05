@@ -10,11 +10,10 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 )
 
 func TestFindWorkflow(t *testing.T) {
@@ -30,7 +29,7 @@ func TestFindWorkflow(t *testing.T) {
 		httpStubs         func(*httpmock.Registry)
 		states            []WorkflowState
 		expectedWorkflow  Workflow
-		expectedHTTPError *api.HTTPError
+		expectedHTTPError *githubrest.ErrorResponse
 		expectedError     error
 	}{
 		{
@@ -85,12 +84,10 @@ func TestFindWorkflow(t *testing.T) {
 					httpmock.StatusJSONResponse(404, Workflow{}),
 				)
 			},
-			expectedHTTPError: &api.HTTPError{
-				HTTPError: &ghAPI.HTTPError{
-					Message:    "workflow nonexistentWorkflow.yml not found on the default branch",
-					StatusCode: 404,
-					RequestURL: badRequestURL,
-				},
+			expectedHTTPError: &githubrest.ErrorResponse{
+				Message:    "workflow nonexistentWorkflow.yml not found on the default branch",
+				StatusCode: 404,
+				RequestURL: badRequestURL,
 			},
 		},
 		{
@@ -103,16 +100,14 @@ func TestFindWorkflow(t *testing.T) {
 					httpmock.StatusStringResponse(500, "server error"),
 				)
 			},
-			expectedHTTPError: &api.HTTPError{
-				HTTPError: &ghAPI.HTTPError{
-					Errors: []ghAPI.HTTPErrorItem{
-						{
-							Message: "server error",
-						},
+			expectedHTTPError: &githubrest.ErrorResponse{
+				Errors: []githubrest.ErrorItem{
+					{
+						Message: "server error",
 					},
-					StatusCode: 500,
-					RequestURL: badRequestURL,
 				},
+				StatusCode: 500,
+				RequestURL: badRequestURL,
 			},
 		},
 		{
@@ -154,7 +149,7 @@ func TestFindWorkflow(t *testing.T) {
 				require.Error(t, err)
 				assert.Equal(t, tt.expectedError, err)
 			} else if tt.expectedHTTPError != nil {
-				var httpErr api.HTTPError
+				var httpErr *githubrest.ErrorResponse
 				require.ErrorAs(t, err, &httpErr)
 				assert.Equal(t, tt.expectedHTTPError.Error(), httpErr.Error())
 			} else {

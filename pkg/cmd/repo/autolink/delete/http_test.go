@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	cliapi "github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	ghapi "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/stretchr/testify/assert"
@@ -72,7 +72,7 @@ func TestAutolinkDeleter_Delete(t *testing.T) {
 			if tt.expectErr {
 				require.EqualError(t, err, tt.expectedErrMsg)
 				if tt.expectedStatus != 0 {
-					var httpErr cliapi.HTTPError
+					var httpErr *githubrest.ErrorResponse
 					require.ErrorAs(t, err, &httpErr)
 					assert.Equal(t, tt.expectedStatus, httpErr.StatusCode)
 				}

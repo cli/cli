@@ -18,6 +18,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
@@ -157,7 +158,7 @@ func createRun(opts *CreateOptions) error {
 	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		var httpError api.HTTPError
+		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) {
 			if httpError.StatusCode == http.StatusUnprocessableEntity {
 				if detectEmptyFiles(files) {

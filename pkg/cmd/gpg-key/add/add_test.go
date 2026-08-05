@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +82,7 @@ func Test_gpgKeyUploadHTTPError(t *testing.T) {
 
 	err := gpgKeyUpload(&http.Client{Transport: reg}, "github.com", strings.NewReader("-----BEGIN PGP PUBLIC KEY BLOCK-----"), "")
 
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 500")

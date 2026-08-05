@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -125,7 +126,7 @@ func TestRESTError(t *testing.T) {
 		}, nil
 	})
 
-	var httpErr HTTPError
+	var httpErr *githubrest.ErrorResponse
 	err := client.REST("github.com", "DELETE", "repos/branch", nil, nil)
 	if err == nil || !errors.As(err, &httpErr) {
 		t.Fatalf("got %v", err)
@@ -159,7 +160,7 @@ func TestRESTWithNextError(t *testing.T) {
 
 	_, err := client.RESTWithNext("github.com", http.MethodGet, "repos/owner/repo/items", nil, nil)
 
-	var httpErr HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 404")
@@ -250,7 +251,7 @@ func TestHandleHTTPError_GraphQL502(t *testing.T) {
 	}
 }
 
-func TestHTTPError_ScopesSuggestion(t *testing.T) {
+func TestErrorResponse_ScopesSuggestion(t *testing.T) {
 	makeResponse := func(s int, u, haveScopes, needScopes string) *http.Response {
 		req, err := http.NewRequest("GET", u, nil)
 		if err != nil {
@@ -312,7 +313,7 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			httpError := HandleHTTPError(tt.resp)
-			if got := httpError.(HTTPError).ScopesSuggestion(); got != tt.want {
+			if got := httpError.(*githubrest.ErrorResponse).ScopesSuggestion(); got != tt.want {
 				t.Errorf("HTTPError.ScopesSuggestion() = %v, want %v", got, tt.want)
 			}
 		})

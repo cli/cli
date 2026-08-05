@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/cache/shared"
@@ -173,7 +174,7 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 		}
 
 		if err != nil {
-			var httpErr api.HTTPError
+			var httpErr *githubrest.ErrorResponse
 			if errors.As(err, &httpErr) {
 				if httpErr.StatusCode == http.StatusNotFound {
 					if opts.Ref == "" {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -44,7 +45,7 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 	apiClient := api.NewClientFromHTTP(httpClient)
 	err = apiClient.REST(hostname, "POST", path.String(), bytes.NewBuffer(payloadBytes), nil)
 	if err != nil {
-		if httpError, ok := errors.AsType[api.HTTPError](err); ok {
+		if httpError, ok := errors.AsType[*githubrest.ErrorResponse](err); ok {
 			if httpError.StatusCode == 404 {
 				return errScopesMissing
 			}

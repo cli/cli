@@ -8,6 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
 )
@@ -40,7 +41,7 @@ func (a *AutolinkCreator) Create(repo ghrepo.Interface, request AutolinkCreateRe
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	err = api.NewClientFromHTTP(a.HTTPClient).REST(repo.RepoHost(), http.MethodPost, path.String(), requestBody, &autolink)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			httpErr.Message = "Must have admin rights to Repository."
 			return nil, httpErr

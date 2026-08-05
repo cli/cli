@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -32,7 +32,7 @@ func Test_deleteGPGKeyHTTPError(t *testing.T) {
 
 	err := deleteGPGKey(&http.Client{Transport: reg}, "github.com", "123")
 
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 500")
@@ -53,7 +53,7 @@ func Test_getGPGKeysHTTPError(t *testing.T) {
 	keys, err := getGPGKeys(&http.Client{Transport: reg}, "github.com")
 
 	assert.Nil(t, keys)
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 500")

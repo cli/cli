@@ -8,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -112,7 +113,7 @@ func runDelete(opts *DeleteOptions) error {
 	} else {
 		run, err = shared.GetRun(client, repo, runID, 0)
 		if err != nil {
-			var httpErr api.HTTPError
+			var httpErr *githubrest.ErrorResponse
 			if errors.As(err, &httpErr) {
 				if httpErr.StatusCode == http.StatusNotFound {
 					err = fmt.Errorf("could not find any workflow run with ID %s", opts.RunID)
@@ -124,7 +125,7 @@ func runDelete(opts *DeleteOptions) error {
 
 	err = deleteWorkflowRun(client, repo, fmt.Sprintf("%d", run.ID))
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
 			if httpErr.StatusCode == http.StatusConflict {
 				err = fmt.Errorf("cannot delete a workflow run that is completed")

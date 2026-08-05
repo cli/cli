@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -325,7 +326,7 @@ func resolveBranchRef(client *api.Client, host, owner, repo, branch string) (*Re
 
 // isNotFound returns true if the error is an HTTP 404 response.
 func isNotFound(err error) bool {
-	var httpErr api.HTTPError
+	var httpErr *githubrest.ErrorResponse
 	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
 }
 

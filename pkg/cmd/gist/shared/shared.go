@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
@@ -71,7 +72,7 @@ func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
 	apiClient := api.NewClientFromHTTP(client)
 	err = apiClient.REST(hostname, "GET", path.String(), nil, &gist)
 	if err != nil {
-		var httpErr api.HTTPError
+		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
 			return nil, NotFoundErr
 		}

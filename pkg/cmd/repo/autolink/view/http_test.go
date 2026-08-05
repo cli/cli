@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -105,7 +105,7 @@ func TestAutolinkViewer_View(t *testing.T) {
 			if tt.expectErr {
 				require.EqualError(t, err, tt.expectedErrMsg)
 				if tt.expectedStatus != 0 {
-					var httpErr api.HTTPError
+					var httpErr *githubrest.ErrorResponse
 					require.ErrorAs(t, err, &httpErr)
 					assert.Equal(t, tt.expectedStatus, httpErr.StatusCode)
 				}

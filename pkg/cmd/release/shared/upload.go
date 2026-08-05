@@ -15,6 +15,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"golang.org/x/sync/errgroup"
@@ -136,7 +137,7 @@ func shouldRetry(err error) bool {
 	if errors.As(err, &networkError) {
 		return true
 	}
-	var httpError api.HTTPError
+	var httpError *githubrest.ErrorResponse
 	return errors.As(err, &httpError) && httpError.StatusCode >= 500
 }
 
