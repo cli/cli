@@ -2,8 +2,10 @@ package view
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"regexp"
@@ -14,7 +16,6 @@ import (
 	"unicode/utf16"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -40,25 +41,29 @@ type apiLogFetcher struct {
 }
 
 func (f *apiLogFetcher) GetLog() (io.ReadCloser, error) {
-	logURL, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(f.repo.RepoHost()), "repos", f.repo.RepoOwner(), f.repo.RepoName(), "actions", "jobs", strconv.FormatInt(f.jobID, 10), "logs")
+	client, err := api.NewRESTClient(f.httpClient, f.repo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", logURL.String(), nil)
+	logURL, err := safeurl.JoinPath("repos", f.repo.RepoOwner(), f.repo.RepoName(), "actions", "jobs", strconv.FormatInt(f.jobID, 10), "logs")
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := f.httpClient.Do(req)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, logURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if resp.StatusCode == 404 {
-		return nil, fmt.Errorf("log not found: %v", f.jobID)
-	} else if resp.StatusCode != 200 {
-		return nil, api.HandleHTTPError(resp)
+	// Send rather than Do, because the caller owns and streams the log body.
+	resp, err := client.Send(req)
+	if err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("log not found: %v", f.jobID)
+		}
+		return nil, err
 	}
 
 	return resp.Body, nil

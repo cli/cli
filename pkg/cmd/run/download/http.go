@@ -2,6 +2,7 @@ package download
 
 import (
 	"archive/zip"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,26 +26,27 @@ func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
 }
 
 func (p *apiPlatform) Download(url safeurl.SafeURL, dir safepaths.Absolute) error {
-	return downloadArtifact(p.client, url, dir)
+	return downloadArtifact(p.client, p.repo.RepoHost(), url, dir)
 }
 
-func downloadArtifact(httpClient *http.Client, url safeurl.SafeURL, destDir safepaths.Absolute) error {
-	req, err := http.NewRequest("GET", url.String(), nil)
+func downloadArtifact(httpClient *http.Client, hostname string, url safeurl.SafeURL, destDir safepaths.Absolute) error {
+	client, err := api.NewRESTClient(httpClient, hostname)
 	if err != nil {
 		return err
 	}
-	// The server rejects this :(
-	//req.Header.Set("Accept", "application/zip")
 
-	resp, err := httpClient.Do(req)
+	// The server rejects an Accept of application/zip :(
+	req, err := client.NewRequest(context.Background(), http.MethodGet, url.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	// Send rather than Do, because the body is a zip streamed to a temp file.
+	resp, err := client.Send(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
 
 	tmpfile, err := os.CreateTemp("", "gh-artifact.*.zip")
 	if err != nil {
