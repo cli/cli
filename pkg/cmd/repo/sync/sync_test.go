@@ -206,9 +206,9 @@ func TestUpdateBranchInSingleWorktreeRepository(t *testing.T) {
 	runGit(t, repoDir, "fetch", "--quiet", ".", "test")
 
 	gitClient := &git.Client{RepoDir: repoDir}
-	gitExecuter := &gitExecuter{client: gitClient}
+	executer := &gitExecuter{client: gitClient}
 
-	err := gitExecuter.UpdateBranch("trunk", "FETCH_HEAD")
+	err := executer.UpdateBranch("trunk", "FETCH_HEAD")
 	require.NoError(t, err)
 	require.Equal(t, runGit(t, repoDir, "rev-parse", "FETCH_HEAD"), runGit(t, repoDir, "rev-parse", "trunk"))
 	require.Equal(t, "test", runGit(t, repoDir, "branch", "--show-current"))
