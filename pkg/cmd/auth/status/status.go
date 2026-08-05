@@ -1,6 +1,7 @@
 package status
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -118,10 +120,11 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 }
 
 type StatusOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	Config     func() (gh.Config, error)
-	Exporter   cmdutil.Exporter
+	HttpClient          func() (*http.Client, error)
+	GitHubRESTAnonymous func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
+	IO                  *iostreams.IOStreams
+	Config              func() (gh.Config, error)
+	Exporter            cmdutil.Exporter
 
 	Hostname  string
 	ShowToken bool
@@ -130,9 +133,10 @@ type StatusOptions struct {
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
 	opts := &StatusOptions{
-		HttpClient: f.HttpClient,
-		IO:         f.IOStreams,
-		Config:     f.Config,
+		HttpClient:          f.HttpClient,
+		GitHubRESTAnonymous: f.GitHubRESTAnonymous,
+		IO:                  f.IOStreams,
+		Config:              f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -175,7 +179,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return statusRun(opts)
+			return statusRun(cmd.Context(), opts)
 		},
 	}
 
@@ -189,7 +193,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	return cmd
 }
 
-func statusRun(opts *StatusOptions) error {
+func statusRun(ctx context.Context, opts *StatusOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -242,7 +246,14 @@ func statusRun(opts *StatusOptions) error {
 		if authTokenWriteable(activeUserTokenSource) {
 			activeUser, _ = authCfg.ActiveUser(hostname)
 		}
-		entry := buildEntry(httpClient, buildEntryOptions{
+		// An anonymous client per host, because status reports on every token
+		// configured for that host rather than on the active one.
+		restClient, err := opts.GitHubRESTAnonymous(hostname)
+		if err != nil {
+			return err
+		}
+
+		entry := buildEntry(ctx, httpClient, restClient, buildEntryOptions{
 			active:      true,
 			gitProtocol: gitProtocol,
 			hostname:    hostname,
@@ -266,7 +277,14 @@ func statusRun(opts *StatusOptions) error {
 				continue
 			}
 			token, tokenSource, _ := authCfg.TokenForUser(hostname, username)
-			entry := buildEntry(httpClient, buildEntryOptions{
+			// An anonymous client per host, because status reports on every token
+			// configured for that host rather than on the active one.
+			restClient, err := opts.GitHubRESTAnonymous(hostname)
+			if err != nil {
+				return err
+			}
+
+			entry := buildEntry(ctx, httpClient, restClient, buildEntryOptions{
 				active:      false,
 				gitProtocol: gitProtocol,
 				hostname:    hostname,
@@ -368,7 +386,7 @@ type buildEntryOptions struct {
 	username    string
 }
 
-func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
+func buildEntry(ctx context.Context, httpClient *http.Client, restClient *githubrest.Client, opts buildEntryOptions) authEntry {
 	tokenSource := opts.tokenSource
 	if tokenSource == "oauth_token" {
 		// The go-gh function TokenForHost returns this value as source for tokens read from the
@@ -400,7 +418,7 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 	}
 
 	// Get scopes for token.
-	scopesHeader, err := shared.GetScopes(httpClient, opts.hostname, opts.token)
+	scopesHeader, err := shared.GetScopes(ctx, restClient, opts.hostname, opts.token)
 	if err != nil {
 		var networkError net.Error
 		if errors.As(err, &networkError) && networkError.Timeout() {

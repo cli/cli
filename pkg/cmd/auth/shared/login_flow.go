@@ -2,6 +2,7 @@ package shared
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -31,6 +33,7 @@ type LoginOptions struct {
 	IO               *iostreams.IOStreams
 	Config           iconfig
 	HTTPClient       *http.Client
+	RESTClient       *githubrest.Client
 	PlainHTTPClient  *http.Client
 	Hostname         string
 	Interactive      bool
@@ -47,7 +50,7 @@ type LoginOptions struct {
 	sshContext ssh.Context
 }
 
-func Login(opts *LoginOptions) error {
+func Login(ctx context.Context, opts *LoginOptions) error {
 	cfg := opts.Config
 	hostname := opts.Hostname
 	httpClient := opts.HTTPClient
@@ -169,7 +172,7 @@ func Login(opts *LoginOptions) error {
 			return err
 		}
 
-		if err := HasMinimumScopes(httpClient, hostname, authToken); err != nil {
+		if err := HasMinimumScopes(ctx, opts.RESTClient, hostname, authToken); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 	}
@@ -248,6 +251,12 @@ func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title strin
 	defer f.Close()
 
 	return add.SSHKeyUpload(httpClient, hostname, f, title)
+}
+
+// httpClient is the GraphQL leg of login, which is out of scope for the REST
+// migration and still takes a token per request.
+type httpClient interface {
+	Do(*http.Request) (*http.Response, error)
 }
 
 func GetCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {

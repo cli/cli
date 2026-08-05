@@ -2,6 +2,7 @@ package login
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -483,6 +484,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubRESTAnonymous = httpmock.RESTClientFuncAnonymous(reg)
 			tt.opts.PlainHttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
@@ -497,7 +499,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			_, restoreRun := run.Stub()
 			defer restoreRun(t)
 
-			err := loginRun(tt.opts)
+			err := loginRun(context.Background(), tt.opts)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 			} else {
@@ -778,6 +780,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubRESTAnonymous = httpmock.RESTClientFuncAnonymous(reg)
 			tt.opts.PlainHttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
@@ -810,7 +813,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				tt.runStubs(rs)
 			}
 
-			err := loginRun(tt.opts)
+			err := loginRun(context.Background(), tt.opts)
 			if err != nil {
 				t.Fatalf("unexpected error: %s", err)
 			}

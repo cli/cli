@@ -1,6 +1,7 @@
 package login
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -20,13 +22,14 @@ import (
 )
 
 type LoginOptions struct {
-	IO              *iostreams.IOStreams
-	Config          func() (gh.Config, error)
-	HttpClient      func() (*http.Client, error)
-	PlainHttpClient func() (*http.Client, error)
-	GitClient       *git.Client
-	Prompter        shared.Prompt
-	Browser         browser.Browser
+	IO                  *iostreams.IOStreams
+	Config              func() (gh.Config, error)
+	HttpClient          func() (*http.Client, error)
+	PlainHttpClient     func() (*http.Client, error)
+	GitHubRESTAnonymous func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
+	GitClient           *git.Client
+	Prompter            shared.Prompt
+	Browser             browser.Browser
 
 	MainExecutable string
 
@@ -44,13 +47,14 @@ type LoginOptions struct {
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
 	opts := &LoginOptions{
-		IO:              f.IOStreams,
-		Config:          f.Config,
-		HttpClient:      f.HttpClient,
-		PlainHttpClient: f.PlainHttpClient,
-		GitClient:       f.GitClient,
-		Prompter:        f.Prompter,
-		Browser:         f.Browser,
+		IO:                  f.IOStreams,
+		Config:              f.Config,
+		HttpClient:          f.HttpClient,
+		PlainHttpClient:     f.PlainHttpClient,
+		GitHubRESTAnonymous: f.GitHubRESTAnonymous,
+		GitClient:           f.GitClient,
+		Prompter:            f.Prompter,
+		Browser:             f.Browser,
 	}
 
 	var tokenStdin bool
@@ -143,7 +147,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 				return runF(opts)
 			}
 
-			return loginRun(opts)
+			return loginRun(cmd.Context(), opts)
 		},
 	}
 
@@ -165,7 +169,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	return cmd
 }
 
-func loginRun(opts *LoginOptions) error {
+func loginRun(ctx context.Context, opts *LoginOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -192,6 +196,13 @@ func loginRun(opts *LoginOptions) error {
 		return cmdutil.SilentError
 	}
 
+	// An anonymous client, because every call below authenticates as a token
+	// that is being validated rather than as the configured one.
+	restClient, err := opts.GitHubRESTAnonymous(hostname)
+	if err != nil {
+		return err
+	}
+
 	plainHTTPClient, err := opts.PlainHttpClient()
 	if err != nil {
 		return err
@@ -203,7 +214,7 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if opts.Token != "" {
-		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
+		if err := shared.HasMinimumScopes(ctx, restClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 		username, err := shared.GetCurrentLogin(httpClient, hostname, opts.Token)
@@ -216,11 +227,12 @@ func loginRun(opts *LoginOptions) error {
 		return loginErr
 	}
 
-	return shared.Login(&shared.LoginOptions{
+	return shared.Login(ctx, &shared.LoginOptions{
 		IO:              opts.IO,
 		Config:          authCfg,
 		HTTPClient:      httpClient,
 		PlainHTTPClient: plainHTTPClient,
+		RESTClient:      restClient,
 		Hostname:        hostname,
 		Interactive:     opts.Interactive,
 		Web:             opts.Web,

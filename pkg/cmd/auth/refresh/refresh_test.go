@@ -2,6 +2,7 @@ package refresh
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -517,6 +518,7 @@ func Test_refreshRun(t *testing.T) {
 			tt.opts.PlainHttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: httpReg}, nil
 			}
+			tt.opts.GitHubRESTAnonymous = httpmock.RESTClientFuncAnonymous(httpReg)
 
 			pm := &prompter.PrompterMock{}
 			if tt.prompterStubs != nil {
@@ -524,7 +526,7 @@ func Test_refreshRun(t *testing.T) {
 			}
 			tt.opts.Prompter = pm
 
-			err := refreshRun(tt.opts)
+			err := refreshRun(context.Background(), tt.opts)
 			if tt.wantErr != "" {
 				require.Contains(t, err.Error(), tt.wantErr)
 				return

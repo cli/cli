@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
@@ -261,6 +263,7 @@ func TestLogin(t *testing.T) {
 			tt.opts.IO = ios
 			tt.opts.Config = &cfg
 			tt.opts.HTTPClient = &http.Client{Transport: reg}
+			tt.opts.RESTClient = mustRESTClient(t, reg)
 			tt.opts.CredentialFlow = &GitCredentialFlow{
 				// Intentionally not instantiating anything in here because the tests do not hit this code path.
 				// Right now it's better to panic if we write a test that hits the code than say, start calling
@@ -273,7 +276,7 @@ func TestLogin(t *testing.T) {
 				tt.runStubs(t, rs, &tt.opts)
 			}
 
-			err := Login(&tt.opts)
+			err := Login(context.Background(), &tt.opts)
 
 			if tt.wantsErr != "" {
 				assert.EqualError(t, err, tt.wantsErr)
@@ -313,6 +316,7 @@ func TestAuthenticatingGitCredentials(t *testing.T) {
 		IO:          ios,
 		Config:      tinyConfig{},
 		HTTPClient:  &http.Client{Transport: reg},
+		RESTClient:  mustRESTClient(t, reg),
 		Hostname:    "example.com",
 		Interactive: true,
 		GitProtocol: "https",
@@ -341,7 +345,7 @@ func TestAuthenticatingGitCredentials(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, Login(opts))
+	require.NoError(t, Login(context.Background(), opts))
 
 	helper, err := opts.CredentialFlow.HelperConfig.ConfiguredHelper("example.com")
 	require.NoError(t, err)
@@ -386,4 +390,11 @@ func Test_scopesSentence(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustRESTClient(t *testing.T, reg *httpmock.Registry) *githubrest.Client {
+	t.Helper()
+	client, err := httpmock.RESTClientFuncAnonymous(reg)("example.com")
+	require.NoError(t, err)
+	return client
 }

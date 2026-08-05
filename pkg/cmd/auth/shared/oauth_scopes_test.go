@@ -2,12 +2,14 @@ package shared
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_HasMinimumScopes(t *testing.T) {
@@ -45,8 +47,10 @@ func Test_HasMinimumScopes(t *testing.T) {
 				}, nil
 			})
 
-			client := http.Client{Transport: fakehttp}
-			err := HasMinimumScopes(&client, "github.com", "ATOKEN")
+			client, err := httpmock.RESTClientFuncAnonymous(fakehttp)("github.com")
+			require.NoError(t, err)
+
+			err = HasMinimumScopes(context.Background(), client, "github.com", "ATOKEN")
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 			} else {

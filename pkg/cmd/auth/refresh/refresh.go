@@ -1,6 +1,7 @@
 package refresh
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -21,11 +23,12 @@ type token string
 type username string
 
 type RefreshOptions struct {
-	IO              *iostreams.IOStreams
-	Config          func() (gh.Config, error)
-	PlainHttpClient func() (*http.Client, error)
-	GitClient       *git.Client
-	Prompter        shared.Prompt
+	IO                  *iostreams.IOStreams
+	Config              func() (gh.Config, error)
+	PlainHttpClient     func() (*http.Client, error)
+	GitHubRESTAnonymous func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
+	GitClient           *git.Client
+	Prompter            shared.Prompt
 
 	MainExecutable string
 
@@ -48,9 +51,10 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			t, u, err := authflow.AuthFlow(httpClient, hostname, io, "", scopes, interactive, f.Browser, clipboard)
 			return token(t), username(u), err
 		},
-		PlainHttpClient: f.PlainHttpClient,
-		GitClient:       f.GitClient,
-		Prompter:        f.Prompter,
+		PlainHttpClient:     f.PlainHttpClient,
+		GitHubRESTAnonymous: f.GitHubRESTAnonymous,
+		GitClient:           f.GitClient,
+		Prompter:            f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -105,7 +109,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			if runF != nil {
 				return runF(opts)
 			}
-			return refreshRun(opts)
+			return refreshRun(cmd.Context(), opts)
 		},
 	}
 
@@ -124,7 +128,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	return cmd
 }
 
-func refreshRun(opts *RefreshOptions) error {
+func refreshRun(ctx context.Context, opts *RefreshOptions) error {
 	plainHTTPClient, err := opts.PlainHttpClient()
 	if err != nil {
 		return err
@@ -174,9 +178,16 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes := set.NewStringSet()
 
+	// An anonymous client, because the scopes wanted are those of the token
+	// being replaced, not of whichever token is active now.
+	restClient, err := opts.GitHubRESTAnonymous(hostname)
+	if err != nil {
+		return err
+	}
+
 	if !opts.ResetScopes {
 		if oldToken, _ := authCfg.ActiveToken(hostname); oldToken != "" {
-			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken); err == nil {
+			if oldScopes, err := shared.GetScopes(ctx, restClient, hostname, oldToken); err == nil {
 				for _, s := range strings.Split(oldScopes, ",") {
 					s = strings.TrimSpace(s)
 					if s != "" {

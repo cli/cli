@@ -731,6 +731,7 @@ func Test_statusRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubRESTAnonymous = httpmock.RESTClientFuncAnonymous(reg)
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
@@ -745,7 +746,7 @@ func Test_statusRun(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			err := statusRun(&tt.opts)
+			err := statusRun(context.Background(), &tt.opts)
 			if tt.wantErr != nil {
 				require.Equal(t, err, tt.wantErr)
 			} else {
