@@ -1,4 +1,4 @@
-package githubv3
+package githubrest
 
 import (
 	"fmt"
