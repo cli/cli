@@ -211,3 +211,22 @@ func TestCategorizeHost(t *testing.T) {
 		})
 	}
 }
+
+func TestUploadHost(t *testing.T) {
+	tests := []struct {
+		hostname string
+		want     string
+	}{
+		{hostname: "github.com", want: "uploads.github.com"},
+		{hostname: "github.localhost", want: "uploads.github.localhost"},
+		{hostname: "tenant.ghe.com", want: "uploads.tenant.ghe.com"},
+		{hostname: "garage.github.com", want: "garage.github.com"},
+		{hostname: "github.example.com", want: "github.example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.hostname, func(t *testing.T) {
+			assert.Equal(t, tt.want, UploadHost(tt.hostname))
+		})
+	}
+}

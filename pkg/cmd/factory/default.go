@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -13,11 +14,14 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 var ssoHeader string
@@ -33,6 +37,9 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 
 	f.IOStreams = ios
 	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
+	restClients := newGitHubRESTClientFactory(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
+	f.GitHubREST = restClients.Authenticated
+	f.GitHubRESTAnonymous = restClients.Anonymous
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
 	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
 	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
@@ -183,6 +190,86 @@ func remotesFunc(f *cmdutil.Factory) func() (ghContext.Remotes, error) {
 		getConfig: f.Config,
 	}
 	return rr.Resolver()
+}
+
+// gitHubRESTClientFactory builds githubrest.Clients that share one transport.
+//
+// The transport is built once and reused, because it carries the HTTP cache and
+// connection pool and building one per host would throw both away. Clients
+// themselves are not cached: a client is a base URL, a token and a set of
+// options, so constructing one is cheap, and caching by host alone would hand
+// back a client carrying options a previous caller asked for.
+type gitHubRESTClientFactory struct {
+	cfgFunc func() (gh.Config, error)
+
+	httpClientOnce sync.Once
+	httpClient     *http.Client
+	httpClientErr  error
+	newHTTPClient  func() (*http.Client, error)
+}
+
+func newGitHubRESTClientFactory(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) *gitHubRESTClientFactory {
+	return &gitHubRESTClientFactory{
+		cfgFunc: cfgFunc,
+		newHTTPClient: func() (*http.Client, error) {
+			client, err := githubrest.NewHTTPClient(githubrest.HTTPClientOptions{
+				AppVersion:        appVersion,
+				InvokingAgent:     invokingAgent,
+				Log:               ios.ErrOut,
+				LogColorize:       ios.ColorEnabled(),
+				TelemetryDisabler: telemetryDisabler,
+			})
+			if err != nil {
+				return nil, err
+			}
+			client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
+			return client, nil
+		},
+	}
+}
+
+func (f *gitHubRESTClientFactory) sharedHTTPClient() (*http.Client, error) {
+	f.httpClientOnce.Do(func() {
+		f.httpClient, f.httpClientErr = f.newHTTPClient()
+	})
+	return f.httpClient, f.httpClientErr
+}
+
+// Authenticated returns a client for host carrying that host's active token.
+func (f *gitHubRESTClientFactory) Authenticated(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
+	cfg, err := f.cfgFunc()
+	if err != nil {
+		return nil, err
+	}
+
+	// An empty token is passed through rather than turned into WithoutToken.
+	// The two are different: a request with an empty credential is rejected as
+	// unauthorized, where an unauthenticated one may succeed against public
+	// data, and a command that asked for an authenticated client should hear
+	// the former.
+	token, _ := cfg.Authentication().ActiveToken(ghauth.NormalizeHostname(host))
+	return f.newClient(host, githubrest.WithToken(token), opts...)
+}
+
+// Anonymous returns a client for host that sets no Authorization header.
+func (f *gitHubRESTClientFactory) Anonymous(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
+	return f.newClient(host, githubrest.WithoutToken(), opts...)
+}
+
+func (f *gitHubRESTClientFactory) newClient(host string, auth githubrest.AuthStrategy, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
+	httpClient, err := f.sharedHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// Uploads may live on a sibling host, which is a deployment accident rather
+	// than anything a call site should reason about, so it is declared here
+	// where the deployment is already known.
+	opts = append([]githubrest.ClientOption{
+		githubrest.WithCredentialedHost(ghinstance.UploadHost(host)),
+	}, opts...)
+
+	return githubrest.NewClient(ghinstance.RESTPrefix(host), httpClient, auth, opts...)
 }
 
 func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {

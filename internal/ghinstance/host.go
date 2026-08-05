@@ -69,6 +69,24 @@ func RESTPrefix(hostname string) string {
 	return fmt.Sprintf("https://api.%s/", hostname)
 }
 
+// UploadHost returns the host that serves the REST upload endpoint for
+// hostname.
+//
+// On an Enterprise Server or garage instance uploads live on the instance
+// itself; elsewhere they live on their own subdomain, mirroring how RESTPrefix
+// puts the API on "api.". Callers need this because a release's upload_url
+// points at that host, so a client must be told it belongs to the same
+// deployment before it will send a token there.
+func UploadHost(hostname string) string {
+	if isGarage(hostname) {
+		return hostname
+	}
+	if ghauth.IsEnterprise(hostname) {
+		return hostname
+	}
+	return "uploads." + hostname
+}
+
 func GistPrefix(hostname string) string {
 	prefix := "https://"
 	if strings.EqualFold(hostname, localhost) {

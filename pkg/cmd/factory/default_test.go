@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -442,4 +444,104 @@ func defaultConfig() *ghmock.ConfigMock {
 	cfg := config.NewFromString("")
 	cfg.Set("nonsense.com", "oauth_token", "BLAH")
 	return cfg
+}
+
+func TestGitHubRESTClientFactory(t *testing.T) {
+	newFactory := func(t *testing.T, cfg gh.Config) *gitHubRESTClientFactory {
+		t.Helper()
+		ios, _, _, _ := iostreams.Test()
+		return newGitHubRESTClientFactory(func() (gh.Config, error) { return cfg, nil }, ios, "v1.2.3", "", &telemetry.NoOpService{})
+	}
+
+	// AuthConfig's token override lives on the instance, and cfg.Authentication()
+	// hands back a fresh one each call, so the same instance has to be pinned.
+	configWithToken := func(token string) gh.Config {
+		authCfg := config.NewBlankConfig().Authentication()
+		authCfg.SetActiveToken(token, "oauth_token")
+		return &ghmock.ConfigMock{
+			AuthenticationFunc: func() gh.AuthConfig { return authCfg },
+		}
+	}
+
+	t.Run("resolves the API base URL from the host", func(t *testing.T) {
+		tests := []struct {
+			host    string
+			wantURL string
+		}{
+			{host: "github.com", wantURL: "https://api.github.com/user"},
+			{host: "github.example.com", wantURL: "https://github.example.com/api/v3/user"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.host, func(t *testing.T) {
+				f := newFactory(t, config.NewBlankConfig())
+
+				client, err := f.Authenticated(tt.host)
+				require.NoError(t, err)
+
+				req, err := client.NewRequest(context.Background(), http.MethodGet, "user", nil)
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantURL, req.URL.String())
+			})
+		}
+	})
+
+	// The point of constructing per host is that the token is settled here
+	// rather than filled in per request by a transport.
+	t.Run("sets the Authorization header from the host's active token", func(t *testing.T) {
+		f := newFactory(t, configWithToken("a-token"))
+
+		client, err := f.Authenticated("github.com")
+		require.NoError(t, err)
+
+		req, err := client.NewRequest(context.Background(), http.MethodGet, "user", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "token a-token", req.Header.Get("Authorization"))
+	})
+
+	t.Run("an anonymous client sets no Authorization header", func(t *testing.T) {
+		f := newFactory(t, configWithToken("a-token"))
+
+		client, err := f.Anonymous("github.com")
+		require.NoError(t, err)
+
+		req, err := client.NewRequest(context.Background(), http.MethodGet, "user", nil)
+		require.NoError(t, err)
+		assert.Empty(t, req.Header.Get("Authorization"))
+	})
+
+	// A release's upload_url points at a sibling host on github.com, and a
+	// client refuses to send its token to a host it was not told about.
+	t.Run("credentials the upload host", func(t *testing.T) {
+		f := newFactory(t, config.NewBlankConfig())
+
+		client, err := f.Authenticated("github.com")
+		require.NoError(t, err)
+
+		_, err = client.NewRequest(context.Background(), http.MethodPost, "https://uploads.github.com/repos/OWNER/REPO/releases/1/assets?name=x", nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("passes caller options through", func(t *testing.T) {
+		f := newFactory(t, config.NewBlankConfig())
+
+		client, err := f.Authenticated("github.com", githubrest.WithCredentialedHost("codeload.github.com"))
+		require.NoError(t, err)
+
+		_, err = client.NewRequest(context.Background(), http.MethodGet, "https://codeload.github.com/OWNER/REPO/zip", nil)
+		require.NoError(t, err)
+	})
+
+	// The transport carries the HTTP cache and connection pool, so rebuilding
+	// it per host would throw both away.
+	t.Run("shares one transport across clients", func(t *testing.T) {
+		f := newFactory(t, config.NewBlankConfig())
+
+		first, err := f.sharedHTTPClient()
+		require.NoError(t, err)
+		second, err := f.sharedHTTPClient()
+		require.NoError(t, err)
+
+		assert.Same(t, first, second)
+	})
 }
