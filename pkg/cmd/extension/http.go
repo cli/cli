@@ -18,11 +18,14 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+
+	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
 	if err != nil {
 		return false, err
 	}
 
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to its exact-status contract and body-blind response handling.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return false, err
@@ -30,9 +33,9 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
-	case 200:
+	case http.StatusOK:
 		return true, nil
-	case 404:
+	case http.StatusNotFound:
 		return false, nil
 	default:
 		return false, api.HandleHTTPError(resp)
@@ -40,27 +43,22 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 }
 
 func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "contents", repo.RepoName())
-	if err != nil {
-		return false, err
-	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "contents", repo.RepoName())
 	if err != nil {
 		return false, err
 	}
 
-	resp, err := httpClient.Do(req)
+	// The response body is not decoded, because a script is considered present for any
+	// successful response regardless of the content type reported.
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodGet, path.String(), nil, nil)
 	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		return false, nil
-	}
-
-	if resp.StatusCode > 299 {
-		err = api.HandleHTTPError(resp)
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 
@@ -87,6 +85,8 @@ func downloadAsset(httpClient *http.Client, assetURL safeurl.SafeURL, destPath s
 	req.Header.Set("Accept", "application/octet-stream")
 
 	var resp *http.Response
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to its custom Accept header and binary response streaming.
 	if resp, downloadErr = httpClient.Do(req); downloadErr != nil {
 		return
 	}
@@ -117,36 +117,26 @@ var repositoryNotFoundErr = errors.New("repository not found")
 
 // fetchLatestRelease finds the latest published release for a repository.
 func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "latest")
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+	path, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "latest")
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
+	var data json.RawMessage
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(baseRepo.RepoHost(), http.MethodGet, path.String(), nil, &data)
 	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		return nil, releaseNotFoundErr
-	}
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return nil, releaseNotFoundErr
+		}
 		return nil, err
 	}
 
 	var r release
-	err = json.Unmarshal(b, &r)
-	if err != nil {
+	if err := json.Unmarshal(data, &r); err != nil {
 		return nil, err
 	}
 
@@ -155,36 +145,26 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 
 // fetchReleaseFromTag finds release by tag name for a repository
 func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*release, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "tags", tagName)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+	path, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
+	var data json.RawMessage
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(baseRepo.RepoHost(), http.MethodGet, path.String(), nil, &data)
 	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode == 404 {
-		return nil, releaseNotFoundErr
-	}
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return nil, releaseNotFoundErr
+		}
 		return nil, err
 	}
 
 	var r release
-	err = json.Unmarshal(b, &r)
-	if err != nil {
+	if err := json.Unmarshal(data, &r); err != nil {
 		return nil, err
 	}
 
@@ -203,6 +183,8 @@ func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRe
 	}
 
 	req.Header.Set("Accept", "application/vnd.github.v3.sha")
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to its custom Accept header and bare SHA response body.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err

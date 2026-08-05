@@ -185,6 +185,10 @@ For host resolution, use `cfg.Authentication().DefaultHost()`; do not use `ghins
 
 Avoid extra round-trips.
 
+## Pull Requests
+
+Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the PR body. Keep its headings and HTML comments, and fill in every section; write "N/A" rather than deleting one.
+
 ## Code Review
 
 Review pull requests with the [`cli-code-reviewer` skill](.github/skills/cli-code-reviewer/SKILL.md).
