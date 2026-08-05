@@ -116,5 +116,5 @@ func deleteAsset(httpClient *http.Client, host string, assetURL safeurl.SafeURL)
 	// TODO(api-client-rollout)
 	// This line of code is part of a mechanical roll out of the api client.
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	return api.NewClientFromHTTP(httpClient).REST(host, "DELETE", assetURL.String(), nil, nil)
+	return api.NewClientFromHTTP(httpClient).REST(host, http.MethodDelete, assetURL.String(), nil, nil)
 }

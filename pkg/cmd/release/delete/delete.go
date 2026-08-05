@@ -125,7 +125,7 @@ func deleteRelease(httpClient *http.Client, host string, releaseURL safeurl.Safe
 	// TODO(api-client-rollout)
 	// This line of code is part of a mechanical roll out of the api client.
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	return api.NewClientFromHTTP(httpClient).REST(host, "DELETE", releaseURL.String(), nil, nil)
+	return api.NewClientFromHTTP(httpClient).REST(host, http.MethodDelete, releaseURL.String(), nil, nil)
 }
 
 func deleteTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) error {
@@ -136,5 +136,5 @@ func deleteTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName strin
 	// TODO(api-client-rollout)
 	// This line of code is part of a mechanical roll out of the api client.
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	return api.NewClientFromHTTP(httpClient).REST(baseRepo.RepoHost(), "DELETE", path.String(), nil, nil)
+	return api.NewClientFromHTTP(httpClient).REST(baseRepo.RepoHost(), http.MethodDelete, path.String(), nil, nil)
 }
