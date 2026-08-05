@@ -1,6 +1,7 @@
 package view
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
@@ -27,6 +29,7 @@ type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Browser    browser
 	Prompter   prompter.Prompter
 
@@ -44,6 +47,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Browser:    f.Browser,
 		Prompter:   f.Prompter,
 	}
@@ -65,7 +69,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return viewRun(opts)
+			return viewRun(cmd.Context(), opts)
 		},
 	}
 
@@ -78,7 +82,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
-func viewRun(opts *ViewOptions) error {
+func viewRun(ctx context.Context, opts *ViewOptions) error {
 	gistID := opts.Selector
 
 	if opts.AllowEscapeSequences {
@@ -96,6 +100,11 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	hostname, _ := cfg.Authentication().DefaultHost()
+
+	restClient, err := opts.GitHubREST(hostname)
+	if err != nil {
+		return err
+	}
 
 	cs := opts.IO.ColorScheme()
 	if gistID == "" {
@@ -134,7 +143,7 @@ func viewRun(opts *ViewOptions) error {
 		gistID = id
 	}
 
-	gist, err := shared.GetGist(client, hostname, gistID)
+	gist, err := shared.GetGist(ctx, restClient, gistID)
 	if err != nil {
 		return err
 	}

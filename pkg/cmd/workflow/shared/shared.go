@@ -2,15 +2,16 @@ package shared
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"path"
 	"strconv"
 	"strings"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
@@ -55,7 +56,7 @@ func (w *Workflow) ExportData(fields []string) map[string]interface{} {
 	return cmdutil.StructExportData(w, fields)
 }
 
-func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workflow, error) {
+func GetWorkflows(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, limit int) ([]Workflow, error) {
 	perPage := limit
 	page := 1
 	if limit > 100 || limit == 0 {
@@ -77,8 +78,11 @@ func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workf
 		u.SetQuery("per_page", strconv.Itoa(perPage))
 		u.SetQuery("page", strconv.Itoa(page))
 
-		err = client.REST(repo.RepoHost(), "GET", u.String(), nil, &result)
+		req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
 		if err != nil {
+			return nil, err
+		}
+		if _, err := client.Do(req, &result); err != nil {
 			return nil, err
 		}
 
@@ -129,13 +133,13 @@ func selectWorkflow(p iprompter, workflows []Workflow, promptMsg string, states 
 }
 
 // FindWorkflow looks up a workflow either by numeric database ID, file name, or its Name field
-func FindWorkflow(client *api.Client, repo ghrepo.Interface, workflowSelector string, states []WorkflowState) ([]Workflow, error) {
+func FindWorkflow(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, workflowSelector string, states []WorkflowState) ([]Workflow, error) {
 	if workflowSelector == "" {
 		return nil, errors.New("empty workflow selector")
 	}
 
 	if _, err := strconv.Atoi(workflowSelector); err == nil || isWorkflowFile(workflowSelector) {
-		workflow, err := getWorkflowByID(client, repo, workflowSelector)
+		workflow, err := getWorkflowByID(ctx, client, repo, workflowSelector)
 		if err != nil {
 			var httpErr *githubrest.ErrorResponse
 			if errors.As(err, &httpErr) {
@@ -149,11 +153,11 @@ func FindWorkflow(client *api.Client, repo ghrepo.Interface, workflowSelector st
 		return []Workflow{*workflow}, nil
 	}
 
-	return getWorkflowsByName(client, repo, workflowSelector, states)
+	return getWorkflowsByName(ctx, client, repo, workflowSelector, states)
 }
 
-func GetWorkflow(client *api.Client, repo ghrepo.Interface, workflowID int64) (*Workflow, error) {
-	return getWorkflowByID(client, repo, strconv.FormatInt(workflowID, 10))
+func GetWorkflow(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, workflowID int64) (*Workflow, error) {
+	return getWorkflowByID(ctx, client, repo, strconv.FormatInt(workflowID, 10))
 }
 
 func isWorkflowFile(f string) bool {
@@ -162,22 +166,26 @@ func isWorkflowFile(f string) bool {
 }
 
 // ID can be either a numeric database ID or the workflow file name
-func getWorkflowByID(client *api.Client, repo ghrepo.Interface, ID string) (*Workflow, error) {
+func getWorkflowByID(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, ID string) (*Workflow, error) {
 	var workflow Workflow
 
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "workflows", ID)
 	if err != nil {
 		return nil, err
 	}
-	if err := client.REST(repo.RepoHost(), "GET", path.String(), nil, &workflow); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &workflow); err != nil {
 		return nil, err
 	}
 
 	return &workflow, nil
 }
 
-func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, name string, states []WorkflowState) ([]Workflow, error) {
-	workflows, err := GetWorkflows(client, repo, 0)
+func getWorkflowsByName(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, name string, states []WorkflowState) ([]Workflow, error) {
+	workflows, err := GetWorkflows(ctx, client, repo, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't fetch workflows for %s: %w", ghrepo.FullName(repo), err)
 	}
@@ -198,9 +206,9 @@ func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, name string, 
 	return filtered, nil
 }
 
-func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, repo ghrepo.Interface, prompt bool, workflowSelector string, states []WorkflowState) (*Workflow, error) {
+func ResolveWorkflow(ctx context.Context, p iprompter, io *iostreams.IOStreams, client *githubrest.Client, repo ghrepo.Interface, prompt bool, workflowSelector string, states []WorkflowState) (*Workflow, error) {
 	if prompt {
-		workflows, err := GetWorkflows(client, repo, 0)
+		workflows, err := GetWorkflows(ctx, client, repo, 0)
 		if len(workflows) == 0 {
 			err = errors.New("no workflows are enabled")
 		}
@@ -217,7 +225,7 @@ func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, r
 		return selectWorkflow(p, workflows, "Select a workflow", states)
 	}
 
-	workflows, err := FindWorkflow(client, repo, workflowSelector, states)
+	workflows, err := FindWorkflow(ctx, client, repo, workflowSelector, states)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +249,7 @@ func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, r
 	return selectWorkflow(p, workflows, "Which workflow do you mean?", states)
 }
 
-func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Workflow, ref string) ([]byte, error) {
+func GetWorkflowContent(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, workflow Workflow, ref string) ([]byte, error) {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "contents", workflow.Path)
 	if err != nil {
 		return nil, err
@@ -255,8 +263,11 @@ func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Work
 	}
 
 	var result Result
-	err = client.REST(repo.RepoHost(), "GET", path.String(), nil, &result)
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &result); err != nil {
 		return nil, err
 	}
 

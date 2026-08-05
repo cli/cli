@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -165,9 +164,7 @@ func TestRunDelete(t *testing.T) {
 		// mock http
 		reg := &httpmock.Registry{}
 		tt.httpStubs(reg)
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		// mock IO
 		ios, _, stdout, _ := iostreams.Test()
@@ -184,7 +181,7 @@ func TestRunDelete(t *testing.T) {
 
 		// execute test
 		t.Run(tt.name, func(t *testing.T) {
-			err := runDelete(tt.opts)
+			err := runDelete(t.Context(), tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {

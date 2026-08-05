@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -18,7 +19,9 @@ func TestUserKeysHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	keys, err := UserKeys(&http.Client{Transport: reg}, "github.com", "")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	keys, err := UserKeys(context.Background(), client, "")
 
 	assert.Nil(t, keys)
 	var httpErr *githubrest.ErrorResponse

@@ -33,6 +33,7 @@ type hostConfig interface {
 
 type StatusOptions struct {
 	HttpClient   func() (*http.Client, error)
+	GitHubREST   func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	HostConfig   hostConfig
 	CachedClient func(*http.Client, time.Duration) *http.Client
 	IO           *iostreams.IOStreams
@@ -47,6 +48,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 	opts.HttpClient = f.HttpClient
+	opts.GitHubREST = f.GitHubREST
 	opts.IO = f.IOStreams
 	cmd := &cobra.Command{
 		Use:   "status",
@@ -76,7 +78,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return statusRun(opts)
+			return statusRun(cmd.Context(), opts)
 		},
 	}
 
@@ -172,6 +174,7 @@ type stringSet interface {
 
 type StatusGetter struct {
 	Client         *http.Client
+	restClient     *githubrest.Client
 	cachedClient   func(*http.Client, time.Duration) *http.Client
 	host           string
 	Org            string
@@ -189,9 +192,10 @@ type StatusGetter struct {
 	usernameMu      sync.Mutex
 }
 
-func NewStatusGetter(client *http.Client, hostname string, opts *StatusOptions) *StatusGetter {
+func NewStatusGetter(client *http.Client, restClient *githubrest.Client, hostname string, opts *StatusOptions) *StatusGetter {
 	return &StatusGetter{
 		Client:       client,
+		restClient:   restClient,
 		Org:          opts.Org,
 		Exclude:      opts.Exclude,
 		cachedClient: opts.CachedClient,
@@ -235,7 +239,7 @@ func (s *StatusGetter) CurrentUsername() (string, error) {
 	return currentUsername, nil
 }
 
-func (s *StatusGetter) ActualMention(commentURL safeurl.SafeURL) (string, error) {
+func (s *StatusGetter) ActualMention(ctx context.Context, commentURL safeurl.SafeURL) (string, error) {
 	currentUsername, err := s.CurrentUsername()
 	if err != nil {
 		return "", err
@@ -243,12 +247,14 @@ func (s *StatusGetter) ActualMention(commentURL safeurl.SafeURL) (string, error)
 
 	// long cache period since once a comment is looked up, it never needs to be
 	// consulted again.
-	cachedClient := s.CachedClient(time.Hour * 24 * 30)
-	c := api.NewClientFromHTTP(cachedClient)
 	resp := struct {
 		Body string
 	}{}
-	if err := c.REST(s.hostname(), "GET", commentURL.String(), nil, &resp); err != nil {
+	req, err := s.restClient.NewRequest(ctx, "GET", commentURL.String(), nil, githubrest.WithCacheTTL(time.Hour*24*30))
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.restClient.Do(req, &resp); err != nil {
 		return "", err
 	}
 
@@ -263,12 +269,11 @@ func (s *StatusGetter) ActualMention(commentURL safeurl.SafeURL) (string, error)
 // work
 
 // Populate .Mentions
-func (s *StatusGetter) LoadNotifications() error {
+func (s *StatusGetter) LoadNotifications(ctx context.Context) error {
 	perPage := 100
-	c := api.NewClientFromHTTP(s.Client)
 
 	fetchWorkers := 10
-	ctx, abortFetching := context.WithCancel(context.Background())
+	fetchCtx, abortFetching := context.WithCancel(ctx)
 	defer abortFetching()
 	toFetch := make(chan Notification)
 	fetched := make(chan StatusItem)
@@ -278,13 +283,13 @@ func (s *StatusGetter) LoadNotifications() error {
 		wg.Go(func() error {
 			for {
 				select {
-				case <-ctx.Done():
+				case <-fetchCtx.Done():
 					return nil
 				case n, ok := <-toFetch:
 					if !ok {
 						return nil
 					}
-					actual, err := s.ActualMention(safeurl.NewImmutableSafeURL(n.Subject.LatestCommentURL))
+					actual, err := s.ActualMention(ctx, safeurl.NewImmutableSafeURL(n.Subject.LatestCommentURL))
 
 					if err != nil {
 						var httpErr *githubrest.ErrorResponse
@@ -344,7 +349,11 @@ func (s *StatusGetter) LoadNotifications() error {
 	var p safeurl.SafeURL = u
 	for pages := 0; pages < 3; pages++ {
 		var resp []Notification
-		next, err := c.RESTWithNext(s.hostname(), "GET", p.String(), nil, &resp)
+		req, err := s.restClient.NewRequest(ctx, "GET", p.String(), nil)
+		if err != nil {
+			return err
+		}
+		httpResp, err := s.restClient.Do(req, &resp)
 		if err != nil {
 			var httpErr *githubrest.ErrorResponse
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
@@ -367,6 +376,10 @@ func (s *StatusGetter) LoadNotifications() error {
 			toFetch <- n
 		}
 
+		next := ""
+		if httpResp != nil {
+			next = httpResp.NextPage()
+		}
 		if next == "" || len(resp) < perPage {
 			break
 		}
@@ -532,9 +545,8 @@ func (s *StatusGetter) LoadSearchResults() error {
 }
 
 // Populate .RepoActivity
-func (s *StatusGetter) LoadEvents() error {
+func (s *StatusGetter) LoadEvents(ctx context.Context) error {
 	perPage := 100
-	c := api.NewClientFromHTTP(s.Client)
 
 	currentUsername, err := s.CurrentUsername()
 	if err != nil {
@@ -551,7 +563,11 @@ func (s *StatusGetter) LoadEvents() error {
 	u.SetQuery("per_page", strconv.Itoa(perPage))
 	var p safeurl.SafeURL = u
 	for pages < 2 {
-		next, err := c.RESTWithNext(s.hostname(), "GET", p.String(), nil, &resp)
+		req, err := s.restClient.NewRequest(ctx, "GET", p.String(), nil)
+		if err != nil {
+			return err
+		}
+		httpResp, err := s.restClient.Do(req, &resp)
 		if err != nil {
 			var httpErr *githubrest.ErrorResponse
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
@@ -559,6 +575,10 @@ func (s *StatusGetter) LoadEvents() error {
 			}
 		}
 		events = append(events, resp...)
+		next := ""
+		if httpResp != nil {
+			next = httpResp.NextPage()
+		}
 		if next == "" || len(resp) < perPage {
 			break
 		}
@@ -634,7 +654,7 @@ func (s *StatusGetter) HasAuthErrors() bool {
 	return s.authErrors != nil && s.authErrors.Len() > 0
 }
 
-func statusRun(opts *StatusOptions) error {
+func statusRun(ctx context.Context, opts *StatusOptions) error {
 	client, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("could not create client: %w", err)
@@ -642,19 +662,24 @@ func statusRun(opts *StatusOptions) error {
 
 	hostname, _ := opts.HostConfig.DefaultHost()
 
-	sg := NewStatusGetter(client, hostname, opts)
+	restClient, err := opts.GitHubREST(hostname)
+	if err != nil {
+		return fmt.Errorf("could not create client: %w", err)
+	}
+
+	sg := NewStatusGetter(client, restClient, hostname, opts)
 
 	// TODO break out sections into individual subcommands
 
 	g := new(errgroup.Group)
 	g.Go(func() error {
-		if err := sg.LoadNotifications(); err != nil {
+		if err := sg.LoadNotifications(ctx); err != nil {
 			return fmt.Errorf("could not load notifications: %w", err)
 		}
 		return nil
 	})
 	g.Go(func() error {
-		if err := sg.LoadEvents(); err != nil {
+		if err := sg.LoadEvents(ctx); err != nil {
 			return fmt.Errorf("could not load events: %w", err)
 		}
 		return nil

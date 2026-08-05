@@ -1,13 +1,13 @@
 package delete
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
@@ -20,7 +20,7 @@ import (
 
 type DeleteOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 
 	DeleteAll         bool
@@ -32,7 +32,7 @@ type DeleteOptions struct {
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -106,7 +106,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return deleteRun(opts)
+			return deleteRun(cmd.Context(), opts)
 		},
 	}
 
@@ -117,22 +117,21 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	return cmd
 }
 
-func deleteRun(opts *DeleteOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("failed to create http client: %w", err)
-	}
-	client := api.NewClientFromHTTP(httpClient)
-
+func deleteRun(ctx context.Context, opts *DeleteOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("failed to determine base repo: %w", err)
 	}
 
+	client, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return fmt.Errorf("failed to create http client: %w", err)
+	}
+
 	var toDelete []string
 	if opts.DeleteAll {
 		opts.IO.StartProgressIndicator()
-		caches, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: -1, Ref: opts.Ref})
+		caches, err := shared.GetCaches(ctx, client, repo, shared.GetCachesOptions{Limit: -1, Ref: opts.Ref})
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
@@ -154,10 +153,10 @@ func deleteRun(opts *DeleteOptions) error {
 		toDelete = append(toDelete, opts.Identifier)
 	}
 
-	return deleteCaches(opts, client, repo, toDelete)
+	return deleteCaches(ctx, opts, client, repo, toDelete)
 }
 
-func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface, toDelete []string) error {
+func deleteCaches(ctx context.Context, opts *DeleteOptions, client *githubrest.Client, repo ghrepo.Interface, toDelete []string) error {
 	cs := opts.IO.ColorScheme()
 	repoName := ghrepo.FullName(repo)
 	opts.IO.StartProgressIndicator()
@@ -167,10 +166,10 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 		var count int
 		var err error
 		if id, ok := parseCacheID(cache); ok {
-			err = deleteCacheByID(client, repo, id)
+			err = deleteCacheByID(ctx, client, repo, id)
 			count = 1
 		} else {
-			count, err = deleteCacheByKey(client, repo, cache, opts.Ref)
+			count, err = deleteCacheByKey(ctx, client, repo, cache, opts.Ref)
 		}
 
 		if err != nil {
@@ -202,13 +201,18 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 	return nil
 }
 
-func deleteCacheByID(client *api.Client, repo ghrepo.Interface, id int64) error {
+func deleteCacheByID(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, id int64) error {
 	// returns HTTP 204 (NO CONTENT) on success
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "caches", strconv.FormatInt(id, 10))
 	if err != nil {
 		return err
 	}
-	return client.REST(repo.RepoHost(), "DELETE", path.String(), nil, nil)
+	req, err := client.NewRequest(ctx, http.MethodDelete, path.String(), nil)
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(req, nil)
+	return err
 }
 
 // deleteCacheByKey deletes cache entries by given key (and optional ref) and
@@ -217,7 +221,7 @@ func deleteCacheByID(client *api.Client, repo ghrepo.Interface, id int64) error 
 // Note that a key/ref combination does not necessarily map to a single cache
 // entry. There may be more than one entries with the same key/ref combination,
 // but those entries will have different IDs.
-func deleteCacheByKey(client *api.Client, repo ghrepo.Interface, key, ref string) (int, error) {
+func deleteCacheByKey(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, key, ref string) (int, error) {
 	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "caches")
 	if err != nil {
 		return 0, err
@@ -226,9 +230,12 @@ func deleteCacheByKey(client *api.Client, repo ghrepo.Interface, key, ref string
 	if ref != "" {
 		u.SetQuery("ref", ref)
 	}
-	var payload shared.CachePayload
-	err = client.REST(repo.RepoHost(), "DELETE", u.String(), nil, &payload)
+	req, err := client.NewRequest(ctx, http.MethodDelete, u.String(), nil)
 	if err != nil {
+		return 0, err
+	}
+	var payload shared.CachePayload
+	if _, err := client.Do(req, &payload); err != nil {
 		return 0, err
 	}
 

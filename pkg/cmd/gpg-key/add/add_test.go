@@ -1,6 +1,7 @@
 package add
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -23,7 +24,9 @@ func Test_gpgKeyUploadScopesMissing(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	err := gpgKeyUpload(&http.Client{Transport: reg}, "github.com", strings.NewReader("-----BEGIN PGP PUBLIC KEY BLOCK-----"), "")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	err = gpgKeyUpload(context.Background(), client, strings.NewReader("-----BEGIN PGP PUBLIC KEY BLOCK-----"), "")
 
 	require.Same(t, errScopesMissing, err)
 }
@@ -44,7 +47,9 @@ func Test_gpgKeyUploadDuplicateKeyBeforeWrongFormat(t *testing.T) {
 		}`), "Content-Type", "application/json"),
 	)
 
-	err := gpgKeyUpload(&http.Client{Transport: reg}, "github.com", strings.NewReader("binary-key"), "")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	err = gpgKeyUpload(context.Background(), client, strings.NewReader("binary-key"), "")
 
 	require.Same(t, errDuplicateKey, err)
 }
@@ -64,7 +69,9 @@ func Test_gpgKeyUploadWrongFormat(t *testing.T) {
 		}`),
 	)
 
-	err := gpgKeyUpload(&http.Client{Transport: reg}, "github.com", strings.NewReader("binary-key"), "")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	err = gpgKeyUpload(context.Background(), client, strings.NewReader("binary-key"), "")
 
 	require.Same(t, errWrongFormat, err)
 }
@@ -80,7 +87,9 @@ func Test_gpgKeyUploadHTTPError(t *testing.T) {
 		),
 	)
 
-	err := gpgKeyUpload(&http.Client{Transport: reg}, "github.com", strings.NewReader("-----BEGIN PGP PUBLIC KEY BLOCK-----"), "")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	err = gpgKeyUpload(context.Background(), client, strings.NewReader("-----BEGIN PGP PUBLIC KEY BLOCK-----"), "")
 
 	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
@@ -197,9 +206,7 @@ func Test_runAdd(t *testing.T) {
 		reg := &httpmock.Registry{}
 
 		tt.opts.IO = ios
-		tt.opts.HTTPClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		if tt.httpStubs != nil {
 			tt.httpStubs(reg)
 		}
@@ -209,7 +216,7 @@ func Test_runAdd(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			err := runAdd(&tt.opts)
+			err := runAdd(context.Background(), &tt.opts)
 			if tt.wantErrMsg != "" {
 				assert.Equal(t, tt.wantErrMsg, err.Error())
 			} else {

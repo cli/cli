@@ -1,14 +1,15 @@
 package list
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
@@ -25,7 +26,7 @@ func TestListRun(t *testing.T) {
 		{
 			name: "list authentication and signing keys; in tty",
 			opts: ListOptions{
-				HTTPClient: func() (*http.Client, error) {
+				GitHubREST: func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 					createdAt := time.Now().Add(time.Duration(-24) * time.Hour)
 					reg := &httpmock.Registry{}
 					reg.Register(
@@ -56,7 +57,7 @@ func TestListRun(t *testing.T) {
 							}
 						]`, createdAt.Format(time.RFC3339))),
 					)
-					return &http.Client{Transport: reg}, nil
+					return httpmock.RESTClientFunc(reg)(host, opts...)
 				},
 			},
 			isTTY: true,
@@ -71,7 +72,7 @@ func TestListRun(t *testing.T) {
 		{
 			name: "list authentication and signing keys; in non-tty",
 			opts: ListOptions{
-				HTTPClient: func() (*http.Client, error) {
+				GitHubREST: func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 					createdAt, _ := time.Parse(time.RFC3339, "2020-08-31T15:44:24+02:00")
 					reg := &httpmock.Registry{}
 					reg.Register(
@@ -102,7 +103,7 @@ func TestListRun(t *testing.T) {
 							}
 						]`, createdAt.Format(time.RFC3339))),
 					)
-					return &http.Client{Transport: reg}, nil
+					return httpmock.RESTClientFunc(reg)(host, opts...)
 				},
 			},
 			isTTY: false,
@@ -116,7 +117,7 @@ func TestListRun(t *testing.T) {
 		{
 			name: "only authentication ssh keys are available",
 			opts: ListOptions{
-				HTTPClient: func() (*http.Client, error) {
+				GitHubREST: func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 					createdAt := time.Now().Add(time.Duration(-24) * time.Hour)
 					reg := &httpmock.Registry{}
 					reg.Register(
@@ -134,7 +135,7 @@ func TestListRun(t *testing.T) {
 						httpmock.REST("GET", "user/ssh_signing_keys"),
 						httpmock.StatusStringResponse(404, "Not Found"),
 					)
-					return &http.Client{Transport: reg}, nil
+					return httpmock.RESTClientFunc(reg)(host, opts...)
 				},
 			},
 			wantStdout: heredoc.Doc(`
@@ -150,7 +151,7 @@ func TestListRun(t *testing.T) {
 		{
 			name: "only signing ssh keys are available",
 			opts: ListOptions{
-				HTTPClient: func() (*http.Client, error) {
+				GitHubREST: func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 					createdAt := time.Now().Add(time.Duration(-24) * time.Hour)
 					reg := &httpmock.Registry{}
 					reg.Register(
@@ -168,7 +169,7 @@ func TestListRun(t *testing.T) {
 						httpmock.REST("GET", "user/keys"),
 						httpmock.StatusStringResponse(404, "Not Found"),
 					)
-					return &http.Client{Transport: reg}, nil
+					return httpmock.RESTClientFunc(reg)(host, opts...)
 				},
 			},
 			wantStdout: heredoc.Doc(`
@@ -184,7 +185,7 @@ func TestListRun(t *testing.T) {
 		{
 			name: "no keys tty",
 			opts: ListOptions{
-				HTTPClient: func() (*http.Client, error) {
+				GitHubREST: func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 					reg := &httpmock.Registry{}
 					reg.Register(
 						httpmock.REST("GET", "user/keys"),
@@ -194,7 +195,7 @@ func TestListRun(t *testing.T) {
 						httpmock.REST("GET", "user/ssh_signing_keys"),
 						httpmock.StringResponse(`[]`),
 					)
-					return &http.Client{Transport: reg}, nil
+					return httpmock.RESTClientFunc(reg)(host, opts...)
 				},
 			},
 			wantStdout: "",
@@ -205,7 +206,7 @@ func TestListRun(t *testing.T) {
 		{
 			name: "no keys non-tty",
 			opts: ListOptions{
-				HTTPClient: func() (*http.Client, error) {
+				GitHubREST: func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 					reg := &httpmock.Registry{}
 					reg.Register(
 						httpmock.REST("GET", "user/keys"),
@@ -215,7 +216,7 @@ func TestListRun(t *testing.T) {
 						httpmock.REST("GET", "user/ssh_signing_keys"),
 						httpmock.StringResponse(`[]`),
 					)
-					return &http.Client{Transport: reg}, nil
+					return httpmock.RESTClientFunc(reg)(host, opts...)
 				},
 			},
 			wantStdout: "",
@@ -236,7 +237,7 @@ func TestListRun(t *testing.T) {
 			opts.IO = ios
 			opts.Config = func() (gh.Config, error) { return config.NewBlankConfig(), nil }
 
-			err := listRun(&opts)
+			err := listRun(context.Background(), &opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("listRun() return error: %v", err)
 				return

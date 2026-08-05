@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -435,9 +434,7 @@ func TestRerun(t *testing.T) {
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
 		tt.httpStubs(reg)
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		ios, _, stdout, _ := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)
@@ -454,7 +451,7 @@ func TestRerun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := runRerun(tt.opts)
+			err := runRerun(t.Context(), tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.errOut, err.Error())

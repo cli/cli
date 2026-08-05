@@ -1,6 +1,7 @@
 package list
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,9 +10,9 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -22,7 +23,7 @@ import (
 )
 
 type ListOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -51,7 +52,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Now:        time.Now,
 		Prompter:   f.Prompter,
 	}
@@ -92,7 +93,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return runF(opts)
 			}
 
-			return listRun(opts)
+			return listRun(cmd.Context(), opts)
 		},
 	}
 
@@ -104,17 +105,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	return cmd
 }
 
-func listRun(opts *ListOptions) error {
-	client, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("could not create http client: %w", err)
-	}
-
+func listRun(ctx context.Context, opts *ListOptions) error {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
 	if orgName == "" && !opts.UserSecrets {
+		var err error
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return err
@@ -152,9 +149,19 @@ func listRun(opts *ListOptions) error {
 	var secrets []Secret
 	switch secretEntity {
 	case shared.Repository:
-		secrets, err = getRepoSecrets(client, baseRepo, secretApp)
+		var client *githubrest.Client
+		client, err = opts.GitHubREST(baseRepo.RepoHost())
+		if err != nil {
+			return fmt.Errorf("could not create http client: %w", err)
+		}
+		secrets, err = getRepoSecrets(ctx, client, baseRepo, secretApp)
 	case shared.Environment:
-		secrets, err = getEnvSecrets(client, baseRepo, envName)
+		var client *githubrest.Client
+		client, err = opts.GitHubREST(baseRepo.RepoHost())
+		if err != nil {
+			return fmt.Errorf("could not create http client: %w", err)
+		}
+		secrets, err = getEnvSecrets(ctx, client, baseRepo, envName)
 	case shared.Organization, shared.User:
 		var cfg gh.Config
 		var host string
@@ -166,10 +173,16 @@ func listRun(opts *ListOptions) error {
 
 		host, _ = cfg.Authentication().DefaultHost()
 
+		var client *githubrest.Client
+		client, err = opts.GitHubREST(host)
+		if err != nil {
+			return fmt.Errorf("could not create http client: %w", err)
+		}
+
 		if secretEntity == shared.User {
-			secrets, err = getUserSecrets(client, host, showSelectedRepoInfo)
+			secrets, err = getUserSecrets(ctx, client, showSelectedRepoInfo)
 		} else {
-			secrets, err = getOrgSecrets(client, host, orgName, showSelectedRepoInfo, secretApp)
+			secrets, err = getOrgSecrets(ctx, client, orgName, showSelectedRepoInfo, secretApp)
 		}
 	}
 
@@ -248,12 +261,12 @@ func fmtVisibility(s Secret) string {
 	return ""
 }
 
-func getOrgSecrets(client *http.Client, host, orgName string, showSelectedRepoInfo bool, app shared.App) ([]Secret, error) {
+func getOrgSecrets(ctx context.Context, client *githubrest.Client, orgName string, showSelectedRepoInfo bool, app shared.App) ([]Secret, error) {
 	u, err := safeurl.JoinPath("orgs", orgName, string(app), "secrets")
 	if err != nil {
 		return nil, err
 	}
-	secrets, err := getSecrets(client, host, u)
+	secrets, err := getSecrets(ctx, client, u)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +276,7 @@ func getOrgSecrets(client *http.Client, host, orgName string, showSelectedRepoIn
 			if secrets[i].SelectedReposURL == "" {
 				continue
 			}
-			count, err := selectedRepositoryCount(client, host, safeurl.NewImmutableSafeURL(secrets[i].SelectedReposURL))
+			count, err := selectedRepositoryCount(ctx, client, safeurl.NewImmutableSafeURL(secrets[i].SelectedReposURL))
 			if err != nil {
 				return nil, fmt.Errorf("failed determining selected repositories for %s: %w", secrets[i].Name, err)
 			}
@@ -273,12 +286,12 @@ func getOrgSecrets(client *http.Client, host, orgName string, showSelectedRepoIn
 	return secrets, nil
 }
 
-func getUserSecrets(client *http.Client, host string, showSelectedRepoInfo bool) ([]Secret, error) {
+func getUserSecrets(ctx context.Context, client *githubrest.Client, showSelectedRepoInfo bool) ([]Secret, error) {
 	u, err := safeurl.JoinPath("user", "codespaces", "secrets")
 	if err != nil {
 		return nil, err
 	}
-	secrets, err := getSecrets(client, host, u)
+	secrets, err := getSecrets(ctx, client, u)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +301,7 @@ func getUserSecrets(client *http.Client, host string, showSelectedRepoInfo bool)
 			if secrets[i].SelectedReposURL == "" {
 				continue
 			}
-			count, err := selectedRepositoryCount(client, host, safeurl.NewImmutableSafeURL(secrets[i].SelectedReposURL))
+			count, err := selectedRepositoryCount(ctx, client, safeurl.NewImmutableSafeURL(secrets[i].SelectedReposURL))
 			if err != nil {
 				return nil, fmt.Errorf("failed determining selected repositories for %s: %w", secrets[i].Name, err)
 			}
@@ -299,47 +312,53 @@ func getUserSecrets(client *http.Client, host string, showSelectedRepoInfo bool)
 	return secrets, nil
 }
 
-func getEnvSecrets(client *http.Client, repo ghrepo.Interface, envName string) ([]Secret, error) {
+func getEnvSecrets(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, envName string) ([]Secret, error) {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "environments", envName, "secrets")
 	if err != nil {
 		return nil, err
 	}
-	return getSecrets(client, repo.RepoHost(), path)
+	return getSecrets(ctx, client, path)
 }
 
-func getRepoSecrets(client *http.Client, repo ghrepo.Interface, app shared.App) ([]Secret, error) {
+func getRepoSecrets(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, app shared.App) ([]Secret, error) {
 	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), string(app), "secrets")
 	if err != nil {
 		return nil, err
 	}
-	return getSecrets(client, repo.RepoHost(), u)
+	return getSecrets(ctx, client, u)
 }
 
-func getSecrets(client *http.Client, host string, u *safeurl.MutableSafeURL) ([]Secret, error) {
+func getSecrets(ctx context.Context, client *githubrest.Client, u *safeurl.MutableSafeURL) ([]Secret, error) {
 	var results []Secret
-	apiClient := api.NewClientFromHTTP(client)
 	u.SetQuery("per_page", "100")
 	var pageURL safeurl.SafeURL = u
 	for pageURL.String() != "" {
 		response := struct {
 			Secrets []Secret
 		}{}
-		next, err := apiClient.RESTWithNext(host, "GET", pageURL.String(), nil, &response)
+		req, err := client.NewRequest(ctx, http.MethodGet, pageURL.String(), nil)
 		if err != nil {
 			return nil, err
 		}
-		pageURL = safeurl.NewImmutableSafeURL(next)
+		resp, err := client.Do(req, &response)
+		if err != nil {
+			return nil, err
+		}
+		pageURL = safeurl.NewImmutableSafeURL(resp.NextPage())
 		results = append(results, response.Secrets...)
 	}
 	return results, nil
 }
 
-func selectedRepositoryCount(client *http.Client, host string, selectedReposURL safeurl.SafeURL) (int, error) {
-	apiClient := api.NewClientFromHTTP(client)
+func selectedRepositoryCount(ctx context.Context, client *githubrest.Client, selectedReposURL safeurl.SafeURL) (int, error) {
 	response := struct {
 		TotalCount int `json:"total_count"`
 	}{}
-	if err := apiClient.REST(host, "GET", selectedReposURL.String(), nil, &response); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, selectedReposURL.String(), nil)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := client.Do(req, &response); err != nil {
 		return 0, err
 	}
 	return response.TotalCount, nil

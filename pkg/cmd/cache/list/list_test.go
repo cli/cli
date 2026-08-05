@@ -2,6 +2,7 @@ package list
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -319,9 +320,7 @@ ID  KEY  SIZE      CREATED            ACCESSED
 			if tt.stubs != nil {
 				tt.stubs(reg)
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(tt.tty)
 			ios.SetStdinTTY(tt.tty)
@@ -333,7 +332,7 @@ ID  KEY  SIZE      CREATED            ACCESSED
 			}
 			defer reg.Verify(t)
 
-			err := listRun(&tt.opts)
+			err := listRun(context.Background(), &tt.opts)
 			if tt.wantErr {
 				if tt.wantErrMsg != "" {
 					assert.EqualError(t, err, tt.wantErrMsg)

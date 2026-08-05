@@ -1,12 +1,12 @@
 package get
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
@@ -18,7 +18,7 @@ import (
 )
 
 type GetOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -34,7 +34,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	opts := &GetOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -61,7 +61,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 				return runF(opts)
 			}
 
-			return getRun(opts)
+			return getRun(cmd.Context(), opts)
 		},
 	}
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Get a variable for an organization")
@@ -71,13 +71,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	return cmd
 }
 
-func getRun(opts *GetOptions) error {
-	c, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("could not create http client: %w", err)
-	}
-	client := api.NewClientFromHTTP(c)
-
+func getRun(ctx context.Context, opts *GetOptions) error {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 
@@ -116,8 +110,17 @@ func getRun(opts *GetOptions) error {
 		return err
 	}
 
+	client, err := opts.GitHubREST(host)
+	if err != nil {
+		return fmt.Errorf("could not create http client: %w", err)
+	}
+
 	var variable shared.Variable
-	if err = client.REST(host, "GET", path.String(), nil, &variable); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
+	if err != nil {
+		return err
+	}
+	if _, err = client.Do(req, &variable); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return fmt.Errorf("variable %s was not found", opts.VariableName)
@@ -128,7 +131,7 @@ func getRun(opts *GetOptions) error {
 
 	if opts.Exporter != nil {
 		if variable.SelectedReposURL != "" {
-			count, err := shared.SelectedRepositoryCount(client, host, safeurl.NewImmutableSafeURL(variable.SelectedReposURL))
+			count, err := shared.SelectedRepositoryCount(ctx, client, safeurl.NewImmutableSafeURL(variable.SelectedReposURL))
 			if err != nil {
 				return fmt.Errorf("failed determining selected repositories for %s: %w", variable.Name, err)
 			}

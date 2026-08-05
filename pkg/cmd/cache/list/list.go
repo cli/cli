@@ -1,14 +1,14 @@
 package list
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/cache/shared"
@@ -19,7 +19,7 @@ import (
 
 type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Exporter   cmdutil.Exporter
 	Now        time.Time
@@ -34,7 +34,7 @@ type ListOptions struct {
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := ListOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -73,7 +73,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return runF(&opts)
 			}
 
-			return listRun(&opts)
+			return listRun(cmd.Context(), &opts)
 		},
 	}
 
@@ -87,21 +87,20 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	return cmd
 }
 
-func listRun(opts *ListOptions) error {
+func listRun(ctx context.Context, opts *ListOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	httpClient, err := opts.HttpClient()
+	client, err := opts.GitHubREST(repo.RepoHost())
 	if err != nil {
 		return err
 	}
-	client := api.NewClientFromHTTP(httpClient)
 
 	cs := opts.IO.ColorScheme()
 	opts.IO.StartProgressIndicator()
-	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order, Key: opts.Key, Ref: opts.Ref})
+	result, err := shared.GetCaches(ctx, client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order, Key: opts.Key, Ref: opts.Ref})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("%s Failed to get caches: %w", cs.FailureIcon(), err)

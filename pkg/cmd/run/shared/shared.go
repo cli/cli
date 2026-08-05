@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -280,7 +281,7 @@ var ErrMissingAnnotationsPermissions = errors.New("missing annotations permissio
 // If the API returns a 403, a custom ErrMissingAnnotationsPermissions error is returned.
 //
 // When fine-grained PATs support checks:read permission, we can remove the need for this at the call sites.
-func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annotation, error) {
+func GetAnnotations(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, job Job) ([]Annotation, error) {
 	var result []*Annotation
 
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "check-runs", strconv.FormatInt(job.ID, 10), "annotations")
@@ -288,8 +289,11 @@ func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annot
 		return nil, err
 	}
 
-	err = client.REST(repo.RepoHost(), "GET", path.String(), nil, &result)
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &result); err != nil {
 		var httpError *githubrest.ErrorResponse
 		if !errors.As(err, &httpError) {
 			return nil, err
@@ -347,8 +351,8 @@ type FilterOptions struct {
 }
 
 // GetRunsWithFilter fetches 50 runs from the API and filters them in-memory
-func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int, f func(Run) bool) ([]Run, error) {
-	runs, err := GetRuns(client, repo, opts, 50)
+func GetRunsWithFilter(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, opts *FilterOptions, limit int, f func(Run) bool) ([]Run, error) {
+	runs, err := GetRuns(ctx, client, repo, opts, 50)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +370,7 @@ func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, opts *FilterOp
 	return filtered, nil
 }
 
-func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int) (*RunsPayload, error) {
+func GetRuns(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, opts *FilterOptions, limit int) (*RunsPayload, error) {
 	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs")
 	if err != nil {
 		return nil, err
@@ -412,11 +416,15 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 pagination:
 	for pageURL.String() != "" {
 		var response RunsPayload
-		next, err := client.RESTWithNext(repo.RepoHost(), "GET", pageURL.String(), nil, &response)
+		req, err := client.NewRequest(ctx, http.MethodGet, pageURL.String(), nil)
 		if err != nil {
 			return nil, err
 		}
-		pageURL = safeurl.NewImmutableSafeURL(next)
+		resp, err := client.Do(req, &response)
+		if err != nil {
+			return nil, err
+		}
+		pageURL = safeurl.NewImmutableSafeURL(resp.NextPage())
 
 		if result == nil {
 			result = &response
@@ -438,7 +446,7 @@ pagination:
 			result.WorkflowRuns[i].workflowName = opts.WorkflowName
 		}
 	} else if len(result.WorkflowRuns) > 0 {
-		if err := preloadWorkflowNames(client, repo, result.WorkflowRuns); err != nil {
+		if err := preloadWorkflowNames(ctx, client, repo, result.WorkflowRuns); err != nil {
 			return result, err
 		}
 	}
@@ -446,8 +454,8 @@ pagination:
 	return result, nil
 }
 
-func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run) error {
-	workflows, err := workflowShared.GetWorkflows(client, repo, 0)
+func preloadWorkflowNames(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, runs []Run) error {
+	workflows, err := workflowShared.GetWorkflows(ctx, client, repo, 0)
 	if err != nil {
 		return err
 	}
@@ -460,7 +468,7 @@ func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run)
 	for i, run := range runs {
 		if _, ok := workflowMap[run.WorkflowID]; !ok {
 			// Look up workflow by ID because it may have been deleted
-			workflow, err := workflowShared.GetWorkflow(client, repo, run.WorkflowID)
+			workflow, err := workflowShared.GetWorkflow(ctx, client, repo, run.WorkflowID)
 			// If the error is an httpError and it is a 404, this is likely a
 			// organization or enterprise ruleset workflow. The user does not
 			// have permissions to view the details of the workflow, so we cannot
@@ -488,7 +496,7 @@ type JobsPayload struct {
 	Jobs       []Job
 }
 
-func GetJobs(client *api.Client, repo ghrepo.Interface, runID int64, jobsURL safeurl.SafeURL, attempt uint64) ([]Job, error) {
+func GetJobs(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, runID int64, jobsURL safeurl.SafeURL, attempt uint64) ([]Job, error) {
 	var jobsPath safeurl.SafeURL
 	if attempt > 0 {
 		p, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", strconv.FormatInt(runID, 10), "attempts", strconv.FormatUint(attempt, 10), "jobs")
@@ -513,25 +521,32 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, runID int64, jobsURL saf
 	jobs := []Job{}
 	for jobsPath.String() != "" {
 		var resp JobsPayload
-		next, err := client.RESTWithNext(repo.RepoHost(), http.MethodGet, jobsPath.String(), nil, &resp)
+		req, err := client.NewRequest(ctx, http.MethodGet, jobsPath.String(), nil)
+		if err != nil {
+			return nil, err
+		}
+		response, err := client.Do(req, &resp)
 		if err != nil {
 			return nil, err
 		}
 		jobs = append(jobs, resp.Jobs...)
-		jobsPath = safeurl.NewImmutableSafeURL(next)
+		jobsPath = safeurl.NewImmutableSafeURL(response.NextPage())
 	}
 	return jobs, nil
 }
 
-func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {
+func GetJob(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, jobID string) (*Job, error) {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "jobs", jobID)
 	if err != nil {
 		return nil, err
 	}
 
 	var result Job
-	err = client.REST(repo.RepoHost(), "GET", path.String(), nil, &result)
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &result); err != nil {
 		return nil, err
 	}
 
@@ -560,7 +575,7 @@ func SelectRun(p Prompter, cs *iostreams.ColorScheme, runs []Run) (string, error
 	return fmt.Sprintf("%d", runs[selected].ID), nil
 }
 
-func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uint64) (*Run, error) {
+func GetRun(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, runID string, attempt uint64) (*Run, error) {
 	var result Run
 
 	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", runID)
@@ -576,8 +591,11 @@ func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uin
 	}
 	u.SetQuery("exclude_pull_requests", "true")
 
-	err = client.REST(repo.RepoHost(), "GET", u.String(), nil, &result)
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &result); err != nil {
 		return nil, err
 	}
 
@@ -589,7 +607,7 @@ func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uin
 	}
 
 	// Set name to workflow name
-	workflow, err := workflowShared.GetWorkflow(client, repo, result.WorkflowID)
+	workflow, err := workflowShared.GetWorkflow(ctx, client, repo, result.WorkflowID)
 	if err != nil {
 		return nil, err
 	} else {

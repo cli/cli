@@ -2,6 +2,7 @@ package set
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -211,7 +212,8 @@ func Test_setRun_repo(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
-				Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+				GitHubREST: httpmock.RESTClientFunc(reg),
+				Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
@@ -220,7 +222,7 @@ func Test_setRun_repo(t *testing.T) {
 				Body:         "a variable",
 			}
 
-			err := setRun(opts)
+			err := setRun(context.Background(), opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -284,7 +286,8 @@ func Test_setRun_env(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
-				Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+				GitHubREST: httpmock.RESTClientFunc(reg),
+				Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
@@ -294,7 +297,7 @@ func Test_setRun_env(t *testing.T) {
 				EnvName:      "release",
 			}
 
-			err := setRun(opts)
+			err := setRun(context.Background(), opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -395,6 +398,7 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			tt.opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -402,7 +406,7 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.VariableName = "cool_variable"
 			tt.opts.Body = "a variable"
 
-			err := setRun(tt.opts)
+			err := setRun(context.Background(), tt.opts)
 			assert.NoError(t, err)
 
 			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)

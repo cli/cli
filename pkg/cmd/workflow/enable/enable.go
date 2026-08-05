@@ -1,13 +1,14 @@
 package enable
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -16,7 +17,7 @@ import (
 )
 
 type EnableOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
@@ -32,7 +33,7 @@ type iprompter interface {
 func NewCmdEnable(f *cmdutil.Factory, runF func(*EnableOptions) error) *cobra.Command {
 	opts := &EnableOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 	}
 
@@ -56,27 +57,26 @@ func NewCmdEnable(f *cmdutil.Factory, runF func(*EnableOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return runEnable(opts)
+			return runEnable(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func runEnable(opts *EnableOptions) error {
-	c, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("could not build http client: %w", err)
-	}
-	client := api.NewClientFromHTTP(c)
-
+func runEnable(ctx context.Context, opts *EnableOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
+	client, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return fmt.Errorf("could not build client: %w", err)
+	}
+
 	states := []shared.WorkflowState{shared.DisabledManually, shared.DisabledInactivity}
-	workflow, err := shared.ResolveWorkflow(opts.Prompter,
+	workflow, err := shared.ResolveWorkflow(ctx, opts.Prompter,
 		opts.IO, client, repo, opts.Prompt, opts.Selector, states)
 	if err != nil {
 		var fae shared.FilteredAllError
@@ -90,8 +90,11 @@ func runEnable(opts *EnableOptions) error {
 	if err != nil {
 		return err
 	}
-	err = client.REST(repo.RepoHost(), "PUT", path.String(), nil, nil)
+	req, err := client.NewRequest(ctx, http.MethodPut, path.String(), nil)
 	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, nil); err != nil {
 		return fmt.Errorf("failed to enable workflow: %w", err)
 	}
 

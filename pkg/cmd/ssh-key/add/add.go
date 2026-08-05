@@ -1,12 +1,13 @@
 package add
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -16,7 +17,7 @@ import (
 type AddOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
-	HTTPClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 
 	KeyFile string
 	Title   string
@@ -25,7 +26,7 @@ type AddOptions struct {
 
 func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command {
 	opts := &AddOptions{
-		HTTPClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Config:     f.Config,
 		IO:         f.IOStreams,
 	}
@@ -47,7 +48,7 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 			if runF != nil {
 				return runF(opts)
 			}
-			return runAdd(opts)
+			return runAdd(cmd.Context(), opts)
 		},
 	}
 
@@ -57,12 +58,7 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 	return cmd
 }
 
-func runAdd(opts *AddOptions) error {
-	httpClient, err := opts.HTTPClient()
-	if err != nil {
-		return err
-	}
-
+func runAdd(ctx context.Context, opts *AddOptions) error {
 	var keyReader io.Reader
 	if opts.KeyFile == "-" {
 		keyReader = opts.IO.In
@@ -83,12 +79,17 @@ func runAdd(opts *AddOptions) error {
 
 	hostname, _ := cfg.Authentication().DefaultHost()
 
+	client, err := opts.GitHubREST(hostname)
+	if err != nil {
+		return err
+	}
+
 	var uploaded bool
 
 	if opts.Type == shared.SigningKey {
-		uploaded, err = SSHSigningKeyUpload(httpClient, hostname, keyReader, opts.Title)
+		uploaded, err = SSHSigningKeyUpload(ctx, client, keyReader, opts.Title)
 	} else {
-		uploaded, err = SSHKeyUpload(httpClient, hostname, keyReader, opts.Title)
+		uploaded, err = SSHKeyUpload(ctx, client, keyReader, opts.Title)
 	}
 
 	if err != nil {

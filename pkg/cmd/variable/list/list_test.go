@@ -2,8 +2,8 @@ package list
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -275,9 +275,7 @@ func Test_listRun(t *testing.T) {
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			tt.opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -292,7 +290,7 @@ func Test_listRun(t *testing.T) {
 				tt.opts.Exporter = jsonExporter
 			}
 
-			err := listRun(tt.opts)
+			err := listRun(context.Background(), tt.opts)
 			assert.NoError(t, err)
 
 			expected := fmt.Sprintf("%s\n", strings.Join(tt.wantOut, "\n"))
@@ -397,9 +395,7 @@ func Test_listRun_populatesNumSelectedReposIfRequired(t *testing.T) {
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}
-			opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -408,7 +404,7 @@ func Test_listRun_populatesNumSelectedReposIfRequired(t *testing.T) {
 				return t
 			}
 
-			require.NoError(t, listRun(opts))
+			require.NoError(t, listRun(context.Background(), opts))
 
 			if tt.wantPopulated {
 				// There should be 2 requests; one to get the variables list and
@@ -430,16 +426,17 @@ func Test_getVariables_pagination(t *testing.T) {
 		httpmock.WithHeader(
 			httpmock.StringResponse(`{"variables":[{},{}]}`),
 			"Link",
-			`<http://example.com/page/0>; rel="previous", <http://example.com/page/2>; rel="next"`),
+			`<https://api.github.com/page/0>; rel="previous", <https://api.github.com/page/2>; rel="next"`),
 	)
 	reg.Register(
 		httpmock.REST("GET", "page/2"),
 		httpmock.StringResponse(`{"variables":[{},{}]}`),
 	)
-	client := &http.Client{Transport: reg}
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
 	u, err := safeurl.JoinPath("path", "to")
 	require.NoError(t, err)
-	variables, err := getVariables(client, "github.com", u)
+	variables, err := getVariables(context.Background(), client, u)
 	assert.NoError(t, err)
 	assert.Equal(t, 4, len(variables))
 }

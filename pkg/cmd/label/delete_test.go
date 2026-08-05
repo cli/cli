@@ -2,7 +2,7 @@ package label
 
 import (
 	"bytes"
-	"net/http"
+	"context"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -149,9 +149,7 @@ func TestDeleteRun(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 			pm := &prompter.PrompterMock{}
 			if tt.prompterStubs != nil {
@@ -168,7 +166,7 @@ func TestDeleteRun(t *testing.T) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			}
 			defer reg.Verify(t)
-			err := deleteRun(tt.opts)
+			err := deleteRun(context.Background(), tt.opts)
 
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)

@@ -1,11 +1,13 @@
 package shared
 
 import (
+	"context"
+	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 )
@@ -45,7 +47,7 @@ type GetCachesOptions struct {
 
 // Return a list of caches for a repository. Pass a negative limit to request
 // all pages from the API until all caches have been fetched.
-func GetCaches(client *api.Client, repo ghrepo.Interface, opts GetCachesOptions) (*CachePayload, error) {
+func GetCaches(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, opts GetCachesOptions) (*CachePayload, error) {
 	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "caches")
 	if err != nil {
 		return nil, err
@@ -75,11 +77,15 @@ func GetCaches(client *api.Client, repo ghrepo.Interface, opts GetCachesOptions)
 pagination:
 	for pageURL.String() != "" {
 		var response CachePayload
-		next, err := client.RESTWithNext(repo.RepoHost(), "GET", pageURL.String(), nil, &response)
+		req, err := client.NewRequest(ctx, http.MethodGet, pageURL.String(), nil)
 		if err != nil {
 			return nil, err
 		}
-		pageURL = safeurl.NewImmutableSafeURL(next)
+		resp, err := client.Do(req, &response)
+		if err != nil {
+			return nil, err
+		}
+		pageURL = safeurl.NewImmutableSafeURL(resp.NextPage())
 
 		if result == nil {
 			result = &response

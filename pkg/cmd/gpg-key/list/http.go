@@ -1,12 +1,12 @@
 package list
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
@@ -35,7 +35,7 @@ type gpgKey struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-func userKeys(httpClient *http.Client, host, userHandle string) ([]gpgKey, error) {
+func userKeys(ctx context.Context, client *githubrest.Client, userHandle string) ([]gpgKey, error) {
 	u, err := safeurl.JoinPath("user", "gpg_keys")
 	if err != nil {
 		return nil, err
@@ -49,11 +49,11 @@ func userKeys(httpClient *http.Client, host, userHandle string) ([]gpgKey, error
 	u.SetQuery("per_page", "100")
 
 	var keys []gpgKey
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(host, "GET", u.String(), nil, &keys)
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &keys); err != nil {
 		if httpErr, ok := errors.AsType[*githubrest.ErrorResponse](err); ok && httpErr.StatusCode == 404 {
 			return nil, errScopes
 		}

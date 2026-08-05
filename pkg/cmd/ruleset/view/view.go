@@ -1,6 +1,7 @@
 package view
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -10,6 +11,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
@@ -21,6 +23,7 @@ import (
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
@@ -37,6 +40,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Browser:    f.Browser,
 		Prompter:   f.Prompter,
 	}
@@ -96,7 +100,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return viewRun(opts)
+			return viewRun(cmd.Context(), opts)
 		},
 	}
 
@@ -107,7 +111,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
-func viewRun(opts *ViewOptions) error {
+func viewRun(ctx context.Context, opts *ViewOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -161,9 +165,19 @@ func viewRun(opts *ViewOptions) error {
 
 	var rs *shared.RulesetREST
 	if opts.Organization != "" {
-		rs, err = viewOrgRuleset(httpClient, opts.Organization, opts.ID, hostname)
+		var restClient *githubrest.Client
+		restClient, err = opts.GitHubREST(hostname)
+		if err != nil {
+			return err
+		}
+		rs, err = viewOrgRuleset(ctx, restClient, opts.Organization, opts.ID)
 	} else {
-		rs, err = viewRepoRuleset(httpClient, repoI, opts.ID)
+		var restClient *githubrest.Client
+		restClient, err = opts.GitHubREST(repoI.RepoHost())
+		if err != nil {
+			return err
+		}
+		rs, err = viewRepoRuleset(ctx, restClient, repoI, opts.ID)
 	}
 
 	if err != nil {

@@ -2,9 +2,11 @@ package set
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 
 	"github.com/cli/cli/v2/api"
@@ -43,40 +45,43 @@ type setResult struct {
 	Operation string
 }
 
-func setVariable(client *api.Client, host string, opts setOptions) setResult {
+// setVariable creates or updates a variable. It takes both a REST client, which
+// performs the create and update requests, and a GraphQL client, which resolves
+// a repository name to the ID that the environment variable endpoint requires.
+func setVariable(ctx context.Context, client *githubrest.Client, gqlClient *api.Client, opts setOptions) setResult {
 	var err error
 	var postErr *githubrest.ErrorResponse
 	result := setResult{Operation: createdOperation, Key: opts.Key}
 	switch opts.Entity {
 	case shared.Organization:
-		if err = postOrgVariable(client, host, opts.Organization, opts.Visibility, opts.Key, opts.Value, opts.RepositoryIDs); err == nil {
+		if err = postOrgVariable(ctx, client, opts.Organization, opts.Visibility, opts.Key, opts.Value, opts.RepositoryIDs); err == nil {
 			return result
 		} else if errors.As(err, &postErr) && postErr.StatusCode == 409 {
 			// Server will return a 409 if variable already exists
 			result.Operation = updatedOperation
-			err = patchOrgVariable(client, host, opts.Organization, opts.Visibility, opts.Key, opts.Value, opts.RepositoryIDs)
+			err = patchOrgVariable(ctx, client, opts.Organization, opts.Visibility, opts.Key, opts.Value, opts.RepositoryIDs)
 		}
 	case shared.Environment:
 		var ids []int64
-		ids, err = api.GetRepoIDs(client, opts.Repository.RepoHost(), []ghrepo.Interface{opts.Repository})
+		ids, err = api.GetRepoIDs(gqlClient, opts.Repository.RepoHost(), []ghrepo.Interface{opts.Repository})
 		if err != nil || len(ids) != 1 {
 			err = fmt.Errorf("failed to look up repository %s: %w", ghrepo.FullName(opts.Repository), err)
 			break
 		}
-		if err = postEnvVariable(client, opts.Repository.RepoHost(), ids[0], opts.Environment, opts.Key, opts.Value); err == nil {
+		if err = postEnvVariable(ctx, client, ids[0], opts.Environment, opts.Key, opts.Value); err == nil {
 			return result
 		} else if errors.As(err, &postErr) && postErr.StatusCode == 409 {
 			// Server will return a 409 if variable already exists
 			result.Operation = updatedOperation
-			err = patchEnvVariable(client, opts.Repository.RepoHost(), ids[0], opts.Environment, opts.Key, opts.Value)
+			err = patchEnvVariable(ctx, client, ids[0], opts.Environment, opts.Key, opts.Value)
 		}
 	default:
-		if err = postRepoVariable(client, opts.Repository, opts.Key, opts.Value); err == nil {
+		if err = postRepoVariable(ctx, client, opts.Repository, opts.Key, opts.Value); err == nil {
 			return result
 		} else if errors.As(err, &postErr) && postErr.StatusCode == 409 {
 			// Server will return a 409 if variable already exists
 			result.Operation = updatedOperation
-			err = patchRepoVariable(client, opts.Repository, opts.Key, opts.Value)
+			err = patchRepoVariable(ctx, client, opts.Repository, opts.Key, opts.Value)
 		}
 	}
 	if err != nil {
@@ -85,16 +90,20 @@ func setVariable(client *api.Client, host string, opts setOptions) setResult {
 	return result
 }
 
-func postVariable(client *api.Client, host string, path safeurl.SafeURL, payload interface{}) error {
+func postVariable(ctx context.Context, client *githubrest.Client, path safeurl.SafeURL, payload interface{}) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)
 	}
-	requestBody := bytes.NewReader(payloadBytes)
-	return client.REST(host, "POST", path.String(), requestBody, nil)
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), bytes.NewReader(payloadBytes))
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(req, nil)
+	return err
 }
 
-func postOrgVariable(client *api.Client, host, orgName, visibility, variableName, value string, repositoryIDs []int64) error {
+func postOrgVariable(ctx context.Context, client *githubrest.Client, orgName, visibility, variableName, value string, repositoryIDs []int64) error {
 	payload := setPayload{
 		Name:         variableName,
 		Value:        value,
@@ -105,10 +114,10 @@ func postOrgVariable(client *api.Client, host, orgName, visibility, variableName
 	if err != nil {
 		return err
 	}
-	return postVariable(client, host, path, payload)
+	return postVariable(ctx, client, path, payload)
 }
 
-func postEnvVariable(client *api.Client, host string, repoID int64, envName, variableName, value string) error {
+func postEnvVariable(ctx context.Context, client *githubrest.Client, repoID int64, envName, variableName, value string) error {
 	payload := setPayload{
 		Name:  variableName,
 		Value: value,
@@ -117,10 +126,10 @@ func postEnvVariable(client *api.Client, host string, repoID int64, envName, var
 	if err != nil {
 		return err
 	}
-	return postVariable(client, host, path, payload)
+	return postVariable(ctx, client, path, payload)
 }
 
-func postRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, value string) error {
+func postRepoVariable(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, variableName, value string) error {
 	payload := setPayload{
 		Name:  variableName,
 		Value: value,
@@ -129,19 +138,23 @@ func postRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, v
 	if err != nil {
 		return err
 	}
-	return postVariable(client, repo.RepoHost(), path, payload)
+	return postVariable(ctx, client, path, payload)
 }
 
-func patchVariable(client *api.Client, host string, path safeurl.SafeURL, payload interface{}) error {
+func patchVariable(ctx context.Context, client *githubrest.Client, path safeurl.SafeURL, payload interface{}) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)
 	}
-	requestBody := bytes.NewReader(payloadBytes)
-	return client.REST(host, "PATCH", path.String(), requestBody, nil)
+	req, err := client.NewRequest(ctx, http.MethodPatch, path.String(), bytes.NewReader(payloadBytes))
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(req, nil)
+	return err
 }
 
-func patchOrgVariable(client *api.Client, host, orgName, visibility, variableName, value string, repositoryIDs []int64) error {
+func patchOrgVariable(ctx context.Context, client *githubrest.Client, orgName, visibility, variableName, value string, repositoryIDs []int64) error {
 	payload := setPayload{
 		Value:        value,
 		Visibility:   visibility,
@@ -151,10 +164,10 @@ func patchOrgVariable(client *api.Client, host, orgName, visibility, variableNam
 	if err != nil {
 		return err
 	}
-	return patchVariable(client, host, path, payload)
+	return patchVariable(ctx, client, path, payload)
 }
 
-func patchEnvVariable(client *api.Client, host string, repoID int64, envName, variableName, value string) error {
+func patchEnvVariable(ctx context.Context, client *githubrest.Client, repoID int64, envName, variableName, value string) error {
 	payload := setPayload{
 		Value: value,
 	}
@@ -162,10 +175,10 @@ func patchEnvVariable(client *api.Client, host string, repoID int64, envName, va
 	if err != nil {
 		return err
 	}
-	return patchVariable(client, host, path, payload)
+	return patchVariable(ctx, client, path, payload)
 }
 
-func patchRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, value string) error {
+func patchRepoVariable(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, variableName, value string) error {
 	payload := setPayload{
 		Value: value,
 	}
@@ -173,5 +186,5 @@ func patchRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, 
 	if err != nil {
 		return err
 	}
-	return patchVariable(client, repo.RepoHost(), path, payload)
+	return patchVariable(ctx, client, path, payload)
 }

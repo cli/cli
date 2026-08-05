@@ -1,10 +1,10 @@
 package list
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strconv"
 	"time"
 
@@ -20,14 +20,14 @@ import (
 type ListOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
-	HTTPClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
-		HTTPClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -39,31 +39,32 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return listRun(opts)
+			return listRun(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func listRun(opts *ListOptions) error {
-	apiClient, err := opts.HTTPClient()
-	if err != nil {
-		return err
-	}
-
+func listRun(ctx context.Context, opts *ListOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
-	sshAuthKeys, authKeyErr := shared.UserKeys(apiClient, host, "")
+
+	client, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
+
+	sshAuthKeys, authKeyErr := shared.UserKeys(ctx, client, "")
 	if authKeyErr != nil {
 		printError(opts.IO.ErrOut, authKeyErr)
 	}
 
-	sshSigningKeys, signKeyErr := shared.UserSigningKeys(apiClient, host, "")
+	sshSigningKeys, signKeyErr := shared.UserSigningKeys(ctx, client, "")
 	if signKeyErr != nil {
 		printError(opts.IO.ErrOut, signKeyErr)
 	}

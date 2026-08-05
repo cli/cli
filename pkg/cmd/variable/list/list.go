@@ -1,6 +1,7 @@
 package list
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
@@ -8,9 +9,9 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
@@ -20,7 +21,7 @@ import (
 )
 
 type ListOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -38,7 +39,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Now:        time.Now,
 	}
 
@@ -65,7 +66,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return runF(opts)
 			}
 
-			return listRun(opts)
+			return listRun(cmd.Context(), opts)
 		},
 	}
 
@@ -76,17 +77,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	return cmd
 }
 
-func listRun(opts *ListOptions) error {
-	client, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("could not create http client: %w", err)
-	}
-
+func listRun(ctx context.Context, opts *ListOptions) error {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
 	if orgName == "" {
+		var err error
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return err
@@ -115,9 +112,19 @@ func listRun(opts *ListOptions) error {
 	var variables []shared.Variable
 	switch variableEntity {
 	case shared.Repository:
-		variables, err = getRepoVariables(client, baseRepo)
+		var client *githubrest.Client
+		client, err = opts.GitHubREST(baseRepo.RepoHost())
+		if err != nil {
+			return fmt.Errorf("could not create http client: %w", err)
+		}
+		variables, err = getRepoVariables(ctx, client, baseRepo)
 	case shared.Environment:
-		variables, err = getEnvVariables(client, baseRepo, envName)
+		var client *githubrest.Client
+		client, err = opts.GitHubREST(baseRepo.RepoHost())
+		if err != nil {
+			return fmt.Errorf("could not create http client: %w", err)
+		}
+		variables, err = getEnvVariables(ctx, client, baseRepo, envName)
 	case shared.Organization:
 		var cfg gh.Config
 		var host string
@@ -126,7 +133,12 @@ func listRun(opts *ListOptions) error {
 			return err
 		}
 		host, _ = cfg.Authentication().DefaultHost()
-		variables, err = getOrgVariables(client, host, orgName, showSelectedRepoInfo)
+		var client *githubrest.Client
+		client, err = opts.GitHubREST(host)
+		if err != nil {
+			return fmt.Errorf("could not create http client: %w", err)
+		}
+		variables, err = getOrgVariables(ctx, client, orgName, showSelectedRepoInfo)
 	}
 
 	if err != nil {
@@ -193,38 +205,37 @@ func fmtVisibility(s shared.Variable) string {
 	return ""
 }
 
-func getRepoVariables(client *http.Client, repo ghrepo.Interface) ([]shared.Variable, error) {
+func getRepoVariables(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface) ([]shared.Variable, error) {
 	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "variables")
 	if err != nil {
 		return nil, err
 	}
-	return getVariables(client, repo.RepoHost(), u)
+	return getVariables(ctx, client, u)
 }
 
-func getEnvVariables(client *http.Client, repo ghrepo.Interface, envName string) ([]shared.Variable, error) {
+func getEnvVariables(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, envName string) ([]shared.Variable, error) {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "environments", envName, "variables")
 	if err != nil {
 		return nil, err
 	}
-	return getVariables(client, repo.RepoHost(), path)
+	return getVariables(ctx, client, path)
 }
 
-func getOrgVariables(client *http.Client, host, orgName string, showSelectedRepoInfo bool) ([]shared.Variable, error) {
+func getOrgVariables(ctx context.Context, client *githubrest.Client, orgName string, showSelectedRepoInfo bool) ([]shared.Variable, error) {
 	u, err := safeurl.JoinPath("orgs", orgName, "actions", "variables")
 	if err != nil {
 		return nil, err
 	}
-	variables, err := getVariables(client, host, u)
+	variables, err := getVariables(ctx, client, u)
 	if err != nil {
 		return nil, err
 	}
-	apiClient := api.NewClientFromHTTP(client)
 	if showSelectedRepoInfo {
 		for i := range variables {
 			if variables[i].SelectedReposURL == "" {
 				continue
 			}
-			count, err := shared.SelectedRepositoryCount(apiClient, host, safeurl.NewImmutableSafeURL(variables[i].SelectedReposURL))
+			count, err := shared.SelectedRepositoryCount(ctx, client, safeurl.NewImmutableSafeURL(variables[i].SelectedReposURL))
 			if err != nil {
 				return nil, fmt.Errorf("failed determining selected repositories for %s: %w", variables[i].Name, err)
 			}
@@ -234,20 +245,23 @@ func getOrgVariables(client *http.Client, host, orgName string, showSelectedRepo
 	return variables, nil
 }
 
-func getVariables(client *http.Client, host string, u *safeurl.MutableSafeURL) ([]shared.Variable, error) {
+func getVariables(ctx context.Context, client *githubrest.Client, u *safeurl.MutableSafeURL) ([]shared.Variable, error) {
 	var results []shared.Variable
-	apiClient := api.NewClientFromHTTP(client)
 	u.SetQuery("per_page", "100")
 	var pageURL safeurl.SafeURL = u
 	for pageURL.String() != "" {
 		response := struct {
 			Variables []shared.Variable
 		}{}
-		next, err := apiClient.RESTWithNext(host, "GET", pageURL.String(), nil, &response)
+		req, err := client.NewRequest(ctx, http.MethodGet, pageURL.String(), nil)
 		if err != nil {
 			return nil, err
 		}
-		pageURL = safeurl.NewImmutableSafeURL(next)
+		resp, err := client.Do(req, &response)
+		if err != nil {
+			return nil, err
+		}
+		pageURL = safeurl.NewImmutableSafeURL(resp.NextPage())
 		results = append(results, response.Variables...)
 	}
 	return results, nil

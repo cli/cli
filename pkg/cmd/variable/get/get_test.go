@@ -2,8 +2,8 @@ package get
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
@@ -264,9 +264,7 @@ func Test_getRun(t *testing.T) {
 				tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullNameWithHost("owner/repo", tt.host)
 				}
-				tt.opts.HttpClient = func() (*http.Client, error) {
-					return &http.Client{Transport: reg}, nil
-				}
+				tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 				tt.opts.Config = func() (gh.Config, error) {
 					return config.NewBlankConfig(), nil
 				}
@@ -277,7 +275,7 @@ func Test_getRun(t *testing.T) {
 					tt.opts.Exporter = exporter
 				}
 
-				err := getRun(tt.opts)
+				err := getRun(context.Background(), tt.opts)
 				if err != nil {
 					require.EqualError(t, tt.wantErr, err.Error())
 					return

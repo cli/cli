@@ -1139,7 +1139,7 @@ jobs:
 				tt.promptStubs(pm)
 			}
 
-			err := runRun(tt.opts)
+			err := runRun(t.Context(), tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.errOut, err.Error())

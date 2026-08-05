@@ -3,13 +3,11 @@ package shared
 import (
 	"bytes"
 	"encoding/json"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -49,11 +47,11 @@ func TestGetAnnotations404(t *testing.T) {
 		httpmock.REST("GET", "repos/OWNER/REPO/check-runs/123456/annotations"),
 		httpmock.StatusStringResponse(404, "not found"))
 
-	httpClient := &http.Client{Transport: reg}
-	apiClient := api.NewClientFromHTTP(httpClient)
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
 	repo := ghrepo.New("OWNER", "REPO")
 
-	result, err := GetAnnotations(apiClient, repo, Job{ID: 123456, Name: "a job"})
+	result, err := GetAnnotations(t.Context(), client, repo, Job{ID: 123456, Name: "a job"})
 	assert.NoError(t, err)
 	assert.Equal(t, result, []Annotation{})
 }

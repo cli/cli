@@ -236,7 +236,7 @@ func runView(ctx context.Context, opts *ViewOptions) error {
 
 	if jobID != "" {
 		opts.IO.StartProgressIndicator()
-		selectedJob, err = shared.GetJob(client, repo, jobID)
+		selectedJob, err = shared.GetJob(ctx, restClient, repo, jobID)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get job: %w", err)
@@ -250,7 +250,7 @@ func runView(ctx context.Context, opts *ViewOptions) error {
 	if opts.Prompt {
 		// TODO arbitrary limit
 		opts.IO.StartProgressIndicator()
-		runs, err := shared.GetRuns(client, repo, nil, 10)
+		runs, err := shared.GetRuns(ctx, restClient, repo, nil, 10)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
@@ -262,7 +262,7 @@ func runView(ctx context.Context, opts *ViewOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	run, err = shared.GetRun(client, repo, runID, attempt)
+	run, err = shared.GetRun(ctx, restClient, repo, runID, attempt)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get run: %w", err)
@@ -270,7 +270,7 @@ func runView(ctx context.Context, opts *ViewOptions) error {
 
 	if shouldFetchJobs(opts) {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, run.ID, safeurl.NewImmutableSafeURL(run.JobsURL), attempt)
+		jobs, err = shared.GetJobs(ctx, restClient, repo, run.ID, safeurl.NewImmutableSafeURL(run.JobsURL), attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
@@ -309,7 +309,7 @@ func runView(ctx context.Context, opts *ViewOptions) error {
 
 	if selectedJob == nil && len(jobs) == 0 {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, run.ID, safeurl.NewImmutableSafeURL(run.JobsURL), attempt)
+		jobs, err = shared.GetJobs(ctx, restClient, repo, run.ID, safeurl.NewImmutableSafeURL(run.JobsURL), attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get jobs: %w", err)
@@ -373,7 +373,7 @@ func runView(ctx context.Context, opts *ViewOptions) error {
 	var missingAnnotationsPermissions bool
 
 	for _, job := range jobs {
-		as, err := shared.GetAnnotations(client, repo, job)
+		as, err := shared.GetAnnotations(ctx, restClient, repo, job)
 		if err != nil {
 			if err != shared.ErrMissingAnnotationsPermissions {
 				return fmt.Errorf("failed to get annotations: %w", err)

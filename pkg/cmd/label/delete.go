@@ -1,11 +1,12 @@
 package label
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -18,7 +19,7 @@ type iprompter interface {
 
 type deleteOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Prompter   iprompter
 
@@ -28,7 +29,7 @@ type deleteOptions struct {
 
 func newCmdDelete(f *cmdutil.Factory, runF func(*deleteOptions) error) *cobra.Command {
 	opts := deleteOptions{
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		IO:         f.IOStreams,
 		Prompter:   f.Prompter,
 	}
@@ -49,7 +50,7 @@ func newCmdDelete(f *cmdutil.Factory, runF func(*deleteOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(&opts)
 			}
-			return deleteRun(&opts)
+			return deleteRun(c.Context(), &opts)
 		},
 	}
 
@@ -60,13 +61,13 @@ func newCmdDelete(f *cmdutil.Factory, runF func(*deleteOptions) error) *cobra.Co
 	return cmd
 }
 
-func deleteRun(opts *deleteOptions) error {
-	httpClient, err := opts.HttpClient()
+func deleteRun(ctx context.Context, opts *deleteOptions) error {
+	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := opts.BaseRepo()
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
 	if err != nil {
 		return err
 	}
@@ -78,7 +79,7 @@ func deleteRun(opts *deleteOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = deleteLabel(httpClient, baseRepo, opts.Name)
+	err = deleteLabel(ctx, client, baseRepo, opts.Name)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -93,12 +94,16 @@ func deleteRun(opts *deleteOptions) error {
 	return nil
 }
 
-func deleteLabel(client *http.Client, repo ghrepo.Interface, name string) error {
-	apiClient := api.NewClientFromHTTP(client)
+func deleteLabel(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, name string) error {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "labels", name)
 	if err != nil {
 		return err
 	}
 
-	return apiClient.REST(repo.RepoHost(), "DELETE", path.String(), nil, nil)
+	req, err := client.NewRequest(ctx, http.MethodDelete, path.String(), nil)
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(req, nil)
+	return err
 }

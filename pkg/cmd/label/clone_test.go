@@ -2,6 +2,7 @@ package label
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
 
@@ -562,6 +563,7 @@ func TestCloneRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			io, _, stdout, _ := iostreams.Test()
 			io.SetStdoutTTY(tt.tty)
 			io.SetStdinTTY(tt.tty)
@@ -571,7 +573,7 @@ func TestCloneRun(t *testing.T) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			}
 
-			err := cloneRun(tt.opts)
+			err := cloneRun(context.Background(), tt.opts)
 
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.wantErrMsg)

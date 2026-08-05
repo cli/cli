@@ -1,13 +1,14 @@
 package delete
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -16,7 +17,7 @@ import (
 )
 
 type DeleteOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -30,7 +31,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -57,7 +58,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return removeRun(opts)
+			return removeRun(cmd.Context(), opts)
 		},
 		Aliases: []string{
 			"remove",
@@ -69,13 +70,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	return cmd
 }
 
-func removeRun(opts *DeleteOptions) error {
-	c, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("could not create http client: %w", err)
-	}
-	client := api.NewClientFromHTTP(c)
-
+func removeRun(ctx context.Context, opts *DeleteOptions) error {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 
@@ -114,8 +109,16 @@ func removeRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	err = client.REST(host, "DELETE", path.String(), nil, nil)
+	client, err := opts.GitHubREST(host)
 	if err != nil {
+		return fmt.Errorf("could not create http client: %w", err)
+	}
+
+	req, err := client.NewRequest(ctx, http.MethodDelete, path.String(), nil)
+	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, nil); err != nil {
 		return fmt.Errorf("failed to delete variable %s: %w", opts.VariableName, err)
 	}
 

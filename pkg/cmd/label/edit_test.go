@@ -2,7 +2,7 @@ package label
 
 import (
 	"bytes"
-	"net/http"
+	"context"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -144,9 +144,7 @@ func TestEditRun(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			io, _, stdout, _ := iostreams.Test()
 			io.SetStdoutTTY(tt.tty)
 			io.SetStdinTTY(tt.tty)
@@ -156,7 +154,7 @@ func TestEditRun(t *testing.T) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			}
 			defer reg.Verify(t)
-			err := editRun(tt.opts)
+			err := editRun(context.Background(), tt.opts)
 
 			if tt.wantErrMsg != "" {
 				assert.EqualError(t, err, tt.wantErrMsg)

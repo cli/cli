@@ -1,14 +1,14 @@
 package label
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -16,7 +16,7 @@ import (
 
 type editOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 
 	Color       string
@@ -27,7 +27,7 @@ type editOptions struct {
 
 func newCmdEdit(f *cmdutil.Factory, runF func(*editOptions) error) *cobra.Command {
 	opts := editOptions{
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		IO:         f.IOStreams,
 	}
 
@@ -61,7 +61,7 @@ func newCmdEdit(f *cmdutil.Factory, runF func(*editOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(&opts)
 			}
-			return editRun(&opts)
+			return editRun(c.Context(), &opts)
 		},
 	}
 
@@ -72,20 +72,19 @@ func newCmdEdit(f *cmdutil.Factory, runF func(*editOptions) error) *cobra.Comman
 	return cmd
 }
 
-func editRun(opts *editOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
+func editRun(ctx context.Context, opts *editOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicator()
-	err = updateLabel(apiClient, baseRepo, opts)
+	err = updateLabel(ctx, client, baseRepo, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		if errors.Is(err, errLabelAlreadyExists) {

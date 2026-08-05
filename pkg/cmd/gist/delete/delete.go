@@ -1,13 +1,13 @@
 package delete
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -22,6 +22,7 @@ type DeleteOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Prompter   prompter.Prompter
 
 	Selector  string
@@ -33,6 +34,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 	}
 
@@ -70,14 +72,14 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(&opts)
 			}
-			return deleteRun(&opts)
+			return deleteRun(c.Context(), &opts)
 		},
 	}
 	cmd.Flags().BoolVar(&opts.Confirmed, "yes", false, "Confirm deletion without prompting")
 	return cmd
 }
 
-func deleteRun(opts *DeleteOptions) error {
+func deleteRun(ctx context.Context, opts *DeleteOptions) error {
 	client, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -89,6 +91,11 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
+
+	restClient, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
 
 	gistID := opts.Selector
 	if strings.Contains(gistID, "/") {
@@ -104,7 +111,7 @@ func deleteRun(opts *DeleteOptions) error {
 	if gistID == "" {
 		gist, err = shared.PromptGists(opts.Prompter, client, host, cs)
 	} else {
-		gist, err = shared.GetGist(client, host, gistID)
+		gist, err = shared.GetGist(ctx, restClient, gistID)
 	}
 	if err != nil {
 		return err
@@ -124,8 +131,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 	}
 
-	apiClient := api.NewClientFromHTTP(client)
-	if err := deleteGist(apiClient, host, gist.ID); err != nil {
+	if err := deleteGist(ctx, restClient, gist.ID); err != nil {
 		if errors.Is(err, shared.NotFoundErr) {
 			return fmt.Errorf("unable to delete gist %q: either the gist is not found or it is not owned by you", gist.Filename())
 		}
@@ -143,13 +149,16 @@ func deleteRun(opts *DeleteOptions) error {
 	return nil
 }
 
-func deleteGist(apiClient *api.Client, hostname string, gistID string) error {
+func deleteGist(ctx context.Context, client *githubrest.Client, gistID string) error {
 	path, err := safeurl.JoinPath("gists", gistID)
 	if err != nil {
 		return err
 	}
-	err = apiClient.REST(hostname, "DELETE", path.String(), nil, nil)
+	req, err := client.NewRequest(ctx, http.MethodDelete, path.String(), nil)
 	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, nil); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
 			return shared.NotFoundErr

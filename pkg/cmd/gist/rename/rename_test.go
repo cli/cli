@@ -2,6 +2,7 @@ package rename
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
 
@@ -157,6 +158,7 @@ func TestRenameRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		ios, stdin, stdout, stderr := iostreams.Test()
 		stdin.WriteString(tt.stdin)
 		ios.SetStdoutTTY(!tt.nontty)
@@ -172,7 +174,7 @@ func TestRenameRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := renameRun(tt.opts)
+			err := renameRun(context.Background(), tt.opts)
 			reg.Verify(t)
 			if tt.wantOut != "" {
 				assert.EqualError(t, err, tt.wantOut)

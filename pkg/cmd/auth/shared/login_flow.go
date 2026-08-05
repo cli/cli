@@ -215,7 +215,7 @@ func Login(ctx context.Context, opts *LoginOptions) error {
 	}
 
 	if keyToUpload != "" {
-		uploaded, err := sshKeyUpload(httpClient, hostname, keyToUpload, keyTitle)
+		uploaded, err := sshKeyUpload(ctx, opts.RESTClient, authToken, keyToUpload, keyTitle)
 		if err != nil {
 			return err
 		}
@@ -243,14 +243,16 @@ func scopesSentence(scopes []string) string {
 	return strings.Join(quoted, ", ")
 }
 
-func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title string) (bool, error) {
+// sshKeyUpload passes the token per request because login has not yet written
+// it to config, so the client it was given carries no credentials.
+func sshKeyUpload(ctx context.Context, client *githubrest.Client, authToken, keyFile, title string) (bool, error) {
 	f, err := os.Open(keyFile)
 	if err != nil {
 		return false, err
 	}
 	defer f.Close()
 
-	return add.SSHKeyUpload(httpClient, hostname, f, title)
+	return add.SSHKeyUpload(ctx, client, f, title, githubrest.WithSingleRequestToken(authToken))
 }
 
 // httpClient is the GraphQL leg of login, which is out of scope for the REST

@@ -1,11 +1,11 @@
 package list
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -17,7 +17,7 @@ const defaultLimit = 50
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Exporter   cmdutil.Exporter
 
@@ -35,7 +35,7 @@ var workflowFields = []string{
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -56,7 +56,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return runF(opts)
 			}
 
-			return listRun(opts)
+			return listRun(cmd.Context(), opts)
 		},
 	}
 
@@ -66,20 +66,19 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	return cmd
 }
 
-func listRun(opts *ListOptions) error {
+func listRun(ctx context.Context, opts *ListOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	httpClient, err := opts.HttpClient()
+	client, err := opts.GitHubREST(repo.RepoHost())
 	if err != nil {
-		return fmt.Errorf("could not create http client: %w", err)
+		return fmt.Errorf("could not create client: %w", err)
 	}
-	client := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	workflows, err := shared.GetWorkflows(client, repo, opts.Limit)
+	workflows, err := shared.GetWorkflows(ctx, client, repo, opts.Limit)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("could not get workflows: %w", err)

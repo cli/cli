@@ -2,6 +2,7 @@ package set
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -469,7 +470,8 @@ func Test_setRun_repo(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
-				Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+				GitHubREST: httpmock.RESTClientFunc(reg),
+				Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
@@ -480,7 +482,7 @@ func Test_setRun_repo(t *testing.T) {
 				Application:    tt.opts.Application,
 			}
 
-			err := setRun(opts)
+			err := setRun(context.Background(), opts)
 			assert.NoError(t, err)
 
 			reg.Verify(t)
@@ -510,7 +512,8 @@ func Test_setRun_env(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
-		Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+		GitHubREST: httpmock.RESTClientFunc(reg),
+		Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
@@ -521,7 +524,7 @@ func Test_setRun_env(t *testing.T) {
 		RandomOverride: fakeRandom,
 	}
 
-	err := setRun(opts)
+	err := setRun(context.Background(), opts)
 	assert.NoError(t, err)
 
 	reg.Verify(t)
@@ -663,6 +666,7 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			tt.opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -671,7 +675,7 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.Body = "a secret"
 			tt.opts.RandomOverride = fakeRandom
 
-			err := setRun(tt.opts)
+			err := setRun(context.Background(), tt.opts)
 			assert.NoError(t, err)
 
 			reg.Verify(t)
@@ -745,6 +749,7 @@ func Test_setRun_user(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			tt.opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -753,7 +758,7 @@ func Test_setRun_user(t *testing.T) {
 			tt.opts.Body = "a secret"
 			tt.opts.RandomOverride = fakeRandom
 
-			err := setRun(tt.opts)
+			err := setRun(context.Background(), tt.opts)
 			assert.NoError(t, err)
 
 			reg.Verify(t)
@@ -783,6 +788,7 @@ func Test_setRun_shouldNotStore(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -795,7 +801,7 @@ func Test_setRun_shouldNotStore(t *testing.T) {
 		RandomOverride: fakeRandom,
 	}
 
-	err := setRun(opts)
+	err := setRun(context.Background(), opts)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=\n", stdout.String())

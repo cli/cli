@@ -1,12 +1,13 @@
 package list
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -16,14 +17,14 @@ import (
 type ListOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
-	HTTPClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
-		HTTPClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -35,19 +36,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return listRun(opts)
+			return listRun(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func listRun(opts *ListOptions) error {
-	apiClient, err := opts.HTTPClient()
-	if err != nil {
-		return err
-	}
-
+func listRun(ctx context.Context, opts *ListOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -55,7 +51,12 @@ func listRun(opts *ListOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	gpgKeys, err := userKeys(apiClient, host, "")
+	client, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
+
+	gpgKeys, err := userKeys(ctx, client, "")
 	if err != nil {
 		if errors.Is(err, errScopes) {
 			cs := opts.IO.ColorScheme()

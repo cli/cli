@@ -2,6 +2,7 @@ package watch
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -23,6 +25,7 @@ const defaultInterval int = 3
 type WatchOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   shared.Prompter
 
@@ -40,6 +43,7 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	opts := &WatchOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 		Now:        time.Now,
 	}
@@ -82,7 +86,7 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 				return runF(opts)
 			}
 
-			return watchRun(opts)
+			return watchRun(cmd.Context(), opts)
 		},
 	}
 	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run fails")
@@ -92,7 +96,7 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	return cmd
 }
 
-func watchRun(opts *WatchOptions) error {
+func watchRun(ctx context.Context, opts *WatchOptions) error {
 	c, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %w", err)
@@ -104,13 +108,18 @@ func watchRun(opts *WatchOptions) error {
 		return fmt.Errorf("failed to determine base repo: %w", err)
 	}
 
+	restClient, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return fmt.Errorf("failed to create REST client: %w", err)
+	}
+
 	cs := opts.IO.ColorScheme()
 
 	runID := opts.RunID
 	var run *shared.Run
 
 	if opts.Prompt {
-		runs, err := shared.GetRunsWithFilter(client, repo, nil, 10, func(run shared.Run) bool {
+		runs, err := shared.GetRunsWithFilter(ctx, restClient, repo, nil, 10, func(run shared.Run) bool {
 			return run.Status != shared.Completed
 		})
 		if err != nil {
@@ -130,7 +139,7 @@ func watchRun(opts *WatchOptions) error {
 			}
 		}
 	} else {
-		run, err = shared.GetRun(client, repo, runID, 0)
+		run, err = shared.GetRun(ctx, restClient, repo, runID, 0)
 		if err != nil {
 			return fmt.Errorf("failed to get run: %w", err)
 		}
@@ -161,7 +170,7 @@ func watchRun(opts *WatchOptions) error {
 	opts.IO.StartAlternateScreenBuffer()
 	for run.Status != shared.Completed {
 		// Write to a temporary buffer to reduce total number of fetches
-		run, err = renderRun(out, *opts, client, repo, run, prNumber, annotationCache)
+		run, err = renderRun(ctx, out, *opts, restClient, repo, run, prNumber, annotationCache)
 		if err != nil {
 			break
 		}
@@ -212,17 +221,17 @@ func watchRun(opts *WatchOptions) error {
 	return nil
 }
 
-func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo.Interface, run *shared.Run, prNumber string, annotationCache map[int64][]shared.Annotation) (*shared.Run, error) {
+func renderRun(ctx context.Context, out io.Writer, opts WatchOptions, client *githubrest.Client, repo ghrepo.Interface, run *shared.Run, prNumber string, annotationCache map[int64][]shared.Annotation) (*shared.Run, error) {
 	cs := opts.IO.ColorScheme()
 
 	var err error
 
-	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID), 0)
+	run, err = shared.GetRun(ctx, client, repo, fmt.Sprintf("%d", run.ID), 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	jobs, err := shared.GetJobs(client, repo, run.ID, safeurl.NewImmutableSafeURL(run.JobsURL), 0)
+	jobs, err := shared.GetJobs(ctx, client, repo, run.ID, safeurl.NewImmutableSafeURL(run.JobsURL), 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}
@@ -237,7 +246,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 			continue
 		}
 
-		as, err := shared.GetAnnotations(client, repo, job)
+		as, err := shared.GetAnnotations(ctx, client, repo, job)
 		if err != nil {
 			if err != shared.ErrMissingAnnotationsPermissions {
 				return nil, fmt.Errorf("failed to get annotations: %w", err)

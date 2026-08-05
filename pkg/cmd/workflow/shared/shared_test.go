@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -142,9 +141,10 @@ func TestFindWorkflow(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			workflow, err := FindWorkflow(client, tt.repo, tt.workflowSelector, tt.states)
+			workflow, err := FindWorkflow(t.Context(), client, tt.repo, tt.workflowSelector, tt.states)
 			if tt.expectedError != nil {
 				require.Error(t, err)
 				assert.Equal(t, tt.expectedError, err)
@@ -170,9 +170,10 @@ func (t *ErrorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func TestFindWorkflow_nonHTTPError(t *testing.T) {
 	t.Run("When the client fails to instantiate, it returns the error", func(t *testing.T) {
-		client := api.NewClientFromHTTP(&http.Client{Transport: &ErrorTransport{Err: errors.New("non-HTTP error")}})
+		client, err := httpmock.RESTClientFunc(&ErrorTransport{Err: errors.New("non-HTTP error")})("github.com")
+		require.NoError(t, err)
 		repo := ghrepo.New("OWNER", "REPO")
-		workflow, err := FindWorkflow(client, repo, "1", nil)
+		workflow, err := FindWorkflow(t.Context(), client, repo, "1", nil)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "non-HTTP error")
@@ -282,9 +283,10 @@ func Test_getWorkflowsByName_filtering(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			workflows, err := getWorkflowsByName(client, tt.repo, tt.workflowName, tt.states)
+			workflows, err := getWorkflowsByName(t.Context(), client, tt.repo, tt.workflowName, tt.states)
 			if tt.expectedErrorMsg != "" {
 				require.Error(t, err)
 				assert.ErrorContains(t, err, tt.expectedErrorMsg)
@@ -387,9 +389,10 @@ func TestGetWorkflows(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			workflows, err := GetWorkflows(client, tt.repo, tt.limit)
+			workflows, err := GetWorkflows(t.Context(), client, tt.repo, tt.limit)
 			if tt.expectedError != nil {
 				require.Error(t, err)
 				assert.Equal(t, tt.expectedError, err)

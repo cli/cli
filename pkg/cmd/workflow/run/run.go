@@ -2,6 +2,7 @@ package run
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -135,7 +136,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 				return runF(opts)
 			}
 
-			return runRun(opts)
+			return runRun(cmd.Context(), opts)
 		},
 	}
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "Branch or tag name which contains the version of the workflow file you'd like to run")
@@ -258,7 +259,7 @@ func collectInputs(p iprompter, yamlContent []byte) (map[string]string, error) {
 	return providedInputs, nil
 }
 
-func runRun(opts *RunOptions) error {
+func runRun(ctx context.Context, opts *RunOptions) error {
 	c, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("could not build http client: %w", err)
@@ -270,13 +271,18 @@ func runRun(opts *RunOptions) error {
 		return err
 	}
 
+	restClient, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return fmt.Errorf("could not build REST client: %w", err)
+	}
+
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(c, time.Hour*24)
-		restClient, err := opts.GitHubREST(repo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+		cachedRESTClient, err := opts.GitHubREST(repo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
 		if err != nil {
 			return err
 		}
-		opts.Detector = fd.NewDetector(cachedClient, restClient, repo.RepoHost())
+		opts.Detector = fd.NewDetector(cachedClient, cachedRESTClient, repo.RepoHost())
 	}
 
 	ref := opts.Ref
@@ -289,8 +295,8 @@ func runRun(opts *RunOptions) error {
 	}
 
 	states := []shared.WorkflowState{shared.Active}
-	workflow, err := shared.ResolveWorkflow(opts.Prompter,
-		opts.IO, client, repo, opts.Prompt, opts.Selector, states)
+	workflow, err := shared.ResolveWorkflow(ctx, opts.Prompter,
+		opts.IO, restClient, repo, opts.Prompt, opts.Selector, states)
 	if err != nil {
 		var fae shared.FilteredAllError
 		if errors.As(err, &fae) {
@@ -312,7 +318,7 @@ func runRun(opts *RunOptions) error {
 			return fmt.Errorf("could not parse provided JSON: %w", err)
 		}
 	} else if opts.Prompt {
-		yamlContent, err := shared.GetWorkflowContent(client, repo, *workflow, ref)
+		yamlContent, err := shared.GetWorkflowContent(ctx, restClient, repo, *workflow, ref)
 		if err != nil {
 			return fmt.Errorf("unable to fetch workflow file content: %w", err)
 		}
@@ -369,8 +375,11 @@ func runRun(opts *RunOptions) error {
 	//
 	// As a related note, the new REST API version (which will come with breaking
 	// changes) will probably default to return 200 + run details.
-	err = client.REST(repo.RepoHost(), "POST", path.String(), body, &response)
+	req, err := restClient.NewRequest(ctx, http.MethodPost, path.String(), body)
 	if err != nil {
+		return err
+	}
+	if _, err := restClient.Do(req, &response); err != nil {
 		return fmt.Errorf("could not create workflow dispatch event: %w", err)
 	}
 

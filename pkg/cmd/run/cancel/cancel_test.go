@@ -3,7 +3,6 @@ package cancel
 import (
 	"bytes"
 	"io"
-	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -269,9 +268,7 @@ func TestRunCancel(t *testing.T) {
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
 		tt.httpStubs(reg)
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		ios, _, stdout, _ := iostreams.Test()
 		ios.SetStdoutTTY(true)
@@ -288,7 +285,7 @@ func TestRunCancel(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := runCancel(tt.opts)
+			err := runCancel(t.Context(), tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {

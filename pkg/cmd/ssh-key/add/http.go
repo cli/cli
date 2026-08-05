@@ -2,19 +2,22 @@ package add
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/shared"
 )
 
-// Uploads the provided SSH key. Returns true if the key was uploaded, false if it was not.
-func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) (bool, error) {
+// SSHKeyUpload uploads the provided SSH key. Returns true if the key was uploaded, false if it was not.
+// reqOpts exists for the login flow, which uploads a key with a token that is
+// not yet stored in config and so must be supplied per request.
+func SSHKeyUpload(ctx context.Context, client *githubrest.Client, keyFile io.Reader, title string, reqOpts ...githubrest.RequestOption) (bool, error) {
 	u, err := safeurl.JoinPath("user", "keys")
 	if err != nil {
 		return false, err
@@ -33,7 +36,7 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 
 	keyToCompare := splitKey[0] + " " + splitKey[1]
 
-	keys, err := shared.UserKeys(httpClient, hostname, "")
+	keys, err := shared.UserKeys(ctx, client, "", reqOpts...)
 	if err != nil {
 		return false, err
 	}
@@ -49,7 +52,7 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 		"key":   fullUserKey,
 	}
 
-	err = keyUpload(httpClient, hostname, u, payload)
+	err = keyUpload(ctx, client, u, payload, reqOpts...)
 
 	if err != nil {
 		return false, err
@@ -58,8 +61,8 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 	return true, nil
 }
 
-// Uploads the provided SSH Signing key. Returns true if the key was uploaded, false if it was not.
-func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) (bool, error) {
+// SSHSigningKeyUpload uploads the provided SSH Signing key. Returns true if the key was uploaded, false if it was not.
+func SSHSigningKeyUpload(ctx context.Context, client *githubrest.Client, keyFile io.Reader, title string, reqOpts ...githubrest.RequestOption) (bool, error) {
 	u, err := safeurl.JoinPath("user", "ssh_signing_keys")
 	if err != nil {
 		return false, err
@@ -78,7 +81,7 @@ func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Re
 
 	keyToCompare := splitKey[0] + " " + splitKey[1]
 
-	keys, err := shared.UserSigningKeys(httpClient, hostname, "")
+	keys, err := shared.UserSigningKeys(ctx, client, "", reqOpts...)
 	if err != nil {
 		return false, err
 	}
@@ -94,7 +97,7 @@ func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Re
 		"key":   fullUserKey,
 	}
 
-	err = keyUpload(httpClient, hostname, u, payload)
+	err = keyUpload(ctx, client, u, payload, reqOpts...)
 
 	if err != nil {
 		return false, err
@@ -103,14 +106,16 @@ func SSHSigningKeyUpload(httpClient *http.Client, hostname string, keyFile io.Re
 	return true, nil
 }
 
-func keyUpload(httpClient *http.Client, hostname string, u safeurl.SafeURL, payload map[string]string) error {
+func keyUpload(ctx context.Context, client *githubrest.Client, u safeurl.SafeURL, payload map[string]string, reqOpts ...githubrest.RequestOption) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	return api.NewClientFromHTTP(httpClient).REST(hostname, http.MethodPost, u.String(), bytes.NewBuffer(payloadBytes), nil)
+	req, err := client.NewRequest(ctx, http.MethodPost, u.String(), bytes.NewBuffer(payloadBytes), reqOpts...)
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(req, nil)
+	return err
 }

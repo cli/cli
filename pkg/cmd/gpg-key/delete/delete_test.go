@@ -2,6 +2,7 @@ package delete
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -30,7 +31,9 @@ func Test_deleteGPGKeyHTTPError(t *testing.T) {
 		),
 	)
 
-	err := deleteGPGKey(&http.Client{Transport: reg}, "github.com", "123")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	err = deleteGPGKey(context.Background(), client, "123")
 
 	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
@@ -50,7 +53,9 @@ func Test_getGPGKeysHTTPError(t *testing.T) {
 		),
 	)
 
-	keys, err := getGPGKeys(&http.Client{Transport: reg}, "github.com")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	keys, err := getGPGKeys(context.Background(), client)
 
 	assert.Nil(t, keys)
 	var httpErr *githubrest.ErrorResponse
@@ -243,9 +248,7 @@ func Test_deleteRun(t *testing.T) {
 			tt.httpStubs(reg)
 		}
 
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
@@ -255,7 +258,7 @@ func Test_deleteRun(t *testing.T) {
 		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := deleteRun(&tt.opts)
+			err := deleteRun(context.Background(), &tt.opts)
 			reg.Verify(t)
 			if tt.wantErr {
 				assert.Error(t, err)

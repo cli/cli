@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"testing"
 	"time"
@@ -694,9 +693,7 @@ func TestListRun(t *testing.T) {
 			defer reg.Verify(t)
 			tt.stubs(reg)
 
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(tt.isTTY)
@@ -705,7 +702,7 @@ func TestListRun(t *testing.T) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 
-			err := listRun(tt.opts)
+			err := listRun(t.Context(), tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.wantErrMsg, err.Error())

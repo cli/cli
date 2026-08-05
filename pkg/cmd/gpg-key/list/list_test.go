@@ -1,6 +1,7 @@
 package list
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,7 +26,9 @@ func Test_userKeysScopesMissing(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	keys, err := userKeys(&http.Client{Transport: reg}, "github.com", "")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	keys, err := userKeys(context.Background(), client, "")
 
 	assert.Nil(t, keys)
 	require.Same(t, errScopes, err)
@@ -42,7 +45,9 @@ func Test_userKeysHTTPError(t *testing.T) {
 		),
 	)
 
-	keys, err := userKeys(&http.Client{Transport: reg}, "github.com", "")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	keys, err := userKeys(context.Background(), client, "")
 
 	assert.Nil(t, keys)
 	var httpErr *githubrest.ErrorResponse
@@ -60,7 +65,9 @@ func Test_userKeysForUser(t *testing.T) {
 		httpmock.StringResponse(`[{"key_id":"ABC123"}]`),
 	)
 
-	keys, err := userKeys(&http.Client{Transport: reg}, "github.com", "monalisa")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	keys, err := userKeys(context.Background(), client, "monalisa")
 
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
@@ -78,7 +85,7 @@ func Test_listRun(t *testing.T) {
 	}{
 		{
 			name: "list tty",
-			opts: ListOptions{HTTPClient: func() (*http.Client, error) {
+			opts: ListOptions{GitHubREST: func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 				createdAt := time.Now().Add(time.Duration(-24) * time.Hour)
 				expiresAt, _ := time.Parse(time.RFC3339, "2099-01-01T15:44:24+01:00")
 				noExpires := time.Time{}
@@ -106,7 +113,7 @@ func Test_listRun(t *testing.T) {
 						expiresAt.Format(time.RFC3339),
 						noExpires.Format(time.RFC3339))),
 				)
-				return &http.Client{Transport: reg}, nil
+				return httpmock.RESTClientFunc(reg)(host, opts...)
 			}},
 			isTTY: true,
 			wantStdout: heredoc.Doc(`
@@ -118,7 +125,7 @@ func Test_listRun(t *testing.T) {
 		},
 		{
 			name: "list non-tty",
-			opts: ListOptions{HTTPClient: func() (*http.Client, error) {
+			opts: ListOptions{GitHubREST: func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 				createdAt1, _ := time.Parse(time.RFC3339, "2020-06-11T15:44:24+01:00")
 				expiresAt, _ := time.Parse(time.RFC3339, "2099-01-01T15:44:24+01:00")
 				createdAt2, _ := time.Parse(time.RFC3339, "2021-01-11T15:44:24+01:00")
@@ -148,7 +155,7 @@ func Test_listRun(t *testing.T) {
 						createdAt2.Format(time.RFC3339),
 						noExpires.Format(time.RFC3339))),
 				)
-				return &http.Client{Transport: reg}, nil
+				return httpmock.RESTClientFunc(reg)(host, opts...)
 			}},
 			isTTY: false,
 			wantStdout: heredoc.Doc(`
@@ -160,13 +167,13 @@ func Test_listRun(t *testing.T) {
 		{
 			name: "no keys",
 			opts: ListOptions{
-				HTTPClient: func() (*http.Client, error) {
+				GitHubREST: func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 					reg := &httpmock.Registry{}
 					reg.Register(
 						httpmock.REST("GET", "user/gpg_keys"),
 						httpmock.StringResponse(`[]`),
 					)
-					return &http.Client{Transport: reg}, nil
+					return httpmock.RESTClientFunc(reg)(host, opts...)
 				},
 			},
 			wantStdout: "",
@@ -185,7 +192,7 @@ func Test_listRun(t *testing.T) {
 			opts := tt.opts
 			opts.IO = ios
 			opts.Config = func() (gh.Config, error) { return config.NewBlankConfig(), nil }
-			err := listRun(&opts)
+			err := listRun(context.Background(), &opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

@@ -2,6 +2,7 @@ package set
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -26,6 +28,7 @@ type iprompter interface {
 
 type SetOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -45,6 +48,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 	}
 
@@ -125,7 +129,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				return runF(opts)
 			}
 
-			return setRun(opts)
+			return setRun(cmd.Context(), opts)
 		},
 	}
 
@@ -139,7 +143,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	return cmd
 }
 
-func setRun(opts *SetOptions) error {
+func setRun(ctx context.Context, opts *SetOptions) error {
 	variables, err := getVariablesFromOptions(opts)
 	if err != nil {
 		return err
@@ -149,7 +153,9 @@ func setRun(opts *SetOptions) error {
 	if err != nil {
 		return fmt.Errorf("could not set http client: %w", err)
 	}
-	client := api.NewClientFromHTTP(c)
+	// The GraphQL client is retained because mapping repository names to IDs is
+	// a GraphQL query; the REST client below handles the variable requests.
+	gqlClient := api.NewClientFromHTTP(c)
 
 	orgName := opts.OrgName
 	envName := opts.EnvName
@@ -170,13 +176,18 @@ func setRun(opts *SetOptions) error {
 		host, _ = cfg.Authentication().DefaultHost()
 	}
 
+	restClient, err := opts.GitHubREST(host)
+	if err != nil {
+		return fmt.Errorf("could not set http client: %w", err)
+	}
+
 	entity, err := shared.GetVariableEntity(orgName, envName)
 	if err != nil {
 		return err
 	}
 
 	opts.IO.StartProgressIndicator()
-	repositoryIDs, err := getRepoIds(client, host, opts.OrgName, opts.RepositoryNames)
+	repositoryIDs, err := getRepoIds(gqlClient, host, opts.OrgName, opts.RepositoryNames)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -197,7 +208,7 @@ func setRun(opts *SetOptions) error {
 				Value:         v,
 				Visibility:    opts.Visibility,
 			}
-			setc <- setVariable(client, host, setOpts)
+			setc <- setVariable(ctx, restClient, gqlClient, setOpts)
 		}()
 	}
 

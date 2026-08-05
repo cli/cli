@@ -2,6 +2,7 @@ package rerun
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
@@ -21,7 +21,7 @@ import (
 )
 
 type RerunOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   shared.Prompter
@@ -38,7 +38,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 	opts := &RerunOptions{
 		IO:         f.IOStreams,
 		Prompter:   f.Prompter,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -84,7 +84,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			if runF != nil {
 				return runF(opts)
 			}
-			return runRerun(opts)
+			return runRerun(cmd.Context(), opts)
 		},
 	}
 
@@ -95,16 +95,15 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 	return cmd
 }
 
-func runRerun(opts *RerunOptions) error {
-	c, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("failed to create http client: %w", err)
-	}
-	client := api.NewClientFromHTTP(c)
-
+func runRerun(ctx context.Context, opts *RerunOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("failed to determine base repo: %w", err)
+	}
+
+	client, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 
 	cs := opts.IO.ColorScheme()
@@ -115,7 +114,7 @@ func runRerun(opts *RerunOptions) error {
 
 	if jobID != "" {
 		opts.IO.StartProgressIndicator()
-		selectedJob, err = shared.GetJob(client, repo, jobID)
+		selectedJob, err = shared.GetJob(ctx, client, repo, jobID)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get job: %w", err)
@@ -124,7 +123,7 @@ func runRerun(opts *RerunOptions) error {
 	}
 
 	if opts.Prompt {
-		runs, err := shared.GetRunsWithFilter(client, repo, nil, 10, func(run shared.Run) bool {
+		runs, err := shared.GetRunsWithFilter(ctx, client, repo, nil, 10, func(run shared.Run) bool {
 			if run.Status != shared.Completed {
 				return false
 			}
@@ -149,7 +148,7 @@ func runRerun(opts *RerunOptions) error {
 	}
 
 	if opts.JobID != "" {
-		err = rerunJob(client, repo, selectedJob, opts.Debug)
+		err = rerunJob(ctx, client, repo, selectedJob, opts.Debug)
 		if err != nil {
 			return err
 		}
@@ -162,13 +161,13 @@ func runRerun(opts *RerunOptions) error {
 		}
 	} else {
 		opts.IO.StartProgressIndicator()
-		run, err := shared.GetRun(client, repo, runID, 0)
+		run, err := shared.GetRun(ctx, client, repo, runID, 0)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get run: %w", err)
 		}
 
-		err = rerunRun(client, repo, run, opts.OnlyFailed, opts.Debug)
+		err = rerunRun(ctx, client, repo, run, opts.OnlyFailed, opts.Debug)
 		if err != nil {
 			return err
 		}
@@ -188,7 +187,7 @@ func runRerun(opts *RerunOptions) error {
 	return nil
 }
 
-func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFailed, debug bool) error {
+func rerunRun(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, run *shared.Run, onlyFailed, debug bool) error {
 	runVerb := "rerun"
 	if onlyFailed {
 		runVerb = "rerun-failed-jobs"
@@ -204,8 +203,11 @@ func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFa
 		return err
 	}
 
-	err = client.REST(repo.RepoHost(), "POST", path.String(), body, nil)
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), body)
 	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, nil); err != nil {
 		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
 			return fmt.Errorf("run %d cannot be rerun; %s", run.ID, httpError.Message)
@@ -215,7 +217,7 @@ func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFa
 	return nil
 }
 
-func rerunJob(client *api.Client, repo ghrepo.Interface, job *shared.Job, debug bool) error {
+func rerunJob(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, job *shared.Job, debug bool) error {
 	body, err := requestBody(debug)
 	if err != nil {
 		return fmt.Errorf("failed to create rerun body: %w", err)
@@ -226,8 +228,11 @@ func rerunJob(client *api.Client, repo ghrepo.Interface, job *shared.Job, debug 
 		return err
 	}
 
-	err = client.REST(repo.RepoHost(), "POST", path.String(), body, nil)
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), body)
 	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, nil); err != nil {
 		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
 			return fmt.Errorf("job %d cannot be rerun", job.ID)

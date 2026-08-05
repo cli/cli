@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -19,6 +20,7 @@ import (
 type cloneOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 
 	SourceRepo ghrepo.Interface
@@ -28,6 +30,7 @@ type cloneOptions struct {
 func newCmdClone(f *cmdutil.Factory, runF func(*cloneOptions) error) *cobra.Command {
 	opts := cloneOptions{
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		IO:         f.IOStreams,
 	}
 
@@ -64,7 +67,7 @@ func newCmdClone(f *cmdutil.Factory, runF func(*cloneOptions) error) *cobra.Comm
 			if runF != nil {
 				return runF(&opts)
 			}
-			return cloneRun(&opts)
+			return cloneRun(c.Context(), &opts)
 		},
 	}
 
@@ -73,7 +76,7 @@ func newCmdClone(f *cmdutil.Factory, runF func(*cloneOptions) error) *cobra.Comm
 	return cmd
 }
 
-func cloneRun(opts *cloneOptions) error {
+func cloneRun(ctx context.Context, opts *cloneOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -84,8 +87,13 @@ func cloneRun(opts *cloneOptions) error {
 		return err
 	}
 
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicator()
-	successCount, totalCount, err := cloneLabels(httpClient, baseRepo, opts)
+	successCount, totalCount, err := cloneLabels(ctx, httpClient, client, baseRepo, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -109,9 +117,9 @@ func cloneRun(opts *cloneOptions) error {
 	return nil
 }
 
-func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneOptions) (successCount uint32, totalCount int, err error) {
+func cloneLabels(ctx context.Context, httpClient *http.Client, client *githubrest.Client, destination ghrepo.Interface, opts *cloneOptions) (successCount uint32, totalCount int, err error) {
 	successCount = 0
-	labels, totalCount, err := listLabels(client, opts.SourceRepo, listQueryOptions{Limit: -1})
+	labels, totalCount, err := listLabels(httpClient, opts.SourceRepo, listQueryOptions{Limit: -1})
 	if err != nil {
 		return
 	}
@@ -119,18 +127,18 @@ func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneO
 	workers := 10
 	toCreate := make(chan createOptions)
 
-	wg, ctx := errgroup.WithContext(context.Background())
+	wg, groupCtx := errgroup.WithContext(ctx)
 	for i := 0; i < workers; i++ {
 		wg.Go(func() error {
 			for {
 				select {
-				case <-ctx.Done():
+				case <-groupCtx.Done():
 					return nil
 				case l, ok := <-toCreate:
 					if !ok {
 						return nil
 					}
-					err := createLabel(client, destination, &l)
+					err := createLabel(ctx, client, destination, &l)
 					if err != nil {
 						if !errors.Is(err, errLabelAlreadyExists) {
 							return err

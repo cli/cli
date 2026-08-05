@@ -2,6 +2,7 @@ package label
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
@@ -41,7 +41,7 @@ var randomColors = []string{
 
 type createOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 
 	Color       string
@@ -52,7 +52,7 @@ type createOptions struct {
 
 func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Command {
 	opts := createOptions{
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		IO:         f.IOStreams,
 	}
 
@@ -79,7 +79,7 @@ func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(&opts)
 			}
-			return createRun(&opts)
+			return createRun(c.Context(), &opts)
 		},
 	}
 
@@ -92,13 +92,13 @@ func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 
 var errLabelAlreadyExists = errors.New("label already exists")
 
-func createRun(opts *createOptions) error {
-	httpClient, err := opts.HttpClient()
+func createRun(ctx context.Context, opts *createOptions) error {
+	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := opts.BaseRepo()
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
 	if err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func createRun(opts *createOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = createLabel(httpClient, baseRepo, opts)
+	err = createLabel(ctx, client, baseRepo, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		if errors.Is(err, errLabelAlreadyExists) {
@@ -127,8 +127,7 @@ func createRun(opts *createOptions) error {
 	return nil
 }
 
-func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions) error {
-	apiClient := api.NewClientFromHTTP(client)
+func createLabel(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, opts *createOptions) error {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "labels")
 	if err != nil {
 		return err
@@ -141,8 +140,11 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions
 	if err != nil {
 		return err
 	}
-	requestBody := bytes.NewReader(requestByte)
-	err = apiClient.REST(repo.RepoHost(), "POST", path.String(), requestBody, nil)
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), bytes.NewReader(requestByte))
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(req, nil)
 
 	if httpError, ok := err.(*githubrest.ErrorResponse); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists
@@ -154,13 +156,13 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions
 			Color:       opts.Color,
 			Name:        opts.Name,
 		}
-		return updateLabel(apiClient, repo, &editOpts)
+		return updateLabel(ctx, client, repo, &editOpts)
 	}
 
 	return err
 }
 
-func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions) error {
+func updateLabel(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, opts *editOptions) error {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "labels", opts.Name)
 	if err != nil {
 		return err
@@ -179,8 +181,11 @@ func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions
 	if err != nil {
 		return err
 	}
-	requestBody := bytes.NewReader(requestByte)
-	err = apiClient.REST(repo.RepoHost(), "PATCH", path.String(), requestBody, nil)
+	req, err := client.NewRequest(ctx, http.MethodPatch, path.String(), bytes.NewReader(requestByte))
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(req, nil)
 
 	if httpError, ok := err.(*githubrest.ErrorResponse); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists

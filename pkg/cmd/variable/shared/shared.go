@@ -1,10 +1,12 @@
 package shared
 
 import (
+	"context"
 	"errors"
+	"net/http"
 	"time"
 
-	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 )
@@ -68,11 +70,15 @@ func GetVariableEntity(orgName, envName string) (VariableEntity, error) {
 
 // SelectedRepositoryCount returns how many repositories the variable is visible to, fetched from the
 // given entrusted URL. Callers own reading the URL off the variable and writing the result back.
-func SelectedRepositoryCount(apiClient *api.Client, host string, selectedReposURL safeurl.SafeURL) (int, error) {
+func SelectedRepositoryCount(ctx context.Context, client *githubrest.Client, selectedReposURL safeurl.SafeURL) (int, error) {
 	response := struct {
 		TotalCount int `json:"total_count"`
 	}{}
-	if err := apiClient.REST(host, "GET", selectedReposURL.String(), nil, &response); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, selectedReposURL.String(), nil)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := client.Do(req, &response); err != nil {
 		return 0, err
 	}
 	return response.TotalCount, nil

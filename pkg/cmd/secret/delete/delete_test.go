@@ -2,8 +2,8 @@ package delete
 
 import (
 	"bytes"
+	"context"
 	"io"
-	"net/http"
 	"testing"
 
 	ghContext "github.com/cli/cli/v2/context"
@@ -359,9 +359,7 @@ func Test_removeRun_repo(t *testing.T) {
 		ios, _, _, _ := iostreams.Test()
 
 		tt.opts.IO = ios
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
@@ -369,7 +367,7 @@ func Test_removeRun_repo(t *testing.T) {
 			return ghrepo.FromFullNameWithHost("owner/repo", tt.host)
 		}
 
-		err := removeRun(tt.opts)
+		err := removeRun(context.Background(), tt.opts)
 		assert.NoError(t, err)
 	}
 }
@@ -420,14 +418,12 @@ func Test_removeRun_env(t *testing.T) {
 			}
 			return ghrepo.FromFullName("owner/repo")
 		}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
 
-		err := removeRun(tt.opts)
+		err := removeRun(context.Background(), tt.opts)
 		require.NoError(t, err)
 	}
 }
@@ -487,13 +483,11 @@ func Test_removeRun_org(t *testing.T) {
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			tt.opts.IO = ios
 			tt.opts.SecretName = "tVirus"
 
-			err := removeRun(tt.opts)
+			err := removeRun(context.Background(), tt.opts)
 			assert.NoError(t, err)
 
 			reg.Verify(t)
@@ -511,10 +505,8 @@ func Test_removeRun_user(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 
 	opts := &DeleteOptions{
-		IO: ios,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		},
+		IO:         ios,
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -522,7 +514,7 @@ func Test_removeRun_user(t *testing.T) {
 		UserSecrets: true,
 	}
 
-	err := removeRun(opts)
+	err := removeRun(context.Background(), opts)
 	assert.NoError(t, err)
 
 	reg.Verify(t)

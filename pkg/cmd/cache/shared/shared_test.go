@@ -2,8 +2,8 @@ package shared
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"net/http"
 	"strings"
 	"testing"
 
@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 )
@@ -62,11 +61,11 @@ func TestGetCaches(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 			tt.stubs(reg)
-			httpClient := &http.Client{Transport: reg}
-			client := api.NewClientFromHTTP(httpClient)
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 			repo, err := ghrepo.FromFullName("OWNER/REPO")
 			assert.NoError(t, err)
-			result, err := GetCaches(client, repo, tt.opts)
+			result, err := GetCaches(context.Background(), client, repo, tt.opts)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantsCount, len(result.ActionsCaches))
 		})

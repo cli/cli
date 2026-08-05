@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
@@ -22,6 +23,7 @@ import (
 
 type CheckOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -38,6 +40,7 @@ func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Browser:    f.Browser,
 		Git:        f.GitClient,
 	}
@@ -92,7 +95,7 @@ func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Comm
 				return runF(opts)
 			}
 
-			return checkRun(opts)
+			return checkRun(cmd.Context(), opts)
 		},
 	}
 
@@ -102,7 +105,7 @@ func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Comm
 	return cmd
 }
 
-func checkRun(opts *CheckOptions) error {
+func checkRun(ctx context.Context, opts *CheckOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -112,6 +115,11 @@ func checkRun(opts *CheckOptions) error {
 	repoI, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("could not determine repo to use: %w", err)
+	}
+
+	restClient, err := opts.GitHubREST(repoI.RepoHost())
+	if err != nil {
+		return err
 	}
 
 	git := opts.Git
@@ -125,7 +133,7 @@ func checkRun(opts *CheckOptions) error {
 	}
 
 	if opts.Branch == "" {
-		opts.Branch, err = git.CurrentBranch(context.Background())
+		opts.Branch, err = git.CurrentBranch(ctx)
 		if err != nil {
 			return fmt.Errorf("could not determine current branch: %w", err)
 		}
@@ -150,7 +158,11 @@ func checkRun(opts *CheckOptions) error {
 		return err
 	}
 
-	if err = client.REST(repoI.RepoHost(), "GET", endpoint.String(), nil, &rules); err != nil {
+	req, err := restClient.NewRequest(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return err
+	}
+	if _, err = restClient.Do(req, &rules); err != nil {
 		return fmt.Errorf("GET %s failed: %w", endpoint.String(), err)
 	}
 

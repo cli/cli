@@ -2,12 +2,12 @@ package add
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
@@ -16,7 +16,7 @@ var errScopesMissing = errors.New("insufficient OAuth scopes")
 var errDuplicateKey = errors.New("key already exists")
 var errWrongFormat = errors.New("key in wrong format")
 
-func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) error {
+func gpgKeyUpload(ctx context.Context, client *githubrest.Client, keyFile io.Reader, title string) error {
 	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
 		return err
@@ -39,11 +39,11 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 		return err
 	}
 
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	apiClient := api.NewClientFromHTTP(httpClient)
-	err = apiClient.REST(hostname, "POST", path.String(), bytes.NewBuffer(payloadBytes), nil)
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(req, nil)
 	if err != nil {
 		if httpError, ok := errors.AsType[*githubrest.ErrorResponse](err); ok {
 			if httpError.StatusCode == 404 {

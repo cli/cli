@@ -1,14 +1,14 @@
 package list
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
@@ -23,7 +23,7 @@ const (
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
 
@@ -49,7 +49,7 @@ type iprompter interface {
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 		now:        time.Now(),
 	}
@@ -81,7 +81,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return runF(opts)
 			}
 
-			return listRun(opts)
+			return listRun(cmd.Context(), opts)
 		},
 	}
 
@@ -101,17 +101,16 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	return cmd
 }
 
-func listRun(opts *ListOptions) error {
+func listRun(ctx context.Context, opts *ListOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("failed to determine base repo: %w", err)
 	}
 
-	c, err := opts.HttpClient()
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
 	if err != nil {
-		return fmt.Errorf("failed to create http client: %w", err)
+		return fmt.Errorf("failed to create client: %w", err)
 	}
-	client := api.NewClientFromHTTP(c)
 
 	filters := &shared.FilterOptions{
 		Branch:  opts.Branch,
@@ -133,14 +132,14 @@ func listRun(opts *ListOptions) error {
 			// note: this will be incomplete if more workflow states are added to `workflowShared`
 			states = append(states, workflowShared.DisabledManually, workflowShared.DisabledInactivity)
 		}
-		if workflow, err := workflowShared.ResolveWorkflow(opts.Prompter, opts.IO, client, baseRepo, false, opts.WorkflowSelector, states); err == nil {
+		if workflow, err := workflowShared.ResolveWorkflow(ctx, opts.Prompter, opts.IO, client, baseRepo, false, opts.WorkflowSelector, states); err == nil {
 			filters.WorkflowID = workflow.ID
 			filters.WorkflowName = workflow.Name
 		} else {
 			return err
 		}
 	}
-	runsResult, err := shared.GetRuns(client, baseRepo, filters, opts.Limit)
+	runsResult, err := shared.GetRuns(ctx, client, baseRepo, filters, opts.Limit)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)

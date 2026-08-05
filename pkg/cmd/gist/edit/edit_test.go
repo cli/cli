@@ -2,6 +2,7 @@ package edit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -792,6 +793,7 @@ func Test_editRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		ios, stdin, stdout, stderr := iostreams.Test()
 		stdin.WriteString(tt.stdin)
 		ios.SetStdoutTTY(tt.isTTY)
@@ -810,7 +812,7 @@ func Test_editRun(t *testing.T) {
 			}
 			tt.opts.Prompter = pm
 
-			err := editRun(tt.opts)
+			err := editRun(context.Background(), tt.opts)
 			reg.Verify(t)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)

@@ -2,6 +2,7 @@ package rename
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -22,6 +24,7 @@ type RenameOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 
 	Selector    string
 	OldFileName string
@@ -32,6 +35,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	opts := &RenameOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Config:     f.Config,
 	}
 
@@ -49,14 +53,14 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 				return runf(opts)
 			}
 
-			return renameRun(opts)
+			return renameRun(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func renameRun(opts *RenameOptions) error {
+func renameRun(ctx context.Context, opts *RenameOptions) error {
 	gistID := opts.Selector
 
 	if strings.Contains(gistID, "/") {
@@ -81,7 +85,12 @@ func renameRun(opts *RenameOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	gist, err := shared.GetGist(client, host, gistID)
+	restClient, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
+
+	gist, err := shared.GetGist(ctx, restClient, gistID)
 	if err != nil {
 		if errors.Is(err, shared.NotFoundErr) {
 			return fmt.Errorf("gist not found: %s", gistID)
@@ -111,10 +120,10 @@ func renameRun(opts *RenameOptions) error {
 	gist.Files[opts.NewFileName].Filename = opts.NewFileName
 	gist.Files[opts.OldFileName] = &shared.GistFile{}
 
-	return updateGist(apiClient, host, gist)
+	return updateGist(ctx, restClient, gist)
 }
 
-func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error {
+func updateGist(ctx context.Context, client *githubrest.Client, gist *shared.Gist) error {
 	body := shared.Gist{
 		Description: gist.Description,
 		Files:       gist.Files,
@@ -134,9 +143,12 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 
 	result := shared.Gist{}
 
-	err = apiClient.REST(hostname, "POST", path.String(), requestBody, &result)
-
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), requestBody)
 	if err != nil {
+		return err
+	}
+
+	if _, err := client.Do(req, &result); err != nil {
 		return err
 	}
 

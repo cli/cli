@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -62,16 +63,18 @@ func (g Gist) TruncDescription() string {
 
 var NotFoundErr = errors.New("not found")
 
-func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
+func GetGist(ctx context.Context, client *githubrest.Client, gistID string) (*Gist, error) {
 	gist := Gist{}
 	path, err := safeurl.JoinPath("gists", gistID)
 	if err != nil {
 		return nil, err
 	}
 
-	apiClient := api.NewClientFromHTTP(client)
-	err = apiClient.REST(hostname, "GET", path.String(), nil, &gist)
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &gist); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
 			return nil, NotFoundErr
@@ -270,7 +273,7 @@ func GetRawGistFile(httpClient *http.Client, rawURL safeurl.SafeURL) (iostreams.
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return iostreams.Untrusted{}, api.HandleHTTPError(resp)
+		return iostreams.Untrusted{}, githubrest.NewErrorResponse(resp)
 	}
 
 	body, err := io.ReadAll(resp.Body)

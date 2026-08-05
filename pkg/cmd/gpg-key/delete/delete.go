@@ -1,11 +1,12 @@
 package delete
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -15,7 +16,7 @@ import (
 type DeleteOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 
 	KeyID     string
 	Confirmed bool
@@ -24,7 +25,7 @@ type DeleteOptions struct {
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
 	opts := &DeleteOptions{
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Config:     f.Config,
 		IO:         f.IOStreams,
 		Prompter:   f.Prompter,
@@ -44,7 +45,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return deleteRun(opts)
+			return deleteRun(cmd.Context(), opts)
 		},
 	}
 
@@ -54,19 +55,20 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	return cmd
 }
 
-func deleteRun(opts *DeleteOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
+func deleteRun(ctx context.Context, opts *DeleteOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
-	gpgKeys, err := getGPGKeys(httpClient, host)
+
+	client, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
+
+	gpgKeys, err := getGPGKeys(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -89,7 +91,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 	}
 
-	err = deleteGPGKey(httpClient, host, id)
+	err = deleteGPGKey(ctx, client, id)
 	if err != nil {
 		return err
 	}

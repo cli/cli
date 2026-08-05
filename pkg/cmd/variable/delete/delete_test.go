@@ -2,7 +2,7 @@ package delete
 
 import (
 	"bytes"
-	"net/http"
+	"context"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
@@ -161,9 +161,7 @@ func TestRemoveRun(t *testing.T) {
 
 			ios, _, _, _ := iostreams.Test()
 			tt.opts.IO = ios
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			tt.opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -171,7 +169,7 @@ func TestRemoveRun(t *testing.T) {
 				return ghrepo.FromFullNameWithHost("owner/repo", tt.host)
 			}
 
-			err := removeRun(tt.opts)
+			err := removeRun(context.Background(), tt.opts)
 			require.NoError(t, err)
 		})
 	}

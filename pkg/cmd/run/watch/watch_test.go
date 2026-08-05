@@ -381,6 +381,7 @@ func TestWatchRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		tt.opts.Now = func() time.Time {
 			notnow, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 05:50:00")
@@ -402,7 +403,7 @@ func TestWatchRun(t *testing.T) {
 				tt.promptStubs(pm)
 			}
 
-			err := watchRun(tt.opts)
+			err := watchRun(t.Context(), tt.opts)
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)
 			} else {

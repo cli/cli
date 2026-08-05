@@ -1,6 +1,7 @@
 package add
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -129,9 +130,7 @@ func Test_runAdd(t *testing.T) {
 		reg := &httpmock.Registry{}
 
 		tt.opts.IO = ios
-		tt.opts.HTTPClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		if tt.httpStubs != nil {
 			tt.httpStubs(reg)
 		}
@@ -141,7 +140,7 @@ func Test_runAdd(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			err := runAdd(&tt.opts)
+			err := runAdd(context.Background(), &tt.opts)
 			if tt.wantErrMsg != "" {
 				assert.Equal(t, tt.wantErrMsg, err.Error())
 			} else {
@@ -165,9 +164,11 @@ func TestSSHKeyUploadHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusUnprocessableEntity, `{"message":"Validation Failed"}`),
 	)
 
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
 	uploaded, err := SSHKeyUpload(
-		&http.Client{Transport: reg},
-		"github.com",
+		context.Background(),
+		client,
 		strings.NewReader("ssh-ed25519 asdf"),
 		"",
 	)

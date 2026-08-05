@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -381,6 +382,7 @@ func Test_viewRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 			// only set this if org is not set, because the repo isn't needed if --org is provided and
 			// leaving it undefined will catch potential errors
@@ -393,7 +395,7 @@ func Test_viewRun(t *testing.T) {
 			browser := &browser.Stub{}
 			tt.opts.Browser = browser
 
-			err := viewRun(&tt.opts)
+			err := viewRun(context.Background(), &tt.opts)
 
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)

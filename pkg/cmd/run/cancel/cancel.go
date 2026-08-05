@@ -1,12 +1,12 @@
 package cancel
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
@@ -17,7 +17,7 @@ import (
 )
 
 type CancelOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   shared.Prompter
@@ -31,7 +31,7 @@ type CancelOptions struct {
 func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Command {
 	opts := &CancelOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 	}
 
@@ -55,7 +55,7 @@ func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return runCancel(opts)
+			return runCancel(cmd.Context(), opts)
 		},
 	}
 
@@ -64,18 +64,13 @@ func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Co
 	return cmd
 }
 
-func runCancel(opts *CancelOptions) error {
+func runCancel(ctx context.Context, opts *CancelOptions) error {
 	if opts.RunID != "" {
 		_, err := strconv.Atoi(opts.RunID)
 		if err != nil {
 			return fmt.Errorf("invalid run-id %#v", opts.RunID)
 		}
 	}
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("failed to create http client: %w", err)
-	}
-	client := api.NewClientFromHTTP(httpClient)
 
 	cs := opts.IO.ColorScheme()
 
@@ -84,11 +79,16 @@ func runCancel(opts *CancelOptions) error {
 		return fmt.Errorf("failed to determine base repo: %w", err)
 	}
 
+	client, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
 	runID := opts.RunID
 	var run *shared.Run
 
 	if opts.Prompt {
-		runs, err := shared.GetRunsWithFilter(client, repo, nil, 10, func(run shared.Run) bool {
+		runs, err := shared.GetRunsWithFilter(ctx, client, repo, nil, 10, func(run shared.Run) bool {
 			return run.Status != shared.Completed
 		})
 		if err != nil {
@@ -108,7 +108,7 @@ func runCancel(opts *CancelOptions) error {
 			}
 		}
 	} else {
-		run, err = shared.GetRun(client, repo, runID, 0)
+		run, err = shared.GetRun(ctx, client, repo, runID, 0)
 		if err != nil {
 			var httpErr *githubrest.ErrorResponse
 			if errors.As(err, &httpErr) {
@@ -122,7 +122,7 @@ func runCancel(opts *CancelOptions) error {
 
 	force := opts.Force
 
-	err = cancelWorkflowRun(client, repo, fmt.Sprintf("%d", run.ID), force)
+	err = cancelWorkflowRun(ctx, client, repo, fmt.Sprintf("%d", run.ID), force)
 	if err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
@@ -143,7 +143,7 @@ func runCancel(opts *CancelOptions) error {
 	return nil
 }
 
-func cancelWorkflowRun(client *api.Client, repo ghrepo.Interface, runID string, force bool) error {
+func cancelWorkflowRun(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, runID string, force bool) error {
 	var path *safeurl.MutableSafeURL
 	var err error
 	if force {
@@ -155,8 +155,11 @@ func cancelWorkflowRun(client *api.Client, repo ghrepo.Interface, runID string, 
 		return err
 	}
 
-	err = client.REST(repo.RepoHost(), "POST", path.String(), nil, nil)
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), nil)
 	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, nil); err != nil {
 		return err
 	}
 

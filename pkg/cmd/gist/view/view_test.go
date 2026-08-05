@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -225,7 +226,7 @@ func Test_viewRun(t *testing.T) {
 			wantOut: "danger\x1b[31m\n",
 		},
 		{
-			name:  "piped inline file escapes are already neutralized by the JSON transport",
+			name:  "piped inline file with escape sequences is refused",
 			isTTY: false,
 			opts: &ViewOptions{
 				Selector:  "1234",
@@ -239,7 +240,7 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "danger^[[31m\n",
+			wantErr: "gist file contains terminal escape sequences; pass --allow-escape-sequences to view it anyway",
 		},
 		{
 			name:  "one file, no ID supplied",
@@ -592,6 +593,8 @@ func Test_viewRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
+
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
@@ -604,7 +607,7 @@ func Test_viewRun(t *testing.T) {
 		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := viewRun(tt.opts)
+			err := viewRun(context.Background(), tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 				return

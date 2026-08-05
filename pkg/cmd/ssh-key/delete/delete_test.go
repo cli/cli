@@ -2,6 +2,7 @@ package delete
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
 
@@ -187,9 +188,7 @@ func Test_deleteRun(t *testing.T) {
 			tt.httpStubs(reg)
 		}
 
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
@@ -199,7 +198,7 @@ func Test_deleteRun(t *testing.T) {
 		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := deleteRun(&tt.opts)
+			err := deleteRun(context.Background(), &tt.opts)
 			reg.Verify(t)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -220,7 +219,9 @@ func TestDeleteSSHKeyHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	err := deleteSSHKey(&http.Client{Transport: reg}, "github.com", "1234")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	err = deleteSSHKey(context.Background(), client, "1234")
 
 	var httpErr *githubrest.ErrorResponse
 	require.ErrorAs(t, err, &httpErr)
@@ -236,7 +237,9 @@ func TestGetSSHKeyHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	key, err := getSSHKey(&http.Client{Transport: reg}, "github.com", "1234")
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	key, err := getSSHKey(context.Background(), client, "1234")
 
 	assert.Nil(t, key)
 	var httpErr *githubrest.ErrorResponse

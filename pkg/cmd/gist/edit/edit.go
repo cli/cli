@@ -2,6 +2,7 @@ package edit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
@@ -29,6 +31,7 @@ var editNextOptions = []string{"Edit another file", "Submit", "Cancel"}
 type EditOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Config     func() (gh.Config, error)
 	Prompter   prompter.Prompter
 
@@ -46,6 +49,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := EditOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Config:     f.Config,
 		Prompter:   f.Prompter,
 		Edit: func(editorCmd, filename, defaultContent string, io *iostreams.IOStreams) (string, error) {
@@ -100,7 +104,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				return runF(&opts)
 			}
 
-			return editRun(&opts)
+			return editRun(c.Context(), &opts)
 		},
 	}
 
@@ -115,7 +119,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	return cmd
 }
 
-func editRun(opts *EditOptions) error {
+func editRun(ctx context.Context, opts *EditOptions) error {
 	client, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -127,6 +131,11 @@ func editRun(opts *EditOptions) error {
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
+
+	restClient, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
 
 	gistID := opts.Selector
 	if gistID == "" {
@@ -159,7 +168,7 @@ func editRun(opts *EditOptions) error {
 
 	apiClient := api.NewClientFromHTTP(client)
 
-	gist, err := shared.GetGist(client, host, gistID)
+	gist, err := shared.GetGist(ctx, restClient, gistID)
 	if err != nil {
 		if errors.Is(err, shared.NotFoundErr) {
 			return fmt.Errorf("gist not found: %s", gistID)
@@ -233,7 +242,7 @@ func editRun(opts *EditOptions) error {
 		}
 
 		gistToUpdate.Files = files
-		return updateGist(apiClient, host, gistToUpdate)
+		return updateGist(ctx, restClient, gistToUpdate)
 	}
 
 	// Remove a file from the gist
@@ -244,7 +253,7 @@ func editRun(opts *EditOptions) error {
 		}
 
 		gistToUpdate.Files = files
-		return updateGist(apiClient, host, gistToUpdate)
+		return updateGist(ctx, restClient, gistToUpdate)
 	}
 
 	filesToUpdate := map[string]string{}
@@ -375,7 +384,7 @@ func editRun(opts *EditOptions) error {
 	}
 	gistToUpdate.Files = updatedFiles
 
-	return updateGist(apiClient, host, gistToUpdate)
+	return updateGist(ctx, restClient, gistToUpdate)
 }
 
 // https://docs.github.com/en/rest/gists/gists?apiVersion=2022-11-28#update-a-gist
@@ -396,7 +405,7 @@ type gistFileToUpdate struct {
 	NewFilename string `json:"filename,omitempty"`
 }
 
-func updateGist(apiClient *api.Client, hostname string, gist gistToUpdate) error {
+func updateGist(ctx context.Context, client *githubrest.Client, gist gistToUpdate) error {
 	requestByte, err := json.Marshal(gist)
 	if err != nil {
 		return err
@@ -409,8 +418,11 @@ func updateGist(apiClient *api.Client, hostname string, gist gistToUpdate) error
 	if err != nil {
 		return err
 	}
-	err = apiClient.REST(hostname, "POST", path.String(), requestBody, &result)
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), requestBody)
 	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, &result); err != nil {
 		return err
 	}
 

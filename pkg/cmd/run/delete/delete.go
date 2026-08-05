@@ -1,12 +1,12 @@
 package delete
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -22,7 +22,7 @@ const (
 )
 
 type DeleteOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   prompter.Prompter
@@ -33,7 +33,7 @@ type DeleteOptions struct {
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 	}
 
@@ -64,20 +64,14 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return runDelete(opts)
+			return runDelete(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func runDelete(opts *DeleteOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("failed to create http client: %w", err)
-	}
-	client := api.NewClientFromHTTP(httpClient)
-
+func runDelete(ctx context.Context, opts *DeleteOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	repo, err := opts.BaseRepo()
@@ -85,11 +79,16 @@ func runDelete(opts *DeleteOptions) error {
 		return fmt.Errorf("failed to determine base repo: %w", err)
 	}
 
+	client, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
 	runID := opts.RunID
 	var run *shared.Run
 
 	if opts.Prompt {
-		payload, err := shared.GetRuns(client, repo, nil, defaultRunGetLimit)
+		payload, err := shared.GetRuns(ctx, client, repo, nil, defaultRunGetLimit)
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
 		}
@@ -111,7 +110,7 @@ func runDelete(opts *DeleteOptions) error {
 			}
 		}
 	} else {
-		run, err = shared.GetRun(client, repo, runID, 0)
+		run, err = shared.GetRun(ctx, client, repo, runID, 0)
 		if err != nil {
 			var httpErr *githubrest.ErrorResponse
 			if errors.As(err, &httpErr) {
@@ -123,7 +122,7 @@ func runDelete(opts *DeleteOptions) error {
 		}
 	}
 
-	err = deleteWorkflowRun(client, repo, fmt.Sprintf("%d", run.ID))
+	err = deleteWorkflowRun(ctx, client, repo, fmt.Sprintf("%d", run.ID))
 	if err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
@@ -139,13 +138,16 @@ func runDelete(opts *DeleteOptions) error {
 	return nil
 }
 
-func deleteWorkflowRun(client *api.Client, repo ghrepo.Interface, runID string) error {
+func deleteWorkflowRun(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, runID string) error {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", runID)
 	if err != nil {
 		return err
 	}
-	err = client.REST(repo.RepoHost(), "DELETE", path.String(), nil, nil)
+	req, err := client.NewRequest(ctx, http.MethodDelete, path.String(), nil)
 	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, nil); err != nil {
 		return err
 	}
 	return nil

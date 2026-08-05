@@ -3,7 +3,6 @@ package enable
 import (
 	"bytes"
 	"io"
-	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -300,9 +299,7 @@ func TestEnableRun(t *testing.T) {
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
 		tt.httpStubs(reg)
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		ios, _, stdout, _ := iostreams.Test()
 		ios.SetStdoutTTY(tt.tty)
@@ -319,7 +316,7 @@ func TestEnableRun(t *testing.T) {
 				tt.promptStubs(pm)
 			}
 
-			err := runEnable(tt.opts)
+			err := runEnable(t.Context(), tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.wantErrOut, err.Error())

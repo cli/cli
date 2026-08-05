@@ -2,12 +2,12 @@ package delete
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -301,6 +301,8 @@ func Test_deleteRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
+
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
@@ -310,7 +312,7 @@ func Test_deleteRun(t *testing.T) {
 		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := deleteRun(tt.opts)
+			err := deleteRun(context.Background(), tt.opts)
 			reg.Verify(t)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -380,9 +382,10 @@ func Test_gistDelete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 			tt.httpStubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)(tt.hostname)
+			require.NoError(t, err)
 
-			err := deleteGist(client, tt.hostname, tt.gistID)
+			err = deleteGist(context.Background(), client, tt.gistID)
 			if tt.wantErrString == "" && tt.wantErr == nil {
 				require.NoError(t, err)
 			} else {

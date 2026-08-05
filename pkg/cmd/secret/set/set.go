@@ -2,6 +2,7 @@ package set
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -26,6 +28,7 @@ import (
 
 type SetOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -50,6 +53,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 	}
 
@@ -182,7 +186,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				return runF(opts)
 			}
 
-			return setRun(opts)
+			return setRun(cmd.Context(), opts)
 		},
 	}
 
@@ -200,7 +204,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	return cmd
 }
 
-func setRun(opts *SetOptions) error {
+func setRun(ctx context.Context, opts *SetOptions) error {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 
@@ -231,7 +235,15 @@ func setRun(opts *SetOptions) error {
 	if err != nil {
 		return fmt.Errorf("could not create http client: %w", err)
 	}
-	client := api.NewClientFromHTTP(c)
+	// The GraphQL client is retained because mapping repository names to IDs is
+	// a GraphQL query; the REST client below handles the public key and secret
+	// requests.
+	gqlClient := api.NewClientFromHTTP(c)
+
+	restClient, err := opts.GitHubREST(host)
+	if err != nil {
+		return fmt.Errorf("could not create http client: %w", err)
+	}
 
 	secretEntity, err := shared.GetSecretEntity(orgName, envName, opts.UserSecrets)
 	if err != nil {
@@ -250,13 +262,13 @@ func setRun(opts *SetOptions) error {
 	var pk *PubKey
 	switch secretEntity {
 	case shared.Organization:
-		pk, err = getOrgPublicKey(client, host, orgName, secretApp)
+		pk, err = getOrgPublicKey(ctx, restClient, orgName, secretApp)
 	case shared.Environment:
-		pk, err = getEnvPubKey(client, baseRepo, envName)
+		pk, err = getEnvPubKey(ctx, restClient, baseRepo, envName)
 	case shared.User:
-		pk, err = getUserPublicKey(client, host)
+		pk, err = getUserPublicKey(ctx, restClient)
 	default:
-		pk, err = getRepoPubKey(client, baseRepo, secretApp)
+		pk, err = getRepoPubKey(ctx, restClient, baseRepo, secretApp)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to fetch public key: %w", err)
@@ -272,7 +284,7 @@ func setRun(opts *SetOptions) error {
 			repoNamesC <- repoNamesResult{}
 			return
 		}
-		repositoryIDs, err := mapRepoNamesToIDs(client, host, opts.OrgName, opts.RepositoryNames)
+		repositoryIDs, err := mapRepoNamesToIDs(gqlClient, host, opts.OrgName, opts.RepositoryNames)
 		repoNamesC <- repoNamesResult{
 			ids: repositoryIDs,
 			err: err,
@@ -291,7 +303,7 @@ func setRun(opts *SetOptions) error {
 		key := secretKey
 		value := secret
 		go func() {
-			setc <- setSecret(opts, pk, host, client, baseRepo, key, value, repositoryIDs, secretApp, secretEntity)
+			setc <- setSecret(ctx, opts, pk, restClient, baseRepo, key, value, repositoryIDs, secretApp, secretEntity)
 		}()
 	}
 
@@ -327,7 +339,7 @@ type setResult struct {
 	err       error
 }
 
-func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, baseRepo ghrepo.Interface, secretKey string, secret []byte, repositoryIDs []int64, app shared.App, entity shared.SecretEntity) (res setResult) {
+func setSecret(ctx context.Context, opts *SetOptions, pk *PubKey, client *githubrest.Client, baseRepo ghrepo.Interface, secretKey string, secret []byte, repositoryIDs []int64, app shared.App, entity shared.SecretEntity) (res setResult) {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 	res.key = secretKey
@@ -358,13 +370,13 @@ func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, ba
 
 	switch entity {
 	case shared.Organization:
-		err = putOrgSecret(client, host, pk, orgName, opts.Visibility, secretKey, encoded, repositoryIDs, app)
+		err = putOrgSecret(ctx, client, pk, orgName, opts.Visibility, secretKey, encoded, repositoryIDs, app)
 	case shared.Environment:
-		err = putEnvSecret(client, pk, baseRepo, envName, secretKey, encoded)
+		err = putEnvSecret(ctx, client, pk, baseRepo, envName, secretKey, encoded)
 	case shared.User:
-		err = putUserSecret(client, host, pk, secretKey, encoded, repositoryIDs)
+		err = putUserSecret(ctx, client, pk, secretKey, encoded, repositoryIDs)
 	default:
-		err = putRepoSecret(client, pk, baseRepo, secretKey, encoded, app)
+		err = putRepoSecret(ctx, client, pk, baseRepo, secretKey, encoded, app)
 	}
 	if err != nil {
 		res.err = fmt.Errorf("failed to set secret %q: %w", secretKey, err)

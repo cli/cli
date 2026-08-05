@@ -1,10 +1,11 @@
 package shared
 
 import (
+	"context"
 	"net/http"
 	"time"
 
-	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -21,7 +22,7 @@ type sshKey struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error) {
+func UserKeys(ctx context.Context, client *githubrest.Client, userHandle string, reqOpts ...githubrest.RequestOption) ([]sshKey, error) {
 	u, err := safeurl.JoinPath("user", "keys")
 	if err != nil {
 		return nil, err
@@ -34,7 +35,7 @@ func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error
 	}
 	u.SetQuery("per_page", "100")
 
-	keys, err := getUserKeys(httpClient, host, u)
+	keys, err := getUserKeys(ctx, client, u, reqOpts...)
 
 	if err != nil {
 		return nil, err
@@ -47,7 +48,7 @@ func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error
 	return keys, nil
 }
 
-func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error) {
+func UserSigningKeys(ctx context.Context, client *githubrest.Client, userHandle string, reqOpts ...githubrest.RequestOption) ([]sshKey, error) {
 	u, err := safeurl.JoinPath("user", "ssh_signing_keys")
 	if err != nil {
 		return nil, err
@@ -60,7 +61,7 @@ func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey
 	}
 	u.SetQuery("per_page", "100")
 
-	keys, err := getUserKeys(httpClient, host, u)
+	keys, err := getUserKeys(ctx, client, u, reqOpts...)
 
 	if err != nil {
 		return nil, err
@@ -73,13 +74,13 @@ func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey
 	return keys, nil
 }
 
-func getUserKeys(httpClient *http.Client, hostname string, u safeurl.SafeURL) ([]sshKey, error) {
+func getUserKeys(ctx context.Context, client *githubrest.Client, u safeurl.SafeURL, reqOpts ...githubrest.RequestOption) ([]sshKey, error) {
 	var keys []sshKey
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err := api.NewClientFromHTTP(httpClient).REST(hostname, http.MethodGet, u.String(), nil, &keys)
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil, reqOpts...)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &keys); err != nil {
 		return nil, err
 	}
 

@@ -2,6 +2,7 @@ package status
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -458,6 +459,7 @@ func TestStatusRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		tt.opts.CachedClient = func(c *http.Client, _ time.Duration) *http.Client {
 			return c
 		}
@@ -467,7 +469,7 @@ func TestStatusRun(t *testing.T) {
 		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := statusRun(tt.opts)
+			err := statusRun(context.Background(), tt.opts)
 			if tt.wantErrMsg != "" {
 				assert.Equal(t, tt.wantErrMsg, err.Error())
 				return

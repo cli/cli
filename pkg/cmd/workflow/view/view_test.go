@@ -404,6 +404,7 @@ func TestViewRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		ios, _, stdout, _ := iostreams.Test()
 		ios.SetStdoutTTY(tt.tty)
@@ -418,7 +419,7 @@ func TestViewRun(t *testing.T) {
 		tt.opts.Browser = browser
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := runView(tt.opts)
+			err := runView(t.Context(), tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.wantErrOut, err.Error())

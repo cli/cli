@@ -1,6 +1,7 @@
 package view
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,6 +25,7 @@ import (
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
@@ -47,6 +49,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Browser:    f.Browser,
 		Prompter:   f.Prompter,
 		now:        time.Now(),
@@ -84,7 +87,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return runView(opts)
+			return runView(cmd.Context(), opts)
 		},
 	}
 
@@ -97,7 +100,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
-func runView(opts *ViewOptions) error {
+func runView(ctx context.Context, opts *ViewOptions) error {
 	c, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("could not build http client: %w", err)
@@ -109,9 +112,14 @@ func runView(opts *ViewOptions) error {
 		return err
 	}
 
+	restClient, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return fmt.Errorf("could not build REST client: %w", err)
+	}
+
 	var workflow *shared.Workflow
 	states := []shared.WorkflowState{shared.Active}
-	workflow, err = shared.ResolveWorkflow(opts.Prompter, opts.IO, client, repo, opts.Prompt, opts.Selector, states)
+	workflow, err = shared.ResolveWorkflow(ctx, opts.Prompter, opts.IO, restClient, repo, opts.Prompt, opts.Selector, states)
 	if err != nil {
 		return err
 	}
@@ -146,9 +154,9 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.YAML {
-		err = viewWorkflowContent(opts, client, repo, workflow, opts.Ref)
+		err = viewWorkflowContent(ctx, opts, restClient, repo, workflow, opts.Ref)
 	} else {
-		err = viewWorkflowInfo(opts, client, repo, workflow)
+		err = viewWorkflowInfo(ctx, opts, restClient, repo, workflow)
 	}
 	if err != nil {
 		return err
@@ -157,8 +165,8 @@ func runView(opts *ViewOptions) error {
 	return nil
 }
 
-func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow, ref string) error {
-	yamlBytes, err := shared.GetWorkflowContent(client, repo, *workflow, ref)
+func viewWorkflowContent(ctx context.Context, opts *ViewOptions, client *githubrest.Client, repo ghrepo.Interface, workflow *shared.Workflow, ref string) error {
+	yamlBytes, err := shared.GetWorkflowContent(ctx, client, repo, *workflow, ref)
 	if err != nil {
 		if s, ok := err.(*githubrest.ErrorResponse); ok && s.StatusCode == 404 {
 			if ref != "" {
@@ -203,8 +211,8 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Inte
 	return nil
 }
 
-func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow) error {
-	wr, err := runShared.GetRuns(client, repo, &runShared.FilterOptions{
+func viewWorkflowInfo(ctx context.Context, opts *ViewOptions, client *githubrest.Client, repo ghrepo.Interface, workflow *shared.Workflow) error {
+	wr, err := runShared.GetRuns(ctx, client, repo, &runShared.FilterOptions{
 		WorkflowID:   workflow.ID,
 		WorkflowName: workflow.Name,
 	}, 5)

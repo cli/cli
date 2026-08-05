@@ -2,6 +2,7 @@ package check
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -207,13 +208,14 @@ func Test_checkRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(fakeHTTP)
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("my-org/repo-name")
 			}
 			browser := &browser.Stub{}
 			tt.opts.Browser = browser
 
-			err := checkRun(&tt.opts)
+			err := checkRun(context.Background(), &tt.opts)
 
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
