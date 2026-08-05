@@ -32,7 +32,7 @@ func extensionHTTPClient(t *testing.T, path string, status int, body string) *ht
 func extensionRESTClient(t *testing.T, path string, status int, body string) *githubrest.Client {
 	t.Helper()
 
-	client, err := restClientFromHTTP(extensionHTTPClient(t, path, status, body), "github.com")
+	client, err := httpmock.RESTClientFunc(extensionHTTPClient(t, path, status, body).Transport)("github.com")
 	require.NoError(t, err)
 	return client
 }
@@ -55,9 +55,9 @@ func TestRepoExists(t *testing.T) {
 		"non-JSON body": "repository",
 	} {
 		t.Run("success with "+name, func(t *testing.T) {
-			client := extensionHTTPClient(t, "repos/OWNER/REPO", http.StatusOK, body)
+			client := extensionRESTClient(t, "repos/OWNER/REPO", http.StatusOK, body)
 
-			exists, err := repoExists(client, repo)
+			exists, err := repoExists(t.Context(), client, repo)
 
 			require.NoError(t, err)
 			assert.True(t, exists)
@@ -65,18 +65,18 @@ func TestRepoExists(t *testing.T) {
 	}
 
 	t.Run("not found", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO", http.StatusNotFound, `{"message":"Not Found"}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO", http.StatusNotFound, `{"message":"Not Found"}`)
 
-		exists, err := repoExists(client, repo)
+		exists, err := repoExists(t.Context(), client, repo)
 
 		require.NoError(t, err)
 		assert.False(t, exists)
 	})
 
 	t.Run("server error", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO", http.StatusInternalServerError, `{"message":"Internal Server Error"}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO", http.StatusInternalServerError, `{"message":"Internal Server Error"}`)
 
-		exists, err := repoExists(client, repo)
+		exists, err := repoExists(t.Context(), client, repo)
 
 		assert.False(t, exists)
 		requireExtensionHTTPError(t, err, http.StatusInternalServerError)
@@ -84,9 +84,9 @@ func TestRepoExists(t *testing.T) {
 
 	for _, status := range []int{http.StatusCreated, http.StatusNoContent} {
 		t.Run("unexpected "+http.StatusText(status), func(t *testing.T) {
-			client := extensionHTTPClient(t, "repos/OWNER/REPO", status, `{"message":"Unexpected status"}`)
+			client := extensionRESTClient(t, "repos/OWNER/REPO", status, `{"message":"Unexpected status"}`)
 
-			exists, err := repoExists(client, repo)
+			exists, err := repoExists(t.Context(), client, repo)
 
 			assert.False(t, exists)
 			requireExtensionHTTPError(t, err, status)

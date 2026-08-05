@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +28,7 @@ type Extension struct {
 	path       string
 	kind       ExtensionKind
 	gitClient  gitClient
-	httpClient *http.Client
+	gitHubREST restClientFactory
 
 	mu sync.RWMutex
 
@@ -130,7 +129,7 @@ func (e *Extension) LatestVersion() string {
 		if err != nil {
 			return ""
 		}
-		restClient, err := restClientFromHTTP(e.httpClient, repo.RepoHost())
+		restClient, err := e.gitHubREST(repo.RepoHost())
 		if err != nil {
 			return ""
 		}

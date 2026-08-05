@@ -1,6 +1,7 @@
 package extension
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,41 +9,32 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
-// restClientFromHTTP builds a githubrest.Client that reaches host through
-// httpClient.
-//
-// The extension manager and each Extension hold an already-authenticated
-// *http.Client whose transport carries the token, so the client is constructed
-// WithoutToken and leans on that transport for auth, exactly as the api.Client
-// it replaced did.
-func restClientFromHTTP(httpClient *http.Client, host string) (*githubrest.Client, error) {
-	return githubrest.NewClient(ghinstance.RESTPrefix(host), httpClient, githubrest.WithoutToken())
-}
-
-func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+func repoExists(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface) (bool, error) {
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
 	if err != nil {
 		return false, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
 	if err != nil {
 		return false, err
 	}
 
-	// TODO(api-client-rollout)
-	// This has been deferred from moving to api.Client due to its exact-status contract and body-blind response handling.
-	resp, err := httpClient.Do(req)
-	if err != nil {
+	// Send is used rather than Do because this check is about the status code:
+	// it returns a non-nil response even for the *ErrorResponse a 404 produces,
+	// and the caller must close the body.
+	resp, err := client.Send(req)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if resp == nil {
 		return false, err
 	}
-	defer resp.Body.Close()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
@@ -50,7 +42,7 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	case http.StatusNotFound:
 		return false, nil
 	default:
-		return false, githubrest.NewErrorResponse(resp)
+		return false, githubrest.NewErrorResponse(resp.Response)
 	}
 }
 
@@ -88,25 +80,23 @@ type release struct {
 }
 
 // downloadAsset downloads a single asset to the given file path.
-func downloadAsset(httpClient *http.Client, assetURL safeurl.SafeURL, destPath string) (downloadErr error) {
-	var req *http.Request
-	if req, downloadErr = http.NewRequest("GET", assetURL.String(), nil); downloadErr != nil {
-		return
+//
+// The asset URL is a GitHub REST API URL, so it goes through client, whose host
+// is credentialed. Send is used rather than Do so a non-2xx status is caught
+// before the destination file is created, leaving no empty file behind on
+// failure, and because the binary body is streamed straight to disk.
+func downloadAsset(ctx context.Context, client *githubrest.Client, assetURL safeurl.SafeURL, destPath string) (downloadErr error) {
+	req, err := client.NewRequest(ctx, http.MethodGet, assetURL.String(), nil, githubrest.WithHeader("Accept", "application/octet-stream"))
+	if err != nil {
+		return err
 	}
 
-	req.Header.Set("Accept", "application/octet-stream")
-
-	var resp *http.Response
-	// TODO(api-client-rollout)
-	// This has been deferred from moving to api.Client due to its custom Accept header and binary response streaming.
-	if resp, downloadErr = httpClient.Do(req); downloadErr != nil {
-		return
+	resp, err := client.Send(req)
+	if resp != nil {
+		defer resp.Body.Close()
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		downloadErr = githubrest.NewErrorResponse(resp)
-		return
+	if err != nil {
+		return err
 	}
 
 	var f *os.File
@@ -184,36 +174,27 @@ func fetchReleaseFromTag(ctx context.Context, client *githubrest.Client, baseRep
 }
 
 // fetchCommitSHA finds full commit SHA from a target ref in a repo
-func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRef string) (string, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "commits", targetRef)
-	if err != nil {
-		return "", err
-	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+func fetchCommitSHA(ctx context.Context, client *githubrest.Client, baseRepo ghrepo.Interface, targetRef string) (string, error) {
+	path, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "commits", targetRef)
 	if err != nil {
 		return "", err
 	}
 
-	req.Header.Set("Accept", "application/vnd.github.v3.sha")
-	// TODO(api-client-rollout)
-	// This has been deferred from moving to api.Client due to its custom Accept header and bare SHA response body.
-	resp, err := httpClient.Do(req)
+	// The v3.sha media type makes the endpoint return the bare SHA as the body,
+	// so it is streamed into a buffer rather than decoded as JSON.
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil, githubrest.WithHeader("Accept", "application/vnd.github.v3.sha"))
 	if err != nil {
 		return "", err
 	}
 
-	defer resp.Body.Close()
-	if resp.StatusCode == 422 {
-		return "", commitNotFoundErr
-	}
-	if resp.StatusCode > 299 {
-		return "", githubrest.NewErrorResponse(resp)
-	}
-
-	body, err := io.ReadAll(resp.Body)
+	var body bytes.Buffer
+	resp, err := client.Do(req, &body)
 	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusUnprocessableEntity {
+			return "", commitNotFoundErr
+		}
 		return "", err
 	}
 
-	return string(body), nil
+	return body.String(), nil
 }

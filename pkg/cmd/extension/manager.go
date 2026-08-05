@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/findsh"
@@ -43,6 +44,12 @@ func (e *ErrExtensionExecutableNotFound) Error() string {
 
 const darwinAmd64 = "darwin-amd64"
 
+// restClientFactory builds a githubrest.Client for host with the token already
+// resolved, mirroring cmdutil.Factory.GitHubREST. The manager holds the factory
+// rather than a single client so it can build one per host it touches, and so
+// the token is settled at construction rather than injected per request.
+type restClientFactory func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
+
 type Manager struct {
 	dataDir    func() string
 	updateDir  func() string
@@ -51,6 +58,7 @@ type Manager struct {
 	newCommand func(string, ...string) *exec.Cmd
 	platform   func() (string, string)
 	client     *http.Client
+	gitHubREST restClientFactory
 	gitClient  gitClient
 	config     gh.Config
 	io         *iostreams.IOStreams
@@ -84,6 +92,12 @@ func (m *Manager) SetConfig(cfg gh.Config) {
 
 func (m *Manager) SetClient(client *http.Client) {
 	m.client = client
+}
+
+// SetGitHubREST wires the factory the manager uses to build githubrest.Clients
+// for REST calls, which is cmdutil.Factory.GitHubREST in production.
+func (m *Manager) SetGitHubREST(f restClientFactory) {
+	m.gitHubREST = f
 }
 
 func (m *Manager) EnableDryRunMode() {
@@ -165,7 +179,7 @@ func (m *Manager) list(includeMetadata bool) ([]*Extension, error) {
 				results = append(results, &Extension{
 					path:       filepath.Join(dir, f.Name(), f.Name()),
 					kind:       BinaryKind,
-					httpClient: m.client,
+					gitHubREST: m.gitHubREST,
 				})
 			} else {
 				results = append(results, &Extension{
@@ -253,10 +267,18 @@ type binManifest struct {
 
 // Install installs an extension from repo, and pins to commitish if provided
 func (m *Manager) Install(repo ghrepo.Interface, target string) error {
-	isBin, err := isBinExtension(m.client, repo)
+	// The ExtensionManager interface method carries no context and widening it
+	// is out of scope, so a background context is used here.
+	ctx := context.Background()
+	restClient, err := m.gitHubREST(repo.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	isBin, err := isBinExtension(ctx, restClient, repo)
 	if err != nil {
 		if errors.Is(err, releaseNotFoundErr) {
-			if ok, err := repoExists(m.client, repo); err != nil {
+			if ok, err := repoExists(ctx, restClient, repo); err != nil {
 				return err
 			} else if !ok {
 				return repositoryNotFoundErr
@@ -269,13 +291,7 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 		return m.installBin(repo, target)
 	}
 
-	restClient, err := restClientFromHTTP(m.client, repo.RepoHost())
-	if err != nil {
-		return err
-	}
-	// The ExtensionManager interface method carries no context and widening it
-	// is out of scope, so a background context is used here.
-	hs, err := hasScript(context.Background(), restClient, repo)
+	hs, err := hasScript(ctx, restClient, repo)
 	if err != nil {
 		return err
 	}
@@ -288,18 +304,18 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 
 func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	var r *release
-	var err error
-	restClient, err := restClientFromHTTP(m.client, repo.RepoHost())
+	// The ExtensionManager interface method carries no context and widening it
+	// is out of scope, so a background context is used here.
+	ctx := context.Background()
+	restClient, err := m.gitHubREST(repo.RepoHost())
 	if err != nil {
 		return err
 	}
 	isPinned := target != ""
-	// The ExtensionManager interface method carries no context and widening it
-	// is out of scope, so a background context is used here.
 	if isPinned {
-		r, err = fetchReleaseFromTag(context.Background(), restClient, repo, target)
+		r, err = fetchReleaseFromTag(ctx, restClient, repo, target)
 	} else {
-		r, err = fetchLatestRelease(context.Background(), restClient, repo)
+		r, err = fetchLatestRelease(ctx, restClient, repo)
 	}
 	if err != nil {
 		return err
@@ -364,7 +380,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	err = downloadAsset(m.client, safeurl.NewImmutableSafeURL(asset.APIURL), binPath)
+	err = downloadAsset(ctx, restClient, safeurl.NewImmutableSafeURL(asset.APIURL), binPath)
 	if err != nil {
 		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
 	}
@@ -428,8 +444,13 @@ func (m *Manager) installGit(repo ghrepo.Interface, target string) error {
 
 	var commitSHA string
 	if target != "" {
-		var err error
-		commitSHA, err = fetchCommitSHA(m.client, repo, target)
+		restClient, err := m.gitHubREST(repo.RepoHost())
+		if err != nil {
+			return err
+		}
+		// The ExtensionManager interface method carries no context and widening
+		// it is out of scope, so a background context is used here.
+		commitSHA, err = fetchCommitSHA(context.Background(), restClient, repo, target)
 		if err != nil {
 			return err
 		}
@@ -548,7 +569,11 @@ func (m *Manager) upgradeExtension(ext *Extension, force bool) error {
 		var isBin bool
 		repo, repoErr := repoFromPath(m.gitClient, filepath.Join(ext.Path(), ".."))
 		if repoErr == nil {
-			isBin, _ = isBinExtension(m.client, repo)
+			if restClient, err := m.gitHubREST(repo.RepoHost()); err == nil {
+				// The ExtensionManager interface method carries no context and
+				// widening it is out of scope, so a background context is used here.
+				isBin, _ = isBinExtension(context.Background(), restClient, repo)
+			}
 		}
 		if isBin {
 			if err := m.Remove(ext.Name()); err != nil {
@@ -758,16 +783,9 @@ func readPathFromFile(path string) (string, error) {
 	return strings.TrimSpace(string(b[:n])), err
 }
 
-func isBinExtension(httpClient *http.Client, repo ghrepo.Interface) (isBin bool, err error) {
-	restClient, err := restClientFromHTTP(httpClient, repo.RepoHost())
-	if err != nil {
-		return false, err
-	}
+func isBinExtension(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface) (isBin bool, err error) {
 	var r *release
-	// This is called from ExtensionManager interface methods that carry no
-	// context and widening them is out of scope, so a background context is
-	// used here.
-	r, err = fetchLatestRelease(context.Background(), restClient, repo)
+	r, err = fetchLatestRelease(ctx, client, repo)
 	if err != nil {
 		return
 	}

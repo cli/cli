@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -285,7 +284,7 @@ func GetCurrentLogin(httpClient httpClient, hostname, authToken string) (string,
 	}
 	defer res.Body.Close()
 	if res.StatusCode > 299 {
-		return "", api.HandleHTTPError(res)
+		return "", githubrest.NewErrorResponse(res)
 	}
 	decoder := json.NewDecoder(res.Body)
 	err = decoder.Decode(&result)

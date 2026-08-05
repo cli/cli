@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )

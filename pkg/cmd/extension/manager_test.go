@@ -46,6 +46,13 @@ func TestHelperProcess(t *testing.T) {
 }
 
 func newTestManager(dataDir, updateDir string, client *http.Client, gitClient gitClient, ios *iostreams.IOStreams, extraEnv ...string) *Manager {
+	var gitHubREST restClientFactory
+	if client != nil {
+		// Mirror the production wiring, which resolves the token at construction
+		// rather than injecting it per request. The transport is whatever the
+		// test's *http.Client wraps, which is usually a *httpmock.Registry.
+		gitHubREST = httpmock.RESTClientFunc(client.Transport)
+	}
 	return &Manager{
 		dataDir:   func() string { return dataDir },
 		updateDir: func() string { return updateDir },
@@ -61,10 +68,11 @@ func newTestManager(dataDir, updateDir string, client *http.Client, gitClient gi
 			cmd.Env = append([]string{"GH_WANT_HELPER_PROCESS=1"}, extraEnv...)
 			return cmd
 		},
-		config:    config.NewBlankConfig(),
-		io:        ios,
-		client:    client,
-		gitClient: gitClient,
+		config:     config.NewBlankConfig(),
+		io:         ios,
+		client:     client,
+		gitHubREST: gitHubREST,
+		gitClient:  gitClient,
 		platform: func() (string, string) {
 			return "windows-amd64", ".exe"
 		},

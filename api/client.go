@@ -2,17 +2,10 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
-	"regexp"
-	"strings"
 
-	"github.com/cli/cli/v2/internal/githubrest"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
-	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const (
@@ -24,8 +17,6 @@ const (
 	features        = "merge_queue"
 	userAgent       = "User-Agent"
 )
-
-var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
 
 func NewClientFromHTTP(httpClient *http.Client) *Client {
 	client := &Client{http: httpClient}
@@ -92,83 +83,13 @@ func (c Client) QueryWithContext(ctx context.Context, hostname, name string, que
 	return handleResponse(gqlClient.QueryWithContext(ctx, name, query, variables))
 }
 
-// REST performs a REST request and parses the response.
-func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
-	restClient, err := ghAPI.NewRESTClient(opts)
-	if err != nil {
-		return err
-	}
-	return handleResponse(restClient.Do(method, p, body, data))
-}
-
-func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data interface{}) (string, error) {
-	opts := clientOptions(hostname, c.http.Transport)
-	restClient, err := ghAPI.NewRESTClient(opts)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := restClient.Request(method, p, body)
-	if err != nil {
-		return "", handleResponse(err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNoContent {
-		return "", nil
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	err = json.Unmarshal(b, &data)
-	if err != nil {
-		return "", err
-	}
-
-	var next string
-	for _, m := range linkRE.FindAllStringSubmatch(resp.Header.Get("Link"), -1) {
-		if len(m) > 2 && m[2] == "next" {
-			next = m[1]
-		}
-	}
-
-	return next, nil
-}
-
-// HandleHTTPError parses a http.Response into a *githubrest.ErrorResponse.
+// handleResponse converts a ghAPI.GraphQLError into this package's GraphQLError.
 //
-// The caller is responsible to close the response body stream.
-func HandleHTTPError(resp *http.Response) error {
-	return githubrest.NewErrorResponse(resp)
-}
-
-// handleResponse takes a ghAPI.HTTPError or ghAPI.GraphQLError and converts it into a
-// *githubrest.ErrorResponse or GraphQLError respectively.
-//
-// Returning githubrest's error type from the api package is interop scaffolding:
-// it means migrated and unmigrated call sites agree on one error type while the
-// REST migration is in flight, so no call site has to handle both.
+// It no longer has a REST leg: every REST request goes through
+// internal/githubrest, which builds its own errors.
 func handleResponse(err error) error {
 	if err == nil {
 		return nil
-	}
-
-	var restErr *ghAPI.HTTPError
-	if errors.As(err, &restErr) {
-		errResp := &githubrest.ErrorResponse{
-			Headers:    restErr.Headers,
-			Message:    restErr.Message,
-			RequestURL: restErr.RequestURL,
-			StatusCode: restErr.StatusCode,
-		}
-		for _, item := range restErr.Errors {
-			errResp.Errors = append(errResp.Errors, githubrest.ErrorItem(item))
-		}
-		return errResp
 	}
 
 	var gqlErr *ghAPI.GraphQLError
@@ -179,77 +100,6 @@ func handleResponse(err error) error {
 	}
 
 	return err
-}
-
-// ScopesSuggestion is an error messaging utility that prints the suggestion to request additional OAuth
-// scopes in case a server response indicates that there are missing scopes.
-func ScopesSuggestion(resp *http.Response) string {
-	return generateScopesSuggestion(resp.StatusCode,
-		resp.Header.Get("X-Accepted-Oauth-Scopes"),
-		resp.Header.Get("X-Oauth-Scopes"),
-		resp.Request.URL.Hostname())
-}
-
-// EndpointNeedsScopes adds additional OAuth scopes to an HTTP response as if they were returned from the
-// server endpoint. This improves HTTP 4xx error messaging for endpoints that don't explicitly list the
-// OAuth scopes they need.
-func EndpointNeedsScopes(resp *http.Response, s string) {
-	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-		oldScopes := resp.Header.Get("X-Accepted-Oauth-Scopes")
-		resp.Header.Set("X-Accepted-Oauth-Scopes", fmt.Sprintf("%s, %s", oldScopes, s))
-	}
-}
-
-func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScopes, hostname string) string {
-	if statusCode < 400 || statusCode > 499 || statusCode == 422 {
-		return ""
-	}
-
-	if tokenHasScopes == "" {
-		return ""
-	}
-
-	gotScopes := map[string]struct{}{}
-	for _, s := range strings.Split(tokenHasScopes, ",") {
-		s = strings.TrimSpace(s)
-		gotScopes[s] = struct{}{}
-
-		// Certain scopes may be grouped under a single "top-level" scope. The following branch
-		// statements include these grouped/implied scopes when the top-level scope is encountered.
-		// See https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps.
-		if s == "repo" {
-			gotScopes["repo:status"] = struct{}{}
-			gotScopes["repo_deployment"] = struct{}{}
-			gotScopes["public_repo"] = struct{}{}
-			gotScopes["repo:invite"] = struct{}{}
-			gotScopes["security_events"] = struct{}{}
-		} else if s == "user" {
-			gotScopes["read:user"] = struct{}{}
-			gotScopes["user:email"] = struct{}{}
-			gotScopes["user:follow"] = struct{}{}
-		} else if s == "codespace" {
-			gotScopes["codespace:secrets"] = struct{}{}
-		} else if strings.HasPrefix(s, "admin:") {
-			gotScopes["read:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
-			gotScopes["write:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
-		} else if strings.HasPrefix(s, "write:") {
-			gotScopes["read:"+strings.TrimPrefix(s, "write:")] = struct{}{}
-		}
-	}
-
-	for _, s := range strings.Split(endpointNeedsScopes, ",") {
-		s = strings.TrimSpace(s)
-		if _, gotScope := gotScopes[s]; s == "" || gotScope {
-			continue
-		}
-		return fmt.Sprintf(
-			"This API operation needs the %[1]q scope. To request it, run:  gh auth refresh -h %[2]s -s %[1]s",
-			s,
-			ghauth.NormalizeHostname(hostname),
-		)
-	}
-
-	return ""
 }
 
 func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOptions {
