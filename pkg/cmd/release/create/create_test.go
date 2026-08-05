@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -810,7 +811,8 @@ func Test_createRun(t *testing.T) {
 				Target:       "",
 				Assets: []*shared.AssetForUpload{
 					{
-						Name: "ball.tgz",
+						Name:     "ball.tgz",
+						MIMEType: "application/x-gtar",
 						Open: func() (io.ReadCloser, error) {
 							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
 						},
@@ -869,7 +871,8 @@ func Test_createRun(t *testing.T) {
 				Target:       "",
 				Assets: []*shared.AssetForUpload{
 					{
-						Name: "ball.tgz",
+						Name:     "ball.tgz",
+						MIMEType: "application/x-gtar",
 						Open: func() (io.ReadCloser, error) {
 							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
 						},
@@ -929,7 +932,8 @@ func Test_createRun(t *testing.T) {
 				Target:       "",
 				Assets: []*shared.AssetForUpload{
 					{
-						Name: "ball.tgz",
+						Name:     "ball.tgz",
+						MIMEType: "application/x-gtar",
 						Open: func() (io.ReadCloser, error) {
 							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
 						},
@@ -957,7 +961,8 @@ func Test_createRun(t *testing.T) {
 				Target:       "",
 				Assets: []*shared.AssetForUpload{
 					{
-						Name: "ball.tgz",
+						Name:     "ball.tgz",
+						MIMEType: "application/x-gtar",
 						Open: func() (io.ReadCloser, error) {
 							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
 						},
@@ -992,7 +997,8 @@ func Test_createRun(t *testing.T) {
 				Target:       "",
 				Assets: []*shared.AssetForUpload{
 					{
-						Name: "ball.tgz",
+						Name:     "ball.tgz",
+						MIMEType: "application/x-gtar",
 						Open: func() (io.ReadCloser, error) {
 							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
 						},
@@ -1028,7 +1034,8 @@ func Test_createRun(t *testing.T) {
 				Target:       "",
 				Assets: []*shared.AssetForUpload{
 					{
-						Name: "ball.tgz",
+						Name:     "ball.tgz",
+						MIMEType: "application/x-gtar",
 						Open: func() (io.ReadCloser, error) {
 							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
 						},
@@ -1056,7 +1063,8 @@ func Test_createRun(t *testing.T) {
 				Target:       "",
 				Assets: []*shared.AssetForUpload{
 					{
-						Name: "ball.tgz",
+						Name:     "ball.tgz",
+						MIMEType: "application/x-gtar",
 						Open: func() (io.ReadCloser, error) {
 							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
 						},
@@ -1279,6 +1287,7 @@ func Test_createRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(fakeHTTP)
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
@@ -1291,7 +1300,7 @@ func Test_createRun(t *testing.T) {
 				tt.runStubs(rs)
 			}
 
-			err := createRun(&tt.opts)
+			err := createRun(context.Background(), &tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 			} else {
@@ -1847,6 +1856,7 @@ func Test_createRun_interactive(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
@@ -1874,7 +1884,7 @@ func Test_createRun_interactive(t *testing.T) {
 				tt.runStubs(rs)
 			}
 
-			err := createRun(tt.opts)
+			err := createRun(context.Background(), tt.opts)
 
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)

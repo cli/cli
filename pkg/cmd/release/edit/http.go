@@ -2,21 +2,22 @@ package edit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/shurcooL/githubv4"
 )
 
-func editRelease(httpClient *http.Client, repo ghrepo.Interface, releaseID int64, params map[string]interface{}) (*shared.Release, error) {
+func editRelease(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, releaseID int64, params map[string]interface{}) (*shared.Release, error) {
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -26,32 +27,17 @@ func editRelease(httpClient *http.Client, repo ghrepo.Interface, releaseID int64
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("PATCH", url.String(), bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
+	req, err := client.NewRequest(ctx, http.MethodPatch, url.String(), bytes.NewBuffer(bodyBytes),
+		githubrest.WithHeader("Content-Type", "application/json; charset=utf-8"))
 	if err != nil {
 		return nil, err
 	}
 
 	var newRelease shared.Release
-	err = json.Unmarshal(b, &newRelease)
-	return &newRelease, err
+	if _, err := client.Do(req, &newRelease); err != nil {
+		return nil, err
+	}
+	return &newRelease, nil
 }
 
 func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {

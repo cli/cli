@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
@@ -29,6 +30,7 @@ type VerifyAssetOptions struct {
 
 type VerifyAssetConfig struct {
 	HttpClient  *http.Client
+	GitHubREST  *githubrest.Client
 	IO          *iostreams.IOStreams
 	Opts        *VerifyAssetOptions
 	AttClient   api.Client
@@ -88,6 +90,11 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*VerifyAssetConfig) error) 
 				return err
 			}
 
+			restClient, err := f.GitHubREST(baseRepo.RepoHost())
+			if err != nil {
+				return err
+			}
+
 			io := f.IOStreams
 			attClient := api.NewLiveClient(httpClient, externalClient, baseRepo.RepoHost(), att_io.NewHandler(io))
 
@@ -101,6 +108,7 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*VerifyAssetConfig) error) 
 			config := &VerifyAssetConfig{
 				Opts:        opts,
 				HttpClient:  httpClient,
+				GitHubREST:  restClient,
 				AttClient:   attClient,
 				AttVerifier: attVerifier,
 				IO:          io,
@@ -127,7 +135,7 @@ func verifyAssetRun(config *VerifyAssetConfig) error {
 	tagName := opts.TagName
 
 	if tagName == "" {
-		release, err := shared.FetchLatestRelease(ctx, config.HttpClient, baseRepo)
+		release, err := shared.FetchLatestRelease(ctx, config.GitHubREST, baseRepo)
 		if err != nil {
 			return err
 		}
@@ -142,7 +150,7 @@ func verifyAssetRun(config *VerifyAssetConfig) error {
 		return err
 	}
 
-	ref, err := shared.FetchRefSHA(ctx, config.HttpClient, baseRepo, tagName)
+	ref, err := shared.FetchRefSHA(ctx, config.GitHubREST, baseRepo, tagName)
 	if err != nil {
 		return err
 	}

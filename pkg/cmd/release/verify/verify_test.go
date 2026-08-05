@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
@@ -46,6 +47,7 @@ func TestNewCmdVerify_Args(t *testing.T) {
 				ExternalHttpClient: func() (*http.Client, error) {
 					return nil, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(&httpmock.Registry{}),
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
@@ -98,6 +100,7 @@ func Test_verifyRun_Success(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   api.NewTestClient(),
 		AttVerifier: shared.NewMockVerifier(result),
 	}
@@ -134,6 +137,7 @@ func Test_verifyRun_FailedNoAttestations_SHA1(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   attClient,
 		AttVerifier: nil,
 	}
@@ -172,6 +176,7 @@ func Test_verifyRun_FailedNoAttestations_SHA256(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   attClient,
 		AttVerifier: nil,
 	}
@@ -207,10 +212,18 @@ func Test_verifyRun_FailedTagNotInAttestation(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   api.NewTestClient(),
 		AttVerifier: nil,
 	}
 
 	err = verifyRun(cfg)
 	require.ErrorContains(t, err, "no attestations found for release v1.2.3")
+}
+
+func mustRESTClient(t *testing.T, reg *httpmock.Registry) *githubrest.Client {
+	t.Helper()
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	return client
 }

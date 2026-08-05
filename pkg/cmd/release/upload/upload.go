@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -19,6 +20,7 @@ import (
 
 type UploadOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -34,6 +36,7 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 	opts := &UploadOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -66,7 +69,7 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return uploadRun(opts)
+			return uploadRun(cmd.Context(), opts)
 		},
 	}
 
@@ -75,7 +78,7 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 	return cmd
 }
 
-func uploadRun(opts *UploadOptions) error {
+func uploadRun(ctx context.Context, opts *UploadOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -86,7 +89,12 @@ func uploadRun(opts *UploadOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, opts.TagName)
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	release, err := shared.FetchRelease(ctx, client, httpClient, baseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}
@@ -113,7 +121,7 @@ func uploadRun(opts *UploadOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = shared.ConcurrentUpload(httpClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
+	err = shared.ConcurrentUpload(ctx, client, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err

@@ -59,22 +59,24 @@ func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName str
 	return query.Repository.Ref.ID != "", err
 }
 
-func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, error) {
+func getTags(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, limit int) ([]tag, error) {
 	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "tags")
 	if err != nil {
 		return nil, err
 	}
 	u.SetQuery("per_page", strconv.Itoa(limit))
 
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
 	var tags []tag
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodGet, u.String(), nil, &tags)
+	_, err = client.Do(req, &tags)
 	return tags, err
 }
 
-func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagName, target, previousTagName string) (*releaseNotes, error) {
+func generateReleaseNotes(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, tagName, target, previousTagName string) (*releaseNotes, error) {
 	params := map[string]interface{}{
 		"tag_name": tagName,
 	}
@@ -95,12 +97,13 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 		return nil, err
 	}
 
-	var rn releaseNotes
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes), &rn)
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes))
 	if err != nil {
+		return nil, err
+	}
+
+	var rn releaseNotes
+	if _, err := client.Do(req, &rn); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return nil, notImplementedError
@@ -110,36 +113,30 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 	return &rn, nil
 }
 
-func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
+// publishedReleaseExists asks with HEAD, so there is no body to decode; a nil
+// decode target says exactly that.
+func publishedReleaseExists(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, tagName string) (bool, error) {
 	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return false, err
 	}
-	req, err := http.NewRequest("HEAD", url.String(), nil)
+	req, err := client.NewRequest(ctx, http.MethodHead, url.String(), nil)
 	if err != nil {
 		return false, err
 	}
 
-	// TODO(api-client-rollout)
-	// This has been deferred from moving to api.Client due to HEAD responses having no body while REST decodes non-204/205 2xx responses as JSON.
-	resp, err := httpClient.Do(req)
-	if err != nil {
+	if _, err := client.Do(req, nil); err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
 		return false, err
 	}
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
 
-	if resp.StatusCode == 200 {
-		return true, nil
-	} else if resp.StatusCode == 404 {
-		return false, nil
-	} else {
-		return false, api.HandleHTTPError(resp)
-	}
+	return true, nil
 }
 
-func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*shared.Release, error) {
+func createRelease(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, params map[string]interface{}) (*shared.Release, error) {
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -161,12 +158,13 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	// beyond returning a 404.
 	//
 	// https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps#available-scopes
-	var newRelease shared.Release
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes), &newRelease)
+	req, err := client.NewRequest(ctx, http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes))
 	if err != nil {
+		return nil, err
+	}
+
+	var newRelease shared.Release
+	if _, err := client.Do(req, &newRelease); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) &&
 			httpErr.StatusCode == http.StatusNotFound &&
@@ -181,7 +179,7 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	return &newRelease, nil
 }
 
-func publishRelease(httpClient *http.Client, host string, releaseURL safeurl.SafeURL, discussionCategory string, isLatest *bool) (*shared.Release, error) {
+func publishRelease(ctx context.Context, client *githubrest.Client, releaseURL safeurl.SafeURL, discussionCategory string, isLatest *bool) (*shared.Release, error) {
 	params := map[string]interface{}{"draft": false}
 	if discussionCategory != "" {
 		params["discussion_category_name"] = discussionCategory
@@ -196,22 +194,26 @@ func publishRelease(httpClient *http.Client, host string, releaseURL safeurl.Saf
 		return nil, err
 	}
 
-	var release shared.Release
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(host, http.MethodPatch, releaseURL.String(), bytes.NewBuffer(bodyBytes), &release)
+	req, err := client.NewRequest(ctx, http.MethodPatch, releaseURL.String(), bytes.NewBuffer(bodyBytes))
 	if err != nil {
+		return nil, err
+	}
+
+	var release shared.Release
+	if _, err := client.Do(req, &release); err != nil {
 		return nil, err
 	}
 	return &release, nil
 }
 
-func deleteRelease(httpClient *http.Client, host string, releaseURL safeurl.SafeURL) error {
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	return api.NewClientFromHTTP(httpClient).REST(host, http.MethodDelete, releaseURL.String(), nil, nil)
+func deleteRelease(ctx context.Context, client *githubrest.Client, releaseURL safeurl.SafeURL) error {
+	req, err := client.NewRequest(ctx, http.MethodDelete, releaseURL.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.Do(req, nil)
+	return err
 }
 
 // tokenHasWorkflowScope checks if the response token has the workflow scope.
@@ -237,9 +239,8 @@ func tokenHasWorkflowScope(headers http.Header) bool {
 }
 
 // isNewRelease checks if there are new commits since the latest release.
-func isNewRelease(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	ctx := context.Background()
-	release, err := shared.FetchLatestRelease(ctx, httpClient, repo)
+func isNewRelease(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface) (bool, error) {
+	release, err := shared.FetchLatestRelease(ctx, client, repo)
 	if err != nil {
 		if errors.Is(err, shared.ErrReleaseNotFound) {
 			return true, nil
@@ -259,8 +260,12 @@ func isNewRelease(httpClient *http.Client, repo ghrepo.Interface) (bool, error) 
 		Status string `json:"status"`
 	}
 
-	apiClient := api.NewClientFromHTTP(httpClient)
-	if err := apiClient.REST(repo.RepoHost(), "GET", u.String(), nil, &comparisonStatus); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return false, err
+	}
+
+	if _, err := client.Do(req, &comparisonStatus); err != nil {
 		return false, err
 	}
 

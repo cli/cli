@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -21,7 +22,7 @@ func TestGetTagsHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`),
 	)
 
-	_, err := getTags(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), 5)
+	_, err := getTags(context.Background(), mustRESTClient(t, reg), ghrepo.New("OWNER", "REPO"), 5)
 
 	requireAPIHTTPError(t, err, http.StatusInternalServerError)
 }
@@ -34,7 +35,7 @@ func TestGenerateReleaseNotesNotImplemented(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	_, err := generateReleaseNotes(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), "v1.2.3", "", "")
+	_, err := generateReleaseNotes(context.Background(), mustRESTClient(t, reg), ghrepo.New("OWNER", "REPO"), "v1.2.3", "", "")
 
 	assert.Same(t, notImplementedError, err)
 }
@@ -47,7 +48,7 @@ func TestGenerateReleaseNotesHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`),
 	)
 
-	_, err := generateReleaseNotes(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), "v1.2.3", "", "")
+	_, err := generateReleaseNotes(context.Background(), mustRESTClient(t, reg), ghrepo.New("OWNER", "REPO"), "v1.2.3", "", "")
 
 	requireAPIHTTPError(t, err, http.StatusInternalServerError)
 }
@@ -60,7 +61,7 @@ func TestCreateReleaseMissingWorkflowScope(t *testing.T) {
 		httpmock.StatusScopesResponder(http.StatusNotFound, "repo,read:org"),
 	)
 
-	_, err := createRelease(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), map[string]interface{}{"tag_name": "v1.2.3"})
+	_, err := createRelease(context.Background(), mustRESTClient(t, reg), ghrepo.New("OWNER", "REPO"), map[string]interface{}{"tag_name": "v1.2.3"})
 
 	var scopeErr *errMissingRequiredWorkflowScope
 	require.ErrorAs(t, err, &scopeErr)
@@ -76,7 +77,7 @@ func TestCreateReleaseHTTPErrorWithoutScopesHeader(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	_, err := createRelease(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), map[string]interface{}{"tag_name": "v1.2.3"})
+	_, err := createRelease(context.Background(), mustRESTClient(t, reg), ghrepo.New("OWNER", "REPO"), map[string]interface{}{"tag_name": "v1.2.3"})
 
 	requireAPIHTTPError(t, err, http.StatusNotFound)
 }
@@ -89,7 +90,7 @@ func TestPublishReleaseHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`),
 	)
 
-	_, err := publishRelease(&http.Client{Transport: reg}, "github.com", safeurl.NewImmutableSafeURL("https://api.github.com/releases/123"), "", nil)
+	_, err := publishRelease(context.Background(), mustRESTClient(t, reg), safeurl.NewImmutableSafeURL("https://api.github.com/releases/123"), "", nil)
 
 	requireAPIHTTPError(t, err, http.StatusInternalServerError)
 }
@@ -102,7 +103,7 @@ func TestDeleteReleaseHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`),
 	)
 
-	err := deleteRelease(&http.Client{Transport: reg}, "github.com", safeurl.NewImmutableSafeURL("https://api.github.com/releases/123"))
+	err := deleteRelease(context.Background(), mustRESTClient(t, reg), safeurl.NewImmutableSafeURL("https://api.github.com/releases/123"))
 
 	requireAPIHTTPError(t, err, http.StatusInternalServerError)
 }
@@ -168,4 +169,11 @@ func requireAPIHTTPError(t *testing.T, err error, statusCode int) {
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, statusCode, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), fmt.Sprintf("HTTP %d", statusCode))
+}
+
+func mustRESTClient(t *testing.T, reg *httpmock.Registry) *githubrest.Client {
+	t.Helper()
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	return client
 }

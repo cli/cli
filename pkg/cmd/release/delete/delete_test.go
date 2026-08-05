@@ -2,6 +2,7 @@ package delete
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -223,12 +224,13 @@ func Test_deleteRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(fakeHTTP)
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
-			err := deleteRun(&tt.opts)
+			err := deleteRun(context.Background(), &tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 				return

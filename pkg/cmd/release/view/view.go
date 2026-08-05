@@ -10,6 +10,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -25,6 +26,7 @@ type browser interface {
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser
@@ -38,6 +40,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Browser:    f.Browser,
 	}
 
@@ -83,16 +86,21 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
 	var release *shared.Release
 
 	if opts.TagName == "" {
-		release, err = shared.FetchLatestRelease(ctx, httpClient, baseRepo)
+		release, err = shared.FetchLatestRelease(ctx, client, baseRepo)
 		if err != nil {
 			return err
 		}
 	} else {
-		release, err = shared.FetchRelease(ctx, httpClient, baseRepo, opts.TagName)
+		release, err = shared.FetchRelease(ctx, client, httpClient, baseRepo, opts.TagName)
 		if err != nil {
 			return err
 		}

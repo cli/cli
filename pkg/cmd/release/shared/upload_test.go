@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -82,7 +83,7 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 	ctx := context.Background()
 
 	tries := 0
-	client := funcClient(func(req *http.Request) (*http.Response, error) {
+	tr := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		tries++
 		if tries == 1 {
 			return nil, errors.New("made up exception")
@@ -99,7 +100,12 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 			Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
 		}, nil
 	})
-	err := uploadWithDelete(ctx, client, safeurl.NewImmutableSafeURL("http://example.com/upload"), AssetForUpload{
+	client, err := githubrest.NewClient("http://example.com/", &http.Client{Transport: tr}, githubrest.WithoutToken())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = uploadWithDelete(ctx, client, safeurl.NewImmutableSafeURL("http://example.com/upload"), AssetForUpload{
 		Name:  "asset",
 		Label: "",
 		Size:  8,
@@ -116,8 +122,8 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 	}
 }
 
-type funcClient func(*http.Request) (*http.Response, error)
+type roundTripperFunc func(*http.Request) (*http.Response, error)
 
-func (f funcClient) Do(req *http.Request) (*http.Response, error) {
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }

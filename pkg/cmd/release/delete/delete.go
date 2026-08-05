@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -22,6 +22,7 @@ type iprompter interface {
 
 type DeleteOptions struct {
 	HttpClient   func() (*http.Client, error)
+	GitHubREST   func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	GitClient    *git.Client
 	IO           *iostreams.IOStreams
 	BaseRepo     func() (ghrepo.Interface, error)
@@ -37,6 +38,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		GitClient:  f.GitClient,
 		Prompter:   f.Prompter,
 	}
@@ -55,7 +57,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return deleteRun(opts)
+			return deleteRun(cmd.Context(), opts)
 		},
 	}
 
@@ -65,7 +67,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	return cmd
 }
 
-func deleteRun(opts *DeleteOptions) error {
+func deleteRun(ctx context.Context, opts *DeleteOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -76,7 +78,12 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, opts.TagName)
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	release, err := shared.FetchRelease(ctx, client, httpClient, baseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}
@@ -93,14 +100,14 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 	}
 
-	err = deleteRelease(httpClient, safeurl.NewImmutableSafeURL(release.APIURL))
+	err = deleteRelease(ctx, client, safeurl.NewImmutableSafeURL(release.APIURL))
 	if err != nil {
 		return err
 	}
 
 	var cleanupMessage string
 	if opts.CleanupTag {
-		if err := deleteTag(httpClient, baseRepo, release.TagName); err != nil {
+		if err := deleteTag(ctx, client, baseRepo, release.TagName); err != nil {
 			return err
 		}
 		if opts.RepoOverride == "" {
@@ -122,42 +129,26 @@ func deleteRun(opts *DeleteOptions) error {
 	return nil
 }
 
-func deleteRelease(httpClient *http.Client, releaseURL safeurl.SafeURL) error {
-	req, err := http.NewRequest("DELETE", releaseURL.String(), nil)
+func deleteRelease(ctx context.Context, client *githubrest.Client, releaseURL safeurl.SafeURL) error {
+	req, err := client.NewRequest(ctx, http.MethodDelete, releaseURL.String(), nil)
 	if err != nil {
 		return err
 	}
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-	return nil
+	_, err = client.Do(req, nil)
+	return err
 }
 
-func deleteTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) error {
+func deleteTag(ctx context.Context, client *githubrest.Client, baseRepo ghrepo.Interface, tagName string) error {
 	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "git", "refs", fmt.Sprintf("tags/%s", tagName))
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("DELETE", url.String(), nil)
+	req, err := client.NewRequest(ctx, http.MethodDelete, url.String(), nil)
 	if err != nil {
 		return err
 	}
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-	return nil
+	_, err = client.Do(req, nil)
+	return err
 }

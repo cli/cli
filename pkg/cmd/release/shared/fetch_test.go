@@ -2,7 +2,6 @@ package shared
 
 import (
 	"context"
-	"net/http"
 	"testing"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -49,7 +48,7 @@ func TestFetchRefSHA(t *testing.T) {
 			tagName:        "v1.2.3",
 			responseStatus: 200,
 			responseBody:   `{"object": {"sha":`,
-			errorMessage:   "failed to parse ref response: unexpected EOF",
+			errorMessage:   "unexpected end of JSON input",
 		},
 	}
 
@@ -77,10 +76,11 @@ func TestFetchRefSHA(t *testing.T) {
 				)
 			}
 
-			httpClient := &http.Client{Transport: fakeHTTP}
+			client, err := httpmock.RESTClientFunc(fakeHTTP)("github.com")
+			require.NoError(t, err)
 			ctx := context.Background()
 
-			sha, err := FetchRefSHA(ctx, httpClient, repo, tt.tagName)
+			sha, err := FetchRefSHA(ctx, client, repo, tt.tagName)
 
 			if tt.errorMessage != "" {
 				assert.Contains(t, err.Error(), tt.errorMessage)

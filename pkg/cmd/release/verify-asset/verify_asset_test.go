@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 )
 
 func TestNewCmdVerifyAsset_Args(t *testing.T) {
@@ -57,6 +58,7 @@ func TestNewCmdVerifyAsset_Args(t *testing.T) {
 				ExternalHttpClient: func() (*http.Client, error) {
 					return nil, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(&httpmock.Registry{}),
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
@@ -118,6 +120,7 @@ func Test_verifyAssetRun_Success(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   api.NewTestClient(),
 		AttVerifier: shared.NewMockVerifier(result),
 	}
@@ -161,6 +164,7 @@ func Test_verifyAssetRun_SuccessNoTagArg(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   api.NewTestClient(),
 		AttVerifier: shared.NewMockVerifier(result),
 	}
@@ -200,6 +204,7 @@ func Test_verifyAssetRun_FailedNoAttestations_SHA1(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   attClient,
 		AttVerifier: nil,
 	}
@@ -241,6 +246,7 @@ func Test_verifyAssetRun_FailedNoAttestations_SHA256(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   attClient,
 		AttVerifier: nil,
 	}
@@ -279,6 +285,7 @@ func Test_verifyAssetRun_FailedTagNotInAttestation(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   api.NewTestClient(),
 		AttVerifier: nil,
 	}
@@ -310,6 +317,7 @@ func Test_verifyAssetRun_FailedInvalidAsset(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   api.NewTestClient(),
 		AttVerifier: nil,
 	}
@@ -338,6 +346,7 @@ func Test_verifyAssetRun_NoSuchAsset(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
+		GitHubREST:  mustRESTClient(t, fakeHTTP),
 		AttClient:   api.NewTestClient(),
 		AttVerifier: nil,
 	}
@@ -361,4 +370,11 @@ func Test_getFileName(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func mustRESTClient(t *testing.T, reg *httpmock.Registry) *githubrest.Client {
+	t.Helper()
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	return client
 }

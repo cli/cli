@@ -2,6 +2,7 @@ package edit
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -454,11 +455,12 @@ func Test_editRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(fakeHTTP)
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 
-			err := editRun("v1.2.3", &tt.opts)
+			err := editRun(context.Background(), "v1.2.3", &tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 				return

@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
@@ -31,6 +32,7 @@ type VerifyOptions struct {
 
 type VerifyConfig struct {
 	HttpClient  *http.Client
+	GitHubREST  *githubrest.Client
 	IO          *iostreams.IOStreams
 	Opts        *VerifyOptions
 	AttClient   api.Client
@@ -84,6 +86,11 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *co
 				return err
 			}
 
+			restClient, err := f.GitHubREST(baseRepo.RepoHost())
+			if err != nil {
+				return err
+			}
+
 			io := f.IOStreams
 			attClient := api.NewLiveClient(httpClient, externalClient, baseRepo.RepoHost(), att_io.NewHandler(io))
 
@@ -97,6 +104,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *co
 			config := &VerifyConfig{
 				Opts:        opts,
 				HttpClient:  httpClient,
+				GitHubREST:  restClient,
 				AttClient:   attClient,
 				AttVerifier: attVerifier,
 				IO:          io,
@@ -122,7 +130,7 @@ func verifyRun(config *VerifyConfig) error {
 	tagName := opts.TagName
 
 	if tagName == "" {
-		release, err := shared.FetchLatestRelease(ctx, config.HttpClient, baseRepo)
+		release, err := shared.FetchLatestRelease(ctx, config.GitHubREST, baseRepo)
 		if err != nil {
 			return err
 		}
@@ -130,7 +138,7 @@ func verifyRun(config *VerifyConfig) error {
 	}
 
 	// Retrieve the ref for the release tag
-	ref, err := shared.FetchRefSHA(ctx, config.HttpClient, baseRepo, tagName)
+	ref, err := shared.FetchRefSHA(ctx, config.GitHubREST, baseRepo, tagName)
 	if err != nil {
 		return err
 	}

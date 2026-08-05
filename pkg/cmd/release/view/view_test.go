@@ -263,6 +263,7 @@ func Test_viewRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(fakeHTTP)
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}

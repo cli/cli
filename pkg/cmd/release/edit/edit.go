@@ -7,6 +7,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -16,6 +17,7 @@ import (
 type EditOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	TagName            string
@@ -33,6 +35,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := &EditOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	var notesFile string
@@ -69,7 +72,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return editRun(args[0], opts)
+			return editRun(cmd.Context(), args[0], opts)
 		},
 	}
 
@@ -89,7 +92,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	return cmd
 }
 
-func editRun(tag string, opts *EditOptions) error {
+func editRun(ctx context.Context, tag string, opts *EditOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -100,7 +103,12 @@ func editRun(tag string, opts *EditOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, tag)
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	release, err := shared.FetchRelease(ctx, client, httpClient, baseRepo, tag)
 	if err != nil {
 		return err
 	}
@@ -123,7 +131,7 @@ func editRun(tag string, opts *EditOptions) error {
 		}
 	}
 
-	editedRelease, err := editRelease(httpClient, baseRepo, release.DatabaseID, params)
+	editedRelease, err := editRelease(ctx, client, baseRepo, release.DatabaseID, params)
 	if err != nil {
 		return err
 	}

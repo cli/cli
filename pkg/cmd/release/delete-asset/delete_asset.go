@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -20,6 +20,7 @@ type iprompter interface {
 
 type DeleteAssetOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
@@ -33,6 +34,7 @@ func NewCmdDeleteAsset(f *cmdutil.Factory, runF func(*DeleteAssetOptions) error)
 	opts := &DeleteAssetOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 	}
 
@@ -48,7 +50,7 @@ func NewCmdDeleteAsset(f *cmdutil.Factory, runF func(*DeleteAssetOptions) error)
 			if runF != nil {
 				return runF(opts)
 			}
-			return deleteAssetRun(opts)
+			return deleteAssetRun(cmd.Context(), opts)
 		},
 	}
 
@@ -57,7 +59,7 @@ func NewCmdDeleteAsset(f *cmdutil.Factory, runF func(*DeleteAssetOptions) error)
 	return cmd
 }
 
-func deleteAssetRun(opts *DeleteAssetOptions) error {
+func deleteAssetRun(ctx context.Context, opts *DeleteAssetOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -68,7 +70,12 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, opts.TagName)
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	release, err := shared.FetchRelease(ctx, client, httpClient, baseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}
@@ -97,7 +104,7 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 		return fmt.Errorf("asset %s not found in release %s", opts.AssetName, release.TagName)
 	}
 
-	err = deleteAsset(httpClient, safeurl.NewImmutableSafeURL(assetURL))
+	err = deleteAsset(ctx, client, safeurl.NewImmutableSafeURL(assetURL))
 	if err != nil {
 		return err
 	}
@@ -112,20 +119,12 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 	return nil
 }
 
-func deleteAsset(httpClient *http.Client, assetURL safeurl.SafeURL) error {
-	req, err := http.NewRequest("DELETE", assetURL.String(), nil)
+func deleteAsset(ctx context.Context, client *githubrest.Client, assetURL safeurl.SafeURL) error {
+	req, err := client.NewRequest(ctx, http.MethodDelete, assetURL.String(), nil)
 	if err != nil {
 		return err
 	}
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-	return nil
+	_, err = client.Do(req, nil)
+	return err
 }

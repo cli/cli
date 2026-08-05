@@ -2,6 +2,7 @@ package download
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -693,11 +694,12 @@ func Test_downloadRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(fakeHTTP)
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 
-			err := downloadRun(&tt.opts)
+			err := downloadRun(context.Background(), &tt.opts)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 				return
@@ -861,12 +863,13 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 
-			err = downloadRun(&tt.opts)
+			err = downloadRun(context.Background(), &tt.opts)
 			if tt.wantErr != "" {
 				assert.ErrorContains(t, err, tt.wantErr)
 			} else {
@@ -913,13 +916,14 @@ func Test_downloadRun_windowsReservedFilename(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		},
 		TagName: tagName,
 	}
 
-	err := downloadRun(opts)
+	err := downloadRun(context.Background(), opts)
 
 	assert.EqualError(t, err, `unable to download release due to asset with reserved filename "CON.tgz"`)
 }

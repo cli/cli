@@ -15,8 +15,8 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -26,6 +26,7 @@ import (
 
 type DownloadOptions struct {
 	HttpClient        func() (*http.Client, error)
+	GitHubREST        func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO                *iostreams.IOStreams
 	BaseRepo          func() (ghrepo.Interface, error)
 	OverwriteExisting bool
@@ -47,6 +48,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	opts := &DownloadOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -103,7 +105,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			if runF != nil {
 				return runF(opts)
 			}
-			return downloadRun(opts)
+			return downloadRun(cmd.Context(), opts)
 		},
 	}
 
@@ -139,7 +141,7 @@ func checkArchiveTypeOption(opts *DownloadOptions) error {
 	return nil
 }
 
-func downloadRun(opts *DownloadOptions) error {
+func downloadRun(ctx context.Context, opts *DownloadOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -150,19 +152,22 @@ func downloadRun(opts *DownloadOptions) error {
 		return err
 	}
 
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicatorWithLabel("Finding assets to download")
 	defer opts.IO.StopProgressIndicator()
 
-	ctx := context.Background()
-
 	var release *shared.Release
 	if opts.TagName == "" {
-		release, err = shared.FetchLatestRelease(ctx, httpClient, baseRepo)
+		release, err = shared.FetchLatestRelease(ctx, client, baseRepo)
 		if err != nil {
 			return err
 		}
 	} else {
-		release, err = shared.FetchRelease(ctx, httpClient, baseRepo, opts.TagName)
+		release, err = shared.FetchRelease(ctx, client, httpClient, baseRepo, opts.TagName)
 		if err != nil {
 			return err
 		}
@@ -242,7 +247,24 @@ func downloadRun(opts *DownloadOptions) error {
 		}
 	}
 
-	return downloadAssets(&dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO)
+	// Archive downloads redirect to Codeload, and the first hop can land on a
+	// "legacy" path that yields a differently-shaped archive. Rewriting it needs
+	// a redirect policy, which belongs to a client rather than to a request, so
+	// archives get a client of their own.
+	downloadClient := client
+	if isArchive {
+		downloadClient, err = opts.GitHubREST(baseRepo.RepoHost(), githubrest.WithCheckRedirect(func(req *http.Request, via []*http.Request) error {
+			if len(via) == 1 {
+				req.URL.Path = removeLegacyFromCodeloadPath(req.URL.Path)
+			}
+			return nil
+		}))
+		if err != nil {
+			return err
+		}
+	}
+
+	return downloadAssets(ctx, &dest, downloadClient, targets, opts.Concurrency, isArchive, opts.IO)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -259,7 +281,7 @@ type downloadTarget struct {
 	name string
 }
 
-func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []downloadTarget, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
+func downloadAssets(ctx context.Context, dest *destinationWriter, client *githubrest.Client, toDownload []downloadTarget, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -275,7 +297,7 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 		go func() {
 			for a := range jobs {
 				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.name))
-				results <- downloadAsset(dest, httpClient, a.url, a.name, isArchive)
+				results <- downloadAsset(ctx, dest, client, a.url, a.name, isArchive)
 			}
 		}()
 	}
@@ -297,41 +319,32 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	return downloadError
 }
 
-func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL safeurl.SafeURL, fileName string, isArchive bool) error {
+func downloadAsset(ctx context.Context, dest *destinationWriter, client *githubrest.Client, assetURL safeurl.SafeURL, fileName string, isArchive bool) error {
 	if err := dest.Check(fileName); err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("GET", assetURL.String(), nil)
+	accept := "application/octet-stream"
+	if isArchive {
+		// adding application/json to Accept header due to a bug in the zipball/tarball API endpoint that makes it mandatory
+		accept = "application/octet-stream, application/json"
+	}
+
+	req, err := client.NewRequest(ctx, http.MethodGet, assetURL.String(), nil, githubrest.WithHeader("Accept", accept))
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("Accept", "application/octet-stream")
-	if isArchive {
-		// adding application/json to Accept header due to a bug in the zipball/tarball API endpoint that makes it mandatory
-		req.Header.Set("Accept", "application/octet-stream, application/json")
-
-		// override HTTP redirect logic to avoid "legacy" Codeload resources
-		oldClient := *httpClient
-		httpClient = &oldClient
-		httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-			if len(via) == 1 {
-				req.URL.Path = removeLegacyFromCodeloadPath(req.URL.Path)
-			}
-			return nil
-		}
-	}
-
-	resp, err := httpClient.Do(req)
+	// Send rather than Do, because the file name can come from a response header
+	// and the body is streamed to disk rather than decoded.
+	resp, err := client.Send(req)
 	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
 		return err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
 
 	if len(fileName) == 0 {
 		contentDisposition := resp.Header.Get("Content-Disposition")

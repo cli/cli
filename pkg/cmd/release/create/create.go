@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -32,6 +33,7 @@ type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	GitClient  *git.Client
 	BaseRepo   func() (ghrepo.Interface, error)
 	Edit       func(string, string, string, io.Reader, io.Writer, io.Writer) (string, error)
@@ -68,6 +70,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Prompter:   f.Prompter,
@@ -202,7 +205,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return createRun(opts)
+			return createRun(cmd.Context(), opts)
 		},
 	}
 
@@ -225,7 +228,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func createRun(ctx context.Context, opts *CreateOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -236,8 +239,13 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	if opts.FailOnNoCommits {
-		isNew, err := isNewRelease(httpClient, baseRepo)
+		isNew, err := isNewRelease(ctx, client, baseRepo)
 		if err != nil {
 			return fmt.Errorf("failed to check whether there were new commits since last release: %v", err)
 		}
@@ -248,7 +256,7 @@ func createRun(opts *CreateOptions) error {
 
 	var existingTag bool
 	if opts.TagName == "" {
-		tags, err := getTags(httpClient, baseRepo, 5)
+		tags, err := getTags(ctx, client, baseRepo, 5)
 		if err != nil {
 			return err
 		}
@@ -329,7 +337,7 @@ func createRun(opts *CreateOptions) error {
 		var generatedNotes *releaseNotes
 		var generatedChangelog string
 
-		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
+		generatedNotes, err = generateReleaseNotes(ctx, client, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
 		if err != nil && !errors.Is(err, notImplementedError) {
 			return err
 		}
@@ -468,7 +476,7 @@ func createRun(opts *CreateOptions) error {
 	}
 	if opts.GenerateNotes {
 		if opts.NotesStartTag != "" {
-			generatedNotes, err := generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
+			generatedNotes, err := generateReleaseNotes(ctx, client, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
 			if err != nil && !errors.Is(err, notImplementedError) {
 				return err
 			}
@@ -500,7 +508,7 @@ func createRun(opts *CreateOptions) error {
 	if hasAssets && !opts.Draft {
 		// Check for an existing release
 		if opts.TagName != "" {
-			if ok, err := publishedReleaseExists(httpClient, baseRepo, opts.TagName); err != nil {
+			if ok, err := publishedReleaseExists(ctx, client, baseRepo, opts.TagName); err != nil {
 				return fmt.Errorf("error checking for existing release: %w", err)
 			} else if ok {
 				return fmt.Errorf("a release with the same tag name already exists: %s", opts.TagName)
@@ -511,7 +519,7 @@ func createRun(opts *CreateOptions) error {
 		params["draft"] = true
 	}
 
-	newRelease, err := createRelease(httpClient, baseRepo, params)
+	newRelease, err := createRelease(ctx, client, baseRepo, params)
 
 	var errMissingRequiredWorkflowScope *errMissingRequiredWorkflowScope
 	if errors.As(err, &errMissingRequiredWorkflowScope) {
@@ -535,7 +543,7 @@ func createRun(opts *CreateOptions) error {
 		if !draftWhileUploading {
 			return err
 		}
-		if cleanupErr := deleteRelease(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(newRelease.APIURL)); cleanupErr != nil {
+		if cleanupErr := deleteRelease(ctx, client, safeurl.NewImmutableSafeURL(newRelease.APIURL)); cleanupErr != nil {
 			return fmt.Errorf("%w\ncleaning up draft failed: %v", err, cleanupErr)
 		}
 		return err
@@ -548,14 +556,14 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		err = shared.ConcurrentUpload(httpClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
+		err = shared.ConcurrentUpload(ctx, client, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return cleanupDraftRelease(err)
 		}
 
 		if draftWhileUploading {
-			rel, err := publishRelease(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(newRelease.APIURL), opts.DiscussionCategory, opts.IsLatest)
+			rel, err := publishRelease(ctx, client, safeurl.NewImmutableSafeURL(newRelease.APIURL), opts.DiscussionCategory, opts.IsLatest)
 			if err != nil {
 				return cleanupDraftRelease(err)
 			}
