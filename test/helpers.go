@@ -4,17 +4,11 @@ import (
 	"bytes"
 	"path/filepath"
 	"regexp"
+	"testing"
 )
 
-// Environment supports test-scoped environment and temporary directory setup.
-type Environment interface {
-	Helper()
-	Setenv(key, value string)
-	TempDir() string
-}
-
 // IsolateGitConfig prevents tests from reading global and system Git configuration.
-func IsolateGitConfig(t Environment) {
+func IsolateGitConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), ".gitconfig"))
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "true")
