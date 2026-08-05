@@ -167,7 +167,7 @@ func NewClient(apiBaseURL string, httpClient *http.Client, auth AuthStrategy, op
 
 	client := &Client{
 		apiBaseURL: parsed,
-		http:       httpClient,
+		http:       withResponseSanitizer(httpClient),
 		credentialedHosts: map[string]struct{}{
 			strings.ToLower(parsed.Host): {},
 		},

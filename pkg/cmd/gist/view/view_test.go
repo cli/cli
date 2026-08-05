@@ -226,7 +226,7 @@ func Test_viewRun(t *testing.T) {
 			wantOut: "danger\x1b[31m\n",
 		},
 		{
-			name:  "piped inline file with escape sequences is refused",
+			name:  "piped inline file escapes are already neutralized by the JSON transport",
 			isTTY: false,
 			opts: &ViewOptions{
 				Selector:  "1234",
@@ -240,7 +240,7 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "gist file contains terminal escape sequences; pass --allow-escape-sequences to view it anyway",
+			wantOut: "danger^[[31m\n",
 		},
 		{
 			name:  "one file, no ID supplied",

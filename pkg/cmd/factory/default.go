@@ -358,7 +358,16 @@ func branchFunc(f *cmdutil.Factory) func() (string, error) {
 
 func extensionManager(f *cmdutil.Factory) *extension.Manager {
 	em := extension.NewManager(f.IOStreams, f.GitClient)
-	em.SetGitHubREST(f.GitHubREST)
+	// The extension manager re-reads the same release and manifest endpoints
+	// several times within a single command, so its requests are cached briefly.
+	// This matched api.NewCachedHTTPClient, which still wraps the GraphQL client
+	// below.
+	em.SetGitHubREST(func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
+		opts = append([]githubrest.ClientOption{
+			githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(30 * time.Second)),
+		}, opts...)
+		return f.GitHubREST(host, opts...)
+	})
 
 	cfg, err := f.Config()
 	if err != nil {
