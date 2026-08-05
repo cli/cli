@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/browser"
@@ -25,7 +26,7 @@ type deleteOptions struct {
 }
 
 type AutolinkDeleteClient interface {
-	Delete(repo ghrepo.Interface, id string) error
+	Delete(ctx context.Context, repo ghrepo.Interface, id string) error
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*deleteOptions) error) *cobra.Command {
@@ -43,13 +44,8 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*deleteOptions) error) *cobra.Co
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
-			httpClient, err := f.HttpClient()
-			if err != nil {
-				return err
-			}
-
-			opts.AutolinkDeleteClient = &AutolinkDeleter{HTTPClient: httpClient}
-			opts.AutolinkViewClient = &view.AutolinkViewer{HTTPClient: httpClient}
+			opts.AutolinkDeleteClient = &AutolinkDeleter{GitHubREST: f.GitHubREST}
+			opts.AutolinkViewClient = &view.AutolinkViewer{GitHubREST: f.GitHubREST}
 			opts.ID = args[0]
 
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
@@ -60,7 +56,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*deleteOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return deleteRun(opts)
+			return deleteRun(cmd.Context(), opts)
 		},
 	}
 
@@ -69,7 +65,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*deleteOptions) error) *cobra.Co
 	return cmd
 }
 
-func deleteRun(opts *deleteOptions) error {
+func deleteRun(ctx context.Context, opts *deleteOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
@@ -78,7 +74,7 @@ func deleteRun(opts *deleteOptions) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
-	autolink, err := opts.AutolinkViewClient.View(repo, opts.ID)
+	autolink, err := opts.AutolinkViewClient.View(ctx, repo, opts.ID)
 
 	if err != nil {
 		return fmt.Errorf("%s %w", cs.Red("error deleting autolink:"), err)
@@ -94,7 +90,7 @@ func deleteRun(opts *deleteOptions) error {
 		}
 	}
 
-	err = opts.AutolinkDeleteClient.Delete(repo, opts.ID)
+	err = opts.AutolinkDeleteClient.Delete(ctx, repo, opts.ID)
 	if err != nil {
 		return err
 	}

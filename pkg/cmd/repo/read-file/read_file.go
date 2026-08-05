@@ -1,9 +1,9 @@
 package readfile
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -34,7 +35,7 @@ var fileFields = []string{
 
 // ReadFileOptions holds the configuration for the read-file command.
 type ReadFileOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Exporter   cmdutil.Exporter
@@ -51,7 +52,7 @@ type ReadFileOptions struct {
 func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobra.Command {
 	opts := &ReadFileOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		BaseRepo:   f.BaseRepo,
 	}
 
@@ -109,7 +110,7 @@ func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobr
 				return runF(opts)
 			}
 
-			return readFileRun(opts)
+			return readFileRun(cmd.Context(), opts)
 		},
 	}
 
@@ -125,18 +126,18 @@ func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobr
 	return cmd
 }
 
-func readFileRun(opts *ReadFileOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
+func readFileRun(ctx context.Context, opts *ReadFileOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("%w. Run this command from within a git repository, or use the `--repo` flag to specify one", err)
 	}
 
-	file, err := fetchFile(httpClient, repo, opts.Path, opts.Ref)
+	client, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	file, err := fetchFile(ctx, client, repo, opts.Path, opts.Ref)
 	if err != nil {
 		return err
 	}
@@ -147,7 +148,7 @@ func readFileRun(opts *ReadFileOptions) error {
 	if opts.Exporter != nil {
 		// Only pay for the file content when the caller actually selected the content field.
 		if !contentAvailable && slices.Contains(opts.Exporter.Fields(), "content") {
-			if err := loadContent(httpClient, repo, file, opts.Ref); err != nil {
+			if err := loadContent(ctx, client, repo, file, opts.Ref); err != nil {
 				return err
 			}
 		}
@@ -155,7 +156,7 @@ func readFileRun(opts *ReadFileOptions) error {
 	}
 
 	if !contentAvailable {
-		if err := loadContent(httpClient, repo, file, opts.Ref); err != nil {
+		if err := loadContent(ctx, client, repo, file, opts.Ref); err != nil {
 			return err
 		}
 	}
@@ -213,12 +214,12 @@ func readFileRun(opts *ReadFileOptions) error {
 // loadContent fetches the raw file bytes when the Contents API did not return them inline.
 // The API only omits inline content for large files, which it marks with a "none" encoding;
 // everything else (including empty files) comes back base64-encoded, so there is nothing to fetch.
-func loadContent(httpClient *http.Client, repo ghrepo.Interface, file *repoFile, ref string) error {
+func loadContent(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, file *repoFile, ref string) error {
 	if file.Encoding != "none" {
 		return nil
 	}
 
-	raw, err := fetchRawFile(httpClient, repo, file.Path, ref)
+	raw, err := fetchRawFile(ctx, client, repo, file.Path, ref)
 	if err != nil {
 		return err
 	}

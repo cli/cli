@@ -1,12 +1,14 @@
 package create
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_repoCreate(t *testing.T) {
@@ -734,7 +736,9 @@ func Test_repoCreate(t *testing.T) {
 			defer reg.Verify(t)
 			tt.stubs(t, reg)
 			httpClient := &http.Client{Transport: reg}
-			r, err := repoCreate(httpClient, tt.hostname, tt.input)
+			restClient, err := httpmock.RESTClientFunc(reg)(tt.hostname)
+			require.NoError(t, err)
+			r, err := repoCreate(context.Background(), httpClient, restClient, tt.hostname, tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {

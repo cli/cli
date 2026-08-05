@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -573,101 +572,6 @@ func InitRepoHostname(repo *Repository, hostname string) *Repository {
 		repo.Parent.hostname = hostname
 	}
 	return repo
-}
-
-// RepositoryV3 is the repository result from GitHub API v3
-type repositoryV3 struct {
-	NodeID    string `json:"node_id"`
-	Name      string
-	CreatedAt time.Time `json:"created_at"`
-	Owner     struct {
-		Login string
-	}
-	Private bool
-	HTMLUrl string `json:"html_url"`
-	Parent  *repositoryV3
-}
-
-// ForkRepo forks the repository on GitHub and returns the new repository
-func ForkRepo(client *Client, repo ghrepo.Interface, org, newName string, defaultBranchOnly bool) (*Repository, error) {
-	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "forks")
-	if err != nil {
-		return nil, err
-	}
-
-	params := map[string]interface{}{}
-	if org != "" {
-		params["organization"] = org
-	}
-	if newName != "" {
-		params["name"] = newName
-	}
-	if defaultBranchOnly {
-		params["default_branch_only"] = true
-	}
-
-	body := &bytes.Buffer{}
-	enc := json.NewEncoder(body)
-	if err := enc.Encode(params); err != nil {
-		return nil, err
-	}
-
-	result := repositoryV3{}
-	err = client.REST(repo.RepoHost(), "POST", path.String(), body, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	newRepo := &Repository{
-		ID:        result.NodeID,
-		Name:      result.Name,
-		CreatedAt: result.CreatedAt,
-		Owner: RepositoryOwner{
-			Login: result.Owner.Login,
-		},
-		ViewerPermission: "WRITE",
-		hostname:         repo.RepoHost(),
-	}
-
-	// The GitHub API will happily return a HTTP 200 when attempting to fork own repo even though no forking
-	// actually took place. Ensure that we raise an error instead.
-	if ghrepo.IsSame(repo, newRepo) {
-		return newRepo, fmt.Errorf("%s cannot be forked. A single user account cannot own both a parent and fork.", ghrepo.FullName(repo))
-	}
-
-	return newRepo, nil
-}
-
-// RenameRepo renames the repository on GitHub and returns the renamed repository
-func RenameRepo(client *Client, repo ghrepo.Interface, newRepoName string) (*Repository, error) {
-	input := map[string]string{"name": newRepoName}
-	body := &bytes.Buffer{}
-	enc := json.NewEncoder(body)
-	if err := enc.Encode(input); err != nil {
-		return nil, err
-	}
-
-	path, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
-	if err != nil {
-		return nil, err
-	}
-
-	result := repositoryV3{}
-	err = client.REST(repo.RepoHost(), "PATCH", path.String(), body, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Repository{
-		ID:        result.NodeID,
-		Name:      result.Name,
-		CreatedAt: result.CreatedAt,
-		Owner: RepositoryOwner{
-			Login: result.Owner.Login,
-		},
-		ViewerPermission: "WRITE",
-		hostname:         repo.RepoHost(),
-	}, nil
 }
 
 func LastCommit(client *Client, repo ghrepo.Interface) (*Commit, error) {
@@ -1613,27 +1517,6 @@ func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, error) {
 	return projectsV2, nil
 }
 
-func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path safeurl.SafeURL, body io.Reader) (*Repository, error) {
-	var responsev3 repositoryV3
-	err := apiClient.REST(hostname, method, path.String(), body, &responsev3)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &Repository{
-		Name:      responsev3.Name,
-		CreatedAt: responsev3.CreatedAt,
-		Owner: RepositoryOwner{
-			Login: responsev3.Owner.Login,
-		},
-		ID:        responsev3.NodeID,
-		hostname:  hostname,
-		URL:       responsev3.HTMLUrl,
-		IsPrivate: responsev3.Private,
-	}, nil
-}
-
 // MapReposToIDs retrieves a set of IDs for the given set of repositories.
 // This is similar logic to RepoNetwork, but only fetches databaseId and does not
 // discover parent repositories.
@@ -1691,68 +1574,4 @@ func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
 	default:
 		return false, ghAPI.HandleHTTPError(resp)
 	}
-}
-
-// RepoLicenses fetches available repository licenses.
-// It uses API v3 because licenses are not supported by GraphQL.
-func RepoLicenses(httpClient *http.Client, hostname string) ([]License, error) {
-	var licenses []License
-	client := NewClientFromHTTP(httpClient)
-	path, err := safeurl.JoinPath("licenses")
-	if err != nil {
-		return nil, err
-	}
-	err = client.REST(hostname, "GET", path.String(), nil, &licenses)
-	if err != nil {
-		return nil, err
-	}
-	return licenses, nil
-}
-
-// RepoLicense fetches an available repository license.
-// It uses API v3 because licenses are not supported by GraphQL.
-func RepoLicense(httpClient *http.Client, hostname string, licenseName string) (*License, error) {
-	var license License
-	client := NewClientFromHTTP(httpClient)
-	path, err := safeurl.JoinPath("licenses", licenseName)
-	if err != nil {
-		return nil, err
-	}
-	err = client.REST(hostname, "GET", path.String(), nil, &license)
-	if err != nil {
-		return nil, err
-	}
-	return &license, nil
-}
-
-// RepoGitIgnoreTemplates fetches available repository gitignore templates.
-// It uses API v3 here because gitignore template isn't supported by GraphQL.
-func RepoGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string, error) {
-	var gitIgnoreTemplates []string
-	client := NewClientFromHTTP(httpClient)
-	path, err := safeurl.JoinPath("gitignore", "templates")
-	if err != nil {
-		return nil, err
-	}
-	err = client.REST(hostname, "GET", path.String(), nil, &gitIgnoreTemplates)
-	if err != nil {
-		return nil, err
-	}
-	return gitIgnoreTemplates, nil
-}
-
-// RepoGitIgnoreTemplate fetches an available repository gitignore template.
-// It uses API v3 here because gitignore template isn't supported by GraphQL.
-func RepoGitIgnoreTemplate(httpClient *http.Client, hostname string, gitIgnoreTemplateName string) (*GitIgnore, error) {
-	var gitIgnoreTemplate GitIgnore
-	client := NewClientFromHTTP(httpClient)
-	path, err := safeurl.JoinPath("gitignore", "templates", gitIgnoreTemplateName)
-	if err != nil {
-		return nil, err
-	}
-	err = client.REST(hostname, "GET", path.String(), nil, &gitIgnoreTemplate)
-	if err != nil {
-		return nil, err
-	}
-	return &gitIgnoreTemplate, nil
 }

@@ -2,6 +2,7 @@ package list
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
 
@@ -101,7 +102,7 @@ type stubAutolinkLister struct {
 	err       error
 }
 
-func (g stubAutolinkLister) List(repo ghrepo.Interface) ([]shared.Autolink, error) {
+func (g stubAutolinkLister) List(_ context.Context, repo ghrepo.Interface) ([]shared.Autolink, error) {
 	return g.autolinks, g.err
 }
 
@@ -250,7 +251,7 @@ func TestListRun(t *testing.T) {
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
 			opts.AutolinkClient = &tt.stubLister
-			err := listRun(opts)
+			err := listRun(context.Background(), opts)
 
 			if tt.expectedErr != nil {
 				require.Error(t, err)

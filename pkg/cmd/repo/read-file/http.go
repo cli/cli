@@ -1,16 +1,16 @@
 package readfile
 
 import (
+	"bytes"
+	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -82,38 +82,22 @@ type contentsResponse struct {
 //
 // It requests the unified object media type so directories, files, symlinks, and
 // submodules all come back as a single JSON object distinguished by the type field.
-func fetchContent(httpClient *http.Client, repo ghrepo.Interface, filePath, ref string) (*contentsResponse, error) {
+func fetchContent(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, filePath, ref string) (*contentsResponse, error) {
 	apiPath, err := contentsAPIPath(repo, filePath, ref)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", apiPath.String(), nil)
-	if err != nil {
-		return nil, err
-	}
 	// We use the "application/vnd.github.object+json" media type to request a unified object
 	// representation from the Contents API. Without this, the API returns a JSON array for
 	// directories and a JSON object for files.
-	req.Header.Set("Accept", "application/vnd.github.object+json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	body, err := io.ReadAll(resp.Body)
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil, githubrest.WithHeader("Accept", "application/vnd.github.object+json"))
 	if err != nil {
 		return nil, err
 	}
 
 	var content contentsResponse
-	if err := json.Unmarshal(body, &content); err != nil {
+	if _, err := client.Do(req, &content); err != nil {
 		return nil, err
 	}
 	return &content, nil
@@ -125,8 +109,8 @@ func fetchContent(httpClient *http.Client, repo ghrepo.Interface, filePath, ref 
 // populated only when the API returns it inline; larger files come back with empty content, and
 // it is up to the caller to fetch the raw bytes via fetchRawFile when the content is actually
 // needed.
-func fetchFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref string) (*repoFile, error) {
-	content, err := fetchContent(httpClient, repo, filePath, ref)
+func fetchFile(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, filePath, ref string) (*repoFile, error) {
+	content, err := fetchContent(ctx, client, repo, filePath, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -173,29 +157,23 @@ func fetchFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref str
 
 // fetchRawFile retrieves the raw bytes of a file, used for files larger than the
 // 1 MB inline content limit of the Contents API.
-func fetchRawFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref string) ([]byte, error) {
+func fetchRawFile(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, filePath, ref string) ([]byte, error) {
 	apiPath, err := contentsAPIPath(repo, filePath, ref)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", apiPath.String(), nil)
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil, githubrest.WithHeader("Accept", "application/vnd.github.raw"))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", "application/vnd.github.raw")
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
+	var buf bytes.Buffer
+	if _, err := client.Do(req, &buf); err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	return io.ReadAll(resp.Body)
+	return buf.Bytes(), nil
 }
 
 // contentsAPIPath builds the absolute Contents API URL for a path and optional ref.

@@ -1,6 +1,7 @@
 package install
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -12,12 +13,12 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/discovery"
@@ -49,7 +50,7 @@ const (
 type InstallOptions struct {
 	IO         *iostreams.IOStreams
 	Telemetry  ghtelemetry.EventRecorder
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Prompter   prompter.Prompter
 	GitClient  *git.Client
 	Remotes    func() (ghContext.Remotes, error)
@@ -80,7 +81,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 		Prompter:   f.Prompter,
 		GitClient:  f.GitClient,
 		Remotes:    f.Remotes,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -233,7 +234,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			if runF != nil {
 				return runF(opts)
 			}
-			return installRun(opts)
+			return installRun(cmd.Context(), opts)
 		},
 	}
 
@@ -252,7 +253,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 	return cmd
 }
 
-func installRun(opts *InstallOptions) error {
+func installRun(ctx context.Context, opts *InstallOptions) error {
 	cs := opts.IO.ColorScheme()
 	canPrompt := opts.IO.CanPrompt()
 
@@ -269,14 +270,13 @@ func installRun(opts *InstallOptions) error {
 
 	parseSkillFromOpts(opts)
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
 	hostname := opts.repo.RepoHost()
 	if err := source.ValidateSupportedHost(hostname); err != nil {
+		return err
+	}
+
+	client, err := opts.GitHubREST(hostname)
+	if err != nil {
 		return err
 	}
 
@@ -293,11 +293,11 @@ func installRun(opts *InstallOptions) error {
 	visOwner := opts.repo.RepoOwner()
 	visRepo := opts.repo.RepoName()
 	go func() {
-		vis, err := discovery.FetchRepoVisibility(apiClient, hostname, visOwner, visRepo)
+		vis, err := discovery.FetchRepoVisibility(ctx, client, visOwner, visRepo)
 		visCh <- visResult{vis: vis, err: err}
 	}()
 
-	resolved, err := resolveVersion(opts, apiClient, hostname)
+	resolved, err := resolveVersion(ctx, opts, client)
 	if err != nil {
 		return err
 	}
@@ -306,14 +306,14 @@ func installRun(opts *InstallOptions) error {
 
 	if discovery.IsSkillPath(opts.SkillName) {
 		opts.IO.StartProgressIndicatorWithLabel("Looking up skill")
-		skill, err := discovery.DiscoverSkillByPath(apiClient, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA, opts.SkillName)
+		skill, err := discovery.DiscoverSkillByPath(ctx, client, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA, opts.SkillName)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
 		selectedSkills = []discovery.Skill{*skill}
 	} else {
-		skills, err := discoverSkills(opts, apiClient, hostname, resolved)
+		skills, err := discoverSkills(ctx, opts, client, resolved)
 		if err != nil {
 			return err
 		}
@@ -323,7 +323,7 @@ func installRun(opts *InstallOptions) error {
 			sourceHint:  ghrepo.FullName(opts.repo),
 			fetchDescriptions: func() {
 				opts.IO.StartProgressIndicatorWithLabel("Fetching skill info")
-				discovery.FetchDescriptionsConcurrent(apiClient, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), skills, nil)
+				discovery.FetchDescriptionsConcurrent(ctx, client, opts.repo.RepoOwner(), opts.repo.RepoName(), skills, nil)
 				opts.IO.StopProgressIndicator()
 			},
 		})
@@ -343,7 +343,7 @@ func installRun(opts *InstallOptions) error {
 	// to the original source repo. If detected, offer to install directly
 	// from upstream instead.
 	if len(selectedSkills) == 1 && selectedSkills[0].BlobSHA != "" {
-		upstreamRepo, detected, err := checkUpstreamProvenance(opts, apiClient, hostname, selectedSkills[0], resolved.SHA)
+		upstreamRepo, detected, err := checkUpstreamProvenance(ctx, opts, client, hostname, selectedSkills[0], resolved.SHA)
 		if err != nil {
 			return err
 		}
@@ -365,7 +365,7 @@ func installRun(opts *InstallOptions) error {
 			opts.SkillSource = ghrepo.FullName(upstreamRepo)
 			opts.version = ""
 			opts.Pin = ""
-			return installRun(opts)
+			return installRun(ctx, opts)
 		}
 		if detected {
 			upstreamSource = "republisher"
@@ -398,7 +398,7 @@ func installRun(opts *InstallOptions) error {
 			fmt.Fprintf(opts.IO.ErrOut, "\nInstalling to %s for %s...\n", friendlyDir(plan.dir), formatPlanHosts(plan.hosts))
 		}
 
-		result, err := installer.Install(&installer.Options{
+		result, err := installer.Install(ctx, &installer.Options{
 			Host:       hostname,
 			Owner:      opts.repo.RepoOwner(),
 			Repo:       opts.repo.RepoName(),
@@ -407,7 +407,7 @@ func installRun(opts *InstallOptions) error {
 			PinnedRef:  opts.Pin,
 			Skills:     plan.skills,
 			Dir:        plan.dir,
-			Client:     apiClient,
+			Client:     client,
 			OnProgress: installProgress(opts.IO, len(plan.skills)),
 		})
 
@@ -620,9 +620,9 @@ func cutLast(s, sep string) (before, after string, found bool) {
 	return s, "", false
 }
 
-func resolveVersion(opts *InstallOptions, client *api.Client, hostname string) (*discovery.ResolvedRef, error) {
+func resolveVersion(ctx context.Context, opts *InstallOptions, client *githubrest.Client) (*discovery.ResolvedRef, error) {
 	opts.IO.StartProgressIndicatorWithLabel("Resolving version")
-	resolved, err := discovery.ResolveRef(client, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), opts.version)
+	resolved, err := discovery.ResolveRef(ctx, client, opts.repo.RepoOwner(), opts.repo.RepoName(), opts.version)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve version: %w", err)
@@ -631,9 +631,9 @@ func resolveVersion(opts *InstallOptions, client *api.Client, hostname string) (
 	return resolved, nil
 }
 
-func discoverSkills(opts *InstallOptions, client *api.Client, hostname string, resolved *discovery.ResolvedRef) ([]discovery.Skill, error) {
+func discoverSkills(ctx context.Context, opts *InstallOptions, client *githubrest.Client, resolved *discovery.ResolvedRef) ([]discovery.Skill, error) {
 	opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
-	allSkills, err := discovery.DiscoverSkillsWithOptions(client, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA, discovery.DiscoverOptions{})
+	allSkills, err := discovery.DiscoverSkillsWithOptions(ctx, client, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA, discovery.DiscoverOptions{})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		var treeTooLarge *discovery.TreeTooLargeError
@@ -1296,7 +1296,7 @@ func filterHiddenDirSkills(opts *InstallOptions, allSkills []discovery.Skill) ([
 // re-publisher or redirect to the upstream. Non-interactive mode always
 // installs from the re-publisher.
 // Returns (repo to redirect to, whether upstream was detected, error).
-func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname string, skill discovery.Skill, commitSHA string) (ghrepo.Interface, bool, error) {
+func checkUpstreamProvenance(ctx context.Context, opts *InstallOptions, client *githubrest.Client, hostname string, skill discovery.Skill, commitSHA string) (ghrepo.Interface, bool, error) {
 	u, err := safeurl.JoinPath("repos", opts.repo.RepoOwner(), opts.repo.RepoName(), "contents", skill.Path+"/SKILL.md")
 	if err != nil {
 		return nil, false, err
@@ -1306,7 +1306,11 @@ func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname 
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
 	}
-	if err := client.REST(hostname, "GET", u.String(), nil, &fileResp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, false, nil //nolint:nilerr // best-effort check; failing to fetch is not fatal
+	}
+	if _, err := client.Do(req, &fileResp); err != nil {
 		return nil, false, nil //nolint:nilerr // best-effort check; failing to fetch is not fatal
 	}
 	if fileResp.Encoding != "base64" {

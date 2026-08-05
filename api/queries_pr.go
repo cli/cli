@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/safeurl"
+
 	"github.com/shurcooL/githubv4"
 )
 
@@ -842,14 +842,6 @@ func ConvertPullRequestToDraft(client *Client, repo ghrepo.Interface, pr *PullRe
 	}
 
 	return client.Mutate(repo.RepoHost(), "ConvertPullRequestToDraft", &mutation, variables)
-}
-
-func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
-	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "git", "refs", fmt.Sprintf("heads/%s", branch))
-	if err != nil {
-		return err
-	}
-	return client.REST(repo.RepoHost(), "DELETE", path.String(), nil, nil)
 }
 
 type RefComparison struct {

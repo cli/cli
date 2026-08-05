@@ -1,6 +1,7 @@
 package list
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -94,9 +95,9 @@ func TestAutolinkLister_List(t *testing.T) {
 			defer reg.Verify(t)
 
 			autolinkLister := &AutolinkLister{
-				HTTPClient: &http.Client{Transport: reg},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 			}
-			autolinks, err := autolinkLister.List(tt.repo)
+			autolinks, err := autolinkLister.List(context.Background(), tt.repo)
 			if tt.expectedErrMsg != "" {
 				require.EqualError(t, err, tt.expectedErrMsg)
 				if tt.expectedStatus != 0 {

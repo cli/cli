@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -25,11 +26,9 @@ func Test_deleteRun(t *testing.T) {
 		httpmock.REST("DELETE", "repos/OWNER/REPO/keys/1234"),
 		httpmock.StringResponse(`{}`))
 
-	err := deleteRun(&DeleteOptions{
-		IO: ios,
-		HTTPClient: func() (*http.Client, error) {
-			return &http.Client{Transport: &tr}, nil
-		},
+	err := deleteRun(context.Background(), &DeleteOptions{
+		IO:         ios,
+		GitHubREST: httpmock.RESTClientFunc(&tr),
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
@@ -50,8 +49,12 @@ func TestDeleteDeployKeyHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	err := deleteDeployKey(
-		&http.Client{Transport: reg},
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+
+	err = deleteDeployKey(
+		context.Background(),
+		client,
 		ghrepo.New("OWNER", "REPO"),
 		"1234",
 	)

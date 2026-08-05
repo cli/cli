@@ -1,6 +1,7 @@
 package view
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -22,6 +24,7 @@ import (
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
@@ -37,6 +40,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		BaseRepo:   f.BaseRepo,
 		Browser:    f.Browser,
 		Config:     f.Config,
@@ -62,7 +66,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(&opts)
 			}
-			return viewRun(&opts)
+			return viewRun(c.Context(), &opts)
 		},
 	}
 
@@ -77,7 +81,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 var defaultFields = []string{"name", "owner", "description"}
 
-func viewRun(opts *ViewOptions) error {
+func viewRun(ctx context.Context, opts *ViewOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -123,7 +127,11 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if !opts.Web && opts.Exporter == nil {
-		readme, err = RepositoryReadme(httpClient, toView, opts.Branch)
+		restClient, err := opts.GitHubREST(toView.RepoHost())
+		if err != nil {
+			return err
+		}
+		readme, err = RepositoryReadme(ctx, restClient, toView, opts.Branch)
 		if err != nil && !errors.Is(err, NotFoundError) {
 			return err
 		}

@@ -2,13 +2,17 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -74,7 +78,7 @@ type updateRepositoryInput struct {
 }
 
 // repoCreate creates a new GitHub repository
-func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*api.Repository, error) {
+func repoCreate(ctx context.Context, client *http.Client, restClient *githubrest.Client, hostname string, input repoCreateInput) (*api.Repository, error) {
 	isOrg := false
 	var ownerID string
 	var teamID string
@@ -83,7 +87,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 	apiClient := api.NewClientFromHTTP(client)
 
 	if input.TeamSlug != "" {
-		team, err := resolveOrganizationTeam(apiClient, hostname, input.OwnerLogin, input.TeamSlug)
+		team, err := resolveOrganizationTeam(ctx, restClient, hostname, input.OwnerLogin, input.TeamSlug)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +96,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		ownerID = team.Organization.NodeID
 		isOrg = true
 	} else if input.OwnerLogin != "" {
-		owner, err := resolveOwner(apiClient, hostname, input.OwnerLogin)
+		owner, err := resolveOwner(ctx, restClient, hostname, input.OwnerLogin)
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +209,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			return nil, err
 		}
 
-		repo, err := api.CreateRepoTransformToV4(apiClient, hostname, "POST", path, body)
+		repo, err := shared.CreateRepoTransformToV4(ctx, restClient, hostname, "POST", path, body)
 		if err != nil {
 			return nil, err
 		}
@@ -259,13 +263,17 @@ func (r *ownerResponse) IsOrganization() bool {
 	return r.Type == "Organization"
 }
 
-func resolveOwner(client *api.Client, hostname, orgName string) (*ownerResponse, error) {
+func resolveOwner(ctx context.Context, client *githubrest.Client, hostname, orgName string) (*ownerResponse, error) {
 	var response ownerResponse
-	u, err := safeurl.JoinPath("users", orgName)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname), "users", orgName)
 	if err != nil {
 		return nil, err
 	}
-	err = client.REST(hostname, "GET", u.String(), nil, &response)
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = client.Do(req, &response)
 	return &response, err
 }
 
@@ -277,13 +285,17 @@ type teamResponse struct {
 	}
 }
 
-func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug string) (*teamResponse, error) {
+func resolveOrganizationTeam(ctx context.Context, client *githubrest.Client, hostname, orgName, teamSlug string) (*teamResponse, error) {
 	var response teamResponse
-	u, err := safeurl.JoinPath("orgs", orgName, "teams", teamSlug)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname), "orgs", orgName, "teams", teamSlug)
 	if err != nil {
 		return nil, err
 	}
-	err = client.REST(hostname, "GET", u.String(), nil, &response)
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = client.Do(req, &response)
 	return &response, err
 }
 

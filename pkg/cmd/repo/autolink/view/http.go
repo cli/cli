@@ -1,11 +1,11 @@
 package view
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
@@ -13,21 +13,26 @@ import (
 )
 
 type AutolinkViewer struct {
-	HTTPClient *http.Client
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 }
 
-func (a *AutolinkViewer) View(repo ghrepo.Interface, id string) (*shared.Autolink, error) {
+func (a *AutolinkViewer) View(ctx context.Context, repo ghrepo.Interface, id string) (*shared.Autolink, error) {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "autolinks", id)
 	if err != nil {
 		return nil, err
 	}
 
-	var autolink shared.Autolink
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(a.HTTPClient).REST(repo.RepoHost(), http.MethodGet, path.String(), nil, &autolink)
+	client, err := a.GitHubREST(repo.RepoHost())
 	if err != nil {
+		return nil, err
+	}
+
+	var autolink shared.Autolink
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &autolink); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("HTTP 404: Perhaps you are missing admin rights to the repository? (%s)", httpErr.RequestURL)

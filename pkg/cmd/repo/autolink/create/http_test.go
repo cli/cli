@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -145,10 +146,10 @@ func TestAutolinkCreator_Create(t *testing.T) {
 			defer reg.Verify(t)
 
 			autolinkCreator := &AutolinkCreator{
-				HTTPClient: &http.Client{Transport: reg},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 			}
 
-			autolink, err := autolinkCreator.Create(repo, tt.req)
+			autolink, err := autolinkCreator.Create(context.Background(), repo, tt.req)
 
 			if tt.expectErr {
 				require.EqualError(t, err, tt.expectedErrMsg)

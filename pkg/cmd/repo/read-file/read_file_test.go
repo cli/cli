@@ -2,6 +2,7 @@ package readfile
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -536,9 +537,7 @@ func Test_readFileRun(t *testing.T) {
 			if opts.Path == "" {
 				opts.Path = "README.md"
 			}
-			opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			if opts.BaseRepo == nil {
 				opts.BaseRepo = func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
@@ -551,7 +550,7 @@ func Test_readFileRun(t *testing.T) {
 				opts.Exporter = exporter
 			}
 
-			err := readFileRun(&opts)
+			err := readFileRun(context.Background(), &opts)
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErrMsg)

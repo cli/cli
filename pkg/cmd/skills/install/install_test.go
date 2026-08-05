@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -343,7 +342,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					Agent:        "github-copilot",
@@ -366,7 +365,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -391,7 +390,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -416,7 +415,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -440,7 +439,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -464,7 +463,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:          ios,
-					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:  httpmock.RESTClientFunc(reg),
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
 					SkillSource: "monalisa/skills-repo",
 					SkillName:   "git-commit",
@@ -487,7 +486,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:          ios,
-					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:  httpmock.RESTClientFunc(reg),
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
 					Prompter:    &prompter.PrompterMock{},
 					SkillSource: "monalisa/skills-repo",
@@ -513,7 +512,7 @@ func TestInstallRun(t *testing.T) {
 				require.NoError(t, os.MkdirAll(filepath.Join(targetDir, "git-commit"), 0o755))
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -540,7 +539,7 @@ func TestInstallRun(t *testing.T) {
 				require.NoError(t, os.MkdirAll(filepath.Join(targetDir, "git-commit"), 0o755))
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -564,7 +563,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "nonexistent",
@@ -594,7 +593,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "xlsx-pro",
@@ -625,7 +624,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "bob/xlsx-pro",
@@ -670,7 +669,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -697,7 +696,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -723,7 +722,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -749,7 +748,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -780,7 +779,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit@v1.2.0",
@@ -808,7 +807,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "skills/git-commit",
@@ -836,7 +835,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "terraform/code-generation/skills/terraform-style-guide",
@@ -864,7 +863,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "packages/agent-skills/code-review",
@@ -889,7 +888,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "https://github.com/monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -922,7 +921,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					Prompter:     pm,
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
@@ -965,7 +964,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					Prompter:     pm,
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
@@ -990,7 +989,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -1058,7 +1057,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:          ios,
-					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:  httpmock.RESTClientFunc(reg),
 					Prompter:    pm,
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
 					SkillSource: "monalisa/octocat-skills",
@@ -1086,7 +1085,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:          ios,
-					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:  httpmock.RESTClientFunc(reg),
 					Prompter:    pm,
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
 					SkillSource: "monalisa/octocat-skills",
@@ -1116,7 +1115,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					Prompter:     pm,
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/octocat-skills",
@@ -1142,7 +1141,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:         ios,
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					GitClient:  &git.Client{RepoDir: t.TempDir()},
 					Prompter: &prompter.PrompterMock{
 						MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
@@ -1177,7 +1176,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:         ios,
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					Prompter:   pm,
 					GitClient:  &git.Client{RepoDir: t.TempDir()},
 					Remotes: func() (context.Remotes, error) {
@@ -1224,7 +1223,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					Prompter:     pm,
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/octocat-skills",
@@ -1244,7 +1243,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:          ios,
-					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:  httpmock.RESTClientFunc(reg),
 					Prompter:    &prompter.PrompterMock{},
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
 					SkillSource: "acme.ghes.com/monalisa/octocat-skills",
@@ -1279,7 +1278,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:          ios,
-					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:  httpmock.RESTClientFunc(reg),
 					Prompter:    pm,
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
 					SkillSource: "monalisa/octocat-skills",
@@ -1310,7 +1309,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:         ios,
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					Prompter:   pm,
 					GitClient:  &git.Client{RepoDir: t.TempDir()},
 					SkillName:  "git-commit",
@@ -1338,7 +1337,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:          ios,
-					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:  httpmock.RESTClientFunc(reg),
 					Prompter:    pm,
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
 					SkillSource: "monalisa/octocat-skills",
@@ -1378,7 +1377,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					Prompter:     pm,
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/octocat-skills",
@@ -1408,7 +1407,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -1443,7 +1442,7 @@ func TestInstallRun(t *testing.T) {
 				}
 				return &InstallOptions{
 					IO:          ios,
-					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:  httpmock.RESTClientFunc(reg),
 					Prompter:    pm,
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
 					SkillSource: "monalisa/octocat-skills",
@@ -1466,7 +1465,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -1490,7 +1489,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:              ios,
-					HttpClient:      func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:      httpmock.RESTClientFunc(reg),
 					GitClient:       &git.Client{RepoDir: t.TempDir()},
 					SkillSource:     "monalisa/skills-repo",
 					SkillName:       "git-commit",
@@ -1518,7 +1517,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -1544,7 +1543,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:              ios,
-					HttpClient:      func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:      httpmock.RESTClientFunc(reg),
 					GitClient:       &git.Client{RepoDir: t.TempDir()},
 					SkillSource:     "monalisa/skills-repo",
 					SkillName:       "hidden-skill",
@@ -1573,7 +1572,7 @@ func TestInstallRun(t *testing.T) {
 				t.Helper()
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
@@ -1616,7 +1615,7 @@ func TestInstallRun(t *testing.T) {
 				opts.Telemetry = &telemetry.NoOpService{}
 			}
 
-			err := installRun(opts)
+			err := installRun(t.Context(), opts)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
@@ -1659,9 +1658,9 @@ func TestInstallRun_AllInstallsRemoteSkills(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 	targetDir := t.TempDir()
 
-	err := installRun(&InstallOptions{
+	err := installRun(t.Context(), &InstallOptions{
 		IO:           ios,
-		HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitHubREST:   httpmock.RESTClientFunc(reg),
 		GitClient:    &git.Client{RepoDir: t.TempDir()},
 		SkillSource:  "monalisa/skills-repo",
 		All:          true,
@@ -1723,9 +1722,9 @@ func TestInstallRun_DeduplicatesSharedProjectDirAcrossHosts(t *testing.T) {
 		},
 	}
 
-	err := installRun(&InstallOptions{
+	err := installRun(t.Context(), &InstallOptions{
 		IO:          ios,
-		HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitHubREST:  httpmock.RESTClientFunc(reg),
 		Prompter:    pm,
 		GitClient:   &git.Client{RepoDir: t.TempDir()},
 		SkillSource: "monalisa/octocat-skills",
@@ -2266,7 +2265,7 @@ func TestRunLocalInstall(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 			opts := tt.opts(ios, sourceDir, targetDir)
 
-			err := installRun(opts)
+			err := installRun(t.Context(), opts)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
@@ -2577,9 +2576,9 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 
 			recorder := &telemetry.EventRecorderSpy{}
 
-			err := installRun(&InstallOptions{
+			err := installRun(t.Context(), &InstallOptions{
 				IO:           ios,
-				HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+				GitHubREST:   httpmock.RESTClientFunc(reg),
 				GitClient:    &git.Client{RepoDir: t.TempDir()},
 				Prompter:     &prompter.PrompterMock{},
 				SkillSource:  "monalisa/octocat-skills",
@@ -2675,9 +2674,9 @@ func TestInstallRun_TelemetryMultipleSkills(t *testing.T) {
 
 	recorder := &telemetry.EventRecorderSpy{}
 
-	err := installRun(&InstallOptions{
+	err := installRun(t.Context(), &InstallOptions{
 		IO:           ios,
-		HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitHubREST:   httpmock.RESTClientFunc(reg),
 		GitClient:    &git.Client{RepoDir: t.TempDir()},
 		Prompter:     pm,
 		SkillSource:  "monalisa/octocat-skills",
@@ -2746,7 +2745,7 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 			opts: func(t *testing.T, ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				return &InstallOptions{
 					IO:         ios,
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					GitClient:  &git.Client{RepoDir: t.TempDir()},
 					Prompter: &prompter.PrompterMock{
 						SelectFunc: func(_ string, _ string, choices []string) (int, error) {
@@ -2788,7 +2787,7 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 			opts: func(t *testing.T, ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				return &InstallOptions{
 					IO:         ios,
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					GitClient:  &git.Client{RepoDir: t.TempDir()},
 					Prompter: &prompter.PrompterMock{
 						SelectFunc: func(_ string, _ string, choices []string) (int, error) {
@@ -2825,7 +2824,7 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 			opts: func(t *testing.T, ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					Telemetry:    &telemetry.NoOpService{},
 					SkillSource:  "monalisa/skills-repo",
@@ -2859,7 +2858,7 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 			opts: func(t *testing.T, ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				return &InstallOptions{
 					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST:   httpmock.RESTClientFunc(reg),
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					Telemetry:    &telemetry.NoOpService{},
 					SkillSource:  "monalisa/skills-repo",
@@ -2892,7 +2891,7 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 			opts := tt.opts(t, ios, reg)
 
-			err := installRun(opts)
+			err := installRun(t.Context(), opts)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)

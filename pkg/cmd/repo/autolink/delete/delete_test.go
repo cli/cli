@@ -2,6 +2,7 @@ package delete
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -105,7 +106,7 @@ type stubAutolinkDeleter struct {
 	err error
 }
 
-func (d *stubAutolinkDeleter) Delete(repo ghrepo.Interface, id string) error {
+func (d *stubAutolinkDeleter) Delete(_ context.Context, repo ghrepo.Interface, id string) error {
 	return d.err
 }
 
@@ -114,7 +115,7 @@ type stubAutolinkViewer struct {
 	err      error
 }
 
-func (g stubAutolinkViewer) View(repo ghrepo.Interface, id string) (*shared.Autolink, error) {
+func (g stubAutolinkViewer) View(_ context.Context, repo ghrepo.Interface, id string) (*shared.Autolink, error) {
 	return g.autolink, g.err
 }
 
@@ -319,7 +320,7 @@ func TestDeleteRun(t *testing.T) {
 			}
 			tt.opts.Prompter = pm
 
-			err := deleteRun(opts)
+			err := deleteRun(context.Background(), opts)
 
 			if tt.expectedErr != nil {
 				require.Error(t, err, "expected error but got none")

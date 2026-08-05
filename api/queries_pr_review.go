@@ -1,15 +1,10 @@
 package api
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -271,82 +266,6 @@ func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *Pu
 	}
 
 	return client.Mutate(repo.RepoHost(), "PullRequestReviewAdd", &mutation, variables)
-}
-
-// AddPullRequestReviews adds the given user and team reviewers to a pull request using the REST API.
-// Team identifiers can be in "org/slug" format.
-func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, users, teams []string) error {
-	if len(users) == 0 && len(teams) == 0 {
-		return nil
-	}
-
-	// The API requires empty arrays instead of null values
-	if users == nil {
-		users = []string{}
-	}
-
-	path, err := safeurl.JoinPath(
-		"repos",
-		repo.RepoOwner(),
-		repo.RepoName(),
-		"pulls",
-		strconv.Itoa(prNumber),
-		"requested_reviewers",
-	)
-	if err != nil {
-		return err
-	}
-	body := struct {
-		Reviewers     []string `json:"reviewers"`
-		TeamReviewers []string `json:"team_reviewers"`
-	}{
-		Reviewers:     users,
-		TeamReviewers: extractTeamSlugs(teams),
-	}
-	buf := &bytes.Buffer{}
-	if err := json.NewEncoder(buf).Encode(body); err != nil {
-		return err
-	}
-	// The endpoint responds with the updated pull request object; we don't need it here.
-	return client.REST(repo.RepoHost(), "POST", path.String(), buf, nil)
-}
-
-// RemovePullRequestReviews removes requested reviewers from a pull request using the REST API.
-// Team identifiers can be in "org/slug" format.
-func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, users, teams []string) error {
-	if len(users) == 0 && len(teams) == 0 {
-		return nil
-	}
-
-	// The API requires empty arrays instead of null values
-	if users == nil {
-		users = []string{}
-	}
-
-	path, err := safeurl.JoinPath(
-		"repos",
-		repo.RepoOwner(),
-		repo.RepoName(),
-		"pulls",
-		strconv.Itoa(prNumber),
-		"requested_reviewers",
-	)
-	if err != nil {
-		return err
-	}
-	body := struct {
-		Reviewers     []string `json:"reviewers"`
-		TeamReviewers []string `json:"team_reviewers"`
-	}{
-		Reviewers:     users,
-		TeamReviewers: extractTeamSlugs(teams),
-	}
-	buf := &bytes.Buffer{}
-	if err := json.NewEncoder(buf).Encode(body); err != nil {
-		return err
-	}
-	// The endpoint responds with the updated pull request object; we don't need it here.
-	return client.REST(repo.RepoHost(), "DELETE", path.String(), buf, nil)
 }
 
 // RequestReviewsByLogin sets requested reviewers on a pull request using the GraphQL mutation.
@@ -684,20 +603,6 @@ func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query
 	moreResults := result.Repository.CollaboratorsTotalCount.TotalCount + result.Repository.Owner.Organization.TeamsTotalCount.TotalCount
 
 	return candidates, moreResults, nil
-}
-
-// extractTeamSlugs extracts just the slug portion from team identifiers.
-// Team identifiers can be in "org/slug" format; this returns just the slug.
-func extractTeamSlugs(teams []string) []string {
-	slugs := make([]string, 0, len(teams))
-	for _, t := range teams {
-		if t == "" {
-			continue
-		}
-		s := strings.SplitN(t, "/", 2)
-		slugs = append(slugs, s[len(s)-1])
-	}
-	return slugs
 }
 
 // toGitHubV4Strings converts a string slice to a githubv4.String slice,

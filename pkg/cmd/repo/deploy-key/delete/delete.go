@@ -1,10 +1,11 @@
 package delete
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -12,7 +13,7 @@ import (
 
 type DeleteOptions struct {
 	IO         *iostreams.IOStreams
-	HTTPClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	KeyID string
@@ -20,7 +21,7 @@ type DeleteOptions struct {
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
 	opts := &DeleteOptions{
-		HTTPClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		IO:         f.IOStreams,
 	}
 
@@ -35,25 +36,25 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return deleteRun(opts)
+			return deleteRun(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func deleteRun(opts *DeleteOptions) error {
-	httpClient, err := opts.HTTPClient()
-	if err != nil {
-		return err
-	}
-
+func deleteRun(ctx context.Context, opts *DeleteOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	if err := deleteDeployKey(httpClient, repo, opts.KeyID); err != nil {
+	client, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	if err := deleteDeployKey(ctx, client, repo, opts.KeyID); err != nil {
 		return err
 	}
 

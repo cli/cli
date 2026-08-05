@@ -1,6 +1,7 @@
 package list
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -117,9 +118,9 @@ func TestListRun(t *testing.T) {
 			opts := tt.opts
 			opts.IO = ios
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
-			opts.HTTPClient = func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
+			opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
-			err := listRun(&opts)
+			err := listRun(context.Background(), &opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("listRun() return error: %v", err)
 				return
@@ -144,8 +145,12 @@ func TestRepoKeysHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	_, err := repoKeys(
-		&http.Client{Transport: reg},
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+
+	_, err = repoKeys(
+		context.Background(),
+		client,
 		ghrepo.New("OWNER", "REPO"),
 	)
 

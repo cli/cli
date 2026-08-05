@@ -3,13 +3,11 @@ package installer
 import (
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/registry"
@@ -291,7 +289,8 @@ func TestInstallSkill(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 			opts := &Options{
 				Host:   "github.com",
 				Owner:  "monalisa",
@@ -301,7 +300,7 @@ func TestInstallSkill(t *testing.T) {
 				Client: client,
 			}
 
-			err := installSkill(opts, tt.skill, destDir)
+			err = installSkill(t.Context(), opts, tt.skill, destDir)
 			if tt.name == "fails on path traversal from malicious tree" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "blocked path traversal")
@@ -404,7 +403,8 @@ func TestInstall(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
 			opts := &Options{
 				Host:       "github.com",
@@ -421,7 +421,7 @@ func TestInstall(t *testing.T) {
 				opts.Dir = ""
 			}
 
-			result, err := Install(opts)
+			result, err := Install(t.Context(), opts)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -461,10 +461,11 @@ func TestInstallSingleSkillFailureStillCompletesProgress(t *testing.T) {
 		httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree-fail"),
 		httpmock.StatusStringResponse(500, "server error"),
 	)
-	client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
 
 	var events []struct{ done, total int }
-	result, err := Install(&Options{
+	result, err := Install(t.Context(), &Options{
 		Host:   "github.com",
 		Owner:  "monalisa",
 		Repo:   "octocat-skills",

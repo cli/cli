@@ -3,7 +3,6 @@ package publish
 import (
 	"bytes"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -164,11 +163,11 @@ func TestPublishRun_UnsupportedHost(t *testing.T) {
 	stubGitRemote(cs, map[string]string{"origin": "https://github.com/monalisa/skills-repo.git"})
 
 	ios, _, _, _ := iostreams.Test()
-	err := publishRun(&PublishOptions{
+	err := publishRun(t.Context(), &PublishOptions{
 		IO:         ios,
 		Dir:        dir,
 		GitClient:  newTestGitClient(),
-		HttpClient: func() (*http.Client, error) { return nil, nil },
+		GitHubREST: httpmock.RESTClientFunc(nil),
 		host:       "acme.ghes.com",
 	})
 	require.ErrorContains(t, err, "does not currently support GitHub Enterprise Server")
@@ -296,7 +295,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:        dir,
 					DryRun:     true,
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -335,7 +334,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:        dir,
 					DryRun:     true,
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -371,7 +370,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:        dir,
 					DryRun:     true,
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -430,7 +429,7 @@ func TestPublishRun(t *testing.T) {
 						ConfirmFunc: func(msg string, def bool) (bool, error) { return true, nil },
 					},
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -583,7 +582,7 @@ func TestPublishRun(t *testing.T) {
 					IO:         ios,
 					Dir:        dir,
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -638,7 +637,7 @@ func TestPublishRun(t *testing.T) {
 					IO:         ios,
 					Dir:        dir,
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -704,7 +703,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:        dir,
 					DryRun:     true,
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -771,7 +770,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:        dir,
 					DryRun:     true,
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -940,7 +939,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:        dir,
 					DryRun:     true,
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -1032,7 +1031,7 @@ func TestPublishRun(t *testing.T) {
 						ConfirmFunc: func(msg string, def bool) (bool, error) { return true, nil },
 					},
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -1109,7 +1108,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:        dir,
 					Tag:        "v2.3.5",
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -1145,7 +1144,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:        dir,
 					Tag:        "v1.0.0", // same as stubAllSecureRemote's existing tag
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -1179,7 +1178,7 @@ func TestPublishRun(t *testing.T) {
 					IO:         ios,
 					Dir:        dir,
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -1293,7 +1292,7 @@ func TestPublishRun(t *testing.T) {
 						},
 					},
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -1353,7 +1352,7 @@ func TestPublishRun(t *testing.T) {
 						},
 					},
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -1412,7 +1411,7 @@ func TestPublishRun(t *testing.T) {
 						},
 					},
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -1479,7 +1478,7 @@ func TestPublishRun(t *testing.T) {
 						},
 					},
 					GitClient:  newTestGitClient(),
-					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					host:       "github.com",
 				}
 			},
@@ -1510,7 +1509,7 @@ func TestPublishRun(t *testing.T) {
 			}
 
 			opts := tt.opts(ios, dir, reg)
-			err := publishRun(opts)
+			err := publishRun(t.Context(), opts)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
@@ -1578,12 +1577,12 @@ func TestPublishRun_DirArgUsesTargetRemote(t *testing.T) {
 	defer reg.Verify(t)
 	stubAllSecureRemote(reg, "monalisa", "target-repo")
 
-	err := publishRun(&PublishOptions{
+	err := publishRun(t.Context(), &PublishOptions{
 		IO:         ios,
 		Dir:        targetRepo,
 		DryRun:     true,
 		GitClient:  &git.Client{GitPath: "some/path/git", RepoDir: cwdRepo},
-		HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		host:       "github.com",
 	})
 

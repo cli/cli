@@ -1,6 +1,7 @@
 package view
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -97,10 +98,10 @@ func TestAutolinkViewer_View(t *testing.T) {
 			defer reg.Verify(t)
 
 			autolinkViewer := &AutolinkViewer{
-				HTTPClient: &http.Client{Transport: reg},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 			}
 
-			autolink, err := autolinkViewer.View(repo, tt.id)
+			autolink, err := autolinkViewer.View(context.Background(), repo, tt.id)
 
 			if tt.expectErr {
 				require.EqualError(t, err, tt.expectedErrMsg)

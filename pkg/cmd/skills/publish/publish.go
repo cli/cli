@@ -15,10 +15,10 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/discovery"
@@ -33,7 +33,7 @@ import (
 // PublishOptions holds all dependencies and user-provided flags for the publish command.
 type PublishOptions struct {
 	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Config     func() (gh.Config, error)
 	Prompter   prompter.Prompter
 	GitClient  *git.Client
@@ -91,7 +91,7 @@ type repoSecurityResponse struct {
 func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.Command {
 	opts := &PublishOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Config:     f.Config,
 		Prompter:   f.Prompter,
 		GitClient:  f.GitClient,
@@ -154,7 +154,7 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 			if runF != nil {
 				return runF(opts)
 			}
-			return publishRun(opts)
+			return publishRun(cmd.Context(), opts)
 		},
 	}
 
@@ -165,7 +165,7 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 	return cmd
 }
 
-func publishRun(opts *PublishOptions) error {
+func publishRun(ctx context.Context, opts *PublishOptions) error {
 	dir := opts.Dir
 	if dir == "" {
 		var err error
@@ -185,7 +185,7 @@ func publishRun(opts *PublishOptions) error {
 	// Client initialization is deferred until after local validation so that
 	// simple errors (missing skills/, bad SKILL.md, etc.) are reported
 	// without requiring an HTTP client.
-	var client *api.Client
+	var client *githubrest.Client
 	host := opts.host
 
 	var diagnostics []publishDiagnostic
@@ -346,12 +346,6 @@ func publishRun(opts *PublishOptions) error {
 	hasTopic := false
 	var existingTags []tagEntry
 	if owner != "" && repo != "" {
-		httpClient, err := opts.HttpClient()
-		if err != nil {
-			return err
-		}
-		client = api.NewClientFromHTTP(httpClient)
-
 		if host == "" && repoInfo != nil {
 			host = repoInfo.Repo.RepoHost()
 		}
@@ -366,22 +360,27 @@ func publishRun(opts *PublishOptions) error {
 			return err
 		}
 
+		client, err = opts.GitHubREST(host)
+		if err != nil {
+			return err
+		}
+
 		// Security and ruleset checks (advisory, always shown)
 		var skillAbsDirs []string
 		for _, skill := range skills {
 			skillAbsDirs = append(skillAbsDirs, filepath.Join(dir, filepath.FromSlash(skill.Path)))
 		}
-		securityDiags := checkSecuritySettings(client, host, owner, repo, skillAbsDirs)
+		securityDiags := checkSecuritySettings(ctx, client, owner, repo, skillAbsDirs)
 		diagnostics = append(diagnostics, securityDiags...)
 
-		rulesetDiags := checkTagProtection(client, host, owner, repo)
+		rulesetDiags := checkTagProtection(ctx, client, owner, repo)
 		diagnostics = append(diagnostics, rulesetDiags...)
 
 		// Check topic (needed for publish flow, not a blocking error)
-		hasTopic = repoHasTopic(client, host, owner, repo)
+		hasTopic = repoHasTopic(ctx, client, owner, repo)
 
 		// Fetch existing tags (needed for version suggestion)
-		existingTags = fetchTags(client, host, owner, repo)
+		existingTags = fetchTags(ctx, client, owner, repo)
 	} else {
 		diagnostics = append(diagnostics, detectMissingRepoDiagnostic(opts.GitClient, dir)...)
 	}
@@ -436,11 +435,11 @@ func publishRun(opts *PublishOptions) error {
 
 	fmt.Fprintf(opts.IO.ErrOut, "\nPublishing to %s/%s...\n\n", owner, repo)
 
-	return runPublishRelease(opts, client, host, owner, repo, dir, repoInfo.RemoteName, hasTopic, existingTags)
+	return runPublishRelease(ctx, opts, client, owner, repo, dir, repoInfo.RemoteName, hasTopic, existingTags)
 }
 
 // repoHasTopic checks whether the repo has the agent-skills topic.
-func repoHasTopic(client *api.Client, host, owner, repo string) bool {
+func repoHasTopic(ctx context.Context, client *githubrest.Client, owner, repo string) bool {
 	if client == nil {
 		return false
 	}
@@ -449,7 +448,11 @@ func repoHasTopic(client *api.Client, host, owner, repo string) bool {
 		return false
 	}
 	var resp repoTopicsResponse
-	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return false
+	}
+	if _, err := client.Do(req, &resp); err != nil {
 		return false
 	}
 	for _, t := range resp.Names {
@@ -461,7 +464,7 @@ func repoHasTopic(client *api.Client, host, owner, repo string) bool {
 }
 
 // fetchTags returns the most recent tags from the repo.
-func fetchTags(client *api.Client, host, owner, repo string) []tagEntry {
+func fetchTags(ctx context.Context, client *githubrest.Client, owner, repo string) []tagEntry {
 	if client == nil {
 		return nil
 	}
@@ -471,14 +474,18 @@ func fetchTags(client *api.Client, host, owner, repo string) []tagEntry {
 	}
 	u.SetQuery("per_page", "10")
 	var tags []tagEntry
-	if err := client.REST(host, "GET", u.String(), nil, &tags); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil
+	}
+	if _, err := client.Do(req, &tags); err != nil {
 		return nil
 	}
 	return tags
 }
 
 // runPublishRelease handles the interactive publish flow: topic, tag, release, immutability.
-func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, repo, dir, remoteName string, hasTopic bool, existingTags []tagEntry) error {
+func runPublishRelease(ctx context.Context, opts *PublishOptions, client *githubrest.Client, owner, repo, dir, remoteName string, hasTopic bool, existingTags []tagEntry) error {
 	cs := opts.IO.ColorScheme()
 	canPrompt := opts.IO.CanPrompt()
 
@@ -494,7 +501,7 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 			}
 		}
 		if addTopic {
-			if err := addAgentSkillsTopic(client, host, owner, repo); err != nil {
+			if err := addAgentSkillsTopic(ctx, client, owner, repo); err != nil {
 				fmt.Fprintf(opts.IO.ErrOut, "%s Could not add topic: %v\n", cs.WarningIcon(), err)
 				fmt.Fprintf(opts.IO.ErrOut, "  Add it manually: gh repo edit %s/%s --add-topic agent-skills\n", owner, repo)
 			} else {
@@ -560,7 +567,7 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 	}
 
 	// Offer to enable immutable releases
-	immutableEnabled := checkImmutableReleases(client, host, owner, repo)
+	immutableEnabled := checkImmutableReleases(ctx, client, owner, repo)
 	if !immutableEnabled && canPrompt {
 		enableImmutable, err := opts.Prompter.Confirm(
 			"Enable immutable releases? (prevents tampering with published releases)", true)
@@ -568,7 +575,7 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 			return err
 		}
 		if enableImmutable {
-			if err := enableImmutableReleases(client, host, owner, repo); err != nil {
+			if err := enableImmutableReleases(ctx, client, owner, repo); err != nil {
 				fmt.Fprintf(opts.IO.ErrOut, "%s Could not enable immutable releases: %v\n", cs.WarningIcon(), err)
 				fmt.Fprintf(opts.IO.ErrOut, "  Enable manually in Settings > General > Releases\n")
 			} else {
@@ -586,7 +593,7 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 			currentBranch = b
 		}
 	}
-	defaultBranch := detectDefaultBranch(client, host, owner, repo)
+	defaultBranch := detectDefaultBranch(ctx, client, owner, repo)
 	if currentBranch != "" && defaultBranch != "" && currentBranch != defaultBranch {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Publishing from branch %q (default is %q)\n", cs.WarningIcon(), currentBranch, defaultBranch)
 	}
@@ -624,7 +631,11 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 	var releaseResp struct {
 		HTMLURL string `json:"html_url"`
 	}
-	if err := client.REST(host, "POST", releasePath.String(), bytes.NewReader(releaseJSON), &releaseResp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodPost, releasePath.String(), bytes.NewReader(releaseJSON))
+	if err != nil {
+		return fmt.Errorf("failed to create release: %w", err)
+	}
+	if _, err := client.Do(req, &releaseResp); err != nil {
 		return fmt.Errorf("failed to create release: %w", err)
 	}
 
@@ -687,7 +698,7 @@ func ensurePushed(opts *PublishOptions, dir, remoteName string) error {
 }
 
 // detectDefaultBranch returns the default branch of the remote repo via the API.
-func detectDefaultBranch(client *api.Client, host, owner, repo string) string {
+func detectDefaultBranch(ctx context.Context, client *githubrest.Client, owner, repo string) string {
 	if client == nil {
 		return ""
 	}
@@ -698,14 +709,18 @@ func detectDefaultBranch(client *api.Client, host, owner, repo string) string {
 	if err != nil {
 		return ""
 	}
-	if err := client.REST(host, "GET", apiPath.String(), nil, &result); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return ""
+	}
+	if _, err := client.Do(req, &result); err != nil {
 		return ""
 	}
 	return result.DefaultBranch
 }
 
 // addAgentSkillsTopic adds the "agent-skills" topic to the repo, preserving existing topics.
-func addAgentSkillsTopic(client *api.Client, host, owner, repo string) error {
+func addAgentSkillsTopic(ctx context.Context, client *githubrest.Client, owner, repo string) error {
 	apiPath, err := safeurl.JoinPath("repos", owner, repo, "topics")
 	if err != nil {
 		return err
@@ -713,7 +728,11 @@ func addAgentSkillsTopic(client *api.Client, host, owner, repo string) error {
 
 	// Fetch existing topics
 	var resp repoTopicsResponse
-	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	getReq, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return fmt.Errorf("could not fetch existing topics: %w", err)
+	}
+	if _, err := client.Do(getReq, &resp); err != nil {
 		return fmt.Errorf("could not fetch existing topics: %w", err)
 	}
 
@@ -729,11 +748,16 @@ func addAgentSkillsTopic(client *api.Client, host, owner, repo string) error {
 	if err != nil {
 		return fmt.Errorf("could not serialize topics: %w", err)
 	}
-	return client.REST(host, "PUT", apiPath.String(), bytes.NewReader(topicsJSON), nil)
+	putReq, err := client.NewRequest(ctx, http.MethodPut, apiPath.String(), bytes.NewReader(topicsJSON))
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(putReq, nil)
+	return err
 }
 
 // checkImmutableReleases checks if immutable releases are enabled for the repo.
-func checkImmutableReleases(client *api.Client, host, owner, repo string) bool {
+func checkImmutableReleases(ctx context.Context, client *githubrest.Client, owner, repo string) bool {
 	if client == nil {
 		return false
 	}
@@ -744,24 +768,33 @@ func checkImmutableReleases(client *api.Client, host, owner, repo string) bool {
 	var resp struct {
 		Enabled bool `json:"enabled"`
 	}
-	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return false
+	}
+	if _, err := client.Do(req, &resp); err != nil {
 		return false
 	}
 	return resp.Enabled
 }
 
 // enableImmutableReleases enables immutable releases for the repo.
-func enableImmutableReleases(client *api.Client, host, owner, repo string) error {
+func enableImmutableReleases(ctx context.Context, client *githubrest.Client, owner, repo string) error {
 	apiPath, err := safeurl.JoinPath("repos", owner, repo, "immutable-releases")
 	if err != nil {
 		return err
 	}
 	body := bytes.NewReader([]byte(`{"enabled":true}`))
-	return client.REST(host, "PATCH", apiPath.String(), body, nil)
+	req, err := client.NewRequest(ctx, http.MethodPatch, apiPath.String(), body)
+	if err != nil {
+		return err
+	}
+	_, err = client.Do(req, nil)
+	return err
 }
 
 // checkTagProtection checks whether tag protection rulesets are enabled.
-func checkTagProtection(client *api.Client, host, owner, repo string) []publishDiagnostic {
+func checkTagProtection(ctx context.Context, client *githubrest.Client, owner, repo string) []publishDiagnostic {
 	if client == nil {
 		return nil
 	}
@@ -770,7 +803,11 @@ func checkTagProtection(client *api.Client, host, owner, repo string) []publishD
 		return nil
 	}
 	var rulesets []rulesetsResponse
-	if err := client.REST(host, "GET", apiPath.String(), nil, &rulesets); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil
+	}
+	if _, err := client.Do(req, &rulesets); err != nil {
 		return nil
 	}
 
@@ -787,7 +824,7 @@ func checkTagProtection(client *api.Client, host, owner, repo string) []publishD
 }
 
 // checkSecuritySettings checks whether recommended security features are enabled.
-func checkSecuritySettings(client *api.Client, host, owner, repo string, skillDirs []string) []publishDiagnostic {
+func checkSecuritySettings(ctx context.Context, client *githubrest.Client, owner, repo string, skillDirs []string) []publishDiagnostic {
 	if client == nil {
 		return nil
 	}
@@ -796,7 +833,11 @@ func checkSecuritySettings(client *api.Client, host, owner, repo string, skillDi
 		return nil
 	}
 	var resp repoSecurityResponse
-	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil
+	}
+	if _, err := client.Do(req, &resp); err != nil {
 		return nil
 	}
 
@@ -827,7 +868,13 @@ func checkSecuritySettings(client *api.Client, host, owner, repo string, skillDi
 		if u, err := safeurl.JoinPath("repos", owner, repo, "code-scanning", "alerts"); err == nil {
 			u.SetQuery("per_page", "1")
 			u.SetQuery("state", "open")
-			if err := client.REST(host, "GET", u.String(), nil, new([]interface{})); err != nil {
+			req, err := client.NewRequest(ctx, http.MethodGet, u.String(), nil)
+			if err != nil {
+				diagnostics = append(diagnostics, publishDiagnostic{
+					severity: "info",
+					message:  "skills include code files but code scanning does not appear to be configured (Settings > Code security > Code scanning)",
+				})
+			} else if _, err := client.Do(req, new([]interface{})); err != nil {
 				diagnostics = append(diagnostics, publishDiagnostic{
 					severity: "info",
 					message:  "skills include code files but code scanning does not appear to be configured (Settings > Code security > Code scanning)",
@@ -838,7 +885,13 @@ func checkSecuritySettings(client *api.Client, host, owner, repo string, skillDi
 
 	if hasManifests {
 		if dependabotPath, err := safeurl.JoinPath("repos", owner, repo, "vulnerability-alerts"); err == nil {
-			if err := client.REST(host, "GET", dependabotPath.String(), nil, nil); err != nil {
+			req, err := client.NewRequest(ctx, http.MethodGet, dependabotPath.String(), nil)
+			if err != nil {
+				diagnostics = append(diagnostics, publishDiagnostic{
+					severity: "info",
+					message:  "skills include dependency manifests but Dependabot alerts do not appear to be enabled (Settings > Code security > Dependabot)",
+				})
+			} else if _, err := client.Do(req, nil); err != nil {
 				diagnostics = append(diagnostics, publishDiagnostic{
 					severity: "info",
 					message:  "skills include dependency manifests but Dependabot alerts do not appear to be enabled (Settings > Code security > Dependabot)",

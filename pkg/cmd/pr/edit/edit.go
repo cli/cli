@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
@@ -204,7 +205,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				return runF(opts)
 			}
 
-			return editRun(opts)
+			return editRun(cmd.Context(), opts)
 		},
 	}
 
@@ -246,7 +247,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	return cmd
 }
 
-func editRun(opts *EditOptions) error {
+func editRun(ctx context.Context, opts *EditOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -360,8 +361,13 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
+	restClient, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicator()
-	err = updatePullRequest(httpClient, repo, pr.ID, pr.Number, editable)
+	err = updatePullRequest(ctx, httpClient, restClient, repo, pr.ID, pr.Number, editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -417,20 +423,20 @@ func reviewerSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *
 	return searchFunc
 }
 
-func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, id string, number int, editable shared.Editable) error {
+func updatePullRequest(ctx context.Context, httpClient *http.Client, restClient *githubrest.Client, repo ghrepo.Interface, id string, number int, editable shared.Editable) error {
 	var wg errgroup.Group
 	wg.Go(func() error {
 		return shared.UpdateIssue(httpClient, repo, id, true, editable)
 	})
 	if editable.Reviewers.Edited {
 		wg.Go(func() error {
-			return updatePullRequestReviews(httpClient, repo, id, number, editable)
+			return updatePullRequestReviews(ctx, httpClient, restClient, repo, id, number, editable)
 		})
 	}
 	return wg.Wait()
 }
 
-func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, prID string, number int, editable shared.Editable) error {
+func updatePullRequestReviews(ctx context.Context, httpClient *http.Client, restClient *githubrest.Client, repo ghrepo.Interface, prID string, number int, editable shared.Editable) error {
 	if !editable.Reviewers.Edited {
 		return nil
 	}
@@ -469,7 +475,7 @@ func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, pr
 	if editable.ApiActorsSupported {
 		return updatePullRequestReviewsGraphQL(client, repo, prID, editable)
 	}
-	return updatePullRequestReviewsREST(client, repo, number, editable)
+	return updatePullRequestReviewsREST(ctx, restClient, repo, number, editable)
 }
 
 // updatePullRequestReviewsGraphQL uses the RequestReviewsByLogin mutation.
@@ -481,7 +487,7 @@ func updatePullRequestReviewsGraphQL(client *api.Client, repo ghrepo.Interface, 
 
 // updatePullRequestReviewsREST uses the REST API to add/remove reviewers.
 // This is the legacy path for GHES compatibility.
-func updatePullRequestReviewsREST(client *api.Client, repo ghrepo.Interface, number int, editable shared.Editable) error {
+func updatePullRequestReviewsREST(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, number int, editable shared.Editable) error {
 	addUsers, addBots, addTeams := partitionReviewersByType(editable.Reviewers.Value)
 	// REST API doesn't distinguish bots from users, so we need to combine them.
 	allAddUsers := append(addUsers, addBots...)
@@ -498,10 +504,10 @@ func updatePullRequestReviewsREST(client *api.Client, repo ghrepo.Interface, num
 
 	wg := errgroup.Group{}
 	wg.Go(func() error {
-		return api.AddPullRequestReviews(client, repo, number, allAddUsers, addTeams)
+		return addPullRequestReviews(ctx, client, repo, number, allAddUsers, addTeams)
 	})
 	wg.Go(func() error {
-		return api.RemovePullRequestReviews(client, repo, number, allRemoveUsers, removeTeams)
+		return removePullRequestReviews(ctx, client, repo, number, allRemoveUsers, removeTeams)
 	})
 	return wg.Wait()
 }

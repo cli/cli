@@ -2,7 +2,7 @@ package view
 
 import (
 	"bytes"
-	"net/http"
+	"context"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -282,9 +282,7 @@ func TestViewRun(t *testing.T) {
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
-		tt.opts.HTTPClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 		ios, _, stdout, stderr := iostreams.Test()
 		ios.SetStdoutTTY(tt.isTTY)
 		ios.SetStdinTTY(tt.isTTY)
@@ -296,7 +294,7 @@ func TestViewRun(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			err := viewRun(tt.opts)
+			err := viewRun(context.Background(), tt.opts)
 
 			if tt.wantErr {
 				assert.Error(t, err)

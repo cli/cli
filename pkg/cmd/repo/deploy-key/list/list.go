@@ -1,12 +1,13 @@
 package list
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -15,7 +16,7 @@ import (
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
-	HTTPClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Exporter   cmdutil.Exporter
 }
@@ -31,7 +32,7 @@ var deployKeyFields = []string{
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
-		HTTPClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -45,25 +46,25 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return listRun(opts)
+			return listRun(cmd.Context(), opts)
 		},
 	}
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, deployKeyFields)
 	return cmd
 }
 
-func listRun(opts *ListOptions) error {
-	apiClient, err := opts.HTTPClient()
-	if err != nil {
-		return err
-	}
-
+func listRun(ctx context.Context, opts *ListOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	deployKeys, err := repoKeys(apiClient, repo)
+	client, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	deployKeys, err := repoKeys(ctx, client, repo)
 	if err != nil {
 		return err
 	}

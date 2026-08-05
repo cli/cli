@@ -1,31 +1,36 @@
 package delete
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type AutolinkDeleter struct {
-	HTTPClient *http.Client
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 }
 
-func (a *AutolinkDeleter) Delete(repo ghrepo.Interface, id string) error {
+func (a *AutolinkDeleter) Delete(ctx context.Context, repo ghrepo.Interface, id string) error {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "autolinks", id)
 	if err != nil {
 		return err
 	}
 
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(a.HTTPClient).REST(repo.RepoHost(), http.MethodDelete, path.String(), nil, nil)
+	client, err := a.GitHubREST(repo.RepoHost())
 	if err != nil {
+		return err
+	}
+
+	req, err := client.NewRequest(ctx, http.MethodDelete, path.String(), nil)
+	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, nil); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return fmt.Errorf("error deleting autolink: HTTP 404: Perhaps you are missing admin rights to the repository? (%s)", httpErr.RequestURL)

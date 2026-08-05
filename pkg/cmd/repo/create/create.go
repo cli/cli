@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -37,6 +38,7 @@ type iprompter interface {
 
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	GitClient  *git.Client
 	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
@@ -69,6 +71,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Prompter:   f.Prompter,
@@ -188,7 +191,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return createRun(opts)
+			return createRun(cmd.Context(), opts)
 		},
 	}
 
@@ -220,16 +223,16 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	_ = cmd.Flags().MarkDeprecated("enable-wiki", "Disable wiki with `--disable-wiki`")
 
 	_ = cmd.RegisterFlagCompletionFunc("gitignore", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		httpClient, err := opts.HttpClient()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
 		cfg, err := opts.Config()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		results, err := api.RepoGitIgnoreTemplates(httpClient, hostname)
+		restClient, err := opts.GitHubREST(hostname)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		results, err := shared.RepoGitIgnoreTemplates(cmd.Context(), restClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -237,16 +240,16 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	})
 
 	_ = cmd.RegisterFlagCompletionFunc("license", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		httpClient, err := opts.HttpClient()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
 		cfg, err := opts.Config()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		licenses, err := api.RepoLicenses(httpClient, hostname)
+		restClient, err := opts.GitHubREST(hostname)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		licenses, err := shared.RepoLicenses(cmd.Context(), restClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -260,7 +263,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func createRun(ctx context.Context, opts *CreateOptions) error {
 	if opts.Interactive {
 		cfg, err := opts.Config()
 		if err != nil {
@@ -277,22 +280,22 @@ func createRun(opts *CreateOptions) error {
 		}
 		switch answer {
 		case 0:
-			return createFromScratch(opts)
+			return createFromScratch(ctx, opts)
 		case 1:
-			return createFromTemplate(opts)
+			return createFromTemplate(ctx, opts)
 		case 2:
-			return createFromLocal(opts)
+			return createFromLocal(ctx, opts)
 		}
 	}
 
 	if opts.Source == "" {
-		return createFromScratch(opts)
+		return createFromScratch(ctx, opts)
 	}
-	return createFromLocal(opts)
+	return createFromLocal(ctx, opts)
 }
 
 // create new repo on remote host
-func createFromScratch(opts *CreateOptions) error {
+func createFromScratch(ctx context.Context, opts *CreateOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -306,6 +309,11 @@ func createFromScratch(opts *CreateOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
+	restClient, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
+
 	if opts.Interactive {
 		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, "")
 		if err != nil {
@@ -315,11 +323,11 @@ func createFromScratch(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		opts.GitIgnoreTemplate, err = interactiveGitIgnore(httpClient, host, opts.Prompter)
+		opts.GitIgnoreTemplate, err = interactiveGitIgnore(ctx, restClient, host, opts.Prompter)
 		if err != nil {
 			return err
 		}
-		opts.LicenseTemplate, err = interactiveLicense(httpClient, host, opts.Prompter)
+		opts.LicenseTemplate, err = interactiveLicense(ctx, restClient, host, opts.Prompter)
 		if err != nil {
 			return err
 		}
@@ -390,7 +398,7 @@ func createFromScratch(opts *CreateOptions) error {
 		templateRepoMainBranch = repo.DefaultBranchRef.Name
 	}
 
-	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
+	repo, err := repoCreate(ctx, httpClient, restClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
 	}
@@ -435,7 +443,7 @@ func createFromScratch(opts *CreateOptions) error {
 }
 
 // create new repo on remote host from template repo
-func createFromTemplate(opts *CreateOptions) error {
+func createFromTemplate(ctx context.Context, opts *CreateOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -447,6 +455,11 @@ func createFromTemplate(opts *CreateOptions) error {
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
+
+	restClient, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
 
 	opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, "")
 	if err != nil {
@@ -499,7 +512,7 @@ func createFromTemplate(opts *CreateOptions) error {
 		return cmdutil.CancelError
 	}
 
-	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
+	repo, err := repoCreate(ctx, httpClient, restClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
 	}
@@ -530,7 +543,7 @@ func createFromTemplate(opts *CreateOptions) error {
 }
 
 // create repo on remote host from existing local repo
-func createFromLocal(opts *CreateOptions) error {
+func createFromLocal(ctx context.Context, opts *CreateOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -545,6 +558,11 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 	host, _ := cfg.Authentication().DefaultHost()
+
+	restClient, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
 
 	if opts.Interactive {
 		var err error
@@ -626,7 +644,7 @@ func createFromLocal(opts *CreateOptions) error {
 		LicenseTemplate:   opts.LicenseTemplate,
 	}
 
-	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
+	repo, err := repoCreate(ctx, httpClient, restClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
 	}
@@ -850,7 +868,7 @@ func interactiveRepoTemplate(client *http.Client, hostname, owner string, prompt
 	return &templateRepos[selected], nil
 }
 
-func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompter) (string, error) {
+func interactiveGitIgnore(ctx context.Context, client *githubrest.Client, hostname string, prompter iprompter) (string, error) {
 	confirmed, err := prompter.Confirm("Would you like to add a .gitignore?", false)
 	if err != nil {
 		return "", err
@@ -858,7 +876,7 @@ func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompt
 		return "", nil
 	}
 
-	templates, err := api.RepoGitIgnoreTemplates(client, hostname)
+	templates, err := shared.RepoGitIgnoreTemplates(ctx, client, hostname)
 	if err != nil {
 		return "", err
 	}
@@ -869,7 +887,7 @@ func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompt
 	return templates[selected], nil
 }
 
-func interactiveLicense(client *http.Client, hostname string, prompter iprompter) (string, error) {
+func interactiveLicense(ctx context.Context, client *githubrest.Client, hostname string, prompter iprompter) (string, error) {
 	confirmed, err := prompter.Confirm("Would you like to add a license?", false)
 	if err != nil {
 		return "", err
@@ -877,7 +895,7 @@ func interactiveLicense(client *http.Client, hostname string, prompter iprompter
 		return "", nil
 	}
 
-	licenses, err := api.RepoLicenses(client, hostname)
+	licenses, err := shared.RepoLicenses(ctx, client, hostname)
 	if err != nil {
 		return "", err
 	}

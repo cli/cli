@@ -26,6 +26,17 @@ func extensionHTTPClient(t *testing.T, path string, status int, body string) *ht
 	return &http.Client{Transport: reg}
 }
 
+// extensionRESTClient wraps extensionHTTPClient in a githubrest.Client, for the
+// helpers that now take one. The host is arbitrary because the registry matches
+// on method and path.
+func extensionRESTClient(t *testing.T, path string, status int, body string) *githubrest.Client {
+	t.Helper()
+
+	client, err := restClientFromHTTP(extensionHTTPClient(t, path, status, body), "github.com")
+	require.NoError(t, err)
+	return client
+}
+
 func requireExtensionHTTPError(t *testing.T, err error, status int) {
 	t.Helper()
 
@@ -87,9 +98,9 @@ func TestHasScript(t *testing.T) {
 	repo := ghrepo.New("OWNER", "REPO")
 
 	t.Run("success", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusOK, `{"type":"file"}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusOK, `{"type":"file"}`)
 
-		hasScript, err := hasScript(client, repo)
+		hasScript, err := hasScript(t.Context(), client, repo)
 
 		require.NoError(t, err)
 		assert.True(t, hasScript)
@@ -106,9 +117,9 @@ func TestHasScript(t *testing.T) {
 			"submodule":         `{"type":"submodule"}`,
 		} {
 			t.Run(name, func(t *testing.T) {
-				client := extensionHTTPClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusOK, body)
+				client := extensionRESTClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusOK, body)
 
-				hasScript, err := hasScript(client, repo)
+				hasScript, err := hasScript(t.Context(), client, repo)
 
 				require.NoError(t, err)
 				assert.True(t, hasScript)
@@ -117,18 +128,18 @@ func TestHasScript(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusNotFound, `{"message":"Not Found"}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusNotFound, `{"message":"Not Found"}`)
 
-		hasScript, err := hasScript(client, repo)
+		hasScript, err := hasScript(t.Context(), client, repo)
 
 		require.NoError(t, err)
 		assert.False(t, hasScript)
 	})
 
 	t.Run("server error", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusInternalServerError, `{"message":"Internal Server Error"}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO/contents/REPO", http.StatusInternalServerError, `{"message":"Internal Server Error"}`)
 
-		hasScript, err := hasScript(client, repo)
+		hasScript, err := hasScript(t.Context(), client, repo)
 
 		assert.False(t, hasScript)
 		requireExtensionHTTPError(t, err, http.StatusInternalServerError)
@@ -139,9 +150,9 @@ func TestFetchLatestRelease(t *testing.T) {
 	repo := ghrepo.New("OWNER", "REPO")
 
 	t.Run("success", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO/releases/latest", http.StatusOK, `{"tag_name":"v1.2.3","assets":[{"name":"asset","url":"https://example.com/asset"}]}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO/releases/latest", http.StatusOK, `{"tag_name":"v1.2.3","assets":[{"name":"asset","url":"https://example.com/asset"}]}`)
 
-		got, err := fetchLatestRelease(client, repo)
+		got, err := fetchLatestRelease(t.Context(), client, repo)
 
 		require.NoError(t, err)
 		assert.Equal(t, &release{
@@ -154,18 +165,18 @@ func TestFetchLatestRelease(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO/releases/latest", http.StatusNotFound, `{"message":"Not Found"}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO/releases/latest", http.StatusNotFound, `{"message":"Not Found"}`)
 
-		got, err := fetchLatestRelease(client, repo)
+		got, err := fetchLatestRelease(t.Context(), client, repo)
 
 		assert.Nil(t, got)
 		require.Same(t, releaseNotFoundErr, err)
 	})
 
 	t.Run("server error", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO/releases/latest", http.StatusInternalServerError, `{"message":"Internal Server Error"}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO/releases/latest", http.StatusInternalServerError, `{"message":"Internal Server Error"}`)
 
-		got, err := fetchLatestRelease(client, repo)
+		got, err := fetchLatestRelease(t.Context(), client, repo)
 
 		assert.Nil(t, got)
 		requireExtensionHTTPError(t, err, http.StatusInternalServerError)
@@ -173,9 +184,9 @@ func TestFetchLatestRelease(t *testing.T) {
 
 	for _, status := range []int{http.StatusNoContent, http.StatusResetContent} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
-			client := extensionHTTPClient(t, "repos/OWNER/REPO/releases/latest", status, "")
+			client := extensionRESTClient(t, "repos/OWNER/REPO/releases/latest", status, "")
 
-			got, err := fetchLatestRelease(client, repo)
+			got, err := fetchLatestRelease(t.Context(), client, repo)
 
 			assert.Nil(t, got)
 			require.EqualError(t, err, "unexpected end of JSON input")
@@ -187,9 +198,9 @@ func TestFetchReleaseFromTag(t *testing.T) {
 	repo := ghrepo.New("OWNER", "REPO")
 
 	t.Run("success", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO/releases/tags/v1.2.3", http.StatusOK, `{"tag_name":"v1.2.3","assets":[{"name":"asset","url":"https://example.com/asset"}]}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO/releases/tags/v1.2.3", http.StatusOK, `{"tag_name":"v1.2.3","assets":[{"name":"asset","url":"https://example.com/asset"}]}`)
 
-		got, err := fetchReleaseFromTag(client, repo, "v1.2.3")
+		got, err := fetchReleaseFromTag(t.Context(), client, repo, "v1.2.3")
 
 		require.NoError(t, err)
 		assert.Equal(t, &release{
@@ -202,18 +213,18 @@ func TestFetchReleaseFromTag(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO/releases/tags/v1.2.3", http.StatusNotFound, `{"message":"Not Found"}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO/releases/tags/v1.2.3", http.StatusNotFound, `{"message":"Not Found"}`)
 
-		got, err := fetchReleaseFromTag(client, repo, "v1.2.3")
+		got, err := fetchReleaseFromTag(t.Context(), client, repo, "v1.2.3")
 
 		assert.Nil(t, got)
 		require.Same(t, releaseNotFoundErr, err)
 	})
 
 	t.Run("server error", func(t *testing.T) {
-		client := extensionHTTPClient(t, "repos/OWNER/REPO/releases/tags/v1.2.3", http.StatusInternalServerError, `{"message":"Internal Server Error"}`)
+		client := extensionRESTClient(t, "repos/OWNER/REPO/releases/tags/v1.2.3", http.StatusInternalServerError, `{"message":"Internal Server Error"}`)
 
-		got, err := fetchReleaseFromTag(client, repo, "v1.2.3")
+		got, err := fetchReleaseFromTag(t.Context(), client, repo, "v1.2.3")
 
 		assert.Nil(t, got)
 		requireExtensionHTTPError(t, err, http.StatusInternalServerError)
@@ -221,9 +232,9 @@ func TestFetchReleaseFromTag(t *testing.T) {
 
 	for _, status := range []int{http.StatusNoContent, http.StatusResetContent} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
-			client := extensionHTTPClient(t, "repos/OWNER/REPO/releases/tags/v1.2.3", status, "")
+			client := extensionRESTClient(t, "repos/OWNER/REPO/releases/tags/v1.2.3", status, "")
 
-			got, err := fetchReleaseFromTag(client, repo, "v1.2.3")
+			got, err := fetchReleaseFromTag(t.Context(), client, repo, "v1.2.3")
 
 			assert.Nil(t, got)
 			require.EqualError(t, err, "unexpected end of JSON input")

@@ -1,13 +1,14 @@
 package add
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -15,7 +16,7 @@ import (
 
 type AddOptions struct {
 	IO         *iostreams.IOStreams
-	HTTPClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	KeyFile    string
@@ -25,7 +26,7 @@ type AddOptions struct {
 
 func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command {
 	opts := &AddOptions{
-		HTTPClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		IO:         f.IOStreams,
 	}
 
@@ -52,7 +53,7 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 			if runF != nil {
 				return runF(opts)
 			}
-			return addRun(opts)
+			return addRun(cmd.Context(), opts)
 		},
 	}
 
@@ -61,12 +62,7 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 	return cmd
 }
 
-func addRun(opts *AddOptions) error {
-	httpClient, err := opts.HTTPClient()
-	if err != nil {
-		return err
-	}
-
+func addRun(ctx context.Context, opts *AddOptions) error {
 	var keyReader io.Reader
 	if opts.KeyFile == "-" {
 		keyReader = opts.IO.In
@@ -85,7 +81,12 @@ func addRun(opts *AddOptions) error {
 		return err
 	}
 
-	if err := uploadDeployKey(httpClient, repo, keyReader, opts.Title, opts.AllowWrite); err != nil {
+	client, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	if err := uploadDeployKey(ctx, client, repo, keyReader, opts.Title, opts.AllowWrite); err != nil {
 		return err
 	}
 

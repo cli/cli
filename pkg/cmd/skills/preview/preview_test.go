@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"testing"
 
@@ -415,9 +414,7 @@ func TestPreviewRun(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 			ios, _, stdout, _ := iostreams.Test()
 			ios.SetStdoutTTY(tt.tty)
@@ -427,7 +424,7 @@ func TestPreviewRun(t *testing.T) {
 			tt.opts.Prompter = &prompter.PrompterMock{}
 			tt.opts.Telemetry = &telemetry.NoOpService{}
 
-			err := previewRun(tt.opts)
+			err := previewRun(t.Context(), tt.opts)
 
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
@@ -444,9 +441,9 @@ func TestPreviewRun(t *testing.T) {
 
 func TestPreviewRun_UnsupportedHost(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
-	err := previewRun(&PreviewOptions{
+	err := previewRun(t.Context(), &PreviewOptions{
 		IO:         ios,
-		HttpClient: func() (*http.Client, error) { return &http.Client{}, nil },
+		GitHubREST: httpmock.RESTClientFunc(nil),
 		repo:       ghrepo.NewWithHost("github", "awesome-copilot", "acme.ghes.com"),
 		Telemetry:  &telemetry.NoOpService{},
 	})
@@ -507,13 +504,13 @@ func TestPreviewRun_Interactive(t *testing.T) {
 
 	opts := &PreviewOptions{
 		IO:         ios,
-		HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		Prompter:   pm,
 		repo:       ghrepo.New("owner", "repo"),
 		Telemetry:  &telemetry.NoOpService{},
 	}
 
-	err := previewRun(opts)
+	err := previewRun(t.Context(), opts)
 	require.NoError(t, err)
 	assert.Contains(t, stdout.String(), "Selected Skill")
 }
@@ -602,14 +599,14 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 
 		opts := &PreviewOptions{
 			IO:         ios,
-			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			Prompter:   pm,
 			repo:       ghrepo.New("owner", "repo"),
 			SkillName:  "my-skill",
 			Telemetry:  &telemetry.NoOpService{},
 		}
 
-		err := previewRun(opts)
+		err := previewRun(t.Context(), opts)
 		require.NoError(t, err)
 
 		out := stdout.String()
@@ -682,7 +679,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 
 		opts := &PreviewOptions{
 			IO:         ios,
-			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			Prompter:   pm,
 			repo:       ghrepo.New("owner", "repo"),
 			SkillName:  "my-skill",
@@ -693,7 +690,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 			Telemetry: &telemetry.NoOpService{},
 		}
 
-		err := previewRun(opts)
+		err := previewRun(t.Context(), opts)
 		require.NoError(t, err)
 
 		out := stdout.String()
@@ -712,14 +709,14 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 
 		opts := &PreviewOptions{
 			IO:         ios,
-			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("owner", "repo"),
 			SkillName:  "my-skill",
 			Telemetry:  &telemetry.NoOpService{},
 		}
 
-		err := previewRun(opts)
+		err := previewRun(t.Context(), opts)
 		require.NoError(t, err)
 
 		out := stdout.String()
@@ -819,14 +816,14 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 
 		opts := &PreviewOptions{
 			IO:         ios,
-			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("monalisa", "skills-repo"),
 			SkillName:  "my-skill",
 			Telemetry:  &telemetry.NoOpService{},
 		}
 
-		err := previewRun(opts)
+		err := previewRun(t.Context(), opts)
 		require.NoError(t, err)
 
 		out := stdout.String()
@@ -857,14 +854,14 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 
 		opts := &PreviewOptions{
 			IO:         ios,
-			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("monalisa", "skills-repo"),
 			SkillName:  "my-skill",
 			Telemetry:  &telemetry.NoOpService{},
 		}
 
-		err := previewRun(opts)
+		err := previewRun(t.Context(), opts)
 		require.NoError(t, err)
 
 		out := stdout.String()
@@ -890,14 +887,14 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 
 		opts := &PreviewOptions{
 			IO:         ios,
-			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("monalisa", "skills-repo"),
 			SkillName:  "my-skill",
 			Telemetry:  &telemetry.NoOpService{},
 		}
 
-		err := previewRun(opts)
+		err := previewRun(t.Context(), opts)
 		require.NoError(t, err)
 
 		out := stdout.String()
@@ -965,14 +962,14 @@ func TestPreviewRun_InteractiveTelemetryCapturesSelectedSkillName(t *testing.T) 
 
 	opts := &PreviewOptions{
 		IO:         ios,
-		HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		Prompter:   pm,
 		Telemetry:  recorder,
 		repo:       ghrepo.New("owner", "repo"),
 		// SkillName intentionally left empty to simulate interactive selection
 	}
 
-	err := previewRun(opts)
+	err := previewRun(t.Context(), opts)
 	require.NoError(t, err)
 
 	// Verify the telemetry event captured the interactively-selected skill name, not empty string
@@ -1076,14 +1073,14 @@ func TestPreviewRun_TelemetryVisibility(t *testing.T) {
 
 			opts := &PreviewOptions{
 				IO:         ios,
-				HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				Prompter:   &prompter.PrompterMock{},
 				Telemetry:  recorder,
 				repo:       ghrepo.New("owner", "repo"),
 				SkillName:  "my-skill",
 			}
 
-			err := previewRun(opts)
+			err := previewRun(t.Context(), opts)
 			require.NoError(t, err)
 
 			require.Len(t, recorder.Events, 1)
@@ -1249,14 +1246,14 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 
 		opts := &PreviewOptions{
 			IO:         ios,
-			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("owner", "repo"),
 			SkillName:  "my-skill",
 			Telemetry:  &telemetry.NoOpService{},
 		}
 
-		err := previewRun(opts)
+		err := previewRun(t.Context(), opts)
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "My Skill")
 		assert.Contains(t, stderr.String(), "skill(s) in hidden directories were excluded")
@@ -1297,7 +1294,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 
 		opts := &PreviewOptions{
 			IO:              ios,
-			HttpClient:      func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			GitHubREST:      httpmock.RESTClientFunc(reg),
 			Prompter:        &prompter.PrompterMock{},
 			repo:            ghrepo.New("owner", "repo"),
 			SkillName:       "hidden-skill",
@@ -1305,7 +1302,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			Telemetry:       &telemetry.NoOpService{},
 		}
 
-		err := previewRun(opts)
+		err := previewRun(t.Context(), opts)
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "My Skill")
 		assert.Contains(t, stderr.String(), "Skills in hidden directories")
@@ -1343,14 +1340,14 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 
 		opts := &PreviewOptions{
 			IO:         ios,
-			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("owner", "repo"),
 			SkillName:  "hidden-skill",
 			Telemetry:  &telemetry.NoOpService{},
 		}
 
-		err := previewRun(opts)
+		err := previewRun(t.Context(), opts)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no standard skills found")
 		assert.Contains(t, err.Error(), "--allow-hidden-dirs")

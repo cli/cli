@@ -1,6 +1,7 @@
 package search
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -13,7 +14,6 @@ import (
 	"sync"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/githubrest"
@@ -52,7 +52,7 @@ var SkillSearchFields = []string{
 type SearchOptions struct {
 	IO             *iostreams.IOStreams
 	Telemetry      ghtelemetry.EventRecorder
-	HttpClient     func() (*http.Client, error)
+	GitHubREST     func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Config         func() (gh.Config, error)
 	Prompter       prompter.Prompter
 	ExecutablePath string // path to the current gh binary for install subprocess
@@ -70,7 +70,7 @@ func NewCmdSearch(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, run
 	opts := &SearchOptions{
 		IO:             f.IOStreams,
 		Telemetry:      telemetry,
-		HttpClient:     f.HttpClient,
+		GitHubREST:     f.GitHubREST,
 		Config:         f.Config,
 		Prompter:       f.Prompter,
 		ExecutablePath: f.ExecutablePath,
@@ -129,7 +129,7 @@ func NewCmdSearch(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, run
 			if runF != nil {
 				return runF(opts)
 			}
-			return searchRun(opts)
+			return searchRun(c.Context(), opts)
 		},
 	}
 
@@ -205,14 +205,7 @@ func (s skillResult) ExportData(fields []string) map[string]interface{} {
 	return data
 }
 
-func searchRun(opts *SearchOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
-	apiClient := api.NewClientFromHTTP(httpClient)
-
+func searchRun(ctx context.Context, opts *SearchOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -222,9 +215,14 @@ func searchRun(opts *SearchOptions) error {
 		return err
 	}
 
+	client, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicatorWithLabel("Searching for skills")
 
-	skills, err := searchByKeyword(apiClient, host, opts.Query, opts.Owner, opts.Page, opts.Limit)
+	skills, err := searchByKeyword(ctx, client, opts.Query, opts.Owner, opts.Page, opts.Limit)
 	if err != nil {
 		opts.IO.StopProgressIndicator()
 		return err
@@ -239,7 +237,7 @@ func searchRun(opts *SearchOptions) error {
 	rankByRelevance(skills, opts.Query)
 	skills = truncateForProcessing(skills, opts.Page, opts.Limit)
 
-	enrichSkills(apiClient, host, skills)
+	enrichSkills(ctx, client, skills)
 	opts.IO.StopProgressIndicator()
 
 	// Filter out noise and re-rank with enriched data (descriptions, stars).
@@ -281,7 +279,7 @@ func noResultsMessage(opts *SearchOptions) string {
 // content match to catch skill names like "mcp-apps" when the user types
 // "mcp apps". When owner is non-empty, all queries are scoped to that
 // GitHub user/org via user:<owner> and the implicit owner search is skipped.
-func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, limit int) ([]skillResult, error) {
+func searchByKeyword(ctx context.Context, client *githubrest.Client, queryTerm, owner string, page, limit int) ([]skillResult, error) {
 	ownerScope := ""
 	if owner != "" {
 		ownerScope = " user:" + owner
@@ -309,7 +307,7 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		pathResult, pathErr = executeSearch(client, host, pathQ, 1, searchPageSize)
+		pathResult, pathErr = executeSearch(ctx, client, pathQ, 1, searchPageSize)
 	}()
 
 	// When no explicit --owner is set and the query looks like it could be a
@@ -321,7 +319,7 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ownerResult, ownerErr = executeSearch(client, host, ownerQ, 1, searchPageSize)
+			ownerResult, ownerErr = executeSearch(ctx, client, ownerQ, 1, searchPageSize)
 		}()
 	}
 
@@ -333,12 +331,12 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			hyphenResult, hyphenErr = executeSearch(client, host, hyphenQ, 1, searchPageSize)
+			hyphenResult, hyphenErr = executeSearch(ctx, client, hyphenQ, 1, searchPageSize)
 		}()
 	}
 
 	// Primary content search runs on the main goroutine.
-	primaryItems, _, primaryErr = fetchPrimaryPages(client, host, primaryQ, page, limit)
+	primaryItems, _, primaryErr = fetchPrimaryPages(ctx, client, primaryQ, page, limit)
 	wg.Wait()
 
 	if primaryErr != nil {
@@ -388,7 +386,7 @@ func truncateForProcessing(skills []skillResult, page, limit int) []skillResult 
 // enrichSkills fetches descriptions and star counts concurrently.
 // Each function collects results into a map; merges happen after both complete
 // to avoid concurrent writes to the shared skills slice.
-func enrichSkills(client *api.Client, host string, skills []skillResult) {
+func enrichSkills(ctx context.Context, client *githubrest.Client, skills []skillResult) {
 	var descMap map[int]string
 	var starsMap map[int]int
 
@@ -396,11 +394,11 @@ func enrichSkills(client *api.Client, host string, skills []skillResult) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		descMap = fetchDescriptions(client, host, skills)
+		descMap = fetchDescriptions(ctx, client, skills)
 	}()
 	go func() {
 		defer wg.Done()
-		starsMap = fetchRepoStars(client, host, skills)
+		starsMap = fetchRepoStars(ctx, client, skills)
 	}()
 	wg.Wait()
 
@@ -734,7 +732,7 @@ func isRateLimitError(err error) bool {
 const rateLimitErrorMessage = "GitHub API rate limit exceeded. Please wait a minute and try again."
 
 // executeSearch performs a single GitHub Code Search API call.
-func executeSearch(client *api.Client, host, query string, page, pageSize int) (*codeSearchResult, error) {
+func executeSearch(ctx context.Context, client *githubrest.Client, query string, page, pageSize int) (*codeSearchResult, error) {
 	apiPath, err := safeurl.JoinPath("search", "code")
 	if err != nil {
 		return nil, err
@@ -743,16 +741,22 @@ func executeSearch(client *api.Client, host, query string, page, pageSize int) (
 	apiPath.SetQuery("per_page", strconv.Itoa(pageSize))
 	apiPath.SetQuery("page", strconv.Itoa(page))
 	var result codeSearchResult
-	err = client.REST(host, "GET", apiPath.String(), nil, &result)
-	if err != nil && isRateLimitError(err) {
-		return nil, fmt.Errorf("%s", rateLimitErrorMessage)
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil, err
 	}
-	return &result, err
+	if _, err := client.Do(req, &result); err != nil {
+		if isRateLimitError(err) {
+			return nil, fmt.Errorf("%s", rateLimitErrorMessage)
+		}
+		return &result, err
+	}
+	return &result, nil
 }
 
 // fetchPrimaryPages fetches enough API pages from GitHub Code Search to
 // cover the requested display page, accounting for filtering losses.
-func fetchPrimaryPages(client *api.Client, host, query string, displayPage, displayLimit int) ([]codeSearchItem, int, error) {
+func fetchPrimaryPages(ctx context.Context, client *githubrest.Client, query string, displayPage, displayLimit int) ([]codeSearchItem, int, error) {
 	// Over-fetch to account for deduplication + filtering losses.
 	// The Code Search API is rate-limited at 10 req/min, so we keep
 	// page fetching conservative. Two pages (200 results) provides a
@@ -771,7 +775,7 @@ func fetchPrimaryPages(client *api.Client, host, query string, displayPage, disp
 	var allItems []codeSearchItem
 	var totalCount int
 	for p := 1; p <= numPages; p++ {
-		result, err := executeSearch(client, host, query, p, searchPageSize)
+		result, err := executeSearch(ctx, client, query, p, searchPageSize)
 		if err != nil {
 			if p == 1 {
 				return nil, 0, err
@@ -840,7 +844,7 @@ func splitRepo(fullName string) (string, string) {
 
 // fetchDescriptions fetches SKILL.md frontmatter descriptions concurrently
 // for all search results. Each result may come from a different repo.
-func fetchDescriptions(client *api.Client, host string, skills []skillResult) map[int]string {
+func fetchDescriptions(ctx context.Context, client *githubrest.Client, skills []skillResult) map[int]string {
 	const maxWorkers = 10
 	sem := make(chan struct{}, maxWorkers)
 	var wg sync.WaitGroup
@@ -858,7 +862,7 @@ func fetchDescriptions(client *api.Client, host string, skills []skillResult) ma
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			content, err := discovery.FetchBlob(client, host, skills[idx].Owner, skills[idx].RepoName, skills[idx].BlobSHA)
+			content, err := discovery.FetchBlob(ctx, client, skills[idx].Owner, skills[idx].RepoName, skills[idx].BlobSHA)
 			if err != nil {
 				return
 			}
@@ -900,7 +904,7 @@ type repoInfo struct {
 
 // fetchRepoStars fetches stargazer counts for each unique repository in
 // the result set, using bounded concurrency.
-func fetchRepoStars(client *api.Client, host string, skills []skillResult) map[int]int {
+func fetchRepoStars(ctx context.Context, client *githubrest.Client, skills []skillResult) map[int]int {
 	const maxWorkers = 10
 	sem := make(chan struct{}, maxWorkers)
 	var wg sync.WaitGroup
@@ -926,7 +930,11 @@ func fetchRepoStars(client *api.Client, host string, skills []skillResult) map[i
 				return
 			}
 			var info repoInfo
-			if err := client.REST(host, "GET", apiPath.String(), nil, &info); err != nil {
+			req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+			if err != nil {
+				return
+			}
+			if _, err := client.Do(req, &info); err != nil {
 				return
 			}
 			mu.Lock()

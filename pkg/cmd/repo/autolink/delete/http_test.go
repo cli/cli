@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -64,10 +65,10 @@ func TestAutolinkDeleter_Delete(t *testing.T) {
 			defer reg.Verify(t)
 
 			autolinkDeleter := &AutolinkDeleter{
-				HTTPClient: &http.Client{Transport: reg},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 			}
 
-			err := autolinkDeleter.Delete(repo, tt.id)
+			err := autolinkDeleter.Delete(context.Background(), repo, tt.id)
 
 			if tt.expectErr {
 				require.EqualError(t, err, tt.expectedErrMsg)

@@ -2,13 +2,13 @@ package view
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
@@ -24,8 +24,7 @@ type RepoReadme struct {
 	BaseURL  string
 }
 
-func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string) (*RepoReadme, error) {
-	apiClient := api.NewClientFromHTTP(client)
+func RepositoryReadme(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, branch string) (*RepoReadme, error) {
 	var response struct {
 		Name    string
 		Content string
@@ -37,8 +36,11 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string)
 		return nil, err
 	}
 
-	err = apiClient.REST(repo.RepoHost(), "GET", readmePath.String(), nil, &response)
+	req, err := client.NewRequest(ctx, http.MethodGet, readmePath.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &response); err != nil {
 		var httpError *githubrest.ErrorResponse
 		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
 			return nil, NotFoundError

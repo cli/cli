@@ -3,15 +3,15 @@ package rename
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -23,7 +23,7 @@ type iprompter interface {
 }
 
 type RenameOptions struct {
-	HttpClient      func() (*http.Client, error)
+	GitHubREST      func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	GitClient       *git.Client
 	IO              *iostreams.IOStreams
 	Prompter        iprompter
@@ -38,7 +38,7 @@ type RenameOptions struct {
 func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Command {
 	opts := &RenameOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		GitClient:  f.GitClient,
 		Remotes:    f.Remotes,
 		Config:     f.Config,
@@ -93,7 +93,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 				return runf(opts)
 			}
 
-			return renameRun(opts)
+			return renameRun(cmd.Context(), opts)
 		},
 	}
 
@@ -105,12 +105,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	return cmd
 }
 
-func renameRun(opts *RenameOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
+func renameRun(ctx context.Context, opts *RenameOptions) error {
 	newRepoName := opts.newRepoSelector
 
 	currRepo, err := opts.BaseRepo()
@@ -140,9 +135,12 @@ func renameRun(opts *RenameOptions) error {
 		}
 	}
 
-	apiClient := api.NewClientFromHTTP(httpClient)
+	restClient, err := opts.GitHubREST(currRepo.RepoHost())
+	if err != nil {
+		return err
+	}
 
-	newRepo, err := api.RenameRepo(apiClient, currRepo, newRepoName)
+	newRepo, err := shared.RenameRepo(ctx, restClient, currRepo, newRepoName)
 	if err != nil {
 		return err
 	}

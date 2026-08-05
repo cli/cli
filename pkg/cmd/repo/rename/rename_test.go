@@ -2,10 +2,10 @@ package rename
 
 import (
 	"bytes"
-	"net/http"
+	"context"
 	"testing"
 
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
@@ -247,8 +247,8 @@ func TestRenameRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		tt.opts.Remotes = func() (context.Remotes, error) {
-			return []*context.Remote{
+		tt.opts.Remotes = func() (ghContext.Remotes, error) {
+			return []*ghContext.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
 					Repo:   repo,
@@ -266,9 +266,7 @@ func TestRenameRun(t *testing.T) {
 		if tt.httpStubs != nil {
 			tt.httpStubs(reg)
 		}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		ios, _, stdout, _ := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)
@@ -279,7 +277,7 @@ func TestRenameRun(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			err := renameRun(&tt.opts)
+			err := renameRun(context.Background(), &tt.opts)
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)
 				return

@@ -1,9 +1,9 @@
 package view
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -19,7 +20,7 @@ import (
 
 type ViewOptions struct {
 	IO         *iostreams.IOStreams
-	HTTPClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Config     func() (gh.Config, error)
 	License    string
 	Web        bool
@@ -29,7 +30,7 @@ type ViewOptions struct {
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
-		HTTPClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Config:     f.Config,
 		Browser:    f.Browser,
 	}
@@ -64,7 +65,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return viewRun(opts)
+			return viewRun(cmd.Context(), opts)
 		},
 	}
 
@@ -73,14 +74,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
-func viewRun(opts *ViewOptions) error {
+func viewRun(ctx context.Context, opts *ViewOptions) error {
 	if opts.License == "" {
 		return errors.New("no license provided")
-	}
-
-	client, err := opts.HTTPClient()
-	if err != nil {
-		return err
 	}
 
 	cfg, err := opts.Config()
@@ -94,7 +90,13 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	license, err := api.RepoLicense(client, hostname, opts.License)
+
+	client, err := opts.GitHubREST(hostname)
+	if err != nil {
+		return err
+	}
+
+	license, err := shared.RepoLicense(ctx, client, hostname, opts.License)
 	if err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {

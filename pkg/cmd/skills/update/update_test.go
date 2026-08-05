@@ -2,7 +2,6 @@ package update
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -354,12 +353,10 @@ func TestUpdateRun(t *testing.T) {
 			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
 				}
 			},
 			wantStderr: "All skills are up to date.",
@@ -370,13 +367,11 @@ func TestUpdateRun(t *testing.T) {
 			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
 				}
 			},
 			wantStderr: "No installed skills found.",
@@ -400,14 +395,12 @@ func TestUpdateRun(t *testing.T) {
 			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
-					Skills:    []string{"nonexistent"},
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
+					Skills:     []string{"nonexistent"},
 				}
 			},
 			wantErr: "none of the specified skills are installed",
@@ -433,14 +426,12 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(true)
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					Prompter:  &prompter.PrompterMock{},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					Prompter:   &prompter.PrompterMock{},
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
 				}
 			},
 			wantStderr: "pinned",
@@ -463,13 +454,11 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				ios.SetStdinTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
 				}
 			},
 			wantStderr: "no GitHub metadata",
@@ -493,11 +482,9 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdinTTY(true)
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					Prompter: &prompter.PrompterMock{
 						InputFunc: func(prompt string, defaultValue string) (string, error) {
 							return "", fmt.Errorf("unexpected prompt")
@@ -543,13 +530,11 @@ func TestUpdateRun(t *testing.T) {
 			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
 				}
 			},
 			wantStderr: "All skills are up to date.",
@@ -588,15 +573,13 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(true)
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					Prompter:  &prompter.PrompterMock{},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
-					DryRun:    true,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					Prompter:   &prompter.PrompterMock{},
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
+					DryRun:     true,
 				}
 			},
 			wantStderr: "1 update(s) available:",
@@ -636,13 +619,11 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				ios.SetStdinTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
 				}
 			},
 			wantErr: "updates available; re-run with --all to apply, or run interactively to confirm",
@@ -688,15 +669,13 @@ func TestUpdateRun(t *testing.T) {
 			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
-					All:       true,
-					Force:     true,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
+					All:        true,
+					Force:      true,
 				}
 			},
 			verify: func(t *testing.T, dir string) {
@@ -751,15 +730,13 @@ func TestUpdateRun(t *testing.T) {
 			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
-					All:       true,
-					Force:     true,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
+					All:        true,
+					Force:      true,
 				}
 			},
 			verify: func(t *testing.T, dir string) {
@@ -821,14 +798,12 @@ func TestUpdateRun(t *testing.T) {
 			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
-					All:       true,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
+					All:        true,
 				}
 			},
 			verify: func(t *testing.T, dir string) {
@@ -883,11 +858,9 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdinTTY(true)
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					Prompter: &prompter.PrompterMock{
 						ConfirmFunc: func(msg string, defaultVal bool) (bool, error) {
 							return true, nil
@@ -938,11 +911,9 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdinTTY(true)
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					Prompter: &prompter.PrompterMock{
 						ConfirmFunc: func(msg string, defaultVal bool) (bool, error) {
 							return false, nil
@@ -974,11 +945,9 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdinTTY(true)
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					Prompter: &prompter.PrompterMock{
 						InputFunc: func(prompt string, defaultValue string) (string, error) {
 							return "", nil
@@ -1029,11 +998,9 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdinTTY(true)
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
 					Prompter: &prompter.PrompterMock{
 						InputFunc: func(prompt string, defaultValue string) (string, error) {
 							return "monalisa/octocat-skills", nil
@@ -1097,15 +1064,13 @@ func TestUpdateRun(t *testing.T) {
 			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
-					All:       true,
-					Unpin:     true,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
+					All:        true,
+					Unpin:      true,
 				}
 			},
 			verify: func(t *testing.T, dir string) {
@@ -1138,15 +1103,13 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(true)
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					Prompter:  &prompter.PrompterMock{},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
-					Unpin:     false,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					Prompter:   &prompter.PrompterMock{},
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
+					Unpin:      false,
 				}
 			},
 			wantStderr: "pinned",
@@ -1184,16 +1147,14 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(true)
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
-					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
-					HttpClient: func() (*http.Client, error) {
-						return &http.Client{Transport: reg}, nil
-					},
-					Prompter:  &prompter.PrompterMock{},
-					GitClient: &git.Client{RepoDir: dir},
-					Dir:       dir,
-					DryRun:    true,
-					Unpin:     true,
+					IO:         ios,
+					Config:     func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					GitHubREST: httpmock.RESTClientFunc(reg),
+					Prompter:   &prompter.PrompterMock{},
+					GitClient:  &git.Client{RepoDir: dir},
+					Dir:        dir,
+					DryRun:     true,
+					Unpin:      true,
 				}
 			},
 			verify: func(t *testing.T, dir string) {
@@ -1223,7 +1184,7 @@ func TestUpdateRun(t *testing.T) {
 			}
 
 			opts := tt.opts(ios, dir, reg)
-			err := updateRun(opts)
+			err := updateRun(t.Context(), opts)
 
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)

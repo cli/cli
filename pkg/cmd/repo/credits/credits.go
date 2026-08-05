@@ -2,6 +2,7 @@ package credits
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -13,8 +14,8 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -24,6 +25,7 @@ import (
 
 type CreditsOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	IO         *iostreams.IOStreams
 
@@ -34,6 +36,7 @@ type CreditsOptions struct {
 func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.Command {
 	opts := &CreditsOptions{
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 		Repository: "cli/cli",
@@ -59,7 +62,7 @@ func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.
 				return runF(opts)
 			}
 
-			return creditsRun(opts)
+			return creditsRun(cmd.Context(), opts)
 		},
 		Hidden: true,
 	}
@@ -72,6 +75,7 @@ func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.
 func NewCmdRepoCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.Command {
 	opts := &CreditsOptions{
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		BaseRepo:   f.BaseRepo,
 		IO:         f.IOStreams,
 	}
@@ -102,7 +106,7 @@ func NewCmdRepoCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *co
 				return runF(opts)
 			}
 
-			return creditsRun(opts)
+			return creditsRun(cmd.Context(), opts)
 		},
 		Hidden: true,
 	}
@@ -112,16 +116,11 @@ func NewCmdRepoCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *co
 	return cmd
 }
 
-func creditsRun(opts *CreditsOptions) error {
+func creditsRun(ctx context.Context, opts *CreditsOptions) error {
 	isWindows := runtime.GOOS == "windows"
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
-	client := api.NewClientFromHTTP(httpClient)
 
 	var baseRepo ghrepo.Interface
+	var err error
 	if opts.Repository == "" {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
@@ -132,6 +131,11 @@ func creditsRun(opts *CreditsOptions) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return err
 	}
 
 	type Contributor struct {
@@ -148,8 +152,11 @@ func creditsRun(opts *CreditsOptions) error {
 		return err
 	}
 
-	err = client.REST(baseRepo.RepoHost(), "GET", path.String(), body, &result)
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), body)
 	if err != nil {
+		return err
+	}
+	if _, err := client.Do(req, &result); err != nil {
 		return err
 	}
 

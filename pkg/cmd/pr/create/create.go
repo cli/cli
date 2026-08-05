@@ -25,6 +25,7 @@ import (
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	reposhared "github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
@@ -1173,8 +1174,12 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	refs := ctx.PRRefs
 	forkableRefs, requiresFork := refs.(forkableRefs)
 	if requiresFork {
+		restClient, err := opts.GitHubREST(forkableRefs.BaseRepo().RepoHost())
+		if err != nil {
+			return err
+		}
 		opts.IO.StartProgressIndicator()
-		forkedRepo, err := api.ForkRepo(ctx.Client, forkableRefs.BaseRepo(), "", "", true)
+		forkedRepo, err := reposhared.ForkRepo(context.Background(), restClient, forkableRefs.BaseRepo(), "", "", true)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)

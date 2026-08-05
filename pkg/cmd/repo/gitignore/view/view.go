@@ -1,15 +1,16 @@
 package view
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/githubrest"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -17,7 +18,7 @@ import (
 
 type ViewOptions struct {
 	IO         *iostreams.IOStreams
-	HTTPClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Config     func() (gh.Config, error)
 	Template   string
 }
@@ -25,7 +26,7 @@ type ViewOptions struct {
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
-		HTTPClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Config:     f.Config,
 		Template:   "",
 	}
@@ -59,20 +60,15 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return viewRun(opts)
+			return viewRun(cmd.Context(), opts)
 		},
 	}
 	return cmd
 }
 
-func viewRun(opts *ViewOptions) error {
+func viewRun(ctx context.Context, opts *ViewOptions) error {
 	if opts.Template == "" {
 		return errors.New("no template provided")
-	}
-
-	client, err := opts.HTTPClient()
-	if err != nil {
-		return err
 	}
 
 	cfg, err := opts.Config()
@@ -86,7 +82,13 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	gitIgnore, err := api.RepoGitIgnoreTemplate(client, hostname, opts.Template)
+
+	client, err := opts.GitHubREST(hostname)
+	if err != nil {
+		return err
+	}
+
+	gitIgnore, err := shared.RepoGitIgnoreTemplate(ctx, client, hostname, opts.Template)
 	if err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {

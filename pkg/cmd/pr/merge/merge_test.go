@@ -259,6 +259,7 @@ func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, 
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(rt),
 		Branch: func() (string, error) {
 			return branch, nil
 		},
@@ -1547,6 +1548,7 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
+		GitHubREST:         httpmock.RESTClientFunc(tr),
 		Prompter:           pm,
 		SelectorArg:        "https://github.com/OWNER/REPO/pull/123",
 		MergeStrategyEmpty: true,
@@ -1685,6 +1687,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
+		GitHubREST:      httpmock.RESTClientFunc(tr),
 		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
 		AutoMergeEnable: true,
 		MergeMethod:     PullRequestMergeMethodSquash,
@@ -1723,6 +1726,7 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
+		GitHubREST:      httpmock.RESTClientFunc(tr),
 		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
 		AutoMergeEnable: true,
 		MergeMethod:     PullRequestMergeMethodMerge,
@@ -1759,6 +1763,7 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
+		GitHubREST:       httpmock.RESTClientFunc(tr),
 		SelectorArg:      "https://github.com/OWNER/REPO/pull/123",
 		AutoMergeDisable: true,
 		Finder: shared.NewMockFinder(

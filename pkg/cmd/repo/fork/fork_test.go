@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"context"
 	"github.com/cenkalti/backoff/v4"
-	"github.com/cli/cli/v2/context"
+
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
@@ -219,7 +221,7 @@ func TestRepoFork(t *testing.T) {
 		execStubs   func(*run.CommandStubber)
 		promptStubs func(*prompter.MockPrompter)
 		cfgStubs    func(*testing.T, gh.Config)
-		remotes     []*context.Remote
+		remotes     []*ghContext.Remote
 		wantOut     string
 		wantErrOut  string
 		wantErr     bool
@@ -232,7 +234,7 @@ func TestRepoFork(t *testing.T) {
 				Remote:     true,
 				RemoteName: "fork",
 			},
-			remotes: []*context.Remote{
+			remotes: []*ghContext.Remote{
 				{
 					Remote: &git.Remote{Name: "origin", PushURL: &url.URL{
 						Scheme: "ssh",
@@ -256,7 +258,7 @@ func TestRepoFork(t *testing.T) {
 				Remote:     true,
 				RemoteName: "fork",
 			},
-			remotes: []*context.Remote{
+			remotes: []*ghContext.Remote{
 				{
 					Remote: &git.Remote{Name: "origin", PushURL: &url.URL{
 						Scheme: "ssh",
@@ -313,7 +315,7 @@ func TestRepoFork(t *testing.T) {
 				Remote:     true,
 				RemoteName: defaultRemoteName,
 			},
-			remotes: []*context.Remote{
+			remotes: []*ghContext.Remote{
 				{
 					Remote: &git.Remote{Name: "origin", FetchURL: &url.URL{}},
 					Repo:   ghrepo.New("someone", "REPO"),
@@ -385,7 +387,7 @@ func TestRepoFork(t *testing.T) {
 				RemoteName: defaultRemoteName,
 				Rename:     true,
 			},
-			remotes: []*context.Remote{
+			remotes: []*ghContext.Remote{
 				{
 					Remote: &git.Remote{Name: "origin", FetchURL: &url.URL{}},
 					Repo:   ghrepo.New("someone", "REPO"),
@@ -741,9 +743,7 @@ func TestRepoFork(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
@@ -753,9 +753,9 @@ func TestRepoFork(t *testing.T) {
 				return cfg, nil
 			}
 
-			tt.opts.Remotes = func() (context.Remotes, error) {
+			tt.opts.Remotes = func() (ghContext.Remotes, error) {
 				if tt.remotes == nil {
-					return []*context.Remote{
+					return []*ghContext.Remote{
 						{
 							Remote: &git.Remote{
 								Name:     "origin",
@@ -792,7 +792,7 @@ func TestRepoFork(t *testing.T) {
 			}
 
 			defer reg.Verify(t)
-			err := forkRun(tt.opts)
+			err := forkRun(context.Background(), tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err, tt.errMsg)
 				return

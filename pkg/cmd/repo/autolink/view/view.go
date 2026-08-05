@@ -1,6 +1,7 @@
 package view
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/browser"
@@ -22,7 +23,7 @@ type viewOptions struct {
 }
 
 type AutolinkViewClient interface {
-	View(repo ghrepo.Interface, id string) (*shared.Autolink, error)
+	View(ctx context.Context, repo ghrepo.Interface, id string) (*shared.Autolink, error)
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*viewOptions) error) *cobra.Command {
@@ -37,20 +38,15 @@ func NewCmdView(f *cmdutil.Factory, runF func(*viewOptions) error) *cobra.Comman
 		Long:  "View an autolink reference for a repository.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			httpClient, err := f.HttpClient()
-			if err != nil {
-				return err
-			}
-
 			opts.BaseRepo = f.BaseRepo
 			opts.ID = args[0]
-			opts.AutolinkClient = &AutolinkViewer{HTTPClient: httpClient}
+			opts.AutolinkClient = &AutolinkViewer{GitHubREST: f.GitHubREST}
 
 			if runF != nil {
 				return runF(opts)
 			}
 
-			return viewRun(opts)
+			return viewRun(cmd.Context(), opts)
 		},
 	}
 
@@ -59,7 +55,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*viewOptions) error) *cobra.Comman
 	return cmd
 }
 
-func viewRun(opts *viewOptions) error {
+func viewRun(ctx context.Context, opts *viewOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
@@ -68,7 +64,7 @@ func viewRun(opts *viewOptions) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
-	autolink, err := opts.AutolinkClient.View(repo, opts.ID)
+	autolink, err := opts.AutolinkClient.View(ctx, repo, opts.ID)
 
 	if err != nil {
 		return fmt.Errorf("%s %w", cs.Red("error viewing autolink:"), err)

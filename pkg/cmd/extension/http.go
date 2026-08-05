@@ -1,18 +1,29 @@
 package extension
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"os"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
+
+// restClientFromHTTP builds a githubrest.Client that reaches host through
+// httpClient.
+//
+// The extension manager and each Extension hold an already-authenticated
+// *http.Client whose transport carries the token, so the client is constructed
+// WithoutToken and leans on that transport for auth, exactly as the api.Client
+// it replaced did.
+func restClientFromHTTP(httpClient *http.Client, host string) (*githubrest.Client, error) {
+	return githubrest.NewClient(ghinstance.RESTPrefix(host), httpClient, githubrest.WithoutToken())
+}
 
 func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
@@ -39,11 +50,11 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	case http.StatusNotFound:
 		return false, nil
 	default:
-		return false, api.HandleHTTPError(resp)
+		return false, githubrest.NewErrorResponse(resp)
 	}
 }
 
-func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
+func hasScript(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface) (bool, error) {
 	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "contents", repo.RepoName())
 	if err != nil {
 		return false, err
@@ -51,11 +62,11 @@ func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 
 	// The response body is not decoded, because a script is considered present for any
 	// successful response regardless of the content type reported.
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodGet, path.String(), nil, nil)
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
 	if err != nil {
+		return false, err
+	}
+	if _, err := client.Do(req, nil); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return false, nil
@@ -94,7 +105,7 @@ func downloadAsset(httpClient *http.Client, assetURL safeurl.SafeURL, destPath s
 	defer resp.Body.Close()
 
 	if resp.StatusCode > 299 {
-		downloadErr = api.HandleHTTPError(resp)
+		downloadErr = githubrest.NewErrorResponse(resp)
 		return
 	}
 
@@ -117,18 +128,18 @@ var releaseNotFoundErr = errors.New("release not found")
 var repositoryNotFoundErr = errors.New("repository not found")
 
 // fetchLatestRelease finds the latest published release for a repository.
-func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
+func fetchLatestRelease(ctx context.Context, client *githubrest.Client, baseRepo ghrepo.Interface) (*release, error) {
 	path, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "latest")
 	if err != nil {
 		return nil, err
 	}
 
 	var data json.RawMessage
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(baseRepo.RepoHost(), http.MethodGet, path.String(), nil, &data)
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &data); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return nil, releaseNotFoundErr
@@ -145,18 +156,18 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 }
 
 // fetchReleaseFromTag finds release by tag name for a repository
-func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*release, error) {
+func fetchReleaseFromTag(ctx context.Context, client *githubrest.Client, baseRepo ghrepo.Interface, tagName string) (*release, error) {
 	path, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return nil, err
 	}
 
 	var data json.RawMessage
-	// TODO(api-client-rollout)
-	// This line of code is part of a mechanical roll out of the api client.
-	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	err = api.NewClientFromHTTP(httpClient).REST(baseRepo.RepoHost(), http.MethodGet, path.String(), nil, &data)
+	req, err := client.NewRequest(ctx, http.MethodGet, path.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &data); err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return nil, releaseNotFoundErr
@@ -196,7 +207,7 @@ func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRe
 		return "", commitNotFoundErr
 	}
 	if resp.StatusCode > 299 {
-		return "", api.HandleHTTPError(resp)
+		return "", githubrest.NewErrorResponse(resp)
 	}
 
 	body, err := io.ReadAll(resp.Body)

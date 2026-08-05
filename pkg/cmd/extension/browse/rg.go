@@ -1,22 +1,25 @@
 package browse
 
 import (
-	"net/http"
-	"time"
+	"context"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 )
 
 type readmeGetter struct {
-	client *http.Client
+	client *githubrest.Client
+
+	// ctx is stored on the struct because Get is called from the interactive
+	// browse UI, which has no request context of its own to thread through.
+	ctx context.Context
 }
 
-func newReadmeGetter(client *http.Client, cacheTTL time.Duration) *readmeGetter {
-	cachingClient := api.NewCachedHTTPClient(client, cacheTTL)
+func newReadmeGetter(ctx context.Context, client *githubrest.Client) *readmeGetter {
 	return &readmeGetter{
-		client: cachingClient,
+		client: client,
+		ctx:    ctx,
 	}
 }
 
@@ -25,7 +28,7 @@ func (g *readmeGetter) Get(repoFullName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	readme, err := view.RepositoryReadme(g.client, repo, "")
+	readme, err := view.RepositoryReadme(g.ctx, g.client, repo, "")
 	if err != nil {
 		return "", err
 	}

@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/context"
+	"context"
+
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -105,7 +107,7 @@ func Test_SyncRun(t *testing.T) {
 		name       string
 		tty        bool
 		opts       *SyncOptions
-		remotes    []*context.Remote
+		remotes    []*ghContext.Remote
 		httpStubs  func(*httpmock.Registry)
 		gitStubs   func(*mockGitClient)
 		wantStdout string
@@ -532,6 +534,7 @@ func Test_SyncRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		ios, _, stdout, _ := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)
@@ -544,9 +547,9 @@ func Test_SyncRun(t *testing.T) {
 			return repo1, nil
 		}
 
-		tt.opts.Remotes = func() (context.Remotes, error) {
+		tt.opts.Remotes = func() (ghContext.Remotes, error) {
 			if tt.remotes == nil {
-				return []*context.Remote{
+				return []*ghContext.Remote{
 					{
 						Remote: &git.Remote{Name: "origin"},
 						Repo:   repo1,
@@ -563,7 +566,7 @@ func Test_SyncRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.opts.Git = newMockGitClient(t, tt.gitStubs)
 			defer reg.Verify(t)
-			err := syncRun(tt.opts)
+			err := syncRun(context.Background(), tt.opts)
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)
 				return

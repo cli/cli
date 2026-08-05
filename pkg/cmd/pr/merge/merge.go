@@ -26,6 +26,7 @@ type editor interface {
 
 type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	GitClient  *git.Client
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
@@ -62,6 +63,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	opts := &MergeOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		GitClient:  f.GitClient,
 		Branch:     f.Branch,
 		Remotes:    f.Remotes,
@@ -192,6 +194,7 @@ type mergeContext struct {
 	pr                 *api.PullRequest
 	baseRepo           ghrepo.Interface
 	httpClient         *http.Client
+	restClient         *githubrest.Client
 	opts               *MergeOptions
 	cs                 *iostreams.ColorScheme
 	isTerminal         bool
@@ -459,8 +462,7 @@ func (m *mergeContext) deleteRemoteBranch() error {
 	}
 
 	if !m.merged {
-		apiClient := api.NewClientFromHTTP(m.httpClient)
-		err := api.BranchDeleteRemote(apiClient, m.baseRepo, m.pr.HeadRefName)
+		err := shared.BranchDeleteRemote(context.Background(), m.restClient, m.baseRepo, m.pr.HeadRefName)
 		if err != nil {
 			// Normally, the API returns 422, with the message "Reference does not exist"
 			// when the branch has already been deleted. It also returns 404 with the same
@@ -519,6 +521,11 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		return nil, err
 	}
 
+	restClient, err := opts.GitHubREST(baseRepo.RepoHost())
+	if err != nil {
+		return nil, err
+	}
+
 	return &mergeContext{
 		opts:               opts,
 		pr:                 pr,
@@ -526,6 +533,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		baseRepo:           baseRepo,
 		isTerminal:         opts.IO.IsStdoutTTY(),
 		httpClient:         httpClient,
+		restClient:         restClient,
 		merged:             pr.State == MergeStateStatusMerged,
 		deleteBranch:       opts.DeleteBranch,
 		crossRepoPR:        pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner(),

@@ -1,14 +1,12 @@
 package discovery
 
 import (
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -704,9 +702,10 @@ func TestResolveRef(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			ref, err := ResolveRef(client, "github.com", "monalisa", "octocat-skills", tt.version)
+			ref, err := ResolveRef(t.Context(), client, "monalisa", "octocat-skills", tt.version)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -763,9 +762,10 @@ func TestFetchBlob(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			got, err := FetchBlob(client, "github.com", "monalisa", "octocat-skills", "abc")
+			got, err := FetchBlob(t.Context(), client, "monalisa", "octocat-skills", "abc")
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -843,9 +843,10 @@ func TestFetchRepoVisibility(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			got, err := FetchRepoVisibility(client, "github.com", "monalisa", "octocat-skills")
+			got, err := FetchRepoVisibility(t.Context(), client, "monalisa", "octocat-skills")
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -973,9 +974,10 @@ func TestDiscoverSkills(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			skills, err := DiscoverSkills(client, "github.com", "monalisa", "octocat-skills", "abc123")
+			skills, err := DiscoverSkills(t.Context(), client, "monalisa", "octocat-skills", "abc123")
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -1064,9 +1066,10 @@ func TestDiscoverSkillsWithOptions(t *testing.T) {
 			reg.Register(
 				httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/abc123"),
 				httpmock.JSONResponse(tt.tree))
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			skills, err := DiscoverSkillsWithOptions(client, "github.com", "monalisa", "octocat-skills", "abc123", DiscoverOptions{})
+			skills, err := DiscoverSkillsWithOptions(t.Context(), client, "monalisa", "octocat-skills", "abc123", DiscoverOptions{})
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -1316,9 +1319,10 @@ func TestDiscoverSkillByPath(t *testing.T) {
 			if tt.stubs != nil {
 				tt.stubs(reg)
 			}
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			skill, err := DiscoverSkillByPath(client, "github.com", "monalisa", "octocat-skills", "abc123", tt.skillPath)
+			skill, err := DiscoverSkillByPath(t.Context(), client, "monalisa", "octocat-skills", "abc123", tt.skillPath)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -1352,8 +1356,9 @@ func TestDiscoverSkillByPathWithOptionsSkipsDescription(t *testing.T) {
 			},
 		}))
 
-	client := api.NewClientFromHTTP(&http.Client{Transport: reg})
-	skill, err := DiscoverSkillByPathWithOptions(client, "github.com", "monalisa", "octocat-skills", "abc123", "skills/code-review", DiscoverSkillByPathOptions{SkipDescription: true})
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+	skill, err := DiscoverSkillByPathWithOptions(t.Context(), client, "monalisa", "octocat-skills", "abc123", "skills/code-review", DiscoverSkillByPathOptions{SkipDescription: true})
 
 	require.NoError(t, err)
 	assert.Equal(t, "code-review", skill.Name)
@@ -1650,9 +1655,10 @@ func TestDiscoverSkillFiles(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			files, err := DiscoverSkillFiles(client, "github.com", "monalisa", "octocat-skills", "tree123", "skills/code-review")
+			files, err := DiscoverSkillFiles(t.Context(), client, "monalisa", "octocat-skills", "tree123", "skills/code-review")
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -1735,9 +1741,10 @@ func TestListSkillFiles(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			files, err := ListSkillFiles(client, "github.com", "monalisa", "octocat-skills", "tree123")
+			files, err := ListSkillFiles(t.Context(), client, "monalisa", "octocat-skills", "tree123")
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -1790,9 +1797,10 @@ func TestFetchDescriptionsConcurrent(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
-			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
 
-			FetchDescriptionsConcurrent(client, "github.com", "monalisa", "octocat-skills", tt.skills, nil)
+			FetchDescriptionsConcurrent(t.Context(), client, "monalisa", "octocat-skills", tt.skills, nil)
 			var descs []string
 			for _, s := range tt.skills {
 				descs = append(descs, s.Description)

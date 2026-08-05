@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -1048,6 +1049,7 @@ func Test_createRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		if tt.opts.Config == nil {
 			tt.opts.Config = func() (gh.Config, error) {
@@ -1073,7 +1075,7 @@ func Test_createRun(t *testing.T) {
 			}
 
 			defer reg.Verify(t)
-			err := createRun(tt.opts)
+			err := createRun(context.Background(), tt.opts)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errMsg)

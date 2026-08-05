@@ -534,7 +534,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						Browser:      browser,
 						Searcher:     searcher,
 						Em:           m,
-						Client:       client,
+						GitHubREST:   restClient,
 						Cfg:          cfg,
 						Debug:        debug,
 						SingleColumn: singleColumn,

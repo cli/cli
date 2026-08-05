@@ -1,6 +1,7 @@
 package list
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -26,7 +27,7 @@ type listOptions struct {
 }
 
 type AutolinkListClient interface {
-	List(repo ghrepo.Interface) ([]shared.Autolink, error)
+	List(ctx context.Context, repo ghrepo.Interface) ([]shared.Autolink, error)
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Command {
@@ -48,17 +49,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
-			httpClient, err := f.HttpClient()
-			if err != nil {
-				return err
-			}
-			opts.AutolinkClient = &AutolinkLister{HTTPClient: httpClient}
+			opts.AutolinkClient = &AutolinkLister{GitHubREST: f.GitHubREST}
 
 			if runF != nil {
 				return runF(opts)
 			}
 
-			return listRun(opts)
+			return listRun(cmd.Context(), opts)
 		},
 	}
 
@@ -68,7 +65,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	return cmd
 }
 
-func listRun(opts *listOptions) error {
+func listRun(ctx context.Context, opts *listOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
@@ -84,7 +81,7 @@ func listRun(opts *listOptions) error {
 		return opts.Browser.Browse(autolinksListURL)
 	}
 
-	autolinks, err := opts.AutolinkClient.List(repo)
+	autolinks, err := opts.AutolinkClient.List(ctx, repo)
 	if err != nil {
 		return err
 	}

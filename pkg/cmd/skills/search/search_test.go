@@ -2,7 +2,6 @@ package search
 
 import (
 	"io"
-	"net/http"
 	"strings"
 	"testing"
 
@@ -25,12 +24,12 @@ func TestSearchRun_UnsupportedHost(t *testing.T) {
 	cfg.AuthenticationFunc = func() gh.AuthConfig {
 		return authCfg
 	}
-	err := searchRun(&SearchOptions{
+	err := searchRun(t.Context(), &SearchOptions{
 		IO:         ios,
 		Query:      "terraform",
 		Page:       1,
 		Limit:      defaultLimit,
-		HttpClient: func() (*http.Client, error) { return &http.Client{}, nil },
+		GitHubREST: httpmock.RESTClientFunc(nil),
 		Config:     func() (gh.Config, error) { return cfg, nil },
 	})
 	require.ErrorContains(t, err, "does not currently support GitHub Enterprise Server")
@@ -363,9 +362,7 @@ func TestSearchRun(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			tt.opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -377,7 +374,7 @@ func TestSearchRun(t *testing.T) {
 			tt.opts.Telemetry = &telemetry.NoOpService{}
 
 			defer reg.Verify(t)
-			err := searchRun(tt.opts)
+			err := searchRun(t.Context(), tt.opts)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
@@ -620,9 +617,9 @@ func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 
 	recorder := &telemetry.EventRecorderSpy{}
 
-	err := searchRun(&SearchOptions{
+	err := searchRun(t.Context(), &SearchOptions{
 		IO:             ios,
-		HttpClient:     func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitHubREST:     httpmock.RESTClientFunc(reg),
 		Config:         func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 		Prompter:       pm,
 		Telemetry:      recorder,

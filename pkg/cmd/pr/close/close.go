@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -16,6 +17,7 @@ import (
 
 type CloseOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	GitClient  *git.Client
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
@@ -32,6 +34,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	opts := &CloseOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		GitClient:  f.GitClient,
 		Branch:     f.Branch,
 	}
@@ -153,7 +156,11 @@ func closeRun(opts *CloseOptions) error {
 				return nil
 			}
 		} else {
-			if err := api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName); err != nil {
+			restClient, err := opts.GitHubREST(baseRepo.RepoHost())
+			if err != nil {
+				return err
+			}
+			if err := shared.BranchDeleteRemote(ctx, restClient, baseRepo, pr.HeadRefName); err != nil {
 				return fmt.Errorf("failed to delete remote branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 			}
 		}

@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -202,6 +203,7 @@ func Test_RepoView_Web(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			BaseRepo: func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
@@ -218,7 +220,7 @@ func Test_RepoView_Web(t *testing.T) {
 			_, teardown := run.Stub()
 			defer teardown(t)
 
-			if err := viewRun(opts); err != nil {
+			if err := viewRun(context.Background(), opts); err != nil {
 				t.Errorf("viewRun() error = %v", err)
 			}
 			assert.Equal(t, "", stdout.String())
@@ -351,6 +353,7 @@ func Test_ViewRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		io, _, stdout, stderr := iostreams.Test()
 		tt.opts.IO = io
@@ -358,7 +361,7 @@ func Test_ViewRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io.SetStdoutTTY(tt.stdoutTTY)
 
-			if err := viewRun(tt.opts); (err != nil) != tt.wantErr {
+			if err := viewRun(context.Background(), tt.opts); (err != nil) != tt.wantErr {
 				t.Errorf("viewRun() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			assert.Equal(t, tt.wantStderr, stderr.String())
@@ -416,6 +419,7 @@ func Test_ViewRun_NonMarkdownReadme(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			BaseRepo: func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
@@ -428,7 +432,7 @@ func Test_ViewRun_NonMarkdownReadme(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io.SetStdoutTTY(tt.stdoutTTY)
 
-			if err := viewRun(opts); err != nil {
+			if err := viewRun(context.Background(), opts); err != nil {
 				t.Errorf("viewRun() error = %v", err)
 			}
 			assert.Equal(t, tt.wantOut, stdout.String())
@@ -482,6 +486,7 @@ func Test_ViewRun_NoReadme(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			BaseRepo: func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
@@ -494,7 +499,7 @@ func Test_ViewRun_NoReadme(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io.SetStdoutTTY(tt.stdoutTTY)
 
-			if err := viewRun(opts); err != nil {
+			if err := viewRun(context.Background(), opts); err != nil {
 				t.Errorf("viewRun() error = %v", err)
 			}
 			assert.Equal(t, tt.wantOut, stdout.String())
@@ -552,6 +557,7 @@ func Test_ViewRun_NoDescription(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			BaseRepo: func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
@@ -564,7 +570,7 @@ func Test_ViewRun_NoDescription(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io.SetStdoutTTY(tt.stdoutTTY)
 
-			if err := viewRun(opts); err != nil {
+			if err := viewRun(context.Background(), opts); err != nil {
 				t.Errorf("viewRun() error = %v", err)
 			}
 			assert.Equal(t, tt.wantOut, stdout.String())
@@ -603,13 +609,14 @@ func Test_ViewRun_WithoutUsername(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
-		IO: io,
+		GitHubREST: httpmock.RESTClientFunc(reg),
+		IO:         io,
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 	}
 
-	if err := viewRun(opts); err != nil {
+	if err := viewRun(context.Background(), opts); err != nil {
 		t.Errorf("viewRun() error = %v", err)
 	}
 
@@ -689,6 +696,7 @@ func Test_ViewRun_HandlesSpecialCharacters(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		io, _, stdout, stderr := iostreams.Test()
 		tt.opts.IO = io
@@ -696,7 +704,7 @@ func Test_ViewRun_HandlesSpecialCharacters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io.SetStdoutTTY(tt.stdoutTTY)
 
-			if err := viewRun(tt.opts); (err != nil) != tt.wantErr {
+			if err := viewRun(context.Background(), tt.opts); (err != nil) != tt.wantErr {
 				t.Errorf("viewRun() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			assert.Equal(t, tt.wantStderr, stderr.String())
@@ -719,6 +727,7 @@ func Test_viewRun_json(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
@@ -730,7 +739,7 @@ func Test_viewRun_json(t *testing.T) {
 	_, teardown := run.Stub()
 	defer teardown(t)
 
-	err := viewRun(opts)
+	err := viewRun(context.Background(), opts)
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Doc(`
 		name: REPO

@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -15,7 +16,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
@@ -189,7 +189,7 @@ func parseRepoVisibility(s string) (RepoVisibility, error) {
 }
 
 // FetchRepoVisibility returns the repository visibility: "public", "private", or "internal".
-func FetchRepoVisibility(client *api.Client, host, owner, repo string) (RepoVisibility, error) {
+func FetchRepoVisibility(ctx context.Context, client *githubrest.Client, owner, repo string) (RepoVisibility, error) {
 	apiPath, err := safeurl.JoinPath("repos", owner, repo)
 	if err != nil {
 		return "", err
@@ -197,7 +197,11 @@ func FetchRepoVisibility(client *api.Client, host, owner, repo string) (RepoVisi
 	var resp struct {
 		Visibility string `json:"visibility"`
 	}
-	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	if _, err := client.Do(req, &resp); err != nil {
 		return "", err
 	}
 	return parseRepoVisibility(resp.Visibility)
@@ -205,11 +209,11 @@ func FetchRepoVisibility(client *api.Client, host, owner, repo string) (RepoVisi
 
 // ResolveRef determines the git ref to use for a given owner/repo.
 // Priority: explicit version > latest release tag > default branch.
-func ResolveRef(client *api.Client, host, owner, repo, version string) (*ResolvedRef, error) {
+func ResolveRef(ctx context.Context, client *githubrest.Client, owner, repo, version string) (*ResolvedRef, error) {
 	if version != "" {
-		return resolveExplicitRef(client, host, owner, repo, version)
+		return resolveExplicitRef(ctx, client, owner, repo, version)
 	}
-	ref, err := resolveLatestRelease(client, host, owner, repo)
+	ref, err := resolveLatestRelease(ctx, client, owner, repo)
 	if err == nil {
 		return ref, nil
 	}
@@ -222,7 +226,7 @@ func ResolveRef(client *api.Client, host, owner, repo, version string) (*Resolve
 	if !errors.As(err, &nre) {
 		return nil, err
 	}
-	return resolveDefaultBranch(client, host, owner, repo)
+	return resolveDefaultBranch(ctx, client, owner, repo)
 }
 
 // resolveExplicitRef resolves a user-supplied version string. It supports:
@@ -233,24 +237,24 @@ func ResolveRef(client *api.Client, host, owner, repo, version string) (*Resolve
 // When a short name matches both a branch and a tag, the branch wins.
 // The returned Ref is always a fully qualified ref (refs/heads/* or refs/tags/*)
 // unless the input resolves to a bare commit SHA.
-func resolveExplicitRef(client *api.Client, host, owner, repo, ref string) (*ResolvedRef, error) {
+func resolveExplicitRef(ctx context.Context, client *githubrest.Client, owner, repo, ref string) (*ResolvedRef, error) {
 	// Handle fully-qualified refs: resolve directly without ambiguity.
 	if after, ok := strings.CutPrefix(ref, "refs/tags/"); ok {
-		return resolveTagRef(client, host, owner, repo, after)
+		return resolveTagRef(ctx, client, owner, repo, after)
 	}
 	if after, ok := strings.CutPrefix(ref, "refs/heads/"); ok {
-		return resolveBranchRef(client, host, owner, repo, after)
+		return resolveBranchRef(ctx, client, owner, repo, after)
 	}
 
 	// Short name: try branch first, then tag, then commit SHA.
 	// Only fall through on 404 (not found); surface other errors
 	// (403, 500, network) immediately to avoid masking real failures.
-	if resolved, err := resolveBranchRef(client, host, owner, repo, ref); err == nil {
+	if resolved, err := resolveBranchRef(ctx, client, owner, repo, ref); err == nil {
 		return resolved, nil
 	} else if !isNotFound(err) {
 		return nil, err
 	}
-	if resolved, err := resolveTagRef(client, host, owner, repo, ref); err == nil {
+	if resolved, err := resolveTagRef(ctx, client, owner, repo, ref); err == nil {
 		return resolved, nil
 	} else if !isNotFound(err) {
 		return nil, err
@@ -263,7 +267,11 @@ func resolveExplicitRef(client *api.Client, host, owner, repo, ref string) (*Res
 	var commitResp struct {
 		SHA string `json:"sha"`
 	}
-	if err := client.REST(host, "GET", commitPath.String(), nil, &commitResp); err == nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, commitPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &commitResp); err == nil {
 		return &ResolvedRef{Ref: commitResp.SHA, SHA: commitResp.SHA}, nil
 	} else if !isNotFound(err) {
 		return nil, err
@@ -274,7 +282,7 @@ func resolveExplicitRef(client *api.Client, host, owner, repo, ref string) (*Res
 
 // resolveTagRef looks up a tag by short name and returns a fully qualified ref.
 // For annotated tags, the tag object is dereferenced to obtain the commit SHA.
-func resolveTagRef(client *api.Client, host, owner, repo, tag string) (*ResolvedRef, error) {
+func resolveTagRef(ctx context.Context, client *githubrest.Client, owner, repo, tag string) (*ResolvedRef, error) {
 	tagPath, err := safeurl.JoinPath("repos", owner, repo, "git", "ref", fmt.Sprintf("tags/%s", tag))
 	if err != nil {
 		return nil, err
@@ -285,7 +293,11 @@ func resolveTagRef(client *api.Client, host, owner, repo, tag string) (*Resolved
 			Type string `json:"type"`
 		} `json:"object"`
 	}
-	if err := client.REST(host, "GET", tagPath.String(), nil, &refResp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, tagPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &refResp); err != nil {
 		return nil, fmt.Errorf("tag %q not found in %s/%s: %w", tag, owner, repo, err)
 	}
 	sha := refResp.Object.SHA
@@ -299,7 +311,11 @@ func resolveTagRef(client *api.Client, host, owner, repo, tag string) (*Resolved
 				SHA string `json:"sha"`
 			} `json:"object"`
 		}
-		if err := client.REST(host, "GET", derefPath.String(), nil, &tagResp); err != nil {
+		req, err := client.NewRequest(ctx, http.MethodGet, derefPath.String(), nil)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := client.Do(req, &tagResp); err != nil {
 			return nil, fmt.Errorf("could not dereference annotated tag %q: %w", tag, err)
 		}
 		sha = tagResp.Object.SHA
@@ -308,7 +324,7 @@ func resolveTagRef(client *api.Client, host, owner, repo, tag string) (*Resolved
 }
 
 // resolveBranchRef looks up a branch by short name and returns a fully qualified ref.
-func resolveBranchRef(client *api.Client, host, owner, repo, branch string) (*ResolvedRef, error) {
+func resolveBranchRef(ctx context.Context, client *githubrest.Client, owner, repo, branch string) (*ResolvedRef, error) {
 	refPath, err := safeurl.JoinPath("repos", owner, repo, "git", "ref", fmt.Sprintf("heads/%s", branch))
 	if err != nil {
 		return nil, err
@@ -318,7 +334,11 @@ func resolveBranchRef(client *api.Client, host, owner, repo, branch string) (*Re
 			SHA string `json:"sha"`
 		} `json:"object"`
 	}
-	if err := client.REST(host, "GET", refPath.String(), nil, &refResp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, refPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &refResp); err != nil {
 		return nil, fmt.Errorf("branch %q not found in %s/%s: %w", branch, owner, repo, err)
 	}
 	return &ResolvedRef{Ref: "refs/heads/" + branch, SHA: refResp.Object.SHA}, nil
@@ -339,7 +359,7 @@ type noReleasesError struct {
 
 func (e *noReleasesError) Error() string { return e.reason }
 
-func resolveLatestRelease(client *api.Client, host, owner, repo string) (*ResolvedRef, error) {
+func resolveLatestRelease(ctx context.Context, client *githubrest.Client, owner, repo string) (*ResolvedRef, error) {
 	apiPath, err := safeurl.JoinPath("repos", owner, repo, "releases", "latest")
 	if err != nil {
 		return nil, err
@@ -347,7 +367,11 @@ func resolveLatestRelease(client *api.Client, host, owner, repo string) (*Resolv
 	var resp struct {
 		TagName string `json:"tag_name"`
 	}
-	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &resp); err != nil {
 		// A 404 means the repository has no releases. This is the
 		// only case where falling back to the default branch is safe.
 		// Any other HTTP error (403, 500, …) or network failure is
@@ -361,10 +385,10 @@ func resolveLatestRelease(client *api.Client, host, owner, repo string) (*Resolv
 	if resp.TagName == "" {
 		return nil, &noReleasesError{reason: "latest release has no tag"}
 	}
-	return resolveTagRef(client, host, owner, repo, resp.TagName)
+	return resolveTagRef(ctx, client, owner, repo, resp.TagName)
 }
 
-func resolveDefaultBranch(client *api.Client, host, owner, repo string) (*ResolvedRef, error) {
+func resolveDefaultBranch(ctx context.Context, client *githubrest.Client, owner, repo string) (*ResolvedRef, error) {
 	apiPath, err := safeurl.JoinPath("repos", owner, repo)
 	if err != nil {
 		return nil, err
@@ -372,14 +396,18 @@ func resolveDefaultBranch(client *api.Client, host, owner, repo string) (*Resolv
 	var resp struct {
 		DefaultBranch string `json:"default_branch"`
 	}
-	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &resp); err != nil {
 		return nil, fmt.Errorf("could not determine default branch: %w", err)
 	}
 	branch := resp.DefaultBranch
 	if branch == "" {
 		return nil, fmt.Errorf("could not determine default branch for %s/%s", owner, repo)
 	}
-	return resolveBranchRef(client, host, owner, repo, branch)
+	return resolveBranchRef(ctx, client, owner, repo, branch)
 }
 
 // skillMatch represents a matched SKILL.md file and its convention.
@@ -548,8 +576,8 @@ type DiscoverOptions struct {
 // DiscoverSkills finds all non-hidden-dir skills in a repository at the given
 // commit SHA. Hidden-dir skills are excluded; use DiscoverSkillsWithOptions to
 // retrieve all skills including those in hidden directories.
-func DiscoverSkills(client *api.Client, host, owner, repo, commitSHA string) ([]Skill, error) {
-	all, err := DiscoverSkillsWithOptions(client, host, owner, repo, commitSHA, DiscoverOptions{})
+func DiscoverSkills(ctx context.Context, client *githubrest.Client, owner, repo, commitSHA string) ([]Skill, error) {
+	all, err := DiscoverSkillsWithOptions(ctx, client, owner, repo, commitSHA, DiscoverOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -573,14 +601,18 @@ func DiscoverSkills(client *api.Client, host, owner, repo, commitSHA string) ([]
 
 // DiscoverSkillsWithOptions finds all skills in a repository at the given
 // commit SHA, with configurable discovery behavior.
-func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA string, opts DiscoverOptions) ([]Skill, error) {
+func DiscoverSkillsWithOptions(ctx context.Context, client *githubrest.Client, owner, repo, commitSHA string, opts DiscoverOptions) ([]Skill, error) {
 	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", commitSHA)
 	if err != nil {
 		return nil, err
 	}
 	apiPath.SetQuery("recursive", "true")
 	var tree treeResponse
-	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &tree); err != nil {
 		return nil, fmt.Errorf("could not fetch repository tree: %w", err)
 	}
 
@@ -646,11 +678,11 @@ func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA 
 }
 
 // fetchDescription fetches and parses the frontmatter description for a skill.
-func fetchDescription(client *api.Client, host, owner, repo string, skill *Skill) string {
+func fetchDescription(ctx context.Context, client *githubrest.Client, owner, repo string, skill *Skill) string {
 	if skill.BlobSHA == "" {
 		return ""
 	}
-	content, err := FetchBlob(client, host, owner, repo, skill.BlobSHA)
+	content, err := FetchBlob(ctx, client, owner, repo, skill.BlobSHA)
 	if err != nil {
 		return ""
 	}
@@ -662,7 +694,7 @@ func fetchDescription(client *api.Client, host, owner, repo string, skill *Skill
 }
 
 // FetchDescriptionsConcurrent fetches descriptions with bounded concurrency.
-func FetchDescriptionsConcurrent(client *api.Client, host, owner, repo string, skills []Skill, onProgress func(done, total int)) {
+func FetchDescriptionsConcurrent(ctx context.Context, client *githubrest.Client, owner, repo string, skills []Skill, onProgress func(done, total int)) {
 	total := 0
 	for _, s := range skills {
 		if s.Description == "" {
@@ -683,7 +715,7 @@ func FetchDescriptionsConcurrent(client *api.Client, host, owner, repo string, s
 	for range workers {
 		wg.Go(func() {
 			for s := range jobs {
-				s.Description = fetchDescription(client, host, owner, repo, s)
+				s.Description = fetchDescription(ctx, client, owner, repo, s)
 
 				d := int(done.Add(1))
 				if onProgress != nil {
@@ -708,13 +740,13 @@ type DiscoverSkillByPathOptions struct {
 }
 
 // DiscoverSkillByPath looks up a single skill by its exact path in the repository.
-func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skillPath string) (*Skill, error) {
-	return DiscoverSkillByPathWithOptions(client, host, owner, repo, commitSHA, skillPath, DiscoverSkillByPathOptions{})
+func DiscoverSkillByPath(ctx context.Context, client *githubrest.Client, owner, repo, commitSHA, skillPath string) (*Skill, error) {
+	return DiscoverSkillByPathWithOptions(ctx, client, owner, repo, commitSHA, skillPath, DiscoverSkillByPathOptions{})
 }
 
 // DiscoverSkillByPathWithOptions looks up a single skill by its exact path in
 // the repository, applying the given options.
-func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commitSHA, skillPath string, opts DiscoverSkillByPathOptions) (*Skill, error) {
+func DiscoverSkillByPathWithOptions(ctx context.Context, client *githubrest.Client, owner, repo, commitSHA, skillPath string, opts DiscoverSkillByPathOptions) (*Skill, error) {
 	skillPath = strings.TrimSuffix(skillPath, "/SKILL.md")
 	skillPath = strings.TrimSuffix(skillPath, "/")
 
@@ -736,7 +768,11 @@ func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commi
 		SHA  string `json:"sha"`
 		Type string `json:"type"`
 	}
-	if err := client.REST(host, "GET", apiPath.String(), nil, &contents); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &contents); err != nil {
 		return nil, fmt.Errorf("path %q not found in %s/%s: %w", parentPath, owner, repo, err)
 	}
 
@@ -756,7 +792,11 @@ func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commi
 		return nil, err
 	}
 	var skillTree treeResponse
-	if err := client.REST(host, "GET", skillTreePath.String(), nil, &skillTree); err != nil {
+	treeReq, err := client.NewRequest(ctx, http.MethodGet, skillTreePath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(treeReq, &skillTree); err != nil {
 		return nil, fmt.Errorf("could not read skill directory: %w", err)
 	}
 
@@ -803,7 +843,7 @@ func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commi
 	}
 
 	if !opts.SkipDescription {
-		skill.Description = fetchDescription(client, host, owner, repo, skill)
+		skill.Description = fetchDescription(ctx, client, owner, repo, skill)
 	}
 
 	return skill, nil
@@ -811,20 +851,24 @@ func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commi
 
 // DiscoverSkillFiles returns all file paths belonging to a skill directory
 // by fetching the skill's subtree directly using its tree SHA.
-func DiscoverSkillFiles(client *api.Client, host, owner, repo, treeSHA, skillPath string) ([]SkillFile, error) {
+func DiscoverSkillFiles(ctx context.Context, client *githubrest.Client, owner, repo, treeSHA, skillPath string) ([]SkillFile, error) {
 	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", treeSHA)
 	if err != nil {
 		return nil, err
 	}
 	apiPath.SetQuery("recursive", "true")
 	var tree treeResponse
-	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &tree); err != nil {
 		return nil, fmt.Errorf("could not fetch skill tree: %w", err)
 	}
 
 	if tree.Truncated {
 		// Recursive fetch was truncated. Fall back to walking subtrees individually.
-		return walkTree(client, host, owner, repo, treeSHA, skillPath, 0)
+		return walkTree(ctx, client, owner, repo, treeSHA, skillPath, 0)
 	}
 
 	var files []SkillFile
@@ -843,20 +887,24 @@ func DiscoverSkillFiles(client *api.Client, host, owner, repo, treeSHA, skillPat
 
 // ListSkillFiles returns all files in a skill directory as public SkillFile
 // structs with paths relative to the skill root.
-func ListSkillFiles(client *api.Client, host, owner, repo, treeSHA string) ([]SkillFile, error) {
+func ListSkillFiles(ctx context.Context, client *githubrest.Client, owner, repo, treeSHA string) ([]SkillFile, error) {
 	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", treeSHA)
 	if err != nil {
 		return nil, err
 	}
 	apiPath.SetQuery("recursive", "true")
 	var tree treeResponse
-	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &tree); err != nil {
 		return nil, fmt.Errorf("could not fetch skill tree: %w", err)
 	}
 
 	if tree.Truncated {
 		// Fall back to non-recursive traversal when the tree is too large.
-		return walkTree(client, host, owner, repo, treeSHA, "", 0)
+		return walkTree(ctx, client, owner, repo, treeSHA, "", 0)
 	}
 
 	var files []SkillFile
@@ -879,7 +927,7 @@ const maxTreeDepth = 20
 // walkTree enumerates files by fetching each tree level individually,
 // avoiding the truncation limit of the recursive tree API. Recursion
 // depth is bounded by maxTreeDepth to prevent unbounded API calls.
-func walkTree(client *api.Client, host, owner, repo, sha, prefix string, depth int) ([]SkillFile, error) {
+func walkTree(ctx context.Context, client *githubrest.Client, owner, repo, sha, prefix string, depth int) ([]SkillFile, error) {
 	if depth > maxTreeDepth {
 		return nil, fmt.Errorf("tree depth exceeds %d levels at %s", maxTreeDepth, prefix)
 	}
@@ -888,7 +936,11 @@ func walkTree(client *api.Client, host, owner, repo, sha, prefix string, depth i
 		return nil, err
 	}
 	var tree treeResponse
-	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &tree); err != nil {
 		return nil, fmt.Errorf("could not fetch tree %s: %w", prefix, err)
 	}
 
@@ -902,7 +954,7 @@ func walkTree(client *api.Client, host, owner, repo, sha, prefix string, depth i
 		case "blob":
 			files = append(files, SkillFile{Path: entryPath, SHA: entry.SHA, Size: entry.Size})
 		case "tree":
-			sub, err := walkTree(client, host, owner, repo, entry.SHA, entryPath, depth+1)
+			sub, err := walkTree(ctx, client, owner, repo, entry.SHA, entryPath, depth+1)
 			if err != nil {
 				return nil, err
 			}
@@ -916,7 +968,7 @@ func walkTree(client *api.Client, host, owner, repo, sha, prefix string, depth i
 // inside the JSON response and decoded here, so it is returned as
 // iostreams.Untrusted and callers must choose sanitized display or raw
 // round-tripping.
-func FetchBlob(client *api.Client, host, owner, repo, sha string) (iostreams.Untrusted, error) {
+func FetchBlob(ctx context.Context, client *githubrest.Client, owner, repo, sha string) (iostreams.Untrusted, error) {
 	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "blobs", sha)
 	if err != nil {
 		return iostreams.Untrusted{}, err
@@ -926,7 +978,11 @@ func FetchBlob(client *api.Client, host, owner, repo, sha string) (iostreams.Unt
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
 	}
-	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	req, err := client.NewRequest(ctx, http.MethodGet, apiPath.String(), nil)
+	if err != nil {
+		return iostreams.Untrusted{}, err
+	}
+	if _, err := client.Do(req, &resp); err != nil {
 		return iostreams.Untrusted{}, fmt.Errorf("could not fetch blob: %w", err)
 	}
 

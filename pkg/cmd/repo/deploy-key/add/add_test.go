@@ -1,6 +1,7 @@
 package add
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -70,9 +71,9 @@ func Test_addRun(t *testing.T) {
 			opts := tt.opts
 			opts.IO = ios
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
-			opts.HTTPClient = func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
+			opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
-			err := addRun(&opts)
+			err := addRun(context.Background(), &opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("addRun() return error: %v", err)
 				return
@@ -97,8 +98,12 @@ func TestUploadDeployKeyHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	err := uploadDeployKey(
-		&http.Client{Transport: reg},
+	client, err := httpmock.RESTClientFunc(reg)("github.com")
+	require.NoError(t, err)
+
+	err = uploadDeployKey(
+		context.Background(),
+		client,
 		ghrepo.New("OWNER", "REPO"),
 		strings.NewReader("PUBKEY\n"),
 		"my sacred key",

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
@@ -36,7 +36,7 @@ type Options struct {
 	Dir        string // explicit target directory (overrides AgentHost+Scope)
 	GitRoot    string // git repository root (for project scope)
 	HomeDir    string // user home directory (for user scope)
-	Client     *api.Client
+	Client     *githubrest.Client
 	OnProgress func(done, total int) // called after each skill is installed
 }
 
@@ -53,7 +53,7 @@ type skillResult struct {
 }
 
 // Install fetches and writes skills to the target directory.
-func Install(opts *Options) (*Result, error) {
+func Install(ctx context.Context, opts *Options) (*Result, error) {
 	targetDir := opts.Dir
 	if targetDir == "" {
 		if opts.AgentHost == nil {
@@ -72,7 +72,7 @@ func Install(opts *Options) (*Result, error) {
 			opts.OnProgress(0, 1)
 			defer opts.OnProgress(1, 1)
 		}
-		if err := installSkill(opts, skill, targetDir); err != nil {
+		if err := installSkill(ctx, opts, skill, targetDir); err != nil {
 			return nil, fmt.Errorf("failed to install skill %q: %w", skill.InstallName(), err)
 		}
 		var warnings []string
@@ -101,7 +101,7 @@ func Install(opts *Options) (*Result, error) {
 	for range workers {
 		wg.Go(func() {
 			for j := range jobs {
-				err := installSkill(opts, j.skill, targetDir)
+				err := installSkill(ctx, opts, j.skill, targetDir)
 				results[j.idx] = skillResult{name: j.skill.InstallName(), err: err}
 
 				if opts.OnProgress != nil {
@@ -248,14 +248,14 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 	})
 }
 
-func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
+func installSkill(ctx context.Context, opts *Options, skill discovery.Skill, baseDir string) error {
 	// Use skill.Name (not InstallName) for a flat directory layout.
 	skillDir := filepath.Join(baseDir, skill.Name)
 	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		return fmt.Errorf("could not create directory %s: %w", skillDir, err)
 	}
 
-	files, err := discovery.DiscoverSkillFiles(opts.Client, opts.Host, opts.Owner, opts.Repo, skill.TreeSHA, skill.Path)
+	files, err := discovery.DiscoverSkillFiles(ctx, opts.Client, opts.Owner, opts.Repo, skill.TreeSHA, skill.Path)
 	if err != nil {
 		return fmt.Errorf("could not list skill files: %w", err)
 	}
@@ -266,7 +266,7 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 	}
 
 	for _, file := range files {
-		fetchedContent, err := discovery.FetchBlob(opts.Client, opts.Host, opts.Owner, opts.Repo, file.SHA)
+		fetchedContent, err := discovery.FetchBlob(ctx, opts.Client, opts.Owner, opts.Repo, file.SHA)
 		if err != nil {
 			return fmt.Errorf("could not fetch %s: %w", file.Path, err)
 		}

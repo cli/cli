@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"slices"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
+	reposhared "github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
@@ -317,12 +317,16 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		return err
 	}
 
+	restClient, err := opts.GitHubREST(repo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	g := errgroup.Group{}
 
 	if body.Len() > 3 {
 		g.Go(func() error {
-			apiClient := api.NewClientFromHTTP(opts.HTTPClient)
-			_, err := api.CreateRepoTransformToV4(apiClient, repo.RepoHost(), "PATCH", apiPath, body)
+			_, err := reposhared.CreateRepoTransformToV4(ctx, restClient, repo.RepoHost(), "PATCH", apiPath, body)
 			return err
 		})
 	}
@@ -332,7 +336,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			// opts.topicsCache gets populated in interactive mode
 			if !opts.InteractiveMode {
 				var err error
-				opts.topicsCache, err = getTopics(ctx, opts.HTTPClient, repo)
+				opts.topicsCache, err = getTopics(ctx, restClient, repo)
 				if err != nil {
 					return err
 				}
@@ -348,7 +352,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			if oldTopics.Equal(newTopics) {
 				return nil
 			}
-			return setTopics(ctx, opts.HTTPClient, repo, newTopics.ToSlice())
+			return setTopics(ctx, restClient, repo, newTopics.ToSlice())
 		})
 	}
 
@@ -573,37 +577,28 @@ func parseTopics(s string) []string {
 	return topics
 }
 
-func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
+func getTopics(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface) ([]string, error) {
 	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "topics")
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	// "mercy-preview" is still needed for some GitHub Enterprise versions
-	req.Header.Set("Accept", "application/vnd.github.mercy-preview+json")
-	res, err := httpClient.Do(req)
+	req, err := client.NewRequest(ctx, http.MethodGet, url.String(), nil, githubrest.WithHeader("Accept", "application/vnd.github.mercy-preview+json"))
 	if err != nil {
 		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(res)
 	}
 
 	var responseData struct {
 		Names []string `json:"names"`
 	}
-	dec := json.NewDecoder(res.Body)
-	err = dec.Decode(&responseData)
-	return responseData.Names, err
+	if _, err := client.Do(req, &responseData); err != nil {
+		return nil, err
+	}
+	return responseData.Names, nil
 }
 
-func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, topics []string) error {
+func setTopics(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, topics []string) error {
 	payload := struct {
 		Names []string `json:"names"`
 	}{
@@ -619,26 +614,18 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, "PUT", url.String(), body)
-	if err != nil {
-		return err
-	}
 
-	req.Header.Set("Content-type", "application/json")
 	// "mercy-preview" is still needed for some GitHub Enterprise versions
-	req.Header.Set("Accept", "application/vnd.github.mercy-preview+json")
-	res, err := httpClient.Do(req)
+	req, err := client.NewRequest(ctx, http.MethodPut, url.String(), body,
+		githubrest.WithHeader("Content-type", "application/json"),
+		githubrest.WithHeader("Accept", "application/vnd.github.mercy-preview+json"),
+	)
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK {
-		return api.HandleHTTPError(res)
-	}
-
-	if res.Body != nil {
-		_, _ = io.Copy(io.Discard, res.Body)
+	if _, err := client.Do(req, nil); err != nil {
+		return err
 	}
 
 	return nil

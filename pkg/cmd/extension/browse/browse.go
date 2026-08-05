@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/charmbracelet/glamour"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
@@ -31,7 +30,7 @@ type ExtBrowseOpts struct {
 	IO           *iostreams.IOStreams
 	Searcher     search.Searcher
 	Em           extensions.ExtensionManager
-	Client       *http.Client
+	GitHubREST   *githubrest.Client
 	Logger       *log.Logger
 	Cfg          gh.Config
 	Rg           *readmeGetter
@@ -397,7 +396,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		return err
 	}
 
-	opts.Rg = newReadmeGetter(opts.Client, time.Hour*24)
+	opts.Rg = newReadmeGetter(opts.Cmd.Context(), opts.GitHubREST)
 
 	app := tview.NewApplication()
 

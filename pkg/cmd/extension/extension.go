@@ -2,6 +2,7 @@ package extension
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -129,7 +130,14 @@ func (e *Extension) LatestVersion() string {
 		if err != nil {
 			return ""
 		}
-		release, err := fetchLatestRelease(e.httpClient, repo)
+		restClient, err := restClientFromHTTP(e.httpClient, repo.RepoHost())
+		if err != nil {
+			return ""
+		}
+		// LatestVersion is part of the extensions.Extension interface, which
+		// carries no context and widening it is out of scope, so a background
+		// context is used here.
+		release, err := fetchLatestRelease(context.Background(), restClient, repo)
 		if err != nil {
 			return ""
 		}

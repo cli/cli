@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
@@ -25,7 +26,7 @@ type createOptions struct {
 }
 
 type AutolinkCreateClient interface {
-	Create(repo ghrepo.Interface, request AutolinkCreateRequest) (*shared.Autolink, error)
+	Create(ctx context.Context, repo ghrepo.Interface, request AutolinkCreateRequest) (*shared.Autolink, error)
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Command {
@@ -68,12 +69,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
-			httpClient, err := f.HttpClient()
-			if err != nil {
-				return err
-			}
-
-			opts.AutolinkClient = &AutolinkCreator{HTTPClient: httpClient}
+			opts.AutolinkClient = &AutolinkCreator{GitHubREST: f.GitHubREST}
 			opts.KeyPrefix = args[0]
 			opts.URLTemplate = args[1]
 
@@ -81,7 +77,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return createRun(opts)
+			return createRun(c.Context(), opts)
 		},
 	}
 
@@ -90,7 +86,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *createOptions) error {
+func createRun(ctx context.Context, opts *createOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
@@ -102,7 +98,7 @@ func createRun(opts *createOptions) error {
 		IsAlphanumeric: !opts.Numeric,
 	}
 
-	autolink, err := opts.AutolinkClient.Create(repo, request)
+	autolink, err := opts.AutolinkClient.Create(ctx, repo, request)
 	if err != nil {
 		return fmt.Errorf("error creating autolink: %w", err)
 	}

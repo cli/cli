@@ -4,18 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cenkalti/backoff/v4"
-	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -30,7 +29,7 @@ type iprompter interface {
 }
 
 type ForkOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	GitClient  *git.Client
 	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
@@ -64,7 +63,7 @@ type errWithExitCode interface {
 func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Command {
 	opts := &ForkOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		GitClient:  f.GitClient,
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
@@ -136,7 +135,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return forkRun(opts)
+			return forkRun(cmd.Context(), opts)
 		},
 	}
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
@@ -156,7 +155,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 	return cmd
 }
 
-func forkRun(opts *ForkOptions) error {
+func forkRun(ctx context.Context, opts *ForkOptions) error {
 	var repoToFork ghrepo.Interface
 	var err error
 	inParent := false // whether or not we're forking the repo we're currently "in"
@@ -203,15 +202,13 @@ func forkRun(opts *ForkOptions) error {
 	cs := opts.IO.ColorScheme()
 	stderr := opts.IO.ErrOut
 
-	httpClient, err := opts.HttpClient()
+	restClient, err := opts.GitHubREST(repoToFork.RepoHost())
 	if err != nil {
 		return fmt.Errorf("unable to create client: %w", err)
 	}
 
-	apiClient := api.NewClientFromHTTP(httpClient)
-
 	opts.IO.StartProgressIndicator()
-	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization, opts.ForkName, opts.DefaultBranchOnly)
+	forkedRepo, err := shared.ForkRepo(ctx, restClient, repoToFork, opts.Organization, opts.ForkName, opts.DefaultBranchOnly)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to fork: %w", err)
@@ -242,7 +239,7 @@ func forkRun(opts *ForkOptions) error {
 
 	// Rename the new repo if necessary
 	if opts.ForkName != "" && !strings.EqualFold(forkedRepo.RepoName(), shared.NormalizeRepoName(opts.ForkName)) {
-		forkedRepo, err = api.RenameRepo(apiClient, forkedRepo, opts.ForkName)
+		forkedRepo, err = shared.RenameRepo(ctx, restClient, forkedRepo, opts.ForkName)
 		if err != nil {
 			return fmt.Errorf("could not rename fork: %w", err)
 		}
@@ -264,7 +261,6 @@ func forkRun(opts *ForkOptions) error {
 	protocol := protocolConfig.Value
 
 	gitClient := opts.GitClient
-	ctx := context.Background()
 
 	if inParent {
 		remotes, err := opts.Remotes()

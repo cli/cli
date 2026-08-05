@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -96,7 +97,7 @@ type stubAutolinkCreator struct {
 	err error
 }
 
-func (g stubAutolinkCreator) Create(repo ghrepo.Interface, request AutolinkCreateRequest) (*shared.Autolink, error) {
+func (g stubAutolinkCreator) Create(_ context.Context, repo ghrepo.Interface, request AutolinkCreateRequest) (*shared.Autolink, error) {
 	if g.err != nil {
 		return nil, g.err
 	}
@@ -168,7 +169,7 @@ func TestCreateRun(t *testing.T) {
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
 			opts.AutolinkClient = &tt.stubCreator
-			err := createRun(opts)
+			err := createRun(context.Background(), opts)
 
 			if tt.expectedErr != nil {
 				require.Error(t, err)

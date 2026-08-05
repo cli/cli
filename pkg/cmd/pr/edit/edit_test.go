@@ -2,6 +2,7 @@ package edit
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -1170,9 +1171,10 @@ func Test_editRun(t *testing.T) {
 
 			tt.input.IO = ios
 			tt.input.HttpClient = httpClient
+			tt.input.GitHubREST = httpmock.RESTClientFunc(reg)
 			tt.input.BaseRepo = baseRepo
 
-			err := editRun(tt.input)
+			err := editRun(context.Background(), tt.input)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
@@ -1417,12 +1419,13 @@ func TestProjectsV1Deprecation(t *testing.T) {
 
 		// Ignore the error because we have no way to really stub it without
 		// fully stubbing a GQL error structure in the request body.
-		_ = editRun(&EditOptions{
+		_ = editRun(context.Background(), &EditOptions{
 			IO: ios,
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
-			Detector: &fd.EnabledDetectorMock{},
+			GitHubREST: httpmock.RESTClientFunc(reg),
+			Detector:   &fd.EnabledDetectorMock{},
 
 			Finder: shared.NewFinder(f),
 
@@ -1448,12 +1451,13 @@ func TestProjectsV1Deprecation(t *testing.T) {
 
 		// Ignore the error because we have no way to really stub it without
 		// fully stubbing a GQL error structure in the request body.
-		_ = editRun(&EditOptions{
+		_ = editRun(context.Background(), &EditOptions{
 			IO: ios,
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
-			Detector: &fd.DisabledDetectorMock{},
+			GitHubREST: httpmock.RESTClientFunc(reg),
+			Detector:   &fd.DisabledDetectorMock{},
 
 			Finder: shared.NewFinder(f),
 

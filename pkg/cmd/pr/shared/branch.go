@@ -1,7 +1,8 @@
-package delete
+package shared
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -9,8 +10,9 @@ import (
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
-func deleteDeployKey(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, id string) error {
-	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "keys", id)
+// BranchDeleteRemote deletes the remote branch on the given repository.
+func BranchDeleteRemote(ctx context.Context, client *githubrest.Client, repo ghrepo.Interface, branch string) error {
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "git", "refs", fmt.Sprintf("heads/%s", branch))
 	if err != nil {
 		return err
 	}

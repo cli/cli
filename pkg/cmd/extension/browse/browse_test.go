@@ -5,11 +5,9 @@ import (
 	"encoding/base64"
 	"io"
 	"log"
-	"net/http"
 	"net/url"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
@@ -34,9 +32,10 @@ func Test_getSelectedReadme(t *testing.T) {
 		httpmock.REST("GET", "repos/cli/gh-cool/readme"),
 		httpmock.JSONResponse(view.RepoReadme{Content: content}))
 
-	client := &http.Client{Transport: &reg}
+	restClient, err := httpmock.RESTClientFunc(&reg)("github.com")
+	require.NoError(t, err)
 
-	rg := newReadmeGetter(client, time.Second)
+	rg := newReadmeGetter(context.Background(), restClient)
 	opts := ExtBrowseOpts{
 		Rg: rg,
 	}
@@ -62,7 +61,7 @@ func Test_getSelectedReadme(t *testing.T) {
 	}
 	el := newExtList(opts, ui, extEntries)
 
-	content, err := getSelectedReadme(opts, readme, el)
+	content, err = getSelectedReadme(opts, readme, el)
 	assert.NoError(t, err)
 	assert.Contains(t, content, "lol")
 }

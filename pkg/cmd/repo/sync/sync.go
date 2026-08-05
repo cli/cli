@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,7 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	gitpkg "github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
@@ -24,9 +25,10 @@ const (
 
 type SyncOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (ghContext.Remotes, error)
 	Git        gitClient
 	DestArg    string
 	SrcArg     string
@@ -37,6 +39,7 @@ type SyncOptions struct {
 func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Command {
 	opts := SyncOptions{
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
@@ -79,7 +82,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(&opts)
 			}
-			return syncRun(&opts)
+			return syncRun(c.Context(), &opts)
 		},
 	}
 
@@ -89,11 +92,11 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 	return cmd
 }
 
-func syncRun(opts *SyncOptions) error {
+func syncRun(ctx context.Context, opts *SyncOptions) error {
 	if opts.DestArg == "" {
 		return syncLocalRepo(opts)
 	} else {
-		return syncRemoteRepo(opts)
+		return syncRemoteRepo(ctx, opts)
 	}
 }
 
@@ -166,7 +169,7 @@ func syncLocalRepo(opts *SyncOptions) error {
 	return nil
 }
 
-func syncRemoteRepo(opts *SyncOptions) error {
+func syncRemoteRepo(ctx context.Context, opts *SyncOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -191,8 +194,13 @@ func syncRemoteRepo(opts *SyncOptions) error {
 		return fmt.Errorf("can't sync repositories from different hosts")
 	}
 
+	restClient, err := opts.GitHubREST(destRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicator()
-	baseBranchLabel, err := executeRemoteRepoSync(apiClient, destRepo, srcRepo, opts)
+	baseBranchLabel, err := executeRemoteRepoSync(ctx, apiClient, restClient, destRepo, srcRepo, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		if errors.Is(err, divergingError) {
@@ -279,7 +287,7 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 // endpoint allows us to sync repositories that are not fast-forward merge compatible. Additionally,
 // the git references API endpoint gives more detailed error responses as to why the sync failed.
 // Unless the --force flag is specified we will not perform non-fast-forward merges.
-func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts *SyncOptions) (string, error) {
+func executeRemoteRepoSync(ctx context.Context, client *api.Client, restClient *githubrest.Client, destRepo, srcRepo ghrepo.Interface, opts *SyncOptions) (string, error) {
 	branchName := opts.Branch
 	if branchName == "" {
 		var err error
@@ -290,7 +298,7 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 	}
 
 	var apiErr upstreamMergeErr
-	if baseBranch, err := triggerUpstreamMerge(client, destRepo, branchName); err == nil {
+	if baseBranch, err := triggerUpstreamMerge(ctx, restClient, destRepo, branchName); err == nil {
 		return baseBranch, nil
 	} else if !errors.As(err, &apiErr) {
 		return "", err
@@ -307,7 +315,7 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 		}
 	}
 
-	commit, err := latestCommit(client, srcRepo, branchName)
+	commit, err := latestCommit(ctx, restClient, srcRepo, branchName)
 	if err != nil {
 		return "", err
 	}
@@ -315,7 +323,7 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 	// Using string comparison is a brittle way to determine the error returned by the API
 	// endpoint but unfortunately the API returns 422 for many reasons so we must
 	// interpret the message provide better error messaging for our users.
-	err = syncFork(client, destRepo, branchName, commit.Object.SHA, opts.Force)
+	err = syncFork(ctx, restClient, destRepo, branchName, commit.Object.SHA, opts.Force)
 	var httpErr *githubrest.ErrorResponse
 	if err != nil {
 		if errors.As(err, &httpErr) {

@@ -1,19 +1,19 @@
 package preview
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"path"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
@@ -27,7 +27,7 @@ import (
 type PreviewOptions struct {
 	IO             *iostreams.IOStreams
 	Telemetry      ghtelemetry.EventRecorder
-	HttpClient     func() (*http.Client, error)
+	GitHubREST     func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Prompter       prompter.Prompter
 	ExecutablePath string
 	RenderFile     func(string, string) string
@@ -45,7 +45,7 @@ func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 	opts := &PreviewOptions{
 		IO:             f.IOStreams,
 		Telemetry:      telemetry,
-		HttpClient:     f.HttpClient,
+		GitHubREST:     f.GitHubREST,
 		Prompter:       f.Prompter,
 		ExecutablePath: f.ExecutablePath,
 	}
@@ -116,7 +116,7 @@ func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			if runF != nil {
 				return runF(opts)
 			}
-			return previewRun(opts)
+			return previewRun(c.Context(), opts)
 		},
 	}
 
@@ -125,7 +125,7 @@ func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 	return cmd
 }
 
-func previewRun(opts *PreviewOptions) error {
+func previewRun(ctx context.Context, opts *PreviewOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	repo := opts.repo
@@ -136,11 +136,10 @@ func previewRun(opts *PreviewOptions) error {
 		return err
 	}
 
-	httpClient, err := opts.HttpClient()
+	client, err := opts.GitHubREST(hostname)
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	// Kick off the visibility fetch in parallel with the preview work so
 	// the extra API roundtrip doesn't add latency on the critical path.
@@ -151,12 +150,12 @@ func previewRun(opts *PreviewOptions) error {
 	}
 	visCh := make(chan visResult, 1)
 	go func() {
-		vis, err := discovery.FetchRepoVisibility(apiClient, hostname, owner, repoName)
+		vis, err := discovery.FetchRepoVisibility(ctx, client, owner, repoName)
 		visCh <- visResult{vis: vis, err: err}
 	}()
 
 	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Resolving %s/%s", owner, repoName))
-	resolved, err := discovery.ResolveRef(apiClient, hostname, owner, repoName, opts.Version)
+	resolved, err := discovery.ResolveRef(ctx, client, owner, repoName, opts.Version)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("could not resolve version: %w", err)
@@ -165,7 +164,7 @@ func previewRun(opts *PreviewOptions) error {
 	var skill discovery.Skill
 	if discovery.IsSkillPath(opts.SkillName) {
 		opts.IO.StartProgressIndicatorWithLabel("Looking up skill")
-		found, err := discovery.DiscoverSkillByPathWithOptions(apiClient, hostname, owner, repoName, resolved.SHA, opts.SkillName, discovery.DiscoverSkillByPathOptions{SkipDescription: true})
+		found, err := discovery.DiscoverSkillByPathWithOptions(ctx, client, owner, repoName, resolved.SHA, opts.SkillName, discovery.DiscoverSkillByPathOptions{SkipDescription: true})
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
@@ -173,7 +172,7 @@ func previewRun(opts *PreviewOptions) error {
 		skill = *found
 	} else {
 		opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
-		allSkills, err := discovery.DiscoverSkillsWithOptions(apiClient, hostname, owner, repoName, resolved.SHA, discovery.DiscoverOptions{})
+		allSkills, err := discovery.DiscoverSkillsWithOptions(ctx, client, owner, repoName, resolved.SHA, discovery.DiscoverOptions{})
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
@@ -197,13 +196,13 @@ func previewRun(opts *PreviewOptions) error {
 	opts.IO.StartProgressIndicatorWithLabel("Fetching skill content")
 	var files []discovery.SkillFile
 	if skill.TreeSHA != "" {
-		files, err = discovery.ListSkillFiles(apiClient, hostname, owner, repoName, skill.TreeSHA)
+		files, err = discovery.ListSkillFiles(ctx, client, owner, repoName, skill.TreeSHA)
 		if err != nil {
 			fmt.Fprintf(opts.IO.ErrOut, "warning: could not list skill files: %v\n", err)
 			files = nil
 		}
 	}
-	content, err := discovery.FetchBlob(apiClient, hostname, owner, repoName, skill.BlobSHA)
+	content, err := discovery.FetchBlob(ctx, client, owner, repoName, skill.BlobSHA)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -223,10 +222,10 @@ func previewRun(opts *PreviewOptions) error {
 
 	// Non-interactive or skill has only SKILL.md: dump through pager
 	if !canPrompt || len(extraFiles) == 0 {
-		renderAllFiles(opts, cs, skill, files, rendered, extraFiles, apiClient, hostname, owner, repoName)
+		renderAllFiles(ctx, opts, cs, skill, files, rendered, extraFiles, client, owner, repoName)
 	} else {
 		// Interactive with multiple files: show tree, then file picker
-		renderInteractive(opts, cs, skill, files, rendered, extraFiles, apiClient, hostname, owner, repoName)
+		renderInteractive(ctx, opts, cs, skill, files, rendered, extraFiles, client, owner, repoName)
 	}
 
 	dims := map[string]string{
@@ -264,9 +263,9 @@ func previewRun(opts *PreviewOptions) error {
 const visibilityWaitTimeout = 200 * time.Millisecond
 
 // renderAllFiles dumps the tree, SKILL.md, and all extra files through the pager.
-func renderAllFiles(opts *PreviewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
+func renderAllFiles(ctx context.Context, opts *PreviewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
 	files []discovery.SkillFile, rendered string, extraFiles []discovery.SkillFile,
-	apiClient *api.Client, hostname, owner, repo string) {
+	client *githubrest.Client, owner, repo string) {
 
 	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
@@ -298,7 +297,7 @@ func renderAllFiles(opts *PreviewOptions, cs *iostreams.ColorScheme, skill disco
 			fmt.Fprintf(out, "\n%s\n", cs.Muted("(skipped remaining files, size limit reached)"))
 			break
 		}
-		fileContent, fetchErr := discovery.FetchBlob(apiClient, hostname, owner, repo, f.SHA)
+		fileContent, fetchErr := discovery.FetchBlob(ctx, client, owner, repo, f.SHA)
 		if fetchErr != nil {
 			fmt.Fprintf(out, "\n%s\n\n%s\n", cs.Bold("── "+f.Path+" ──"), cs.Muted("(could not fetch file)"))
 			continue
@@ -315,9 +314,9 @@ func renderAllFiles(opts *PreviewOptions, cs *iostreams.ColorScheme, skill disco
 }
 
 // renderInteractive shows the file tree, then a picker to browse individual files.
-func renderInteractive(opts *PreviewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
+func renderInteractive(ctx context.Context, opts *PreviewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
 	files []discovery.SkillFile, renderedSkillMD string, extraFiles []discovery.SkillFile,
-	apiClient *api.Client, hostname, owner, repo string) {
+	client *githubrest.Client, owner, repo string) {
 
 	// Show the file tree to stderr so it persists above the prompt
 	fmt.Fprintf(opts.IO.ErrOut, "\n%s\n", cs.Bold(skill.DisplayName()+"/"))
@@ -354,7 +353,7 @@ func renderInteractive(opts *PreviewOptions, cs *iostreams.ColorScheme, skill di
 			selectedFile := extraFiles[idx-1]
 
 			// Fetch on demand; don't hold blob data in memory
-			fileContent, fetchErr := discovery.FetchBlob(apiClient, hostname, owner, repo, selectedFile.SHA)
+			fileContent, fetchErr := discovery.FetchBlob(ctx, client, owner, repo, selectedFile.SHA)
 			if fetchErr != nil {
 				fmt.Fprintf(opts.IO.ErrOut, "%s could not fetch %s: %v\n", cs.Red("!"), selectedFile.Path, fetchErr)
 				continue

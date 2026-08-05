@@ -1,17 +1,17 @@
 package update
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
@@ -26,7 +26,7 @@ import (
 // UpdateOptions holds all dependencies and user-provided flags for the update command.
 type UpdateOptions struct {
 	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Config     func() (gh.Config, error)
 	Prompter   prompter.Prompter
 	GitClient  *git.Client
@@ -69,7 +69,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 		Prompter:   f.Prompter,
 		Config:     f.Config,
 		GitClient:  f.GitClient,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -127,7 +127,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return updateRun(opts)
+			return updateRun(cmd.Context(), opts)
 		},
 	}
 
@@ -140,15 +140,24 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 	return cmd
 }
 
-func updateRun(opts *UpdateOptions) error {
+func updateRun(ctx context.Context, opts *UpdateOptions) error {
 	cs := opts.IO.ColorScheme()
 	canPrompt := opts.IO.CanPrompt()
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
+	// Installed skills can span multiple hosts, so a githubrest.Client (which is
+	// bound to one host) is built and cached per host rather than once.
+	clients := map[string]*githubrest.Client{}
+	clientFor := func(host string) (*githubrest.Client, error) {
+		if c, ok := clients[host]; ok {
+			return c, nil
+		}
+		c, err := opts.GitHubREST(host)
+		if err != nil {
+			return nil, err
+		}
+		clients[host] = c
+		return c, nil
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	gitRoot := installer.ResolveGitRoot(opts.GitClient)
 	homeDir := installer.ResolveHomeDir()
@@ -271,7 +280,11 @@ func updateRun(opts *UpdateOptions) error {
 
 		// Resolve ref and discover skills once per repo
 		if _, ok := repoRefs[key]; !ok {
-			resolved, resolveErr := discovery.ResolveRef(apiClient, s.repoHost, s.owner, s.repo, "")
+			client, clientErr := clientFor(s.repoHost)
+			if clientErr != nil {
+				return clientErr
+			}
+			resolved, resolveErr := discovery.ResolveRef(ctx, client, s.owner, s.repo, "")
 			if resolveErr != nil {
 				repoErrors[key] = true
 				opts.IO.StopProgressIndicator()
@@ -281,7 +294,7 @@ func updateRun(opts *UpdateOptions) error {
 			}
 			repoRefs[key] = resolved
 
-			skills, discoverErr := discovery.DiscoverSkills(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA)
+			skills, discoverErr := discovery.DiscoverSkills(ctx, client, s.owner, s.repo, resolved.SHA)
 			if discoverErr != nil {
 				repoErrors[key] = true
 				opts.IO.StopProgressIndicator()
@@ -385,7 +398,11 @@ func updateRun(opts *UpdateOptions) error {
 
 	var failed bool
 	for _, u := range updates {
-		if err := updateSkillInPlace(opts, u, apiClient, gitRoot, homeDir); err != nil {
+		client, clientErr := clientFor(u.local.repoHost)
+		if clientErr != nil {
+			return clientErr
+		}
+		if err := updateSkillInPlace(ctx, opts, u, client, gitRoot, homeDir); err != nil {
 			fmt.Fprintf(opts.IO.ErrOut, "%s Failed to update %s: %v\n", cs.FailureIcon(), u.local.name, err)
 			failed = true
 			continue
@@ -415,7 +432,7 @@ func updateRun(opts *UpdateOptions) error {
 //   - A failure at any point (install, read, rename) leaves the existing
 //     skill completely untouched: existing files are first moved aside into
 //     a backup directory and restored if any subsequent step fails.
-func updateSkillInPlace(opts *UpdateOptions, u pendingUpdate, apiClient *api.Client, gitRoot, homeDir string) error {
+func updateSkillInPlace(ctx context.Context, opts *UpdateOptions, u pendingUpdate, client *githubrest.Client, gitRoot, homeDir string) error {
 	if u.local.dir == "" {
 		return fmt.Errorf("cannot update %s: no install location recorded", u.local.name)
 	}
@@ -443,9 +460,9 @@ func updateSkillInPlace(opts *UpdateOptions, u pendingUpdate, apiClient *api.Cli
 		Dir:     staging,
 		GitRoot: gitRoot,
 		HomeDir: homeDir,
-		Client:  apiClient,
+		Client:  client,
 	}
-	if _, err := installer.Install(installOpts); err != nil {
+	if _, err := installer.Install(ctx, installOpts); err != nil {
 		return err
 	}
 

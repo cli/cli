@@ -11,53 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBranchDeleteRemote(t *testing.T) {
-	var tests = []struct {
-		name        string
-		branch      string
-		httpStubs   func(*httpmock.Registry)
-		expectError bool
-	}{
-		{
-			name:   "success",
-			branch: "owner/branch#123",
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fowner%2Fbranch%23123"),
-					httpmock.StatusStringResponse(204, ""))
-			},
-			expectError: false,
-		},
-		{
-			name:   "error",
-			branch: "my-branch",
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fmy-branch"),
-					httpmock.StatusStringResponse(500, `{"message": "oh no"}`))
-			},
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			http := &httpmock.Registry{}
-			if tt.httpStubs != nil {
-				tt.httpStubs(http)
-			}
-
-			client := newTestClient(http)
-			repo, _ := ghrepo.FromFullName("OWNER/REPO")
-
-			err := BranchDeleteRemote(client, repo, tt.branch)
-			if (err != nil) != tt.expectError {
-				t.Fatalf("unexpected result: %v", err)
-			}
-		})
-	}
-}
-
 func Test_Logins(t *testing.T) {
 	rr := ReviewRequests{}
 	var tests = []struct {

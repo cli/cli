@@ -1,6 +1,7 @@
 package extension
 
 import (
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -268,7 +269,13 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 		return m.installBin(repo, target)
 	}
 
-	hs, err := hasScript(m.client, repo)
+	restClient, err := restClientFromHTTP(m.client, repo.RepoHost())
+	if err != nil {
+		return err
+	}
+	// The ExtensionManager interface method carries no context and widening it
+	// is out of scope, so a background context is used here.
+	hs, err := hasScript(context.Background(), restClient, repo)
 	if err != nil {
 		return err
 	}
@@ -282,11 +289,17 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	var r *release
 	var err error
+	restClient, err := restClientFromHTTP(m.client, repo.RepoHost())
+	if err != nil {
+		return err
+	}
 	isPinned := target != ""
+	// The ExtensionManager interface method carries no context and widening it
+	// is out of scope, so a background context is used here.
 	if isPinned {
-		r, err = fetchReleaseFromTag(m.client, repo, target)
+		r, err = fetchReleaseFromTag(context.Background(), restClient, repo, target)
 	} else {
-		r, err = fetchLatestRelease(m.client, repo)
+		r, err = fetchLatestRelease(context.Background(), restClient, repo)
 	}
 	if err != nil {
 		return err
@@ -745,9 +758,16 @@ func readPathFromFile(path string) (string, error) {
 	return strings.TrimSpace(string(b[:n])), err
 }
 
-func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err error) {
+func isBinExtension(httpClient *http.Client, repo ghrepo.Interface) (isBin bool, err error) {
+	restClient, err := restClientFromHTTP(httpClient, repo.RepoHost())
+	if err != nil {
+		return false, err
+	}
 	var r *release
-	r, err = fetchLatestRelease(client, repo)
+	// This is called from ExtensionManager interface methods that carry no
+	// context and widening them is out of scope, so a background context is
+	// used here.
+	r, err = fetchLatestRelease(context.Background(), restClient, repo)
 	if err != nil {
 		return
 	}

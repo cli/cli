@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
 
@@ -101,7 +102,7 @@ type stubAutolinkViewer struct {
 	err      error
 }
 
-func (g stubAutolinkViewer) View(repo ghrepo.Interface, id string) (*shared.Autolink, error) {
+func (g stubAutolinkViewer) View(_ context.Context, repo ghrepo.Interface, id string) (*shared.Autolink, error) {
 	return g.autolink, g.err
 }
 
@@ -183,7 +184,7 @@ func TestViewRun(t *testing.T) {
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
 			opts.AutolinkClient = &tt.stubViewer
-			err := viewRun(opts)
+			err := viewRun(context.Background(), opts)
 
 			if tt.expectedErr != nil {
 				require.Error(t, err)
