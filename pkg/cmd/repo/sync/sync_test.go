@@ -133,7 +133,11 @@ func TestExecuteLocalRepoSyncBranchCheckedOutInOtherWorktree(t *testing.T) {
 	}
 
 	err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
-	require.Error(t, err)
+	require.ErrorContains(t, err, `can't sync "trunk" because it's checked out in another worktree at `)
+	// Assert on the directory name rather than the full path because git reports the
+	// symlink-resolved path, which differs from t.TempDir() on macOS.
+	require.ErrorContains(t, err, filepath.Base(worktreeDir))
+	require.ErrorContains(t, err, "tip: run `gh repo sync` from that worktree instead")
 	require.Equal(t, originalBranch, runGit(t, repoDir, "rev-parse", "trunk"))
 	require.Empty(t, runGit(t, worktreeDir, "status", "--porcelain"))
 }
@@ -389,9 +393,26 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("BranchWorktreePath", "trunk").Return("", nil).Once()
 				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(nil).Once()
 			},
 			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
+		},
+		{
+			name: "sync local repo with parent - existing branch checked out in another worktree",
+			tty:  true,
+			opts: &SyncOptions{
+				Branch: "trunk",
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
+				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
+				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("BranchWorktreePath", "trunk").Return("/path/to/worktree", nil).Once()
+			},
+			wantErr: true,
+			errMsg:  "can't sync \"trunk\" because it's checked out in another worktree at /path/to/worktree\ntip: run `gh repo sync` from that worktree instead",
 		},
 		{
 			name: "sync local repo with parent - create new branch",
