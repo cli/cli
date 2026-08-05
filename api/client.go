@@ -251,6 +251,21 @@ func EndpointNeedsScopes(resp *http.Response, s string) {
 	}
 }
 
+// ErrorNeedsScopes annotates a REST error with an OAuth scope the endpoint
+// requires but does not advertise in its response, so that the resulting
+// scope suggestion names it.
+//
+// It is the Send/Do shaped counterpart to EndpointNeedsScopes, which needs the
+// *http.Response that those two no longer hand back on a failure.
+func ErrorNeedsScopes(err error, s string) error {
+	var errResp *githubrest.ErrorResponse
+	if errors.As(err, &errResp) && errResp.StatusCode >= 400 && errResp.StatusCode < 500 {
+		oldScopes := errResp.Headers.Get("X-Accepted-Oauth-Scopes")
+		errResp.Headers.Set("X-Accepted-Oauth-Scopes", fmt.Sprintf("%s, %s", oldScopes, s))
+	}
+	return err
+}
+
 func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScopes, hostname string) string {
 	if statusCode < 400 || statusCode > 499 || statusCode == 422 {
 		return ""

@@ -44,7 +44,7 @@ func Test_repoFile_ExportData(t *testing.T) {
 		Path:        "docs/README.md",
 		SHA:         "abc",
 		Size:        5,
-		URL:         "https://api.github.com/repos/OWNER/REPO/contents/docs/README.md",
+		URL:         "repos/OWNER/REPO/contents/docs/README.md",
 		HTMLURL:     "https://github.com/OWNER/REPO/blob/main/docs/README.md",
 		GitURL:      "https://api.github.com/repos/OWNER/REPO/git/blobs/abc",
 		DownloadURL: "https://raw.githubusercontent.com/OWNER/REPO/main/docs/README.md",
@@ -58,7 +58,7 @@ func Test_repoFile_ExportData(t *testing.T) {
 	assert.Equal(t, "docs/README.md", data["path"])
 	assert.Equal(t, "abc", data["gitSHA"])
 	assert.Equal(t, 5, data["size"])
-	assert.Equal(t, "https://api.github.com/repos/OWNER/REPO/contents/docs/README.md", data["url"])
+	assert.Equal(t, "repos/OWNER/REPO/contents/docs/README.md", data["url"])
 	assert.Equal(t, "https://github.com/OWNER/REPO/blob/main/docs/README.md", data["htmlUrl"])
 	assert.Equal(t, "https://api.github.com/repos/OWNER/REPO/git/blobs/abc", data["gitUrl"])
 	assert.Equal(t, "https://raw.githubusercontent.com/OWNER/REPO/main/docs/README.md", data["downloadUrl"])
@@ -263,7 +263,7 @@ func Test_readFileRun(t *testing.T) {
 						"encoding":     "base64",
 						"content":      "aGVsbG8=",
 						"sha":          "deadbeef",
-						"url":          "https://api.github.com/repos/OWNER/REPO/contents/meta.md",
+						"url":          "repos/OWNER/REPO/contents/meta.md",
 						"html_url":     "https://github.com/OWNER/REPO/blob/main/meta.md",
 						"git_url":      "https://api.github.com/repos/OWNER/REPO/git/blobs/deadbeef",
 						"download_url": "https://raw.githubusercontent.com/OWNER/REPO/main/meta.md",
@@ -281,7 +281,7 @@ func Test_readFileRun(t *testing.T) {
 				"\"path\":\"meta.md\"," +
 				"\"size\":5," +
 				"\"type\":\"file\"," +
-				"\"url\":\"https://api.github.com/repos/OWNER/REPO/contents/meta.md\"" +
+				"\"url\":\"repos/OWNER/REPO/contents/meta.md\"" +
 				"}\n",
 		},
 		{
@@ -696,12 +696,12 @@ func fileContentResponseBytes(name string, content []byte) map[string]interface{
 		"encoding":     "base64",
 		"content":      base64.StdEncoding.EncodeToString(content),
 		"sha":          "deadbeef",
-		"url":          "https://api.github.com/repos/OWNER/REPO/contents/" + name,
+		"url":          "repos/OWNER/REPO/contents/" + name,
 		"git_url":      "https://api.github.com/repos/OWNER/REPO/git/blobs/deadbeef",
 		"html_url":     "https://github.com/OWNER/REPO/blob/main/" + name,
 		"download_url": "https://raw.githubusercontent.com/OWNER/REPO/main/" + name,
 		"_links": map[string]interface{}{
-			"self": "https://api.github.com/repos/OWNER/REPO/contents/" + name,
+			"self": "repos/OWNER/REPO/contents/" + name,
 			"git":  "https://api.github.com/repos/OWNER/REPO/git/blobs/deadbeef",
 			"html": "https://github.com/OWNER/REPO/blob/main/" + name,
 		},
@@ -724,28 +724,28 @@ func Test_contentsAPIPath(t *testing.T) {
 		{
 			name:     "simple path",
 			filePath: "README.md",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+			want:     "repos/OWNER/REPO/contents/README.md",
 		},
 		{
 			name:     "leading slash trimmed",
 			filePath: "/README.md",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+			want:     "repos/OWNER/REPO/contents/README.md",
 		},
 		{
 			name:     "nested path encodes separators",
 			filePath: "pkg/cmd/create.go",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/pkg%2Fcmd%2Fcreate.go",
+			want:     "repos/OWNER/REPO/contents/pkg%2Fcmd%2Fcreate.go",
 		},
 		{
 			name:     "spaces are encoded",
 			filePath: "dir with spaces/file.txt",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/dir%20with%20spaces%2Ffile.txt",
+			want:     "repos/OWNER/REPO/contents/dir%20with%20spaces%2Ffile.txt",
 		},
 		{
 			name:     "ref is appended",
 			filePath: "README.md",
 			ref:      "feature/branch",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md?ref=feature%2Fbranch",
+			want:     "repos/OWNER/REPO/contents/README.md?ref=feature%2Fbranch",
 		},
 	}
 

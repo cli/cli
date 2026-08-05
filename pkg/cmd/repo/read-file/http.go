@@ -1,15 +1,15 @@
 package readfile
 
 import (
+	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
@@ -88,32 +88,22 @@ func fetchContent(httpClient *http.Client, repo ghrepo.Interface, filePath, ref 
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", apiPath.String(), nil)
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
+
 	// We use the "application/vnd.github.object+json" media type to request a unified object
 	// representation from the Contents API. Without this, the API returns a JSON array for
 	// directories and a JSON object for files.
-	req.Header.Set("Accept", "application/vnd.github.object+json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	body, err := io.ReadAll(resp.Body)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, apiPath.String(), nil,
+		githubrest.WithHeader("Accept", "application/vnd.github.object+json"))
 	if err != nil {
 		return nil, err
 	}
 
 	var content contentsResponse
-	if err := json.Unmarshal(body, &content); err != nil {
+	if _, err := client.Do(req, &content); err != nil {
 		return nil, err
 	}
 	return &content, nil
@@ -179,21 +169,23 @@ func fetchRawFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref 
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", apiPath.String(), nil)
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", "application/vnd.github.raw")
 
-	resp, err := httpClient.Do(req)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, apiPath.String(), nil,
+		githubrest.WithHeader("Accept", "application/vnd.github.raw"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Send rather than Do, because the response body is raw file bytes.
+	resp, err := client.Send(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
 
 	return io.ReadAll(resp.Body)
 }
@@ -202,7 +194,7 @@ func fetchRawFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref 
 func contentsAPIPath(repo ghrepo.Interface, filePath, ref string) (safeurl.SafeURL, error) {
 	// The Contents API accepts a fully percent-encoded path, including path separators
 	// encoded as %2F, so spaces and other special characters are handled transparently.
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "contents", strings.TrimPrefix(filePath, "/"))
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "contents", strings.TrimPrefix(filePath, "/"))
 	if err != nil {
 		return nil, err
 	}

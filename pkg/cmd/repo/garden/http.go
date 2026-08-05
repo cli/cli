@@ -1,15 +1,15 @@
 package garden
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
-	"io"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
@@ -27,7 +27,7 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 	commits := []*Commit{}
 
 	pathF := func(page int) (*safeurl.MutableSafeURL, error) {
-		u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "commits")
+		u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "commits")
 		if err != nil {
 			return nil, err
 		}
@@ -47,7 +47,7 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 		if err != nil {
 			return nil, err
 		}
-		links, err := getResponse(client, path, &result)
+		links, err := getResponse(client, repo.RepoHost(), path, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -80,39 +80,23 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 
 // getResponse performs the API call and returns the response's link header values.
 // If the "Link" header is missing, the returned slice will be nil.
-func getResponse(client *http.Client, url safeurl.SafeURL, data interface{}) ([]string, error) {
-	req, err := http.NewRequest("GET", url.String(), nil)
+func getResponse(client *http.Client, hostname string, url safeurl.SafeURL, data interface{}) ([]string, error) {
+	restClient, err := api.NewRESTClient(client, hostname)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	resp, err := client.Do(req)
+	req, err := restClient.NewRequest(context.Background(), http.MethodGet, url.String(), nil,
+		githubrest.WithHeader("Content-Type", "application/json; charset=utf-8"))
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
+	resp, err := restClient.Do(req, data)
+	if err != nil {
+		// The message deliberately stays this vague, as it was before.
 		return nil, errors.New("api call failed")
 	}
 
-	links := resp.Header["Link"]
-
-	if resp.StatusCode == http.StatusNoContent {
-		return links, nil
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(b, &data)
-	if err != nil {
-		return nil, err
-	}
-
-	return links, nil
+	return resp.Header["Link"], nil
 }

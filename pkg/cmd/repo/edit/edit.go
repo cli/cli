@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"slices"
 	"strings"
@@ -14,7 +14,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
@@ -567,33 +566,30 @@ func parseTopics(s string) []string {
 }
 
 func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "topics")
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
+
+	url, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "topics")
 	if err != nil {
 		return nil, err
 	}
 
 	// "mercy-preview" is still needed for some GitHub Enterprise versions
-	req.Header.Set("Accept", "application/vnd.github.mercy-preview+json")
-	res, err := httpClient.Do(req)
+	req, err := client.NewRequest(ctx, http.MethodGet, url.String(), nil,
+		githubrest.WithHeader("Accept", "application/vnd.github.mercy-preview+json"))
 	if err != nil {
 		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(res)
 	}
 
 	var responseData struct {
 		Names []string `json:"names"`
 	}
-	dec := json.NewDecoder(res.Body)
-	err = dec.Decode(&responseData)
-	return responseData.Names, err
+	if _, err := client.Do(req, &responseData); err != nil {
+		return nil, err
+	}
+	return responseData.Names, nil
 }
 
 func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, topics []string) error {
@@ -608,33 +604,27 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 		return err
 	}
 
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "topics")
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, "PUT", url.String(), body)
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("Content-type", "application/json")
+	url, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "topics")
+	if err != nil {
+		return err
+	}
+
 	// "mercy-preview" is still needed for some GitHub Enterprise versions
-	req.Header.Set("Accept", "application/vnd.github.mercy-preview+json")
-	res, err := httpClient.Do(req)
+	req, err := client.NewRequest(ctx, http.MethodPut, url.String(), body,
+		githubrest.WithHeader("Content-type", "application/json"),
+		githubrest.WithHeader("Accept", "application/vnd.github.mercy-preview+json"))
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK {
-		return api.HandleHTTPError(res)
-	}
-
-	if res.Body != nil {
-		_, _ = io.Copy(io.Discard, res.Body)
-	}
-
-	return nil
+	// A nil receiver makes Do discard the body, which this never read.
+	_, err = client.Do(req, nil)
+	return err
 }
 
 func isIncluded(value string, opts []string) bool {
