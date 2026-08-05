@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/extension/browse"
@@ -170,7 +170,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					host, _ := cfg.Authentication().DefaultHost()
 					detector := featuredetection.NewDetector(client, host)
-					searcher := search.NewSearcher(client, host, detector)
+					restClient, err := f.GitHubREST(host)
+					if err != nil {
+						return err
+					}
+					searcher := search.NewSearcher(cmd.Context(), restClient, host, detector)
 
 					if webMode {
 						url := searcher.URL(query)
@@ -516,7 +520,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					}
 
 					detector := featuredetection.NewDetector(client, host)
-					searcher := search.NewSearcher(api.NewCachedHTTPClient(client, time.Hour*24), host, detector)
+					restClient, err := f.GitHubREST(host, githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+					if err != nil {
+						return err
+					}
+					searcher := search.NewSearcher(cmd.Context(), restClient, host, detector)
 
 					gc.Stderr = gio.Discard
 

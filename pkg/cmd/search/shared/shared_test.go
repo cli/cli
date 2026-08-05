@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/stretchr/testify/assert"
@@ -23,8 +25,9 @@ func TestSearcher(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(&httpmock.Registry{}),
 	}
-	_, err := Searcher(f)
+	_, err := Searcher(context.Background(), f)
 	assert.NoError(t, err)
 }
 

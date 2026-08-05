@@ -127,7 +127,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 				return runF(opts)
 			}
 			var err error
-			opts.Searcher, err = shared.Searcher(f)
+			opts.Searcher, err = shared.Searcher(c.Context(), f)
 			if err != nil {
 				return err
 			}

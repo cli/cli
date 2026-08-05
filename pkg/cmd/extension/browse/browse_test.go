@@ -1,6 +1,7 @@
 package browse
 
 import (
+	"context"
 	"encoding/base64"
 	"io"
 	"log"
@@ -20,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/rivo/tview"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_getSelectedReadme(t *testing.T) {
@@ -68,8 +70,6 @@ func Test_getSelectedReadme(t *testing.T) {
 func Test_getExtensionRepos(t *testing.T) {
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
-
-	client := &http.Client{Transport: &reg}
 
 	values := url.Values{
 		"page":     []string{"1"},
@@ -126,7 +126,9 @@ func Test_getExtensionRepos(t *testing.T) {
 		}),
 	)
 
-	searcher := search.NewSearcher(client, "github.com", &fd.DisabledDetectorMock{})
+	restClient, err := httpmock.RESTClientFunc(&reg)("github.com")
+	require.NoError(t, err)
+	searcher := search.NewSearcher(context.Background(), restClient, "github.com", &fd.DisabledDetectorMock{})
 	emMock := &extensions.ExtensionManagerMock{}
 	emMock.ListFunc = func() []extensions.Extension {
 		return []extensions.Extension{

@@ -1,8 +1,8 @@
 package search
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strconv"
 	"testing"
@@ -11,6 +11,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSearcherCode(t *testing.T) {
@@ -262,11 +263,12 @@ func TestSearcherCode(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			client := &http.Client{Transport: reg}
 			if tt.host == "" {
 				tt.host = "github.com"
 			}
-			searcher := NewSearcher(client, tt.host, &fd.DisabledDetectorMock{})
+			client, err := httpmock.RESTClientFunc(reg)(tt.host)
+			require.NoError(t, err)
+			searcher := NewSearcher(context.Background(), client, tt.host, &fd.DisabledDetectorMock{})
 			result, err := searcher.Code(tt.query)
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)
@@ -548,11 +550,12 @@ func TestSearcherCommits(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			client := &http.Client{Transport: reg}
 			if tt.host == "" {
 				tt.host = "github.com"
 			}
-			searcher := NewSearcher(client, tt.host, &fd.DisabledDetectorMock{})
+			client, err := httpmock.RESTClientFunc(reg)(tt.host)
+			require.NoError(t, err)
+			searcher := NewSearcher(context.Background(), client, tt.host, &fd.DisabledDetectorMock{})
 			result, err := searcher.Commits(tt.query)
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)
@@ -834,11 +837,12 @@ func TestSearcherRepositories(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			client := &http.Client{Transport: reg}
 			if tt.host == "" {
 				tt.host = "github.com"
 			}
-			searcher := NewSearcher(client, tt.host, &fd.DisabledDetectorMock{})
+			client, err := httpmock.RESTClientFunc(reg)(tt.host)
+			require.NoError(t, err)
+			searcher := NewSearcher(context.Background(), client, tt.host, &fd.DisabledDetectorMock{})
 			result, err := searcher.Repositories(tt.query)
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)
@@ -1120,11 +1124,12 @@ func TestSearcherIssues(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			client := &http.Client{Transport: reg}
 			if tt.host == "" {
 				tt.host = "github.com"
 			}
-			searcher := NewSearcher(client, tt.host, fd.AdvancedIssueSearchUnsupported())
+			client, err := httpmock.RESTClientFunc(reg)(tt.host)
+			require.NoError(t, err)
+			searcher := NewSearcher(context.Background(), client, tt.host, fd.AdvancedIssueSearchUnsupported())
 			result, err := searcher.Issues(tt.query)
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)
@@ -1205,10 +1210,11 @@ func TestSearcherIssuesAdvancedSyntax(t *testing.T) {
 				httpmock.JSONResponse(IssuesResult{}),
 			)
 
-			client := &http.Client{Transport: reg}
-			searcher := NewSearcher(client, "github.com", tt.detector)
+			client, err := httpmock.RESTClientFunc(reg)("github.com")
+			require.NoError(t, err)
+			searcher := NewSearcher(context.Background(), client, "github.com", tt.detector)
 
-			_, err := searcher.Issues(tt.query)
+			_, err = searcher.Issues(tt.query)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 			} else {
@@ -1262,7 +1268,7 @@ func TestSearcherURL(t *testing.T) {
 			if tt.host == "" {
 				tt.host = "github.com"
 			}
-			searcher := NewSearcher(nil, tt.host, nil)
+			searcher := NewSearcher(context.Background(), nil, tt.host, nil)
 			assert.Equal(t, tt.url, searcher.URL(tt.query))
 		})
 	}

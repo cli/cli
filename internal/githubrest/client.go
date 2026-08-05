@@ -53,6 +53,9 @@ type Client struct {
 	// credentialedHosts are the hosts this client will send an Authorization
 	// header to, lowercased and including any port.
 	credentialedHosts map[string]struct{}
+
+	// defaultRequestOptions are applied to every request the client builds.
+	defaultRequestOptions []RequestOption
 }
 
 // AuthStrategy states whether a client authenticates, and is a required
@@ -120,6 +123,19 @@ func WithCredentialedHost(host string) ClientOption {
 func WithCheckRedirect(fn func(*http.Request, []*http.Request) error) ClientOption {
 	return func(c *Client) {
 		c.http = withRedirectPolicy(c.http, fn)
+	}
+}
+
+// WithDefaultRequestOptions applies opts to every request the client builds,
+// before the request's own options, so a call site can still override them.
+//
+// This exists for options that describe the client's whole job rather than one
+// request. Caching is the case that exists: gh extension browse wants every
+// search response served from cache for a day, and the searcher it hands the
+// client to builds the requests itself.
+func WithDefaultRequestOptions(opts ...RequestOption) ClientOption {
+	return func(c *Client) {
+		c.defaultRequestOptions = append(c.defaultRequestOptions, opts...)
 	}
 }
 
@@ -259,6 +275,10 @@ func (c *Client) NewRequest(ctx context.Context, method, path string, body io.Re
 
 	if token, ok := c.token.Value(); ok {
 		req.Header.Set(authorizationHeader, authorizationValue(token))
+	}
+
+	for _, opt := range c.defaultRequestOptions {
+		opt(req)
 	}
 
 	for _, opt := range opts {

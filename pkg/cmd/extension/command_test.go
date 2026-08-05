@@ -942,6 +942,7 @@ func TestNewCmdExtension(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &client, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(&reg),
 			}
 
 			cmd := NewCmdExtension(&f)

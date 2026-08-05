@@ -2,6 +2,7 @@ package code
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"testing"
 
@@ -337,7 +338,7 @@ func TestCodeRun(t *testing.T) {
 						Extension: "go",
 					},
 				},
-				Searcher: search.NewSearcher(nil, "github.com", &fd.DisabledDetectorMock{}),
+				Searcher: search.NewSearcher(context.Background(), nil, "github.com", &fd.DisabledDetectorMock{}),
 				WebMode:  true,
 			},
 			wantBrowse: "https://github.com/search?q=map+path%3Atesting.go&type=code",
@@ -355,7 +356,7 @@ func TestCodeRun(t *testing.T) {
 						Extension: ".cpp",
 					},
 				},
-				Searcher: search.NewSearcher(nil, "github.com", &fd.DisabledDetectorMock{}),
+				Searcher: search.NewSearcher(context.Background(), nil, "github.com", &fd.DisabledDetectorMock{}),
 				WebMode:  true,
 			},
 			wantBrowse: "https://github.com/search?q=map+path%3Atesting.cpp&type=code",
@@ -382,7 +383,7 @@ func TestCodeRun(t *testing.T) {
 						Extension: "go",
 					},
 				},
-				Searcher: search.NewSearcher(nil, "example.com", &fd.DisabledDetectorMock{}),
+				Searcher: search.NewSearcher(context.Background(), nil, "example.com", &fd.DisabledDetectorMock{}),
 				WebMode:  true,
 			},
 			wantBrowse: "https://example.com/search?q=map+extension%3Ago+filename%3Atesting&type=code",

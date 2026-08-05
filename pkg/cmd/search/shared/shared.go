@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -38,7 +39,7 @@ type IssuesOptions struct {
 	WebMode  bool
 }
 
-func Searcher(f *cmdutil.Factory) (search.Searcher, error) {
+func Searcher(ctx context.Context, f *cmdutil.Factory) (search.Searcher, error) {
 	cfg, err := f.Config()
 	if err != nil {
 		return nil, err
@@ -52,7 +53,12 @@ func Searcher(f *cmdutil.Factory) (search.Searcher, error) {
 
 	detector := fd.NewDetector(client, host)
 
-	return search.NewSearcher(client, host, detector), nil
+	restClient, err := f.GitHubREST(host)
+	if err != nil {
+		return nil, err
+	}
+
+	return search.NewSearcher(ctx, restClient, host, detector), nil
 }
 
 func SearchIssues(opts *IssuesOptions) error {

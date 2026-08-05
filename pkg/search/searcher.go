@@ -1,6 +1,7 @@
 package search
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -36,7 +38,11 @@ type Searcher interface {
 }
 
 type searcher struct {
-	client   *http.Client
+	// ctx is held rather than passed, because the Searcher interface is
+	// implemented against per-query methods that the CLI's search commands
+	// call without one.
+	ctx      context.Context
+	client   *githubrest.Client
 	detector fd.Detector
 	host     string
 }
@@ -55,8 +61,9 @@ type httpErrorItem struct {
 	Resource string
 }
 
-func NewSearcher(client *http.Client, host string, detector fd.Detector) Searcher {
+func NewSearcher(ctx context.Context, client *githubrest.Client, host string, detector fd.Detector) Searcher {
 	return &searcher{
+		ctx:      ctx,
 		client:   client,
 		host:     host,
 		detector: detector,
@@ -236,28 +243,33 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 	if query.Sort != "" {
 		u.SetQuery(sortKey, query.Sort)
 	}
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	accept := "application/vnd.github.v3+json"
 	if query.Kind == KindCode {
-		req.Header.Set("Accept", "application/vnd.github.text-match+json")
+		accept = "application/vnd.github.text-match+json"
 	}
 
-	resp, err := s.client.Do(req)
+	req, err := s.client.NewRequest(s.ctx, http.MethodGet, u.String(), nil,
+		githubrest.WithHeader("Content-Type", "application/json; charset=utf-8"),
+		githubrest.WithHeader("Accept", accept))
 	if err != nil {
 		return "", err
+	}
+
+	// Send rather than Do, because pagination reads the Link header, and
+	// because search reports an invalid query as a 422 that this package
+	// renders specially.
+	resp, err := s.client.Send(req)
+	if err != nil {
+		if resp == nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		return resp.Header.Get("Link"), handleHTTPError(resp.Response)
 	}
 	defer resp.Body.Close()
 
 	link := resp.Header.Get("Link")
 
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return link, handleHTTPError(resp)
-	}
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(result)
 	if err != nil {
