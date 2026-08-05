@@ -88,7 +88,7 @@ func TestCheckForUpdate(t *testing.T) {
 				}`, s.LatestVersion, s.LatestURL)),
 			)
 
-			rel, err := CheckForUpdate(context.TODO(), client, tempFilePath(), "OWNER/REPO", s.CurrentVersion)
+			rel, err := CheckForUpdate(context.Background(), client, tempFilePath(), "OWNER/REPO", s.CurrentVersion)
 			if err != nil {
 				t.Fatal(err)
 			}
