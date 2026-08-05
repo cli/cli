@@ -17,6 +17,7 @@ import (
 const (
 	apiVersion      = "X-GitHub-Api-Version"
 	apiVersionValue = "2022-11-28"
+	authorization   = "Authorization"
 	cacheTTL        = "X-GH-CACHE-TTL"
 	graphqlFeatures = "GraphQL-Features"
 	features        = "merge_queue"
@@ -301,11 +302,22 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 //
 // Only GraphQL uses this now. REST is built on githubrest.
 func clientOptions(hostname, token string, transport http.RoundTripper) ghAPI.ClientOptions {
+	headers := map[string]string{
+		apiVersion: apiVersionValue,
+	}
+
+	// An empty AuthToken makes go-gh resolve one from the environment and fail
+	// when there is none, so the placeholder it was always given is kept for
+	// the unauthenticated case. The empty Authorization header then stops the
+	// header round tripper from sending "token none", exactly as before.
+	if token == "" {
+		token = "none"
+		headers[authorization] = ""
+	}
+
 	opts := ghAPI.ClientOptions{
-		AuthToken: token,
-		Headers: map[string]string{
-			apiVersion: apiVersionValue,
-		},
+		AuthToken:          token,
+		Headers:            headers,
 		Host:               hostname,
 		SkipDefaultHeaders: true,
 		Transport:          transport,

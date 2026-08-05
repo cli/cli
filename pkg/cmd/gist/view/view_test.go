@@ -3,6 +3,7 @@ package view
 import (
 	"bytes"
 	"fmt"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"net/http"
 	"testing"
 	"time"
@@ -589,7 +590,20 @@ func Test_viewRun(t *testing.T) {
 		}
 
 		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
+			// Wrapped in go-gh's client, as the factory's HTTP client is, so
+			// that the escape sanitizing round tripper this test depends on is
+			// present. It used to arrive by accident: api.Client.REST built a
+			// second go-gh client per call around whatever transport it was
+			// given, which added a sanitizer even to a bare httpmock registry.
+			// REST no longer does that, and in production the sanitizer has
+			// always come from the factory's client.
+			return ghAPI.NewHTTPClient(ghAPI.ClientOptions{
+				Host:               "none",
+				AuthToken:          "none",
+				LogIgnoreEnv:       true,
+				SkipDefaultHeaders: true,
+				Transport:          reg,
+			})
 		}
 
 		tt.opts.Config = func() (gh.Config, error) {

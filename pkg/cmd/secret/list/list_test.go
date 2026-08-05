@@ -851,7 +851,10 @@ func Test_getSecrets_pagination(t *testing.T) {
 		httpmock.WithHeader(
 			httpmock.StringResponse(`{"secrets":[{},{}]}`),
 			"Link",
-			`<http://example.com/page/0>; rel="previous", <http://example.com/page/2>; rel="next"`),
+			// The next page URL is on the API host, as a real Link header is. It used
+			// to name an unrelated host, which only worked while REST followed any
+			// absolute URL it was handed.
+			`<https://api.github.com/page/0>; rel="previous", <https://api.github.com/page/2>; rel="next"`),
 	)
 	reg.Register(
 		httpmock.REST("GET", "page/2"),
