@@ -40,8 +40,8 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/opentracing/opentracing-go"
@@ -61,7 +61,8 @@ const (
 
 // API is the interface to the codespace service.
 type API struct {
-	client         func() (*http.Client, error)
+	restClient     *githubrest.Client
+	restClientErr  error
 	externalClient func() (*http.Client, error)
 	githubAPI      string
 	githubServer   string
@@ -70,37 +71,75 @@ type API struct {
 
 // New creates a new API client connecting to the configured endpoints with the HTTP client.
 func New(f *cmdutil.Factory) *API {
+	// The default host is resolved once and shared by the endpoint defaults and
+	// the REST client, so that a single config lookup serves all three.
+	var host string
+	cfg, cfgErr := f.Config()
+	if cfgErr == nil {
+		host, _ = cfg.Authentication().DefaultHost()
+	}
+
 	apiURL := os.Getenv("GITHUB_API_URL")
 	if apiURL == "" {
-		cfg, err := f.Config()
-		if err != nil {
+		if cfgErr != nil {
 			// fallback to the default api endpoint
 			apiURL = defaultAPIURL
 		} else {
-			host, _ := cfg.Authentication().DefaultHost()
 			apiURL = ghinstance.RESTPrefix(host)
 		}
 	}
 
 	serverURL := os.Getenv("GITHUB_SERVER_URL")
 	if serverURL == "" {
-		cfg, err := f.Config()
-		if err != nil {
+		if cfgErr != nil {
 			// fallback to the default server endpoint
 			serverURL = defaultServerURL
 		} else {
-			host, _ := cfg.Authentication().DefaultHost()
 			serverURL = ghinstance.HostPrefix(host)
 		}
 	}
 
+	// The client is resolved here rather than per request, but New has no error
+	// to return, so a failure is carried and surfaced by newRequest.
+	restClient, restClientErr := newRESTClient(f, host, apiURL)
+	if cfgErr != nil {
+		restClient, restClientErr = nil, cfgErr
+	}
+
 	return &API{
-		client:         f.HttpClient,
+		restClient:     restClient,
+		restClientErr:  restClientErr,
 		externalClient: f.ExternalHttpClient,
 		githubAPI:      strings.TrimSuffix(apiURL, "/"),
 		githubServer:   strings.TrimSuffix(serverURL, "/"),
 		retryBackoff:   100 * time.Millisecond,
 	}
+}
+
+// newRESTClient builds the REST client for apiURL.
+//
+// apiURL can be overridden by GITHUB_API_URL, so its host is declared as
+// credentialed explicitly: it is not necessarily the host the factory resolved
+// the token for.
+func newRESTClient(f *cmdutil.Factory, host, apiURL string) (*githubrest.Client, error) {
+	opts := []githubrest.ClientOption{}
+	if parsed, err := url.Parse(apiURL); err == nil && parsed.Host != "" {
+		opts = append(opts, githubrest.WithCredentialedHost(parsed.Host))
+	}
+
+	return f.GitHubREST(host, opts...)
+}
+
+// newRequest builds a request through the package's REST client.
+//
+// It exists because New cannot report a client construction failure, and
+// because every request in this file is built from an absolute URL derived
+// from a.githubAPI rather than from a relative path.
+func (a *API) newRequest(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
+	if a.restClientErr != nil {
+		return nil, a.restClientErr
+	}
+	return a.restClient.NewRequest(ctx, method, url, body)
 }
 
 // User represents a GitHub user.
@@ -120,7 +159,7 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := a.newRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -133,7 +172,7 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -173,7 +212,7 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := a.newRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -186,7 +225,7 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -425,7 +464,7 @@ func (a *API) ListCodespaces(ctx context.Context, opts ListCodespacesOptions) (c
 	}
 
 	for {
-		req, err := http.NewRequest(http.MethodGet, listURL.String(), nil)
+		req, err := a.newRequest(ctx, http.MethodGet, listURL.String(), nil)
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %w", err)
 		}
@@ -438,7 +477,7 @@ func (a *API) ListCodespaces(ctx context.Context, opts ListCodespacesOptions) (c
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			return nil, api.HandleHTTPError(resp)
+			return nil, githubrest.NewErrorResponse(resp)
 		}
 
 		var response struct {
@@ -492,7 +531,7 @@ func (a *API) GetOrgMemberCodespace(ctx context.Context, orgName string, userNam
 	var listURL safeurl.SafeURL = u
 
 	for {
-		req, err := http.NewRequest(http.MethodGet, listURL.String(), nil)
+		req, err := a.newRequest(ctx, http.MethodGet, listURL.String(), nil)
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %w", err)
 		}
@@ -505,7 +544,7 @@ func (a *API) GetOrgMemberCodespace(ctx context.Context, orgName string, userNam
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			return nil, api.HandleHTTPError(resp)
+			return nil, githubrest.NewErrorResponse(resp)
 		}
 
 		var response struct {
@@ -542,7 +581,8 @@ func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeCon
 		if err != nil {
 			return nil, err
 		}
-		req, err := http.NewRequest(
+		req, err := a.newRequest(
+			ctx,
 			http.MethodGet,
 			u.String(),
 			nil,
@@ -565,7 +605,7 @@ func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeCon
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -589,7 +629,8 @@ func (a *API) StartCodespace(ctx context.Context, codespaceName string) error {
 		if err != nil {
 			return nil, err
 		}
-		req, err := http.NewRequest(
+		req, err := a.newRequest(
+			ctx,
 			http.MethodPost,
 			u.String(),
 			nil,
@@ -610,7 +651,7 @@ func (a *API) StartCodespace(ctx context.Context, codespaceName string) error {
 			// 409 means the codespace is already running which we can safely ignore
 			return nil
 		}
-		return api.HandleHTTPError(resp)
+		return githubrest.NewErrorResponse(resp)
 	}
 
 	return nil
@@ -632,7 +673,7 @@ func (a *API) StopCodespace(ctx context.Context, codespaceName string, orgName s
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, stopURL.String(), nil)
+	req, err := a.newRequest(ctx, http.MethodPost, stopURL.String(), nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
@@ -645,7 +686,7 @@ func (a *API) StopCodespace(ctx context.Context, codespaceName string, orgName s
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return api.HandleHTTPError(resp)
+		return githubrest.NewErrorResponse(resp)
 	}
 
 	return nil
@@ -663,7 +704,7 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int64, branch, l
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := a.newRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -682,7 +723,7 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int64, branch, l
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -706,7 +747,7 @@ func (a *API) GetCodespacesPermissionsCheck(ctx context.Context, repoID int64, b
 	if err != nil {
 		return false, err
 	}
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := a.newRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return false, fmt.Errorf("error creating request: %w", err)
 	}
@@ -724,7 +765,7 @@ func (a *API) GetCodespacesPermissionsCheck(ctx context.Context, repoID int64, b
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, api.HandleHTTPError(resp)
+		return false, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -756,7 +797,7 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodGet, reqURL.String(), nil)
+	req, err := a.newRequest(ctx, http.MethodGet, reqURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -800,7 +841,7 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -834,7 +875,7 @@ func (a *API) GetCodespaceBillableOwner(ctx context.Context, nwo string) (*User,
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := a.newRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -851,7 +892,7 @@ func (a *API) GetCodespaceBillableOwner(ctx context.Context, nwo string) (*User,
 	} else if resp.StatusCode == http.StatusForbidden {
 		return nil, fmt.Errorf("you cannot create codespaces with that repository")
 	} else if resp.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -983,7 +1024,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewBuffer(requestBody))
+	req, err := a.newRequest(ctx, http.MethodPost, u.String(), bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -1028,10 +1069,10 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 
 		resp.Body = io.NopCloser(bodyCopy)
 
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 
 	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -1064,7 +1105,7 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string, orgName
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodDelete, deleteURL.String(), nil)
+	req, err := a.newRequest(ctx, http.MethodDelete, deleteURL.String(), nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
@@ -1077,7 +1118,7 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string, orgName
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		return api.HandleHTTPError(resp)
+		return githubrest.NewErrorResponse(resp)
 	}
 
 	return nil
@@ -1107,7 +1148,7 @@ func (a *API) ListDevContainers(ctx context.Context, repoID int64, branch string
 	var listURL safeurl.SafeURL = u
 
 	for {
-		req, err := http.NewRequest(http.MethodGet, listURL.String(), nil)
+		req, err := a.newRequest(ctx, http.MethodGet, listURL.String(), nil)
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %w", err)
 		}
@@ -1120,7 +1161,7 @@ func (a *API) ListDevContainers(ctx context.Context, repoID int64, branch string
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			return nil, api.HandleHTTPError(resp)
+			return nil, githubrest.NewErrorResponse(resp)
 		}
 
 		var response struct {
@@ -1169,7 +1210,7 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPatch, u.String(), bytes.NewBuffer(requestBody))
+	req, err := a.newRequest(ctx, http.MethodPatch, u.String(), bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -1196,7 +1237,7 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 				)
 			}
 		}
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -1233,7 +1274,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := a.newRequest(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -1252,7 +1293,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil
 	} else if resp.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(resp)
+		return nil, githubrest.NewErrorResponse(resp)
 	}
 
 	b, err := io.ReadAll(resp.Body)
@@ -1281,12 +1322,22 @@ func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http
 	defer span.Finish()
 	req = req.WithContext(ctx)
 
-	httpClient, err := a.client()
-	if err != nil {
-		return nil, err
+	if a.restClientErr != nil {
+		return nil, a.restClientErr
 	}
 
-	return httpClient.Do(req)
+	// A non-2xx is returned as a response rather than an error, because this
+	// package inspects status codes itself: withRetry retries 5xx, and several
+	// callers map particular 4xx codes to domain errors.
+	resp, err := a.restClient.Send(req)
+	if err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) {
+			return resp.Response, nil
+		}
+		return nil, err
+	}
+	return resp.Response, nil
 }
 
 // setHeaders sets the required headers for the API.

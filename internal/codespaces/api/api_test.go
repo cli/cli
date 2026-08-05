@@ -9,12 +9,15 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/stretchr/testify/require"
 )
 
 func generateCodespaceList(start int, end int) []*Codespace {
@@ -132,8 +135,19 @@ func createFakeCreateEndpointServer(t *testing.T, wantStatus int) *httptest.Serv
 	}))
 }
 
-func createHttpClient() (*http.Client, error) {
-	return &http.Client{}, nil
+// newTestRESTClient builds a client whose API base URL is the test server, so
+// that the absolute URLs this package builds resolve and are credentialed.
+func newTestRESTClient(t *testing.T, baseURL string) *githubrest.Client {
+	t.Helper()
+	client, err := githubrest.NewClient(strings.TrimSuffix(baseURL, "/")+"/", &http.Client{}, githubrest.WithToken("test-token"))
+	require.NoError(t, err)
+	return client
+}
+
+// stubRESTClient stands in for the factory's client vendor; these tests only
+// exercise endpoint resolution, not requests.
+func stubRESTClient(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
+	return githubrest.NewClient("https://api.github.com/", &http.Client{}, githubrest.WithToken("test-token"), opts...)
 }
 
 func TestNew_APIURL_dotcomConfig(t *testing.T) {
@@ -145,6 +159,7 @@ func TestNew_APIURL_dotcomConfig(t *testing.T) {
 		},
 	}
 	f := &cmdutil.Factory{
+		GitHubREST: stubRESTClient,
 		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
@@ -170,6 +185,7 @@ func TestNew_APIURL_customConfig(t *testing.T) {
 		},
 	}
 	f := &cmdutil.Factory{
+		GitHubREST: stubRESTClient,
 		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
@@ -193,6 +209,7 @@ func TestNew_APIURL_env(t *testing.T) {
 		},
 	}
 	f := &cmdutil.Factory{
+		GitHubREST: stubRESTClient,
 		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
@@ -202,14 +219,14 @@ func TestNew_APIURL_env(t *testing.T) {
 	if api.githubAPI != "https://api.mycompany.com" {
 		t.Fatalf("expected https://api.mycompany.com, got %s", api.githubAPI)
 	}
-	if len(cfg.AuthenticationCalls()) != 0 {
-		t.Fatalf("Configuration was checked instead of using the GITHUB_API_URL environment variable")
-	}
+	// The config is still read, because the REST client needs the default host
+	// to resolve a token, but it must not decide the endpoint.
 }
 
 func TestNew_APIURL_dotcomFallback(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "")
 	f := &cmdutil.Factory{
+		GitHubREST: stubRESTClient,
 		Config: func() (gh.Config, error) {
 			return nil, errors.New("Failed to load")
 		},
@@ -230,6 +247,7 @@ func TestNew_ServerURL_dotcomConfig(t *testing.T) {
 		},
 	}
 	f := &cmdutil.Factory{
+		GitHubREST: stubRESTClient,
 		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
@@ -255,6 +273,7 @@ func TestNew_ServerURL_customConfig(t *testing.T) {
 		},
 	}
 	f := &cmdutil.Factory{
+		GitHubREST: stubRESTClient,
 		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
@@ -278,6 +297,7 @@ func TestNew_ServerURL_env(t *testing.T) {
 		},
 	}
 	f := &cmdutil.Factory{
+		GitHubREST: stubRESTClient,
 		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
@@ -287,14 +307,14 @@ func TestNew_ServerURL_env(t *testing.T) {
 	if api.githubServer != "https://mycompany.com" {
 		t.Fatalf("expected https://mycompany.com, got %s", api.githubServer)
 	}
-	if len(cfg.AuthenticationCalls()) != 0 {
-		t.Fatalf("Configuration was checked instead of using the GITHUB_SERVER_URL environment variable")
-	}
+	// The config is still read, because the REST client needs the default host
+	// to resolve a token, but it must not decide the endpoint.
 }
 
 func TestNew_ServerURL_dotcomFallback(t *testing.T) {
 	t.Setenv("GITHUB_SERVER_URL", "")
 	f := &cmdutil.Factory{
+		GitHubREST: stubRESTClient,
 		Config: func() (gh.Config, error) {
 			return nil, errors.New("Failed to load")
 		},
@@ -311,8 +331,8 @@ func TestCreateCodespaces(t *testing.T) {
 	defer svr.Close()
 
 	api := API{
-		githubAPI: svr.URL,
-		client:    createHttpClient,
+		githubAPI:  svr.URL,
+		restClient: newTestRESTClient(t, svr.URL),
 	}
 
 	ctx := context.TODO()
@@ -340,8 +360,8 @@ func TestCreateCodespaces_displayName(t *testing.T) {
 	defer svr.Close()
 
 	api := API{
-		githubAPI: svr.URL,
-		client:    createHttpClient,
+		githubAPI:  svr.URL,
+		restClient: newTestRESTClient(t, svr.URL),
 	}
 
 	retentionPeriod := 0
@@ -366,7 +386,7 @@ func TestCreateCodespaces_Pending(t *testing.T) {
 
 	api := API{
 		githubAPI:    svr.URL,
-		client:       createHttpClient,
+		restClient:   newTestRESTClient(t, svr.URL),
 		retryBackoff: 0,
 	}
 
@@ -392,8 +412,8 @@ func TestListCodespaces_limited(t *testing.T) {
 	defer svr.Close()
 
 	api := API{
-		githubAPI: svr.URL,
-		client:    createHttpClient,
+		githubAPI:  svr.URL,
+		restClient: newTestRESTClient(t, svr.URL),
 	}
 	ctx := context.TODO()
 	codespaces, err := api.ListCodespaces(ctx, ListCodespacesOptions{Limit: 200})
@@ -417,8 +437,8 @@ func TestListCodespaces_unlimited(t *testing.T) {
 	defer svr.Close()
 
 	api := API{
-		githubAPI: svr.URL,
-		client:    createHttpClient,
+		githubAPI:  svr.URL,
+		restClient: newTestRESTClient(t, svr.URL),
 	}
 	ctx := context.TODO()
 	codespaces, err := api.ListCodespaces(ctx, ListCodespacesOptions{})
@@ -508,8 +528,8 @@ func runRepoSearchTest(t *testing.T, searchText, wantQueryText, wantSort, wantMa
 	defer svr.Close()
 
 	api := API{
-		githubAPI: svr.URL,
-		client:    createHttpClient,
+		githubAPI:  svr.URL,
+		restClient: newTestRESTClient(t, svr.URL),
 	}
 
 	ctx := context.Background()
@@ -553,8 +573,8 @@ func TestRetries(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler(w, r) }))
 	t.Cleanup(srv.Close)
 	a := &API{
-		githubAPI: srv.URL,
-		client:    createHttpClient,
+		githubAPI:  srv.URL,
+		restClient: newTestRESTClient(t, srv.URL),
 	}
 	cs, err := a.GetCodespace(context.Background(), "test", false)
 	if err != nil {
@@ -742,8 +762,8 @@ func TestAPI_EditCodespace(t *testing.T) {
 			defer svr.Close()
 
 			a := &API{
-				client:    createHttpClient,
-				githubAPI: svr.URL,
+				restClient: newTestRESTClient(t, svr.URL),
+				githubAPI:  svr.URL,
 			}
 			got, err := a.EditCodespace(tt.args.ctx, tt.args.codespaceName, tt.args.params)
 			if (err != nil) != tt.wantErr {
@@ -782,8 +802,8 @@ func TestAPI_EditCodespacePendingOperation(t *testing.T) {
 	defer svr.Close()
 
 	a := &API{
-		client:    createHttpClient,
-		githubAPI: svr.URL,
+		restClient: newTestRESTClient(t, svr.URL),
+		githubAPI:  svr.URL,
 	}
 
 	_, err := a.EditCodespace(context.Background(), "disabledCodespace", &EditCodespaceParams{DisplayName: "some silly name"})
