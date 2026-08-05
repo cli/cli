@@ -78,7 +78,7 @@ rubric, and post exactly one comment.
 
 ## Required evidence
 
-Gather all five items for every PR before you decide. They are cheap, and each
+Gather these four items for every PR before you decide. They are cheap, and each
 one exists because guessing it has produced a wrong assessment in the past.
 
 1. **The PR's own diff.** `pull_request_read(method: "get_diff", owner: <owner>,
@@ -101,17 +101,19 @@ one exists because guessing it has produced a wrong assessment in the past.
    otherwise is a false alarm. Conversely, a change to a package that is imported
    deserves attention even when the release notes sound routine.
 
-4. **CI state.** Already terminal - the pre-flight step guarantees it. Read the
-   check runs only if you need to name a specific failing check.
-
-5. **Upstream release evidence** for the target version, via the `repos` tools.
+4. **Upstream release evidence** for the target version, via the `repos` tools.
 
 For a grouped update, do items 2 and 3 for **every** dependency in the group, not
 only the one named in the title.
 
-You may claim `High` confidence only if you obtained all five. If any item was
+You may claim `High` confidence only if you obtained all four. If any item was
 unavailable, cap confidence at `Medium` and say in the prose which one was
 missing and why.
+
+CI state is not on that list because you are not the one who gathers it: the
+pre-flight step has already established that every check reached a terminal
+state, so it can never be the missing item that caps your confidence. Read the
+check runs only when you need to name a specific failing check.
 
 
 ## Recommendation and confidence rubric
@@ -140,7 +142,7 @@ is:
 
 | Value | Meaning |
 |---|---|
-| `High` | Every fact the recommendation rests on was directly observed, and the five required evidence items were all obtained. Exhaustive upstream reading is **not** required for `High`. |
+| `High` | Every fact the recommendation rests on was directly observed, and the four required evidence items were all obtained. Exhaustive upstream reading is **not** required for `High`. |
 | `Medium` | Core evidence was direct, but a required item was unavailable or only partially gathered. |
 | `Low` | Evidence the recommendation depends on was unavailable, stale, or contradictory. |
 
