@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -22,6 +23,7 @@ type iprompter interface {
 
 type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
 	IO         *iostreams.IOStreams
@@ -33,6 +35,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		BaseRepo:   f.BaseRepo,
 		Prompter:   f.Prompter,
 	}
@@ -75,7 +78,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return deleteRun(opts)
+			return deleteRun(cmd.Context(), opts)
 		},
 	}
 
@@ -85,7 +88,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	return cmd
 }
 
-func deleteRun(opts *DeleteOptions) error {
+func deleteRun(ctx context.Context, opts *DeleteOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -122,7 +125,12 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 	}
 
-	err = deleteRepo(httpClient, toDelete)
+	client, err := opts.GitHubREST(toDelete.RepoHost())
+	if err != nil {
+		return err
+	}
+
+	err = deleteRepo(ctx, client, toDelete)
 	if err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {

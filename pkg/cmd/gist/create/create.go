@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -37,7 +37,7 @@ type CreateOptions struct {
 	WebMode          bool
 
 	Config     func() (gh.Config, error)
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Browser    browser.Browser
 }
 
@@ -45,7 +45,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	opts := CreateOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Browser:    f.Browser,
 	}
 
@@ -95,7 +95,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(&opts)
 			}
-			return createRun(&opts)
+			return createRun(c.Context(), &opts)
 		},
 	}
 
@@ -106,7 +106,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func createRun(ctx context.Context, opts *CreateOptions) error {
 
 	readFromStdInArg, filenames := cmdutil.Partition(opts.Filenames, func(f string) bool {
 		return f == "-"
@@ -142,11 +142,6 @@ func createRun(opts *CreateOptions) error {
 	}
 	fmt.Fprintf(errOut, "%s %s\n", cs.Muted("-"), processMessage)
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -155,7 +150,12 @@ func createRun(opts *CreateOptions) error {
 	host, _ := cfg.Authentication().DefaultHost()
 
 	opts.IO.StartProgressIndicator()
-	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)
+	restClient, err := opts.GitHubREST(host)
+	if err != nil {
+		return err
+	}
+
+	gist, err := createGist(ctx, restClient, host, opts.Description, opts.Public, files)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		var httpError *githubrest.ErrorResponse
@@ -261,7 +261,7 @@ func guessGistName(files map[string]*shared.GistFile) string {
 	return gistName
 }
 
-func createGist(client *http.Client, hostname, description string, public bool, files map[string]*shared.GistFile) (*shared.Gist, error) {
+func createGist(ctx context.Context, client *githubrest.Client, hostname, description string, public bool, files map[string]*shared.GistFile) (*shared.Gist, error) {
 	body := &shared.Gist{
 		Description: description,
 		Public:      public,
@@ -278,26 +278,21 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, u.String(), requestBody)
+
+	req, err := client.NewRequest(ctx, http.MethodPost, u.String(), requestBody,
+		githubrest.WithHeader("Content-Type", "application/json; charset=utf-8"))
 	if err != nil {
 		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		api.EndpointNeedsScopes(resp, "gist")
-		return nil, api.HandleHTTPError(resp)
 	}
 
 	result := &shared.Gist{}
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(result); err != nil {
+	if _, err := client.Do(req, result); err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) {
+			// The endpoint does not report the scope it needs, so a token
+			// without it would otherwise fail with a bare permission error.
+			errResp.RequireScopes("gist")
+		}
 		return nil, err
 	}
 

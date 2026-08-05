@@ -3,6 +3,7 @@ package diff
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,10 +14,10 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -28,7 +29,7 @@ import (
 )
 
 type DiffOptions struct {
-	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Browser    browser.Browser
 
@@ -47,7 +48,7 @@ type DiffOptions struct {
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
 	opts := &DiffOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Browser:    f.Browser,
 	}
 
@@ -111,7 +112,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return diffRun(opts)
+			return diffRun(cmd.Context(), opts)
 		},
 	}
 
@@ -125,7 +126,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 	return cmd
 }
 
-func diffRun(opts *DiffOptions) error {
+func diffRun(ctx context.Context, opts *DiffOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   []string{"number"},
@@ -148,7 +149,7 @@ func diffRun(opts *DiffOptions) error {
 		return opts.Browser.Browse(openUrl)
 	}
 
-	httpClient, err := opts.HttpClient()
+	client, err := opts.GitHubREST(baseRepo.RepoHost())
 	if err != nil {
 		return err
 	}
@@ -157,7 +158,7 @@ func diffRun(opts *DiffOptions) error {
 		opts.Patch = false
 	}
 
-	diffReadCloser, err := fetchDiff(httpClient, baseRepo, pr.Number, opts.Patch)
+	diffReadCloser, err := fetchDiff(ctx, client, baseRepo, pr.Number, opts.Patch)
 	if err != nil {
 		return fmt.Errorf("could not find pull request diff: %w", err)
 	}
@@ -210,7 +211,7 @@ func diffRun(opts *DiffOptions) error {
 	return err
 }
 
-func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int, asPatch bool) (io.ReadCloser, error) {
+func fetchDiff(ctx context.Context, client *githubrest.Client, baseRepo ghrepo.Interface, prNumber int, asPatch bool) (io.ReadCloser, error) {
 	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "pulls", strconv.Itoa(prNumber))
 	if err != nil {
 		return nil, err
@@ -220,19 +221,19 @@ func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int,
 		acceptType = "application/vnd.github.v3.patch"
 	}
 
-	req, err := http.NewRequest("GET", url.String(), nil)
+	req, err := client.NewRequest(ctx, http.MethodGet, url.String(), nil, githubrest.WithHeader("Accept", acceptType))
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Accept", acceptType)
-
-	resp, err := httpClient.Do(req)
+	// Send rather than Do, because a diff is streamed to the terminal as it
+	// arrives rather than read into memory.
+	resp, err := client.Send(req)
 	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
 		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		return nil, api.HandleHTTPError(resp)
 	}
 
 	return resp.Body, nil

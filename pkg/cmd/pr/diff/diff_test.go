@@ -2,6 +2,7 @@ package diff
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -356,9 +357,7 @@ index f2b4805c..3d7bd0f9 100644
 			if tt.httpStubs != nil {
 				tt.httpStubs(httpReg)
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: httpReg}, nil
-			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(httpReg)
 
 			browser := &browser.Stub{}
 			tt.opts.Browser = browser
@@ -371,7 +370,7 @@ index f2b4805c..3d7bd0f9 100644
 			finder.ExpectFields(tt.wantFields)
 			tt.opts.Finder = finder
 
-			err := diffRun(&tt.opts)
+			err := diffRun(context.Background(), &tt.opts)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 			} else {

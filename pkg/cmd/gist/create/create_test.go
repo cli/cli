@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -351,10 +352,7 @@ func Test_createRun(t *testing.T) {
 				httpmock.StatusStringResponse(tt.responseStatus, "{}"))
 		}
 
-		mockClient := func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-		tt.opts.HttpClient = mockClient
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
@@ -372,7 +370,7 @@ func Test_createRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			stdin.WriteString(tt.stdin)
 
-			if err := createRun(tt.opts); (err != nil) != tt.wantErr {
+			if err := createRun(context.Background(), tt.opts); (err != nil) != tt.wantErr {
 				t.Errorf("createRun() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			bodyBytes, _ := io.ReadAll(reg.Requests[0].Body)

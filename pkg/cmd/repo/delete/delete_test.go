@@ -2,6 +2,7 @@ package delete
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
 
@@ -218,6 +219,7 @@ func Test_deleteRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+		tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 		ios, _, stdout, stderr := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)
@@ -226,7 +228,7 @@ func Test_deleteRun(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			err := deleteRun(tt.opts)
+			err := deleteRun(context.Background(), tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.errMsg, err.Error())
