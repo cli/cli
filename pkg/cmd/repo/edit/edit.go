@@ -18,7 +18,6 @@ import (
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
-	reposhared "github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
@@ -306,11 +305,6 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		}
 	}
 
-	apiPath, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
-	if err != nil {
-		return err
-	}
-
 	body := &bytes.Buffer{}
 	enc := json.NewEncoder(body)
 	if err := enc.Encode(opts.Edits); err != nil {
@@ -326,8 +320,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	if body.Len() > 3 {
 		g.Go(func() error {
-			_, err := reposhared.CreateRepoTransformToV4(ctx, restClient, repo.RepoHost(), "PATCH", apiPath, body)
-			return err
+			return githubrest.EditRepo(ctx, restClient, repo, body)
 		})
 	}
 

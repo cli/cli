@@ -226,27 +226,6 @@ type IssueLabel struct {
 	Color       string `json:"color"`
 }
 
-type License struct {
-	Key            string   `json:"key"`
-	Name           string   `json:"name"`
-	SPDXID         string   `json:"spdx_id"`
-	URL            string   `json:"url"`
-	NodeID         string   `json:"node_id"`
-	HTMLURL        string   `json:"html_url"`
-	Description    string   `json:"description"`
-	Implementation string   `json:"implementation"`
-	Permissions    []string `json:"permissions"`
-	Conditions     []string `json:"conditions"`
-	Limitations    []string `json:"limitations"`
-	Body           string   `json:"body"`
-	Featured       bool     `json:"featured"`
-}
-
-type GitIgnore struct {
-	Name   string `json:"name"`
-	Source string `json:"source"`
-}
-
 // RepoOwner is the login name of the owner
 func (r Repository) RepoOwner() string {
 	return r.Owner.Login

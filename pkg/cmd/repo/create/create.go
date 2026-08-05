@@ -232,7 +232,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		results, err := shared.RepoGitIgnoreTemplates(cmd.Context(), restClient, hostname)
+		results, err := githubrest.RepoGitIgnoreTemplates(cmd.Context(), restClient)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -249,7 +249,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		licenses, err := shared.RepoLicenses(cmd.Context(), restClient, hostname)
+		licenses, err := githubrest.RepoLicenses(cmd.Context(), restClient)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -876,7 +876,7 @@ func interactiveGitIgnore(ctx context.Context, client *githubrest.Client, hostna
 		return "", nil
 	}
 
-	templates, err := shared.RepoGitIgnoreTemplates(ctx, client, hostname)
+	templates, err := githubrest.RepoGitIgnoreTemplates(ctx, client)
 	if err != nil {
 		return "", err
 	}
@@ -895,7 +895,7 @@ func interactiveLicense(ctx context.Context, client *githubrest.Client, hostname
 		return "", nil
 	}
 
-	licenses, err := shared.RepoLicenses(ctx, client, hostname)
+	licenses, err := githubrest.RepoLicenses(ctx, client)
 	if err != nil {
 		return "", err
 	}

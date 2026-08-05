@@ -7,10 +7,8 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/githubrest"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -88,7 +86,7 @@ func viewRun(ctx context.Context, opts *ViewOptions) error {
 		return err
 	}
 
-	gitIgnore, err := shared.RepoGitIgnoreTemplate(ctx, client, hostname, opts.Template)
+	gitIgnore, err := githubrest.RepoGitIgnoreTemplate(ctx, client, opts.Template)
 	if err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
@@ -102,7 +100,7 @@ func viewRun(ctx context.Context, opts *ViewOptions) error {
 	return renderGitIgnore(gitIgnore, opts)
 }
 
-func renderGitIgnore(licenseTemplate *api.GitIgnore, opts *ViewOptions) error {
+func renderGitIgnore(licenseTemplate *githubrest.GitIgnore, opts *ViewOptions) error {
 	// I wanted to render this in a markdown code block and benefit
 	// from .gitignore syntax highlighting. But, the upstream syntax highlighter
 	// does not currently support .gitignore.

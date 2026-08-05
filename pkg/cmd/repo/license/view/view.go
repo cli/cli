@@ -7,12 +7,10 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/text"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -96,7 +94,7 @@ func viewRun(ctx context.Context, opts *ViewOptions) error {
 		return err
 	}
 
-	license, err := shared.RepoLicense(ctx, client, hostname, opts.License)
+	license, err := githubrest.RepoLicense(ctx, client, opts.License)
 	if err != nil {
 		var httpErr *githubrest.ErrorResponse
 		if errors.As(err, &httpErr) {
@@ -118,7 +116,7 @@ func viewRun(ctx context.Context, opts *ViewOptions) error {
 	return renderLicense(license, opts)
 }
 
-func renderLicense(license *api.License, opts *ViewOptions) error {
+func renderLicense(license *githubrest.License, opts *ViewOptions) error {
 	cs := opts.IO.ColorScheme()
 	var out strings.Builder
 	if opts.IO.IsStdoutTTY() {

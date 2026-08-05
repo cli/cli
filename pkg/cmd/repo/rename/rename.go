@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -140,7 +139,7 @@ func renameRun(ctx context.Context, opts *RenameOptions) error {
 		return err
 	}
 
-	newRepo, err := shared.RenameRepo(ctx, restClient, currRepo, newRepoName)
+	newRepo, err := githubrest.RenameRepo(ctx, restClient, currRepo, newRepoName)
 	if err != nil {
 		return err
 	}

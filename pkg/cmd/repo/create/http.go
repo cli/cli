@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -209,11 +208,13 @@ func repoCreate(ctx context.Context, client *http.Client, restClient *githubrest
 			return nil, err
 		}
 
-		repo, err := shared.CreateRepoTransformToV4(ctx, restClient, hostname, "POST", path, body)
+		created, err := githubrest.CreateRepo(ctx, restClient, hostname, path, body)
 		if err != nil {
 			return nil, err
 		}
-		return repo, nil
+		// The GraphQL branch below returns an api.Repository, so the REST result
+		// has to be mapped onto the same type for callers of repoCreate.
+		return repositoryFromREST(created), nil
 	}
 
 	var response struct {
@@ -370,4 +371,19 @@ func listTemplateRepositories(client *http.Client, hostname, owner string) ([]ap
 func userAndOrgs(httpClient *http.Client, hostname string) (string, []string, error) {
 	client := api.NewClientFromHTTP(httpClient)
 	return api.CurrentLoginNameAndOrgs(client, hostname)
+}
+
+// repositoryFromREST maps the small REST repository representation onto the
+// GraphQL-shaped api.Repository that repoCreate's callers expect. Only the
+// fields the REST create response actually populates are set.
+func repositoryFromREST(r *githubrest.Repository) *api.Repository {
+	repo := &api.Repository{
+		ID:        r.NodeID,
+		Name:      r.Name,
+		CreatedAt: r.CreatedAt,
+		Owner:     api.RepositoryOwner{Login: r.Owner.Login},
+		URL:       r.HTMLURL,
+		IsPrivate: r.Private,
+	}
+	return api.InitRepoHostname(repo, r.RepoHost())
 }

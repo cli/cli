@@ -1,10 +1,11 @@
-package shared
+package githubrest_test
 
 import (
 	"context"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +50,7 @@ func TestBranchDeleteRemote(t *testing.T) {
 			require.NoError(t, err)
 			repo, _ := ghrepo.FromFullName("OWNER/REPO")
 
-			err = BranchDeleteRemote(context.Background(), client, repo, tt.branch)
+			err = githubrest.BranchDeleteRemote(context.Background(), client, repo, tt.branch)
 			if (err != nil) != tt.expectError {
 				t.Fatalf("unexpected result: %v", err)
 			}

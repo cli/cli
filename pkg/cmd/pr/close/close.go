@@ -160,7 +160,7 @@ func closeRun(opts *CloseOptions) error {
 			if err != nil {
 				return err
 			}
-			if err := shared.BranchDeleteRemote(ctx, restClient, baseRepo, pr.HeadRefName); err != nil {
+			if err := githubrest.BranchDeleteRemote(ctx, restClient, baseRepo, pr.HeadRefName); err != nil {
 				return fmt.Errorf("failed to delete remote branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 			}
 		}

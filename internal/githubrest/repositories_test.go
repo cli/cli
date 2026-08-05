@@ -1,4 +1,4 @@
-package shared
+package githubrest_test
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -26,11 +25,9 @@ func TestForkRepoReturnsErrorWhenForkIsNotPossible(t *testing.T) {
 	// the repo we provided
 	repoName := "test-repo"
 	ownerLogin := "test-owner"
-	stubbedForkResponse := repositoryV3{
-		Name: repoName,
-		Owner: struct{ Login string }{
-			Login: ownerLogin,
-		},
+	stubbedForkResponse := map[string]any{
+		"name":  repoName,
+		"owner": map[string]any{"login": ownerLogin},
 	}
 
 	reg := &httpmock.Registry{}
@@ -42,14 +39,13 @@ func TestForkRepoReturnsErrorWhenForkIsNotPossible(t *testing.T) {
 	client := newTestRESTClient(t, reg)
 
 	// When we fork the repo
-	_, err := ForkRepo(context.Background(), client, ghrepo.New(ownerLogin, repoName), ownerLogin, "", false)
+	_, err := githubrest.ForkRepo(context.Background(), client, ghrepo.New(ownerLogin, repoName), ownerLogin, "", false)
 
 	// Then it provides a useful error message
 	require.Equal(t, fmt.Errorf("%s/%s cannot be forked. A single user account cannot own both a parent and fork.", ownerLogin, repoName), err)
 }
 
-func TestListLicenseTemplatesReturnsLicenses(t *testing.T) {
-	hostname := "api.github.com"
+func TestListLicenseTemplatesReturnsRepoLicenses(t *testing.T) {
 	httpStubs := func(reg *httpmock.Registry) {
 		reg.Register(
 			httpmock.REST("GET", "licenses"),
@@ -106,7 +102,7 @@ func TestListLicenseTemplatesReturnsLicenses(t *testing.T) {
 						]`,
 			))
 	}
-	wantLicenses := []api.License{
+	wantLicenses := []githubrest.License{
 		{
 			Key:            "mit",
 			Name:           "MIT License",
@@ -213,15 +209,14 @@ func TestListLicenseTemplatesReturnsLicenses(t *testing.T) {
 
 	client := newTestRESTClient(t, reg)
 
-	gotLicenses, err := RepoLicenses(context.Background(), client, hostname)
+	gotLicenses, err := githubrest.RepoLicenses(context.Background(), client)
 
 	assert.NoError(t, err, "Expected no error while fetching /licenses")
 	assert.Equal(t, wantLicenses, gotLicenses, "Licenses fetched is not as expected")
 }
 
-func TestLicenseTemplateReturnsLicense(t *testing.T) {
+func TestLicenseTemplateReturnsRepoLicense(t *testing.T) {
 	licenseTemplateName := "mit"
-	hostname := "api.github.com"
 	httpStubs := func(reg *httpmock.Registry) {
 		reg.Register(
 			httpmock.REST("GET", fmt.Sprintf("licenses/%v", licenseTemplateName)),
@@ -252,7 +247,7 @@ func TestLicenseTemplateReturnsLicense(t *testing.T) {
 						}`,
 			))
 	}
-	wantLicense := &api.License{
+	wantLicense := &githubrest.License{
 		Key:            "mit",
 		Name:           "MIT License",
 		SPDXID:         "MIT",
@@ -284,7 +279,7 @@ func TestLicenseTemplateReturnsLicense(t *testing.T) {
 
 	client := newTestRESTClient(t, reg)
 
-	gotLicenseTemplate, err := RepoLicense(context.Background(), client, hostname, licenseTemplateName)
+	gotLicenseTemplate, err := githubrest.RepoLicense(context.Background(), client, licenseTemplateName)
 
 	assert.NoError(t, err, fmt.Sprintf("Expected no error while fetching /licenses/%v", licenseTemplateName))
 	assert.Equal(t, wantLicense, gotLicenseTemplate, fmt.Sprintf("License \"%v\" fetched is not as expected", licenseTemplateName))
@@ -292,7 +287,6 @@ func TestLicenseTemplateReturnsLicense(t *testing.T) {
 
 func TestLicenseTemplateReturnsErrorWhenLicenseTemplateNotFound(t *testing.T) {
 	licenseTemplateName := "invalid-license"
-	hostname := "api.github.com"
 	httpStubs := func(reg *httpmock.Registry) {
 		reg.Register(
 			httpmock.REST("GET", fmt.Sprintf("licenses/%v", licenseTemplateName)),
@@ -311,13 +305,12 @@ func TestLicenseTemplateReturnsErrorWhenLicenseTemplateNotFound(t *testing.T) {
 
 	client := newTestRESTClient(t, reg)
 
-	_, err := RepoLicense(context.Background(), client, hostname, licenseTemplateName)
+	_, err := githubrest.RepoLicense(context.Background(), client, licenseTemplateName)
 
 	assert.Error(t, err, fmt.Sprintf("Expected error while fetching /licenses/%v", licenseTemplateName))
 }
 
-func TestListGitIgnoreTemplatesReturnsGitIgnoreTemplates(t *testing.T) {
-	hostname := "api.github.com"
+func TestListGitIgnoreTemplatesReturnsRepoGitIgnoreTemplates(t *testing.T) {
 	httpStubs := func(reg *httpmock.Registry) {
 		reg.Register(
 			httpmock.REST("GET", "gitignore/templates"),
@@ -384,13 +377,13 @@ func TestListGitIgnoreTemplatesReturnsGitIgnoreTemplates(t *testing.T) {
 
 	client := newTestRESTClient(t, reg)
 
-	gotGitIgnoreTemplates, err := RepoGitIgnoreTemplates(context.Background(), client, hostname)
+	gotGitIgnoreTemplates, err := githubrest.RepoGitIgnoreTemplates(context.Background(), client)
 
 	assert.NoError(t, err, "Expected no error while fetching /gitignore/templates")
 	assert.Equal(t, wantGitIgnoreTemplates, gotGitIgnoreTemplates, "GitIgnore templates fetched is not as expected")
 }
 
-func TestGitIgnoreTemplateReturnsGitIgnoreTemplate(t *testing.T) {
+func TestGitIgnoreTemplateReturnsRepoGitIgnoreTemplate(t *testing.T) {
 	gitIgnoreTemplateName := "Go"
 	httpStubs := func(reg *httpmock.Registry) {
 		reg.Register(
@@ -401,7 +394,7 @@ func TestGitIgnoreTemplateReturnsGitIgnoreTemplate(t *testing.T) {
 						}`,
 			))
 	}
-	wantGitIgnoreTemplate := &api.GitIgnore{
+	wantGitIgnoreTemplate := &githubrest.GitIgnore{
 		Name:   "Go",
 		Source: "# If you prefer the allow list template instead of the deny list, see community template:\n# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore\n#\n# Binaries for programs and plugins\n*.exe\n*.exe~\n*.dll\n*.so\n*.dylib\n\n# Test binary, built with go test -c\n*.test\n\n# Output of the go coverage tool, specifically when used with LiteIDE\n*.out\n\n# Dependency directories (remove the comment below to include it)\n# vendor/\n\n# Go workspace file\ngo.work\ngo.work.sum\n\n# env file\n.env\n",
 	}
@@ -412,7 +405,7 @@ func TestGitIgnoreTemplateReturnsGitIgnoreTemplate(t *testing.T) {
 
 	client := newTestRESTClient(t, reg)
 
-	gotGitIgnoreTemplate, err := RepoGitIgnoreTemplate(context.Background(), client, "api.github.com", gitIgnoreTemplateName)
+	gotGitIgnoreTemplate, err := githubrest.RepoGitIgnoreTemplate(context.Background(), client, gitIgnoreTemplateName)
 
 	assert.NoError(t, err, fmt.Sprintf("Expected no error while fetching /gitignore/templates/%v", gitIgnoreTemplateName))
 	assert.Equal(t, wantGitIgnoreTemplate, gotGitIgnoreTemplate, fmt.Sprintf("GitIgnore template \"%v\" fetched is not as expected", gitIgnoreTemplateName))
@@ -438,7 +431,7 @@ func TestGitIgnoreTemplateReturnsErrorWhenGitIgnoreTemplateNotFound(t *testing.T
 
 	client := newTestRESTClient(t, reg)
 
-	_, err := RepoGitIgnoreTemplate(context.Background(), client, "api.github.com", gitIgnoreTemplateName)
+	_, err := githubrest.RepoGitIgnoreTemplate(context.Background(), client, gitIgnoreTemplateName)
 
 	assert.Error(t, err, fmt.Sprintf("Expected error while fetching /gitignore/templates/%v", gitIgnoreTemplateName))
 }

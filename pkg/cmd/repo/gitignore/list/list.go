@@ -7,7 +7,6 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -60,7 +59,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	gitIgnoreTemplates, err := shared.RepoGitIgnoreTemplates(ctx, client, hostname)
+	gitIgnoreTemplates, err := githubrest.RepoGitIgnoreTemplates(ctx, client)
 	if err != nil {
 		return err
 	}

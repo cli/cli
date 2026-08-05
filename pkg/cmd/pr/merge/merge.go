@@ -462,7 +462,7 @@ func (m *mergeContext) deleteRemoteBranch() error {
 	}
 
 	if !m.merged {
-		err := shared.BranchDeleteRemote(context.Background(), m.restClient, m.baseRepo, m.pr.HeadRefName)
+		err := githubrest.BranchDeleteRemote(context.Background(), m.restClient, m.baseRepo, m.pr.HeadRefName)
 		if err != nil {
 			// Normally, the API returns 422, with the message "Reference does not exist"
 			// when the branch has already been deleted. It also returns 404 with the same

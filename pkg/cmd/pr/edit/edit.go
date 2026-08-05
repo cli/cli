@@ -504,10 +504,10 @@ func updatePullRequestReviewsREST(ctx context.Context, client *githubrest.Client
 
 	wg := errgroup.Group{}
 	wg.Go(func() error {
-		return addPullRequestReviews(ctx, client, repo, number, allAddUsers, addTeams)
+		return githubrest.AddPullRequestReviews(ctx, client, repo, number, allAddUsers, addTeams)
 	})
 	wg.Go(func() error {
-		return removePullRequestReviews(ctx, client, repo, number, allRemoveUsers, removeTeams)
+		return githubrest.RemovePullRequestReviews(ctx, client, repo, number, allRemoveUsers, removeTeams)
 	})
 	return wg.Wait()
 }

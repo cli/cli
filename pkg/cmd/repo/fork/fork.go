@@ -208,7 +208,7 @@ func forkRun(ctx context.Context, opts *ForkOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	forkedRepo, err := shared.ForkRepo(ctx, restClient, repoToFork, opts.Organization, opts.ForkName, opts.DefaultBranchOnly)
+	forkedRepo, err := githubrest.ForkRepo(ctx, restClient, repoToFork, opts.Organization, opts.ForkName, opts.DefaultBranchOnly)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to fork: %w", err)
@@ -239,7 +239,7 @@ func forkRun(ctx context.Context, opts *ForkOptions) error {
 
 	// Rename the new repo if necessary
 	if opts.ForkName != "" && !strings.EqualFold(forkedRepo.RepoName(), shared.NormalizeRepoName(opts.ForkName)) {
-		forkedRepo, err = shared.RenameRepo(ctx, restClient, forkedRepo, opts.ForkName)
+		forkedRepo, err = githubrest.RenameRepo(ctx, restClient, forkedRepo, opts.ForkName)
 		if err != nil {
 			return fmt.Errorf("could not rename fork: %w", err)
 		}

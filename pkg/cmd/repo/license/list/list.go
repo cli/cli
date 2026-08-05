@@ -5,11 +5,9 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -67,7 +65,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	licenses, err := shared.RepoLicenses(ctx, client, hostname)
+	licenses, err := githubrest.RepoLicenses(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -79,7 +77,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 	return renderLicensesTable(licenses, opts)
 }
 
-func renderLicensesTable(licenses []api.License, opts *ListOptions) error {
+func renderLicensesTable(licenses []githubrest.License, opts *ListOptions) error {
 	t := tableprinter.New(opts.IO, tableprinter.WithHeader("LICENSE KEY", "SPDX ID", "LICENSE NAME"))
 	for _, l := range licenses {
 		t.AddField(l.Key)
