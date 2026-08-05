@@ -341,7 +341,10 @@ func (c *Client) Do(req *http.Request, v any) (*Response, error) {
 	}
 
 	if v == nil {
-		// Drained rather than ignored so the connection can be reused.
+		// Drained rather than ignored: the transport cannot reuse a connection
+		// with unread data on it, so closing early costs a TLS handshake on the
+		// next request. The decoding path drains naturally via ReadAll, so
+		// without this a nil v would be quietly slower than a typed one.
 		_, err := io.Copy(io.Discard, resp.Body)
 		if err != nil {
 			return resp, err
@@ -354,10 +357,20 @@ func (c *Client) Do(req *http.Request, v any) (*Response, error) {
 		return resp, err
 	}
 
-	// An empty body reaches json.Unmarshal and fails with "unexpected end of
-	// JSON input". That is deliberate: it is what api.Client.REST and go-gh do
-	// today, so tolerating it the way google/go-github does would silently
-	// change behaviour at every existing call site.
+	// A non-nil v states that the caller expects a JSON document, and an empty
+	// body is not one. JSON can already express "nothing" as null, which
+	// decodes cleanly and leaves v at its zero value, so a body with nothing at
+	// all in it is a malformed response rather than an empty answer.
+	//
+	// google/go-github tolerates this by swallowing io.EOF, which suits a
+	// client that covers the whole API generically and cannot audit each
+	// endpoint. Here every call site targets a known endpoint, so the caller is
+	// better served by hearing about it than by receiving a zero-valued struct
+	// that looks like a real answer.
+	if len(b) == 0 {
+		return resp, fmt.Errorf("githubrest: %d response had an empty body, but a JSON document was expected", resp.StatusCode)
+	}
+
 	if err := json.Unmarshal(b, v); err != nil {
 		return resp, err
 	}
