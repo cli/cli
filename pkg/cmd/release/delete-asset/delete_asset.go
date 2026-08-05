@@ -113,19 +113,16 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 }
 
 func deleteAsset(httpClient *http.Client, assetURL safeurl.SafeURL) error {
-	req, err := http.NewRequest("DELETE", assetURL.String(), nil)
+	client, err := api.NewRESTClientForURL(httpClient, assetURL.String())
 	if err != nil {
 		return err
 	}
 
-	resp, err := httpClient.Do(req)
+	req, err := client.NewRequest(context.Background(), http.MethodDelete, assetURL.String(), nil)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-	return nil
+	_, err = client.Do(req, nil)
+	return err
 }

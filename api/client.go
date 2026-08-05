@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/cli/cli/v2/internal/githubrest"
@@ -74,18 +75,29 @@ func (c Client) tokenFor(hostname string) string {
 // api.Client.REST takes one per call. That was already true of the go-gh
 // RESTClient this replaces, but the cost changes from rebuilding a layered
 // transport chain to allocating a small struct.
-func (c Client) restClient(hostname string) (*githubrest.Client, error) {
+func (c Client) restClient(hostname string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
 	auth := githubrest.WithoutToken()
 	if token := c.tokenFor(hostname); token != "" {
 		auth = githubrest.WithToken(token)
 	}
 
-	return githubrest.NewClient(
-		githubrest.APIBaseURL(hostname),
-		c.http,
-		auth,
+	opts = append([]githubrest.ClientOption{
 		githubrest.WithCredentialedHost(githubrest.UploadHost(hostname)),
-	)
+	}, opts...)
+
+	return githubrest.NewClient(githubrest.APIBaseURL(hostname), c.http, auth, opts...)
+}
+
+// NewRESTClient returns a githubrest.Client for one host, built from an
+// *http.Client the same way api.Client builds its own.
+//
+// It exists for the call sites that used to hand-build an *http.Request and
+// call httpClient.Do, which need the request and the response rather than the
+// decode-into-a-value shape of REST. Those call sites hold an *http.Client and
+// a hostname and nothing else, so resolving the base URL and the token has to
+// happen for them somewhere, and doing it here keeps one implementation.
+func NewRESTClient(httpClient *http.Client, hostname string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
+	return NewClientFromHTTP(httpClient).restClient(hostname, opts...)
 }
 
 type GraphQLError struct {
@@ -324,4 +336,23 @@ func clientOptions(hostname, token string, transport http.RoundTripper) ghAPI.Cl
 		LogIgnoreEnv:       true,
 	}
 	return opts
+}
+
+// NewRESTClientForURL returns a githubrest.Client for the host of an already
+// absolute API URL.
+//
+// Several helpers are handed a URL that came from an earlier API response, such
+// as a release's own URL, and never see a hostname. Deriving the host from the
+// URL keeps their signatures as they are. The host is normalized during token
+// lookup and base URL derivation, so api.github.com resolves github.com's token
+// and base URL, and an Enterprise host resolves its own.
+func NewRESTClientForURL(httpClient *http.Client, apiURL string, opts ...githubrest.ClientOption) (*githubrest.Client, error) {
+	parsed, err := url.Parse(apiURL)
+	if err != nil {
+		return nil, err
+	}
+	if parsed.Host == "" {
+		return nil, fmt.Errorf("api: %q has no host, so no client can be built for it", apiURL)
+	}
+	return NewRESTClient(httpClient, parsed.Host, opts...)
 }

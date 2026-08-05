@@ -7,7 +7,6 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -123,41 +122,36 @@ func deleteRun(opts *DeleteOptions) error {
 }
 
 func deleteRelease(httpClient *http.Client, releaseURL safeurl.SafeURL) error {
-	req, err := http.NewRequest("DELETE", releaseURL.String(), nil)
+	client, err := api.NewRESTClientForURL(httpClient, releaseURL.String())
 	if err != nil {
 		return err
 	}
 
-	resp, err := httpClient.Do(req)
+	req, err := client.NewRequest(context.Background(), http.MethodDelete, releaseURL.String(), nil)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-	return nil
+	_, err = client.Do(req, nil)
+	return err
 }
 
 func deleteTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) error {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "git", "refs", fmt.Sprintf("tags/%s", tagName))
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequest("DELETE", url.String(), nil)
+	client, err := api.NewRESTClient(httpClient, baseRepo.RepoHost())
 	if err != nil {
 		return err
 	}
 
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "git", "refs", fmt.Sprintf("tags/%s", tagName))
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
+	req, err := client.NewRequest(context.Background(), http.MethodDelete, url.String(), nil)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	_, err = client.Do(req, nil)
+	return err
 }

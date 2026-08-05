@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"mime"
 	"net/http"
@@ -302,36 +303,40 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL sa
 		return err
 	}
 
-	req, err := http.NewRequest("GET", assetURL.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Accept", "application/octet-stream")
+	accept := "application/octet-stream"
+	var clientOpts []githubrest.ClientOption
 	if isArchive {
 		// adding application/json to Accept header due to a bug in the zipball/tarball API endpoint that makes it mandatory
-		req.Header.Set("Accept", "application/octet-stream, application/json")
+		accept = "application/octet-stream, application/json"
 
 		// override HTTP redirect logic to avoid "legacy" Codeload resources
-		oldClient := *httpClient
-		httpClient = &oldClient
-		httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		clientOpts = append(clientOpts, githubrest.WithCheckRedirect(func(req *http.Request, via []*http.Request) error {
 			if len(via) == 1 {
 				req.URL.Path = removeLegacyFromCodeloadPath(req.URL.Path)
 			}
 			return nil
-		}
+		}))
 	}
 
-	resp, err := httpClient.Do(req)
+	client, err := api.NewRESTClientForURL(httpClient, assetURL.String(), clientOpts...)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, assetURL.String(), nil,
+		githubrest.WithHeader("Accept", accept))
+	if err != nil {
+		return err
 	}
+
+	// Send rather than Do, because the body is streamed to disk rather than
+	// decoded.
+	response, err := client.Send(req)
+	if err != nil {
+		return err
+	}
+	resp := response.Response
+	defer resp.Body.Close()
 
 	if len(fileName) == 0 {
 		contentDisposition := resp.Header.Get("Content-Disposition")

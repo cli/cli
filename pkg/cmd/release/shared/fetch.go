@@ -2,10 +2,9 @@ package shared
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -138,28 +136,19 @@ type fetchResult struct {
 }
 
 func FetchRefSHA(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (string, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "git", "ref", fmt.Sprintf("tags/%s", tagName))
-	if err != nil {
-		return "", err
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return "", err
 	}
 
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "git", "ref", fmt.Sprintf("tags/%s", tagName))
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		return "", ErrReleaseNotFound
-	}
-
-	if resp.StatusCode > 299 {
-		return "", api.HandleHTTPError(resp)
+	req, err := client.NewRequest(ctx, http.MethodGet, url.String(), nil)
+	if err != nil {
+		return "", err
 	}
 
 	var ref struct {
@@ -168,8 +157,12 @@ func FetchRefSHA(ctx context.Context, httpClient *http.Client, repo ghrepo.Inter
 		} `json:"object"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&ref); err != nil {
-		return "", fmt.Errorf("failed to parse ref response: %w", err)
+	if _, err := client.Do(req, &ref); err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return "", ErrReleaseNotFound
+		}
+		return "", err
 	}
 
 	return ref.Object.SHA, nil
@@ -190,7 +183,7 @@ func DigestAlgForRef(digest string) string {
 
 // FetchRelease finds a published repository release by its tagName, or a draft release by its pending tag name.
 func FetchRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (*Release, error) {
-	publishedURL, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
+	publishedURL, err := safeurl.JoinPathWithHostPrefix(githubrest.APIBaseURL(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +228,7 @@ func FetchRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Inte
 
 // FetchLatestRelease finds the latest published release for a repository.
 func FetchLatestRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) (*Release, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "latest")
+	url, err := safeurl.JoinPathWithHostPrefix(githubrest.APIBaseURL(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "latest")
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +264,7 @@ func fetchDraftRelease(ctx context.Context, httpClient *http.Client, repo ghrepo
 
 	// Then, use REST to get information about the draft release. In theory, we could have fetched
 	// all the necessary information via GraphQL, but REST is safer for backwards compatibility.
-	path, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", strconv.FormatInt(query.Repository.Release.DatabaseID, 10))
+	path, err := safeurl.JoinPathWithHostPrefix(githubrest.APIBaseURL(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", strconv.FormatInt(query.Repository.Release.DatabaseID, 10))
 	if err != nil {
 		return nil, err
 	}
@@ -279,26 +272,22 @@ func fetchDraftRelease(ctx context.Context, httpClient *http.Client, repo ghrepo
 }
 
 func fetchReleasePath(ctx context.Context, httpClient *http.Client, url safeurl.SafeURL) (*Release, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
+	client, err := api.NewRESTClientForURL(httpClient, url.String())
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
+	req, err := client.NewRequest(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		return nil, ErrReleaseNotFound
-	} else if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
 	}
 
 	var release Release
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	if _, err := client.Do(req, &release); err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return nil, ErrReleaseNotFound
+		}
 		return nil, err
 	}
 

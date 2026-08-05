@@ -82,7 +82,7 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 	ctx := context.Background()
 
 	tries := 0
-	client := funcClient(func(req *http.Request) (*http.Response, error) {
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		tries++
 		if tries == 1 {
 			return nil, errors.New("made up exception")
@@ -98,8 +98,10 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
 		}, nil
-	})
-	err := uploadWithDelete(ctx, client, safeurl.NewImmutableSafeURL("http://example.com/upload"), AssetForUpload{
+	})}
+	// githubrest refuses an absolute URL that is not https on a credentialed
+	// host, so this fixture URL moved from http:// to https://.
+	err := uploadWithDelete(ctx, client, safeurl.NewImmutableSafeURL("https://example.com/upload"), AssetForUpload{
 		Name:  "asset",
 		Label: "",
 		Size:  8,
@@ -116,8 +118,8 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 	}
 }
 
-type funcClient func(*http.Request) (*http.Response, error)
+type roundTripFunc func(*http.Request) (*http.Response, error)
 
-func (f funcClient) Do(req *http.Request) (*http.Response, error) {
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }

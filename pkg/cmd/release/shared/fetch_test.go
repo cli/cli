@@ -48,7 +48,9 @@ func TestFetchRefSHA(t *testing.T) {
 			tagName:        "v1.2.3",
 			responseStatus: 200,
 			responseBody:   `{"object": {"sha":`,
-			errorMessage:   "failed to parse ref response: unexpected EOF",
+			// githubrest.Do unmarshals the whole body rather than streaming, so the
+			// decoder error differs and is no longer wrapped with call-site context.
+			errorMessage: "unexpected end of JSON input",
 		},
 	}
 

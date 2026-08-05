@@ -2,7 +2,6 @@ package shared
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
@@ -20,10 +19,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"golang.org/x/sync/errgroup"
 )
-
-type httpDoer interface {
-	Do(*http.Request) (*http.Response, error)
-}
 
 type errNetwork struct{ error }
 
@@ -113,7 +108,7 @@ func fileExt(fn string) string {
 	return path.Ext(fn)
 }
 
-func ConcurrentUpload(httpClient httpDoer, uploadURL safeurl.SafeURL, numWorkers int, assets []*AssetForUpload) error {
+func ConcurrentUpload(httpClient *http.Client, uploadURL safeurl.SafeURL, numWorkers int, assets []*AssetForUpload) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -144,7 +139,7 @@ func shouldRetry(err error) bool {
 // Allow injecting backoff interval in tests.
 var retryInterval = time.Millisecond * 200
 
-func uploadWithDelete(ctx context.Context, httpClient httpDoer, uploadURL safeurl.SafeURL, a AssetForUpload) error {
+func uploadWithDelete(ctx context.Context, httpClient *http.Client, uploadURL safeurl.SafeURL, a AssetForUpload) error {
 	if a.ExistingURL != nil && a.ExistingURL.String() != "" {
 		if err := deleteAsset(ctx, httpClient, a.ExistingURL); err != nil {
 			return err
@@ -160,7 +155,7 @@ func uploadWithDelete(ctx context.Context, httpClient httpDoer, uploadURL safeur
 	}, backoff.WithContext(backoff.WithMaxRetries(bo, 3), ctx))
 }
 
-func uploadAsset(ctx context.Context, httpClient httpDoer, uploadURL safeurl.SafeURL, asset AssetForUpload) (*ReleaseAsset, error) {
+func uploadAsset(ctx context.Context, httpClient *http.Client, uploadURL safeurl.SafeURL, asset AssetForUpload) (*ReleaseAsset, error) {
 	u, err := url.Parse(uploadURL.String())
 	if err != nil {
 		return nil, err
@@ -173,56 +168,50 @@ func uploadAsset(ctx context.Context, httpClient httpDoer, uploadURL safeurl.Saf
 	// Since u is derived from uploadURL, an already-trusted safeurl.SafeURL, the resulting URL is safe to declare as such.
 	safeURL := safeurl.NewImmutableSafeURL(u.String())
 
-	f, err := asset.Open()
+	client, err := api.NewRESTClientForURL(httpClient, safeURL.String())
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
-	req, err := http.NewRequestWithContext(ctx, "POST", safeURL.String(), f)
+	// NewUploadRequest requires a content type, where http.Request.Header.Set
+	// happily took the empty string that typeForFilename returns for an unknown
+	// extension. Defaulting here matches what the header would have meant.
+	mimeType := asset.MIMEType
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+
+	req, err := client.NewUploadRequest(ctx, safeURL.String(), asset.Open, asset.Size, mimeType)
 	if err != nil {
 		return nil, err
-	}
-	req.ContentLength = asset.Size
-	req.Header.Set("Content-Type", asset.MIMEType)
-	req.GetBody = asset.Open
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, errNetwork{err}
-	}
-	defer resp.Body.Close()
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, api.HandleHTTPError(resp)
 	}
 
 	var newAsset ReleaseAsset
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&newAsset); err != nil {
+	if _, err := client.Do(req, &newAsset); err != nil {
+		// Send reports transport failures and non-2xx statuses through the same
+		// return, so anything that is not an *ErrorResponse came off the wire
+		// and stays retryable, as it was when this called httpClient.Do.
+		var errResp *githubrest.ErrorResponse
+		if !errors.As(err, &errResp) {
+			return nil, errNetwork{err}
+		}
 		return nil, err
 	}
 
 	return &newAsset, nil
 }
 
-func deleteAsset(ctx context.Context, httpClient httpDoer, assetURL safeurl.SafeURL) error {
-	req, err := http.NewRequestWithContext(ctx, "DELETE", assetURL.String(), nil)
+func deleteAsset(ctx context.Context, httpClient *http.Client, assetURL safeurl.SafeURL) error {
+	client, err := api.NewRESTClientForURL(httpClient, assetURL.String())
 	if err != nil {
 		return err
 	}
 
-	resp, err := httpClient.Do(req)
+	req, err := client.NewRequest(ctx, http.MethodDelete, assetURL.String(), nil)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return api.HandleHTTPError(resp)
-	}
-
-	return nil
+	_, err = client.Do(req, nil)
+	return err
 }

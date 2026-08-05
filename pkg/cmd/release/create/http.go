@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"slices"
@@ -13,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -61,37 +61,28 @@ func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName str
 }
 
 func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, error) {
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "tags")
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "tags")
 	if err != nil {
 		return nil, err
 	}
 	u.SetQuery("per_page", strconv.Itoa(limit))
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
 
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, u.String(), nil,
+		githubrest.WithHeader("Content-Type", "application/json; charset=utf-8"))
 	if err != nil {
 		return nil, err
 	}
 
 	var tags []tag
-	err = json.Unmarshal(b, &tags)
-	return tags, err
+	if _, err := client.Do(req, &tags); err != nil {
+		return nil, err
+	}
+	return tags, nil
 }
 
 func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagName, target, previousTagName string) (*releaseNotes, error) {
@@ -110,68 +101,67 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 		return nil, err
 	}
 
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "generate-notes")
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(bodyBytes))
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", "generate-notes")
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		return nil, notImplementedError
-	}
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
+	req, err := client.NewRequest(context.Background(), http.MethodPost, url.String(), bytes.NewBuffer(bodyBytes),
+		githubrest.WithHeader("Accept", "application/vnd.github.v3+json"),
+		githubrest.WithHeader("Content-Type", "application/json; charset=utf-8"))
 	if err != nil {
 		return nil, err
 	}
 
 	var rn releaseNotes
-	err = json.Unmarshal(b, &rn)
-	return &rn, err
+	if _, err := client.Do(req, &rn); err != nil {
+		// A 404 here means the endpoint is absent rather than the release, which
+		// is how an older Enterprise Server reports that it cannot generate
+		// notes.
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return nil, notImplementedError
+		}
+		return nil, err
+	}
+	return &rn, nil
 }
 
 func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
-	if err != nil {
-		return false, err
-	}
-	req, err := http.NewRequest("HEAD", url.String(), nil)
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return false, err
 	}
 
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return false, err
 	}
-	if resp.Body != nil {
-		defer resp.Body.Close()
+
+	req, err := client.NewRequest(context.Background(), http.MethodHead, url.String(), nil)
+	if err != nil {
+		return false, err
 	}
 
-	if resp.StatusCode == 200 {
-		return true, nil
-	} else if resp.StatusCode == 404 {
-		return false, nil
-	} else {
-		return false, api.HandleHTTPError(resp)
+	// A 404 is an answer here rather than a failure, and Send reports every
+	// non-2xx as an error, so it has to be unwrapped rather than read off a
+	// status code.
+	resp, err := client.Send(req)
+	if err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, err
 	}
+	defer resp.Body.Close()
+
+	return true, nil
 }
 
 func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*shared.Release, error) {
@@ -180,45 +170,35 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 		return nil, err
 	}
 
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases")
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(bodyBytes))
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases")
 	if err != nil {
+		return nil, err
+	}
+
+	req, err := client.NewRequest(context.Background(), http.MethodPost, url.String(), bytes.NewBuffer(bodyBytes),
+		githubrest.WithHeader("Content-Type", "application/json; charset=utf-8"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Send rather than Do, because the 404 branch below reads response headers
+	// to tell a missing repository from a token without the workflow scope.
+	resp, err := client.Send(req)
+	if err != nil {
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound && !tokenHasWorkflowScope(errResp.Headers) {
+			return nil, &errMissingRequiredWorkflowScope{
+				Hostname: ghauth.NormalizeHostname(errResp.RequestURL.Hostname()),
+			}
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	// Check if we received a 404 while attempting to create a release without
-	// the workflow scope, and if so, return an error message that explains a possible
-	// solution to the user.
-	//
-	// If the same file (with both the same path and contents) exists
-	// on another branch in the repo, releases with workflow file changes can be
-	// created without the workflow scope. Otherwise, the workflow scope is
-	// required to create the release, but the API does not indicate this criteria
-	// beyond returning a 404.
-	//
-	// https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps#available-scopes
-	if resp.StatusCode == http.StatusNotFound && !tokenHasWorkflowScope(resp) {
-		normalizedHostname := ghauth.NormalizeHostname(resp.Request.URL.Hostname())
-		return nil, &errMissingRequiredWorkflowScope{
-			Hostname: normalizedHostname,
-		}
-	}
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, api.HandleHTTPError(resp)
-	}
 
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -244,62 +224,46 @@ func publishRelease(httpClient *http.Client, releaseURL safeurl.SafeURL, discuss
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("PATCH", releaseURL.String(), bytes.NewBuffer(bodyBytes))
+	client, err := api.NewRESTClientForURL(httpClient, releaseURL.String())
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
+	req, err := client.NewRequest(context.Background(), http.MethodPatch, releaseURL.String(), bytes.NewBuffer(bodyBytes),
+		githubrest.WithHeader("Content-Type", "application/json"))
 	if err != nil {
 		return nil, err
 	}
 
 	var release shared.Release
-	err = json.Unmarshal(b, &release)
-	return &release, err
+	if _, err := client.Do(req, &release); err != nil {
+		return nil, err
+	}
+	return &release, nil
 }
 
 func deleteRelease(httpClient *http.Client, releaseURL safeurl.SafeURL) error {
-	req, err := http.NewRequest("DELETE", releaseURL.String(), nil)
+	client, err := api.NewRESTClientForURL(httpClient, releaseURL.String())
 	if err != nil {
 		return err
 	}
 
-	resp, err := httpClient.Do(req)
+	req, err := client.NewRequest(context.Background(), http.MethodDelete, releaseURL.String(), nil)
 	if err != nil {
 		return err
 	}
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
 
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return api.HandleHTTPError(resp)
-	}
-
-	if resp.StatusCode != 204 {
-		_, _ = io.Copy(io.Discard, resp.Body)
-	}
-	return nil
+	// A nil receiver discards the body, which is what the drain this replaces
+	// was for.
+	_, err = client.Do(req, nil)
+	return err
 }
 
-// tokenHasWorkflowScope checks if the given http.Response's token has the workflow scope.
+// tokenHasWorkflowScope checks if the token behind the given response headers
+// has the workflow scope.
 // Tokens that do not have OAuth scopes are assumed to have the workflow scope.
-func tokenHasWorkflowScope(resp *http.Response) bool {
-	scopes := resp.Header.Get("X-Oauth-Scopes")
+func tokenHasWorkflowScope(headers http.Header) bool {
+	scopes := headers.Get("X-Oauth-Scopes")
 
 	// Return true when no scopes are present - no scopes in this header
 	// means that the user is probably authenticating with a token type other
