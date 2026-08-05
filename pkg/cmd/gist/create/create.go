@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,7 +19,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
@@ -274,31 +274,25 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 		return nil, err
 	}
 
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname), "gists")
+	restClient, err := api.NewRESTClient(client, hostname)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, u.String(), requestBody)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
-	resp, err := client.Do(req)
+	u, err := safeurl.JoinPath("gists")
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		api.EndpointNeedsScopes(resp, "gist")
-		return nil, api.HandleHTTPError(resp)
+	req, err := restClient.NewRequest(context.Background(), http.MethodPost, u.String(), requestBody,
+		githubrest.WithHeader("Content-Type", "application/json; charset=utf-8"))
+	if err != nil {
+		return nil, err
 	}
 
 	result := &shared.Gist{}
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(result); err != nil {
-		return nil, err
+	if _, err := restClient.Do(req, result); err != nil {
+		return nil, api.ErrorNeedsScopes(err, "gist")
 	}
 
 	return result, nil

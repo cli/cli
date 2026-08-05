@@ -1,14 +1,12 @@
 package shared
 
 import (
+	"context"
 	"fmt"
-	"io"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strings"
 
-	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type MissingScopesError struct {
@@ -28,38 +26,27 @@ func (e MissingScopesError) Error() string {
 	return "missing required scopes " + scopes
 }
 
-type httpClient interface {
-	Do(*http.Request) (*http.Response, error)
-}
-
 // GetScopes performs a GitHub API request and returns the value of the X-Oauth-Scopes header.
-func GetScopes(httpClient httpClient, hostname, authToken string) (string, error) {
-	apiEndpoint, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname))
+func GetScopes(httpClient *http.Client, hostname, authToken string) (string, error) {
+	// The token being checked is not necessarily the configured one, so it is
+	// supplied per request rather than at client construction. WithoutToken
+	// then guarantees no other Authorization can reach the wire.
+	client, err := githubrest.NewClient(githubrest.APIBaseURL(hostname), httpClient, githubrest.WithoutToken())
 	if err != nil {
 		return "", err
 	}
 
-	req, err := http.NewRequest("GET", apiEndpoint.String(), nil)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, "", nil,
+		githubrest.WithSingleRequestToken(authToken))
 	if err != nil {
 		return "", err
 	}
 
-	req.Header.Set("Authorization", "token "+authToken)
-
-	res, err := httpClient.Do(req)
+	// Do drains and closes the body, which this relies on so that the
+	// connection is reused for the request that follows.
+	res, err := client.Do(req, nil)
 	if err != nil {
 		return "", err
-	}
-
-	defer func() {
-		// Ensure the response body is fully read and closed
-		// before we reconnect, so that we reuse the same TCPconnection.
-		_, _ = io.Copy(io.Discard, res.Body)
-		res.Body.Close()
-	}()
-
-	if res.StatusCode != 200 {
-		return "", api.HandleHTTPError(res)
 	}
 
 	return res.Header.Get("X-Oauth-Scopes"), nil
@@ -67,7 +54,7 @@ func GetScopes(httpClient httpClient, hostname, authToken string) (string, error
 
 // HasMinimumScopes performs a GitHub API request and returns an error if the token used in the request
 // lacks the minimum required scopes for performing API operations with gh.
-func HasMinimumScopes(httpClient httpClient, hostname, authToken string) error {
+func HasMinimumScopes(httpClient *http.Client, hostname, authToken string) error {
 	scopesHeader, err := GetScopes(httpClient, hostname, authToken)
 	if err != nil {
 		return err

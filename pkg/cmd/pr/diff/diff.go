@@ -3,8 +3,10 @@ package diff
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"io"
 	"net/http"
 	"path"
@@ -15,7 +17,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
@@ -211,28 +212,31 @@ func diffRun(opts *DiffOptions) error {
 }
 
 func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int, asPatch bool) (io.ReadCloser, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "pulls", strconv.Itoa(prNumber))
+	client, err := api.NewRESTClient(httpClient, baseRepo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
+
+	url, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "pulls", strconv.Itoa(prNumber))
+	if err != nil {
+		return nil, err
+	}
+
 	acceptType := "application/vnd.github.v3.diff"
 	if asPatch {
 		acceptType = "application/vnd.github.v3.patch"
 	}
 
-	req, err := http.NewRequest("GET", url.String(), nil)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, url.String(), nil,
+		githubrest.WithHeader("Accept", acceptType))
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Accept", acceptType)
-
-	resp, err := httpClient.Do(req)
+	// Send rather than Do, because the body is a diff the caller streams.
+	resp, err := client.Send(req)
 	if err != nil {
 		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		return nil, api.HandleHTTPError(resp)
 	}
 
 	return resp.Body, nil

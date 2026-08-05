@@ -1,9 +1,11 @@
 package search
 
 import (
-	"encoding/json"
+	"context"
+	"errors"
 	"fmt"
-	"io"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -11,7 +13,6 @@ import (
 	"strings"
 
 	fd "github.com/cli/cli/v2/internal/featuredetection"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -198,7 +199,12 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 //
 // For more information, see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28.
 func (s searcher) search(query Query, result interface{}) (string, error) {
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(s.host), "search", string(query.Kind))
+	client, err := api.NewRESTClient(s.client, s.host)
+	if err != nil {
+		return "", err
+	}
+
+	u, err := safeurl.JoinPath("search", string(query.Kind))
 	if err != nil {
 		return "", err
 	}
@@ -236,34 +242,28 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 	if query.Sort != "" {
 		u.SetQuery(sortKey, query.Sort)
 	}
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	accept := "application/vnd.github.v3+json"
 	if query.Kind == KindCode {
-		req.Header.Set("Accept", "application/vnd.github.text-match+json")
+		accept = "application/vnd.github.text-match+json"
 	}
 
-	resp, err := s.client.Do(req)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, u.String(), nil,
+		githubrest.WithHeader("Content-Type", "application/json; charset=utf-8"),
+		githubrest.WithHeader("Accept", accept))
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
 
-	link := resp.Header.Get("Link")
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return link, handleHTTPError(resp)
-	}
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(result)
+	resp, err := client.Do(req, result)
 	if err != nil {
-		return link, err
+		var errResp *githubrest.ErrorResponse
+		if errors.As(err, &errResp) {
+			return errResp.Headers.Get("Link"), searchError(errResp)
+		}
+		return "", err
 	}
-	return link, nil
+
+	return resp.Header.Get("Link"), nil
 }
 
 // URL returns URL to the global search in web GUI (i.e. github.com/search).
@@ -297,23 +297,22 @@ func (err httpError) Error() string {
 	return fmt.Sprintf("Invalid search query %q.\n%s", query, err.Errors[0].Message)
 }
 
-func handleHTTPError(resp *http.Response) error {
-	httpError := httpError{
-		RequestURL: resp.Request.URL,
-		StatusCode: resp.StatusCode,
+// searchError restates a REST error as the search package's own error, which
+// renders a 422 as advice about the query rather than as an HTTP failure.
+//
+// githubrest.ErrorResponse already carries every field this needs, so the
+// conversion is mechanical, but the type stays because its Error method is what
+// search commands print.
+func searchError(errResp *githubrest.ErrorResponse) error {
+	converted := httpError{
+		Message:    errResp.Message,
+		RequestURL: errResp.RequestURL,
+		StatusCode: errResp.StatusCode,
 	}
-	if !jsonTypeRE.MatchString(resp.Header.Get("Content-Type")) {
-		httpError.Message = resp.Status
-		return httpError
+	for _, item := range errResp.Errors {
+		converted.Errors = append(converted.Errors, httpErrorItem(item))
 	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(body, &httpError); err != nil {
-		return err
-	}
-	return httpError
+	return converted
 }
 
 // nextPage extracts the next page number from an API response's link header. if
