@@ -24,6 +24,9 @@ stderr 'no assets to download'
 # Delete the release and its tag
 exec gh release delete v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --yes --cleanup-tag
 
+# Wait for tag deletion to become visible through the ref lookup
+sleep 5
+
 # Verify the release is gone
 ! exec gh release view v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING
 stderr 'release not found'
