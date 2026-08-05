@@ -1,66 +1,74 @@
 package extension
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"os"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
+// statusIs reports whether err is a REST error carrying the given status.
+//
+// Send and Do turn every non-2xx into an error, so the handful of call sites
+// that treat a particular status as a normal outcome have to look inside the
+// error rather than at a status code.
+func statusIs(err error, status int) bool {
+	var errResp *githubrest.ErrorResponse
+	return errors.As(err, &errResp) && errResp.StatusCode == status
+}
+
 func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
-	if err != nil {
-		return false, err
-	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return false, err
 	}
 
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case 200:
-		return true, nil
-	case 404:
-		return false, nil
-	default:
-		return false, api.HandleHTTPError(resp)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, url.String(), nil)
+	if err != nil {
+		return false, err
 	}
+
+	// The body is not read, so Do discards it rather than Send leaving it open.
+	if _, err := client.Do(req, nil); err != nil {
+		if statusIs(err, http.StatusNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "contents", repo.RepoName())
-	if err != nil {
-		return false, err
-	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+	client, err := api.NewRESTClient(httpClient, repo.RepoHost())
 	if err != nil {
 		return false, err
 	}
 
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "contents", repo.RepoName())
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		return false, nil
+	req, err := client.NewRequest(context.Background(), http.MethodGet, url.String(), nil)
+	if err != nil {
+		return false, err
 	}
 
-	if resp.StatusCode > 299 {
-		err = api.HandleHTTPError(resp)
+	if _, err := client.Do(req, nil); err != nil {
+		if statusIs(err, http.StatusNotFound) {
+			return false, nil
+		}
 		return false, err
 	}
 
@@ -78,24 +86,25 @@ type release struct {
 }
 
 // downloadAsset downloads a single asset to the given file path.
-func downloadAsset(httpClient *http.Client, assetURL safeurl.SafeURL, destPath string) (downloadErr error) {
-	var req *http.Request
-	if req, downloadErr = http.NewRequest("GET", assetURL.String(), nil); downloadErr != nil {
+func downloadAsset(httpClient *http.Client, hostname string, assetURL safeurl.SafeURL, destPath string) (downloadErr error) {
+	var client *githubrest.Client
+	if client, downloadErr = api.NewRESTClient(httpClient, hostname); downloadErr != nil {
 		return
 	}
 
-	req.Header.Set("Accept", "application/octet-stream")
+	var req *http.Request
+	req, downloadErr = client.NewRequest(context.Background(), http.MethodGet, assetURL.String(), nil,
+		githubrest.WithHeader("Accept", "application/octet-stream"))
+	if downloadErr != nil {
+		return
+	}
 
-	var resp *http.Response
-	if resp, downloadErr = httpClient.Do(req); downloadErr != nil {
+	// Send rather than Do, because the body is streamed to a file.
+	var resp *githubrest.Response
+	if resp, downloadErr = client.Send(req); downloadErr != nil {
 		return
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		downloadErr = api.HandleHTTPError(resp)
-		return
-	}
 
 	var f *os.File
 	if f, downloadErr = os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755); downloadErr != nil {
@@ -117,36 +126,26 @@ var repositoryNotFoundErr = errors.New("repository not found")
 
 // fetchLatestRelease finds the latest published release for a repository.
 func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "latest")
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+	client, err := api.NewRESTClient(httpClient, baseRepo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "latest")
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		return nil, releaseNotFoundErr
-	}
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	var r release
-	err = json.Unmarshal(b, &r)
-	if err != nil {
+	if _, err := client.Do(req, &r); err != nil {
+		if statusIs(err, http.StatusNotFound) {
+			return nil, releaseNotFoundErr
+		}
 		return nil, err
 	}
 
@@ -155,36 +154,26 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 
 // fetchReleaseFromTag finds release by tag name for a repository
 func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*release, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "tags", tagName)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+	client, err := api.NewRESTClient(httpClient, baseRepo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return nil, err
 	}
 
-	defer resp.Body.Close()
-	if resp.StatusCode == 404 {
-		return nil, releaseNotFoundErr
-	}
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
+	req, err := client.NewRequest(context.Background(), http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	var r release
-	err = json.Unmarshal(b, &r)
-	if err != nil {
+	if _, err := client.Do(req, &r); err != nil {
+		if statusIs(err, http.StatusNotFound) {
+			return nil, releaseNotFoundErr
+		}
 		return nil, err
 	}
 
@@ -193,28 +182,32 @@ func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tag
 
 // fetchCommitSHA finds full commit SHA from a target ref in a repo
 func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRef string) (string, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "commits", targetRef)
-	if err != nil {
-		return "", err
-	}
-	req, err := http.NewRequest("GET", url.String(), nil)
+	client, err := api.NewRESTClient(httpClient, baseRepo.RepoHost())
 	if err != nil {
 		return "", err
 	}
 
-	req.Header.Set("Accept", "application/vnd.github.v3.sha")
-	resp, err := httpClient.Do(req)
+	url, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "commits", targetRef)
 	if err != nil {
 		return "", err
 	}
 
+	req, err := client.NewRequest(context.Background(), http.MethodGet, url.String(), nil,
+		githubrest.WithHeader("Accept", "application/vnd.github.v3.sha"))
+	if err != nil {
+		return "", err
+	}
+
+	// Send rather than Do, because the response body is a bare SHA rather than
+	// JSON.
+	resp, err := client.Send(req)
+	if err != nil {
+		if statusIs(err, http.StatusUnprocessableEntity) {
+			return "", commitNotFoundErr
+		}
+		return "", err
+	}
 	defer resp.Body.Close()
-	if resp.StatusCode == 422 {
-		return "", commitNotFoundErr
-	}
-	if resp.StatusCode > 299 {
-		return "", api.HandleHTTPError(resp)
-	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
