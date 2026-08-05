@@ -8,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -113,7 +114,11 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 					return err
 				}
 				host, _ := cfg.Authentication().DefaultHost()
-				config.detector = fd.NewDetector(api.NewCachedHTTPClient(httpClient, time.Hour*24), host)
+				restClient, err := f.GitHubREST(host, githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+				if err != nil {
+					return err
+				}
+				config.detector = fd.NewDetector(api.NewCachedHTTPClient(httpClient, time.Hour*24), restClient, host)
 			}
 
 			return runList(config)

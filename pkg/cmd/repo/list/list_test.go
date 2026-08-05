@@ -356,6 +356,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(rt),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -399,6 +400,7 @@ func TestRepoList_nontty(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(httpReg),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -440,6 +442,7 @@ func TestRepoList_tty(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(httpReg),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -510,6 +513,7 @@ func TestRepoList_noVisibilityField(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -548,6 +552,7 @@ func TestRepoList_invalidOwner(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},

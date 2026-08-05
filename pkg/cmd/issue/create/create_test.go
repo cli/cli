@@ -943,6 +943,7 @@ func Test_createRun(t *testing.T) {
 			opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: httpReg}, nil
 			}
+			opts.GitHubREST = httpmock.RESTClientFunc(httpReg)
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			}
@@ -988,6 +989,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(rt),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -1587,6 +1589,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
@@ -1619,6 +1622,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
@@ -1657,6 +1661,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
@@ -1687,6 +1692,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},

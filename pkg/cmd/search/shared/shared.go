@@ -51,12 +51,12 @@ func Searcher(ctx context.Context, f *cmdutil.Factory) (search.Searcher, error) 
 		return nil, err
 	}
 
-	detector := fd.NewDetector(client, host)
-
 	restClient, err := f.GitHubREST(host)
 	if err != nil {
 		return nil, err
 	}
+
+	detector := fd.NewDetector(client, restClient, host)
 
 	return search.NewSearcher(ctx, restClient, host, detector), nil
 }

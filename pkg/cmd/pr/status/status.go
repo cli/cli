@@ -16,6 +16,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -25,6 +26,7 @@ import (
 
 type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	GitClient  *git.Client
 	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
@@ -43,6 +45,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	opts := &StatusOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Remotes:    f.Remotes,
@@ -145,7 +148,11 @@ func statusRun(opts *StatusOptions) error {
 
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		opts.Detector = fd.NewDetector(cachedClient, baseRefRepo.RepoHost())
+		restClient, err := opts.GitHubREST(baseRefRepo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+		if err != nil {
+			return err
+		}
+		opts.Detector = fd.NewDetector(cachedClient, restClient, baseRefRepo.RepoHost())
 	}
 	prFeatures, err := opts.Detector.PullRequestFeatures()
 	if err != nil {

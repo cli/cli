@@ -4,9 +4,10 @@
 package shared
 
 import (
-	"github.com/cli/cli/v2/pkg/iostreams"
 	"io"
 	"sync"
+
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 // Ensure, that LogRendererMock does implement LogRenderer.

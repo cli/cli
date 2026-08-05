@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -27,6 +28,7 @@ import (
 
 type RunOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Detector   fd.Detector
@@ -52,6 +54,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 	opts := &RunOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Prompter:   f.Prompter,
 	}
 
@@ -269,7 +272,11 @@ func runRun(opts *RunOptions) error {
 
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(c, time.Hour*24)
-		opts.Detector = fd.NewDetector(cachedClient, repo.RepoHost())
+		restClient, err := opts.GitHubREST(repo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+		if err != nil {
+			return err
+		}
+		opts.Detector = fd.NewDetector(cachedClient, restClient, repo.RepoHost())
 	}
 
 	ref := opts.Ref

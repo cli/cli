@@ -1602,6 +1602,7 @@ func Test_createRun(t *testing.T) {
 			opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -2130,6 +2131,7 @@ func Test_createRun_GHES(t *testing.T) {
 			opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			opts.GitHubREST = httpmock.RESTClientFunc(reg)
 			opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -2218,6 +2220,7 @@ func TestRemoteGuessing(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -2293,6 +2296,7 @@ func TestNoRepoCanBeDetermined(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -2658,6 +2662,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				GitClient: &git.Client{
 					GhPath:  "some/path/gh",
 					GitPath: "some/path/git",
@@ -2710,6 +2715,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				GitClient: &git.Client{
 					GhPath:  "some/path/gh",
 					GitPath: "some/path/git",
@@ -2815,6 +2821,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				Config: func() (gh.Config, error) {
 					return config.NewBlankConfig(), nil
 				},
@@ -2910,6 +2917,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				Config: func() (gh.Config, error) {
 					return config.NewBlankConfig(), nil
 				},
@@ -2974,6 +2982,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				GitClient: &git.Client{
 					GhPath:  "some/path/gh",
 					GitPath: "some/path/git",
@@ -3028,6 +3037,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				GitClient: &git.Client{
 					GhPath:  "some/path/gh",
 					GitPath: "some/path/git",

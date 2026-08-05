@@ -73,6 +73,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(rt),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -127,6 +128,7 @@ func TestIssueView_web(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(reg),
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
@@ -311,6 +313,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: httpReg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(httpReg),
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
@@ -557,6 +560,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			BaseRepo: func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
@@ -584,6 +588,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
+			GitHubREST: httpmock.RESTClientFunc(reg),
 			BaseRepo: func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
@@ -730,6 +735,7 @@ func TestIssueView_tty_Issues2AllFields(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(httpReg),
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
@@ -802,6 +808,7 @@ func TestIssueView_nontty_Issues2AllFields(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(httpReg),
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
@@ -847,6 +854,7 @@ func TestIssueView_tty_Issues2NoFields(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(httpReg),
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
@@ -896,6 +904,7 @@ func TestIssueView_nontty_Issues2NoFields(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(httpReg),
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},

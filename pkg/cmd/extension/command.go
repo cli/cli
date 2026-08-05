@@ -169,11 +169,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					query.Qualifiers = qualifiers
 
 					host, _ := cfg.Authentication().DefaultHost()
-					detector := featuredetection.NewDetector(client, host)
 					restClient, err := f.GitHubREST(host)
 					if err != nil {
 						return err
 					}
+					detector := featuredetection.NewDetector(client, restClient, host)
 					searcher := search.NewSearcher(cmd.Context(), restClient, host, detector)
 
 					if webMode {
@@ -519,11 +519,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return err
 					}
 
-					detector := featuredetection.NewDetector(client, host)
 					restClient, err := f.GitHubREST(host, githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
 					if err != nil {
 						return err
 					}
+					detector := featuredetection.NewDetector(client, restClient, host)
 					searcher := search.NewSearcher(cmd.Context(), restClient, host, detector)
 
 					gc.Stderr = gio.Discard

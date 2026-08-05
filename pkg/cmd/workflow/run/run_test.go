@@ -1119,6 +1119,7 @@ jobs:
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.GitHubREST = httpmock.RESTClientFunc(reg)
 
 			ios, _, stdout, _ := iostreams.Test()
 			ios.SetStdinTTY(tt.tty)

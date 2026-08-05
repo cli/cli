@@ -12,6 +12,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -24,6 +25,7 @@ import (
 
 type CreateOptions struct {
 	HttpClient       func() (*http.Client, error)
+	GitHubREST       func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Config           func() (gh.Config, error)
 	IO               *iostreams.IOStreams
 	BaseRepo         func() (ghrepo.Interface, error)
@@ -60,6 +62,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Config:     f.Config,
 		Browser:    f.Browser,
 		Prompter:   f.Prompter,
@@ -176,7 +179,11 @@ func createRun(opts *CreateOptions) (err error) {
 	// Remove this section as we should no longer need to detect
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+		restClient, err := opts.GitHubREST(baseRepo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+		if err != nil {
+			return err
+		}
+		opts.Detector = fd.NewDetector(cachedClient, restClient, baseRepo.RepoHost())
 	}
 
 	projectsV1Support := opts.Detector.ProjectsV1()
@@ -221,7 +228,11 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	tpl := prShared.NewTemplateManager(httpClient, baseRepo, opts.Prompter, opts.RootDirOverride, !opts.HasRepoOverride, false)
+	tplRESTClient, err := opts.GitHubREST(baseRepo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+	if err != nil {
+		return err
+	}
+	tpl := prShared.NewTemplateManager(httpClient, tplRESTClient, baseRepo, opts.Prompter, opts.RootDirOverride, !opts.HasRepoOverride, false)
 
 	if opts.WebMode {
 		var openURL string

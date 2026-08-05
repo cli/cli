@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -17,6 +18,7 @@ import (
 
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -33,6 +35,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 	}
 
 	cmd := &cobra.Command{
@@ -80,7 +83,11 @@ func listRun(opts *ListOptions) error {
 	// immutable releases (probably when 3.18 goes EOL).
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+		restClient, err := opts.GitHubREST(baseRepo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+		if err != nil {
+			return err
+		}
+		opts.Detector = fd.NewDetector(cachedClient, restClient, baseRepo.RepoHost())
 	}
 
 	releaseFeatures, err := opts.Detector.ReleaseFeatures()

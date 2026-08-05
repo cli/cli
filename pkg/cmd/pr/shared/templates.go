@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/githubtemplate"
 	"github.com/shurcooL/githubv4"
 )
@@ -141,7 +142,7 @@ type templateManager struct {
 	fetchError error
 }
 
-func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, p iprompter, dir string, allowFS bool, isPR bool) *templateManager {
+func NewTemplateManager(httpClient *http.Client, restClient *githubrest.Client, repo ghrepo.Interface, p iprompter, dir string, allowFS bool, isPR bool) *templateManager {
 	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 	return &templateManager{
 		repo:       repo,
@@ -150,7 +151,7 @@ func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, p ipromp
 		isPR:       isPR,
 		httpClient: httpClient,
 		prompter:   p,
-		detector:   fd.NewDetector(cachedClient, repo.RepoHost()),
+		detector:   fd.NewDetector(cachedClient, restClient, repo.RepoHost()),
 	}
 }
 

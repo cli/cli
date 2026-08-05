@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -20,6 +21,7 @@ import (
 
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	Exporter   cmdutil.Exporter
@@ -44,6 +46,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Now:        time.Now,
 	}
 
@@ -131,7 +134,11 @@ func listRun(opts *ListOptions) error {
 
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		opts.Detector = fd.NewDetector(cachedClient, host)
+		restClient, err := opts.GitHubREST(host, githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+		if err != nil {
+			return err
+		}
+		opts.Detector = fd.NewDetector(cachedClient, restClient, host)
 	}
 	features, err := opts.Detector.RepositoryFeatures()
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -34,6 +35,7 @@ var prCheckFields = []string{
 
 type ChecksOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	Browser    browser.Browser
 	Exporter   cmdutil.Exporter
@@ -53,6 +55,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	var interval int
 	opts := &ChecksOptions{
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		IO:         f.IOStreams,
 		Browser:    f.Browser,
 		Interval:   defaultInterval,
@@ -173,7 +176,11 @@ func checksRun(opts *ChecksOptions) error {
 
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(client, time.Hour*24)
-		opts.Detector = fd.NewDetector(cachedClient, repo.RepoHost())
+		restClient, err := opts.GitHubREST(repo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+		if err != nil {
+			return err
+		}
+		opts.Detector = fd.NewDetector(cachedClient, restClient, repo.RepoHost())
 	}
 	if features, featuresErr := opts.Detector.PullRequestFeatures(); featuresErr != nil {
 		return featuresErr

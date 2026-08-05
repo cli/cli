@@ -14,6 +14,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/text"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -26,6 +27,7 @@ import (
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
@@ -43,6 +45,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitHubREST: f.GitHubREST,
 		Browser:    f.Browser,
 		Now:        time.Now,
 	}
@@ -121,7 +124,11 @@ func viewRun(opts *ViewOptions) error {
 		// Remove this section as we should no longer add projectCards
 		if opts.Detector == nil {
 			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+			restClient, err := opts.GitHubREST(baseRepo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+			if err != nil {
+				return err
+			}
+			opts.Detector = fd.NewDetector(cachedClient, restClient, baseRepo.RepoHost())
 		}
 
 		lookupFields.Add("projectItems")

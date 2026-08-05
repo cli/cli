@@ -19,6 +19,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/cli/cli/v2/pkg/set"
@@ -46,6 +47,7 @@ type finder struct {
 	baseRepoFn      func() (ghrepo.Interface, error)
 	branchFn        func() (string, error)
 	httpClient      func() (*http.Client, error)
+	gitHubREST      func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	remotesFn       func() (ghContext.Remotes, error)
 	gitConfigClient GitConfigClient
 	progress        progressIndicator
@@ -66,10 +68,23 @@ func NewFinder(factory *cmdutil.Factory) PRFinder {
 		baseRepoFn:      factory.BaseRepo,
 		branchFn:        factory.Branch,
 		httpClient:      factory.HttpClient,
+		gitHubREST:      factory.GitHubREST,
 		gitConfigClient: factory.GitClient,
 		remotesFn:       factory.Remotes,
 		progress:        factory.IOStreams,
 	}
+}
+
+// newDetector builds a feature detector against the base repo's host, with
+// both clients caching for a day: feature support does not change often, and
+// several fields can each trigger a probe within one command.
+func (f *finder) newDetector(httpClient *http.Client) (fd.Detector, error) {
+	host := f.baseRefRepo.RepoHost()
+	restClient, err := f.gitHubREST(host, githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+	if err != nil {
+		return nil, err
+	}
+	return fd.NewDetector(api.NewCachedHTTPClient(httpClient, time.Hour*24), restClient, host), nil
 }
 
 var finderForRunCommandStyleTests PRFinder
@@ -211,8 +226,11 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 
 	if fields.Contains("isInMergeQueue") || fields.Contains("isMergeQueueEnabled") {
 		if opts.Detector == nil {
-			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-			opts.Detector = fd.NewDetector(cachedClient, f.baseRefRepo.RepoHost())
+			detector, err := f.newDetector(httpClient)
+			if err != nil {
+				return nil, nil, err
+			}
+			opts.Detector = detector
 		}
 		prFeatures, err := opts.Detector.PullRequestFeatures()
 		if err != nil {
@@ -236,8 +254,11 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	// When removing this, remember to remove `projectCards` from the list of default fields in pr/view.go
 	if fields.Contains("projectCards") {
 		if opts.Detector == nil {
-			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-			opts.Detector = fd.NewDetector(cachedClient, f.baseRefRepo.RepoHost())
+			detector, err := f.newDetector(httpClient)
+			if err != nil {
+				return nil, nil, err
+			}
+			opts.Detector = detector
 		}
 
 		if opts.Detector.ProjectsV1() == gh.ProjectsV1Unsupported {

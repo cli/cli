@@ -84,6 +84,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
+		GitHubREST: httpmock.RESTClientFunc(rt),
 		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
@@ -278,6 +279,7 @@ func TestIssueList_web(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
+				GitHubREST: httpmock.RESTClientFunc(reg),
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},

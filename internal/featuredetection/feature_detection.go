@@ -1,10 +1,12 @@
 package featuredetection
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/hashicorp/go-version"
 	"golang.org/x/sync/errgroup"
@@ -152,13 +154,18 @@ type ActionsFeatures struct {
 }
 
 type detector struct {
-	host       string
+	host string
+	// httpClient serves the GraphQL probes, restClient the REST ones. Both are
+	// required: which one a given feature check needs is not visible to the
+	// caller constructing the detector.
 	httpClient *http.Client
+	restClient *githubrest.Client
 }
 
-func NewDetector(httpClient *http.Client, host string) Detector {
+func NewDetector(httpClient *http.Client, restClient *githubrest.Client, host string) Detector {
 	return &detector{
 		httpClient: httpClient,
+		restClient: restClient,
 		host:       host,
 	}
 }
@@ -314,7 +321,7 @@ func (d *detector) ProjectsV1() gh.ProjectsV1Support {
 		return gh.ProjectsV1Unsupported
 	}
 
-	hostVersion, hostVersionErr := resolveEnterpriseVersion(d.httpClient, d.host)
+	hostVersion, hostVersionErr := resolveEnterpriseVersion(d.restClient)
 	v1ProjectCutoffVersion, v1ProjectCutoffVersionErr := version.NewVersion(enterpriseProjectsV1Removed)
 
 	if hostVersionErr == nil && v1ProjectCutoffVersionErr == nil && hostVersion.LessThan(v1ProjectCutoffVersion) {
@@ -403,7 +410,7 @@ func (d *detector) SearchFeatures() (SearchFeatures, error) {
 			return SearchFeatures{}, err
 		}
 
-		hostVersion, err := resolveEnterpriseVersion(d.httpClient, d.host)
+		hostVersion, err := resolveEnterpriseVersion(d.restClient)
 		if err != nil {
 			return SearchFeatures{}, err
 		}
@@ -520,7 +527,7 @@ func (d *detector) ActionsFeatures() (ActionsFeatures, error) {
 		return ActionsFeatures{}, err
 	}
 
-	hostVersion, err := resolveEnterpriseVersion(d.httpClient, d.host)
+	hostVersion, err := resolveEnterpriseVersion(d.restClient)
 	if err != nil {
 		return ActionsFeatures{}, err
 	}
@@ -536,18 +543,23 @@ func (d *detector) ActionsFeatures() (ActionsFeatures, error) {
 	}, nil
 }
 
-func resolveEnterpriseVersion(httpClient *http.Client, host string) (*version.Version, error) {
+func resolveEnterpriseVersion(client *githubrest.Client) (*version.Version, error) {
 	var metaResponse struct {
 		InstalledVersion string `json:"installed_version"`
 	}
 
-	apiClient := api.NewClientFromHTTP(httpClient)
 	u, err := safeurl.JoinPath("meta")
 	if err != nil {
 		return nil, err
 	}
-	err = apiClient.REST(host, "GET", u.String(), nil, &metaResponse)
+	// The Detector interface's methods take no context, and threading one
+	// through every construction site is out of proportion to a single /meta
+	// probe. Revisit if Detector ever grows a context-aware surface.
+	req, err := client.NewRequest(context.Background(), http.MethodGet, u.String(), nil)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Do(req, &metaResponse); err != nil {
 		return nil, err
 	}
 

@@ -435,7 +435,9 @@ func TestProjectV1Support(t *testing.T) {
 			httpClient := &http.Client{}
 			httpmock.ReplaceTripper(httpClient, reg)
 
-			detector := NewDetector(httpClient, tt.hostname)
+			restClient, err := httpmock.RESTClientFunc(reg)(tt.hostname)
+			require.NoError(t, err)
+			detector := NewDetector(httpClient, restClient, tt.hostname)
 			require.Equal(t, tt.wantFeatures, detector.ProjectsV1())
 		})
 	}
@@ -578,7 +580,9 @@ func TestAdvancedIssueSearchSupport(t *testing.T) {
 			httpClient := &http.Client{}
 			httpmock.ReplaceTripper(httpClient, reg)
 
-			detector := NewDetector(httpClient, tt.hostname)
+			restClient, err := httpmock.RESTClientFunc(reg)(tt.hostname)
+			require.NoError(t, err)
+			detector := NewDetector(httpClient, restClient, tt.hostname)
 
 			features, err := detector.SearchFeatures()
 			require.NoError(t, err)
@@ -775,7 +779,9 @@ func TestReleaseFeatures(t *testing.T) {
 			httpClient := &http.Client{}
 			httpmock.ReplaceTripper(httpClient, reg)
 
-			detector := NewDetector(httpClient, tt.hostname)
+			restClient, err := httpmock.RESTClientFunc(reg)(tt.hostname)
+			require.NoError(t, err)
+			detector := NewDetector(httpClient, restClient, tt.hostname)
 
 			features, err := detector.ReleaseFeatures()
 			require.NoError(t, err)
@@ -843,7 +849,9 @@ func TestActionsFeatures(t *testing.T) {
 			httpClient := &http.Client{}
 			httpmock.ReplaceTripper(httpClient, reg)
 
-			detector := NewDetector(httpClient, tt.hostname)
+			restClient, err := httpmock.RESTClientFunc(reg)(tt.hostname)
+			require.NoError(t, err)
+			detector := NewDetector(httpClient, restClient, tt.hostname)
 
 			features, err := detector.ActionsFeatures()
 			require.NoError(t, err)

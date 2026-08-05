@@ -325,6 +325,7 @@ func Test_editRun(t *testing.T) {
 
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
+			opts.GitHubREST = httpmock.RESTClientFunc(httpReg)
 			opts.IO = ios
 			err := editRun(context.Background(), opts)
 			if tt.wantsErr == "" {
@@ -828,6 +829,7 @@ func Test_editRun_interactive(t *testing.T) {
 
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
+			opts.GitHubREST = httpmock.RESTClientFunc(httpReg)
 			opts.IO = ios
 
 			err := editRun(context.Background(), opts)

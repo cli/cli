@@ -4,8 +4,9 @@
 package client
 
 import (
-	"github.com/cli/cli/v2/internal/ghrepo"
 	"sync"
+
+	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
 // Ensure, that DiscussionClientMock does implement DiscussionClient.

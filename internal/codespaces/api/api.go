@@ -37,6 +37,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -61,8 +62,11 @@ const (
 
 // API is the interface to the codespace service.
 type API struct {
+	// restClient is resolved lazily: New runs while the command tree is being
+	// built, on every gh invocation, so a client is only worth constructing
+	// once a codespaces request is actually made. Tests set it directly.
 	restClient     *githubrest.Client
-	restClientErr  error
+	resolveClient  func() (*githubrest.Client, error)
 	externalClient func() (*http.Client, error)
 	githubAPI      string
 	githubServer   string
@@ -99,16 +103,15 @@ func New(f *cmdutil.Factory) *API {
 		}
 	}
 
-	// The client is resolved here rather than per request, but New has no error
-	// to return, so a failure is carried and surfaced by newRequest.
-	restClient, restClientErr := newRESTClient(f, host, apiURL)
-	if cfgErr != nil {
-		restClient, restClientErr = nil, cfgErr
-	}
+	resolveClient := sync.OnceValues(func() (*githubrest.Client, error) {
+		if cfgErr != nil {
+			return nil, cfgErr
+		}
+		return newRESTClient(f, host, apiURL)
+	})
 
 	return &API{
-		restClient:     restClient,
-		restClientErr:  restClientErr,
+		resolveClient:  resolveClient,
 		externalClient: f.ExternalHttpClient,
 		githubAPI:      strings.TrimSuffix(apiURL, "/"),
 		githubServer:   strings.TrimSuffix(serverURL, "/"),
@@ -130,16 +133,25 @@ func newRESTClient(f *cmdutil.Factory, host, apiURL string) (*githubrest.Client,
 	return f.GitHubREST(host, opts...)
 }
 
+// client returns the REST client, resolving it on first use.
+func (a *API) client() (*githubrest.Client, error) {
+	if a.restClient != nil {
+		return a.restClient, nil
+	}
+	return a.resolveClient()
+}
+
 // newRequest builds a request through the package's REST client.
 //
 // It exists because New cannot report a client construction failure, and
 // because every request in this file is built from an absolute URL derived
 // from a.githubAPI rather than from a relative path.
 func (a *API) newRequest(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
-	if a.restClientErr != nil {
-		return nil, a.restClientErr
+	client, err := a.client()
+	if err != nil {
+		return nil, err
 	}
-	return a.restClient.NewRequest(ctx, method, url, body)
+	return client.NewRequest(ctx, method, url, body)
 }
 
 // User represents a GitHub user.
@@ -1322,14 +1334,15 @@ func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http
 	defer span.Finish()
 	req = req.WithContext(ctx)
 
-	if a.restClientErr != nil {
-		return nil, a.restClientErr
+	client, err := a.client()
+	if err != nil {
+		return nil, err
 	}
 
 	// A non-2xx is returned as a response rather than an error, because this
 	// package inspects status codes itself: withRetry retries 5xx, and several
 	// callers map particular 4xx codes to domain errors.
-	resp, err := a.restClient.Send(req)
+	resp, err := client.Send(req)
 	if err != nil {
 		var errResp *githubrest.ErrorResponse
 		if errors.As(err, &errResp) {

@@ -12,6 +12,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -23,6 +24,7 @@ import (
 
 type EditOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitHubREST func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	IO         *iostreams.IOStreams
 
 	Finder          shared.PRFinder
@@ -43,6 +45,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := &EditOptions{
 		IO:              f.IOStreams,
 		HttpClient:      f.HttpClient,
+		GitHubREST:      f.GitHubREST,
 		Surveyor:        surveyor{P: f.Prompter},
 		Fetcher:         fetcher{},
 		EditorRetriever: editorRetriever{config: f.Config},
@@ -256,7 +259,11 @@ func editRun(opts *EditOptions) error {
 		}
 
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+		restClient, err := opts.GitHubREST(baseRepo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+		if err != nil {
+			return err
+		}
+		opts.Detector = fd.NewDetector(cachedClient, restClient, baseRepo.RepoHost())
 	}
 
 	findOptions := shared.FindOptions{

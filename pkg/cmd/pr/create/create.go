@@ -21,6 +21,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -35,6 +36,7 @@ type CreateOptions struct {
 	// This struct stores user input and factory functions
 	Detector         fd.Detector
 	HttpClient       func() (*http.Client, error)
+	GitHubREST       func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	GitClient        *git.Client
 	Config           func() (gh.Config, error)
 	IO               *iostreams.IOStreams
@@ -195,6 +197,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	opts := &CreateOptions{
 		IO:               f.IOStreams,
 		HttpClient:       f.HttpClient,
+		GitHubREST:       f.GitHubREST,
 		GitClient:        f.GitClient,
 		Config:           f.Config,
 		Remotes:          f.Remotes,
@@ -392,7 +395,11 @@ func createRun(opts *CreateOptions) error {
 	// Remove this section as we should no longer need to detect
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		opts.Detector = fd.NewDetector(cachedClient, ctx.PRRefs.BaseRepo().RepoHost())
+		restClient, err := opts.GitHubREST(ctx.PRRefs.BaseRepo().RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+		if err != nil {
+			return err
+		}
+		opts.Detector = fd.NewDetector(cachedClient, restClient, ctx.PRRefs.BaseRepo().RepoHost())
 	}
 
 	projectsV1Support := opts.Detector.ProjectsV1()
@@ -519,7 +526,11 @@ func createRun(opts *CreateOptions) error {
 		action = shared.SubmitDraftAction
 	}
 
-	tpl := shared.NewTemplateManager(client.HTTP(), ctx.PRRefs.BaseRepo(), opts.Prompter, opts.RootDirOverride, opts.RepoOverride == "", true)
+	restClient, err := opts.GitHubREST(ctx.PRRefs.BaseRepo().RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+	if err != nil {
+		return err
+	}
+	tpl := shared.NewTemplateManager(client.HTTP(), restClient, ctx.PRRefs.BaseRepo(), opts.Prompter, opts.RootDirOverride, opts.RepoOverride == "", true)
 
 	if opts.EditorMode {
 		if opts.Template != "" {

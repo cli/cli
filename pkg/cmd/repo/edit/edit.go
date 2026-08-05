@@ -16,6 +16,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -60,6 +61,7 @@ const (
 
 type EditOptions struct {
 	HTTPClient                         *http.Client
+	GitHubREST                         func(host string, opts ...githubrest.ClientOption) (*githubrest.Client, error)
 	Repository                         ghrepo.Interface
 	IO                                 *iostreams.IOStreams
 	Edits                              EditRepositoryInput
@@ -169,6 +171,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 			} else {
 				return err
 			}
+			opts.GitHubREST = f.GitHubREST
 
 			if cmd.Flags().NFlag() == 0 {
 				opts.InteractiveMode = true
@@ -240,7 +243,11 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		detector := opts.Detector
 		if detector == nil {
 			cachedClient := api.NewCachedHTTPClient(opts.HTTPClient, time.Hour*24)
-			detector = fd.NewDetector(cachedClient, repo.RepoHost())
+			restClient, err := opts.GitHubREST(repo.RepoHost(), githubrest.WithDefaultRequestOptions(githubrest.WithCacheTTL(time.Hour*24)))
+			if err != nil {
+				return err
+			}
+			detector = fd.NewDetector(cachedClient, restClient, repo.RepoHost())
 		}
 		repoFeatures, err := detector.RepositoryFeatures()
 		if err != nil {
