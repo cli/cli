@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -35,6 +36,7 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
 	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
+	f.GitHubClient = gitHubClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
 	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
 	f.Remotes = remotesFunc(f)    // Depends on Config, and GitClient
 	f.BaseRepo = BaseRepoFunc(f.Remotes)
@@ -205,6 +207,42 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 		}
 		client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
 		return client, nil
+	}
+}
+
+// gitHubClientFunc builds githubrest clients over an *http.Client that has no
+// token-injecting transport, so the token comes from the client's auth strategy
+// alone.
+//
+// The SSO header extraction that HttpClientFunc installs is repeated here
+// because factory.SSOURL() reads the same package-level variable and callers
+// have no way to know which client produced a response.
+func gitHubClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func(string) (*githubrest.Client, error) {
+	return func(hostname string) (*githubrest.Client, error) {
+		cfg, err := cfgFunc()
+		if err != nil {
+			return nil, err
+		}
+
+		client, err := githubrest.NewHTTPClient(githubrest.HTTPClientOptions{
+			Log:               ios.ErrOut,
+			LogColorize:       ios.ColorEnabled(),
+			AppVersion:        appVersion,
+			InvokingAgent:     invokingAgent,
+			TelemetryDisabler: telemetryDisabler,
+		})
+		if err != nil {
+			return nil, err
+		}
+		client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
+
+		token, _ := cfg.Authentication().ActiveToken(hostname)
+		return githubrest.NewClient(
+			githubrest.APIBaseURL(hostname),
+			client,
+			githubrest.WithToken(token),
+			githubrest.WithCredentialedHost(githubrest.UploadHost(hostname)),
+		)
 	}
 }
 

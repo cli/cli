@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -548,7 +549,15 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		err = shared.ConcurrentUpload(httpClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
+		// Unlike gh release upload this stays on the api.Client-derived REST
+		// client, since create's other calls already run over httpClient and
+		// there is nothing to gain from two clients in one command.
+		uploadClient, uploadErr := api.NewRESTClient(httpClient, baseRepo.RepoHost())
+		if uploadErr != nil {
+			return cleanupDraftRelease(uploadErr)
+		}
+
+		err = shared.ConcurrentUpload(uploadClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return cleanupDraftRelease(err)

@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_typeForFilename(t *testing.T) {
@@ -101,7 +103,10 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 	})}
 	// githubrest refuses an absolute URL that is not https on a credentialed
 	// host, so this fixture URL moved from http:// to https://.
-	err := uploadWithDelete(ctx, client, safeurl.NewImmutableSafeURL("https://example.com/upload"), AssetForUpload{
+	restClient, err := githubrest.NewClient("https://example.com/", client, githubrest.WithoutToken())
+	require.NoError(t, err)
+
+	err = uploadWithDelete(ctx, restClient, safeurl.NewImmutableSafeURL("https://example.com/upload"), AssetForUpload{
 		Name:  "asset",
 		Label: "",
 		Size:  8,

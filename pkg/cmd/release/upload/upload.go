@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -19,8 +20,13 @@ import (
 
 type UploadOptions struct {
 	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
+	// GitHubClient builds the REST client that uploads run over. Uploads go to
+	// a different host from the rest of the API, which the factory declares as
+	// credentialed, so they cannot share a client with the API-host callers
+	// above.
+	GitHubClient func(hostname string) (*githubrest.Client, error)
+	IO           *iostreams.IOStreams
+	BaseRepo     func() (ghrepo.Interface, error)
 
 	TagName string
 	Assets  []*shared.AssetForUpload
@@ -32,8 +38,9 @@ type UploadOptions struct {
 
 func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Command {
 	opts := &UploadOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		IO:           f.IOStreams,
+		HttpClient:   f.HttpClient,
+		GitHubClient: f.GitHubClient,
 	}
 
 	cmd := &cobra.Command{
@@ -112,8 +119,13 @@ func uploadRun(opts *UploadOptions) error {
 		uploadURL = uploadURL[:idx]
 	}
 
+	restClient, err := opts.GitHubClient(baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicator()
-	err = shared.ConcurrentUpload(httpClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
+	err = shared.ConcurrentUpload(restClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err

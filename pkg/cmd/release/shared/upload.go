@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"golang.org/x/sync/errgroup"
@@ -108,7 +107,9 @@ func fileExt(fn string) string {
 	return path.Ext(fn)
 }
 
-func ConcurrentUpload(httpClient *http.Client, uploadURL safeurl.SafeURL, numWorkers int, assets []*AssetForUpload) error {
+// ConcurrentUpload uploads assets using the given client, which must be able to
+// send credentials to the upload host as well as the API host.
+func ConcurrentUpload(client *githubrest.Client, uploadURL safeurl.SafeURL, numWorkers int, assets []*AssetForUpload) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -120,7 +121,7 @@ func ConcurrentUpload(httpClient *http.Client, uploadURL safeurl.SafeURL, numWor
 	for _, a := range assets {
 		asset := *a
 		g.Go(func() error {
-			return uploadWithDelete(gctx, httpClient, uploadURL, asset)
+			return uploadWithDelete(gctx, client, uploadURL, asset)
 		})
 	}
 
@@ -139,15 +140,15 @@ func shouldRetry(err error) bool {
 // Allow injecting backoff interval in tests.
 var retryInterval = time.Millisecond * 200
 
-func uploadWithDelete(ctx context.Context, httpClient *http.Client, uploadURL safeurl.SafeURL, a AssetForUpload) error {
+func uploadWithDelete(ctx context.Context, client *githubrest.Client, uploadURL safeurl.SafeURL, a AssetForUpload) error {
 	if a.ExistingURL != nil && a.ExistingURL.String() != "" {
-		if err := deleteAsset(ctx, httpClient, a.ExistingURL); err != nil {
+		if err := deleteAsset(ctx, client, a.ExistingURL); err != nil {
 			return err
 		}
 	}
 	bo := backoff.NewConstantBackOff(retryInterval)
 	return backoff.Retry(func() error {
-		_, err := uploadAsset(ctx, httpClient, uploadURL, a)
+		_, err := uploadAsset(ctx, client, uploadURL, a)
 		if err == nil || shouldRetry(err) {
 			return err
 		}
@@ -155,7 +156,7 @@ func uploadWithDelete(ctx context.Context, httpClient *http.Client, uploadURL sa
 	}, backoff.WithContext(backoff.WithMaxRetries(bo, 3), ctx))
 }
 
-func uploadAsset(ctx context.Context, httpClient *http.Client, uploadURL safeurl.SafeURL, asset AssetForUpload) (*ReleaseAsset, error) {
+func uploadAsset(ctx context.Context, client *githubrest.Client, uploadURL safeurl.SafeURL, asset AssetForUpload) (*ReleaseAsset, error) {
 	u, err := url.Parse(uploadURL.String())
 	if err != nil {
 		return nil, err
@@ -167,11 +168,6 @@ func uploadAsset(ctx context.Context, httpClient *http.Client, uploadURL safeurl
 
 	// Since u is derived from uploadURL, an already-trusted safeurl.SafeURL, the resulting URL is safe to declare as such.
 	safeURL := safeurl.NewImmutableSafeURL(u.String())
-
-	client, err := api.NewRESTClientForURL(httpClient, safeURL.String())
-	if err != nil {
-		return nil, err
-	}
 
 	// NewUploadRequest requires a content type, where http.Request.Header.Set
 	// happily took the empty string that typeForFilename returns for an unknown
@@ -201,12 +197,7 @@ func uploadAsset(ctx context.Context, httpClient *http.Client, uploadURL safeurl
 	return &newAsset, nil
 }
 
-func deleteAsset(ctx context.Context, httpClient *http.Client, assetURL safeurl.SafeURL) error {
-	client, err := api.NewRESTClientForURL(httpClient, assetURL.String())
-	if err != nil {
-		return err
-	}
-
+func deleteAsset(ctx context.Context, client *githubrest.Client, assetURL safeurl.SafeURL) error {
 	req, err := client.NewRequest(ctx, http.MethodDelete, assetURL.String(), nil)
 	if err != nil {
 		return err

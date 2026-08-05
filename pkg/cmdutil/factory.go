@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/githubrest"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -43,5 +44,12 @@ type Factory struct {
 	// It includes debug logging and a User-Agent header but does not attach any
 	// authentication tokens or GitHub-specific headers.
 	ExternalHttpClient func() (*http.Client, error)
-	Remotes            func() (context.Remotes, error)
+	// GitHubClient returns a REST client for one GitHub host, authenticated as
+	// that host's active token.
+	//
+	// Unlike HttpClient, the *http.Client underneath carries no transport that
+	// injects an Authorization header, so the token is entirely the client's
+	// concern and githubrest.WithoutToken genuinely means anonymous.
+	GitHubClient func(hostname string) (*githubrest.Client, error)
+	Remotes      func() (context.Remotes, error)
 }

@@ -3,9 +3,10 @@ package shared
 import (
 	"context"
 	"fmt"
-	"github.com/cli/cli/v2/internal/githubrest"
 	"net/http"
 	"strings"
+
+	"github.com/cli/cli/v2/internal/githubrest"
 )
 
 type MissingScopesError struct {
@@ -28,8 +29,14 @@ func (e MissingScopesError) Error() string {
 // GetScopes performs a GitHub API request and returns the value of the X-Oauth-Scopes header.
 func GetScopes(httpClient *http.Client, hostname, authToken string) (string, error) {
 	// The token being checked is not necessarily the configured one, so it is
-	// supplied per request rather than at client construction. WithoutToken
-	// then guarantees no other Authorization can reach the wire.
+	// supplied per request rather than at client construction.
+	//
+	// WithoutToken only means the client adds no Authorization of its own.
+	// Callers still pass an *http.Client that may carry api.AddAuthTokenHeader,
+	// which would otherwise add the host's active token. It does not overwrite
+	// an existing header, so the per-request token above still wins, but a
+	// client from githubrest.NewHTTPClient would make that a guarantee rather
+	// than a consequence.
 	client, err := githubrest.NewClient(githubrest.APIBaseURL(hostname), httpClient, githubrest.WithoutToken())
 	if err != nil {
 		return "", err
