@@ -84,6 +84,7 @@ timeout-minutes: 30
 # correctly.
 steps:
   - name: Compute Dependabot triage work list
+    id: worklist
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_REPOSITORY: ${{ github.repository }}
@@ -112,6 +113,7 @@ steps:
         else
           echo "Ignoring non-numeric pr_number input"
           echo '[]' > "$WORKLIST"
+          echo "needs_go=false" >> "$GITHUB_OUTPUT"
           echo '{"type":"noop","message":"pr_number input was not a positive integer"}' >> "$SAFE_OUT"
           exit 0
         fi
@@ -168,6 +170,7 @@ steps:
       echo "PRs with terminal CI: $(printf '%s' "$ready" | jq length)"
 
       work='[]'
+      needs_go=false
       for row in $(printf '%s' "$ready" | jq -r '.[] | @base64'); do
         entry=$(printf '%s' "$row" | base64 --decode)
         n=$(printf '%s' "$entry" | jq -r '.number')
@@ -187,6 +190,18 @@ steps:
         else
           echo "PR #$n: needs assessment (head $head, last assessed '${assessed:-none}')"
           work=$(printf '%s' "$work" | jq -c --argjson e "$entry" '. + [$e]')
+
+          # Most Dependabot traffic here bumps GitHub Actions, not Go modules,
+          # and the vendored Go artifacts are meaningless for those. Only pay
+          # for vendoring when something in scope actually moves the Go
+          # manifests. Treat an unreadable file list as "might be Go" so a
+          # transient API failure degrades to wasted work rather than to
+          # missing evidence.
+          files=$(gh pr view "$n" --repo "$GITHUB_REPOSITORY" --json files \
+                    --jq '.files[].path' 2>/dev/null) || files="go.mod"
+          if printf '%s\n' "$files" | grep -qE '^(go\.mod|go\.sum)$'; then
+            needs_go=true
+          fi
         fi
       done
 
@@ -194,9 +209,86 @@ steps:
       count=$(printf '%s' "$work" | jq length)
       echo "Work list: $count PR(s) -> $WORKLIST"
 
+      # Gates the vendoring step below, so a run with no Go dependency work
+      # costs no module downloads on top of costing no AI Credits.
+      echo "needs_go=$needs_go" >> "$GITHUB_OUTPUT"
+      echo "Go reachability evidence needed: $needs_go"
+
       if [ "$count" -eq 0 ]; then
         echo '{"type":"noop","message":"No Dependabot PRs need triage: all open PRs are already assessed at their current head commit, or their CI is still pending."}' >> "$SAFE_OUT"
       fi
+
+  # Dependency reachability evidence. The agent is asked whether an upstream
+  # change can reach this repository. It used to answer that by grepping our
+  # own source for the module's import path, which for an indirect dependency
+  # always finds nothing - by definition, since "indirect" means precisely that
+  # we do not import it. Reading that silence as safety is a tautology, and it
+  # produced a wrong `High` confidence assessment on PR #14066: a
+  # `github.com/docker/cli` bump was called risk-free when five of its packages
+  # are compiled into the shipped binary via `go-containerregistry/pkg/authn`.
+  #
+  # These steps replace that inference with the build graph. `go mod vendor`
+  # resolves what the module graph actually needs, so it is indifferent to who
+  # writes the import, and its `vendor/modules.txt` is a per-module list of the
+  # exact packages required. The vendored tree also puts the dependency source
+  # itself in the workspace, which the agent already has mounted, so it can read
+  # the changed code rather than reasoning from release notes alone.
+  #
+  # `vendor/` is gitignored and nothing in this job commits, so this is a
+  # read-only side effect on the runner's checkout.
+  #
+  # Gated on a Go manifest actually moving. Most Dependabot traffic in this
+  # repository bumps GitHub Actions, where these artifacts say nothing, so
+  # vendoring unconditionally would download tens of megabytes per run to
+  # produce evidence the agent must ignore. The skill tells the agent to
+  # establish Actions reachability by grepping `.github/` for `uses:` instead,
+  # and warns it not to read a module's absence from these files as safety.
+  #
+  # There is deliberately no `actions/setup-go` step here. The compiler detects
+  # the `go` invocations below and emits its own Setup Go step, taking the
+  # version from `go.mod`, so an explicit one would be silently replaced and
+  # would drift. That generated step is not conditional, so a run with no Go
+  # work still pays for the toolchain but not for the module downloads below.
+  - name: Vendor dependency source for the agent
+    if: steps.worklist.outputs.needs_go == 'true'
+    run: |
+      set -uo pipefail
+      PKGS=/tmp/gh-aw/go-production-packages.txt
+      rm -f "$PKGS" "$PKGS.tmp"
+
+      # Deliberately not fatal. Missing evidence should degrade the assessment,
+      # not cancel triage: the skill treats an absent artifact as an
+      # unobtainable evidence item and caps confidence at Medium, which is
+      # visible in the posted comment. A hard failure would post nothing at all.
+      if ! go mod vendor; then
+        echo "::warning::go mod vendor failed; the agent has no reachability evidence this run."
+        rm -rf vendor
+        exit 0
+      fi
+
+      # `go list -deps` evaluates build constraints for one GOOS/GOARCH/cgo
+      # combination, so a single invocation would miss platform-guarded imports
+      # and understate what a change can reach. Union the exact release matrix
+      # from .goreleaser.yml, including linux's CGO_ENABLED=0, so the evidence
+      # describes what we actually ship. Today every combination yields the same
+      # set, but that is a property of the current dependencies, not a guarantee.
+      for target in \
+        "darwin amd64 1" "darwin arm64 1" \
+        "linux 386 0" "linux arm 0" "linux amd64 0" "linux arm64 0" \
+        "windows 386 1" "windows amd64 1" "windows arm64 1"; do
+        # shellcheck disable=SC2086
+        set -- $target
+        if ! GOOS="$1" GOARCH="$2" CGO_ENABLED="$3" go list -deps ./cmd/gh >> "$PKGS.tmp"; then
+          echo "::warning::go list failed for GOOS=$1 GOARCH=$2; production package list is incomplete and will not be written."
+          rm -f "$PKGS.tmp"
+          exit 0
+        fi
+      done
+      sort -u "$PKGS.tmp" -o "$PKGS"
+      rm -f "$PKGS.tmp"
+
+      echo "Vendored $(grep -c '^# ' vendor/modules.txt) modules into vendor/"
+      echo "Shipped binary compiles $(wc -l < "$PKGS" | tr -d ' ') packages -> $PKGS"
 
 # Security + output envelope (read-only GitHub tools, GitHub App posting
 # identity, comment-only safe-output). Vendored locally so this workflow has no
@@ -227,6 +319,14 @@ assessed at their current head commit, and it has already applied the optional
 
 Read that file. It is a JSON array of objects with `number` and `head_sha`.
 
+The same pre-flight step has also, when this run includes a Go dependency
+update, vendored the dependency source into `vendor/` and written the packages
+compiled into the shipped `gh` binary to
+`/tmp/gh-aw/go-production-packages.txt`. Those are your Go reachability
+evidence; the skill explains how to use them, and how to establish reachability
+for GitHub Actions updates, where those files do not apply and their absence
+means nothing.
+
 That array is your entire working scope for this run. Assess every entry in it,
 and never comment on anything outside it. If the array is empty, do nothing.
 
@@ -243,8 +343,10 @@ For each entry in the work list, follow the `dependabot-triager` skill precisely
 
 1. Gather the skill's four required evidence items, including the PR's own diff,
    the dependency's direct/indirect position read from the manifest in the
-   checkout, and a usage trace grepped from the checked-out source tree. Never
-   infer these from the PR title or the Dependabot summary.
+   checkout, and the reachability of each updated dependency established by the
+   method the skill gives for that ecosystem. Never infer these from the PR
+   title or the Dependabot summary, and never treat a dependency's absence from
+   the Go artifacts as evidence of safety.
 2. Check in-repo coherence: whether the PR edits generated files and leaves
    embedded version pins or metadata inconsistent.
 3. Decide the recommendation and confidence, and post exactly one comment.
