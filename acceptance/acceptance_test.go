@@ -258,8 +258,13 @@ func TestTelemetry(t *testing.T) {
 
 func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
 	var files []string
-	if tsEnv.script != "" {
-		files = []string{path.Join("testdata", command, tsEnv.script)}
+	for _, script := range tsEnv.scripts {
+		// A named script that is not in this command's directory belongs to
+		// another directory in the same run, so it is not an error here.
+		p := path.Join("testdata", command, script)
+		if _, err := os.Stat(p); err == nil {
+			files = append(files, p)
+		}
 	}
 
 	var dir string
@@ -570,7 +575,9 @@ type testScriptEnv struct {
 	org   string
 	token string
 
-	script string
+	// scripts optionally narrows a run to named scripts within the command
+	// directory being run. Empty means run every script in the directory.
+	scripts []string
 
 	skipDefer       bool
 	preserveWorkDir bool
@@ -608,7 +615,7 @@ func (e *testScriptEnv) fromEnv() error {
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
 
-	e.script = os.Getenv("GH_ACCEPTANCE_SCRIPT")
+	e.scripts = parseScriptFilter(os.Getenv("GH_ACCEPTANCE_SCRIPT"))
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
 	e.skipDefer = os.Getenv("GH_ACCEPTANCE_SKIP_DEFER") == "true"
 
