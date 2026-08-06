@@ -75,11 +75,11 @@ func TestSelectScripts(t *testing.T) {
 	require.NoError(t, os.WriteFile(workflowScript, []byte(""), 0o644))
 
 	tests := []struct {
-		name           string
-		command        string
-		scripts        []string
-		wantFiles      []string
-		wantFiltered   bool
+		name         string
+		command      string
+		scripts      []string
+		wantFiles    []string
+		wantFiltered bool
 	}{
 		{
 			name:         "no filter - whole directory should be used",
@@ -126,4 +126,3 @@ func TestSelectScripts(t *testing.T) {
 		})
 	}
 }
-
