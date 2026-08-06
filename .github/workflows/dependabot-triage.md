@@ -84,6 +84,7 @@ timeout-minutes: 30
 # correctly.
 steps:
   - name: Compute Dependabot triage work list
+    id: worklist
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_REPOSITORY: ${{ github.repository }}
@@ -112,6 +113,7 @@ steps:
         else
           echo "Ignoring non-numeric pr_number input"
           echo '[]' > "$WORKLIST"
+          echo "count=0" >> "$GITHUB_OUTPUT"
           echo '{"type":"noop","message":"pr_number input was not a positive integer"}' >> "$SAFE_OUT"
           exit 0
         fi
@@ -194,9 +196,70 @@ steps:
       count=$(printf '%s' "$work" | jq length)
       echo "Work list: $count PR(s) -> $WORKLIST"
 
+      # Gates the vendoring step below, so an idle run costs no module
+      # downloads on top of costing no AI Credits.
+      echo "count=$count" >> "$GITHUB_OUTPUT"
+
       if [ "$count" -eq 0 ]; then
         echo '{"type":"noop","message":"No Dependabot PRs need triage: all open PRs are already assessed at their current head commit, or their CI is still pending."}' >> "$SAFE_OUT"
       fi
+
+  # Dependency reachability evidence. The agent is asked whether an upstream
+  # change can reach this repository. It used to answer that by grepping our
+  # own source for the module's import path, which for an indirect dependency
+  # always finds nothing - by definition, since "indirect" means precisely that
+  # we do not import it. Reading that silence as safety is a tautology, and it
+  # produced a wrong `High` confidence assessment on PR #14066: a
+  # `github.com/docker/cli` bump was called risk-free when five of its packages
+  # are compiled into the shipped binary via `go-containerregistry/pkg/authn`.
+  #
+  # These steps replace that inference with the build graph. `go mod vendor`
+  # resolves what the module graph actually needs, so it is indifferent to who
+  # writes the import, and its `vendor/modules.txt` is a per-module list of the
+  # exact packages required. The vendored tree also puts the dependency source
+  # itself in the workspace, which the agent already has mounted, so it can read
+  # the changed code rather than reasoning from release notes alone.
+  #
+  # `vendor/` is gitignored and nothing in this job commits, so this is a
+  # read-only side effect on the runner's checkout.
+  #
+  # There is deliberately no `actions/setup-go` step here. The compiler detects
+  # the `go` invocations below and emits its own Setup Go step, taking the
+  # version from `go.mod`, so an explicit one would be silently replaced and
+  # would drift. That generated step is not conditional, so an idle run pays for
+  # the toolchain but not for the module downloads below.
+  - name: Vendor dependency source for the agent
+    if: steps.worklist.outputs.count != '0'
+    run: |
+      set -uo pipefail
+      PKGS=/tmp/gh-aw/go-production-packages.txt
+      rm -f "$PKGS" "$PKGS.tmp"
+
+      # Deliberately not fatal. Missing evidence should degrade the assessment,
+      # not cancel triage: the skill treats an absent artifact as an
+      # unobtainable evidence item and caps confidence at Medium, which is
+      # visible in the posted comment. A hard failure would post nothing at all.
+      if ! go mod vendor; then
+        echo "::warning::go mod vendor failed; the agent has no reachability evidence this run."
+        rm -rf vendor
+        exit 0
+      fi
+
+      # `go list -deps` evaluates build constraints for a single GOOS, but gh
+      # ships on all three, so one invocation would miss platform-guarded
+      # imports and understate what a change can reach. Union them.
+      for goos in linux darwin windows; do
+        if ! GOOS="$goos" GOARCH=amd64 go list -deps ./cmd/gh >> "$PKGS.tmp"; then
+          echo "::warning::go list failed for GOOS=$goos; production package list is incomplete and will not be written."
+          rm -f "$PKGS.tmp"
+          exit 0
+        fi
+      done
+      sort -u "$PKGS.tmp" -o "$PKGS"
+      rm -f "$PKGS.tmp"
+
+      echo "Vendored $(grep -c '^# ' vendor/modules.txt) modules into vendor/"
+      echo "Shipped binary compiles $(wc -l < "$PKGS" | tr -d ' ') packages -> $PKGS"
 
 # Security + output envelope (read-only GitHub tools, GitHub App posting
 # identity, comment-only safe-output). Vendored locally so this workflow has no
@@ -227,6 +290,11 @@ assessed at their current head commit, and it has already applied the optional
 
 Read that file. It is a JSON array of objects with `number` and `head_sha`.
 
+The same pre-flight step has also vendored the dependency source into
+`vendor/` and written the packages compiled into the shipped `gh` binary to
+`/tmp/gh-aw/go-production-packages.txt`. Those are your reachability evidence;
+the skill explains how to use them.
+
 That array is your entire working scope for this run. Assess every entry in it,
 and never comment on anything outside it. If the array is empty, do nothing.
 
@@ -243,8 +311,9 @@ For each entry in the work list, follow the `dependabot-triager` skill precisely
 
 1. Gather the skill's four required evidence items, including the PR's own diff,
    the dependency's direct/indirect position read from the manifest in the
-   checkout, and a usage trace grepped from the checked-out source tree. Never
-   infer these from the PR title or the Dependabot summary.
+   checkout, and the reachability of each updated module read from the vendored
+   build graph. Never infer these from the PR title or the Dependabot summary,
+   and never treat "this repository does not import it" as evidence of safety.
 2. Check in-repo coherence: whether the PR edits generated files and leaves
    embedded version pins or metadata inconsistent.
 3. Decide the recommendation and confidence, and post exactly one comment.
