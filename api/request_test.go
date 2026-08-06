@@ -391,3 +391,53 @@ func TestGraphQLWithHeader(t *testing.T) {
 
 	assert.Equal(t, "token explicit-token", reg.Requests[0].Header.Get("Authorization"))
 }
+
+// TestDoRequestPreservesCheckRedirect pins the difference between Request and DoRequest that
+// motivates DoRequest existing for redirect-sensitive call sites. Request delegates to go-gh,
+// which builds an http.Client of its own from the transport alone, so a redirect policy set on
+// the client cannot survive. DoRequest sends through that client and so keeps it.
+func TestDoRequestPreservesCheckRedirect(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/start" {
+			http.Redirect(w, r, "/final", http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	newClient := func(called *bool) *http.Client {
+		return &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			*called = true
+			return http.ErrUseLastResponse
+		}}
+	}
+
+	t.Run("DoRequest honours it", func(t *testing.T) {
+		var called bool
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/start", nil)
+		require.NoError(t, err)
+
+		// The redirect is not followed, so the 3xx is the final response and, being outside
+		// the 2xx range, is reported as an error. Call sites such as gh repo delete rely on
+		// seeing that status to explain that a repo was renamed or transferred.
+		_, err = NewClientFromHTTP(newClient(&called)).DoRequest(req)
+		require.Error(t, err)
+
+		var httpErr HTTPError
+		require.ErrorAs(t, err, &httpErr)
+		assert.True(t, called, "CheckRedirect should have been consulted")
+		assert.Equal(t, http.StatusFound, httpErr.StatusCode)
+	})
+
+	t.Run("Request cannot honour it", func(t *testing.T) {
+		var called bool
+
+		resp, err := NewClientFromHTTP(newClient(&called)).Request("github.com", http.MethodGet, ts.URL+"/start", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.False(t, called, "go-gh builds its own client, so the policy cannot apply")
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+}

@@ -49,3 +49,33 @@ func TestDeleteRepoMissingScope(t *testing.T) {
 	require.ErrorAs(t, err, &httpErr)
 	assert.Contains(t, httpErr.ScopesSuggestion(), "delete_repo")
 }
+
+// TestDeleteRepoDoesNotFollowRedirect pins that a renamed or transferred repo surfaces the 3xx
+// to the caller rather than being followed. deleteRun relies on seeing that status to explain
+// what happened, so following the redirect would report success while deleting nothing.
+//
+// The Location header matters: without it Go cannot follow a redirect at all, so a stub that
+// omits it passes whatever the redirect policy is.
+func TestDeleteRepoDoesNotFollowRedirect(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO"),
+		func(req *http.Request) (*http.Response, error) {
+			resp, err := httpmock.StatusStringResponse(301, "")(req)
+			if err != nil {
+				return nil, err
+			}
+			resp.Header.Set("Location", "https://api.github.com/repos/OWNER/RENAMED")
+			return resp, nil
+		},
+	)
+
+	err := deleteRepo(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"))
+	require.Error(t, err)
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, 301, httpErr.StatusCode)
+}

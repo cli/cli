@@ -242,7 +242,7 @@ func downloadRun(opts *DownloadOptions) error {
 		}
 	}
 
-	return downloadAssets(&dest, httpClient, baseRepo.RepoHost(), targets, opts.Concurrency, isArchive, opts.IO)
+	return downloadAssets(&dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -259,7 +259,7 @@ type downloadTarget struct {
 	name string
 }
 
-func downloadAssets(dest *destinationWriter, httpClient *http.Client, hostname string, toDownload []downloadTarget, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
+func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []downloadTarget, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -275,7 +275,7 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, hostname s
 		go func() {
 			for a := range jobs {
 				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.name))
-				results <- downloadAsset(dest, httpClient, hostname, a.url, a.name, isArchive)
+				results <- downloadAsset(dest, httpClient, a.url, a.name, isArchive)
 			}
 		}()
 	}
@@ -297,15 +297,20 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, hostname s
 	return downloadError
 }
 
-func downloadAsset(dest *destinationWriter, httpClient *http.Client, hostname string, assetURL safeurl.SafeURL, fileName string, isArchive bool) error {
+func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL safeurl.SafeURL, fileName string, isArchive bool) error {
 	if err := dest.Check(fileName); err != nil {
 		return err
 	}
 
-	accept := "application/octet-stream"
+	req, err := http.NewRequest(http.MethodGet, assetURL.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Accept", "application/octet-stream")
 	if isArchive {
 		// adding application/json to Accept header due to a bug in the zipball/tarball API endpoint that makes it mandatory
-		accept = "application/octet-stream, application/json"
+		req.Header.Set("Accept", "application/octet-stream, application/json")
 
 		// override HTTP redirect logic to avoid "legacy" Codeload resources. This is client
 		// level rather than request level, so the client is copied before being handed over
@@ -320,12 +325,15 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, hostname st
 		}
 	}
 
-	// The asset URL is supplied by the API, so it is absolute and requested as given.
+	// The asset URL is supplied by the API, so it is absolute and requested as given. DoRequest
+	// rather than Request because the CheckRedirect above is a property of the client, and
+	// Request delegates to go-gh, which builds a client of its own from the transport alone and
+	// so silently drops it. Without it the "legacy" Codeload path is never rewritten and the
+	// archive is saved under the wrong name.
 	// TODO(api-client-rollout)
 	// This line of code is part of a mechanical roll out of the api client.
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	resp, err := api.NewClientFromHTTP(httpClient).Request(hostname, http.MethodGet, assetURL.String(), nil,
-		api.WithHeader("Accept", accept))
+	resp, err := api.NewClientFromHTTP(httpClient).DoRequest(req)
 	if err != nil {
 		return err
 	}
