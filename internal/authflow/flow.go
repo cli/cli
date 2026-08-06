@@ -129,6 +129,11 @@ func (c cfg) HostForAPIHost(string) (string, bool) {
 	return "", false
 }
 
+// APIHostForHost never resolves for the same reason as HostForAPIHost.
+func (c cfg) APIHostForHost(string) (string, bool) {
+	return "", false
+}
+
 func getViewer(httpClient *http.Client, hostname, token string) (string, error) {
 	authedClient := *httpClient
 	authedClient.Transport = api.AddAuthTokenHeader(httpClient.Transport, cfg{token: token})
