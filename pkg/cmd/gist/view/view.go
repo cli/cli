@@ -150,7 +150,7 @@ func viewRun(opts *ViewOptions) error {
 		// path fetches the full content from the raw URL.
 		content := iostreams.NewUntrusted(gf.Content)
 		if gf.Truncated {
-			fullContent, err := shared.GetRawGistFile(client, safeurl.NewImmutableSafeURL(gf.RawURL))
+			fullContent, err := shared.GetRawGistFile(client, hostname, safeurl.NewImmutableSafeURL(gf.RawURL))
 			if err != nil {
 				return err
 			}
