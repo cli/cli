@@ -299,7 +299,28 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 
 		ts.Setenv("GH_HOST", tsEnv.host)
 		ts.Setenv("ORG", tsEnv.org)
-		ts.Setenv("GH_TOKEN", tsEnv.token)
+
+		if tsEnv.apiHost == "" {
+			ts.Setenv("GH_TOKEN", tsEnv.token)
+		} else {
+			// api_host is only readable from hosts.yml, and a GH_TOKEN in the
+			// environment resolves auth without ever consulting that file, so
+			// the token has to move into the same place as the override.
+			hostsFile := filepath.Join(ts.Cd, "hosts.yml")
+			hostsContent := fmt.Sprintf(""+
+				"%[1]s:\n"+
+				"    user: %[2]s\n"+
+				"    oauth_token: %[3]s\n"+
+				"    git_protocol: https\n"+
+				"    api_host: %[4]s\n"+
+				"    users:\n"+
+				"        %[2]s:\n"+
+				"            oauth_token: %[3]s\n",
+				tsEnv.host, tsEnv.user, tsEnv.token, tsEnv.apiHost)
+			if err := os.WriteFile(hostsFile, []byte(hostsContent), 0o600); err != nil {
+				return fmt.Errorf("writing sandbox hosts.yml: %w", err)
+			}
+		}
 
 		ts.Setenv("RANDOM_STRING", randomString(10))
 
@@ -572,10 +593,16 @@ type testScriptEnv struct {
 	host  string
 	org   string
 	token string
+	user  string
 
 	// scripts optionally narrows a run to named scripts within the command
 	// directory being run. Empty means run every script in the directory.
 	scripts []string
+
+	// apiHost, when set, routes API traffic through that hostname by writing a
+	// hosts.yml instead of authenticating from GH_TOKEN. Used by the gateway
+	// harness in script/api-host-gateway.
+	apiHost string
 
 	skipDefer       bool
 	preserveWorkDir bool
@@ -616,6 +643,11 @@ func (e *testScriptEnv) fromEnv() error {
 	e.scripts = parseScriptFilter(os.Getenv("GH_ACCEPTANCE_SCRIPT"))
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
 	e.skipDefer = os.Getenv("GH_ACCEPTANCE_SKIP_DEFER") == "true"
+	e.apiHost = os.Getenv("GH_ACCEPTANCE_API_HOST")
+	e.user = os.Getenv("GH_ACCEPTANCE_USER")
+	if e.apiHost != "" && e.user == "" {
+		return fmt.Errorf("GH_ACCEPTANCE_USER is required when GH_ACCEPTANCE_API_HOST is set")
+	}
 
 	return nil
 }
