@@ -150,6 +150,29 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 
 `gh` itself cannot be pointed at that, because `api_host` cannot carry a port.
 
+## Running against an older revision
+
+`at-rev.sh` applies the harness onto an arbitrary revision in a detached
+worktree and runs the acceptance subset there:
+
+```console
+$ HARNESS_COMMIT=0e661576450b4918dabbe7b54952ea3f19c37187 \
+    GH_APIHOST_ORG=my-org \
+    GH_APIHOST_ORG_TOKEN=<fine-grained-PAT> \
+    script/api-host-gateway/at-rev.sh v2.97.0
+```
+
+`HARNESS_COMMIT` is the squashed harness commit (`0e661576450b4918dabbe7b54952ea3f19c37187`)
+on branch `api-host-gateway-harness`. It contains everything on this branch
+except Task 4b (`ef1f342f5` and `c51147d6c`). Task 4b is deliberately absent:
+it makes `gh api` honour `api_host` for relative paths, so carrying it onto
+`v2.97.0` would make TestAPI green in the baseline and hide one of the reds the
+baseline exists to measure. Do not "fix" this omission.
+
+`GH_APIHOST_ORG_TOKEN` must be set in the environment; `at-rev.sh` will not
+prompt for it. This is intentional so a run across several revisions does not
+stop once per revision to ask for a credential.
+
 ## Expected result today
 
 Phases 1, 2 and 3 pass. Phase 4, when enabled, is a tally run: TestAPI is
