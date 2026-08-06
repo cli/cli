@@ -113,7 +113,7 @@ steps:
         else
           echo "Ignoring non-numeric pr_number input"
           echo '[]' > "$WORKLIST"
-          echo "count=0" >> "$GITHUB_OUTPUT"
+          echo "needs_go=false" >> "$GITHUB_OUTPUT"
           echo '{"type":"noop","message":"pr_number input was not a positive integer"}' >> "$SAFE_OUT"
           exit 0
         fi
@@ -170,6 +170,7 @@ steps:
       echo "PRs with terminal CI: $(printf '%s' "$ready" | jq length)"
 
       work='[]'
+      needs_go=false
       for row in $(printf '%s' "$ready" | jq -r '.[] | @base64'); do
         entry=$(printf '%s' "$row" | base64 --decode)
         n=$(printf '%s' "$entry" | jq -r '.number')
@@ -189,6 +190,18 @@ steps:
         else
           echo "PR #$n: needs assessment (head $head, last assessed '${assessed:-none}')"
           work=$(printf '%s' "$work" | jq -c --argjson e "$entry" '. + [$e]')
+
+          # Most Dependabot traffic here bumps GitHub Actions, not Go modules,
+          # and the vendored Go artifacts are meaningless for those. Only pay
+          # for vendoring when something in scope actually moves the Go
+          # manifests. Treat an unreadable file list as "might be Go" so a
+          # transient API failure degrades to wasted work rather than to
+          # missing evidence.
+          files=$(gh pr view "$n" --repo "$GITHUB_REPOSITORY" --json files \
+                    --jq '.files[].path' 2>/dev/null) || files="go.mod"
+          if printf '%s\n' "$files" | grep -qE '^(go\.mod|go\.sum)$'; then
+            needs_go=true
+          fi
         fi
       done
 
@@ -196,9 +209,10 @@ steps:
       count=$(printf '%s' "$work" | jq length)
       echo "Work list: $count PR(s) -> $WORKLIST"
 
-      # Gates the vendoring step below, so an idle run costs no module
-      # downloads on top of costing no AI Credits.
-      echo "count=$count" >> "$GITHUB_OUTPUT"
+      # Gates the vendoring step below, so a run with no Go dependency work
+      # costs no module downloads on top of costing no AI Credits.
+      echo "needs_go=$needs_go" >> "$GITHUB_OUTPUT"
+      echo "Go reachability evidence needed: $needs_go"
 
       if [ "$count" -eq 0 ]; then
         echo '{"type":"noop","message":"No Dependabot PRs need triage: all open PRs are already assessed at their current head commit, or their CI is still pending."}' >> "$SAFE_OUT"
@@ -223,13 +237,20 @@ steps:
   # `vendor/` is gitignored and nothing in this job commits, so this is a
   # read-only side effect on the runner's checkout.
   #
+  # Gated on a Go manifest actually moving. Most Dependabot traffic in this
+  # repository bumps GitHub Actions, where these artifacts say nothing, so
+  # vendoring unconditionally would download tens of megabytes per run to
+  # produce evidence the agent must ignore. The skill tells the agent to
+  # establish Actions reachability by grepping `.github/` for `uses:` instead,
+  # and warns it not to read a module's absence from these files as safety.
+  #
   # There is deliberately no `actions/setup-go` step here. The compiler detects
   # the `go` invocations below and emits its own Setup Go step, taking the
   # version from `go.mod`, so an explicit one would be silently replaced and
-  # would drift. That generated step is not conditional, so an idle run pays for
-  # the toolchain but not for the module downloads below.
+  # would drift. That generated step is not conditional, so a run with no Go
+  # work still pays for the toolchain but not for the module downloads below.
   - name: Vendor dependency source for the agent
-    if: steps.worklist.outputs.count != '0'
+    if: steps.worklist.outputs.needs_go == 'true'
     run: |
       set -uo pipefail
       PKGS=/tmp/gh-aw/go-production-packages.txt
@@ -290,10 +311,13 @@ assessed at their current head commit, and it has already applied the optional
 
 Read that file. It is a JSON array of objects with `number` and `head_sha`.
 
-The same pre-flight step has also vendored the dependency source into
-`vendor/` and written the packages compiled into the shipped `gh` binary to
-`/tmp/gh-aw/go-production-packages.txt`. Those are your reachability evidence;
-the skill explains how to use them.
+The same pre-flight step has also, when this run includes a Go dependency
+update, vendored the dependency source into `vendor/` and written the packages
+compiled into the shipped `gh` binary to
+`/tmp/gh-aw/go-production-packages.txt`. Those are your Go reachability
+evidence; the skill explains how to use them, and how to establish reachability
+for GitHub Actions updates, where those files do not apply and their absence
+means nothing.
 
 That array is your entire working scope for this run. Assess every entry in it,
 and never comment on anything outside it. If the array is empty, do nothing.
@@ -311,9 +335,10 @@ For each entry in the work list, follow the `dependabot-triager` skill precisely
 
 1. Gather the skill's four required evidence items, including the PR's own diff,
    the dependency's direct/indirect position read from the manifest in the
-   checkout, and the reachability of each updated module read from the vendored
-   build graph. Never infer these from the PR title or the Dependabot summary,
-   and never treat "this repository does not import it" as evidence of safety.
+   checkout, and the reachability of each updated dependency established by the
+   method the skill gives for that ecosystem. Never infer these from the PR
+   title or the Dependabot summary, and never treat a dependency's absence from
+   the Go artifacts as evidence of safety.
 2. Check in-repo coherence: whether the PR edits generated files and leaves
    embedded version pins or metadata inconsistent.
 3. Decide the recommendation and confidence, and post exactly one comment.

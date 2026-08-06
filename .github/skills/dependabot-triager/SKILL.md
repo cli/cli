@@ -38,16 +38,18 @@ will fail. Use the MCP tools named below.
 
 You also have the repository checked out at the base branch, and you can read
 and grep it with your local file tools. This is how you establish facts about
-*this* repository: whether a dependency is direct or transitive, and which of its
-packages the build actually needs. Never infer either from the PR title, the
-Dependabot summary, or memory. Read `go.mod`, and read the vendored build graph
-described under "Required evidence".
+*this* repository: whether a dependency is direct or transitive, and how the
+change can reach us. Never infer either from the PR title, the Dependabot
+summary, or memory. Read the manifest, and use the reachability method
+"Required evidence" gives for the ecosystem in question.
 
-The pre-flight step also leaves two artifacts for you: `vendor/`, containing the
-source of every dependency the build needs, and
-`/tmp/gh-aw/go-production-packages.txt`, listing the packages compiled into the
-shipped `gh` binary. `vendor/` is generated tooling output, not repository code,
-so never describe it as a change this PR makes.
+The pre-flight step also leaves two artifacts for you when this run includes a
+Go dependency update: `vendor/`, containing the source of every dependency the
+build needs, and `/tmp/gh-aw/go-production-packages.txt`, listing the packages
+compiled into the shipped `gh` binary. They are absent on runs that only bump
+GitHub Actions, which is expected and is not a missing evidence item. `vendor/`
+is generated tooling output, not repository code, so never describe it as a
+change this PR makes.
 
 The checkout is the base branch, not the PR head. To see what the PR changes,
 use `pull_request_read(method: "get_diff", ...)`.
@@ -102,11 +104,15 @@ one exists because guessing it has produced a wrong assessment in the past.
    meaning, and a reorganised or hand-edited file can mix them freely. State
    this only after reading the line.
 
-3. **The reachability of each updated module.** A pre-flight step has vendored
-   the dependency source into `vendor/` and written the packages compiled into
-   the shipped `gh` binary to `/tmp/gh-aw/go-production-packages.txt`. Use those
-   two files. Do **not** answer this by grepping this repository's source for
-   the module's import path.
+3. **The reachability of each updated dependency.** How you establish this
+   depends on the ecosystem, and getting the method wrong is what produced the
+   worst assessment this skill has made.
+
+   **For a Go module update**, a pre-flight step has vendored the dependency
+   source into `vendor/` and written the packages compiled into the shipped `gh`
+   binary to `/tmp/gh-aw/go-production-packages.txt`. Use those two files. Do
+   **not** answer this by grepping this repository's source for the module's
+   import path.
 
    That grep answers "does code we wrote import it", which for an indirect
    dependency is always no, by definition. Reading the silence as "the change
@@ -115,7 +121,7 @@ one exists because guessing it has produced a wrong assessment in the past.
    carrying no risk because nothing here imports it, when five of its packages
    are compiled into the shipped binary by way of `go-containerregistry/pkg/authn`.
 
-   For each module in the update, classify it:
+   Classify each module:
 
    - If `grep -E "^<module>(/|$)" /tmp/gh-aw/go-production-packages.txt` returns
      packages, the module is **compiled into the shipped binary**, and those
@@ -135,8 +141,28 @@ one exists because guessing it has produced a wrong assessment in the past.
    scrutinise, and their source is already on disk under `vendor/<module path>/`
    for you to read.
 
-   If `vendor/modules.txt` or the production package list is missing, this
-   evidence item is unavailable: say which, and cap confidence at `Medium`.
+   If a Go dependency update is in scope but `vendor/modules.txt` or the
+   production package list is missing, this evidence item is unavailable: say
+   which, and cap confidence at `Medium`.
+
+   **For a GitHub Actions update**, the vendored Go artifacts say nothing at all.
+   A bumped action is not a Go module, so it will be absent from both files, and
+   you must not read that absence as "not built" or as any kind of safety
+   signal. Establish reachability by grepping `.github/` for `uses:` lines
+   naming the action, and record every workflow and job that calls it.
+
+   Grepping is the correct method here, and the reason it is correct for actions
+   but not for Go is worth understanding: a workflow reaches an action only by
+   naming it in a `uses:` line in our own files, so there is no equivalent of an
+   indirect dependency that our source never mentions. If no `uses:` line names
+   it, check whether the reference lives in a generated `.lock.yml` or a
+   `# gh-aw-manifest:` block before concluding it is unused.
+
+   Then judge the change against how those call sites use it: which inputs they
+   pass, which outputs they consume, and what permissions the job grants it.
+
+   **For any other ecosystem**, say plainly in the prose that you had no
+   mechanical way to establish reachability, and cap confidence at `Medium`.
 
 4. **Upstream release evidence** for the target version, via the `repos` tools.
 
@@ -185,9 +211,9 @@ is:
 
 Confidence is about the evidence your conclusion actually depends on, not about
 how much of the upstream history you read. If a bump spans four releases but
-changes only packages outside the reachable surface you established from the
-vendored build graph, that is `High`. You do not need to read all four releases
-to be certain of a conclusion that does not depend on them.
+changes nothing within the reachable surface you established in evidence item 3,
+that is `High`. You do not need to read all four releases to be certain of a
+conclusion that does not depend on them.
 
 A negative recommendation can still have high confidence. For example, if CI is
 reproducibly red, use `Do not merge, Confidence: High`.
@@ -225,10 +251,10 @@ not restate metadata that the PR page already shows.
 
 Keep this bounded by relevance, not by a call budget. Read until the questions
 your recommendation depends on are answered, then stop. Use the reachable
-surface from the required evidence to decide what is relevant: changes to
-packages outside it do not need to be chased. Changes inside it do, and you can
-read the affected code directly under `vendor/<module path>/` rather than
-inferring it from release notes.
+surface from the required evidence to decide what is relevant: changes outside
+it do not need to be chased. Changes inside it do, and for a Go module the
+affected code is already on disk under `vendor/<module path>/`, so read it
+rather than inferring from release notes.
 
 If the upstream history genuinely is too large to establish something your
 recommendation depends on, say so in the prose and cap confidence at **Medium**.
