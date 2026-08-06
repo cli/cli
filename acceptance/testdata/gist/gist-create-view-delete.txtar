@@ -5,13 +5,6 @@
 # back truncated, and the full content is then fetched from a raw URL on
 # gist.githubusercontent.com rather than the API host. Triggering that needs a
 # file too large to keep in a txtar, so it is left to unit tests.
-#
-# Also not covered: editing an existing gist, whether by content, rename, add or
-# remove. Reads of a gist that has just been updated serve the previous state
-# often enough to make any such script unreliable, measured at 2 failures in 10
-# attempts, whereas creating and deleting read back consistently. Nothing is
-# lost by the omission, because the edit path reaches the API through the same
-# fetch and list calls this script already exercises.
 
 # Setup useful env vars
 env GIST_DESC=${SCRIPT_NAME}-${RANDOM_STRING}
