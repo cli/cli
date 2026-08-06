@@ -73,6 +73,9 @@ safe-outputs:
       - duplicate
   add-comment:
     max: 1
+  # Preserve the reporting behavior from the v0.83.4 runtime.
+  noop:
+    report-as-issue: true
 ---
 
 # Issue Triage (skills-driven)
