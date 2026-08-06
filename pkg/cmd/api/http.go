@@ -162,6 +162,10 @@ func addQueryParam(query url.Values, key string, value interface{}) error {
 func swapURLHost(rawURL, newHost string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
+		// rawURL is always a well-formed URL built by ghinstance.GraphQLEndpoint
+		// or ghinstance.RESTPrefix, so this error is unreachable in practice. If it
+		// did occur, returning the input unchanged leaves the request pointed at the
+		// original host, which is safe (no host swap, but request still succeeds).
 		return rawURL
 	}
 	u.Host = newHost

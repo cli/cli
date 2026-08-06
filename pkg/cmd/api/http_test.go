@@ -104,6 +104,7 @@ func Test_httpRequest(t *testing.T) {
 		method        string
 		u             string
 		path          string // decoded path, checked when non-empty
+		rawURLString  string // encoded URL from req.URL.String(), checked when non-empty
 		body          string
 		headers       string
 		contentLength int64
@@ -385,9 +386,10 @@ func Test_httpRequest(t *testing.T) {
 				headers: []string{},
 			},
 			want: expects{
-				method:  "GET",
-				path:    "/repos/octocat/hello world[0]",
-				headers: "Accept: */*\r\n",
+				method:       "GET",
+				path:         "/repos/octocat/hello world[0]",
+				rawURLString: "https://api.github.com/repos/octocat/hello%20world%5B0%5D",
+				headers:      "Accept: */*\r\n",
 			},
 		},
 		{
@@ -427,6 +429,9 @@ func Test_httpRequest(t *testing.T) {
 			}
 			if tt.want.path != "" && req.URL.Path != tt.want.path {
 				t.Errorf("Request.URL.Path = %q, want %q", req.URL.Path, tt.want.path)
+			}
+			if tt.want.rawURLString != "" && req.URL.String() != tt.want.rawURLString {
+				t.Errorf("Request.URL.String() = %q, want %q", req.URL.String(), tt.want.rawURLString)
 			}
 
 			if tt.want.body != "" {
