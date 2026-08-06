@@ -44,6 +44,7 @@ import (
 	skillsCmd "github.com/cli/cli/v2/pkg/cmd/skills"
 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
 	statusCmd "github.com/cli/cli/v2/pkg/cmd/status"
+	uptimeCmd "github.com/cli/cli/v2/pkg/cmd/uptime"
 	variableCmd "github.com/cli/cli/v2/pkg/cmd/variable"
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
 	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
@@ -155,6 +156,7 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, versi
 	// Root commands with standalone functionality and no subcommands
 	cmd.AddCommand(copilotCmd.NewCmdCopilot(f, telemetry, nil))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
+	cmd.AddCommand(uptimeCmd.NewCmdUptime(f, nil))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(licensesCmd.NewCmdLicenses(f))
 	cmd.AddCommand(sendTelemetryCmd.NewCmdSendTelemetry(f))
