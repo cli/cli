@@ -194,9 +194,14 @@ func Test_deleteRun(t *testing.T) {
 			errMsg:     "SilentError",
 			wantStderr: "X Failed to delete repository: OWNER/REPO has changed name or transferred ownership\n",
 			httpStubs: func(reg *httpmock.Registry) {
+				// The Location header is what makes this a real redirect. Without it Go declines
+				// to follow the 307 regardless of the client's CheckRedirect policy, so the stub
+				// would pass even if deleteRepo stopped suppressing redirects.
 				reg.Register(
 					httpmock.REST("DELETE", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(307, "{}"))
+					httpmock.WithHeader(
+						httpmock.StatusStringResponse(307, "{}"),
+						"Location", "https://api.github.com/repos/OWNER/RENAMED"))
 			},
 		},
 	}
@@ -230,6 +235,7 @@ func Test_deleteRun(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.errMsg, err.Error())
+				assert.Equal(t, tt.wantStderr, stderr.String())
 				return
 			}
 			assert.NoError(t, err)
