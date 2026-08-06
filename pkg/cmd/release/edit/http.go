@@ -33,6 +33,8 @@ func editRelease(httpClient *http.Client, repo ghrepo.Interface, releaseID int64
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client because its return shape depends on the response status code, which api.Client.REST does not expose on success.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
