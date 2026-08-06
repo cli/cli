@@ -19,6 +19,7 @@ REPO=${GH_APIHOST_REPO:-/src}
 WORK=${GH_APIHOST_WORK:-/tmp/api-host-gateway}
 EXPECTED_LOGIN=${GH_APIHOST_EXPECTED_LOGIN:-williammartin}
 TOKEN=${GH_APIHOST_TOKEN:-}
+ORG_TOKEN=${GH_APIHOST_ORG_TOKEN:-}
 
 CONFIG_DIR="$WORK/ghconfig"
 LOG="$WORK/gateway.jsonl"
@@ -98,19 +99,22 @@ grep -q "$GATEWAY_HOST" /etc/hosts || printf '%s %s\n' "$GATEWAY_IP" "$GATEWAY_H
 
 # --- helpers -----------------------------------------------------------------
 
-# write_config yes|no controls whether hosts.yml carries the api_host override.
+# write_config yes|no [token] controls whether hosts.yml carries the api_host
+# override. The optional second argument sets the oauth_token; defaults to
+# $TOKEN so existing single-argument call sites are unchanged.
 write_config() {
+	local tok="${2:-$TOKEN}"
 	{
 		printf '%s:\n' "github.com"
 		printf '    user: %s\n' "$EXPECTED_LOGIN"
-		printf '    oauth_token: %s\n' "$TOKEN"
+		printf '    oauth_token: %s\n' "$tok"
 		printf '    git_protocol: https\n'
 		if [ "$1" = "yes" ]; then
 			printf '    api_host: %s\n' "$GATEWAY_HOST"
 		fi
 		printf '    users:\n'
 		printf '        %s:\n' "$EXPECTED_LOGIN"
-		printf '            oauth_token: %s\n' "$TOKEN"
+		printf '            oauth_token: %s\n' "$tok"
 	} >"$CONFIG_DIR/hosts.yml"
 	chmod 600 "$CONFIG_DIR/hosts.yml"
 }
@@ -276,19 +280,22 @@ expect_gh_failure "gh cannot reach GitHub directly while blackholed" api user
 
 blackhole_off
 
-# --- phase 4: acceptance subset ----------------------------------------------
-# Chosen for distinct URL handling rather than coverage: redirects, blob stores,
-# pagination and the two endpoint builders in gh api. See the spec for why each
-# one earns its place.
+# --- phase 4 & 5: acceptance subset ------------------------------------------
+# Fine-grained PATs have mutually exclusive resource owners: Account permissions
+# (such as Gists) can only be used when the resource owner is the current user,
+# while Organization permissions can only be used when the resource owner is an
+# organization. A single fine-grained PAT cannot cover both the org-scoped
+# scripts and the gist script. Phase 4 therefore runs the eleven org-scoped
+# scripts under GH_APIHOST_ORG_TOKEN (a PAT owned by gh-acceptance-testing),
+# and phase 5 runs the one gist script under the developer's OAuth token.
 if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
-	write_config yes
-	blackhole_on
+	[ -n "$ORG_TOKEN" ] || die "GH_APIHOST_ORG_TOKEN is required for the acceptance run"
 
 	run_subset() {
-		local testfunc="$1" scripts="$2"
+		local testfunc="$1" scripts="$2" tok="$3"
 		GH_ACCEPTANCE_HOST=github.com \
 		GH_ACCEPTANCE_ORG="$GH_APIHOST_ORG" \
-		GH_ACCEPTANCE_TOKEN="$TOKEN" \
+		GH_ACCEPTANCE_TOKEN="$tok" \
 		GH_ACCEPTANCE_USER="$EXPECTED_LOGIN" \
 		GH_ACCEPTANCE_API_HOST="$GATEWAY_HOST" \
 		GH_ACCEPTANCE_SCRIPT="$scripts" \
@@ -297,16 +304,23 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 			-run "^$testfunc\$" ./acceptance
 	}
 
-	heading "Phase 4: acceptance subset through the gateway"
+	blackhole_on
 
-	run_subset TestAPI        'basic-rest.txtar,basic-graphql.txtar'          || echo "RED: TestAPI"
-	run_subset TestReleases   'release-upload-download.txtar'                 || echo "RED: TestReleases"
-	run_subset TestRepo       'repo-delete.txtar,repo-list-rename.txtar,repo-read-file.txtar,repo-rename-transfer-ownership.txtar' || echo "RED: TestRepo"
-	run_subset TestWorkflows  'run-download.txtar'                            || echo "RED: TestWorkflows"
-	run_subset TestExtensions 'extension.txtar'                               || echo "RED: TestExtensions"
-	run_subset TestGists      'gist-create-view-delete.txtar'                 || echo "RED: TestGists"
-	run_subset TestSearches   'search-issues.txtar'                           || echo "RED: TestSearches"
-	run_subset TestAuth       'auth-status.txtar'                             || echo "RED: TestAuth"
+	heading "Phase 4: org-scoped acceptance subset through the gateway"
+	write_config yes "$ORG_TOKEN"
+
+	run_subset TestAPI        'basic-rest.txtar,basic-graphql.txtar'                                                                           "$ORG_TOKEN" || echo "RED: TestAPI"
+	run_subset TestReleases   'release-upload-download.txtar'                                                                                  "$ORG_TOKEN" || echo "RED: TestReleases"
+	run_subset TestRepo       'repo-delete.txtar,repo-list-rename.txtar,repo-read-file.txtar,repo-rename-transfer-ownership.txtar'              "$ORG_TOKEN" || echo "RED: TestRepo"
+	run_subset TestWorkflows  'run-download.txtar'                                                                                             "$ORG_TOKEN" || echo "RED: TestWorkflows"
+	run_subset TestExtensions 'extension.txtar'                                                                                                "$ORG_TOKEN" || echo "RED: TestExtensions"
+	run_subset TestSearches   'search-issues.txtar'                                                                                            "$ORG_TOKEN" || echo "RED: TestSearches"
+	run_subset TestAuth       'auth-status.txtar'                                                                                              "$ORG_TOKEN" || echo "RED: TestAuth"
+
+	heading "Phase 5: user-scoped acceptance subset through the gateway"
+	write_config yes "$TOKEN"
+
+	run_subset TestGists      'gist-create-view-delete.txtar'                                                                                  "$TOKEN"     || echo "RED: TestGists"
 
 	blackhole_off
 fi
