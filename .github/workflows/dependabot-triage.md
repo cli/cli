@@ -266,12 +266,20 @@ steps:
         exit 0
       fi
 
-      # `go list -deps` evaluates build constraints for a single GOOS, but gh
-      # ships on all three, so one invocation would miss platform-guarded
-      # imports and understate what a change can reach. Union them.
-      for goos in linux darwin windows; do
-        if ! GOOS="$goos" GOARCH=amd64 go list -deps ./cmd/gh >> "$PKGS.tmp"; then
-          echo "::warning::go list failed for GOOS=$goos; production package list is incomplete and will not be written."
+      # `go list -deps` evaluates build constraints for one GOOS/GOARCH/cgo
+      # combination, so a single invocation would miss platform-guarded imports
+      # and understate what a change can reach. Union the exact release matrix
+      # from .goreleaser.yml, including linux's CGO_ENABLED=0, so the evidence
+      # describes what we actually ship. Today every combination yields the same
+      # set, but that is a property of the current dependencies, not a guarantee.
+      for target in \
+        "darwin amd64 1" "darwin arm64 1" \
+        "linux 386 0" "linux arm 0" "linux amd64 0" "linux arm64 0" \
+        "windows 386 1" "windows amd64 1" "windows arm64 1"; do
+        # shellcheck disable=SC2086
+        set -- $target
+        if ! GOOS="$1" GOARCH="$2" CGO_ENABLED="$3" go list -deps ./cmd/gh >> "$PKGS.tmp"; then
+          echo "::warning::go list failed for GOOS=$1 GOARCH=$2; production package list is incomplete and will not be written."
           rm -f "$PKGS.tmp"
           exit 0
         fi

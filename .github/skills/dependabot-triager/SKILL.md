@@ -123,9 +123,11 @@ one exists because guessing it has produced a wrong assessment in the past.
 
    Classify each module:
 
-   - If `grep -E "^<module>(/|$)" /tmp/gh-aw/go-production-packages.txt` returns
-     packages, the module is **compiled into the shipped binary**, and those
-     exact packages are its reachable surface.
+   - If `/tmp/gh-aw/go-production-packages.txt` has any line that is exactly the
+     module path or begins with the module path followed by `/`, the module is
+     **compiled into the shipped binary**, and those exact lines are its
+     reachable surface. Match literally rather than by regex: module paths
+     contain `.`, so a naive pattern can match the wrong module.
    - Otherwise, if it appears in `vendor/modules.txt`, it is built only for
      **tests or tooling**. Lower stakes, and worth saying so, but do not call it
      unreachable.
