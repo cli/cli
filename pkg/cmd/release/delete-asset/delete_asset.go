@@ -97,7 +97,7 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 		return fmt.Errorf("asset %s not found in release %s", opts.AssetName, release.TagName)
 	}
 
-	err = deleteAsset(httpClient, safeurl.NewImmutableSafeURL(assetURL))
+	err = deleteAsset(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(assetURL))
 	if err != nil {
 		return err
 	}
@@ -112,20 +112,16 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 	return nil
 }
 
-func deleteAsset(httpClient *http.Client, assetURL safeurl.SafeURL) error {
-	req, err := http.NewRequest("DELETE", assetURL.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := httpClient.Do(req)
+func deleteAsset(httpClient *http.Client, hostname string, assetURL safeurl.SafeURL) error {
+	// The asset URL is supplied by the API, so it is absolute and requested as given.
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).Request(hostname, http.MethodDelete, assetURL.String(), nil)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
 	return nil
 }
