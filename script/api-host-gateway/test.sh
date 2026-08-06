@@ -276,6 +276,41 @@ expect_gh_failure "gh cannot reach GitHub directly while blackholed" api user
 
 blackhole_off
 
+# --- phase 4: acceptance subset ----------------------------------------------
+# Chosen for distinct URL handling rather than coverage: redirects, blob stores,
+# pagination and the two endpoint builders in gh api. See the spec for why each
+# one earns its place.
+if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
+	write_config yes
+	blackhole_on
+
+	run_subset() {
+		local testfunc="$1" scripts="$2"
+		GH_ACCEPTANCE_HOST=github.com \
+		GH_ACCEPTANCE_ORG="$GH_APIHOST_ORG" \
+		GH_ACCEPTANCE_TOKEN="$TOKEN" \
+		GH_ACCEPTANCE_USER="$EXPECTED_LOGIN" \
+		GH_ACCEPTANCE_API_HOST="$GATEWAY_HOST" \
+		GH_ACCEPTANCE_SCRIPT="$scripts" \
+		SSL_CERT_FILE="$BUNDLE" \
+		go test -tags=acceptance -count=1 -parallel=1 -timeout=45m \
+			-run "^$testfunc\$" ./acceptance
+	}
+
+	heading "Phase 4: acceptance subset through the gateway"
+
+	run_subset TestAPI        'basic-rest.txtar,basic-graphql.txtar'          || echo "RED: TestAPI"
+	run_subset TestReleases   'release-upload-download.txtar'                 || echo "RED: TestReleases"
+	run_subset TestRepo       'repo-delete.txtar,repo-list-rename.txtar,repo-read-file.txtar,repo-rename-transfer-ownership.txtar' || echo "RED: TestRepo"
+	run_subset TestWorkflows  'run-download.txtar'                            || echo "RED: TestWorkflows"
+	run_subset TestExtensions 'extension.txtar'                               || echo "RED: TestExtensions"
+	run_subset TestGists      'gist-create-view-delete.txtar'                 || echo "RED: TestGists"
+	run_subset TestSearches   'search-issues.txtar'                           || echo "RED: TestSearches"
+	run_subset TestAuth       'auth-status.txtar'                             || echo "RED: TestAuth"
+
+	blackhole_off
+fi
+
 # --- summary -----------------------------------------------------------------
 
 heading "Summary"

@@ -33,6 +33,8 @@ exec docker run --rm -t \
 	-v "$BUILD_CACHE_VOLUME:/root/.cache/go-build" \
 	-e GH_APIHOST_TOKEN="$token" \
 	-e GH_APIHOST_EXPECTED_LOGIN="${GH_APIHOST_EXPECTED_LOGIN:-williammartin}" \
+	-e GH_APIHOST_ORG="${GH_APIHOST_ORG:-}" \
+	-e GH_APIHOST_ACCEPTANCE="${GH_APIHOST_ACCEPTANCE:-no}" \
 	-w /src \
 	"$IMAGE" \
 	/src/script/api-host-gateway/test.sh

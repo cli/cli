@@ -20,6 +20,19 @@ Requires Docker and a token: `$GH_TOKEN` if set, otherwise
 the test expects, which defaults to `williammartin` and can be overridden with
 `GH_APIHOST_EXPECTED_LOGIN`.
 
+### Running with the acceptance subset (phase 4)
+
+Set `GH_APIHOST_ACCEPTANCE=yes` and `GH_APIHOST_ORG` to a GitHub organisation
+the token can create repositories in:
+
+```console
+$ GH_APIHOST_ACCEPTANCE=yes GH_APIHOST_ORG=my-org script/api-host-gateway/run.sh
+```
+
+Phase 4 creates real repositories and can take up to 45 minutes. It is
+intentionally non-blocking: a red result is printed but does not stop the script
+or affect the phases 1-3 exit code.
+
 ## Why a container
 
 Two constraints make this awkward to run directly on a developer machine, and
@@ -73,6 +86,42 @@ the routing.
 must fail. Without this, phase 1 could pass through a direct connection that the
 blackhole was silently failing to prevent.
 
+**Phase 4, acceptance subset (optional).** Runs when `GH_APIHOST_ACCEPTANCE=yes`.
+`api_host` is set and `api.github.com` is blackholed, matching phase 1. Eight
+`go test` invocations run a chosen subset of the real acceptance suite through
+the gateway. A red result is printed but does not abort the script, because the
+phase exists to produce a tally that goes from red to green over time, not to
+gate the build.
+
+#### Predicted results for phase 4 (as of 2026-08-06)
+
+| Test function  | Scripts                                                                | Expected  |
+|----------------|------------------------------------------------------------------------|-----------|
+| TestAPI        | basic-rest.txtar, basic-graphql.txtar                                  | **GREEN** |
+| TestReleases   | release-upload-download.txtar                                          | red       |
+| TestRepo       | repo-delete.txtar + three others                                       | red       |
+| TestWorkflows  | run-download.txtar                                                     | red       |
+| TestExtensions | extension.txtar                                                        | red       |
+| TestGists      | gist-create-view-delete.txtar                                          | red       |
+| TestSearches   | search-issues.txtar                                                    | red       |
+| TestAuth       | auth-status.txtar                                                      | red       |
+
+**Why TestAPI is green.** Task 4b made `gh api` honour `api_host` for relative
+paths, so `basic-rest.txtar` and `basic-graphql.txtar` now route through the
+gateway correctly.
+
+**Why the rest are red.** The common root cause is `gh repo delete`, which still
+builds an absolute URL via `DoRequest` for its redirect policy. `DoRequest`
+deliberately does not rewrite to `api_host`. Most acceptance scripts end in a
+`defer gh repo delete` cleanup, so they fail in cleanup even when the command
+under test routes correctly. Fixing this requires a `CheckRedirect` field on
+go-gh's `ClientOptions` (the sibling change to cli/go-gh#275), not a cli/cli
+change.
+
+A red result in phase 4 is therefore expected and is **not** a signal of a
+broken harness unless it appears in TestAPI, which was fixed. A new green result
+in any other test is a sign that the underlying routing gap has been closed.
+
 ## The gateway
 
 `gateway/main.go` is a single dependency-free program. Beyond recording
@@ -102,13 +151,7 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 `gh` itself cannot be pointed at that, because `api_host` cannot carry a port.
 
 ## Expected result today
-Phase 1 fails and phases 2 and 3 pass. `gh` builds its own REST and GraphQL
-endpoints in `internal/ghinstance` and passes `Host: "none"` to go-gh's
-`NewHTTPClient`, so it never consults `api_host` and cannot reach the blackholed
-canonical host. That red result is the point: it is the acceptance criterion for
-teaching `gh` itself about `api_host`.
 
-The assertions have been confirmed to be satisfiable. A throwaway spike that
-swapped the request host in `api.NewHTTPClient` and attached the canonical
-host's token for the configured API host turned all of phase 1 green, including
-the paginated case.
+Phases 1, 2 and 3 pass. Phase 4, when enabled, is a tally run: TestAPI is
+expected to pass; the rest are expected to fail for reasons documented in the
+phase 4 table above.
