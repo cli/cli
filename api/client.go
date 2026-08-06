@@ -52,12 +52,50 @@ func (err HTTPError) ScopesSuggestion() string {
 	return err.scopesSuggestion
 }
 
+// RequestOption configures a single request made through Request, RequestWithContext or GraphQL.
+type RequestOption func(*requestConfig)
+
+// requestConfig accumulates the effect of the RequestOptions applied to one request.
+type requestConfig struct {
+	headers        map[string]string
+	endpointScopes string
+}
+
+// WithHeader sets a header on the request, taking precedence over any header of the same name
+// that the underlying transport would otherwise supply.
+func WithHeader(name, value string) RequestOption {
+	return func(cfg *requestConfig) {
+		cfg.headers[name] = value
+	}
+}
+
+// WithEndpointScopes adds OAuth scopes to a 4xx error as if the server endpoint had returned them.
+// This improves error messaging for endpoints that do not explicitly list the scopes they need, and
+// is the Request equivalent of calling EndpointNeedsScopes on a raw response.
+func WithEndpointScopes(scopes string) RequestOption {
+	return func(cfg *requestConfig) {
+		cfg.endpointScopes = scopes
+	}
+}
+
+func newRequestConfig(opts []RequestOption) requestConfig {
+	cfg := requestConfig{headers: map[string]string{}}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	return cfg
+}
+
 // GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
-func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = features
-	gqlClient, err := ghAPI.NewGraphQLClient(opts)
+func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}, opts ...RequestOption) error {
+	cfg := newRequestConfig(opts)
+	clientOpts := clientOptions(hostname, c.http.Transport)
+	clientOpts.Headers[graphqlFeatures] = features
+	for name, value := range cfg.headers {
+		clientOpts.Headers[name] = value
+	}
+	gqlClient, err := ghAPI.NewGraphQLClient(clientOpts)
 	if err != nil {
 		return err
 	}
@@ -147,11 +185,89 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 	return next, nil
 }
 
+// Request performs a REST request and returns the response for the caller to consume.
+//
+// See RequestWithContext for the full semantics.
+func (c Client) Request(hostname string, method string, p string, body io.Reader, opts ...RequestOption) (*http.Response, error) {
+	return c.RequestWithContext(context.Background(), hostname, method, p, body, opts...)
+}
+
+// RequestWithContext performs a REST request and returns the response for the caller to consume,
+// rather than decoding it into a receiver as REST does. It exists for call sites that need access
+// to the response itself: streaming bodies, non-JSON bodies, response headers, or the status code
+// of a successful response.
+//
+// p may be a path relative to the host's REST endpoint, or an absolute URL. Prefer a relative path.
+// Absolute URLs are requested as given, which is correct for URLs supplied by the API itself, such
+// as asset and upload URLs, but means they do not benefit from host-level endpoint resolution.
+//
+// Responses outside the 2xx range are returned as an HTTPError and their body is closed. On success
+// the response is returned unread and the caller is responsible for closing its body.
+func (c Client) RequestWithContext(ctx context.Context, hostname string, method string, p string, body io.Reader, opts ...RequestOption) (*http.Response, error) {
+	cfg := newRequestConfig(opts)
+	clientOpts := clientOptions(hostname, c.http.Transport)
+	for name, value := range cfg.headers {
+		clientOpts.Headers[name] = value
+	}
+
+	restClient, err := ghAPI.NewRESTClient(clientOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := restClient.RequestWithContext(ctx, method, p, body)
+	if err != nil {
+		return nil, handleRequestError(err, cfg.endpointScopes)
+	}
+
+	return resp, nil
+}
+
+// DoRequest sends a request that the caller has already built, and returns the response for the
+// caller to consume. It applies the same error handling as Request.
+//
+// Prefer Request. DoRequest exists for the few call sites that must control fields of the request
+// which are neither method, path, body nor header, such as ContentLength and GetBody when uploading
+// a release asset. Because the caller supplies the URL, requests sent this way do not benefit from
+// host-level endpoint resolution, so it is only appropriate for absolute URLs supplied by the API.
+//
+// Responses outside the 2xx range are returned as an HTTPError and their body is closed. On success
+// the response is returned unread and the caller is responsible for closing its body.
+func (c Client) DoRequest(req *http.Request) (*http.Response, error) {
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !success {
+		defer resp.Body.Close()
+		return nil, HandleHTTPError(resp)
+	}
+
+	return resp, nil
+}
+
 // HandleHTTPError parses a http.Response into a HTTPError.
 //
 // The caller is responsible to close the response body stream.
 func HandleHTTPError(resp *http.Response) error {
 	return handleResponse(ghAPI.HandleHTTPError(resp))
+}
+
+// handleRequestError converts a request error into an HTTPError or GraphQLError, first adding any
+// endpoint scopes to the error's headers so that the scopes suggestion generated by handleResponse
+// accounts for them. This is the error-path equivalent of calling EndpointNeedsScopes on a response
+// before HandleHTTPError, which call sites can no longer do when the response never reaches them.
+func handleRequestError(err error, endpointScopes string) error {
+	if endpointScopes != "" {
+		var restErr *ghAPI.HTTPError
+		if errors.As(err, &restErr) && restErr.Headers != nil && restErr.StatusCode >= 400 && restErr.StatusCode < 500 {
+			oldScopes := restErr.Headers.Get("X-Accepted-Oauth-Scopes")
+			restErr.Headers.Set("X-Accepted-Oauth-Scopes", fmt.Sprintf("%s, %s", oldScopes, endpointScopes))
+		}
+	}
+	return handleResponse(err)
 }
 
 // handleResponse takes a ghAPI.HTTPError or ghAPI.GraphQLError and converts it into an
