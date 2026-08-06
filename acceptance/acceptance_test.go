@@ -85,6 +85,15 @@ func TestAuth(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "auth"))
 }
 
+func TestGists(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "gist"))
+}
+
 func TestGPGKeys(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
