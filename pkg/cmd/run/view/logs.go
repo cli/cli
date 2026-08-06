@@ -45,6 +45,8 @@ func (f *apiLogFetcher) GetLog() (io.ReadCloser, error) {
 		return nil, err
 	}
 
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to returning the job log response body as an io.ReadCloser instead of decoding JSON.
 	req, err := http.NewRequest("GET", logURL.String(), nil)
 	if err != nil {
 		return nil, err
