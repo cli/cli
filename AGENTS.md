@@ -192,3 +192,7 @@ Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and 
 ## Code Review
 
 Review pull requests with the [`cli-code-reviewer` skill](.github/skills/cli-code-reviewer/SKILL.md).
+
+## Tech Debt
+
+Pay down tech debt with the [`tech-debt-burndown` skill](.github/skills/tech-debt-burndown/SKILL.md). It fixes one small, verifiable piece per run and leaves a validated commit on a branch for review.
