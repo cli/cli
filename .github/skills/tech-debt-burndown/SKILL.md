@@ -47,12 +47,33 @@ Read these, in this order:
    codebase, and several debt categories below exist precisely because code
    predates a rule in it.
 
-Then confirm you are starting from a clean tree on an up to date `trunk`:
+Then get onto a clean working branch. The tree must be clean before you start,
+so your diff contains only your change:
 
 ```bash
 git status --porcelain          # must be empty
-git fetch origin && git switch -c tech-debt/<short-slug> origin/trunk
 ```
+
+Where you branch from depends on where you already are:
+
+- **On `trunk`**: branch from an up to date `trunk`.
+
+  ```bash
+  git fetch origin && git switch -c tech-debt/<short-slug> origin/trunk
+  ```
+
+- **Already on a working branch**: branch from `HEAD`, not from `origin/trunk`.
+
+  ```bash
+  git switch -c tech-debt/<short-slug>
+  ```
+
+  Switching to `origin/trunk` would discard whatever that branch carries,
+  including possibly this skill itself, and would silently change the code you
+  are reasoning about.
+
+  Say in your report which commit you branched from, so the human knows the fix
+  may need rebasing before it can land.
 
 Work on the branch from the first edit. Do not commit to `trunk`.
 
@@ -246,6 +267,8 @@ Do not push. Do not open a pull request. The human takes it from here.
 Keep it short enough to read on a phone. State:
 
 - **Target**: what you picked and why, in one line.
+- **Base**: the branch and commit you branched from, and whether the fix will
+  need rebasing onto `trunk`.
 - **Before and after**: the sensor output either side of the change. This is the
   core of the report. It is what makes the change reviewable in two minutes.
 - **The change**: what you altered and what the new test proves.
