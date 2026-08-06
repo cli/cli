@@ -52,6 +52,8 @@ tools:
     min-integrity: none
 
 safe-outputs:
+  # Preserve the reporting behavior from the v0.83.4 runtime.
+  report-failed-jobs: false
   github-app:
     client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
     private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
@@ -73,7 +75,6 @@ safe-outputs:
       - duplicate
   add-comment:
     max: 1
-  # Preserve the reporting behavior from the v0.83.4 runtime.
   noop:
     report-as-issue: true
 ---
