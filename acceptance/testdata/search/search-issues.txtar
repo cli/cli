@@ -12,8 +12,10 @@ cd $SCRIPT_NAME-$RANDOM_STRING
 
 exec gh issue create --title 'Feature Request' --body $RANDOM_STRING
 
-# It takes some time for the issue to be created and indexed
-sleep 5
+# It takes some time for the issue to be created and indexed. Search reads a
+# separate index rather than the issue itself, so this wait is longer than the
+# five seconds used elsewhere, which was not enough to stop this flaking.
+sleep 20
 
 # Search for the issue
 exec gh search issues $RANDOM_STRING -R $ORG/$SCRIPT_NAME-$RANDOM_STRING
