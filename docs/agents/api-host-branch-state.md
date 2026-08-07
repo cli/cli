@@ -217,6 +217,60 @@ out, because the mismatch has already cost one investigation: `gh repo rename` a
 `pkg/cmd/repo/rename/` or `pkg/cmd/search/` changed**. They were migrated
 indirectly, via `api/queries_repo.go` and `pkg/search/searcher.go` respectively.
 
+## Scope decisions: what `api_host` covers
+
+Two questions came up in review that look like defects but are settled scope
+decisions. They are recorded here so they do not get re-litigated.
+
+**1. Absolute URLs bypass `api_host`, and the gateway is expected to compensate.**
+
+go-gh's `restURL` returns any path that already has a scheme unchanged, so an
+absolute URL never has `api_host` applied to it:
+
+```go
+func restURL(endpoint string, pathOrURL string) string {
+	if strings.HasPrefix(pathOrURL, "https://") || strings.HasPrefix(pathOrURL, "http://") {
+		return pathOrURL
+	}
+	return endpoint + pathOrURL
+}
+```
+
+Nine call sites pass an absolute URL, all of them URLs the API itself returned
+(release and asset URLs, artifact download URLs, the gist raw URL, and the
+update checker). Pagination is the same shape: `RESTWithNext` feeds the absolute
+URL from the `Link` header back in on each iteration.
+
+GitHub emits canonical URLs even when reached through a proxy, so a gateway is
+expected to rewrite its own responses. That is a real requirement placed on the
+gateway operator, and the harness models it deliberately: `rewriteResponse` in
+`gateway/main.go` replaces the upstream host in both headers and JSON bodies.
+**This is the accepted contract, not a workaround.**
+
+Deferring this is safe rather than a trap, because the client could take the work
+over later without breaking anyone. `RequestWithContext` and `RESTWithNext` both
+already receive the logical `hostname` alongside the possibly-absolute path,
+which is everything a rewrite needs, so it would be a change of behaviour inside
+those methods rather than a change of signature. It would also be a no-op for
+gateways that already rewrite: if the origin is already the `api_host`, a rule of
+"canonical or `api_host` becomes `api_host`" leaves it alone. The one place that
+would need a signature change is `DoRequest`, which takes a built
+`*http.Request` and so has no idea which logical host it belongs to. That is two
+call sites, both release asset upload and download.
+
+**2. Content hosts are out of scope, by design.**
+
+`api_host` proxies the API specifically, not every GitHub endpoint. Content is
+served from separate hosts: gist file bodies come from
+`gist.githubusercontent.com` via the `raw_url` the API returns, and the same
+applies to `codeload` and release binary storage. Those requests do not go
+through `api_host` and are not meant to.
+
+This is why `test.sh` blackholes only `$UPSTREAM_HOST` and leaves content hosts
+reachable. That is the customer's network modelled correctly, not a hole in the
+harness. Do not "fix" it by blackholing the content hosts, because the resulting
+failures would not represent anything a user would hit.
+
 ## Known gaps: things that still ignore `api_host`
 
 These are *not* covered by this branch and will still bypass a configured

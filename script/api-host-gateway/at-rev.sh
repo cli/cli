@@ -22,10 +22,19 @@ if [ -z "${GH_APIHOST_ORG:-}" ]; then
 fi
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-worktree="$(mktemp -d)/gh-at-$REV"
+tmp_root=$(mktemp -d)
+worktree="$tmp_root/gh-at-$REV"
 
 git -C "$repo_root" worktree add --detach "$worktree" "$REV"
-trap 'git -C "$repo_root" worktree remove --force "$worktree"' EXIT
+
+# Removing the worktree leaves the mktemp parent behind, so clean up both. The trap
+# covers the signals as well as EXIT because an interrupted run would otherwise leave
+# a worktree registered against the repo, which the next run has to prune by hand.
+cleanup() {
+	git -C "$repo_root" worktree remove --force "$worktree" || true
+	rm -rf "$tmp_root"
+}
+trap cleanup EXIT INT TERM
 
 git -C "$worktree" cherry-pick "$HARNESS"
 
