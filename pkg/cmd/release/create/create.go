@@ -548,7 +548,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		err = shared.ConcurrentUpload(httpClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
+		err = shared.ConcurrentUpload(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return cleanupDraftRelease(err)

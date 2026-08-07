@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -296,6 +297,55 @@ func TestRequestWithContextPropagatesContext(t *testing.T) {
 	assert.Equal(t, "carried", gotValue)
 }
 
+func TestDoRequest(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(httpmock.MatchAny, httpmock.StatusStringResponse(201, `{"id": 1}`))
+
+	// Fields such as ContentLength are the reason DoRequest exists, so assert one survives.
+	req, err := http.NewRequest(http.MethodPost, "https://uploads.github.com/assets", strings.NewReader("asset"))
+	require.NoError(t, err)
+	req.ContentLength = 5
+
+	resp, err := client.DoRequest(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, 201, resp.StatusCode)
+	assert.Equal(t, "uploads.github.com", reg.Requests[0].URL.Hostname())
+	assert.Equal(t, int64(5), reg.Requests[0].ContentLength)
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, `{"id": 1}`, string(body))
+}
+
+func TestDoRequestError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(httpmock.MatchAny, httpmock.StatusJSONResponse(422, map[string]interface{}{
+		"message": "Validation Failed",
+	}))
+
+	req, err := http.NewRequest(http.MethodPost, "https://uploads.github.com/assets", nil)
+	require.NoError(t, err)
+
+	resp, err := client.DoRequest(req)
+	assert.Nil(t, resp)
+
+	var httpErr HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, 422, httpErr.StatusCode)
+	assert.Equal(t, "Validation Failed", httpErr.Message)
+}
+
+// The transport built by NewHTTPClient supplies default Accept, Content-Type and User-Agent
+// headers. Per-request headers are only useful if they win against that real transport, so this
+// exercises it rather than a bare test tripper.
 func TestRequestHeadersAgainstRealTransport(t *testing.T) {
 	var gotReq *http.Request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -346,3 +396,48 @@ func TestGraphQLWithHeader(t *testing.T) {
 // motivates DoRequest existing for redirect-sensitive call sites. Request delegates to go-gh,
 // which builds an http.Client of its own from the transport alone, so a redirect policy set on
 // the client cannot survive. DoRequest sends through that client and so keeps it.
+func TestDoRequestPreservesCheckRedirect(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/start" {
+			http.Redirect(w, r, "/final", http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	newClient := func(called *bool) *http.Client {
+		return &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			*called = true
+			return http.ErrUseLastResponse
+		}}
+	}
+
+	t.Run("DoRequest honours it", func(t *testing.T) {
+		var called bool
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/start", nil)
+		require.NoError(t, err)
+
+		// The redirect is not followed, so the 3xx is the final response and, being outside
+		// the 2xx range, is reported as an error. Call sites such as gh repo delete rely on
+		// seeing that status to explain that a repo was renamed or transferred.
+		_, err = NewClientFromHTTP(newClient(&called)).DoRequest(req)
+		require.Error(t, err)
+
+		var httpErr HTTPError
+		require.ErrorAs(t, err, &httpErr)
+		assert.True(t, called, "CheckRedirect should have been consulted")
+		assert.Equal(t, http.StatusFound, httpErr.StatusCode)
+	})
+
+	t.Run("Request cannot honour it", func(t *testing.T) {
+		var called bool
+
+		resp, err := NewClientFromHTTP(newClient(&called)).Request("github.com", http.MethodGet, ts.URL+"/start", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.False(t, called, "go-gh builds its own client, so the policy cannot apply")
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+}

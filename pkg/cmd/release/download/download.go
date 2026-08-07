@@ -302,7 +302,7 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL sa
 		return err
 	}
 
-	req, err := http.NewRequest("GET", assetURL.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, assetURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -312,7 +312,9 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL sa
 		// adding application/json to Accept header due to a bug in the zipball/tarball API endpoint that makes it mandatory
 		req.Header.Set("Accept", "application/octet-stream, application/json")
 
-		// override HTTP redirect logic to avoid "legacy" Codeload resources
+		// override HTTP redirect logic to avoid "legacy" Codeload resources. This is client
+		// level rather than request level, so the client is copied before being handed over
+		// rather than mutating the one shared with every other caller.
 		oldClient := *httpClient
 		httpClient = &oldClient
 		httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
@@ -323,15 +325,19 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL sa
 		}
 	}
 
-	resp, err := httpClient.Do(req)
+	// The asset URL is supplied by the API, so it is absolute and requested as given. DoRequest
+	// rather than Request because the CheckRedirect above is a property of the client, and
+	// Request delegates to go-gh, which builds a client of its own from the transport alone and
+	// so silently drops it. Without it the "legacy" Codeload path is never rewritten and the
+	// archive is saved under the wrong name.
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).DoRequest(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
 
 	if len(fileName) == 0 {
 		contentDisposition := resp.Header.Get("Content-Disposition")

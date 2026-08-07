@@ -88,7 +88,22 @@ implementations of "where does this request go" is exactly the shape of problem
 this feature exists to remove, and it survives here only because `gh api` takes
 its path verbatim from the user and cannot route it through the normal client.
 
-The test harness enumerates what is still unrouted, and its recorded transcript
-is the current tally.
+Two call sites still send a request the client did not build, through
+DoRequest: uploading and downloading a release asset. Both use an absolute URL
+that the API itself supplied, so they reach the right place today, but they
+resolve their own destination rather than asking the client to.
+
+Whole commands remain unmigrated, and none of them are covered by the harness:
+`gh codespace`, `gh agent-task` and `gh copilot` each build their own absolute
+URLs, and the update checker does too. They are not oversights. Codespaces and
+agent-task talk to services that are not the REST API and have clients of their
+own, so whether `api_host` should apply to them is a question about what the
+setting means rather than about how to implement it.
+
+So the harness proves something narrower than "`gh` honours `api_host`": it
+proves that the twelve journeys it exercises do, and that the shared client can
+express what a call site needs in order to stop resolving its own destination.
+What is left is mechanical for the REST commands, and a design question for the
+rest.
 
 [go-gh]: https://github.com/cli/go-gh
