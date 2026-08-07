@@ -1,0 +1,40 @@
+# Gists are owned by the authenticated user rather than an org, so unlike most
+# other acceptance scripts there is no repository to create or clean up.
+#
+# Not covered here: gists whose files exceed the API's 1MB inline limit come
+# back truncated, and the full content is then fetched from a raw URL on
+# gist.githubusercontent.com rather than the API host. Triggering that needs a
+# file too large to keep in a txtar, so it is left to unit tests.
+
+# Setup useful env vars
+env GIST_DESC=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Create a gist from a file, capturing its URL
+exec gh gist create gist-file.txt --desc ${GIST_DESC}
+stdout 'https://gist.github.com/'
+stdout2env GIST_URL
+
+# View the gist and check the description and content are both rendered
+exec gh gist view ${GIST_URL}
+stdout ${GIST_DESC}
+stdout 'hello from the acceptance tests'
+
+# List the file names in the gist
+exec gh gist view ${GIST_URL} --files
+stdout 'gist-file.txt'
+
+# View a single file raw, which must be the content we uploaded and nothing else
+exec gh gist view ${GIST_URL} --filename gist-file.txt --raw
+stdout 'hello from the acceptance tests'
+! stdout ${GIST_DESC}
+
+# Delete the gist. This is deliberately not deferred because deletion is what
+# the script is testing, and a deferred delete would fail on the second attempt.
+exec gh gist delete --yes ${GIST_URL}
+
+# Check the gist is gone
+! exec gh gist view ${GIST_URL}
+stderr 'not found'
+
+-- gist-file.txt --
+hello from the acceptance tests
