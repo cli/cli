@@ -40,6 +40,8 @@ type Extension struct {
 	latestVersion         string
 	latestVersionErr      error
 	latestVersionResolved bool
+	latestRelease         *release
+	latestReleaseClient   *http.Client
 	owner                 string
 }
 
@@ -131,16 +133,17 @@ func (e *Extension) latestVersionWithError() (string, error) {
 
 	var latestVersion string
 	var resolveErr error
+	var latestRelease *release
+	var latestReleaseClient *http.Client
 	switch e.kind {
 	case LocalKind:
 	case BinaryKind:
 		var repo ghrepo.Interface
 		repo, resolveErr = ghrepo.FromFullName(e.URL())
 		if resolveErr == nil {
-			var release *release
-			release, _, resolveErr = fetchLatestReleaseWithFallback(e.httpClient, e.plainHTTPClient, repo)
+			latestRelease, latestReleaseClient, resolveErr = fetchLatestReleaseWithFallback(e.httpClient, e.plainHTTPClient, repo)
 			if resolveErr == nil {
-				latestVersion = release.Tag
+				latestVersion = latestRelease.Tag
 			}
 		}
 	case GitKind:
@@ -153,10 +156,20 @@ func (e *Extension) latestVersionWithError() (string, error) {
 	e.mu.Lock()
 	e.latestVersion = latestVersion
 	e.latestVersionErr = resolveErr
-	e.latestVersionResolved = true
+	e.latestVersionResolved = e.kind != GitKind || resolveErr == nil
+	e.latestRelease = latestRelease
+	e.latestReleaseClient = latestReleaseClient
 	e.mu.Unlock()
 
 	return latestVersion, resolveErr
+}
+
+func (e *Extension) latestReleaseWithError() (*release, *http.Client, error) {
+	_, err := e.latestVersionWithError()
+
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.latestRelease, e.latestReleaseClient, err
 }
 
 func (e *Extension) IsPinned() bool {

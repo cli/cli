@@ -259,19 +259,24 @@ type binManifest struct {
 
 // Install installs an extension from repo, and pins to commitish if provided
 func (m *Manager) Install(repo ghrepo.Interface, target string) error {
-	isBin, client, err := isBinExtension(m.client, m.plainClient, repo)
+	isBin, latestRelease, client, err := isBinExtension(m.client, m.plainClient, repo)
 	if err != nil {
 		if errors.Is(err, releaseNotFoundErr) {
-			if ok, err := repoExists(client, repo); err != nil {
-				return err
-			} else if !ok {
-				return repositoryNotFoundErr
+			if client != m.plainClient || m.plainClient == nil {
+				if ok, err := repoExists(client, repo); err != nil {
+					return err
+				} else if !ok {
+					return repositoryNotFoundErr
+				}
 			}
 		} else {
 			return fmt.Errorf("could not check for binary extension: %w", err)
 		}
 	}
 	if isBin {
+		if target == "" {
+			return m.installBinFromRelease(repo, target, latestRelease, client)
+		}
 		return m.installBinWithClient(repo, target, client)
 	}
 
@@ -309,6 +314,10 @@ func (m *Manager) installBinWithClient(repo ghrepo.Interface, target string, cli
 		return err
 	}
 
+	return m.installBinFromRelease(repo, target, r, client)
+}
+
+func (m *Manager) installBinFromRelease(repo ghrepo.Interface, target string, r *release, client *http.Client) error {
 	platform, ext := m.platform()
 	isMacARM := platform == "darwin-arm64"
 	trueARMBinary := false
@@ -361,15 +370,14 @@ func (m *Manager) installBinWithClient(repo ghrepo.Interface, target string, cli
 	}
 
 	targetDir := filepath.Join(m.installDir(), name)
-	if err = os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("failed to create installation directory: %w", err)
 	}
 
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	err = downloadAsset(client, safeurl.NewImmutableSafeURL(asset.APIURL), binPath)
-	if err != nil {
+	if err := downloadAsset(client, safeurl.NewImmutableSafeURL(asset.APIURL), binPath); err != nil {
 		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
 	}
 	if trueARMBinary {
@@ -384,7 +392,7 @@ func (m *Manager) installBinWithClient(repo ghrepo.Interface, target string, cli
 		Host:     repo.RepoHost(),
 		Path:     binPath,
 		Tag:      r.Tag,
-		IsPinned: isPinned,
+		IsPinned: target != "",
 	}
 
 	bs, err := yaml.Marshal(manifest)
@@ -493,9 +501,13 @@ func (m *Manager) Upgrade(name string, force bool) error {
 			return localExtensionUpgradeError
 		}
 		// For single extensions manually retrieve latest version since we forgo doing it during list.
-		latestVersion, err := f.latestVersionWithError()
-		if err != nil {
-			return fmt.Errorf("unable to retrieve latest version for extension %q: %w", name, err)
+		latestVersion := f.LatestVersion()
+		if f.IsBinary() {
+			var err error
+			latestVersion, err = f.latestVersionWithError()
+			if err != nil {
+				return fmt.Errorf("unable to retrieve latest version for extension %q: %w", name, err)
+			}
 		}
 		if latestVersion == "" {
 			return fmt.Errorf("unable to retrieve latest version for extension %q", name)
@@ -514,11 +526,15 @@ func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
 	var failed bool
 	for _, f := range exts {
 		fmt.Fprintf(m.io.Out, "[%*s]: ", longestExtName, f.Name())
-		latestVersion, latestVersionErr := f.latestVersionWithError()
-		if latestVersionErr != nil {
-			failed = true
-			fmt.Fprintf(m.io.Out, "%s\n", latestVersionErr)
-			continue
+		latestVersion := f.LatestVersion()
+		if f.IsBinary() {
+			var latestVersionErr error
+			latestVersion, latestVersionErr = f.latestVersionWithError()
+			if latestVersionErr != nil {
+				failed = true
+				fmt.Fprintf(m.io.Out, "%s\n", latestVersionErr)
+				continue
+			}
 		}
 		currentVersion := displayExtensionVersion(f, f.CurrentVersion())
 		err := m.upgradeExtension(f, force)
@@ -560,16 +576,17 @@ func (m *Manager) upgradeExtension(ext *Extension, force bool) error {
 	} else {
 		// Check if git extension has changed to a binary extension
 		var isBin bool
+		var latestRelease *release
 		var client *http.Client
 		repo, repoErr := repoFromPath(m.gitClient, filepath.Join(ext.Path(), ".."))
 		if repoErr == nil {
-			isBin, client, _ = isBinExtension(m.client, m.plainClient, repo)
+			isBin, latestRelease, client, _ = isBinExtension(m.client, m.plainClient, repo)
 		}
 		if isBin {
 			if err := m.Remove(ext.Name()); err != nil {
 				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
 			}
-			return m.installBinWithClient(repo, "", client)
+			return m.installBinFromRelease(repo, "", latestRelease, client)
 		}
 		err = m.upgradeGitExtension(ext, force)
 	}
@@ -600,6 +617,15 @@ func (m *Manager) upgradeBinExtension(ext *Extension) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse URL %s: %w", ext.URL(), err)
 	}
+
+	latestRelease, client, err := ext.latestReleaseWithError()
+	if err != nil {
+		return err
+	}
+	if latestRelease != nil && client != nil {
+		return m.installBinFromRelease(repo, "", latestRelease, client)
+	}
+
 	return m.installBin(repo, "")
 }
 
@@ -773,8 +799,7 @@ func readPathFromFile(path string) (string, error) {
 	return strings.TrimSpace(string(b[:n])), err
 }
 
-func isBinExtension(client, plainClient *http.Client, repo ghrepo.Interface) (isBin bool, selectedClient *http.Client, err error) {
-	var r *release
+func isBinExtension(client, plainClient *http.Client, repo ghrepo.Interface) (isBin bool, r *release, selectedClient *http.Client, err error) {
 	r, selectedClient, err = fetchLatestReleaseWithFallback(client, plainClient, repo)
 	if err != nil {
 		return

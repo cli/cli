@@ -395,6 +395,49 @@ func TestManager_UpgradeExtensions_DryRun(t *testing.T) {
 	gcTwo.AssertExpectations(t)
 }
 
+func TestManager_UpgradeExtensions_RetriesGitVersionError(t *testing.T) {
+	dataDir := t.TempDir()
+	extensionDir := filepath.Join(dataDir, "extensions", "gh-remote")
+	require.NoError(t, stubExtension(filepath.Join(extensionDir, "gh-remote")))
+
+	ios, _, stdout, _ := iostreams.Test()
+	gc, scopedClient := &mockGitClient{}, &mockGitClient{}
+	gc.On("ForRepo", extensionDir).Return(scopedClient).Times(3)
+	scopedClient.On("CommandOutput", []string{"ls-remote", "origin", "HEAD"}).Return("", fmt.Errorf("network unavailable")).Once()
+	scopedClient.On("CommandOutput", []string{"ls-remote", "origin", "HEAD"}).Return("new version\tHEAD", nil).Once()
+	scopedClient.On("CommandOutput", []string{"rev-parse", "HEAD"}).Return("old version", nil).Once()
+	scopedClient.On("Remotes").Return(nil, nil).Once()
+	scopedClient.On("Pull", "", "").Return(nil).Once()
+
+	m := newTestManager(dataDir, t.TempDir(), nil, gc, ios)
+
+	err := m.Upgrade("", false)
+
+	require.NoError(t, err)
+	assert.Equal(t, "[remote]: upgraded from old vers to new vers\n", stdout.String())
+	gc.AssertExpectations(t)
+	scopedClient.AssertExpectations(t)
+}
+
+func TestManager_UpgradeSingleGitVersionErrorRemainsGeneric(t *testing.T) {
+	dataDir := t.TempDir()
+	extensionDir := filepath.Join(dataDir, "extensions", "gh-remote")
+	require.NoError(t, stubExtension(filepath.Join(extensionDir, "gh-remote")))
+
+	ios, _, _, _ := iostreams.Test()
+	gc, scopedClient := &mockGitClient{}, &mockGitClient{}
+	gc.On("ForRepo", extensionDir).Return(scopedClient).Once()
+	scopedClient.On("CommandOutput", []string{"ls-remote", "origin", "HEAD"}).Return("", fmt.Errorf("network unavailable")).Once()
+
+	m := newTestManager(dataDir, t.TempDir(), nil, gc, ios)
+
+	err := m.Upgrade("remote", false)
+
+	require.EqualError(t, err, `unable to retrieve latest version for extension "remote"`)
+	gc.AssertExpectations(t)
+	scopedClient.AssertExpectations(t)
+}
+
 func TestManager_UpgradeExtension_LocalExtension(t *testing.T) {
 	dataDir := t.TempDir()
 	updateDir := t.TempDir()
@@ -545,18 +588,6 @@ func TestManager_MigrateToBinaryExtension(t *testing.T) {
 				},
 			}))
 	reg.Register(
-		httpmock.REST("GET", "repos/owner/gh-remote/releases/latest"),
-		httpmock.JSONResponse(
-			release{
-				Tag: "v1.0.2",
-				Assets: []releaseAsset{
-					{
-						Name:   "gh-remote-windows-amd64.exe",
-						APIURL: "/release/cool",
-					},
-				},
-			}))
-	reg.Register(
 		httpmock.REST("GET", "release/cool"),
 		httpmock.StringResponse("FAKE UPGRADED BINARY"))
 
@@ -670,27 +701,9 @@ func TestManager_UpgradeExtension_public_binary_with_SAML_protected_token(t *tes
 		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
 		samlProtectedResponse(),
 	)
-	authReg.Register(
-		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
-		samlProtectedResponse(),
-	)
 
 	plainReg := &httpmock.Registry{}
 	defer plainReg.Verify(t)
-	plainReg.Register(
-		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext"),
-		httpmock.JSONResponse(map[string]string{"visibility": "public"}),
-	)
-	plainReg.Register(
-		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
-		httpmock.JSONResponse(release{
-			Tag: "v1.0.2",
-			Assets: []releaseAsset{{
-				Name:   "gh-bin-ext-windows-amd64.exe",
-				APIURL: "https://api.github.com/assets/2",
-			}},
-		}),
-	)
 	plainReg.Register(
 		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext"),
 		httpmock.JSONResponse(map[string]string{"visibility": "public"}),
@@ -1206,17 +1219,6 @@ func TestManager_Install_binary_unsupported(t *testing.T) {
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
 			release{
-				Assets: []releaseAsset{
-					{
-						Name:   "gh-bin-ext-linux-amd64",
-						APIURL: "https://example.com/release/cool",
-					},
-				},
-			}))
-	reg.Register(
-		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
-		httpmock.JSONResponse(
-			release{
 				Tag: "v1.0.1",
 				Assets: []releaseAsset{
 					{
@@ -1246,17 +1248,6 @@ func TestManager_Install_rosetta_fallback_not_found(t *testing.T) {
 	defer reg.Verify(t)
 	client := http.Client{Transport: &reg}
 
-	reg.Register(
-		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
-		httpmock.JSONResponse(
-			release{
-				Assets: []releaseAsset{
-					{
-						Name:   "gh-bin-ext-darwin-amd64",
-						APIURL: "https://example.com/release/cool",
-					},
-				},
-			}))
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
@@ -1299,17 +1290,6 @@ func TestManager_Install_binary(t *testing.T) {
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
 
-	reg.Register(
-		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
-		httpmock.JSONResponse(
-			release{
-				Assets: []releaseAsset{
-					{
-						Name:   "gh-bin-ext-windows-amd64.exe",
-						APIURL: "https://example.com/release/cool",
-					},
-				},
-			}))
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
@@ -1390,16 +1370,6 @@ func TestManager_Install_public_binary_with_SAML_protected_token(t *testing.T) {
 		}),
 	)
 	plainReg.Register(
-		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
-		httpmock.JSONResponse(release{
-			Tag: "v1.0.1",
-			Assets: []releaseAsset{{
-				Name:   "gh-bin-ext-windows-amd64.exe",
-				APIURL: "https://api.github.com/assets/1",
-			}},
-		}),
-	)
-	plainReg.Register(
 		httpmock.REST(http.MethodGet, "assets/1"),
 		httpmock.StringResponse("FAKE BINARY"),
 	)
@@ -1438,10 +1408,6 @@ func TestManager_Install_public_script_with_SAML_protected_token(t *testing.T) {
 		httpmock.StatusJSONResponse(http.StatusNotFound, map[string]string{"message": "Not Found"}),
 	)
 	plainReg.Register(
-		httpmock.REST(http.MethodGet, "repos/github/gh-script-ext"),
-		httpmock.JSONResponse(map[string]string{"visibility": "public"}),
-	)
-	plainReg.Register(
 		httpmock.REST(http.MethodGet, "repos/github/gh-script-ext/contents/gh-script-ext"),
 		httpmock.JSONResponse(map[string]string{"type": "file"}),
 	)
@@ -1468,17 +1434,6 @@ func TestManager_Install_amd64_when_supported(t *testing.T) {
 	defer reg.Verify(t)
 	client := http.Client{Transport: &reg}
 
-	reg.Register(
-		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
-		httpmock.JSONResponse(
-			release{
-				Assets: []releaseAsset{
-					{
-						Name:   "gh-bin-ext-darwin-amd64",
-						APIURL: "https://example.com/release/cool",
-					},
-				},
-			}))
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
