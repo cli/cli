@@ -82,7 +82,7 @@ try to make a failing check pass.
 
 ```bash
 git status --porcelain          # must be empty
-gh pr list --state open --json headRefName \
+gh pr list --state open --limit 1000 --json headRefName \
   --jq '[.[] | select(.headRefName | startswith("tech-debt/"))] | length'
 ```
 
