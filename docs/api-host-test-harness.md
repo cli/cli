@@ -209,31 +209,40 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 
 ## Current state
 
-Nothing about `api_host` is implemented yet. This commit adds only the harness,
-so the run below is the baseline every later change is measured against.
+Phase 1 has 8 assertions red, down from 10. `gh repo view` and the GraphQL
+gateway assertion pass: those go through go-gh's client, which honours
+`api_host`, and they now carry the right token.
 
-Phases 2 and 3 pass, which is what makes the rest meaningful: the blackhole
-works, and traffic reaches GitHub normally when no override is configured.
-Everything in phases 1, 4 and 5 fails, all of it traceable to `connection
-refused` against `api.github.com`.
+`gh api` is still entirely red. It builds its own request URLs and does not read
+`api_host`.
 
-Two of those failures do not say `connection refused`, and both are worth
-knowing about before reading a later run:
+Phases 4 and 5 are still 12 red, but the tally understates the change: the
+scripts now get much further before failing. `gh repo create` succeeds, so
+scripts that previously died on their second line now run their whole setup and
+fail at a specific unrouted call. That is the useful signal, and it is only
+visible in the failure detail rather than in the counts:
 
-- `auth-status` reports `The token in $WORK/hosts.yml is invalid`. The request
-  was refused like all the others; `gh auth status` reports any failure to
-  validate a token as an invalid token, which hides the cause.
-- `repo-list-rename` has separately been seen to fail with `HTTP 422 ... A
-  conflicting repository operation is still in progress`, from renaming a
-  repository moments after creating it. That is a server-side race in the
-  script, unrelated to routing, and it can appear on a run whose routing is
-  entirely correct.
+| Script | Now fails at |
+|---|---|
+| `basic-rest`, `basic-graphql` | `gh api` |
+| `repo-read-file` | `gh api -X PUT` for contents |
+| `repo-list-rename` | `gh repo rename` (PATCH) |
+| `repo-delete` | `gh repo delete` |
+| `release-upload-download` | `gh release upload` |
+| `extension` | `gh repo edit --add-topic` |
+| `search-issues` | `gh search issues` |
+| `auth-status` | scope checking |
+| `gist-create-view-delete` | `gh gist create` |
+| `repo-rename-transfer-ownership`, `run-download` | nothing in the body; both pass and fail only in deferred `gh repo delete` cleanup |
+
+The last row is worth reading twice. Those two scripts exercise their subject
+end to end through the gateway, including all three `gh run download`
+invocations, and are red purely because cleanup cannot delete the repository.
 
 ## Remaining
 
-Everything. `api_host` is not read from configuration, no token is forwarded to a
-configured gateway, and every call site that builds its own absolute URL still
-goes straight to `api.github.com`.
+Every call site that builds an absolute `api.github.com` URL, and `gh api`
+itself. The table above names them.
 
 ## Transcript
 
@@ -247,11 +256,11 @@ PHASE  RESULT   NAME
 1      FAIL     gh api user returns the authenticated login: gh exited 1: Get "https://api.github.com/user": dial tcp 127.0.0.1:443: connect: connection refused
 1      FAIL     gh api repos/cli/cli returns real repository data: gh exited 1: Get "https://api.github.com/repos/cli/cli": dial tcp 127.0.0.1:443: connect: connection refused
 1      FAIL     gh api graphql returns the authenticated login: gh exited 1: Post "https://api.github.com/graphql": dial tcp 127.0.0.1:443: connect: connection refused
-1      FAIL     gh repo view returns real repository data: gh exited 1: Post "https://api.github.com/graphql": dial tcp 127.0.0.1:443: connect: connection refused
+1      PASS     gh repo view returns real repository data
 1      FAIL     gh api --paginate did not get past the first page (got 0 labels): Get "https://api.github.com/repos/cli/cli/labels?per_page=50": dial tcp 127.0.0.1:443: connect: connection refused
 1      FAIL     gateway recorded the authenticated REST request for /user: no authenticated GET /user recorded for gh-gateway.internal
 1      FAIL     gateway recorded the authenticated REST request for the repository: no authenticated GET /repos/cli/cli recorded for gh-gateway.internal
-1      FAIL     gateway recorded the authenticated GraphQL requests: no authenticated POST /graphql recorded for gh-gateway.internal
+1      PASS     gateway recorded the authenticated GraphQL requests
 1      FAIL     gateway recorded the second page of labels: no gateway record matching "path":"[^"]*page=2[^"]*","host":"gh-gateway.internal"
 1      FAIL     second page request carried the token: no gateway record matching "path":"[^"]*page=2[^"]*","host":"gh-gateway.internal","auth_header":true
 2      PASS     gh api user still works without an override
@@ -274,6 +283,6 @@ PHASE  RESULT   NAME
 5      FAIL     gist-create-view-delete.txtar
 
 == Summary
-10 assertion(s) failed
+8 assertion(s) failed
 12 subset script(s) red: basic-rest.txtar basic-graphql.txtar release-upload-download.txtar repo-delete.txtar repo-list-rename.txtar repo-read-file.txtar repo-rename-transfer-ownership.txtar run-download.txtar extension.txtar search-issues.txtar auth-status.txtar gist-create-view-delete.txtar
 ```
