@@ -95,6 +95,26 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --parent 100
 			$ gh issue create --parent https://github.com/cli/go-gh/issues/42
 			$ gh issue create --blocked-by 200,201 --blocking 300
+
+			# Multiline body on bash
+			$ gh issue create --title "Bug" --body "$(cat <<'EOF'
+			Line 1
+			Line 2
+			EOF
+			)"
+
+			# Multiline body on PowerShell: prefer --body-file (here-strings are easy to get wrong)
+			$ @"
+			Line 1
+			Line 2
+			"@ | Out-File -Encoding utf8 body.md
+			$ gh issue create --title "Bug" --body-file body.md
+
+			# Or read stdin with --body-file -
+			$ @"
+			Line 1
+			Line 2
+			"@ | gh issue create --title "Bug" --body-file -
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
