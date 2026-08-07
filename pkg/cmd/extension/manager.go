@@ -351,7 +351,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	err = downloadAsset(m.client, safeurl.NewImmutableSafeURL(asset.APIURL), binPath)
+	err = downloadAsset(m.client, repo.RepoHost(), safeurl.NewImmutableSafeURL(asset.APIURL), binPath)
 	if err != nil {
 		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
 	}

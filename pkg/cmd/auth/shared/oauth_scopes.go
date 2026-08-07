@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type MissingScopesError struct {
@@ -28,25 +26,17 @@ func (e MissingScopesError) Error() string {
 	return "missing required scopes " + scopes
 }
 
-type httpClient interface {
-	Do(*http.Request) (*http.Response, error)
-}
-
 // GetScopes performs a GitHub API request and returns the value of the X-Oauth-Scopes header.
-func GetScopes(httpClient httpClient, hostname, authToken string) (string, error) {
-	apiEndpoint, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname))
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequest("GET", apiEndpoint.String(), nil)
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Set("Authorization", "token "+authToken)
-
-	res, err := httpClient.Do(req)
+//
+// The token is passed explicitly because this runs before the token is stored in config, so
+// the transport has nothing to attach. The transport only sets Authorization when it is
+// absent, so the header set here wins.
+func GetScopes(httpClient *http.Client, hostname, authToken string) (string, error) {
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	res, err := api.NewClientFromHTTP(httpClient).Request(hostname, http.MethodGet, "", nil,
+		api.WithHeader("Authorization", "token "+authToken))
 	if err != nil {
 		return "", err
 	}
@@ -59,7 +49,7 @@ func GetScopes(httpClient httpClient, hostname, authToken string) (string, error
 	}()
 
 	if res.StatusCode != 200 {
-		return "", api.HandleHTTPError(res)
+		return "", api.UnexpectedStatusError(res)
 	}
 
 	return res.Header.Get("X-Oauth-Scopes"), nil
@@ -67,7 +57,7 @@ func GetScopes(httpClient httpClient, hostname, authToken string) (string, error
 
 // HasMinimumScopes performs a GitHub API request and returns an error if the token used in the request
 // lacks the minimum required scopes for performing API operations with gh.
-func HasMinimumScopes(httpClient httpClient, hostname, authToken string) error {
+func HasMinimumScopes(httpClient *http.Client, hostname, authToken string) error {
 	scopesHeader, err := GetScopes(httpClient, hostname, authToken)
 	if err != nil {
 		return err
