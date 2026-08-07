@@ -73,8 +73,13 @@ report an error.
 ## Known gaps
 
 `api_host` is not yet honoured centrally. It works for requests that go through
-go-gh's client, and for `gh api`, but many call sites still build absolute
+go-gh's client, and for `gh api`, but some call sites still build absolute
 `api.github.com` URLs and never reach the gateway at all.
+
+Those call sites are being migrated a capability at a time, because each one
+built its own request for a reason. Endpoint scopes were one such reason and
+are now expressible; per-request headers and control over redirects are not
+yet.
 
 `gh api` is a wart worth naming. It does not use go-gh's client, so it resolves
 `api_host` itself with a second implementation of the same rule. Two
