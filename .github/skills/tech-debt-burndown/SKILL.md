@@ -400,11 +400,18 @@ focus should change, say so in the pull request body and leave the section alone
 A run that rewrites its own instructions and then obeys them is a loop with no
 human in it at all.
 
-**Keep the file under 100 lines.** It is loaded into context on every run, so
-length is a tax on all future work. If your append would push it over, first
+**Keep the entries under 150 lines.** That budget covers everything below the
+Current focus section. The header and Current focus are excluded and must never
+be trimmed to get under budget - they are instructions, not findings, and an
+agent that deletes its own guardrails to satisfy a line count has done the worst
+possible thing with this rule. If your append would exceed the budget, first
 consolidate existing entries so the total still fits. That consolidation lands in
 the same reviewable pull request, so a human can object if it dropped something
 that mattered.
+
+Consolidation is lossy, so it should be rare. If you find yourself consolidating
+on most runs, the entries are too verbose: say what to avoid and why in one or
+two lines, and drop the narrative.
 
 ## When to stop
 

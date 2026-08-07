@@ -2,16 +2,20 @@
 
 Standing corrections for the [`tech-debt-burndown` skill](../../.github/skills/tech-debt-burndown/SKILL.md).
 This file is loaded at the start of every run and is binding.
-
 Both humans and agent runs write here, and nothing distinguishes the two once
 written. Assume any entry may be an unreviewed conclusion from a previous run.
 Entries are binding on what to avoid; factual claims in them should be
 re-verified before you lean on them, and corrected when stale. Date-stamp
 anything you add.
 
-**Budget: 100 lines.** This file costs context on every future run. If an append
-would exceed the budget, consolidate existing entries first, in the same pull
-request.
+**Budget: 150 lines of entries**, counted from the end of Current focus to the end
+of the file. The header and Current focus do not count, and must never be trimmed
+to get under budget: they are instructions, not findings. If an append would
+exceed the budget, consolidate existing entries first, in the same pull request.
+
+The budget exists so this file stays worth reading, not to save tokens - the
+skill file is several times longer. A memory file that has become a run log is
+one nobody reads carefully, including you.
 
 ## Current focus
 
