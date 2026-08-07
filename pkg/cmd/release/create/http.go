@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -110,32 +109,33 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 }
 
 func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
-	if err != nil {
-		return false, err
-	}
-	req, err := http.NewRequest("HEAD", url.String(), nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return false, err
 	}
 
+	// A HEAD response has no body, so Request is used rather than REST, which would try to
+	// decode one.
 	// TODO(api-client-rollout)
-	// This has been deferred from moving to api.Client due to HEAD responses having no body while REST decodes non-204/205 2xx responses as JSON.
-	resp, err := httpClient.Do(req)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).Request(repo.RepoHost(), http.MethodHead, path.String(), nil)
 	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 	if resp.Body != nil {
 		defer resp.Body.Close()
 	}
 
-	if resp.StatusCode == 200 {
-		return true, nil
-	} else if resp.StatusCode == 404 {
-		return false, nil
-	} else {
-		return false, api.HandleHTTPError(resp)
+	if resp.StatusCode != http.StatusOK {
+		return false, api.UnexpectedStatusError(resp)
 	}
+
+	return true, nil
 }
 
 func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]any) (*shared.Release, error) {

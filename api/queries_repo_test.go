@@ -881,6 +881,20 @@ func TestRepoExists(t *testing.T) {
 			existCheck: false,
 			wantErrMsg: "HTTP 500 (https://api.github.com/repos/OWNER/REPO)",
 		},
+		{
+			// Only 200 counts as existence. A 2xx other than 200 is unexpected for this
+			// endpoint and must be reported rather than quietly taken as a yes.
+			name: "unexpected success status",
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("HEAD", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(201, ""),
+				)
+			},
+			repo:       ghrepo.New("OWNER", "REPO"),
+			existCheck: false,
+			wantErrMsg: "unexpected HTTP 201 for HEAD https://api.github.com/repos/OWNER/REPO",
+		},
 	}
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}

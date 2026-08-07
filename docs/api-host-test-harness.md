@@ -209,29 +209,36 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 
 ## Current state
 
-Phases 1, 2 and 3 pass. 10 of the 12 acceptance scripts are still red, the same
-count as the previous commit, but `repo-list-rename` now passes its whole body
-including the rename itself and fails only in cleanup.
+Phases 1, 2 and 3 pass, unchanged. That is the main thing this commit had to
+show: a dozen call sites changed how they make requests, and nothing that
+already worked stopped working.
 
-Three scripts are now in that state, and they are the reason the tally alone is
-a poor progress measure here:
+10 scripts are still red, but four of them now pass their entire body and fail
+only in deferred `gh repo delete` cleanup:
 
 | Script | Fails at |
 |---|---|
-| `extension` | `gh repo edit --add-topic` |
 | `repo-read-file` | `gh repo read-file` |
+| `extension` | `gh repo edit --add-topic` |
 | `search-issues` | `gh search issues` |
 | `auth-status` | scope checking |
 | `gist-create-view-delete` | `gh gist create` |
 | `repo-delete` | `gh repo delete` |
-| `release-upload-download` | `gh release upload` |
-| `repo-list-rename`, `repo-rename-transfer-ownership`, `run-download` | nothing in the body; all three pass and fail only in deferred `gh repo delete` cleanup |
+| `release-upload-download`, `repo-list-rename`, `repo-rename-transfer-ownership`, `run-download` | nothing in the body; cleanup only |
+
+`release-upload-download` joining that group is worth understanding, because it
+was not migrated by this commit. Uploads and downloads use the `upload_url` and
+asset URLs that the API itself returns, and now that the release is *created*
+through the gateway those URLs already point at the gateway. Routing propagates
+through response bodies, so fixing one call site can fix its dependents for
+free.
 
 ## Remaining
 
-The call sites named above. Each needs the shared client to grow a capability it
-does not have yet, which is why they are fixed a class at a time rather than all
-at once.
+`gh repo read-file`, `gh repo edit`, `gh search issues`, `gh auth status`, `gh
+gist create` and `gh repo delete`. Each is blocked on a capability the shared
+client does not have yet: per-request headers, endpoint scopes, or control over
+redirects.
 
 ## Transcript
 

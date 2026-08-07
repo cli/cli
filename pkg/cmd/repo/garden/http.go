@@ -2,14 +2,13 @@ package garden
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
@@ -27,7 +26,7 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 	commits := []*Commit{}
 
 	pathF := func(page int) (*safeurl.MutableSafeURL, error) {
-		u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "commits")
+		u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "commits")
 		if err != nil {
 			return nil, err
 		}
@@ -47,7 +46,7 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 		if err != nil {
 			return nil, err
 		}
-		links, err := getResponse(client, path, &result)
+		links, err := getResponse(client, repo.RepoHost(), path, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -80,23 +79,17 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 
 // getResponse performs the API call and returns the response's link header values.
 // If the "Link" header is missing, the returned slice will be nil.
-func getResponse(client *http.Client, url safeurl.SafeURL, data any) ([]string, error) {
-	req, err := http.NewRequest("GET", url.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	resp, err := client.Do(req)
+func getResponse(client *http.Client, hostname string, path safeurl.SafeURL, data interface{}) ([]string, error) {
+	// The Content-Type this site used to set explicitly is the one the client already sends,
+	// so it is no longer stated here.
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(client).Request(hostname, http.MethodGet, path.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, errors.New("api call failed")
-	}
 
 	links := resp.Header["Link"]
 

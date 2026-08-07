@@ -147,11 +147,56 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 	return next, nil
 }
 
+// Request performs a REST request and returns the response for the caller to consume.
+//
+// See RequestWithContext for the full semantics.
+func (c Client) Request(hostname string, method string, p string, body io.Reader) (*http.Response, error) {
+	return c.RequestWithContext(context.Background(), hostname, method, p, body)
+}
+
+// RequestWithContext performs a REST request and returns the response for the caller to consume,
+// rather than decoding it into a receiver as REST does. It exists for call sites that need access
+// to the response itself: streaming bodies, non-JSON bodies, response headers, or the status code
+// of a successful response.
+//
+// p may be a path relative to the host's REST endpoint, or an absolute URL. Prefer a relative path.
+// Absolute URLs are requested as given, which is correct for URLs supplied by the API itself, such
+// as asset and upload URLs, but means they do not benefit from host-level endpoint resolution.
+//
+// Responses outside the 2xx range are returned as an HTTPError and their body is closed. On success
+// the response is returned unread and the caller is responsible for closing its body.
+func (c Client) RequestWithContext(ctx context.Context, hostname string, method string, p string, body io.Reader) (*http.Response, error) {
+	restClient, err := ghAPI.NewRESTClient(clientOptions(hostname, c.http.Transport))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := restClient.RequestWithContext(ctx, method, p, body)
+	if err != nil {
+		return nil, handleResponse(err)
+	}
+
+	return resp, nil
+}
+
 // HandleHTTPError parses a http.Response into a HTTPError.
 //
 // The caller is responsible to close the response body stream.
 func HandleHTTPError(resp *http.Response) error {
 	return handleResponse(ghAPI.HandleHTTPError(resp))
+}
+
+// UnexpectedStatusError reports a successful response whose status the caller did not expect.
+//
+// The request methods on Client convert every non-2xx response into an HTTPError, so a call site
+// that requires one specific status can only ever be surprised by a different 2xx. Passing such a
+// response to HandleHTTPError would ask an error parser to explain a success, so this is used
+// instead. The caller remains responsible for closing the response body stream.
+func UnexpectedStatusError(resp *http.Response) error {
+	if resp.Request != nil {
+		return fmt.Errorf("unexpected HTTP %d for %s %s", resp.StatusCode, resp.Request.Method, resp.Request.URL)
+	}
+	return fmt.Errorf("unexpected HTTP %d", resp.StatusCode)
 }
 
 // handleResponse takes a ghAPI.HTTPError or ghAPI.GraphQLError and converts it into an
