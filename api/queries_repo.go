@@ -651,13 +651,13 @@ func RenameRepo(client *Client, repo ghrepo.Interface, newRepoName string) (*Rep
 		return nil, err
 	}
 
-	path, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
 	if err != nil {
 		return nil, err
 	}
 
 	result := repositoryV3{}
-	err = client.REST(repo.RepoHost(), "PATCH", path.String(), body, &result)
+	err = client.REST(repo.RepoHost(), http.MethodPatch, path.String(), body, &result)
 	if err != nil {
 		return nil, err
 	}
