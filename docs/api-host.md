@@ -72,6 +72,32 @@ report an error.
 
 ## Known gaps
 
+Nothing in `gh` writes `api_host`. `gh auth login` has no `--api-host` flag and
+`gh config set` does not reach host-level keys, so the only way to turn the
+feature on is editing `hosts.yml` by hand. That is fine for a centrally
+provisioned fleet and poor for anyone trying it out.
+
+That gap bites hardest on a first login. go-gh resolves `api_host` by reading
+`hosts.yml` for the host being addressed, so it can only apply to a host that is
+already in the file. `gh auth login` validates a token before writing anything -
+`HasMinimumScopes` and then `GetCurrentLogin` - and on a machine with no entry
+for the host yet, those calls resolve no `api_host` and go straight to
+`api.github.com`. A user behind a gateway therefore cannot complete a first
+login, and no amount of configuring afterwards helps, because the request that
+fails happens before there is anywhere to read the setting from.
+
+Everything after that first login does route correctly. Routing is decided when
+the client is constructed, from the hostname plus `hosts.yml`, not by whichever
+`*http.Client` the caller happens to hold: the OAuth flow is handed the plain
+client but `getViewer` rebuilds a go-gh client around its transport, so it picks
+up `api_host` like any other call site.
+
+Adding a flag is still a user-facing design question in its own right - whether
+re-running `gh auth login` without it should clear the setting, whether it
+belongs on login at all given it is host configuration rather than a credential,
+and whether the interactive flow should prompt - so it is deliberately left out
+of the routing work rather than answered in passing.
+
 `api_host` is not yet honoured centrally. It works for requests that go through
 go-gh's client, and for `gh api`, but some call sites still build absolute
 `api.github.com` URLs and never reach the gateway at all.
