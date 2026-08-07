@@ -1,48 +1,66 @@
 ---
 name: tech-debt-burndown
 description: >
-  Pays down exactly one small piece of tech debt in the GitHub CLI codebase per
-  run and leaves a validated commit on a branch for human review. Picks a target
-  from a menu of verified debt signals, fixes one instance, proves the fix with
-  the same tool that found it plus the full test and lint suite, and records what
-  it learned. Never merges, never pushes, never widens scope.
+  Pays down one small piece of tech debt in the GitHub CLI codebase per run and
+  opens a ready-to-review pull request. Designed to run unattended on a schedule:
+  it picks a target, tries up to three, proves the one that lands with the same
+  tool that found it, and records what it learned. Never merges, never pushes to
+  an existing branch, never widens scope.
 ---
 
 # Tech Debt Burndown
 
 You pay down tech debt in the GitHub CLI (`gh`), one small piece at a time.
 
-Each run does one thing: pick a single target, fix it, prove the fix, commit it
-on a branch. A human reads the result. The value of this skill is not throughput,
-it is producing a change so small and so obviously correct that reviewing it
-takes two minutes.
+Each run picks a target, fixes it, proves the fix, and opens a pull request that
+is ready for a human to review. The value of this skill is not throughput, it is
+producing a change so small and so obviously correct that reviewing it takes two
+minutes.
 
 You are not here to improve the codebase in general. You are here to close one
 specific, verifiable gap and stop.
 
+## Assume nobody is watching
+
+This skill is built to run unattended, on a schedule, in a loop. Write every step
+as though no human will see it until the pull request exists.
+
+That has consequences you must respect:
+
+- **Never ask a question.** There is nobody to answer. If a target needs a human
+  decision, abandon that target and try the next one.
+- **Never treat silence as approval.** If you need a fact, look it up. If you
+  cannot, that is a reason to abandon the target, not to guess.
+- **Do not behave differently when a human happens to be present.** A run
+  invoked by hand and a run invoked by a scheduler must do the same thing, or
+  what you tested by hand is not what runs on the schedule.
+
+The steering channel is the memory file, not conversation. See
+[Before you start](#before-you-start).
+
 ## The rule that matters most
 
-**One thing per run. Only one thing.**
+**One landed change per pull request. Only one.**
 
 The moment you find a second problem while fixing the first, you have a choice,
 and the answer is always the same: note it, leave it, keep going on the original
-target. A commit that fixes one `errcheck` violation gets merged. A commit that
+target. A pull request that fixes one `errcheck` violation gets merged. One that
 fixes one `errcheck` violation and also renames a helper, reorders some imports,
 and tidies up while it is in there gets bounced, and the original fix dies with
 it.
 
-If the fix you are making turns out to require a design decision, stop and hand
-it back. See [When to stop](#when-to-stop).
+You may *attempt* up to three targets in a run. Only one of them ends up in the
+pull request. See [Three attempts](#three-attempts).
 
 ## Before you start
 
 Read these, in this order:
 
 1. `.experiments/tech-debt-burndown/memory.md` in this repo. It carries standing
-   corrections: areas that are off limits, approaches that were rejected,
-   targets already considered and declined. Treat it as binding. If it
-   contradicts this skill, it wins, because it is the more specific and more
-   recent of the two, and it is the channel a human uses to correct a run
+   corrections: what to work on now, areas that are off limits, approaches that
+   were rejected, targets already considered and declined. Treat it as binding.
+   If it contradicts this skill, it wins, because it is the more specific and
+   more recent of the two, and it is the channel a human uses to steer a run
    without editing the skill.
 
    Entries come from two places, and they are not equally trustworthy. A human
@@ -57,30 +75,32 @@ Read these, in this order:
    codebase, and several debt categories below exist precisely because code
    predates a rule in it.
 
-Then check where you are. This skill only runs from `trunk`:
+### Check the preconditions
+
+Three checks, all of which must pass. If any fails, stop and say why. Do not try
+to make a failing check pass.
 
 ```bash
 git status --porcelain          # must be empty
 git branch --show-current       # must be trunk
+gh pr list --state open --json headRefName \
+  --jq '[.[] | select(.headRefName | startswith("tech-debt/"))] | length'
 ```
 
-**If either check fails, stop and tell the human. Do not fix it yourself.**
-
-A dirty tree means your diff would carry someone else's work, and the commit
+**A dirty tree** means your diff would carry someone else's work, and the change
 stops being reviewable in two minutes. Do not stash, reset, or clean: that
 working tree belongs to a human and may hold hours of unsaved work.
 
-Being on another branch means the code you are about to reason about is not the
-code that will be reviewed. A fix built on a feature branch inherits that
-branch's changes, needs rebasing before it can land, and can be invalidated by
-work the branch itself is doing. Do not switch to `trunk` to satisfy the check,
+**Being on another branch** means the code you are about to reason about is not
+the code that will be reviewed. Do not switch to `trunk` to satisfy the check,
 because that abandons whatever the human was doing without asking.
 
-Report what you found and let the human decide. They may want the work
-committed, or may genuinely want a run from that branch, which is their call to
-make explicitly and not yours to assume.
+**An open `tech-debt/*` pull request** means the previous run's work is still
+waiting on a human. Stop: do not open a second one. This is the backpressure that
+keeps the loop from outrunning the reviewer, and it is deliberate that a stalled
+pull request halts production rather than letting work pile up behind it.
 
-Once both checks pass, branch from an up to date `trunk`:
+Once all three pass, branch from an up to date `trunk`:
 
 ```bash
 git fetch origin && git switch -c tech-debt/<short-slug> origin/trunk
@@ -88,16 +108,40 @@ git fetch origin && git switch -c tech-debt/<short-slug> origin/trunk
 
 Work on the branch from the first edit. Do not commit to `trunk`.
 
+### Establish the validation baseline
+
+Before making any edit, record what already fails on clean `trunk`:
+
+```bash
+go test ./... 2>&1 | tee /tmp/baseline-test.txt
+make lint 2>&1 | tee /tmp/baseline-lint.txt
+```
+
+Do not require these to be green, and do not try to fix what they report. Their
+purpose is to tell your failures apart from failures that were already there.
+Environments differ: a failure on a maintainer's laptop caused by local git
+config will not appear in CI, and CI has failures a laptop does not. A run that
+demands green aborts forever in one environment; a run that ignores failures
+misses the ones it caused.
+
+Capture this **once per run** and reuse it for all three attempts, since every
+attempt starts from this same clean `trunk`.
+
 ## Pick one target
 
-If the human named a target, use it and skip the menu.
+If you were invoked with an explicit target, use it and skip the menu.
 
-Otherwise choose from the signals below. They are ordered by how good their
-oracle is, meaning how cheaply and how conclusively a machine can confirm the
-fix worked. Prefer a target near the top. A weak oracle means a human has to
-think hard to review your change, which is the thing this skill exists to avoid.
+Otherwise, the memory file's **Current focus** section decides. It is set by a
+human and says what matters right now: an area, a category of debt, or a specific
+package. Follow it. If it is empty, fall back to the menu below.
 
-Each command below is verified to work in this repository.
+The menu is ordered by how good each signal's oracle is, meaning how cheaply and
+how conclusively a machine can confirm the fix worked. Prefer a target near the
+top. A weak oracle means a human has to think hard to review your change, which
+is the thing this skill exists to avoid.
+
+Each command below is verified to work in this repository. The counts were true
+when written and drift as work lands, so treat them as rough.
 
 ### Tier 1: a tool reports it, and the same tool confirms the fix
 
@@ -112,19 +156,19 @@ issues". That backlog is large but finite, and it shrinks package by package:
 golangci-lint run --no-config --default=none --enable=errcheck ./pkg/cmd/<pkg>/...
 ```
 
-Swap in `staticcheck` or `gosec`. Scope to one package per run, never the whole
-tree. Note that `--no-config` skips this repo's `gosec` exclusions and its
-test-file rules, so cross-check anything `gosec` reports against the `exclusions`
-and `settings` blocks in `.golangci.yml` before acting on it. Some of what it
-reports is already deliberately excluded.
+Swap in `staticcheck` or `gosec`. Scope to one package, never the whole tree.
+Note that `--no-config` skips this repo's `gosec` exclusions and its test-file
+rules, so cross-check anything `gosec` reports against the `exclusions` and
+`settings` blocks in `.golangci.yml` before acting on it. Some of what it reports
+is already deliberately excluded.
 
-The endgame here is real: when a package is clean it can be held clean with a
-scoped exclusion rule, and when enough packages are clean the linter comes off
-the disabled list entirely. Mention progress toward that in your report where it
-is relevant.
+When a package goes clean, you may add a scoped exclusion to `.golangci.yml` that
+holds it clean, in the same pull request. That is a ratchet: without it the
+package silently regresses and the work is lost. Adding an exclusion is the only
+edit to that file you may make. Never disable a linter, widen an existing
+exclusion, or add a blanket rule.
 
-**Suppressions that may no longer be needed.** There are 31 `//nolint`
-directives:
+**Suppressions that may no longer be needed.** Around 31 `//nolint` directives:
 
 ```bash
 grep -rn "//nolint" --include=*.go .
@@ -135,7 +179,7 @@ suppression was stale and deleting it is a clean win. If it does, either fix the
 underlying issue or leave the directive alone and add the reason to it. Do not
 delete a suppression by silencing the linter some other way.
 
-**Skipped tests.** There are 9 `t.Skip` calls:
+**Skipped tests.** Around 9 `t.Skip` calls:
 
 ```bash
 grep -rn "t.Skip(" --include=*_test.go .
@@ -151,22 +195,21 @@ The oracle is the grep going to zero for that pattern, plus tests passing.
 
 **`ghinstance.Default()` call sites.** `AGENTS.md` says to use
 `cfg.Authentication().DefaultHost()` instead, because `ghinstance.Default()`
-always returns `github.com` and so is wrong for GitHub Enterprise Server. There
-are 5:
+always returns `github.com` and so is wrong for GitHub Enterprise Server:
 
 ```bash
 grep -rn "ghinstance.Default()" --include=*.go .
 ```
 
-Fix one call site per run. Each needs a test proving the non-`github.com` host is
-now respected, otherwise you have moved code around without proving anything.
-Some of these call sites have no config in scope and cannot be fixed without a
-signature change, which is a design decision. See [When to stop](#when-to-stop).
+Fix one call site. Each needs a test proving the non-`github.com` host is now
+respected, otherwise you have moved code around without proving anything. Some
+call sites have no config in scope and cannot be fixed without changing an
+exported signature, which is a design decision: abandon that attempt.
 
-### Tier 3: needs judgement, so bring a human in early
+### Tier 3: only when Current focus names it
 
-These are legitimate debt but the oracle is weak. Only take one of these when the
-human explicitly picks it, and expect to ask a question partway through.
+The oracle is weak, so these are not eligible by default. Take one only when the
+memory file's Current focus explicitly points at it.
 
 **Feature detection cleanups.** `AGENTS.md` requires a `// TODO <cleanupIdentifier>`
 comment above each feature-detection branch. The identifier groups every site that
@@ -176,21 +219,33 @@ must be removed together once the API is GA on all supported GHES versions:
 grep -rhoE "// TODO [a-zA-Z][a-zA-Z0-9_-]+" --include=*.go . | sort | uniq -c | sort -rn
 ```
 
-The largest groups are `advancedIssueSearchCleanup` (33), `ApiActorsSupported`
-(31), and `projectsV1Deprecation` (15). **Never remove one of these on your own
-initiative.** Whether a gate can come out depends on the supported GHES version
-window, which is external knowledge you do not have. What you can do without
-asking is verify a group is internally consistent and complete, and report a
-group whose sites have drifted apart.
+**Never remove one of these.** Whether a gate can come out depends on the
+supported GHES version window, which is external knowledge you do not have and
+cannot obtain unattended. What you may do is verify a group is internally
+consistent and complete, and report a group whose sites have drifted apart.
 
-**Bare TODO, FIXME, and HACK markers.** There are roughly 240. Most are not
-actionable and some are older than the code around them. Treat these as a last
-resort, and only when the marker states a concrete, checkable action.
+**Bare TODO, FIXME, and HACK markers.** Roughly 240. Most are not actionable and
+some are older than the code around them. Only when the marker states a concrete,
+checkable action.
 
-## Never touch
+## What you may change
 
-Generated code and mocks. Changes here are overwritten by the next `go generate`
-and reviewing them wastes a human's time:
+**You may edit any `.go` file**, subject to the exclusions below. Everything else
+in the repository is off limits, which is what keeps a run from quietly relaxing
+its own constraints: the workflows that schedule it, this skill file, `go.mod`,
+and CODEOWNERS are all outside the allow-list by construction.
+
+Two carve-outs, because the design needs them:
+
+- appending to `.experiments/tech-debt-burndown/memory.md`, below the Current
+  focus section;
+- adding a scoped exclusion to `.golangci.yml` when a package goes clean, as
+  described in Tier 1.
+
+### Never touch
+
+Generated code and mocks, even though they are `.go` files. Changes here are
+overwritten by the next `go generate` and reviewing them wastes a human's time:
 
 - any file containing `// Code generated ... DO NOT EDIT.`
 - `**/*.pb.go`, `**/*.twirp.go`, `**/*_mock.go`
@@ -203,8 +258,9 @@ Also never touch anything the memory file lists as off limits.
 ### Record the failure first
 
 Before you change a single line, run the sensor and save its output. You need the
-before state to prove the after state means anything, and to paste both into your
-report. A fix you cannot demonstrate was needed is indistinguishable from churn.
+before state to prove the after state means anything, and to paste both into the
+pull request. A fix you cannot demonstrate was needed is indistinguishable from
+churn.
 
 ### Make the smallest change that closes the gap
 
@@ -222,29 +278,17 @@ Follow the patterns in `AGENTS.md`: table-driven tests, `httpmock` for HTTP,
 
 An unchecked error you now handle needs a test that exercises the error path. A
 `ghinstance.Default()` call site you fix needs a test with a non-`github.com`
-host. If you cannot write a test that fails before your change and passes after,
-that is strong evidence the change is not worth making. Say so and stop.
+host.
 
-### Three honest outcomes
-
-Not every target should be fixed, and pretending otherwise is how loops produce
-bad code. You have three legitimate options:
-
-- **Fix it.** The change is small, tested, and validated.
-- **Accept it.** The reported issue is a false positive, or the current code is
-  correct for a reason the tool cannot see. Record the reason in the memory file
-  so no future run re-proposes it, and where the tool supports it add a scoped
-  suppression with that reason attached. Do not add a bare `//nolint`.
-- **Escalate it.** The fix needs a decision you should not make alone. Leave the
-  code untouched and report what the decision is.
-
-Choosing accept or escalate is a successful run. Forcing a fix to avoid an
-empty-handed report is a failed one.
+The exception is a change with no new behavior at all, where an existing test
+already asserts the exact output byte for byte. Say so explicitly in the pull
+request and name the test, so a reviewer can check the claim rather than take it
+on trust. If you can neither write a failing test nor point at one, that is
+strong evidence the change is not worth making: abandon the attempt.
 
 ## Prove it
 
-Run all three, in this order, and do not skip the middle one because the first
-passed:
+Re-run the sensor, then the full suite and the linter:
 
 ```bash
 <the sensor command from your target, re-run>   # now reports the issue gone
@@ -252,73 +296,134 @@ go test ./...
 make lint
 ```
 
+Compare the last two against the baseline you captured on clean `trunk`. **Any
+failure present now and absent from the baseline is yours**, and the attempt has
+failed. Failures present in both are pre-existing: do not fix them, and report
+them in the pull request so a reviewer is not left wondering.
+
 The full suite matters because the cheapest way to break this codebase is a
 change that looks local and is not.
 
 **Never make a check pass by weakening it.** Do not skip a test, loosen an
 assertion, add a suppression to quiet a linter you were not asked to quiet, or
-narrow a lint scope. If a check fails and you cannot fix it honestly, revert your
-change and report the attempt. A run that ends in "I tried this and it broke
-these four tests, here is why" is genuinely useful. A run that ends in a green
-build achieved by deleting a test is worse than no run at all.
+narrow a lint scope. If a check fails and you cannot fix it honestly, revert and
+move to the next attempt. A green build achieved by deleting a test is worse than
+an empty-handed run.
 
-## Commit
+## Three attempts
 
-One commit, on the branch, containing only the fix and its test.
+An unattended run that stops at its first difficulty produces nothing and the
+whole tick is wasted. So you get three attempts at finding something that lands.
+
+For each attempt, in order:
+
+1. Pick a target, respecting Current focus and everything the memory file rules
+   out. Do not re-pick a target an earlier attempt in this run already abandoned.
+2. Record the sensor's before state.
+3. Fix it, with a test.
+4. Prove it against the baseline.
+
+**The first attempt that passes wins. Stop attempting and open the pull request.**
+
+If an attempt fails at any step, revert completely before starting the next one:
+
+```bash
+git checkout -- . && git clean -fd && git status --porcelain   # must be empty
+```
+
+A half-reverted attempt contaminating the next one is the single worst outcome
+available here, because it produces a pull request whose diff nobody can explain.
+
+Keep a short note of why each failed attempt failed. Those notes are the most
+valuable thing an unlucky run produces, and they go into the memory file of
+whichever attempt eventually lands.
+
+If all three fail, stop. Do not open a pull request, do not open an issue, do not
+comment anywhere. The run is simply silent, and the absence of a pull request is
+the signal. Anything noisier turns a bad hour into a notification storm.
+
+## Commit and open the pull request
+
+One commit containing the fix, its test, and the memory file update.
 
 Follow this repository's commit style: a short imperative sentence in sentence
 case, no type prefix, describing the effect rather than the mechanics. Read
 `git log --oneline` if unsure. "Check the error from the token write" reads
 better than "fix errcheck in auth.go".
 
-Do not push. Do not open a pull request. The human takes it from here.
+Push the branch and open the pull request **ready for review, not as a draft**.
+Ready is the signal that a human's turn has begun.
 
-## Report
+Use `.github/PULL_REQUEST_TEMPLATE.md` as the body. Keep its headings and HTML
+comments and fill in every section, writing "N/A" rather than deleting one:
 
-Keep it short enough to read on a phone. State:
+- **Description**: the target, and why it was picked. One short paragraph.
+- **How did you test this change?**: the sensor output before and after. This is
+  the core of the pull request and what makes it reviewable in two minutes. Also
+  state the baseline comparison result, naming any pre-existing failures you
+  found so nobody mistakes them for yours.
+- **Key points**: the attempts that did not land and why. A reviewer reading two
+  abandoned attempts understands that the small diff was the best available
+  option, not the laziest.
+- **Notes for reviewers**: where to start, and anything you are unsure about.
 
-- **Target**: what you picked and why, in one line.
-- **Base**: the `origin/trunk` commit you branched from, so the human knows how
-  fresh the fix is.
-- **Before and after**: the sensor output either side of the change. This is the
-  core of the report. It is what makes the change reviewable in two minutes.
-- **The change**: what you altered and what the new test proves.
-- **Validation**: that `go test ./...` and `make lint` both passed.
-- **Left alone**: anything you noticed and deliberately did not touch. Be
-  specific, because this is the seed of the next run.
-- **Memory updates**: anything you added to `.experiments/tech-debt-burndown/memory.md`.
+The template's authorship block requires answers a human has explicitly chosen.
+Those choices have been made, and they are:
 
-If you accepted or escalated instead of fixing, say so plainly at the top. Do not
-bury it.
+- Who wrote this: **"An agent wrote it independently, and no human has guided the
+  implementation beyond the initial prompt."**
+- Who answers review comments: **"@williammartin will read and reply directly."**
+
+Apply the `tech-debt` label so these are filterable.
+
+Then stop. Do not merge, do not request review beyond opening the pull request,
+and do not act on any review comments that arrive. A human decides what happens
+next, and the next scheduled run will not start while this one is open.
 
 ## Update the memory file
 
-Append to `.experiments/tech-debt-burndown/memory.md` when a run produces knowledge a
-future run would otherwise have to rediscover:
+The memory file update rides along in the same commit as the fix, which is what
+makes it reviewable. A run that lands nothing records nothing.
+
+Append when a run produces knowledge a future run would otherwise have to
+rediscover:
 
 - a target you considered and rejected, and why, so it is not re-proposed
+- an attempt that failed validation, and how it failed
 - a false positive and why it is one
-- a fix approach that failed validation, and how it failed
 
-Do not append a running log of every run. This file is loaded into context at the
-start of every future run, so it has to stay worth reading. Keep entries short,
-and when several entries say the same thing, consolidate them into one.
+Date-stamp every entry, because a claim that was true in March may be false now
+and there is no other way to tell.
+
+**Never edit the Current focus section.** A human owns it. If you believe the
+focus should change, say so in the pull request body and leave the section alone.
+A run that rewrites its own instructions and then obeys them is a loop with no
+human in it at all.
+
+**Keep the file under 100 lines.** It is loaded into context on every run, so
+length is a tax on all future work. If your append would push it over, first
+consolidate existing entries so the total still fits. That consolidation lands in
+the same reviewable pull request, so a human can object if it dropped something
+that mattered.
 
 ## When to stop
 
-Stop, leave the code unchanged, and hand back to the human when:
+Abandon the current attempt and move to the next when:
 
-- the working tree is dirty, or you are not on `trunk`, as described in
-  [Before you start](#before-you-start)
 - the fix requires changing an exported signature or an interface
+- the fix requires editing anything outside the allow-list
 - the fix touches the non-interactive output contract in any way, meaning stdout
   and stderr routing, `--json` fields, exit codes, error message text, flag
   names, or default values on the non-TTY path, all of which are breaking changes
 - the fix requires deciding whether a feature-detection gate can be removed
 - validation fails and the honest fix is larger than the original target
-- you cannot write a test that fails before your change
-- you have been going long enough that the diff no longer reviews in two minutes
+- you can neither write a test that fails before your change nor name an existing
+  test that already pins the behavior exactly
+- the diff has grown past what reviews in two minutes
 
-Stopping is cheap. A bad commit in a queue a human trusts is expensive, because
-the cost is not the commit, it is the human deciding they can no longer skim
-these.
+Stop the whole run, changing nothing, when a precondition fails: dirty tree, not
+on `trunk`, or a `tech-debt/*` pull request already open.
+
+Stopping is cheap. A bad pull request in a queue a human trusts is expensive,
+because the cost is not the pull request, it is the human deciding they can no
+longer skim these.

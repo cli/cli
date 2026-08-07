@@ -1,43 +1,60 @@
 # Tech debt burndown: agent memory
 
 Standing corrections for the [`tech-debt-burndown` skill](../../.github/skills/tech-debt-burndown/SKILL.md).
-This file is loaded at the start of every run and is binding. Keep it short:
-every line here costs context on every future run.
+This file is loaded at the start of every run and is binding.
 
 Both humans and agent runs write here, and nothing distinguishes the two once
 written. Assume any entry may be an unreviewed conclusion from a previous run.
 Entries are binding on what to avoid; factual claims in them should be
-re-verified before you lean on them, and corrected when stale.
+re-verified before you lean on them, and corrected when stale. Date-stamp
+anything you add.
 
-Add an entry when a run produces knowledge a future run would otherwise have to
-rediscover. Consolidate entries that say the same thing.
+**Budget: 100 lines.** This file costs context on every future run. If an append
+would exceed the budget, consolidate existing entries first, in the same pull
+request.
+
+## Current focus
+
+**Human-owned. Agent runs must not edit this section.** Propose changes in the
+pull request body instead.
+
+Empty. With no focus set, runs fall back to the tier order in the skill.
+
+<!-- Examples of what can go here:
+     - "Work on pkg/cmd/pr/edit until staticcheck is clean, then add the exclusion."
+     - "Prefer skipped tests and stale nolints over linter findings for now."
+     - "Leave staticcheck alone, it is all cosmetic. Focus on errcheck." -->
 
 ## Off limits
 
 - Generated code and mocks. See the Never touch section of the skill.
 - Removing a feature-detection gate (`// TODO <cleanupIdentifier>`). Whether a
   gate can come out depends on the supported GHES version window, which is not
-  discoverable from the repo. Ask.
+  discoverable from the repo and cannot be resolved unattended.
 
 ## Known scale of the linter backlog
 
 Counts measured by an agent run on 2026-08-06 against `trunk`, not verified by a
-human, and stale the moment anyone lands a fix. Use them to choose between
-linters, not as a target count. Command:
-`--no-config --default=none --max-issues-per-linter=0 --max-same-issues=0`, so
-this repo's exclusions are *not* applied and these are upper bounds:
+human, and stale as soon as anything lands. Use them to choose between linters,
+not as a target count. Command: `--no-config --default=none
+--max-issues-per-linter=0 --max-same-issues=0`, so this repo's exclusions are
+*not* applied and these are upper bounds: errcheck 1245, staticcheck 221,
+gosec 435.
 
-| Linter | Issues |
-| --- | --- |
-| errcheck | 1245 |
-| staticcheck | 221 |
-| gosec | 435 |
+`gosec` is the least tractable, because `.golangci.yml` already excludes G110,
+G204, G301, G302, G304, G307, and G404, plus all `gosec` findings in `_test.go`
+files, and a `--no-config` run reports all of those anyway. Always cross-check
+`gosec` output against `.golangci.yml` before acting on it.
 
-`staticcheck` is the most tractable of the three. `gosec` is the least, because
-`.golangci.yml` already excludes G110, G204, G301, G302, G304, G307, and G404,
-plus all `gosec` findings in `_test.go` files, and a `--no-config` run will
-report all of those anyway. Always cross-check `gosec` output against
-`.golangci.yml` before acting on it.
+## Staticcheck shape
+
+2026-08-06: repo-wide staticcheck has **no `SA` (correctness) findings**. It is
+all style: QF1008 (70), QF1012 (50), ST1005 (29), QF1003 (24), ST1012 (16), rest
+single digits. Staticcheck targets are mechanical and safe, but low value.
+
+Most-affected packages: `pkg/cmd/pr/edit` (23), `pkg/cmd/issue/edit` (19),
+`pkg/cmd/auth/status` (16), `pkg/cmd/extension` (11). `pkg/cmd/alias/imports` was
+cleared 2026-08-06.
 
 ## Rejected targets
 
@@ -47,26 +64,6 @@ None yet.
 
 None yet.
 
-## Failed approaches
+## Failed attempts
 
 None yet.
-
-## Baseline noise on this machine
-
-Two failures are pre-existing and unrelated to any fix; confirmed against a
-clean tree. Do not try to fix them and do not treat them as validation failures:
-
-- `make lint` reports 3 `govet` issues in vendored/toolchain source.
-- `git/...` tests fail with `safe.bareRepository is 'explicit'`, a local git
-  config setting, not a code defect.
-
-## Staticcheck shape
-
-Repo-wide staticcheck has **no `SA` (correctness) findings**. It is all style:
-QF1008 (70), QF1012 (50), ST1005 (29), QF1003 (24), ST1012 (16), rest single
-digits. So staticcheck targets are mechanical and safe, but pick a package that
-goes fully to zero rather than fixing scattered instances.
-
-Packages with the most staticcheck issues: `pkg/cmd/pr/edit` (23),
-`pkg/cmd/issue/edit` (19), `pkg/cmd/auth/status` (16), `pkg/cmd/extension` (11).
-`pkg/cmd/alias/imports` is now clean (2026-08-06).

@@ -195,4 +195,4 @@ Review pull requests with the [`cli-code-reviewer` skill](.github/skills/cli-cod
 
 ## Tech Debt
 
-Pay down tech debt with the [`tech-debt-burndown` skill](.github/skills/tech-debt-burndown/SKILL.md). It fixes one small, verifiable piece per run and leaves a validated commit on a branch for review.
+Pay down tech debt with the [`tech-debt-burndown` skill](.github/skills/tech-debt-burndown/SKILL.md). It fixes one small, verifiable piece per run and opens a ready-to-review pull request. It is built to run unattended on a schedule, so it never asks questions and only runs from a clean `trunk` with no other burndown pull request open.
