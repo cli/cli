@@ -48,11 +48,29 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 	fi
 fi
 
+# A go.mod replace pointing at a directory on this machine is invisible inside
+# the container unless we mount it, so collect any such directories and bind
+# them at the same absolute path the replace names. There are none once the
+# temporary go-gh replace is reverted, and none at older revisions.
+replace_mounts=()
+while read -r target; do
+	case "$target" in
+	/*) ;;
+	*) continue ;;
+	esac
+	[ -d "$target" ] || {
+		printf 'error: go.mod replaces a module with %s, which does not exist\n' "$target" >&2
+		exit 1
+	}
+	replace_mounts+=(-v "$target:$target:ro")
+done < <(awk '/^replace|=>/ { for (i = 1; i < NF; i++) if ($i == "=>") print $(i + 1) }' "$repo_root/go.mod")
+
 docker volume create "$MODULE_CACHE_VOLUME" >/dev/null
 docker volume create "$BUILD_CACHE_VOLUME" >/dev/null
 
 exec docker run --rm -t \
 	-v "$repo_root:/src:ro" \
+	${replace_mounts[@]+"${replace_mounts[@]}"} \
 	-v "$MODULE_CACHE_VOLUME:/go/pkg/mod" \
 	-v "$BUILD_CACHE_VOLUME:/root/.cache/go-build" \
 	-e GH_APIHOST_TOKEN="$token" \
