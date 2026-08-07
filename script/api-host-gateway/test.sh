@@ -26,6 +26,10 @@ LOG="$WORK/gateway.jsonl"
 BUNDLE="$WORK/bundle.pem"
 
 FAILURES=0
+SUBSET_REDS=0
+SUBSET_RED_NAMES=
+SUBSET_NOMATCHES=0
+SUBSET_NOMATCH_NAMES=
 GATEWAY_PID=
 
 die() {
@@ -293,7 +297,9 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 
 	run_subset() {
 		local testfunc="$1" scripts="$2" tok="$3"
-		GH_ACCEPTANCE_HOST=github.com \
+		local out rc
+		# Capture output so we can detect "no tests to run" without losing it.
+		out=$(GH_ACCEPTANCE_HOST=github.com \
 		GH_ACCEPTANCE_ORG="$GH_APIHOST_ORG" \
 		GH_ACCEPTANCE_TOKEN="$tok" \
 		GH_ACCEPTANCE_USER="$EXPECTED_LOGIN" \
@@ -301,7 +307,16 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 		GH_ACCEPTANCE_SCRIPT="$scripts" \
 		SSL_CERT_FILE="$BUNDLE" \
 		go test -tags=acceptance -count=1 -parallel=1 -timeout=45m \
-			-run "^$testfunc\$" ./acceptance
+			-run "^$testfunc\$" ./acceptance 2>&1)
+		rc=$?
+		printf '%s\n' "$out"
+		if [ $rc -ne 0 ]; then
+			SUBSET_REDS=$((SUBSET_REDS + 1))
+			SUBSET_RED_NAMES="${SUBSET_RED_NAMES} $testfunc"
+		elif printf '%s\n' "$out" | grep -q 'no tests to run'; then
+			SUBSET_NOMATCHES=$((SUBSET_NOMATCHES + 1))
+			SUBSET_NOMATCH_NAMES="${SUBSET_NOMATCH_NAMES} $testfunc"
+		fi
 	}
 
 	blackhole_on
@@ -309,18 +324,18 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 	heading "Phase 4: org-scoped acceptance subset through the gateway"
 	write_config yes "$ORG_TOKEN"
 
-	run_subset TestAPI        'basic-rest.txtar,basic-graphql.txtar'                                                                           "$ORG_TOKEN" || echo "RED: TestAPI"
-	run_subset TestReleases   'release-upload-download.txtar'                                                                                  "$ORG_TOKEN" || echo "RED: TestReleases"
-	run_subset TestRepo       'repo-delete.txtar,repo-list-rename.txtar,repo-read-file.txtar,repo-rename-transfer-ownership.txtar'              "$ORG_TOKEN" || echo "RED: TestRepo"
-	run_subset TestWorkflows  'run-download.txtar'                                                                                             "$ORG_TOKEN" || echo "RED: TestWorkflows"
-	run_subset TestExtensions 'extension.txtar'                                                                                                "$ORG_TOKEN" || echo "RED: TestExtensions"
-	run_subset TestSearches   'search-issues.txtar'                                                                                            "$ORG_TOKEN" || echo "RED: TestSearches"
-	run_subset TestAuth       'auth-status.txtar'                                                                                              "$ORG_TOKEN" || echo "RED: TestAuth"
+	run_subset TestAPI        'basic-rest.txtar,basic-graphql.txtar'                                                                           "$ORG_TOKEN"
+	run_subset TestReleases   'release-upload-download.txtar'                                                                                  "$ORG_TOKEN"
+	run_subset TestRepo       'repo-delete.txtar,repo-list-rename.txtar,repo-read-file.txtar,repo-rename-transfer-ownership.txtar'              "$ORG_TOKEN"
+	run_subset TestWorkflows  'run-download.txtar'                                                                                             "$ORG_TOKEN"
+	run_subset TestExtensions 'extension.txtar'                                                                                                "$ORG_TOKEN"
+	run_subset TestSearches   'search-issues.txtar'                                                                                            "$ORG_TOKEN"
+	run_subset TestAuth       'auth-status.txtar'                                                                                              "$ORG_TOKEN"
 
 	heading "Phase 5: user-scoped acceptance subset through the gateway"
 	write_config yes "$TOKEN"
 
-	run_subset TestGists      'gist-create-view-delete.txtar'                                                                                  "$TOKEN"     || echo "RED: TestGists"
+	run_subset TestGists      'gist-create-view-delete.txtar'                                                                                  "$TOKEN"
 
 	blackhole_off
 fi
@@ -328,10 +343,28 @@ fi
 # --- summary -----------------------------------------------------------------
 
 heading "Summary"
-if [ "$FAILURES" -eq 0 ]; then
+# Phases 4 and 5 are expected to be partly red during the migration period,
+# so subset failures are reported but do not drive the exit code. Only the
+# phase 1-3 assertion count does that.
+if [ "$FAILURES" -eq 0 ] && [ "$SUBSET_REDS" -eq 0 ] && [ "$SUBSET_NOMATCHES" -eq 0 ]; then
 	printf 'all assertions passed\n'
 	exit 0
 fi
 
-printf '%d assertion(s) failed\n' "$FAILURES"
-exit 1
+if [ "$FAILURES" -gt 0 ]; then
+	printf '%d assertion(s) failed\n' "$FAILURES"
+fi
+
+if [ "$SUBSET_REDS" -gt 0 ]; then
+	printf '%d subset test function(s) red:%s\n' "$SUBSET_REDS" "$SUBSET_RED_NAMES"
+fi
+
+if [ "$SUBSET_NOMATCHES" -gt 0 ]; then
+	printf '%d subset test function(s) matched no tests (function may not exist at this revision):%s\n' "$SUBSET_NOMATCHES" "$SUBSET_NOMATCH_NAMES"
+fi
+
+if [ "$FAILURES" -gt 0 ]; then
+	exit 1
+fi
+
+exit 0

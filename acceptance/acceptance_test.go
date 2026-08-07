@@ -326,6 +326,15 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 
 		ts.Setenv("GH_TELEMETRY", "false")
 
+		// testscript constructs a fresh environment from a fixed allowlist and
+		// does not propagate SSL_CERT_FILE. When the operator has set it - for
+		// instance because all API traffic routes through a gateway whose CA is
+		// not in the system bundle - honour that intent explicitly, or every
+		// request inside the sandbox will fail certificate verification.
+		if certFile := os.Getenv("SSL_CERT_FILE"); certFile != "" {
+			ts.Setenv("SSL_CERT_FILE", certFile)
+		}
+
 		// The sandbox overrides HOME, so git cannot find the user's global
 		// config. Write a minimal identity so commits inside the sandbox
 		// don't fail with "Author identity unknown".
