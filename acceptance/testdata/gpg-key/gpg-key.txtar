@@ -1,4 +1,4 @@
-skip 'it modifies the user''s personal GitHub account GPG keys'
+[!allow:personal-account] skip 'it modifies the user''s personal GitHub account GPG keys'
 
 # This test requires the admin:gpg_key scope to add and delete GPG keys to and
 # from the user's personal GitHub account. 

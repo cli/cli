@@ -1,4 +1,4 @@
-skip 'it modifies the user''s personal GitHub account SSH keys'
+[!allow:personal-account] skip 'it modifies the user''s personal GitHub account SSH keys'
 
 # scopes admin:ssh_signing_key,admin:public_key
 

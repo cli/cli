@@ -20,6 +20,11 @@ WORK=${GH_APIHOST_WORK:-/tmp/api-host-gateway}
 EXPECTED_LOGIN=${GH_APIHOST_EXPECTED_LOGIN:-}
 TOKEN=${GH_APIHOST_TOKEN:-}
 ORG_TOKEN=${GH_APIHOST_ORG_TOKEN:-}
+RUN_ALL=${GH_APIHOST_ALL:-no}
+# A space separated list of test functions to run instead of the usual set, so a
+# run can be narrowed to whatever failed last time. An entry may name a single
+# script with "TestRepo=repo-archive-unarchive.txtar".
+FUNCS=${GH_APIHOST_FUNCS:-}
 
 CONFIG_DIR="$WORK/ghconfig"
 LOG="$WORK/gateway.jsonl"
@@ -31,6 +36,8 @@ SUBSET_REDS=0
 SUBSET_RED_NAMES=
 SUBSET_NOMATCHES=0
 SUBSET_NOMATCH_NAMES=
+SUBSET_SKIPS=0
+SUBSET_SKIP_NAMES=
 GATEWAY_PID=
 
 # PHASE labels every recorded result so the summary can be read phase by phase.
@@ -329,14 +336,37 @@ blackhole_off
 if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 	[ -n "$ORG_TOKEN" ] || die "GH_APIHOST_ORG_TOKEN is required for the acceptance run"
 
-	# run_subset <test function> <script> <token> runs exactly one acceptance
-	# script. Scripts are run one at a time rather than batched per test
-	# function because a test function bundles scripts that fail for unrelated
-	# reasons, which would hide a script turning green on its own.
+	# go test -v with parallel subtests emits every subtest's output first,
+	# grouped under "=== CONT", and only then the "--- PASS/FAIL" lines. A
+	# single pass therefore cannot tell which block failed, so read the log
+	# twice: once to collect the failing subtest names, once to print only
+	# their blocks. Dumping the whole log instead buries the failure under
+	# every passing script's trace, which for a directory of 38 scripts is
+	# thousands of lines.
+	print_failure_detail() {
+		awk '
+			NR==FNR {
+				if ($0 ~ /^[[:space:]]*--- FAIL: /) fail[$3]=1
+				next
+			}
+			/^=== CONT/ {
+				show = ($3 in fail)
+				if (show) printf "\n--- failure detail: %s\n", $3
+				next
+			}
+			/^=== (RUN|PAUSE)/ { next }
+			/^[[:space:]]*--- / { show=0 }
+			show { print }
+		' "$1" "$1"
+	}
+
+	# run_subset <test function> <script> <token>. An empty script runs every
+	# script in the test function's directory, which is what the full run does.
 	run_subset() {
 		local testfunc="$1" script="$2" tok="$3"
-		local logfile rc
-		logfile="$WORK/subset-${testfunc}-${script%.txtar}.log"
+		local logfile rc label
+		label=${script:-$testfunc}
+		logfile="$WORK/subset-${testfunc}-${label%.txtar}.log"
 		# Tee to a file so we can inspect output for "no tests to run" while
 		# still streaming it live to the terminal. pipefail would make the
 		# pipeline exit with tee's status; PIPESTATUS[0] extracts go test's
@@ -347,20 +377,36 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 		GH_ACCEPTANCE_USER="$EXPECTED_LOGIN" \
 		GH_ACCEPTANCE_API_HOST="$GATEWAY_HOST" \
 		GH_ACCEPTANCE_SCRIPT="$script" \
+		GH_ACCEPTANCE_ALLOW_PERSONAL_ACCOUNT="${ALLOW_PERSONAL_ACCOUNT:-false}" \
 		SSL_CERT_FILE="$BUNDLE" \
-		go test -tags=acceptance -count=1 -parallel=1 -timeout=45m \
-			-run "^$testfunc\$" ./acceptance 2>&1 | tee "$logfile"
+		go test -tags=acceptance -count=1 -parallel=1 -timeout=45m -v \
+			-run "^$testfunc\$" ./acceptance 2>&1 | tee "$logfile" |
+			grep -E '^(ok|FAIL)|^[[:space:]]*--- (PASS|FAIL|SKIP)'
+		# No "|| true" here. There is no set -e, so grep failing to match is
+		# harmless, and appending it would make PIPESTATUS describe the "true"
+		# rather than the pipeline, silently recording every failure as a pass.
 		rc=${PIPESTATUS[0]}
 		if [ $rc -ne 0 ]; then
+			# -v suppressed the failure detail from the live stream, so print it
+			# now that we know it is worth reading.
+			print_failure_detail "$logfile"
 			SUBSET_REDS=$((SUBSET_REDS + 1))
-			SUBSET_RED_NAMES="${SUBSET_RED_NAMES:+${SUBSET_RED_NAMES} }${script}"
-			record "$script" FAIL
+			SUBSET_RED_NAMES="${SUBSET_RED_NAMES:+${SUBSET_RED_NAMES} }${label}"
+			record "$label" FAIL
 		elif grep -qE '^\s*(ok|FAIL)\s+\S+\s+[0-9.]+s \[no tests to run\]' "$logfile"; then
 			SUBSET_NOMATCHES=$((SUBSET_NOMATCHES + 1))
-			SUBSET_NOMATCH_NAMES="${SUBSET_NOMATCH_NAMES:+${SUBSET_NOMATCH_NAMES} }${script}"
-			record "$script" NOMATCH
+			SUBSET_NOMATCH_NAMES="${SUBSET_NOMATCH_NAMES:+${SUBSET_NOMATCH_NAMES} }${label}"
+			record "$label" NOMATCH
+		elif grep -qE '^[[:space:]]*--- SKIP' "$logfile" &&
+			! grep -qE '^[[:space:]]+--- PASS' "$logfile"; then
+			# Every script skipped. go test prints "ok" and the parent test still
+			# reports PASS, so only an indented subtest PASS proves a script ran.
+			# Without this check a script that never ran is recorded as a pass.
+			SUBSET_SKIPS=$((SUBSET_SKIPS + 1))
+			SUBSET_SKIP_NAMES="${SUBSET_SKIP_NAMES:+${SUBSET_SKIP_NAMES} }${label}"
+			record "$label" SKIP
 		else
-			record "$script" PASS
+			record "$label" PASS
 		fi
 	}
 
@@ -370,23 +416,84 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 	PHASE=4
 	write_config yes "$ORG_TOKEN"
 
-	run_subset TestAPI        basic-rest.txtar                        "$ORG_TOKEN"
-	run_subset TestAPI        basic-graphql.txtar                     "$ORG_TOKEN"
-	run_subset TestReleases   release-upload-download.txtar           "$ORG_TOKEN"
-	run_subset TestRepo       repo-delete.txtar                       "$ORG_TOKEN"
-	run_subset TestRepo       repo-list-rename.txtar                  "$ORG_TOKEN"
-	run_subset TestRepo       repo-read-file.txtar                    "$ORG_TOKEN"
-	run_subset TestRepo       repo-rename-transfer-ownership.txtar    "$ORG_TOKEN"
-	run_subset TestWorkflows  run-download.txtar                      "$ORG_TOKEN"
-	run_subset TestExtensions extension.txtar                         "$ORG_TOKEN"
-	run_subset TestSearches   search-issues.txtar                     "$ORG_TOKEN"
-	run_subset TestAuth       auth-status.txtar                       "$ORG_TOKEN"
+	# The three functions phase 5 owns, so a GH_APIHOST_FUNCS entry naming one is
+	# run there with the user token rather than here with the org token.
+	is_user_func() {
+		case "$1" in
+		TestGists | TestSSHKeys | TestGPGKeys) return 0 ;;
+		*) return 1 ;;
+		esac
+	}
+
+	# run_funcs <token> <predicate> runs the GH_APIHOST_FUNCS entries the
+	# predicate accepts. An entry is "TestFunc" or "TestFunc=script.txtar".
+	run_funcs() {
+		local tok="$1" want="$2" entry testfunc script
+		for entry in $FUNCS; do
+			testfunc=${entry%%=*}
+			script=${entry#"$testfunc"}
+			script=${script#=}
+			if "$want" "$testfunc"; then
+				run_subset "$testfunc" "$script" "$tok"
+			fi
+		done
+	}
+
+	not_user_func() { ! is_user_func "$1"; }
+
+	if [ -n "$FUNCS" ]; then
+		run_funcs "$ORG_TOKEN" not_user_func
+	elif [ "$RUN_ALL" = yes ]; then
+		# Every org-scoped test function, unfiltered. This asks "is any call site
+		# still bypassing api_host?", which the curated list cannot answer
+		# because it covers well under a tenth of the suite.
+		for testfunc in TestAPI TestAuth TestDiscussions TestExtensions \
+			TestIssues TestIssues2_0 TestLabels TestOrg TestProject \
+			TestPullRequests TestReleases TestRepo TestRulesets TestSearches \
+			TestSecrets TestSkills TestTelemetry TestVariables TestWorkflows; do
+			run_subset "$testfunc" "" "$ORG_TOKEN"
+		done
+	else
+		# A hand-picked list, one script per invocation. Scripts are run one at a
+		# time rather than batched because a test function bundles scripts that
+		# fail for unrelated reasons, which would hide a script turning green on
+		# its own. That mattered while the api_host work was landing commit by
+		# commit; use GH_APIHOST_ALL=yes to check coverage instead.
+		run_subset TestAPI        basic-rest.txtar                        "$ORG_TOKEN"
+		run_subset TestAPI        basic-graphql.txtar                     "$ORG_TOKEN"
+		run_subset TestReleases   release-upload-download.txtar           "$ORG_TOKEN"
+		run_subset TestRepo       repo-delete.txtar                       "$ORG_TOKEN"
+		run_subset TestRepo       repo-list-rename.txtar                  "$ORG_TOKEN"
+		run_subset TestRepo       repo-read-file.txtar                    "$ORG_TOKEN"
+		run_subset TestRepo       repo-rename-transfer-ownership.txtar    "$ORG_TOKEN"
+		run_subset TestWorkflows  run-download.txtar                      "$ORG_TOKEN"
+		run_subset TestExtensions extension.txtar                         "$ORG_TOKEN"
+		run_subset TestSearches   search-issues.txtar                     "$ORG_TOKEN"
+		run_subset TestAuth       auth-status.txtar                       "$ORG_TOKEN"
+	fi
 
 	heading "Phase 5: user-scoped acceptance subset through the gateway"
 	PHASE=5
 	write_config yes "$TOKEN"
 
-	run_subset TestGists      gist-create-view-delete.txtar           "$TOKEN"
+	# These scripts act on the account that owns $TOKEN, so they are skipped
+	# unless a run opts in. The harness opts in because that account is the one
+	# the user token was minted for.
+	ALLOW_PERSONAL_ACCOUNT=true
+
+	if [ -n "$FUNCS" ]; then
+		run_funcs "$TOKEN" is_user_func
+	elif [ "$RUN_ALL" = yes ]; then
+		for testfunc in TestGists TestSSHKeys TestGPGKeys; do
+			run_subset "$testfunc" "" "$TOKEN"
+		done
+	else
+		run_subset TestGists      gist-create-view-delete.txtar           "$TOKEN"
+		run_subset TestSSHKeys    ssh-key.txtar                           "$TOKEN"
+		run_subset TestGPGKeys    gpg-key.txtar                           "$TOKEN"
+	fi
+
+	unset ALLOW_PERSONAL_ACCOUNT
 
 	blackhole_off
 fi
@@ -405,7 +512,8 @@ heading "Summary"
 # Phases 4 and 5 are expected to be partly red during the migration period,
 # so subset failures are reported but do not drive the exit code. Only the
 # phase 1-3 assertion count does that.
-if [ "$FAILURES" -eq 0 ] && [ "$SUBSET_REDS" -eq 0 ] && [ "$SUBSET_NOMATCHES" -eq 0 ]; then
+if [ "$FAILURES" -eq 0 ] && [ "$SUBSET_REDS" -eq 0 ] && [ "$SUBSET_NOMATCHES" -eq 0 ] &&
+	[ "$SUBSET_SKIPS" -eq 0 ]; then
 	printf 'all assertions passed\n'
 	exit 0
 fi
@@ -416,6 +524,10 @@ fi
 
 if [ "$SUBSET_REDS" -gt 0 ]; then
 	printf '%d subset script(s) red: %s\n' "$SUBSET_REDS" "$SUBSET_RED_NAMES"
+fi
+
+if [ "$SUBSET_SKIPS" -gt 0 ]; then
+	printf '%d subset entr(y/ies) skipped every script: %s\n' "$SUBSET_SKIPS" "$SUBSET_SKIP_NAMES"
 fi
 
 if [ "$SUBSET_NOMATCHES" -gt 0 ]; then

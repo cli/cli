@@ -1,4 +1,4 @@
-skip 'it creates a fork owned by the user running the test'
+skip 'it creates a fork owned by the user running the test, so it needs a token spanning both that account and GH_ACCEPTANCE_ORG'
 skip 'this never worked, but could be fixed if we fixed show-refs'
 
 # Setup environment variables used for testscript

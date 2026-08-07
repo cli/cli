@@ -275,9 +275,24 @@ func testScriptParamsFor(t *testing.T, tsEnv testScriptEnv, command string) test
 		Files:               files,
 		Setup:               sharedSetup(tsEnv),
 		Cmds:                sharedCmds(tsEnv),
+		Condition:           sharedCondition(tsEnv),
 		RequireExplicitExec: true,
 		RequireUniqueNames:  true,
 		TestWork:            tsEnv.preserveWorkDir,
+	}
+}
+
+// sharedCondition resolves the conditions scripts may use in a [cond] prefix.
+// Unknown conditions are rejected rather than treated as false, so a typo fails
+// the script instead of silently skipping it.
+func sharedCondition(tsEnv testScriptEnv) func(cond string) (bool, error) {
+	return func(cond string) (bool, error) {
+		switch cond {
+		case "allow:personal-account":
+			return tsEnv.allowPersonalAccount, nil
+		default:
+			return false, fmt.Errorf("unknown condition %q", cond)
+		}
 	}
 }
 
@@ -615,6 +630,11 @@ type testScriptEnv struct {
 
 	skipDefer       bool
 	preserveWorkDir bool
+
+	// allowPersonalAccount permits scripts that act on the account running the
+	// test rather than on GH_ACCEPTANCE_ORG. They are skipped by default because
+	// a normal run should not touch a developer's own gists, keys or repos.
+	allowPersonalAccount bool
 }
 
 func (e *testScriptEnv) fromEnv() error {
@@ -652,6 +672,7 @@ func (e *testScriptEnv) fromEnv() error {
 	e.scripts = parseScriptFilter(os.Getenv("GH_ACCEPTANCE_SCRIPT"))
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
 	e.skipDefer = os.Getenv("GH_ACCEPTANCE_SKIP_DEFER") == "true"
+	e.allowPersonalAccount = os.Getenv("GH_ACCEPTANCE_ALLOW_PERSONAL_ACCOUNT") == "true"
 	e.apiHost = os.Getenv("GH_ACCEPTANCE_API_HOST")
 	e.user = os.Getenv("GH_ACCEPTANCE_USER")
 	if e.apiHost != "" && e.user == "" {

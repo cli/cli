@@ -68,16 +68,105 @@ token can create repositories in:
 $ GH_APIHOST_ACCEPTANCE=yes GH_APIHOST_ORG=my-org script/api-host-gateway/run.sh
 ```
 
-This creates real repositories and takes a couple of minutes. It prompts for a
-fine-grained PAT owned by the organisation. The PAT must be scoped to all
-repositories in the org, because the scripts create repositories with random
-names that cannot be listed ahead of time. Set `GH_APIHOST_ORG_TOKEN` to skip the
-prompt.
+This creates real repositories and takes a couple of minutes. It prompts for two
+fine-grained PATs, printing a pre-filled creation URL for each:
+
+| Token | Resource owner | Covers |
+|---|---|---|
+| `GH_APIHOST_ORG_TOKEN` | the organisation | the org-scoped scripts |
+| `GH_APIHOST_USER_TOKEN` | you | phases 1-3, and gists and account keys |
+
+Two are needed because a fine-grained PAT has exactly one resource owner, and
+Organization and Account permissions cannot be combined on one token. The org
+PAT must be scoped to all repositories in the org, because the scripts create
+repositories with random names that cannot be listed ahead of time. Setting
+either variable skips its prompt.
+
+The permission names in those URLs are not guessable from the form's labels.
+GitHub returns the canonical name in a response header, but only for a
+fine-grained token, so ask an endpoint the script uses:
+
+```console
+$ GH_TOKEN=<a fine-grained PAT> gh api -i /repos/cli/cli/actions/variables |
+    grep -i accepted-github-permissions
+X-Accepted-GitHub-Permissions: actions_variables=read
+```
+
+The form is self-verifying: open the URL and a name it did not understand is
+simply absent from the permission list, so check the counts on the Repositories
+and Organizations tabs before generating the token. Labels mislead. "Git SSH
+keys" is `keys`, and "Variables" is `actions_variables`.
+
+Both are pasted rather than typed, and a token containing control characters is
+rejected: it would be written unquoted into a YAML file, and every script would
+then fail for a reason unrelated to routing.
+
+### The full run
+
+The subset above is a hand-picked list of 14 scripts, chosen so that each commit
+in the api_host series turned a specific script green. It covers well under a
+tenth of the suite, so it cannot answer "is any call site still bypassing
+api_host?". For that, run everything:
+
+```console
+$ GH_APIHOST_ALL=yes GH_APIHOST_ACCEPTANCE=yes GH_APIHOST_ORG=my-org \
+    script/api-host-gateway/run.sh
+```
+
+This runs all 22 script-bearing test functions with no script filter, and takes
+tens of minutes rather than a couple. It creates and deletes a lot of real
+repositories. Results are reported per test function rather than per script.
+
+A test function whose scripts all skipped is reported as `SKIP`, not `PASS`.
+`go test` prints `ok` for a fully skipped package and the parent test still
+reports `PASS`, so a script that never ran is otherwise indistinguishable from
+one that passed.
+
+Phase 5 creates and deletes gists, an SSH key and a GPG key on the account that
+owns the user PAT. The key scripts carry a `[!allow:personal-account] skip`, so
+an ordinary `go test -tags acceptance` run leaves them alone; the harness sets
+`GH_ACCEPTANCE_ALLOW_PERSONAL_ACCOUNT=true` because it knows the account is the
+one the token was minted for.
+
+The ten `pr/` fork scripts stay skipped even here. Each creates a repository in
+the organisation and forks it to the user, so a single fine-grained PAT cannot
+run one: a fine-grained PAT has exactly one resource owner. Running them would
+need a classic token spanning both.
 
 Phases 4 and 5 are intentionally non-blocking: a red result is printed but does
 not stop the script or affect the exit code, which is driven by phases 1-3 alone.
 The phases exist to produce a tally that moves from red to green over a series of
 changes, not to gate a build.
+
+### Drilling into specific failures
+
+A full run takes tens of minutes, which is too slow a loop for chasing a handful
+of reds. `GH_APIHOST_FUNCS` replaces the phase 4 and 5 lists with whatever you
+name, either a whole test function or a single script within one:
+
+```console
+$ GH_APIHOST_FUNCS="TestVariables TestRepo=repo-archive-unarchive.txtar" \
+    GH_APIHOST_ACCEPTANCE=yes GH_APIHOST_ORG=my-org \
+    script/api-host-gateway/run.sh
+```
+
+Entries are routed to the right token automatically: `TestGists`, `TestSSHKeys`
+and `TestGPGKeys` run under the user PAT, everything else under the org PAT. So
+a list may mix the two freely.
+
+Run a script known to hang, such as `auth-login-logout.txtar`, on its own. Sharing
+an invocation with others means its timeout costs you their results too.
+
+### Reading the failure output
+
+`go test -v` with parallel subtests prints every subtest's output first, grouped
+under `=== CONT`, and only then the `--- PASS`/`--- FAIL` lines. Nothing in a
+subtest's own output says whether it passed.
+
+So when a test function goes red the harness reads its log twice: once to collect
+the names of the failing subtests, and once to print only those subtests' blocks.
+For a directory like `pr/` with 38 scripts, printing the whole log instead buries
+the one failure under thousands of lines of passing traces.
 
 ## Why a container
 
