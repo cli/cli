@@ -155,8 +155,21 @@ before your change and does not list it after.
 issues". That backlog is large but finite, and it shrinks package by package:
 
 ```bash
-golangci-lint run --no-config --default=none --enable=errcheck ./pkg/cmd/<pkg>/...
+golangci-lint run --no-config --default=none --enable=errcheck \
+  --max-issues-per-linter=0 --max-same-issues=0 ./pkg/cmd/<pkg>/...
 ```
+
+**Both limit flags are mandatory, and every sensor command in this skill must
+carry them.** `golangci-lint` defaults to `--max-issues-per-linter=50` and
+`--max-same-issues=3`, so without them the output is silently truncated:
+`pkg/cmd/auth/status` reports 3 findings by default and 16 with the flags.
+
+That truncation does not merely undercount, it inverts the oracle. Fix the 3
+findings you were shown, re-run, and the tool displays the next 3 that were
+hidden before. Before: 3 issues. After: 3 issues. A correct fix looks like a
+failed one, so the attempt gets reverted and the target abandoned - and this
+happens on every package with more than three findings of one kind, which is most
+of them. Do not drop these flags to shorten the command.
 
 Swap in `staticcheck` or `gosec`. Scope to one package, never the whole tree.
 Note that `--no-config` skips this repo's `gosec` exclusions and its test-file
