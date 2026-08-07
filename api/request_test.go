@@ -154,8 +154,73 @@ func TestRequestErrorPreservesScopesSuggestion(t *testing.T) {
 
 // Call sites used to mutate the response with EndpointNeedsScopes before converting it to an error.
 // Request converts internally, so WithEndpointScopes has to reproduce that suggestion.
+func TestRequestWithEndpointScopes(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		acceptedScopes string
+		wantSuggestion string
+	}{
+		{
+			name:           "adds scopes the endpoint did not report",
+			statusCode:     403,
+			acceptedScopes: "",
+			wantSuggestion: "delete_repo",
+		},
+		{
+			name:           "appends to scopes the endpoint did report",
+			statusCode:     403,
+			acceptedScopes: "repo",
+			wantSuggestion: "delete_repo",
+		},
+		{
+			name:           "leaves 5xx errors alone",
+			statusCode:     500,
+			acceptedScopes: "",
+			wantSuggestion: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			client := newTestClient(reg)
+
+			reg.Register(httpmock.MatchAny, func(req *http.Request) (*http.Response, error) {
+				header := map[string][]string{
+					"Content-Type":   {"application/json; charset=utf-8"},
+					"X-Oauth-Scopes": {"repo"},
+				}
+				if tt.acceptedScopes != "" {
+					header["X-Accepted-Oauth-Scopes"] = []string{tt.acceptedScopes}
+				}
+				return &http.Response{
+					Request:    req,
+					StatusCode: tt.statusCode,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"message": "Forbidden"}`)),
+					Header:     header,
+				}, nil
+			})
+
+			_, err := client.Request("github.com", http.MethodDelete, "repos/OWNER/REPO", nil,
+				WithEndpointScopes("delete_repo"))
+
+			var httpErr HTTPError
+			require.ErrorAs(t, err, &httpErr)
+			if tt.wantSuggestion == "" {
+				assert.Empty(t, httpErr.ScopesSuggestion())
+			} else {
+				assert.Contains(t, httpErr.ScopesSuggestion(), tt.wantSuggestion)
+			}
+		})
+	}
+}
+
 type ctxKey struct{}
 
+// Call sites such as release asset upload run inside a retry loop that owns a context, so the
+// context has to reach the outgoing request.
 func TestRequestWithContextPropagatesContext(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)

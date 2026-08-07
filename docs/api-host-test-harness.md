@@ -209,36 +209,37 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 
 ## Current state
 
-Phases 1, 2 and 3 pass, unchanged. That is the main thing this commit had to
-show: a dozen call sites changed how they make requests, and nothing that
-already worked stopped working.
+Phases 1, 2 and 3 pass, unchanged.
 
-10 scripts are still red, but four of them now pass their entire body and fail
-only in deferred `gh repo delete` cleanup:
+`gist-create-view-delete` is green. It is the only script whose cleanup is
+`gh gist delete` rather than `gh repo delete`, which is why it can go green on
+its own while the rest cannot.
+
+Nine scripts are still red, and the count overstates how much is broken. Five
+fail in their body, on a call site that is genuinely still unrouted. The other
+four pass their body in full and fail only in deferred cleanup:
 
 | Script | Fails at |
 |---|---|
-| `repo-read-file` | `gh repo read-file` |
-| `extension` | `gh repo edit --add-topic` |
-| `search-issues` | `gh search issues` |
-| `auth-status` | scope checking |
-| `gist-create-view-delete` | `gh gist create` |
-| `repo-delete` | `gh repo delete` |
+| `repo-delete` | `gh repo delete`, line 9 |
+| `auth-status` | scope checking, line 2 |
+| `repo-read-file` | `gh repo read-file`, line 34 |
+| `extension` | `gh repo edit --add-topic`, line 29 |
+| `search-issues` | `gh search issues`, line 21 |
 | `release-upload-download`, `repo-list-rename`, `repo-rename-transfer-ownership`, `run-download` | nothing in the body; cleanup only |
 
-`release-upload-download` joining that group is worth understanding, because it
-was not migrated by this commit. Uploads and downloads use the `upload_url` and
-asset URLs that the API itself returns, and now that the release is *created*
-through the gateway those URLs already point at the gateway. Routing propagates
-through response bodies, so fixing one call site can fix its dependents for
-free.
+Almost every script creates a repository and defers `gh repo delete`, so until
+that one call site is routed those four cannot report anything but red, however
+much of their own subject matter works. Script colour is a poor measure of
+progress on its own: read the step list above the failure, which shows how far
+the body got, and the `.txtar:NN` line, which says whether the failure is the
+script's subject or its cleanup.
 
 ## Remaining
 
-`gh repo read-file`, `gh repo edit`, `gh search issues`, `gh auth status`, `gh
-gist create` and `gh repo delete`. Each is blocked on a capability the shared
-client does not have yet: per-request headers, endpoint scopes, or control over
-redirects.
+`gh repo delete`, which needs control over redirects, and `gh auth status`,
+`gh repo read-file`, `gh repo edit` and `gh search issues`, which need
+per-request headers.
 
 ## Transcript
 
@@ -276,8 +277,8 @@ PHASE  RESULT   NAME
 4      FAIL     extension.txtar
 4      FAIL     search-issues.txtar
 4      FAIL     auth-status.txtar
-5      FAIL     gist-create-view-delete.txtar
+5      PASS     gist-create-view-delete.txtar
 
 == Summary
-10 subset script(s) red: release-upload-download.txtar repo-delete.txtar repo-list-rename.txtar repo-read-file.txtar repo-rename-transfer-ownership.txtar run-download.txtar extension.txtar search-issues.txtar auth-status.txtar gist-create-view-delete.txtar
+9 subset script(s) red: release-upload-download.txtar repo-delete.txtar repo-list-rename.txtar repo-read-file.txtar repo-rename-transfer-ownership.txtar run-download.txtar extension.txtar search-issues.txtar auth-status.txtar
 ```

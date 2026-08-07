@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
@@ -21,6 +22,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_processFiles(t *testing.T) {
@@ -414,4 +416,33 @@ func Test_detectEmptyFiles(t *testing.T) {
 		isEmptyFile := detectEmptyFiles(files)
 		assert.Equal(t, tt.isEmptyFile, isEmptyFile)
 	}
+}
+
+// Test_createGist_missingScope pins the scopes suggestion, which is the reason this call site
+// declares the gist scope rather than relying on what the API reports.
+func Test_createGist_missingScope(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("POST", "gists"),
+		func(req *http.Request) (*http.Response, error) {
+			resp, err := httpmock.StatusJSONResponse(404, map[string]string{"message": "Not Found"})(req)
+			if err != nil {
+				return nil, err
+			}
+			resp.Header.Set("X-Oauth-Scopes", "repo")
+			resp.Header.Set("X-Accepted-Oauth-Scopes", "")
+			return resp, nil
+		},
+	)
+
+	_, err := createGist(&http.Client{Transport: reg}, "github.com", "", true, map[string]*shared.GistFile{
+		"file.txt": {Filename: "file.txt", Content: "hello"},
+	})
+	require.Error(t, err)
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Contains(t, httpErr.ScopesSuggestion(), "gist")
 }
