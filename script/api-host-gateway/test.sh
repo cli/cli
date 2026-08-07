@@ -297,9 +297,13 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 
 	run_subset() {
 		local testfunc="$1" scripts="$2" tok="$3"
-		local out rc
-		# Capture output so we can detect "no tests to run" without losing it.
-		out=$(GH_ACCEPTANCE_HOST=github.com \
+		local logfile rc
+		logfile="$WORK/subset-${testfunc}.log"
+		# Tee to a file so we can inspect output for "no tests to run" while
+		# still streaming it live to the terminal. pipefail would make the
+		# pipeline exit with tee's status; PIPESTATUS[0] extracts go test's
+		# own exit code regardless.
+		GH_ACCEPTANCE_HOST=github.com \
 		GH_ACCEPTANCE_ORG="$GH_APIHOST_ORG" \
 		GH_ACCEPTANCE_TOKEN="$tok" \
 		GH_ACCEPTANCE_USER="$EXPECTED_LOGIN" \
@@ -307,15 +311,14 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 		GH_ACCEPTANCE_SCRIPT="$scripts" \
 		SSL_CERT_FILE="$BUNDLE" \
 		go test -tags=acceptance -count=1 -parallel=1 -timeout=45m \
-			-run "^$testfunc\$" ./acceptance 2>&1)
-		rc=$?
-		printf '%s\n' "$out"
+			-run "^$testfunc\$" ./acceptance 2>&1 | tee "$logfile"
+		rc=${PIPESTATUS[0]}
 		if [ $rc -ne 0 ]; then
 			SUBSET_REDS=$((SUBSET_REDS + 1))
-			SUBSET_RED_NAMES="${SUBSET_RED_NAMES} $testfunc"
-		elif printf '%s\n' "$out" | grep -q 'no tests to run'; then
+			SUBSET_RED_NAMES="${SUBSET_RED_NAMES:+${SUBSET_RED_NAMES} }${testfunc}"
+		elif grep -qE '^\s*(ok|FAIL)\s+\S+\s+[0-9.]+s \[no tests to run\]' "$logfile"; then
 			SUBSET_NOMATCHES=$((SUBSET_NOMATCHES + 1))
-			SUBSET_NOMATCH_NAMES="${SUBSET_NOMATCH_NAMES} $testfunc"
+			SUBSET_NOMATCH_NAMES="${SUBSET_NOMATCH_NAMES:+${SUBSET_NOMATCH_NAMES} }${testfunc}"
 		fi
 	}
 
@@ -356,11 +359,11 @@ if [ "$FAILURES" -gt 0 ]; then
 fi
 
 if [ "$SUBSET_REDS" -gt 0 ]; then
-	printf '%d subset test function(s) red:%s\n' "$SUBSET_REDS" "$SUBSET_RED_NAMES"
+	printf '%d subset test function(s) red: %s\n' "$SUBSET_REDS" "$SUBSET_RED_NAMES"
 fi
 
 if [ "$SUBSET_NOMATCHES" -gt 0 ]; then
-	printf '%d subset test function(s) matched no tests (function may not exist at this revision):%s\n' "$SUBSET_NOMATCHES" "$SUBSET_NOMATCH_NAMES"
+	printf '%d subset test function(s) matched no tests (function may not exist at this revision): %s\n' "$SUBSET_NOMATCHES" "$SUBSET_NOMATCH_NAMES"
 fi
 
 if [ "$FAILURES" -gt 0 ]; then
