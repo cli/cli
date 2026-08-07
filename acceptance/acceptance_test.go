@@ -73,7 +73,7 @@ func TestAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "api"))
 }
 
 func TestAuth(t *testing.T) {
@@ -82,7 +82,7 @@ func TestAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "auth"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "auth"))
 }
 
 func TestGists(t *testing.T) {
@@ -91,7 +91,7 @@ func TestGists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "gist"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "gist"))
 }
 
 func TestGPGKeys(t *testing.T) {
@@ -100,7 +100,7 @@ func TestGPGKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "gpg-key"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "gpg-key"))
 }
 
 func TestExtensions(t *testing.T) {
@@ -109,7 +109,7 @@ func TestExtensions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "extension"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "extension"))
 }
 
 func TestIssues(t *testing.T) {
@@ -118,7 +118,7 @@ func TestIssues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "issue"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "issue"))
 }
 
 func TestDiscussions(t *testing.T) {
@@ -127,7 +127,7 @@ func TestDiscussions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "discussion"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "discussion"))
 }
 
 func TestIssues2_0(t *testing.T) {
@@ -136,7 +136,7 @@ func TestIssues2_0(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "issues-2.0"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "issues-2.0"))
 }
 
 func TestLabels(t *testing.T) {
@@ -145,7 +145,7 @@ func TestLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "label"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "label"))
 }
 
 func TestOrg(t *testing.T) {
@@ -154,7 +154,7 @@ func TestOrg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "org"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "org"))
 }
 
 func TestProject(t *testing.T) {
@@ -163,7 +163,7 @@ func TestProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "project"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "project"))
 }
 
 func TestPullRequests(t *testing.T) {
@@ -172,7 +172,7 @@ func TestPullRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "pr"))
 }
 
 func TestReleases(t *testing.T) {
@@ -181,7 +181,7 @@ func TestReleases(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "release"))
 }
 
 func TestRepo(t *testing.T) {
@@ -190,7 +190,7 @@ func TestRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "repo"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "repo"))
 }
 
 func TestRulesets(t *testing.T) {
@@ -199,7 +199,7 @@ func TestRulesets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "ruleset"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "ruleset"))
 }
 
 func TestSearches(t *testing.T) {
@@ -208,7 +208,7 @@ func TestSearches(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "search"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "search"))
 }
 
 func TestSecrets(t *testing.T) {
@@ -217,7 +217,7 @@ func TestSecrets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "secret"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "secret"))
 }
 
 func TestSSHKeys(t *testing.T) {
@@ -226,7 +226,7 @@ func TestSSHKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "ssh-key"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "ssh-key"))
 }
 
 func TestVariables(t *testing.T) {
@@ -235,7 +235,7 @@ func TestVariables(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "variable"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "variable"))
 }
 
 func TestWorkflows(t *testing.T) {
@@ -244,7 +244,7 @@ func TestWorkflows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "workflow"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "workflow"))
 }
 
 func TestTelemetry(t *testing.T) {
@@ -253,18 +253,21 @@ func TestTelemetry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "telemetry"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "telemetry"))
 }
 
-func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
-	var files []string
-	if tsEnv.script != "" {
-		files = []string{path.Join("testdata", command, tsEnv.script)}
-	}
+func testScriptParamsFor(t *testing.T, tsEnv testScriptEnv, command string) testscript.Params {
+	t.Helper()
+	files, filtered := selectScripts(command, tsEnv.scripts)
 
 	var dir string
-	if len(files) == 0 {
+	if !filtered {
+		// No filter was set - run everything in the directory.
 		dir = path.Join("testdata", command)
+	} else if len(files) == 0 {
+		// A filter was set but none of the selected scripts belong to this
+		// command directory, so skip rather than running the whole directory.
+		t.Skipf("testdata/%s: no selected script belongs to this command directory", command)
 	}
 
 	return testscript.Params{
@@ -570,7 +573,9 @@ type testScriptEnv struct {
 	org   string
 	token string
 
-	script string
+	// scripts optionally narrows a run to named scripts within the command
+	// directory being run. Empty means run every script in the directory.
+	scripts []string
 
 	skipDefer       bool
 	preserveWorkDir bool
@@ -608,7 +613,7 @@ func (e *testScriptEnv) fromEnv() error {
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
 
-	e.script = os.Getenv("GH_ACCEPTANCE_SCRIPT")
+	e.scripts = parseScriptFilter(os.Getenv("GH_ACCEPTANCE_SCRIPT"))
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
 	e.skipDefer = os.Getenv("GH_ACCEPTANCE_SKIP_DEFER") == "true"
 
@@ -620,5 +625,5 @@ func TestSkills(t *testing.T) {
 	if err := tsEnv.fromEnv(); err != nil {
 		t.Fatal(err)
 	}
-	testscript.Run(t, testScriptParamsFor(tsEnv, "skills"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "skills"))
 }
