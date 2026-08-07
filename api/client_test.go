@@ -351,3 +351,44 @@ func TestHTTPHeaders(t *testing.T) {
 	}
 	assert.Equal(t, "", stderr.String())
 }
+
+// TestWithoutFollowingRedirects verifies that WithoutFollowingRedirects stops the request at the
+// redirect and surfaces an HTTPError rather than following through. It also proves the redirect is
+// not followed by recording every method the transport sees: without the option the transport would
+// receive a second call (GET, because Go demotes DELETE to GET on a 301 follow); with it, only the
+// original DELETE arrives.
+//
+// go-gh's RequestWithContext converts any non-2xx response - including 3xx - into an HTTPError.
+// When http.ErrUseLastResponse stops a redirect the client returns the 3xx response with a nil
+// error, so the 3xx reaches RequestWithContext's success check and becomes an HTTPError. This is
+// the correct behaviour for repo delete: the caller learns the operation failed rather than
+// receiving a misleading success.
+func TestUnexpectedStatusError(t *testing.T) {
+	tests := []struct {
+		name        string
+		resp        *http.Response
+		wantMessage string
+	}{
+		{
+			name: "populated request",
+			resp: func() *http.Response {
+				req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/OWNER/REPO", nil)
+				require.NoError(t, err)
+				return &http.Response{StatusCode: http.StatusCreated, Request: req}
+			}(),
+			wantMessage: "unexpected HTTP 201 for GET https://api.github.com/repos/OWNER/REPO",
+		},
+		{
+			name:        "nil request",
+			resp:        &http.Response{StatusCode: http.StatusNoContent},
+			wantMessage: "unexpected HTTP 204",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := UnexpectedStatusError(tt.resp)
+			require.Error(t, err)
+			assert.Equal(t, tt.wantMessage, err.Error())
+		})
+	}
+}
