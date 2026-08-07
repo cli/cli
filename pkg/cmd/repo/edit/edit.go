@@ -583,7 +583,7 @@ func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(res)
+		return nil, api.UnexpectedStatusError(res)
 	}
 
 	var responseData struct {
@@ -624,7 +624,7 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return api.HandleHTTPError(res)
+		return api.UnexpectedStatusError(res)
 	}
 
 	if res.Body != nil {

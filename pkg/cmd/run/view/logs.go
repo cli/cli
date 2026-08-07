@@ -59,7 +59,7 @@ func (f *apiLogFetcher) GetLog() (io.ReadCloser, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-		return nil, api.HandleHTTPError(resp)
+		return nil, api.UnexpectedStatusError(resp)
 	}
 
 	return resp.Body, nil

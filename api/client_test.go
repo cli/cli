@@ -435,3 +435,33 @@ func (t redirectFollowingTransport) RoundTrip(req *http.Request) (*http.Response
 		Request:    req,
 	}, nil
 }
+
+func TestUnexpectedStatusError(t *testing.T) {
+	tests := []struct {
+		name        string
+		resp        *http.Response
+		wantMessage string
+	}{
+		{
+			name: "populated request",
+			resp: func() *http.Response {
+				req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/OWNER/REPO", nil)
+				require.NoError(t, err)
+				return &http.Response{StatusCode: http.StatusCreated, Request: req}
+			}(),
+			wantMessage: "unexpected HTTP 201 for GET https://api.github.com/repos/OWNER/REPO",
+		},
+		{
+			name:        "nil request",
+			resp:        &http.Response{StatusCode: http.StatusNoContent},
+			wantMessage: "unexpected HTTP 204",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := UnexpectedStatusError(tt.resp)
+			require.Error(t, err)
+			assert.Equal(t, tt.wantMessage, err.Error())
+		})
+	}
+}

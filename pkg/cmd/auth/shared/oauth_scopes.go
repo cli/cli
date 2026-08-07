@@ -49,7 +49,7 @@ func GetScopes(httpClient *http.Client, hostname, authToken string) (string, err
 	}()
 
 	if res.StatusCode != 200 {
-		return "", api.HandleHTTPError(res)
+		return "", api.UnexpectedStatusError(res)
 	}
 
 	return res.Header.Get("X-Oauth-Scopes"), nil

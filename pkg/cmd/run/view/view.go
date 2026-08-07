@@ -485,7 +485,7 @@ func getLog(httpClient *http.Client, hostname string, logPath safeurl.SafeURL) (
 
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-		return nil, api.HandleHTTPError(resp)
+		return nil, api.UnexpectedStatusError(resp)
 	}
 
 	return resp.Body, nil

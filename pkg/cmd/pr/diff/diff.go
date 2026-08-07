@@ -229,7 +229,7 @@ func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int,
 	}
 	if resp.StatusCode != 200 {
 		defer resp.Body.Close()
-		return nil, api.HandleHTTPError(resp)
+		return nil, api.UnexpectedStatusError(resp)
 	}
 
 	return resp.Body, nil

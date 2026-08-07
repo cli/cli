@@ -132,7 +132,7 @@ func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagN
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return false, api.HandleHTTPError(resp)
+		return false, api.UnexpectedStatusError(resp)
 	}
 
 	return true, nil

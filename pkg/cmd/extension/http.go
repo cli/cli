@@ -36,7 +36,7 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	// Only 200 means the repository exists. Any other success status is unexpected here and is
 	// reported as an error rather than being taken as existence.
 	if resp.StatusCode != http.StatusOK {
-		return false, api.HandleHTTPError(resp)
+		return false, api.UnexpectedStatusError(resp)
 	}
 
 	return true, nil

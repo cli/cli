@@ -810,7 +810,7 @@ func TestRepoExists(t *testing.T) {
 			},
 			repo:       ghrepo.New("OWNER", "REPO"),
 			existCheck: false,
-			wantErrMsg: "HTTP 201 (https://api.github.com/repos/OWNER/REPO)",
+			wantErrMsg: "unexpected HTTP 201 for HEAD https://api.github.com/repos/OWNER/REPO",
 		},
 	}
 	for _, tt := range tests {

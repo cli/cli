@@ -269,7 +269,7 @@ func GetRawGistFile(httpClient *http.Client, hostname string, rawURL safeurl.Saf
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return iostreams.Untrusted{}, api.HandleHTTPError(resp)
+		return iostreams.Untrusted{}, api.UnexpectedStatusError(resp)
 	}
 
 	body, err := io.ReadAll(resp.Body)

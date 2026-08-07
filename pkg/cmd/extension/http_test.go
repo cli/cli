@@ -81,7 +81,8 @@ func TestRepoExists(t *testing.T) {
 			exists, err := repoExists(client, repo)
 
 			assert.False(t, exists)
-			requireExtensionHTTPError(t, err, status)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), fmt.Sprintf("unexpected HTTP %d", status))
 		})
 	}
 }
