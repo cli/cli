@@ -16,9 +16,9 @@ $ script/api-host-gateway/run.sh
 ```
 
 Requires Docker and a token: `$GH_TOKEN` if set, otherwise
-`gh auth token --hostname github.com`. The token's account must match the login
-the test expects, which defaults to `williammartin` and can be overridden with
-`GH_APIHOST_EXPECTED_LOGIN`.
+`gh auth token --hostname github.com`. The login the test asserts against is
+derived from that token, and can be set explicitly with
+`GH_APIHOST_EXPECTED_LOGIN` to skip the lookup.
 
 ### Running with the acceptance subset (phase 4)
 
@@ -93,34 +93,40 @@ the gateway. A red result is printed but does not abort the script, because the
 phase exists to produce a tally that goes from red to green over time, not to
 gate the build.
 
-#### Predicted results for phase 4 (as of 2026-08-06)
+#### Expected results for phase 4 and 5
+
+Every script is expected to be **green**. All the routing gaps the harness was
+built to expose have been closed, so a red result now means a regression, not a
+known gap.
 
 | Test function  | Scripts                                                                | Expected  |
 |----------------|------------------------------------------------------------------------|-----------|
-| TestAPI        | basic-rest.txtar, basic-graphql.txtar                                  | **GREEN** |
-| TestReleases   | release-upload-download.txtar                                          | red       |
-| TestRepo       | repo-delete.txtar + three others                                       | red       |
-| TestWorkflows  | run-download.txtar                                                     | red       |
-| TestExtensions | extension.txtar                                                        | red       |
-| TestGists      | gist-create-view-delete.txtar                                          | red       |
-| TestSearches   | search-issues.txtar                                                    | red       |
-| TestAuth       | auth-status.txtar                                                      | red       |
+| TestAPI        | basic-rest.txtar, basic-graphql.txtar                                  | green |
+| TestReleases   | release-upload-download.txtar                                          | green |
+| TestRepo       | repo-delete.txtar + three others                                       | green |
+| TestWorkflows  | run-download.txtar                                                     | green |
+| TestExtensions | extension.txtar                                                        | green |
+| TestSearches   | search-issues.txtar                                                    | green |
+| TestGists (phase 5) | gist-create-view-delete.txtar                                     | green |
+| TestAuth       | auth-status.txtar                                                      | green |
 
-**Why TestAPI is green.** Task 4b made `gh api` honour `api_host` for relative
-paths, so `basic-rest.txtar` and `basic-graphql.txtar` now route through the
-gateway correctly.
+Two failure signatures mean opposite things, and telling them apart is the first
+step in any debugging session:
 
-**Why the rest are red.** The common root cause is `gh repo delete`, which still
-builds an absolute URL via `DoRequest` for its redirect policy. `DoRequest`
-deliberately does not rewrite to `api_host`. Most acceptance scripts end in a
-`defer gh repo delete` cleanup, so they fail in cleanup even when the command
-under test routes correctly. Fixing this requires a `CheckRedirect` field on
-go-gh's `ClientOptions` (the sibling change to cli/go-gh#275), not a cli/cli
-change.
+- `dial tcp 127.0.0.1:443: connection refused` for `api.github.com` means the code
+  under test ignored `api_host` and went to the canonical host. This is a real
+  product failure.
+- `x509: certificate signed by unknown authority` for `gh-gateway.internal` means
+  the request *reached* the gateway but the caller did not trust the harness CA.
+  This is a harness defect, usually `SSL_CERT_FILE` not being propagated into a
+  subprocess.
 
-A red result in phase 4 is therefore expected and is **not** a signal of a
-broken harness unless it appears in TestAPI, which was fixed. A new green result
-in any other test is a sign that the underlying routing gap has been closed.
+Note that `gh auth status` reports any transport failure as "The token in
+hosts.yml is invalid". Do not read that message literally while debugging.
+
+Two flakes are pre-existing and unrelated to `api_host`:
+`repo-archive-unarchive` (server-side), and `search-issues`, which depends on the
+search index catching up after the issue is created.
 
 ## The gateway
 
@@ -153,20 +159,40 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 ## Running against an older revision
 
 `at-rev.sh` applies the harness onto an arbitrary revision in a detached
-worktree and runs the acceptance subset there:
+worktree and runs the acceptance subset there. It needs `HARNESS_COMMIT`: a
+single squashed commit carrying the harness, which you build yourself.
+
+**Build the harness commit fresh from current `HEAD` every time.** Do not reuse
+one from a previous baseline run. A squashed commit is frozen at the moment it
+was made and silently omits every harness fix landed since, which produces a
+result that looks like a product failure but is not. The first baseline attempt
+here used a commit predating a fix that propagated `SSL_CERT_FILE` into the
+acceptance subprocess, and every script failed with `x509` errors that had
+nothing to do with `api_host`.
+
+The procedure, which is self-correcting because it starts from the current
+harness:
 
 ```console
-$ HARNESS_COMMIT=0e661576450b4918dabbe7b54952ea3f19c37187 \
+$ git checkout -b harness-vX.Y.Z HEAD
+$ git revert --no-commit <the product fixes under test>
+$ git commit -m "api_host gateway harness, squashed for cherry-picking"
+$ git reset --soft <base> && git commit   # squash to one commit
+```
+
+Revert only the product fixes whose effect you are trying to measure, never the
+harness itself. For a baseline that measures the routing gaps this branch
+closed, that means reverting the `api.Client` migration commits and the `gh api`
+relative-path fix, and leaving everything under `script/api-host-gateway/` and
+`acceptance/` intact.
+
+```console
+$ HARNESS_COMMIT=<sha> \
     GH_APIHOST_ORG=my-org \
     script/api-host-gateway/at-rev.sh v2.97.0
 ```
 
-`HARNESS_COMMIT` is the squashed harness commit (`0e661576450b4918dabbe7b54952ea3f19c37187`)
-on branch `api-host-gateway-harness`. It contains everything on this branch
-except Task 4b (`ef1f342f5` and `c51147d6c`). Task 4b is deliberately absent:
-it makes `gh api` honour `api_host` for relative paths, so carrying it onto
-`v2.97.0` would make TestAPI green in the baseline and hide one of the reds the
-baseline exists to measure. Do not "fix" this omission.
+Note that `at-rev.sh` runs the *old* revision's `run.sh`, not the current one.
 
 `at-rev.sh` prompts for the org token the same way `run.sh` does. Set
 `GH_APIHOST_ORG_TOKEN` in the environment to skip the prompt, which is worth
@@ -175,6 +201,5 @@ to ask for a credential.
 
 ## Expected result today
 
-Phases 1, 2 and 3 pass. Phase 4, when enabled, is a tally run: TestAPI is
-expected to pass; the rest are expected to fail for reasons documented in the
-phase 4 table above.
+All five phases pass, with every script in phases 4 and 5 green. See the table
+above for how to interpret a failure.

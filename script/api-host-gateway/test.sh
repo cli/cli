@@ -17,7 +17,7 @@ GATEWAY_IP=127.0.0.2
 UPSTREAM_HOST=api.github.com
 REPO=${GH_APIHOST_REPO:-/src}
 WORK=${GH_APIHOST_WORK:-/tmp/api-host-gateway}
-EXPECTED_LOGIN=${GH_APIHOST_EXPECTED_LOGIN:-williammartin}
+EXPECTED_LOGIN=${GH_APIHOST_EXPECTED_LOGIN:-}
 TOKEN=${GH_APIHOST_TOKEN:-}
 ORG_TOKEN=${GH_APIHOST_ORG_TOKEN:-}
 
@@ -100,6 +100,22 @@ printf 'gateway pid %s, upstream %s at %s\n' "$GATEWAY_PID" "$UPSTREAM_HOST" "$U
 cat /etc/ssl/certs/ca-certificates.crt "$WORK/ca.pem" >"$BUNDLE" || die "building the trust bundle"
 
 grep -q "$GATEWAY_HOST" /etc/hosts || printf '%s %s\n' "$GATEWAY_IP" "$GATEWAY_HOST" >>/etc/hosts
+
+# The authenticated login is both asserted against and written into hosts.yml,
+# so derive it from the token rather than hardcoding a default that would only
+# be correct for one developer. This runs before the blackhole goes up, so
+# api.github.com is still reachable, and it deliberately does not use gh: the
+# whole point of the test is that gh's routing is what is under examination.
+if [ -z "$EXPECTED_LOGIN" ]; then
+	[ -n "$TOKEN" ] || die "GH_APIHOST_TOKEN is required to determine the authenticated login"
+	EXPECTED_LOGIN=$(curl -fsS \
+		-H "Authorization: token $TOKEN" \
+		-H "Accept: application/vnd.github+json" \
+		https://api.github.com/user |
+		sed -n 's/.*"login"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+	[ -n "$EXPECTED_LOGIN" ] ||
+		die "could not determine the authenticated login; set GH_APIHOST_EXPECTED_LOGIN"
+fi
 
 # --- helpers -----------------------------------------------------------------
 

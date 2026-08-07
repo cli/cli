@@ -107,8 +107,10 @@ current `HEAD`, reverting only the fixes under test.
 
 ## Baseline: v2.97.0
 
-Harness commit `8e579ee60` (local branch `api-host-gateway-harness-v2.97.0`),
-built from current `HEAD` with only the three product fixes under test reverted.
+Baseline harness built from then-current `HEAD` with only the product fixes under
+test reverted, then squashed and cherry-picked onto the tag. The commit itself is
+not published; see `script/api-host-gateway/README.md` for how to rebuild one,
+and why reusing an old harness commit produces a bogus result.
 
 **Phases 1-3:** 8 assertions failed. **Phases 4-5:** 7 of 7 org test functions red;
 `TestGists` correctly reported as *absent* (the script does not exist at that tag).
