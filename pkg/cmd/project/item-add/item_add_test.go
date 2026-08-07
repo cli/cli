@@ -115,6 +115,7 @@ func TestRunAddItem_User(t *testing.T) {
 				"login": "monalisa",
 			},
 		}).
+		Times(2).
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
@@ -145,6 +146,7 @@ func TestRunAddItem_User(t *testing.T) {
 				"afterFields": nil,
 			},
 		}).
+		Times(2).
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
@@ -166,6 +168,7 @@ func TestRunAddItem_User(t *testing.T) {
 				"url": "https://github.com/cli/go-gh/issues/1",
 			},
 		}).
+		Times(2).
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
@@ -180,37 +183,55 @@ func TestRunAddItem_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		BodyString(`{"query":"mutation AddItem.*","variables":{"input":{"projectId":"an ID","contentId":"item ID"}}}`).
+		Times(2).
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
 				"addProjectV2ItemById": map[string]interface{}{
 					"item": map[string]interface{}{
-						"id": "item ID",
+						"id": "project item ID",
 					},
 				},
 			},
 		})
 
-	client := queries.NewTestClient()
-
-	ios, _, stdout, _ := iostreams.Test()
-	ios.SetStdoutTTY(true)
-	config := addItemConfig{
-		opts: addItemOpts{
-			owner:   "monalisa",
-			number:  1,
-			itemURL: "https://github.com/cli/go-gh/issues/1",
+	tests := []struct {
+		name      string
+		stdoutTTY bool
+		want      string
+	}{
+		{
+			name:      "tty",
+			stdoutTTY: true,
+			want:      "Added item\n",
 		},
-		client: client,
-		io:     ios,
+		{
+			name: "non-tty",
+			want: "project item ID\n",
+		},
 	}
 
-	err := runAddItem(config)
-	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"Added item\n",
-		stdout.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := queries.NewTestClient()
+
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.stdoutTTY)
+			config := addItemConfig{
+				opts: addItemOpts{
+					owner:   "monalisa",
+					number:  1,
+					itemURL: "https://github.com/cli/go-gh/issues/1",
+				},
+				client: client,
+				io:     ios,
+			}
+
+			err := runAddItem(config)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, stdout.String())
+		})
+	}
 }
 
 func TestRunAddItem_Org(t *testing.T) {
@@ -539,35 +560,4 @@ func TestRunAddItem_JSON(t *testing.T) {
 		t,
 		`{"id":"item ID","title":"a title","body":"","type":"Issue"}`,
 		stdout.String())
-}
-
-func TestPrintResults(t *testing.T) {
-	tests := []struct {
-		name      string
-		stdoutTTY bool
-		want      string
-	}{
-		{
-			name:      "tty",
-			stdoutTTY: true,
-			want:      "Added item\n",
-		},
-		{
-			name: "non-tty",
-			want: "item ID\n",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
-			ios.SetStdoutTTY(tt.stdoutTTY)
-			config := addItemConfig{io: ios}
-
-			err := printResults(config, queries.ProjectItem{Id: "item ID"})
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, stdout.String())
-		})
-	}
 }
