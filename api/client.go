@@ -57,7 +57,23 @@ type RequestOption func(*requestConfig)
 
 // requestConfig accumulates the effect of the RequestOptions applied to one request.
 type requestConfig struct {
-	endpointScopes string
+	endpointScopes    string
+	noFollowRedirects bool
+}
+
+// WithoutFollowingRedirects stops the request from following redirects. When a redirect is
+// encountered, the request fails with an HTTPError carrying the redirect status code and headers
+// rather than following the redirect. This matters for requests where following a redirect
+// silently changes the meaning of the request: Go's default policy converts a DELETE into a GET
+// when it follows a 301, so a caller deleting a renamed resource would receive a success response
+// while having deleted nothing.
+//
+// This option applies only to the REST request surface (Request and RequestWithContext). It has no
+// effect on GraphQL methods, which do not encounter redirects in practice.
+func WithoutFollowingRedirects() RequestOption {
+	return func(cfg *requestConfig) {
+		cfg.noFollowRedirects = true
+	}
 }
 
 // WithEndpointScopes adds OAuth scopes to a 4xx error as if the server endpoint had returned them.
@@ -192,8 +208,14 @@ func (c Client) Request(hostname string, method string, p string, body io.Reader
 // the response is returned unread and the caller is responsible for closing its body.
 func (c Client) RequestWithContext(ctx context.Context, hostname string, method string, p string, body io.Reader, opts ...RequestOption) (*http.Response, error) {
 	cfg := newRequestConfig(opts)
+	clientOpts := clientOptions(hostname, c.http.Transport)
+	if cfg.noFollowRedirects {
+		clientOpts.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+	}
 
-	restClient, err := ghAPI.NewRESTClient(clientOptions(hostname, c.http.Transport))
+	restClient, err := ghAPI.NewRESTClient(clientOpts)
 	if err != nil {
 		return nil, err
 	}
