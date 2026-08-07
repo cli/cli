@@ -1,8 +1,8 @@
 # Tech debt burndown: agent memory
 
-Standing corrections for the `tech-debt-burndown` skill. This file is loaded at
-the start of every run and is binding. Keep it short: every line here costs
-context on every future run.
+Standing corrections for the [`tech-debt-burndown` skill](../../.github/skills/tech-debt-burndown/SKILL.md).
+This file is loaded at the start of every run and is binding. Keep it short:
+every line here costs context on every future run.
 
 Add an entry when a run produces knowledge a future run would otherwise have to
 rediscover. Consolidate entries that say the same thing.
@@ -43,3 +43,23 @@ None yet.
 ## Failed approaches
 
 None yet.
+
+## Baseline noise on this machine
+
+Two failures are pre-existing and unrelated to any fix; confirmed against a
+clean tree. Do not try to fix them and do not treat them as validation failures:
+
+- `make lint` reports 3 `govet` issues in vendored/toolchain source.
+- `git/...` tests fail with `safe.bareRepository is 'explicit'`, a local git
+  config setting, not a code defect.
+
+## Staticcheck shape
+
+Repo-wide staticcheck has **no `SA` (correctness) findings**. It is all style:
+QF1008 (70), QF1012 (50), ST1005 (29), QF1003 (24), ST1012 (16), rest single
+digits. So staticcheck targets are mechanical and safe, but pick a package that
+goes fully to zero rather than fixing scattered instances.
+
+Packages with the most staticcheck issues: `pkg/cmd/pr/edit` (23),
+`pkg/cmd/issue/edit` (19), `pkg/cmd/auth/status` (16), `pkg/cmd/extension` (11).
+`pkg/cmd/alias/imports` is now clean (2026-08-06).

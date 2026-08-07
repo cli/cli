@@ -38,7 +38,7 @@ it back. See [When to stop](#when-to-stop).
 
 Read these, in this order:
 
-1. `.github/agent-memory/tech-debt.md` in this repo. It carries standing
+1. `.experiments/tech-debt-burndown/memory.md` in this repo. It carries standing
    corrections from previous runs: areas that are off limits, approaches that
    were rejected, targets already considered and declined. Treat it as binding.
    If it contradicts this skill, it wins, because a human wrote it in response
@@ -275,14 +275,14 @@ Keep it short enough to read on a phone. State:
 - **Validation**: that `go test ./...` and `make lint` both passed.
 - **Left alone**: anything you noticed and deliberately did not touch. Be
   specific, because this is the seed of the next run.
-- **Memory updates**: anything you added to `.github/agent-memory/tech-debt.md`.
+- **Memory updates**: anything you added to `.experiments/tech-debt-burndown/memory.md`.
 
 If you accepted or escalated instead of fixing, say so plainly at the top. Do not
 bury it.
 
 ## Update the memory file
 
-Append to `.github/agent-memory/tech-debt.md` when a run produces knowledge a
+Append to `.experiments/tech-debt-burndown/memory.md` when a run produces knowledge a
 future run would otherwise have to rediscover:
 
 - a target you considered and rejected, and why, so it is not re-proposed
