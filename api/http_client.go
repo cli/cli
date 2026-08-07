@@ -13,16 +13,31 @@ import (
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
+// tokenGetter resolves the active token for a host.
 type tokenGetter interface {
 	ActiveToken(string) (string, string)
+}
+
+// apiHostResolver maps an api_host back to the configured host that points at
+// it. go-gh sends a host's API traffic to that host's api_host, which is a
+// hostname gh is not otherwise logged in to, so anything deriving meaning from
+// a request's host needs this to get back to the host the request is for.
+type apiHostResolver interface {
 	HostForAPIHost(string) (string, bool)
+}
+
+// authConfig is the configuration needed to resolve credentials from a request
+// URL, which takes both a token lookup and the api_host mapping.
+type authConfig interface {
+	tokenGetter
+	apiHostResolver
 }
 
 type HTTPClientOptions struct {
 	AppVersion         string
 	InvokingAgent      string
 	CacheTTL           time.Duration
-	Config             tokenGetter
+	Config             authConfig
 	EnableCache        bool
 	Log                io.Writer
 	LogColorize        bool
@@ -78,10 +93,17 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	}
 
 	if opts.TelemetryDisabler != nil {
-		client.Transport = telemetryDisablerTransport{
+		transport := telemetryDisablerTransport{
 			wrappedTransport:  client.Transport,
 			telemetryDisabler: opts.TelemetryDisabler,
 		}
+		// Guarded separately from the auth transport above: a caller can supply
+		// a telemetry disabler without config, and assigning a nil Config here
+		// would leave a non-nil interface holding a nil value.
+		if opts.Config != nil {
+			transport.apiHosts = opts.Config
+		}
+		client.Transport = transport
 	}
 
 	return client, nil
@@ -150,7 +172,7 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 }
 
 // AddAuthTokenHeader adds an authentication token header for the host specified by the request.
-func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper {
+func AddAuthTokenHeader(rt http.RoundTripper, cfg authConfig) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
 		if req.Header.Get(authorization) == "" {
@@ -216,10 +238,23 @@ func getHost(r *http.Request) string {
 type telemetryDisablerTransport struct {
 	wrappedTransport  http.RoundTripper
 	telemetryDisabler ghtelemetry.Disabler
+	apiHosts          apiHostResolver
 }
 
 func (t telemetryDisablerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if ghauth.IsEnterprise(getHost(req)) {
+	host := ghauth.NormalizeHostname(getHost(req))
+	// A github.com user whose host has an api_host sends every API request to
+	// that api_host, which is not itself a GitHub hostname. Classifying it
+	// directly reads as enterprise and disables telemetry for the whole
+	// invocation, so resolve back to the host the request is really for first.
+	// apiHosts is nil when the client was built without config, which is
+	// independent of whether a telemetry disabler was supplied.
+	if t.apiHosts != nil {
+		if canonicalHost, ok := t.apiHosts.HostForAPIHost(host); ok {
+			host = canonicalHost
+		}
+	}
+	if ghauth.IsEnterprise(host) {
 		t.telemetryDisabler.Disable()
 	}
 	return t.wrappedTransport.RoundTrip(req)

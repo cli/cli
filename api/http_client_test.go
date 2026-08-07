@@ -18,7 +18,7 @@ import (
 
 func TestNewHTTPClient(t *testing.T) {
 	type args struct {
-		config             tokenGetter
+		config             authConfig
 		appVersion         string
 		invokingAgent      string
 		logVerboseHTTP     bool
@@ -379,6 +379,7 @@ func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
 	tests := []struct {
 		name         string
 		host         string
+		config       authConfig
 		wantDisabled bool
 	}{
 		{
@@ -396,6 +397,27 @@ func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
 			host:         "my-company.ghe.com",
 			wantDisabled: false,
 		},
+		{
+			// Without resolving the api_host back to the host that configured
+			// it, every github.com user behind a gateway looks like an
+			// enterprise user and silently reports no telemetry at all.
+			name:         "api_host standing in for github.com does not trigger disable",
+			host:         "gh-gateway.internal",
+			config:       tinyConfig{"api_host:gh-gateway.internal": "github.com"},
+			wantDisabled: false,
+		},
+		{
+			name:         "api_host standing in for an enterprise host triggers disable",
+			host:         "gh-gateway.internal",
+			config:       tinyConfig{"api_host:gh-gateway.internal": "ghes.example.com"},
+			wantDisabled: true,
+		},
+		{
+			name:         "unrelated host with config configured still triggers disable",
+			host:         "ghes.example.com",
+			config:       tinyConfig{"api_host:gh-gateway.internal": "github.com"},
+			wantDisabled: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -403,6 +425,7 @@ func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
 			disabler := &fakeTelemetryDisabler{}
 			client, err := NewHTTPClient(HTTPClientOptions{
 				TelemetryDisabler: disabler,
+				Config:            tt.config,
 			})
 			require.NoError(t, err)
 
