@@ -77,34 +77,36 @@ Read these, in this order:
 
 ### Check the preconditions
 
-Three checks, all of which must pass. If any fails, stop and say why. Do not try
-to make a failing check pass.
+Two checks, both of which must pass. If either fails, stop and say why. Do not
+try to make a failing check pass.
 
 ```bash
 git status --porcelain          # must be empty
-git branch --show-current       # must be trunk
 gh pr list --state open --json headRefName \
   --jq '[.[] | select(.headRefName | startswith("tech-debt/"))] | length'
 ```
 
-**A dirty tree** means your diff would carry someone else's work, and the change
-stops being reviewable in two minutes. Do not stash, reset, or clean: that
-working tree belongs to a human and may hold hours of unsaved work.
-
-**Being on another branch** means the code you are about to reason about is not
-the code that will be reviewed. Do not switch to `trunk` to satisfy the check,
-because that abandons whatever the human was doing without asking.
+**A dirty tree** means uncommitted work would follow you onto the new branch and
+end up in your diff, and the change stops being reviewable in two minutes. Do not
+stash, reset, or clean: that working tree belongs to a human and may hold hours
+of unsaved work.
 
 **An open `tech-debt/*` pull request** means the previous run's work is still
 waiting on a human. Stop: do not open a second one. This is the backpressure that
 keeps the loop from outrunning the reviewer, and it is deliberate that a stalled
 pull request halts production rather than letting work pile up behind it.
 
-Once all three pass, branch from an up to date `trunk`:
+Which branch is currently checked out does not matter, because you branch from
+`origin/trunk` explicitly rather than from wherever `HEAD` happens to be:
 
 ```bash
 git fetch origin && git switch -c tech-debt/<short-slug> origin/trunk
 ```
+
+Note the side effect: this leaves the checkout on the new branch. On a scheduled
+runner that is irrelevant. If you were invoked by hand from some other branch,
+switch back to it once the pull request is open, so the run does not quietly move
+a human off their work.
 
 Work on the branch from the first edit. Do not commit to `trunk`.
 
@@ -428,8 +430,8 @@ Abandon the current attempt and move to the next when:
   test that already pins the behavior exactly
 - the diff has grown past what reviews in two minutes
 
-Stop the whole run, changing nothing, when a precondition fails: dirty tree, not
-on `trunk`, or a `tech-debt/*` pull request already open.
+Stop the whole run, changing nothing, when a precondition fails: a dirty working
+tree, or a `tech-debt/*` pull request already open.
 
 Stopping is cheap. A bad pull request in a queue a human trusts is expensive,
 because the cost is not the pull request, it is the human deciding they can no
