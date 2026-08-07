@@ -15,6 +15,7 @@ import (
 
 type tokenGetter interface {
 	ActiveToken(string) (string, string)
+	HostForAPIHost(string) (string, bool)
 }
 
 type HTTPClientOptions struct {
@@ -161,7 +162,18 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 			// If the host has changed during a redirect do not add the authentication token header.
 			if !redirectHostnameChange {
 				hostname := ghauth.NormalizeHostname(getHost(req))
-				if token, _ := cfg.ActiveToken(hostname); token != "" {
+				token, _ := cfg.ActiveToken(hostname)
+				if token == "" {
+					// The request may be aimed at a host's api_host, which gh is
+					// not logged in to and so has no token of its own. Fall back
+					// to the token of the host it stands in for. This only ever
+					// adds a token where there would have been none, so hosts we
+					// already authenticate keep resolving exactly as before.
+					if canonicalHost, ok := cfg.HostForAPIHost(hostname); ok {
+						token, _ = cfg.ActiveToken(canonicalHost)
+					}
+				}
+				if token != "" {
 					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 				}
 			}

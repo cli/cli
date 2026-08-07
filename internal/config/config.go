@@ -23,7 +23,8 @@ const (
 	aliasesKey            = "aliases"
 	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
 	colorLabelsKey        = "color_labels"
-	editorKey             = "editor" // used by cli/go-gh to open interactive text editor
+	apiHostKey            = "api_host" // used by cli/go-gh to redirect API requests for a host
+	editorKey             = "editor"   // used by cli/go-gh to open interactive text editor
 	gitProtocolKey        = "git_protocol"
 	hostsKey              = "hosts" // used by cli/go-gh to locate authenticated host tokens
 	httpUnixSocketKey     = "http_unix_socket"
@@ -338,6 +339,34 @@ func (c *AuthConfig) Hosts() []string {
 		return c.hostsOverride()
 	}
 	return ghauth.KnownHosts()
+}
+
+// HostForAPIHost returns the configured host whose api_host points at apiHost,
+// reporting false when no host claims it.
+//
+// go-gh sends API requests for a host to that host's api_host, which is a
+// hostname gh is not otherwise logged in to. Callers that resolve credentials
+// from a request URL need this to get back to the host the request is really
+// for. It answers only the mapping question; deciding whether a given lookup
+// should honour api_host at all is the caller's business, since api_host covers
+// API traffic and not, say, git operations.
+//
+// A misconfiguration where several hosts share one api_host resolves to the
+// first match in Hosts order.
+func (c *AuthConfig) HostForAPIHost(apiHost string) (string, bool) {
+	if apiHost == "" {
+		return "", false
+	}
+	for _, host := range c.Hosts() {
+		configured, err := c.cfg.Get([]string{hostsKey, host, apiHostKey})
+		if err != nil || configured == "" {
+			continue
+		}
+		if strings.EqualFold(configured, apiHost) {
+			return host, true
+		}
+	}
+	return "", false
 }
 
 // SetHosts will override any hosts resolution and return the given

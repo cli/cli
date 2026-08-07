@@ -167,6 +167,10 @@ type AuthConfig interface {
 	// Hosts retrieves a list of known hosts.
 	Hosts() []string
 
+	// HostForAPIHost returns the known host whose api_host is the given hostname,
+	// reporting false when no host claims it. See config.AuthConfig.HostForAPIHost.
+	HostForAPIHost(apiHost string) (host string, found bool)
+
 	// DefaultHost retrieves the default host.
 	DefaultHost() (host string, source string)
 

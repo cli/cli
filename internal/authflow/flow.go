@@ -123,6 +123,12 @@ func (c cfg) ActiveToken(hostname string) (string, string) {
 	return c.token, "oauth_token"
 }
 
+// HostForAPIHost never resolves, because the token here is supplied directly by
+// the login flow and is used for whatever host the request is aimed at.
+func (c cfg) HostForAPIHost(string) (string, bool) {
+	return "", false
+}
+
 func getViewer(httpClient *http.Client, hostname, token string) (string, error) {
 	authedClient := *httpClient
 	authedClient.Transport = api.AddAuthTokenHeader(httpClient.Transport, cfg{token: token})

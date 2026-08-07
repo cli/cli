@@ -949,6 +949,7 @@ func preMigrationLogin(c *AuthConfig, hostname, username, token, gitProtocol str
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
 
+<<<<<<< HEAD
 func TestActiveTokenType(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -976,3 +977,86 @@ func TestActiveTokenType(t *testing.T) {
 		})
 	}
 }
+=======
+func TestHostForAPIHost(t *testing.T) {
+	tests := []struct {
+		name      string
+		apiHosts  map[string]string
+		lookup    string
+		wantHost  string
+		wantFound bool
+	}{
+		{
+			name:      "no hosts configure an api_host",
+			lookup:    "api.example.com",
+			wantFound: false,
+		},
+		{
+			name:      "a host configures the api_host",
+			apiHosts:  map[string]string{"github.com": "api.example.com"},
+			lookup:    "api.example.com",
+			wantHost:  "github.com",
+			wantFound: true,
+		},
+		{
+			name:      "matching is case insensitive",
+			apiHosts:  map[string]string{"github.com": "API.example.com"},
+			lookup:    "api.example.com",
+			wantHost:  "github.com",
+			wantFound: true,
+		},
+		{
+			name:      "an unrelated api_host does not match",
+			apiHosts:  map[string]string{"github.com": "api.example.com"},
+			lookup:    "api.other.com",
+			wantFound: false,
+		},
+		{
+			name:      "an empty lookup matches nothing",
+			apiHosts:  map[string]string{"github.com": "api.example.com"},
+			lookup:    "",
+			wantFound: false,
+		},
+		{
+			name:      "the right host is chosen when several configure an api_host",
+			apiHosts:  map[string]string{"github.com": "api.example.com", "ghe.io": "api.ghe.io"},
+			lookup:    "api.ghe.io",
+			wantHost:  "ghe.io",
+			wantFound: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authCfg := newTestAuthConfig(t)
+			hosts := make([]string, 0, len(tt.apiHosts))
+			for host, apiHost := range tt.apiHosts {
+				_, err := authCfg.Login(host, "test-user", "test-token", "https", false)
+				require.NoError(t, err)
+				authCfg.cfg.Set([]string{hostsKey, host, apiHostKey}, apiHost)
+				hosts = append(hosts, host)
+			}
+			authCfg.SetHosts(hosts)
+
+			host, found := authCfg.HostForAPIHost(tt.lookup)
+
+			require.Equal(t, tt.wantFound, found)
+			require.Equal(t, tt.wantHost, host)
+		})
+	}
+}
+
+func TestHostForAPIHostIgnoresHostsWithoutAnAPIHost(t *testing.T) {
+	// Given a host that is logged in but sets no api_host
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "https", false)
+	require.NoError(t, err)
+	authCfg.SetHosts([]string{"github.com"})
+
+	// When we look up the empty api_host it configures
+	_, found := authCfg.HostForAPIHost("")
+
+	// Then it does not match, rather than matching every host
+	require.False(t, found)
+}
+>>>>>>> ec71021f0 (Send a host's token to its configured api_host)

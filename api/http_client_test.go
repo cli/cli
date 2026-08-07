@@ -63,6 +63,61 @@ func TestNewHTTPClient(t *testing.T) {
 			wantStderr: "",
 		},
 		{
+			name: "api_host is sent the token of the host it stands in for",
+			args: args{
+				config: tinyConfig{
+					"github.com:oauth_token":    "MYTOKEN",
+					"api_host:gateway.internal": "github.com",
+				},
+				appVersion: "v1.2.3",
+			},
+			host: "gateway.internal",
+			wantHeader: map[string][]string{
+				"authorization":        {"token MYTOKEN"},
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+			},
+			wantStderr: "",
+		},
+		{
+			name: "a host with its own token is unaffected by an api_host mapping",
+			args: args{
+				config: tinyConfig{
+					"github.com:oauth_token":       "MYTOKEN",
+					"gateway.internal:oauth_token": "OWNTOKEN",
+					"api_host:gateway.internal":    "github.com",
+				},
+				appVersion: "v1.2.3",
+			},
+			host: "gateway.internal",
+			wantHeader: map[string][]string{
+				"authorization":        {"token OWNTOKEN"},
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+			},
+			wantStderr: "",
+		},
+		{
+			name: "an unmapped host is still sent no token",
+			args: args{
+				config: tinyConfig{
+					"github.com:oauth_token":    "MYTOKEN",
+					"api_host:gateway.internal": "github.com",
+				},
+				appVersion: "v1.2.3",
+			},
+			host: "elsewhere.internal",
+			wantHeader: map[string][]string{
+				"authorization":        nil, // should not be set
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+			},
+			wantStderr: "",
+		},
+		{
 			name: "github.com no authentication token",
 			args: args{
 				config:         tinyConfig{"example.com:oauth_token": "MYTOKEN"},
@@ -442,6 +497,13 @@ type tinyConfig map[string]string
 
 func (c tinyConfig) ActiveToken(host string) (string, string) {
 	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], "oauth_token"
+}
+
+// HostForAPIHost resolves via an "api_host:<apiHost>" key holding the host that
+// configured it, mirroring the reverse lookup the real config performs.
+func (c tinyConfig) HostForAPIHost(apiHost string) (string, bool) {
+	host, ok := c[fmt.Sprintf("%s:%s", "api_host", apiHost)]
+	return host, ok
 }
 
 var requestAtRE = regexp.MustCompile(`(?m)^\* Request at .+`)
