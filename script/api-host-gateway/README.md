@@ -158,7 +158,6 @@ worktree and runs the acceptance subset there:
 ```console
 $ HARNESS_COMMIT=0e661576450b4918dabbe7b54952ea3f19c37187 \
     GH_APIHOST_ORG=my-org \
-    GH_APIHOST_ORG_TOKEN=<fine-grained-PAT> \
     script/api-host-gateway/at-rev.sh v2.97.0
 ```
 
@@ -169,9 +168,10 @@ it makes `gh api` honour `api_host` for relative paths, so carrying it onto
 `v2.97.0` would make TestAPI green in the baseline and hide one of the reds the
 baseline exists to measure. Do not "fix" this omission.
 
-`GH_APIHOST_ORG_TOKEN` must be set in the environment; `at-rev.sh` will not
-prompt for it. This is intentional so a run across several revisions does not
-stop once per revision to ask for a credential.
+`at-rev.sh` prompts for the org token the same way `run.sh` does. Set
+`GH_APIHOST_ORG_TOKEN` in the environment to skip the prompt, which is worth
+doing for a run across several revisions so it does not stop once per revision
+to ask for a credential.
 
 ## Expected result today
 
