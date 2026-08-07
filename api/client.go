@@ -244,6 +244,44 @@ func (c Client) RequestWithContext(ctx context.Context, hostname string, method 
 	return resp, nil
 }
 
+// DoRequest sends a request that the caller has already built, and returns the response for the
+// caller to consume. It applies the same error handling as Request.
+//
+// Prefer Request. DoRequest exists for the few call sites that must control something Request
+// cannot express. That is either a field of the request which is neither method, path, body nor
+// header, such as ContentLength and GetBody when uploading a release asset, or a property of the
+// client itself, such as CheckRedirect. Request delegates to go-gh, which builds a client of its
+// own from the transport alone, so a redirect policy set on the client passed to
+// NewClientFromHTTP only survives when the request is sent here.
+//
+// Because the caller supplies the URL, requests sent this way do not benefit from host-level
+// endpoint resolution, so it is only appropriate for absolute URLs.
+//
+// Only the endpoint scopes of any RequestOption are applied; headers are the caller's own to set
+// on the request they built.
+//
+// Responses outside the 2xx range are returned as an HTTPError and their body is closed. On success
+// the response is returned unread and the caller is responsible for closing its body.
+func (c Client) DoRequest(req *http.Request, opts ...RequestOption) (*http.Response, error) {
+	cfg := newRequestConfig(opts)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !success {
+		defer resp.Body.Close()
+		if cfg.endpointScopes != "" {
+			EndpointNeedsScopes(resp, cfg.endpointScopes)
+		}
+		return nil, HandleHTTPError(resp)
+	}
+
+	return resp, nil
+}
+
 // HandleHTTPError parses a http.Response into a HTTPError.
 //
 // The caller is responsible to close the response body stream.

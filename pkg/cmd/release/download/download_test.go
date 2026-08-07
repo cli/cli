@@ -4,18 +4,22 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_NewCmdDownload(t *testing.T) {
@@ -977,4 +981,43 @@ func listFiles(dir string) ([]string, error) {
 		return err
 	})
 	return files, err
+}
+
+// Test_downloadAsset_archiveAvoidsLegacyCodeload pins that the redirect policy which rewrites
+// "legacy" Codeload paths is actually applied to the request.
+//
+// The policy lives on the http.Client rather than the request, so it only survives if the
+// request is sent through the client we hand over. A real server is used because httpmock is a
+// RoundTripper and redirects are followed by the client, above the transport, so a stubbed
+// transport cannot exercise this at all.
+func Test_downloadAsset_archiveAvoidsLegacyCodeload(t *testing.T) {
+	var requestedPaths []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestedPaths = append(requestedPaths, r.URL.Path)
+		switch {
+		case r.URL.Path == "/asset":
+			http.Redirect(w, r, "/OWNER/REPO/legacy.zip/refs/tags/v1.2.3", http.StatusFound)
+		case strings.Contains(r.URL.Path, "legacy."):
+			t.Errorf("legacy Codeload path was requested: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.Header().Set("Content-Disposition", `attachment; filename=REPO-1.2.3.zip`)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("archive contents"))
+		}
+	}))
+	defer ts.Close()
+
+	tempDir := t.TempDir()
+	dest := destinationWriter{dir: tempDir}
+
+	err := downloadAsset(&dest, ts.Client(), safeurl.NewImmutableSafeURL(ts.URL+"/asset"), "", true)
+	require.NoError(t, err)
+
+	// The file name is derived from the response, so it also proves which resource was served.
+	body, err := os.ReadFile(filepath.Join(tempDir, "REPO-1.2.3.zip"))
+	require.NoError(t, err)
+	assert.Equal(t, "archive contents", string(body))
+
+	assert.Equal(t, []string{"/asset", "/OWNER/REPO/zip/refs/tags/v1.2.3"}, requestedPaths)
 }
