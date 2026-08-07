@@ -72,12 +72,17 @@ report an error.
 
 ## Known gaps
 
-`api_host` is not yet honoured centrally. Only the credential half is in place:
-a request that reaches a configured gateway is authenticated correctly. Many
-call sites still build absolute `api.github.com` URLs and never reach the
-gateway at all, and `gh api` does not read `api_host` for the paths it builds.
+`api_host` is not yet honoured centrally. It works for requests that go through
+go-gh's client, and for `gh api`, but many call sites still build absolute
+`api.github.com` URLs and never reach the gateway at all.
 
-The test harness enumerates exactly which, and its recorded transcript is the
-current tally.
+`gh api` is a wart worth naming. It does not use go-gh's client, so it resolves
+`api_host` itself with a second implementation of the same rule. Two
+implementations of "where does this request go" is exactly the shape of problem
+this feature exists to remove, and it survives here only because `gh api` takes
+its path verbatim from the user and cannot route it through the normal client.
+
+The test harness enumerates what is still unrouted, and its recorded transcript
+is the current tally.
 
 [go-gh]: https://github.com/cli/go-gh

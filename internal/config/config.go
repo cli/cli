@@ -341,6 +341,19 @@ func (c *AuthConfig) Hosts() []string {
 	return ghauth.KnownHosts()
 }
 
+// APIHostForHost returns the api_host configured for host, reporting false when
+// the host has no api_host set. It is the inverse of HostForAPIHost.
+func (c *AuthConfig) APIHostForHost(host string) (string, bool) {
+	if host == "" || c.cfg == nil {
+		return "", false
+	}
+	configured, err := c.cfg.Get([]string{hostsKey, host, apiHostKey})
+	if err != nil || configured == "" {
+		return "", false
+	}
+	return configured, true
+}
+
 // HostForAPIHost returns the configured host whose api_host points at apiHost,
 // reporting false when no host claims it.
 //
