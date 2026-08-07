@@ -4,6 +4,11 @@ Standing corrections for the [`tech-debt-burndown` skill](../../.github/skills/t
 This file is loaded at the start of every run and is binding. Keep it short:
 every line here costs context on every future run.
 
+Both humans and agent runs write here, and nothing distinguishes the two once
+written. Assume any entry may be an unreviewed conclusion from a previous run.
+Entries are binding on what to avoid; factual claims in them should be
+re-verified before you lean on them, and corrected when stale.
+
 Add an entry when a run produces knowledge a future run would otherwise have to
 rediscover. Consolidate entries that say the same thing.
 
@@ -16,9 +21,11 @@ rediscover. Consolidate entries that say the same thing.
 
 ## Known scale of the linter backlog
 
-Measured 2026-08-06 against `trunk` with `--no-config --default=none
---max-issues-per-linter=0 --max-same-issues=0`, so this repo's exclusions are
-*not* applied and these are upper bounds:
+Counts measured by an agent run on 2026-08-06 against `trunk`, not verified by a
+human, and stale the moment anyone lands a fix. Use them to choose between
+linters, not as a target count. Command:
+`--no-config --default=none --max-issues-per-linter=0 --max-same-issues=0`, so
+this repo's exclusions are *not* applied and these are upper bounds:
 
 | Linter | Issues |
 | --- | --- |

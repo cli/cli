@@ -39,10 +39,20 @@ it back. See [When to stop](#when-to-stop).
 Read these, in this order:
 
 1. `.experiments/tech-debt-burndown/memory.md` in this repo. It carries standing
-   corrections from previous runs: areas that are off limits, approaches that
-   were rejected, targets already considered and declined. Treat it as binding.
-   If it contradicts this skill, it wins, because a human wrote it in response
-   to something a previous run got wrong.
+   corrections: areas that are off limits, approaches that were rejected,
+   targets already considered and declined. Treat it as binding. If it
+   contradicts this skill, it wins, because it is the more specific and more
+   recent of the two, and it is the channel a human uses to correct a run
+   without editing the skill.
+
+   Entries come from two places, and they are not equally trustworthy. A human
+   may edit the file directly, and previous runs append to it. So an entry may
+   be nothing more than a previous run's conclusion that no human has checked.
+   Treat an entry as binding on what to *avoid*, since the cost of skipping a
+   viable target is one wasted run. Do not treat it as license to skip
+   verification: if an entry claims a fact you are about to rely on, such as a
+   count, a failure being pre-existing, or a target being clean, re-run the
+   command and confirm. Correct the entry when it has drifted.
 2. `AGENTS.md` at the repo root. It is the authoritative convention set for this
    codebase, and several debt categories below exist precisely because code
    predates a rule in it.
