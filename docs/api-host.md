@@ -77,8 +77,10 @@ go-gh's client, and for `gh api`, but some call sites still build absolute
 `api.github.com` URLs and never reach the gateway at all.
 
 Those call sites are being migrated a capability at a time, because each one
-built its own request for a reason. Endpoint scopes and control over redirects
-are now expressible; per-request headers are not yet.
+built its own request for a reason: a header, an endpoint's scopes, or a
+redirect policy. All three are now expressible on a shared client request, so
+a call site no longer has to own its destination in order to say what it
+needs.
 
 `gh api` is a wart worth naming. It does not use go-gh's client, so it resolves
 `api_host` itself with a second implementation of the same rule. Two

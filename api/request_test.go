@@ -6,9 +6,11 @@ import (
 
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,6 +64,59 @@ func TestRequestResolvesPathAgainstHost(t *testing.T) {
 			assert.Equal(t, tt.wantPath, reg.Requests[0].URL.Path)
 		})
 	}
+}
+
+func TestRequestWithHeader(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(httpmock.MatchAny, httpmock.StatusStringResponse(200, "{}"))
+
+	resp, err := client.Request("github.com", http.MethodGet, "repos/OWNER/REPO", nil,
+		WithHeader("Accept", "application/vnd.github.raw"))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, "application/vnd.github.raw", reg.Requests[0].Header.Get("Accept"))
+}
+
+// The transport supplies default headers of its own, so a per-request header is only useful if it
+// takes precedence over them.
+func TestRequestHeaderOverridesTransportDefault(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(httpmock.MatchAny, httpmock.StatusStringResponse(200, "{}"))
+
+	resp, err := client.Request("github.com", http.MethodPost, "repos/OWNER/REPO/releases", nil,
+		WithHeader("Content-Type", "application/zip"))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, "application/zip", reg.Requests[0].Header.Get("Content-Type"))
+}
+
+// Pre-auth call sites supply their own token because it is not yet in config, so an explicit
+// Authorization header must survive rather than be replaced by the transport.
+func TestRequestExplicitAuthorizationHeaderIsPreserved(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	httpClient := &http.Client{}
+	httpmock.ReplaceTripper(httpClient, reg)
+	httpClient.Transport = AddAuthTokenHeader(httpClient.Transport, tinyConfig{"github.com:oauth_token": "config-token"})
+	client := NewClientFromHTTP(httpClient)
+
+	reg.Register(httpmock.MatchAny, httpmock.StatusStringResponse(200, "{}"))
+
+	resp, err := client.Request("github.com", http.MethodGet, "user", nil,
+		WithHeader("Authorization", "token explicit-token"))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, "token explicit-token", reg.Requests[0].Header.Get("Authorization"))
 }
 
 func TestRequestReturnsBodyUnread(t *testing.T) {
@@ -240,3 +295,54 @@ func TestRequestWithContextPropagatesContext(t *testing.T) {
 
 	assert.Equal(t, "carried", gotValue)
 }
+
+func TestRequestHeadersAgainstRealTransport(t *testing.T) {
+	var gotReq *http.Request
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotReq = r
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	ios, _, _, _ := iostreams.Test()
+	httpClient, err := NewHTTPClient(HTTPClientOptions{
+		AppVersion: "v1.2.3",
+		Config:     tinyConfig{ts.URL[7:] + ":oauth_token": "MYTOKEN"},
+		Log:        ios.ErrOut,
+	})
+	require.NoError(t, err)
+	client := NewClientFromHTTP(httpClient)
+
+	resp, err := client.Request(ts.URL, http.MethodGet, ts.URL+"/user/repos", nil,
+		WithHeader("Accept", "application/vnd.github.raw"),
+		WithHeader("Content-Type", "application/zip"))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, "application/vnd.github.raw", gotReq.Header.Get("Accept"))
+	assert.Equal(t, "application/zip", gotReq.Header.Get("Content-Type"))
+
+	// Headers the caller did not override must still be supplied by the transport.
+	assert.Equal(t, "token MYTOKEN", gotReq.Header.Get("Authorization"))
+	assert.Equal(t, "GitHub CLI v1.2.3", gotReq.Header.Get("User-Agent"))
+}
+
+func TestGraphQLWithHeader(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(httpmock.MatchAny, httpmock.StatusStringResponse(200, `{"data": {}}`))
+
+	var response struct{}
+	err := client.GraphQL("github.com", "query{}", nil, &response,
+		WithHeader("Authorization", "token explicit-token"))
+	require.NoError(t, err)
+
+	assert.Equal(t, "token explicit-token", reg.Requests[0].Header.Get("Authorization"))
+}
+
+// TestDoRequestPreservesCheckRedirect pins the difference between Request and DoRequest that
+// motivates DoRequest existing for redirect-sensitive call sites. Request delegates to go-gh,
+// which builds an http.Client of its own from the transport alone, so a redirect policy set on
+// the client cannot survive. DoRequest sends through that client and so keeps it.

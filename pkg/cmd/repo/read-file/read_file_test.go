@@ -724,28 +724,28 @@ func Test_contentsAPIPath(t *testing.T) {
 		{
 			name:     "simple path",
 			filePath: "README.md",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+			want:     "repos/OWNER/REPO/contents/README.md",
 		},
 		{
 			name:     "leading slash trimmed",
 			filePath: "/README.md",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+			want:     "repos/OWNER/REPO/contents/README.md",
 		},
 		{
 			name:     "nested path encodes separators",
 			filePath: "pkg/cmd/create.go",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/pkg%2Fcmd%2Fcreate.go",
+			want:     "repos/OWNER/REPO/contents/pkg%2Fcmd%2Fcreate.go",
 		},
 		{
 			name:     "spaces are encoded",
 			filePath: "dir with spaces/file.txt",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/dir%20with%20spaces%2Ffile.txt",
+			want:     "repos/OWNER/REPO/contents/dir%20with%20spaces%2Ffile.txt",
 		},
 		{
 			name:     "ref is appended",
 			filePath: "README.md",
 			ref:      "feature/branch",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md?ref=feature%2Fbranch",
+			want:     "repos/OWNER/REPO/contents/README.md?ref=feature%2Fbranch",
 		},
 	}
 

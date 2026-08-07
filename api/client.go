@@ -57,8 +57,17 @@ type RequestOption func(*requestConfig)
 
 // requestConfig accumulates the effect of the RequestOptions applied to one request.
 type requestConfig struct {
+	headers           map[string]string
 	endpointScopes    string
 	noFollowRedirects bool
+}
+
+// WithHeader sets a header on the request, taking precedence over any header of the same name
+// that the underlying transport would otherwise supply.
+func WithHeader(name, value string) RequestOption {
+	return func(cfg *requestConfig) {
+		cfg.headers[name] = value
+	}
 }
 
 // WithoutFollowingRedirects stops the request from following redirects. When a redirect is
@@ -86,7 +95,7 @@ func WithEndpointScopes(scopes string) RequestOption {
 }
 
 func newRequestConfig(opts []RequestOption) requestConfig {
-	cfg := requestConfig{}
+	cfg := requestConfig{headers: map[string]string{}}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
@@ -95,10 +104,14 @@ func newRequestConfig(opts []RequestOption) requestConfig {
 
 // GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
-func (c Client) GraphQL(hostname string, query string, variables map[string]any, data any) error {
-	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = features
-	gqlClient, err := ghAPI.NewGraphQLClient(opts)
+func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}, opts ...RequestOption) error {
+	cfg := newRequestConfig(opts)
+	clientOpts := clientOptions(hostname, c.http.Transport)
+	clientOpts.Headers[graphqlFeatures] = features
+	for name, value := range cfg.headers {
+		clientOpts.Headers[name] = value
+	}
+	gqlClient, err := ghAPI.NewGraphQLClient(clientOpts)
 	if err != nil {
 		return err
 	}
@@ -209,6 +222,9 @@ func (c Client) Request(hostname string, method string, p string, body io.Reader
 func (c Client) RequestWithContext(ctx context.Context, hostname string, method string, p string, body io.Reader, opts ...RequestOption) (*http.Response, error) {
 	cfg := newRequestConfig(opts)
 	clientOpts := clientOptions(hostname, c.http.Transport)
+	for name, value := range cfg.headers {
+		clientOpts.Headers[name] = value
+	}
 	if cfg.noFollowRedirects {
 		clientOpts.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse

@@ -209,33 +209,30 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 
 ## Current state
 
-Phases 1, 2 and 3 pass, unchanged. Eight of the twelve scripts are green.
+Every phase passes and every script is green, apart from one failure that is
+not about routing:
 
-Routing `gh repo delete` turned six scripts green at once, only one of which is
-about deleting a repository. The other five create a repository and defer
-`gh repo delete` to clean it up, so they had been failing after passing their
-own subject matter in full. This is the clearest evidence in the suite that a
-single unrouted call site can hold an unrelated feature hostage, which is the
-argument for resolving the destination in one place.
+```
+HTTP 422: Validation Failed (https://gh-gateway.internal/repos/gh-acceptance-testing/repo_list_rename-LFxrOIbkOT)
+name A conflicting repository operation is still in progress
+```
 
-Two of them, `repo-list-rename` and `repo-rename-transfer-ownership`, delete a
-repository that has just been renamed. That is the 301 this commit's option
-exists for, and both are green, which is the option working rather than being
-bypassed.
-
-The four still red all fail in their body, and all need the same thing:
-
-| Script | Fails at | Needs |
-|---|---|---|
-| `auth-status` | scope checking, line 2 | per-request headers |
-| `repo-read-file` | `gh repo read-file`, line 34 | per-request headers |
-| `extension` | `gh repo edit --add-topic`, line 29 | per-request headers |
-| `search-issues` | `gh search issues`, line 21 | per-request headers |
+`repo-list-rename` creates a repository and renames it immediately, and GitHub
+sometimes has not finished the creation. The request reached
+`gh-gateway.internal` and came back with a considered answer from GitHub, which
+is the harness reporting success at its own job: the routing worked, and the
+server declined for a reason of its own. It fails intermittently on trunk too.
 
 ## Remaining
 
-Per-request headers, for `gh auth status`, `gh repo read-file`, `gh repo edit`
-and `gh search issues`.
+Nothing that this harness can see. `gh` sends every request in these twelve
+scripts to a host's `api_host`, and sends none of them anywhere else while
+`api.github.com` is unreachable.
+
+That is a claim about twelve scripts, not about `gh`. What the harness proves
+is that the shared client can now express what call sites needed, so migrating
+the rest is mechanical rather than blocked. `docs/api-host.md` records what is
+still unrouted.
 
 ## Transcript
 
@@ -266,15 +263,15 @@ PHASE  RESULT   NAME
 4      PASS     basic-graphql.txtar
 4      PASS     release-upload-download.txtar
 4      PASS     repo-delete.txtar
-4      PASS     repo-list-rename.txtar
-4      FAIL     repo-read-file.txtar
+4      FAIL     repo-list-rename.txtar
+4      PASS     repo-read-file.txtar
 4      PASS     repo-rename-transfer-ownership.txtar
 4      PASS     run-download.txtar
-4      FAIL     extension.txtar
-4      FAIL     search-issues.txtar
-4      FAIL     auth-status.txtar
+4      PASS     extension.txtar
+4      PASS     search-issues.txtar
+4      PASS     auth-status.txtar
 5      PASS     gist-create-view-delete.txtar
 
 == Summary
-4 subset script(s) red: repo-read-file.txtar extension.txtar search-issues.txtar auth-status.txtar
+1 subset script(s) red: repo-list-rename.txtar
 ```
