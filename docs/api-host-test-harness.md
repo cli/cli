@@ -68,7 +68,7 @@ token can create repositories in:
 $ GH_APIHOST_ACCEPTANCE=yes GH_APIHOST_ORG=my-org script/api-host-gateway/run.sh
 ```
 
-This creates real repositories and can take up to 45 minutes. It prompts for a
+This creates real repositories and takes a couple of minutes. It prompts for a
 fine-grained PAT owned by the organisation. The PAT must be scoped to all
 repositories in the org, because the scripts create repositories with random
 names that cannot be listed ahead of time. Set `GH_APIHOST_ORG_TOKEN` to skip the
@@ -209,20 +209,15 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 
 ## Current state
 
-Phases 1, 2 and 3 all pass. Every direct assertion about `gh api`, `gh repo
-view`, the gateway log and `--paginate` is green, so the routing that go-gh and
-`gh api` perform is now correct and authenticated.
+Phases 1, 2 and 3 pass. 10 of the 12 acceptance scripts are still red, the same
+count as the previous commit, but `repo-list-rename` now passes its whole body
+including the rename itself and fails only in cleanup.
 
-`--paginate` passing is the more interesting half. It follows a `Link` header
-that the gateway rewrote to point at itself, which only works because `gh api`
-leaves absolute URLs alone rather than re-resolving them.
-
-10 of the 12 acceptance scripts are still red, each at a single call site that
-builds an absolute `api.github.com` URL:
+Three scripts are now in that state, and they are the reason the tally alone is
+a poor progress measure here:
 
 | Script | Fails at |
 |---|---|
-| `repo-list-rename` | `gh repo rename` (PATCH) |
 | `extension` | `gh repo edit --add-topic` |
 | `repo-read-file` | `gh repo read-file` |
 | `search-issues` | `gh search issues` |
@@ -230,7 +225,7 @@ builds an absolute `api.github.com` URL:
 | `gist-create-view-delete` | `gh gist create` |
 | `repo-delete` | `gh repo delete` |
 | `release-upload-download` | `gh release upload` |
-| `repo-rename-transfer-ownership`, `run-download` | nothing in the body; both pass and fail only in deferred `gh repo delete` cleanup |
+| `repo-list-rename`, `repo-rename-transfer-ownership`, `run-download` | nothing in the body; all three pass and fail only in deferred `gh repo delete` cleanup |
 
 ## Remaining
 
