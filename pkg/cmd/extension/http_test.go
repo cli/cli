@@ -35,6 +35,16 @@ func requireExtensionHTTPError(t *testing.T, err error, status int) {
 	assert.Contains(t, err.Error(), fmt.Sprintf("HTTP %d", status))
 }
 
+func samlProtectedResponse() httpmock.Responder {
+	return httpmock.WithHeader(
+		httpmock.StatusJSONResponse(http.StatusForbidden, map[string]string{
+			"message": "Resource protected by organization SAML enforcement.",
+		}),
+		"X-GitHub-SSO",
+		"required; url=https://github.com/orgs/OWNER/sso?authorization_request=TOKEN",
+	)
+}
+
 func TestRepoExists(t *testing.T) {
 	repo := ghrepo.New("OWNER", "REPO")
 
@@ -181,6 +191,107 @@ func TestFetchLatestRelease(t *testing.T) {
 			require.EqualError(t, err, "unexpected end of JSON input")
 		})
 	}
+}
+
+func TestFetchLatestReleaseWithFallback(t *testing.T) {
+	repo := ghrepo.New("OWNER", "REPO")
+
+	t.Run("public repository", func(t *testing.T) {
+		authReg := &httpmock.Registry{}
+		defer authReg.Verify(t)
+		authReg.Register(
+			httpmock.REST(http.MethodGet, "repos/OWNER/REPO/releases/latest"),
+			samlProtectedResponse(),
+		)
+		authClient := &http.Client{Transport: authReg}
+
+		plainReg := &httpmock.Registry{}
+		defer plainReg.Verify(t)
+		plainReg.Register(
+			httpmock.REST(http.MethodGet, "repos/OWNER/REPO"),
+			httpmock.JSONResponse(map[string]string{"visibility": "public"}),
+		)
+		plainReg.Register(
+			httpmock.REST(http.MethodGet, "repos/OWNER/REPO/releases/latest"),
+			httpmock.JSONResponse(release{Tag: "v1.2.3"}),
+		)
+		plainClient := &http.Client{Transport: plainReg}
+
+		got, selectedClient, err := fetchLatestReleaseWithFallback(authClient, plainClient, repo)
+
+		require.NoError(t, err)
+		assert.Equal(t, "v1.2.3", got.Tag)
+		assert.Same(t, plainClient, selectedClient)
+	})
+
+	t.Run("public repository without a release", func(t *testing.T) {
+		authReg := &httpmock.Registry{}
+		defer authReg.Verify(t)
+		authReg.Register(
+			httpmock.REST(http.MethodGet, "repos/OWNER/REPO/releases/latest"),
+			samlProtectedResponse(),
+		)
+		authClient := &http.Client{Transport: authReg}
+
+		plainReg := &httpmock.Registry{}
+		defer plainReg.Verify(t)
+		plainReg.Register(
+			httpmock.REST(http.MethodGet, "repos/OWNER/REPO"),
+			httpmock.JSONResponse(map[string]string{"visibility": "public"}),
+		)
+		plainReg.Register(
+			httpmock.REST(http.MethodGet, "repos/OWNER/REPO/releases/latest"),
+			httpmock.StatusJSONResponse(http.StatusNotFound, map[string]string{"message": "Not Found"}),
+		)
+		plainClient := &http.Client{Transport: plainReg}
+
+		got, selectedClient, err := fetchLatestReleaseWithFallback(authClient, plainClient, repo)
+
+		assert.Nil(t, got)
+		require.ErrorIs(t, err, releaseNotFoundErr)
+		assert.Same(t, plainClient, selectedClient)
+	})
+
+	t.Run("private repository", func(t *testing.T) {
+		authReg := &httpmock.Registry{}
+		defer authReg.Verify(t)
+		authReg.Register(
+			httpmock.REST(http.MethodGet, "repos/OWNER/REPO/releases/latest"),
+			samlProtectedResponse(),
+		)
+		authClient := &http.Client{Transport: authReg}
+
+		plainReg := &httpmock.Registry{}
+		defer plainReg.Verify(t)
+		plainReg.Register(
+			httpmock.REST(http.MethodGet, "repos/OWNER/REPO"),
+			httpmock.StatusJSONResponse(http.StatusNotFound, map[string]string{"message": "Not Found"}),
+		)
+		plainClient := &http.Client{Transport: plainReg}
+
+		got, selectedClient, err := fetchLatestReleaseWithFallback(authClient, plainClient, repo)
+
+		assert.Nil(t, got)
+		requireExtensionHTTPError(t, err, http.StatusForbidden)
+		assert.Same(t, authClient, selectedClient)
+	})
+
+	t.Run("non-SAML forbidden response", func(t *testing.T) {
+		authReg := &httpmock.Registry{}
+		defer authReg.Verify(t)
+		authReg.Register(
+			httpmock.REST(http.MethodGet, "repos/OWNER/REPO/releases/latest"),
+			httpmock.StatusJSONResponse(http.StatusForbidden, map[string]string{"message": "Forbidden"}),
+		)
+		authClient := &http.Client{Transport: authReg}
+		plainClient := &http.Client{Transport: &httpmock.Registry{}}
+
+		got, selectedClient, err := fetchLatestReleaseWithFallback(authClient, plainClient, repo)
+
+		assert.Nil(t, got)
+		requireExtensionHTTPError(t, err, http.StatusForbidden)
+		assert.Same(t, authClient, selectedClient)
+	})
 }
 
 func TestFetchReleaseFromTag(t *testing.T) {

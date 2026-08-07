@@ -25,19 +25,22 @@ const (
 )
 
 type Extension struct {
-	path       string
-	kind       ExtensionKind
-	gitClient  gitClient
-	httpClient *http.Client
+	path            string
+	kind            ExtensionKind
+	gitClient       gitClient
+	httpClient      *http.Client
+	plainHTTPClient *http.Client
 
 	mu sync.RWMutex
 
 	// These fields get resolved dynamically:
-	url            string
-	isPinned       *bool
-	currentVersion string
-	latestVersion  string
-	owner          string
+	url                   string
+	isPinned              *bool
+	currentVersion        string
+	latestVersion         string
+	latestVersionErr      error
+	latestVersionResolved bool
+	owner                 string
 }
 
 func (e *Extension) Name() string {
@@ -114,37 +117,46 @@ func (e *Extension) CurrentVersion() string {
 }
 
 func (e *Extension) LatestVersion() string {
+	latestVersion, _ := e.latestVersionWithError()
+	return latestVersion
+}
+
+func (e *Extension) latestVersionWithError() (string, error) {
 	e.mu.RLock()
-	if e.latestVersion != "" {
+	if e.latestVersion != "" || e.latestVersionResolved {
 		defer e.mu.RUnlock()
-		return e.latestVersion
+		return e.latestVersion, e.latestVersionErr
 	}
 	e.mu.RUnlock()
 
 	var latestVersion string
+	var resolveErr error
 	switch e.kind {
 	case LocalKind:
 	case BinaryKind:
-		repo, err := ghrepo.FromFullName(e.URL())
-		if err != nil {
-			return ""
+		var repo ghrepo.Interface
+		repo, resolveErr = ghrepo.FromFullName(e.URL())
+		if resolveErr == nil {
+			var release *release
+			release, _, resolveErr = fetchLatestReleaseWithFallback(e.httpClient, e.plainHTTPClient, repo)
+			if resolveErr == nil {
+				latestVersion = release.Tag
+			}
 		}
-		release, err := fetchLatestRelease(e.httpClient, repo)
-		if err != nil {
-			return ""
-		}
-		latestVersion = release.Tag
 	case GitKind:
-		if lsRemote, err := e.gitClient.CommandOutput([]string{"ls-remote", "origin", "HEAD"}); err == nil {
+		var lsRemote []byte
+		if lsRemote, resolveErr = e.gitClient.CommandOutput([]string{"ls-remote", "origin", "HEAD"}); resolveErr == nil {
 			latestVersion = string(bytes.SplitN(lsRemote, []byte("\t"), 2)[0])
 		}
 	}
 
 	e.mu.Lock()
 	e.latestVersion = latestVersion
+	e.latestVersionErr = resolveErr
+	e.latestVersionResolved = true
 	e.mu.Unlock()
 
-	return e.latestVersion
+	return latestVersion, resolveErr
 }
 
 func (e *Extension) IsPinned() bool {

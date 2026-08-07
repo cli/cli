@@ -652,6 +652,112 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_UpgradeExtension_public_binary_with_SAML_protected_token(t *testing.T) {
+	dataDir := t.TempDir()
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(dataDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "github",
+			Name:  "gh-bin-ext",
+			Host:  "github.com",
+			Tag:   "v1.0.1",
+		},
+	))
+
+	authReg := &httpmock.Registry{}
+	defer authReg.Verify(t)
+	authReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		samlProtectedResponse(),
+	)
+	authReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		samlProtectedResponse(),
+	)
+
+	plainReg := &httpmock.Registry{}
+	defer plainReg.Verify(t)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext"),
+		httpmock.JSONResponse(map[string]string{"visibility": "public"}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(release{
+			Tag: "v1.0.2",
+			Assets: []releaseAsset{{
+				Name:   "gh-bin-ext-windows-amd64.exe",
+				APIURL: "https://api.github.com/assets/2",
+			}},
+		}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext"),
+		httpmock.JSONResponse(map[string]string{"visibility": "public"}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(release{
+			Tag: "v1.0.2",
+			Assets: []releaseAsset{{
+				Name:   "gh-bin-ext-windows-amd64.exe",
+				APIURL: "https://api.github.com/assets/2",
+			}},
+		}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "assets/2"),
+		httpmock.StringResponse("FAKE UPGRADED BINARY"),
+	)
+
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(dataDir, t.TempDir(), &http.Client{Transport: authReg}, nil, ios)
+	m.SetPlainClient(&http.Client{Transport: plainReg})
+
+	err := m.Upgrade("bin-ext", false)
+
+	require.NoError(t, err)
+	bin, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
+	require.NoError(t, err)
+	assert.Equal(t, "FAKE UPGRADED BINARY", string(bin))
+}
+
+func TestManager_UpgradeExtension_private_binary_preserves_SAML_error(t *testing.T) {
+	dataDir := t.TempDir()
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(dataDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "github",
+			Name:  "gh-bin-ext",
+			Host:  "github.com",
+			Tag:   "v1.0.1",
+		},
+	))
+
+	authReg := &httpmock.Registry{}
+	defer authReg.Verify(t)
+	authReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		samlProtectedResponse(),
+	)
+
+	plainReg := &httpmock.Registry{}
+	defer plainReg.Verify(t)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext"),
+		httpmock.StatusJSONResponse(http.StatusNotFound, map[string]string{"message": "Not Found"}),
+	)
+
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(dataDir, t.TempDir(), &http.Client{Transport: authReg}, nil, ios)
+	m.SetPlainClient(&http.Client{Transport: plainReg})
+
+	err := m.Upgrade("bin-ext", false)
+
+	require.ErrorContains(t, err, "unable to retrieve latest version for extension \"bin-ext\"")
+	require.ErrorContains(t, err, "HTTP 403: Resource protected by organization SAML enforcement.")
+}
+
 func TestManager_UpgradeExtension_BinaryExtension_Pinned_Force(t *testing.T) {
 	dataDir := t.TempDir()
 	updateDir := t.TempDir()
@@ -1255,6 +1361,104 @@ func TestManager_Install_binary(t *testing.T) {
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
 	require.NoDirExistsf(t, extensionUpdatePath, "update directory should be removed")
+}
+
+func TestManager_Install_public_binary_with_SAML_protected_token(t *testing.T) {
+	repo := ghrepo.New("github", "gh-bin-ext")
+
+	authReg := &httpmock.Registry{}
+	defer authReg.Verify(t)
+	authReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		samlProtectedResponse(),
+	)
+
+	plainReg := &httpmock.Registry{}
+	defer plainReg.Verify(t)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext"),
+		httpmock.JSONResponse(map[string]string{"visibility": "public"}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(release{
+			Tag: "v1.0.1",
+			Assets: []releaseAsset{{
+				Name:   "gh-bin-ext-windows-amd64.exe",
+				APIURL: "https://api.github.com/assets/1",
+			}},
+		}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(release{
+			Tag: "v1.0.1",
+			Assets: []releaseAsset{{
+				Name:   "gh-bin-ext-windows-amd64.exe",
+				APIURL: "https://api.github.com/assets/1",
+			}},
+		}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "assets/1"),
+		httpmock.StringResponse("FAKE BINARY"),
+	)
+
+	dataDir := t.TempDir()
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(dataDir, t.TempDir(), &http.Client{Transport: authReg}, nil, ios)
+	m.SetPlainClient(&http.Client{Transport: plainReg})
+
+	err := m.Install(repo, "")
+
+	require.NoError(t, err)
+	bin, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
+	require.NoError(t, err)
+	assert.Equal(t, "FAKE BINARY", string(bin))
+}
+
+func TestManager_Install_public_script_with_SAML_protected_token(t *testing.T) {
+	repo := ghrepo.New("github", "gh-script-ext")
+
+	authReg := &httpmock.Registry{}
+	defer authReg.Verify(t)
+	authReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-script-ext/releases/latest"),
+		samlProtectedResponse(),
+	)
+
+	plainReg := &httpmock.Registry{}
+	defer plainReg.Verify(t)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-script-ext"),
+		httpmock.JSONResponse(map[string]string{"visibility": "public"}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-script-ext/releases/latest"),
+		httpmock.StatusJSONResponse(http.StatusNotFound, map[string]string{"message": "Not Found"}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-script-ext"),
+		httpmock.JSONResponse(map[string]string{"visibility": "public"}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-script-ext/contents/gh-script-ext"),
+		httpmock.JSONResponse(map[string]string{"type": "file"}),
+	)
+
+	dataDir := t.TempDir()
+	extensionDir := filepath.Join(dataDir, "extensions", "gh-script-ext")
+	gc := &mockGitClient{}
+	gc.On("Clone", "https://github.com/github/gh-script-ext.git", []string{extensionDir}).Return("", nil).Once()
+
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(dataDir, t.TempDir(), &http.Client{Transport: authReg}, gc, ios)
+	m.SetPlainClient(&http.Client{Transport: plainReg})
+
+	err := m.Install(repo, "")
+
+	require.NoError(t, err)
+	gc.AssertExpectations(t)
 }
 
 func TestManager_Install_amd64_when_supported(t *testing.T) {

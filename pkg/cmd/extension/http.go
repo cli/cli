@@ -143,6 +143,12 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 	return &r, nil
 }
 
+func fetchLatestReleaseWithFallback(httpClient, plainHTTPClient *http.Client, baseRepo ghrepo.Interface) (*release, *http.Client, error) {
+	return fetchReleaseWithFallback(httpClient, plainHTTPClient, baseRepo, func(client *http.Client) (*release, error) {
+		return fetchLatestRelease(client, baseRepo)
+	})
+}
+
 // fetchReleaseFromTag finds release by tag name for a repository
 func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*release, error) {
 	path, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "tags", tagName)
@@ -169,6 +175,38 @@ func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tag
 	}
 
 	return &r, nil
+}
+
+func fetchReleaseFromTagWithFallback(httpClient, plainHTTPClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*release, *http.Client, error) {
+	return fetchReleaseWithFallback(httpClient, plainHTTPClient, baseRepo, func(client *http.Client) (*release, error) {
+		return fetchReleaseFromTag(client, baseRepo, tagName)
+	})
+}
+
+func fetchReleaseWithFallback(
+	httpClient, plainHTTPClient *http.Client,
+	repo ghrepo.Interface,
+	fetch func(*http.Client) (*release, error),
+) (*release, *http.Client, error) {
+	r, err := fetch(httpClient)
+	if err == nil || plainHTTPClient == nil || !isSAMLProtectedError(err) {
+		return r, httpClient, err
+	}
+
+	isPublic, publicCheckErr := repoExists(plainHTTPClient, repo)
+	if publicCheckErr != nil || !isPublic {
+		return nil, httpClient, err
+	}
+
+	r, err = fetch(plainHTTPClient)
+	return r, plainHTTPClient, err
+}
+
+func isSAMLProtectedError(err error) bool {
+	var httpErr api.HTTPError
+	return errors.As(err, &httpErr) &&
+		httpErr.StatusCode == http.StatusForbidden &&
+		httpErr.Headers.Get("X-GitHub-SSO") != ""
 }
 
 // fetchCommitSHA finds full commit SHA from a target ref in a repo

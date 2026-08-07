@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -176,12 +177,24 @@ func ExtractHeader(name string, dest *string) func(http.RoundTripper) http.Round
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			res, err := tr.RoundTrip(req)
-			if err == nil {
+			if err == nil && req.Context().Value(skipHeaderExtractionKey(name)) == nil {
 				if value := res.Header.Get(name); value != "" {
 					*dest = value
 				}
 			}
 			return res, err
+		}}
+	}
+}
+
+type skipHeaderExtractionKey string
+
+// SkipHeaderExtraction marks requests so ExtractHeader ignores the named response header.
+func SkipHeaderExtraction(name string) func(http.RoundTripper) http.RoundTripper {
+	return func(tr http.RoundTripper) http.RoundTripper {
+		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			ctx := context.WithValue(req.Context(), skipHeaderExtractionKey(name), true)
+			return tr.RoundTrip(req.Clone(ctx))
 		}}
 	}
 }

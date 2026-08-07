@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -482,6 +483,23 @@ func Test_mightBeGHESUser(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func Test_ssoRecoveryURL(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("X-GitHub-SSO", "required; url=https://github.com/orgs/OWNER/sso?authorization_request=TOKEN")
+	httpErr := api.HTTPError{
+		HTTPError: &ghAPI.HTTPError{
+			Headers: headers,
+		},
+	}
+
+	assert.Equal(
+		t,
+		"https://github.com/orgs/OWNER/sso?authorization_request=TOKEN",
+		ssoRecoveryURL(httpErr, true),
+	)
+	assert.Empty(t, ssoRecoveryURL(api.HTTPError{}, true))
 }
 
 func pagerConfig() gh.Config {

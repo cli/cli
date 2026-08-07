@@ -283,7 +283,14 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 		return em
 	}
 
-	em.SetClient(api.NewCachedHTTPClient(client, time.Second*30))
+	extensionClient := *client
+	extensionClient.Transport = api.SkipHeaderExtraction("X-GitHub-SSO")(client.Transport)
+	em.SetClient(api.NewCachedHTTPClient(&extensionClient, time.Second*30))
+
+	plainClient, err := f.PlainHttpClient()
+	if err == nil {
+		em.SetPlainClient(api.NewCachedHTTPClient(plainClient, time.Second*30))
+	}
 
 	return em
 }
@@ -291,10 +298,15 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 // SSOURL returns the URL of a SAML SSO challenge received by the server for clients that use ExtractHeader
 // to extract the value of the "X-GitHub-SSO" response header.
 func SSOURL() string {
-	if ssoHeader == "" {
+	return SSOURLFromHeader(ssoHeader)
+}
+
+// SSOURLFromHeader returns the authorization URL from an X-GitHub-SSO header.
+func SSOURLFromHeader(header string) string {
+	if header == "" {
 		return ""
 	}
-	m := ssoURLRE.FindStringSubmatch(ssoHeader)
+	m := ssoURLRE.FindStringSubmatch(header)
 	if m == nil {
 		return ""
 	}

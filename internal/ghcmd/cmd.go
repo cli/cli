@@ -231,13 +231,14 @@ func Main() exitCode {
 		}
 
 		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
+		hasHTTPError := errors.As(err, &httpErr)
+		if hasHTTPError && httpErr.StatusCode == 401 {
 			authCommand := "gh auth login"
 			if cfg, cfgErr := cmdFactory.Config(); cfgErr == nil {
 				authCommand = authRecoveryCommand(cfg, httpErr)
 			}
 			fmt.Fprintf(stderr, "Try authenticating with:  %s\n", authCommand)
-		} else if u := factory.SSOURL(); u != "" {
+		} else if u := ssoRecoveryURL(httpErr, hasHTTPError); u != "" {
 			// handles organization SAML enforcement error
 			fmt.Fprintf(stderr, "Authorize in your web browser:  %s\n", u)
 		} else if msg := httpErr.ScopesSuggestion(); msg != "" {
@@ -312,6 +313,16 @@ func authRecoveryCommand(cfg gh.Config, httpErr api.HTTPError) string {
 	}
 
 	return fmt.Sprintf("gh auth login -h %s", hostname)
+}
+
+func ssoRecoveryURL(httpErr api.HTTPError, hasHTTPError bool) string {
+	if hasHTTPError && httpErr.HTTPError != nil {
+		return factory.SSOURLFromHeader(httpErr.Headers.Get("X-GitHub-SSO"))
+	}
+	if hasHTTPError {
+		return ""
+	}
+	return factory.SSOURL()
 }
 
 func checkForUpdate(ctx context.Context, f *cmdutil.Factory, currentVersion string) (*update.ReleaseInfo, error) {

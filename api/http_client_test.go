@@ -209,6 +209,33 @@ func TestNewHTTPClient(t *testing.T) {
 	}
 }
 
+func TestSkipHeaderExtraction(t *testing.T) {
+	var extracted string
+	headers := http.Header{}
+	headers.Set("X-GitHub-SSO", "required; url=https://github.com/orgs/OWNER/sso")
+	base := funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusForbidden,
+			Header:     headers,
+			Body:       http.NoBody,
+			Request:    req,
+		}, nil
+	}}
+	transport := SkipHeaderExtraction("X-GitHub-SSO")(
+		ExtractHeader("X-GitHub-SSO", &extracted)(base),
+	)
+	client := &http.Client{Transport: transport}
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/OWNER/REPO", nil)
+	require.NoError(t, err)
+
+	resp, err := client.Do(req)
+
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	assert.Empty(t, extracted)
+	assert.NotEmpty(t, resp.Header.Get("X-GitHub-SSO"))
+}
+
 func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 	var request *http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
