@@ -57,33 +57,34 @@ Read these, in this order:
    codebase, and several debt categories below exist precisely because code
    predates a rule in it.
 
-Then get onto a clean working branch. The tree must be clean before you start,
-so your diff contains only your change:
+Then check where you are. This skill only runs from `trunk`:
 
 ```bash
 git status --porcelain          # must be empty
+git branch --show-current       # must be trunk
 ```
 
-Where you branch from depends on where you already are:
+**If either check fails, stop and tell the human. Do not fix it yourself.**
 
-- **On `trunk`**: branch from an up to date `trunk`.
+A dirty tree means your diff would carry someone else's work, and the commit
+stops being reviewable in two minutes. Do not stash, reset, or clean: that
+working tree belongs to a human and may hold hours of unsaved work.
 
-  ```bash
-  git fetch origin && git switch -c tech-debt/<short-slug> origin/trunk
-  ```
+Being on another branch means the code you are about to reason about is not the
+code that will be reviewed. A fix built on a feature branch inherits that
+branch's changes, needs rebasing before it can land, and can be invalidated by
+work the branch itself is doing. Do not switch to `trunk` to satisfy the check,
+because that abandons whatever the human was doing without asking.
 
-- **Already on a working branch**: branch from `HEAD`, not from `origin/trunk`.
+Report what you found and let the human decide. They may want the work
+committed, or may genuinely want a run from that branch, which is their call to
+make explicitly and not yours to assume.
 
-  ```bash
-  git switch -c tech-debt/<short-slug>
-  ```
+Once both checks pass, branch from an up to date `trunk`:
 
-  Switching to `origin/trunk` would discard whatever that branch carries,
-  including possibly this skill itself, and would silently change the code you
-  are reasoning about.
-
-  Say in your report which commit you branched from, so the human knows the fix
-  may need rebasing before it can land.
+```bash
+git fetch origin && git switch -c tech-debt/<short-slug> origin/trunk
+```
 
 Work on the branch from the first edit. Do not commit to `trunk`.
 
@@ -277,8 +278,8 @@ Do not push. Do not open a pull request. The human takes it from here.
 Keep it short enough to read on a phone. State:
 
 - **Target**: what you picked and why, in one line.
-- **Base**: the branch and commit you branched from, and whether the fix will
-  need rebasing onto `trunk`.
+- **Base**: the `origin/trunk` commit you branched from, so the human knows how
+  fresh the fix is.
 - **Before and after**: the sensor output either side of the change. This is the
   core of the report. It is what makes the change reviewable in two minutes.
 - **The change**: what you altered and what the new test proves.
@@ -307,6 +308,8 @@ and when several entries say the same thing, consolidate them into one.
 
 Stop, leave the code unchanged, and hand back to the human when:
 
+- the working tree is dirty, or you are not on `trunk`, as described in
+  [Before you start](#before-you-start)
 - the fix requires changing an exported signature or an interface
 - the fix touches the non-interactive output contract in any way, meaning stdout
   and stderr routing, `--json` fields, exit codes, error message text, flag
