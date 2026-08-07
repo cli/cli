@@ -189,3 +189,5 @@ require (
 	gotest.tools/v3 v3.5.2 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 )
+
+replace github.com/cli/go-gh/v2 => /Users/williammartin/workspace/work/go-gh-checkredirect
