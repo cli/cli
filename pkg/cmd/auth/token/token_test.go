@@ -2,6 +2,7 @@ package token
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
@@ -188,6 +189,30 @@ func TestTokenRun(t *testing.T) {
 			require.Equal(t, tt.wantStdout, stdout.String())
 		})
 	}
+}
+
+// failingWriter fails every write, standing in for a closed pipe or a full disk
+// on stdout.
+type failingWriter struct{}
+
+func (failingWriter) Write(p []byte) (int, error) { return 0, errors.New("write failed") }
+
+func (failingWriter) Fd() uintptr { return 0 }
+
+func TestTokenRunReturnsWriteError(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	ios.Out = failingWriter{}
+
+	cfg, _ := config.NewIsolatedTestConfig(t)
+	login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
+
+	opts := TokenOptions{
+		IO:     ios,
+		Config: func() (gh.Config, error) { return cfg, nil },
+	}
+
+	err := tokenRun(&opts)
+	require.EqualError(t, err, "write failed")
 }
 
 func TestTokenRunSecureStorage(t *testing.T) {

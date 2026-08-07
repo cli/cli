@@ -62,12 +62,36 @@ cleared 2026-08-06.
 
 ## Rejected targets
 
-None yet.
+2026-08-07: the `//nolint:gosimple` directives in `pkg/option/option_test.go`.
+`gosimple` folded into `staticcheck` in golangci-lint v2, so the name is dead,
+but the underlying S1025 finding is real. Removing them is wrong and renaming
+them to `staticcheck` is a judgement call about a linter nobody has enabled.
+
+2026-08-07: the errcheck ratchet described in Tier 1 of the skill does not work
+for `errcheck`, `staticcheck`, or `gosec`. Those three are not in the `enable`
+list at all, so `exclusions.rules` has nothing to narrow: a clean package cannot
+be held clean without enabling the linter repo-wide. Clear packages anyway, but
+do not expect to land an exclusion with them.
 
 ## False positives
 
-None yet.
+2026-08-07: `//nolint:bodyclose` at `pkg/httpmock/stub.go:252` is **not** stale.
+Removing it makes `golangci-lint run ./pkg/httpmock/...` report the finding.
 
 ## Failed attempts
 
 None yet.
+
+## Environment notes
+
+2026-08-07: on a macOS dev machine the baseline suite fails in `git`,
+`internal/config`, `pkg/cmdutil`, and every `pkg/cmd/auth/*` package, because the
+local keychain returns `******` in place of stored tokens and `safe.bareRepository
+= explicit` blocks the `git` fixtures. Worse, the set is **not stable between
+runs**: a first `go test ./...` reported 5 failing packages and an immediate
+re-run reported 11. Compare the failing *test names* against a re-run of the
+baseline on a stashed tree, not a set captured once at the start of the run.
+
+2026-08-07: `make lint` there also reports findings with paths pointing into
+*sibling worktrees* (`../<other-worktree>/...`). Those are not yours and cannot
+be fixed from this checkout.

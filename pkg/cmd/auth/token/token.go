@@ -92,8 +92,10 @@ func tokenRun(opts *TokenOptions) error {
 		return errors.New(errMsg)
 	}
 
-	if val != "" {
-		fmt.Fprintf(opts.IO.Out, "%s\n", val)
+	// Callers commonly consume this as `TOKEN=$(gh auth token)` or pipe it into
+	// another process, so a failed write must not exit 0 with no token emitted.
+	if _, err := fmt.Fprintf(opts.IO.Out, "%s\n", val); err != nil {
+		return err
 	}
 
 	return nil
