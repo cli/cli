@@ -102,99 +102,6 @@ func TestNewCmdaddItem(t *testing.T) {
 }
 
 func TestRunAddItem_User(t *testing.T) {
-	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
-
-	// get user ID
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		MatchType("json").
-		JSON(map[string]interface{}{
-			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
-				"login": "monalisa",
-			},
-		}).
-		Times(2).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"id": "an ID",
-				},
-			},
-			"errors": []interface{}{
-				map[string]interface{}{
-					"type": "NOT_FOUND",
-					"path": []string{"organization"},
-				},
-			},
-		})
-
-	// get project ID
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		MatchType("json").
-		JSON(map[string]interface{}{
-			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
-				"login":       "monalisa",
-				"number":      1,
-				"firstItems":  0,
-				"afterItems":  nil,
-				"firstFields": 0,
-				"afterFields": nil,
-			},
-		}).
-		Times(2).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"id": "an ID",
-					},
-				},
-			},
-		})
-
-	// get item ID
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		MatchType("json").
-		JSON(map[string]interface{}{
-			"query": "query GetIssueOrPullRequest.*",
-			"variables": map[string]interface{}{
-				"url": "https://github.com/cli/go-gh/issues/1",
-			},
-		}).
-		Times(2).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"resource": map[string]interface{}{
-					"id":         "item ID",
-					"__typename": "Issue",
-				},
-			},
-		})
-
-	// create item
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		BodyString(`{"query":"mutation AddItem.*","variables":{"input":{"projectId":"an ID","contentId":"item ID"}}}`).
-		Times(2).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"addProjectV2ItemById": map[string]interface{}{
-					"item": map[string]interface{}{
-						"id": "project item ID",
-					},
-				},
-			},
-		})
-
 	tests := []struct {
 		name      string
 		stdoutTTY bool
@@ -213,6 +120,95 @@ func TestRunAddItem_User(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			gock.Observe(gock.DumpRequest)
+
+			// get user ID
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				MatchType("json").
+				JSON(map[string]interface{}{
+					"query": "query UserOrgOwner.*",
+					"variables": map[string]interface{}{
+						"login": "monalisa",
+					},
+				}).
+				Reply(200).
+				JSON(map[string]interface{}{
+					"data": map[string]interface{}{
+						"user": map[string]interface{}{
+							"id": "an ID",
+						},
+					},
+					"errors": []interface{}{
+						map[string]interface{}{
+							"type": "NOT_FOUND",
+							"path": []string{"organization"},
+						},
+					},
+				})
+
+			// get project ID
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				MatchType("json").
+				JSON(map[string]interface{}{
+					"query": "query UserProject.*",
+					"variables": map[string]interface{}{
+						"login":       "monalisa",
+						"number":      1,
+						"firstItems":  0,
+						"afterItems":  nil,
+						"firstFields": 0,
+						"afterFields": nil,
+					},
+				}).
+				Reply(200).
+				JSON(map[string]interface{}{
+					"data": map[string]interface{}{
+						"user": map[string]interface{}{
+							"projectV2": map[string]interface{}{
+								"id": "an ID",
+							},
+						},
+					},
+				})
+
+			// get item ID
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				MatchType("json").
+				JSON(map[string]interface{}{
+					"query": "query GetIssueOrPullRequest.*",
+					"variables": map[string]interface{}{
+						"url": "https://github.com/cli/go-gh/issues/1",
+					},
+				}).
+				Reply(200).
+				JSON(map[string]interface{}{
+					"data": map[string]interface{}{
+						"resource": map[string]interface{}{
+							"id":         "item ID",
+							"__typename": "Issue",
+						},
+					},
+				})
+
+			// create item
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				BodyString(`{"query":"mutation AddItem.*","variables":{"input":{"projectId":"an ID","contentId":"item ID"}}}`).
+				Reply(200).
+				JSON(map[string]interface{}{
+					"data": map[string]interface{}{
+						"addProjectV2ItemById": map[string]interface{}{
+							"item": map[string]interface{}{
+								"id": "project item ID",
+							},
+						},
+					},
+				})
+
 			client := queries.NewTestClient()
 
 			ios, _, stdout, _ := iostreams.Test()
