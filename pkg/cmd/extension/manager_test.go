@@ -1387,6 +1387,67 @@ func TestManager_Install_public_binary_with_SAML_protected_token(t *testing.T) {
 	assert.Equal(t, "FAKE BINARY", string(bin))
 }
 
+func TestManager_Install_public_binary_pinned_with_SAML_protected_token(t *testing.T) {
+	repo := ghrepo.New("github", "gh-bin-ext")
+
+	authReg := &httpmock.Registry{}
+	defer authReg.Verify(t)
+	authReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		samlProtectedResponse(),
+	)
+
+	plainReg := &httpmock.Registry{}
+	defer plainReg.Verify(t)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext"),
+		httpmock.JSONResponse(map[string]string{"visibility": "public"}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(release{
+			Tag: "v1.0.1",
+			Assets: []releaseAsset{{
+				Name:   "gh-bin-ext-windows-amd64.exe",
+				APIURL: "https://api.github.com/assets/latest",
+			}},
+		}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "repos/github/gh-bin-ext/releases/tags/v1.0.0"),
+		httpmock.JSONResponse(release{
+			Tag: "v1.0.0",
+			Assets: []releaseAsset{{
+				Name:   "gh-bin-ext-windows-amd64.exe",
+				APIURL: "https://api.github.com/assets/pinned",
+			}},
+		}),
+	)
+	plainReg.Register(
+		httpmock.REST(http.MethodGet, "assets/pinned"),
+		httpmock.StringResponse("FAKE PINNED BINARY"),
+	)
+
+	dataDir := t.TempDir()
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(dataDir, t.TempDir(), &http.Client{Transport: authReg}, nil, ios)
+	m.SetPlainClient(&http.Client{Transport: plainReg})
+
+	err := m.Install(repo, "v1.0.0")
+
+	require.NoError(t, err)
+	bin, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
+	require.NoError(t, err)
+	assert.Equal(t, "FAKE PINNED BINARY", string(bin))
+
+	manifest, err := os.ReadFile(filepath.Join(dataDir, "extensions/gh-bin-ext", manifestName))
+	require.NoError(t, err)
+	var bm binManifest
+	require.NoError(t, yaml.Unmarshal(manifest, &bm))
+	assert.Equal(t, "v1.0.0", bm.Tag)
+	assert.True(t, bm.IsPinned)
+}
+
 func TestManager_Install_public_script_with_SAML_protected_token(t *testing.T) {
 	repo := ghrepo.New("github", "gh-script-ext")
 
