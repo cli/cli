@@ -21,6 +21,8 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 	} else if isGraphQL {
 		requestURL = ghinstance.GraphQLEndpoint(hostname)
 	} else {
+		// Note that the gh api command takes the path verbatim from the user, so we
+		// intentionally do not route it through safeurl and do not escape it here.
 		requestURL = ghinstance.RESTPrefix(hostname) + strings.TrimPrefix(p, "/")
 	}
 

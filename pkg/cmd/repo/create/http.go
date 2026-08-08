@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -186,9 +187,15 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			InitReadme:        input.InitReadme,
 		}
 
-		path := "user/repos"
+		path, err := safeurl.JoinPath("user", "repos")
+		if err != nil {
+			return nil, err
+		}
 		if isOrg {
-			path = fmt.Sprintf("orgs/%s/repos", input.OwnerLogin)
+			path, err = safeurl.JoinPath("orgs", input.OwnerLogin, "repos")
+			if err != nil {
+				return nil, err
+			}
 			inputv3.Visibility = strings.ToLower(input.Visibility)
 		}
 
@@ -254,7 +261,11 @@ func (r *ownerResponse) IsOrganization() bool {
 
 func resolveOwner(client *api.Client, hostname, orgName string) (*ownerResponse, error) {
 	var response ownerResponse
-	err := client.REST(hostname, "GET", fmt.Sprintf("users/%s", orgName), nil, &response)
+	u, err := safeurl.JoinPath("users", orgName)
+	if err != nil {
+		return nil, err
+	}
+	err = client.REST(hostname, "GET", u.String(), nil, &response)
 	return &response, err
 }
 
@@ -268,7 +279,11 @@ type teamResponse struct {
 
 func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug string) (*teamResponse, error) {
 	var response teamResponse
-	err := client.REST(hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
+	u, err := safeurl.JoinPath("orgs", orgName, "teams", teamSlug)
+	if err != nil {
+		return nil, err
+	}
+	err = client.REST(hostname, "GET", u.String(), nil, &response)
 	return &response, err
 }
 

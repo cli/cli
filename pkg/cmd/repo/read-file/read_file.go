@@ -1,7 +1,6 @@
 package readfile
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -179,18 +178,24 @@ func readFileRun(opts *ReadFileOptions) error {
 		return nil
 	}
 
-	if mime, ok := binaryContentType(file.Content); ok {
+	// read-file does its own escape-sequence guarding below, so it writes raw
+	// bytes through ContentOut in passthrough mode. Leaving sanitization on
+	// would corrupt binary files and strip the escapes that
+	// --allow-escape-sequences explicitly allows.
+	opts.IO.SetContentSanitization(false)
+
+	if mime, ok := iostreams.BinaryContentType(file.Content); ok {
 		if opts.IO.IsStdoutTTY() {
 			return fmt.Errorf("binary file (%s, %s); use --output to save to a file or pipe stdout",
 				mime, text.FormatSize(int64(file.Size)))
 		}
-		_, err = opts.IO.Out.Write(file.Content)
+		_, err = opts.IO.ContentOut.Write(file.Content)
 		return err
 	}
 
 	// Refuse terminal escape sequences unless --allow-escape-sequences, in both TTY and non-TTY modes,
 	// so a malicious file cannot manipulate a downstream terminal.
-	if !opts.AllowEscapeSequences && containsEscapeSequence(file.Content) {
+	if !opts.AllowEscapeSequences && iostreams.ContainsEscapeSequence(file.Content) {
 		return errors.New("file contains terminal escape sequences; use --allow-escape-sequences to read anyway")
 	}
 
@@ -201,7 +206,7 @@ func readFileRun(opts *ReadFileOptions) error {
 		defer opts.IO.StopPager()
 	}
 
-	_, err = opts.IO.Out.Write(file.Content)
+	_, err = opts.IO.ContentOut.Write(file.Content)
 	return err
 }
 
@@ -296,28 +301,4 @@ func writeToOutput(file *repoFile, output string, clobber bool) (string, error) 
 	}
 
 	return dest, nil
-}
-
-// binaryContentType reports whether content appears to be binary and, if so, returns
-// its detected MIME type. Textual content returns ("", false).
-func binaryContentType(content []byte) (string, bool) {
-	if len(content) == 0 {
-		return "", false
-	}
-
-	ct := http.DetectContentType(content)
-	if i := strings.IndexByte(ct, ';'); i >= 0 {
-		ct = strings.TrimSpace(ct[:i])
-	}
-
-	if strings.HasPrefix(ct, "text/") {
-		return "", false
-	}
-	return ct, true
-}
-
-// containsEscapeSequence reports whether content contains an ANSI escape byte (0x1B),
-// which could be used to manipulate the terminal when printed.
-func containsEscapeSequence(content []byte) bool {
-	return bytes.IndexByte(content, 0x1B) >= 0
 }

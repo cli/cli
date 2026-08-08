@@ -157,7 +157,7 @@ func TestPrClose_deleteBranch_sameRepo(t *testing.T) {
 			}),
 	)
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -223,7 +223,7 @@ func TestPrClose_deleteBranch_sameBranch(t *testing.T) {
 			}),
 	)
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/trunk"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Ftrunk"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -258,7 +258,7 @@ func TestPrClose_deleteBranch_notInGitRepo(t *testing.T) {
 			}),
 	)
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/trunk"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Ftrunk"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()

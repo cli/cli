@@ -5,6 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/hashicorp/go-version"
 	"golang.org/x/sync/errgroup"
 
@@ -391,7 +392,7 @@ func (d *detector) SearchFeatures() (SearchFeatures, error) {
 	//
 	// Since there's no schema-wise difference between pre-deprecation and
 	// deprecation periods (i.e. `ISSUE_ADVANCED` is available during both),
-	// we cannot figure out the exact time period. The consensus is to to use
+	// we cannot figure out the exact time period. The consensus is to use
 	// the advanced search syntax during both periods.
 
 	var feature SearchFeatures
@@ -541,7 +542,11 @@ func resolveEnterpriseVersion(httpClient *http.Client, host string) (*version.Ve
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
-	err := apiClient.REST(host, "GET", "meta", nil, &metaResponse)
+	u, err := safeurl.JoinPath("meta")
+	if err != nil {
+		return nil, err
+	}
+	err = apiClient.REST(host, "GET", u.String(), nil, &metaResponse)
 	if err != nil {
 		return nil, err
 	}

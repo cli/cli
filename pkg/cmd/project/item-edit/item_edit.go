@@ -81,14 +81,14 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 		Long: heredoc.Docf(`
 			Edit a draft issue or a project item.
 
-			There are two ways to select the item and field to edit:
+			The usual way to select the item and field is by name: pass the project
+			%[1]snumber%[1]s plus %[1]s--owner%[1]s, point at the item with its issue or pull
+			request %[1]s--url%[1]s, and name the field with %[1]s--field%[1]s. For single-select
+			fields, %[1]s--value%[1]s is the option name.
 
-			- By ID: pass %[1]s--id%[1]s, %[1]s--field-id%[1]s and %[1]s--project-id%[1]s directly.
-			- By name: pass %[1]snumber%[1]s plus %[1]s--owner%[1]s, point at the item with its
-			  issue or pull request %[1]s--url%[1]s, and name the field with %[1]s--field%[1]s.
-			  For single-select fields, %[1]s--value%[1]s is the option name.
-
-			In either case, the project is always selected by number and %[1]s--owner%[1]s.
+			For scripts and machine use, you can also pass GraphQL node IDs directly with
+			%[1]s--id%[1]s, %[1]s--field-id%[1]s and %[1]s--project-id%[1]s (and, for single-select
+			fields, %[1]s--single-select-option-id%[1]s).
 
 			Note that %[1]s--url%[1]s is the issue or pull request URL, not a project URL, so its
 			owner may differ from the project's; %[1]s--owner%[1]s selects the project.
@@ -98,13 +98,13 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 			Remove a project item field value with %[1]s--clear%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# Edit an item's text field value by node ID
-			$ gh project item-edit --id <item-id> --field-id <field-id> --project-id <project-id> --text "new text"
-
 			# Set the "Status" field to "In Progress" for an issue on monalisa's project 1
 			$ gh project item-edit 1 --owner monalisa --url https://github.com/monalisa/myproject/issues/23 --field "Status" --value "In Progress"
 
-			# Clear an item's field value
+			# Edit an item's text field value by node ID (machine / scripted use)
+			$ gh project item-edit --id <item-id> --field-id <field-id> --project-id <project-id> --text "new text"
+
+			# Clear an item's field value by node ID
 			$ gh project item-edit --id <item-id> --field-id <field-id> --project-id <project-id> --clear
 		`),
 		Args: cobra.MaximumNArgs(1),

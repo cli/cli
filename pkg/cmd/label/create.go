@@ -13,6 +13,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -127,7 +128,10 @@ func createRun(opts *createOptions) error {
 
 func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions) error {
 	apiClient := api.NewClientFromHTTP(client)
-	path := fmt.Sprintf("repos/%s/%s/labels", repo.RepoOwner(), repo.RepoName())
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "labels")
+	if err != nil {
+		return err
+	}
 	requestByte, err := json.Marshal(map[string]string{
 		"name":        opts.Name,
 		"description": opts.Description,
@@ -137,7 +141,7 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
-	err = apiClient.REST(repo.RepoHost(), "POST", path, requestBody, nil)
+	err = apiClient.REST(repo.RepoHost(), "POST", path.String(), requestBody, nil)
 
 	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists
@@ -156,7 +160,10 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions
 }
 
 func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions) error {
-	path := fmt.Sprintf("repos/%s/%s/labels/%s", repo.RepoOwner(), repo.RepoName(), opts.Name)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "labels", opts.Name)
+	if err != nil {
+		return err
+	}
 	properties := map[string]string{}
 	if opts.Description != "" {
 		properties["description"] = opts.Description
@@ -172,7 +179,7 @@ func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
-	err = apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, nil)
+	err = apiClient.REST(repo.RepoHost(), "PATCH", path.String(), requestBody, nil)
 
 	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists

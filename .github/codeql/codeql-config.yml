@@ -1,0 +1,19 @@
+name: "cli/cli CodeQL config"
+
+# This config extends the default `security-and-quality` suite with the
+# custom queries in `.github/codeql/queries/`. The custom queries enforce
+# project-specific invariants that are not covered by the stock packs:
+#
+#   - unsanitized-response-to-terminal.ql: HTTP response content that
+#     reaches a terminal writer (`os.Stdout` / `os.Stderr` /
+#     `iostreams.IOStreams.Out` / `ErrOut`) other than `ContentOut`
+#     without being sanitized. Writing to `ContentOut`, calling
+#     `iostreams.Untrusted.String`, wrapping with `asciisanitizer`, or
+#     decoding as structured JSON are accepted, so untrusted response
+#     content is sanitized before it can reach a terminal.
+#
+# This config is only meaningful for the Go matrix entry; the Actions
+# matrix entry ignores it.
+queries:
+  - uses: security-and-quality
+  - uses: ./.github/codeql/queries

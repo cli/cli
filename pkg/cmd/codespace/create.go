@@ -88,6 +88,11 @@ func newCreateCmd(app *App) *cobra.Command {
 		Short: "Create a codespace",
 		Args:  noArgsConstraint,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if opts.repo != "" {
+				if err := validateNWO(opts.repo); err != nil {
+					return cmdutil.FlagErrorf("invalid value for --repo: %v", err)
+				}
+			}
 			return cmdutil.MutuallyExclusive(
 				"using --web with --display-name, --idle-timeout, or --retention-period is not supported",
 				opts.useWeb,

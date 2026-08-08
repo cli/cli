@@ -18,6 +18,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -272,8 +273,11 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 		return nil, err
 	}
 
-	u := ghinstance.RESTPrefix(hostname) + "gists"
-	req, err := http.NewRequest(http.MethodPost, u, requestBody)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname), "gists")
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, u.String(), requestBody)
 	if err != nil {
 		return nil, err
 	}

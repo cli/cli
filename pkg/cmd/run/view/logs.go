@@ -9,12 +9,14 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf16"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 )
 
@@ -38,10 +40,14 @@ type apiLogFetcher struct {
 }
 
 func (f *apiLogFetcher) GetLog() (io.ReadCloser, error) {
-	logURL := fmt.Sprintf("%srepos/%s/actions/jobs/%d/logs",
-		ghinstance.RESTPrefix(f.repo.RepoHost()), ghrepo.FullName(f.repo), f.jobID)
+	logURL, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(f.repo.RepoHost()), "repos", f.repo.RepoOwner(), f.repo.RepoName(), "actions", "jobs", strconv.FormatInt(f.jobID, 10), "logs")
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequest("GET", logURL, nil)
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to returning the job log response body as an io.ReadCloser instead of decoding JSON.
+	req, err := http.NewRequest("GET", logURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}

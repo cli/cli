@@ -1,14 +1,12 @@
 package shared
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
-	"regexp"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type Artifact struct {
@@ -26,16 +24,27 @@ func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string)
 	var results []Artifact
 
 	perPage := 100
-	path := fmt.Sprintf("repos/%s/%s/actions/artifacts?per_page=%d", repo.RepoOwner(), repo.RepoName(), perPage)
-	if runID != "" {
-		path = fmt.Sprintf("repos/%s/%s/actions/runs/%s/artifacts?per_page=%d", repo.RepoOwner(), repo.RepoName(), runID, perPage)
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "artifacts")
+	if err != nil {
+		return nil, err
 	}
+	if runID != "" {
+		u, err = safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", runID, "artifacts")
+		if err != nil {
+			return nil, err
+		}
+	}
+	u.SetQuery("per_page", strconv.Itoa(perPage))
+	var pageURL safeurl.SafeURL = u
 
-	url := fmt.Sprintf("%s%s", ghinstance.RESTPrefix(repo.RepoHost()), path)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	client := api.NewClientFromHTTP(httpClient)
 
 	for {
 		var payload artifactsPayload
-		nextURL, err := apiGet(httpClient, url, &payload)
+		nextURL, err := client.RESTWithNext(repo.RepoHost(), http.MethodGet, pageURL.String(), nil, &payload)
 		if err != nil {
 			return nil, err
 		}
@@ -44,43 +53,8 @@ func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string)
 		if nextURL == "" {
 			break
 		}
-		url = nextURL
+		pageURL = safeurl.NewImmutableSafeURL(nextURL)
 	}
 
 	return results, nil
-}
-
-func apiGet(httpClient *http.Client, url string, data interface{}) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return "", api.HandleHTTPError(resp)
-	}
-
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(data); err != nil {
-		return "", err
-	}
-
-	return findNextPage(resp), nil
-}
-
-var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
-
-func findNextPage(resp *http.Response) string {
-	for _, m := range linkRE.FindAllStringSubmatch(resp.Header.Get("Link"), -1) {
-		if len(m) > 2 && m[2] == "next" {
-			return m[1]
-		}
-	}
-	return ""
 }

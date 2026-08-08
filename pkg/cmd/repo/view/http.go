@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
 	"golang.org/x/text/transform"
 )
@@ -30,7 +31,12 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string)
 		HTMLURL string `json:"html_url"`
 	}
 
-	err := apiClient.REST(repo.RepoHost(), "GET", getReadmePath(repo, branch), nil, &response)
+	readmePath, err := getReadmePath(repo, branch)
+	if err != nil {
+		return nil, err
+	}
+
+	err = apiClient.REST(repo.RepoHost(), "GET", readmePath.String(), nil, &response)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
@@ -56,10 +62,13 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string)
 	}, nil
 }
 
-func getReadmePath(repo ghrepo.Interface, branch string) string {
-	path := fmt.Sprintf("repos/%s/readme", ghrepo.FullName(repo))
-	if branch != "" {
-		path = fmt.Sprintf("%s?ref=%s", path, branch)
+func getReadmePath(repo ghrepo.Interface, branch string) (safeurl.SafeURL, error) {
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "readme")
+	if err != nil {
+		return nil, err
 	}
-	return path
+	if branch != "" {
+		path.SetQuery("ref", branch)
+	}
+	return path, nil
 }

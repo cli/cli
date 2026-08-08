@@ -4,6 +4,9 @@ package acceptance_test
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	cryptorand "crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -20,6 +23,9 @@ import (
 	"github.com/cli/cli/v2/internal/ghcmd"
 	"github.com/cli/go-gh/v2/pkg/jq"
 	"github.com/cli/go-internal/testscript"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/ssh"
 )
 
 func ghMain() int {
@@ -30,6 +36,35 @@ func TestMain(m *testing.M) {
 	os.Exit(testscript.RunMain(m, map[string]func() int{
 		"gh": ghMain,
 	}))
+}
+
+func TestGenerateSSHPublicKey(t *testing.T) {
+	first, err := generateSSHPublicKey("myTitle")
+	require.NoError(t, err)
+	second, err := generateSSHPublicKey("myTitle")
+	require.NoError(t, err)
+
+	publicKey, comment, options, rest, err := ssh.ParseAuthorizedKey(first)
+	require.NoError(t, err)
+	assert.Equal(t, ssh.KeyAlgoED25519, publicKey.Type())
+	assert.Equal(t, "myTitle", comment)
+	assert.Empty(t, options)
+	assert.Empty(t, rest)
+	assert.NotEqual(t, first, second)
+}
+
+func TestSandboxFilePath(t *testing.T) {
+	root := t.TempDir()
+
+	path, err := sandboxFilePath(root, root, "keys/deploy.pub")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(root, "keys/deploy.pub"), path)
+
+	_, err = sandboxFilePath(root, root, filepath.Join(root, "deploy.pub"))
+	assert.EqualError(t, err, "path must be relative to the testscript sandbox")
+
+	_, err = sandboxFilePath(root, root, "../deploy.pub")
+	assert.EqualError(t, err, "path must stay within the testscript sandbox")
 }
 
 func TestAPI(t *testing.T) {
@@ -322,6 +357,24 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 				ts.Setenv(env[:i], strings.ToUpper(env[i+1:]))
 			}
 		},
+		"generate-ssh-key": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! generate-ssh-key")
+			}
+			if len(args) < 1 || len(args) > 2 {
+				ts.Fatalf("usage: generate-ssh-key file [comment]")
+			}
+
+			comment := ""
+			if len(args) == 2 {
+				comment = args[1]
+			}
+			publicKey, err := generateSSHPublicKey(comment)
+			ts.Check(err)
+			outputPath, err := sandboxFilePath(ts.Getenv("WORK"), ts.MkAbs("."), args[0])
+			ts.Check(err)
+			ts.Check(os.WriteFile(outputPath, publicKey, 0o644))
+		},
 		"replace": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
 				ts.Fatalf("unsupported: ! replace")
@@ -438,6 +491,41 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 			ts.Setenv(args[2], result)
 		},
 	}
+}
+
+func generateSSHPublicKey(comment string) ([]byte, error) {
+	publicKey, _, err := ed25519.GenerateKey(cryptorand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	sshPublicKey, err := ssh.NewPublicKey(publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	authorizedKey := bytes.TrimSpace(ssh.MarshalAuthorizedKey(sshPublicKey))
+	if comment != "" {
+		authorizedKey = append(authorizedKey, ' ')
+		authorizedKey = append(authorizedKey, comment...)
+	}
+	return append(authorizedKey, '\n'), nil
+}
+
+func sandboxFilePath(root, currentDir, name string) (string, error) {
+	if filepath.IsAbs(name) {
+		return "", errors.New("path must be relative to the testscript sandbox")
+	}
+
+	outputPath := filepath.Clean(filepath.Join(currentDir, name))
+	relativePath, err := filepath.Rel(root, outputPath)
+	if err != nil {
+		return "", err
+	}
+	if relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+		return "", errors.New("path must stay within the testscript sandbox")
+	}
+	return outputPath, nil
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

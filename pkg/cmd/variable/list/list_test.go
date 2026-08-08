@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -436,7 +437,9 @@ func Test_getVariables_pagination(t *testing.T) {
 		httpmock.StringResponse(`{"variables":[{},{}]}`),
 	)
 	client := &http.Client{Transport: reg}
-	variables, err := getVariables(client, "github.com", "path/to")
+	u, err := safeurl.JoinPath("path", "to")
+	require.NoError(t, err)
+	variables, err := getVariables(client, "github.com", u)
 	assert.NoError(t, err)
 	assert.Equal(t, 4, len(variables))
 }
