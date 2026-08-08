@@ -107,7 +107,7 @@ func validateUniqueAssetNames(assets []*AssetForUpload) error {
 	return fmt.Errorf("duplicate release asset filenames are not supported: %s", strings.Join(names, ", "))
 }
 
-// SanitizeFileName returns the filename used by GitHub for a release asset.
+// SanitizeFileName approximates the filename normalization GitHub applies to release assets.
 func SanitizeFileName(name string) string {
 	value := text.RemoveDiacritics(name)
 	// Stripped all non-ascii characters, provide default name.
