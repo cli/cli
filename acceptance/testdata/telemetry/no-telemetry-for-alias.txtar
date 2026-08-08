@@ -1,0 +1,17 @@
+# Aliases should not leak their user-defined names via telemetry, but the
+# resolved inner command should still record normally — its path is a core
+# gh command and conveys no user-authored identifier.
+
+env GH_TELEMETRY=log
+env GH_TELEMETRY_SAMPLE_RATE=100
+
+# Create a regular (non-shell) alias that resolves to an existing command.
+exec gh alias set secret-project-alias version
+
+# Invoking the alias must not produce any event carrying the alias name.
+exec gh secret-project-alias
+! stderr 'secret-project-alias'
+
+# The resolved inner command still records telemetry as normal.
+stderr 'Telemetry payload:'
+stderr '"command": "gh version"'

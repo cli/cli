@@ -3,7 +3,7 @@ package shared
 import "github.com/cli/cli/v2/pkg/cmdutil"
 
 type Autolink struct {
-	ID             int    `json:"id"`
+	ID             int64  `json:"id"`
 	IsAlphanumeric bool   `json:"is_alphanumeric"`
 	KeyPrefix      string `json:"key_prefix"`
 	URLTemplate    string `json:"url_template"`

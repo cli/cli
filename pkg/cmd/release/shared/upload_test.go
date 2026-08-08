@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 func Test_typeForFilename(t *testing.T) {
@@ -97,7 +99,7 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 			Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
 		}, nil
 	})
-	err := uploadWithDelete(ctx, client, "http://example.com/upload", AssetForUpload{
+	err := uploadWithDelete(ctx, client, safeurl.NewImmutableSafeURL("http://example.com/upload"), AssetForUpload{
 		Name:  "asset",
 		Label: "",
 		Size:  8,

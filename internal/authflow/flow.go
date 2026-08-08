@@ -97,7 +97,7 @@ func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams
 		return "", "", err
 	}
 
-	userLogin, err := getViewer(oauthHost, token.Token, IO.ErrOut)
+	userLogin, err := getViewer(httpClient, oauthHost, token.Token)
 	if err != nil {
 		return "", "", err
 	}
@@ -123,16 +123,10 @@ func (c cfg) ActiveToken(hostname string) (string, string) {
 	return c.token, "oauth_token"
 }
 
-func getViewer(hostname, token string, logWriter io.Writer) (string, error) {
-	opts := api.HTTPClientOptions{
-		Config: cfg{token: token},
-		Log:    logWriter,
-	}
-	client, err := api.NewHTTPClient(opts)
-	if err != nil {
-		return "", err
-	}
-	return api.CurrentLoginName(api.NewClientFromHTTP(client), hostname)
+func getViewer(httpClient *http.Client, hostname, token string) (string, error) {
+	authedClient := *httpClient
+	authedClient.Transport = api.AddAuthTokenHeader(httpClient.Transport, cfg{token: token})
+	return api.CurrentLoginName(api.NewClientFromHTTP(&authedClient), hostname)
 }
 
 func waitForEnter(r io.Reader) error {

@@ -157,3 +157,57 @@ func TestRESTPrefix(t *testing.T) {
 		})
 	}
 }
+
+func TestCategorizeHost(t *testing.T) {
+	tests := []struct {
+		name string
+		host string
+		want string
+	}{
+		{
+			name: "github.com returns github.com",
+			host: "github.com",
+			want: "github.com",
+		},
+		{
+			name: "classic GHES hostname returns ghes",
+			host: "ghe.io",
+			want: "ghes",
+		},
+		{
+			name: "arbitrary enterprise hostname returns ghes",
+			host: "enterprise.example.com",
+			want: "ghes",
+		},
+		{
+			name: "tenant subdomain of ghe.com returns tenancy",
+			host: "tenant.ghe.com",
+			want: "tenancy",
+		},
+		{
+			name: "api subdomain under tenant returns tenancy",
+			host: "api.tenant.ghe.com",
+			want: "tenancy",
+		},
+		{
+			name: "bare ghe.com returns ghes",
+			host: "ghe.com",
+			want: "ghes",
+		},
+		{
+			name: "github.localhost returns uncategorized",
+			host: "github.localhost",
+			want: "uncategorized",
+		},
+		{
+			name: "github.com subdomain returns uncategorized",
+			host: "garage.github.com",
+			want: "uncategorized",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, CategorizeHost(tt.host))
+		})
+	}
+}

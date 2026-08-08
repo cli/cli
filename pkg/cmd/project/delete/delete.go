@@ -28,7 +28,7 @@ type deleteConfig struct {
 
 type deleteProjectMutation struct {
 	DeleteProject struct {
-		Project queries.Project `graphql:"projectV2"`
+		Project queries.ProjectMutationQuery `graphql:"projectV2"`
 	} `graphql:"deleteProjectV2(input:$input)"`
 }
 
@@ -115,7 +115,7 @@ func deleteItemArgs(config deleteConfig) (*deleteProjectMutation, map[string]int
 	}
 }
 
-func printResults(config deleteConfig, project queries.Project) error {
+func printResults(config deleteConfig, project queries.ProjectMutationQuery) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}

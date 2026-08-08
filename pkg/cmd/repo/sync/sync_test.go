@@ -306,10 +306,10 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("POST", "repos/FORKOWNER/REPO-FORK/merge-upstream"),
 					httpmock.StatusStringResponse(422, `{}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
+					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads%2Ftrunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
 				reg.Register(
-					httpmock.REST("PATCH", "repos/FORKOWNER/REPO-FORK/git/refs/heads/trunk"),
+					httpmock.REST("PATCH", "repos/FORKOWNER/REPO-FORK/git/refs/heads%2Ftrunk"),
 					httpmock.StringResponse(`{}`))
 			},
 			wantStdout: "✓ Synced the \"FORKOWNER:trunk\" branch from \"OWNER:trunk\"\n",
@@ -395,10 +395,10 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO-FORK/merge-upstream"),
 					httpmock.StatusStringResponse(409, `{"message": "Merge conflict"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
+					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads%2Ftrunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
 				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
+					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads%2Ftrunk"),
 					httpmock.StringResponse(`{}`))
 			},
 			wantStdout: "✓ Synced the \"OWNER:trunk\" branch from \"OWNER:trunk\"\n",
@@ -420,10 +420,10 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO-FORK/merge-upstream"),
 					httpmock.StatusStringResponse(409, `{"message": "Merge conflict"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
+					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads%2Ftrunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
 				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
+					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads%2Ftrunk"),
 					func(req *http.Request) (*http.Response, error) {
 						return &http.Response{
 							StatusCode: 422,
@@ -453,10 +453,10 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO-FORK/merge-upstream"),
 					httpmock.StatusStringResponse(409, `{"message": "Merge conflict"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
+					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads%2Ftrunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
 				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
+					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads%2Ftrunk"),
 					func(req *http.Request) (*http.Response, error) {
 						return &http.Response{
 							StatusCode: 422,

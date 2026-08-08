@@ -6,6 +6,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -94,7 +95,10 @@ func deleteRun(opts *deleteOptions) error {
 
 func deleteLabel(client *http.Client, repo ghrepo.Interface, name string) error {
 	apiClient := api.NewClientFromHTTP(client)
-	path := fmt.Sprintf("repos/%s/%s/labels/%s", repo.RepoOwner(), repo.RepoName(), name)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "labels", name)
+	if err != nil {
+		return err
+	}
 
-	return apiClient.REST(repo.RepoHost(), "DELETE", path, nil, nil)
+	return apiClient.REST(repo.RepoHost(), "DELETE", path.String(), nil, nil)
 }

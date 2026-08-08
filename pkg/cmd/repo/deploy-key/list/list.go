@@ -81,7 +81,7 @@ func listRun(opts *ListOptions) error {
 	now := time.Now()
 
 	for _, deployKey := range deployKeys {
-		sshID := strconv.Itoa(deployKey.ID)
+		sshID := strconv.FormatInt(deployKey.ID, 10)
 		t.AddField(sshID)
 		t.AddField(deployKey.Title)
 		sshType := "read-only"

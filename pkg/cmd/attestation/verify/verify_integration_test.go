@@ -6,12 +6,16 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/stretchr/testify/require"
@@ -21,24 +25,27 @@ func TestVerifyIntegration(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		HttpClient:     http.DefaultClient,
-		Logger:         logger,
-		TUFMetadataDir: o.Some(t.TempDir()),
+		ExternalHttpClient: http.DefaultClient,
+		Logger:             logger,
+		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
-	cmdFactory := factory.New("test")
-
-	hc, err := cmdFactory.HttpClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	ios, _, _, _ := iostreams.Test()
+	hc, err := factory.HttpClientFunc(
+		func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+		ios,
+		"test",
+		"",
+		&telemetry.NoOpService{},
+	)()
+	require.NoError(t, err)
 
 	host, _ := auth.DefaultHost()
 
 	sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 	require.NoError(t, err)
 	publicGoodOpts := Options{
-		APIClient:        api.NewLiveClient(hc, host, logger),
+		APIClient:        api.NewLiveClient(hc, http.DefaultClient, host, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
 		DigestAlgorithm:  "sha512",
@@ -113,7 +120,7 @@ func TestVerifyIntegration(t *testing.T) {
 		sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 		require.NoError(t, err)
 		opts := Options{
-			APIClient:             api.NewLiveClient(hc, host, logger),
+			APIClient:             api.NewLiveClient(hc, http.DefaultClient, host, logger),
 			ArtifactPath:          "oci://ghcr.io/github/artifact-attestations-helm-charts/policy-controller:v0.10.0-github9",
 			UseBundleFromRegistry: true,
 			DigestAlgorithm:       "sha256",
@@ -138,24 +145,27 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		HttpClient:     http.DefaultClient,
-		Logger:         logger,
-		TUFMetadataDir: o.Some(t.TempDir()),
+		ExternalHttpClient: http.DefaultClient,
+		Logger:             logger,
+		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
-	cmdFactory := factory.New("test")
-
-	hc, err := cmdFactory.HttpClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	ios, _, _, _ := iostreams.Test()
+	hc, err := factory.HttpClientFunc(
+		func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+		ios,
+		"test",
+		"",
+		&telemetry.NoOpService{},
+	)()
+	require.NoError(t, err)
 
 	host, _ := auth.DefaultHost()
 
 	sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 	require.NoError(t, err)
 	baseOpts := Options{
-		APIClient:        api.NewLiveClient(hc, host, logger),
+		APIClient:        api.NewLiveClient(hc, http.DefaultClient, host, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
 		DigestAlgorithm:  "sha256",
@@ -212,24 +222,28 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		HttpClient:     http.DefaultClient,
-		Logger:         logger,
-		TUFMetadataDir: o.Some(t.TempDir()),
+		ExternalHttpClient: http.DefaultClient,
+		Logger:             logger,
+		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
-	cmdFactory := factory.New("test")
-
-	hc, err := cmdFactory.HttpClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := config.NewBlankConfig()
+	ios, _, _, _ := iostreams.Test()
+	hc, err := factory.HttpClientFunc(
+		func() (gh.Config, error) { return cfg, nil },
+		ios,
+		"test",
+		"",
+		&telemetry.NoOpService{},
+	)()
+	require.NoError(t, err)
 
 	host, _ := auth.DefaultHost()
 
 	sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 	require.NoError(t, err)
 	baseOpts := Options{
-		APIClient:        api.NewLiveClient(hc, host, logger),
+		APIClient:        api.NewLiveClient(hc, http.DefaultClient, host, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
 		DigestAlgorithm:  "sha256",
@@ -305,27 +319,33 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		HttpClient:     http.DefaultClient,
-		Logger:         logger,
-		TUFMetadataDir: o.Some(t.TempDir()),
+		ExternalHttpClient: http.DefaultClient,
+		Logger:             logger,
+		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
-	cmdFactory := factory.New("test")
-
-	hc, err := cmdFactory.HttpClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := config.NewBlankConfig()
+	ios, _, _, _ := iostreams.Test()
+	hc, err := factory.HttpClientFunc(
+		func() (gh.Config, error) { return cfg, nil },
+		ios,
+		"test",
+		"",
+		&telemetry.NoOpService{},
+	)()
+	require.NoError(t, err)
 
 	host, _ := auth.DefaultHost()
 
 	sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 	require.NoError(t, err)
 	baseOpts := Options{
-		APIClient:        api.NewLiveClient(hc, host, logger),
-		ArtifactPath:     artifactPath,
-		BundlePath:       bundlePath,
-		Config:           cmdFactory.Config,
+		APIClient:    api.NewLiveClient(hc, http.DefaultClient, host, logger),
+		ArtifactPath: artifactPath,
+		BundlePath:   bundlePath,
+		Config: func() (gh.Config, error) {
+			return cfg, nil
+		},
 		DigestAlgorithm:  "sha256",
 		Logger:           logger,
 		OCIClient:        oci.NewLiveClient(),

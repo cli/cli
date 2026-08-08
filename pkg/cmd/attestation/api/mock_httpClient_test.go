@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
-	"github.com/golang/snappy"
+	"github.com/klauspost/compress/snappy"
 	"github.com/stretchr/testify/mock"
 )
 

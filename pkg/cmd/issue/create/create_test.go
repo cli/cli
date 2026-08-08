@@ -198,6 +198,61 @@ func TestNewCmdCreate(t *testing.T) {
 			cli:      "--editor",
 			wantsErr: true,
 		},
+		{
+			name:     "type",
+			tty:      false,
+			cli:      `-t mytitle -b mybody --type Bug`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:     "mytitle",
+				Body:      "mybody",
+				IssueType: "Bug",
+			},
+		},
+		{
+			name:     "parent by number",
+			tty:      false,
+			cli:      `-t mytitle -b mybody --parent 100`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:  "mytitle",
+				Body:   "mybody",
+				Parent: "100",
+			},
+		},
+		{
+			name:     "parent by URL",
+			tty:      false,
+			cli:      `-t mytitle -b mybody --parent https://github.com/cli/go-gh/issues/42`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:  "mytitle",
+				Body:   "mybody",
+				Parent: "https://github.com/cli/go-gh/issues/42",
+			},
+		},
+		{
+			name:     "blocked by multiple issues",
+			tty:      false,
+			cli:      `-t mytitle -b mybody --blocked-by 200,201`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:     "mytitle",
+				Body:      "mybody",
+				BlockedBy: []string{"200", "201"},
+			},
+		},
+		{
+			name:     "blocking another issue",
+			tty:      false,
+			cli:      `-t mytitle -b mybody --blocking 300`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:    "mytitle",
+				Body:     "mybody",
+				Blocking: []string{"300"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -247,6 +302,10 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
 			assert.Equal(t, tt.wantsOpts.Interactive, opts.Interactive)
 			assert.Equal(t, tt.wantsOpts.Template, opts.Template)
+			assert.Equal(t, tt.wantsOpts.IssueType, opts.IssueType)
+			assert.Equal(t, tt.wantsOpts.Parent, opts.Parent)
+			assert.Equal(t, tt.wantsOpts.BlockedBy, opts.BlockedBy)
+			assert.Equal(t, tt.wantsOpts.Blocking, opts.Blocking)
 		})
 	}
 }
@@ -255,7 +314,7 @@ func Test_createRun(t *testing.T) {
 	tests := []struct {
 		name        string
 		opts        CreateOptions
-		httpStubs   func(*httpmock.Registry)
+		httpStubs   func(*testing.T, *httpmock.Registry)
 		promptStubs func(*prompter.PrompterMock)
 		wantsStdout string
 		wantsStderr string
@@ -299,7 +358,7 @@ func Test_createRun(t *testing.T) {
 				WebMode:   true,
 				Assignees: []string{"@me"},
 			},
-			httpStubs: func(r *httpmock.Registry) {
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`
@@ -327,7 +386,7 @@ func Test_createRun(t *testing.T) {
 				WebMode:  true,
 				Projects: []string{"cleanup"},
 			},
-			httpStubs: func(r *httpmock.Registry) {
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query RepositoryProjectList\b`),
 					httpmock.StringResponse(`
@@ -383,7 +442,7 @@ func Test_createRun(t *testing.T) {
 				Detector: &fd.EnabledDetectorMock{},
 				WebMode:  true,
 			},
-			httpStubs: func(r *httpmock.Registry) {
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query IssueTemplates\b`),
 					httpmock.StringResponse(`
@@ -409,9 +468,9 @@ func Test_createRun(t *testing.T) {
 		},
 		{
 			name: "editor",
-			httpStubs: func(r *httpmock.Registry) {
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
 						{ "data": { "repository": {
 							"id": "REPOID",
@@ -438,9 +497,9 @@ func Test_createRun(t *testing.T) {
 		},
 		{
 			name: "editor and template",
-			httpStubs: func(r *httpmock.Registry) {
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -495,10 +554,16 @@ func Test_createRun(t *testing.T) {
 					switch message {
 					case "What would you like to add?":
 						return prompter.IndexesFor(options, "Assignees")
-					case "Assignees":
-						return prompter.IndexesFor(options, "Copilot (AI)", "MonaLisa (Mona Display Name)")
 					default:
 						return nil, fmt.Errorf("unexpected multi-select prompt: %s", message)
+					}
+				}
+				pm.MultiSelectWithSearchFunc = func(message, searchPrompt string, defaults, persistentOptions []string, searchFunc func(string) prompter.MultiSelectSearchResult) ([]string, error) {
+					switch message {
+					case "Assignees":
+						return []string{"copilot-swe-agent", "MonaLisa"}, nil
+					default:
+						return nil, fmt.Errorf("unexpected multi-select-with-search prompt: %s", message)
 					}
 				}
 				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
@@ -514,9 +579,9 @@ func Test_createRun(t *testing.T) {
 					}
 				}
 			},
-			httpStubs: func(r *httpmock.Registry) {
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
 						{ "data": { "repository": {
 							"id": "REPOID",
@@ -525,24 +590,24 @@ func Test_createRun(t *testing.T) {
 						} } }
 					`))
 				r.Register(
-					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": { "suggestedActors": {
-							"nodes": [
-								{ "login": "copilot-swe-agent", "id": "COPILOTID", "name": "Copilot (AI)", "__typename": "Bot" },
-								{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
-							],
-							"pageInfo": { "hasNextPage": false }
-						} } } }
-					`))
-				r.Register(
 					httpmock.GraphQL(`mutation IssueCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUEID",
 							"URL": "https://github.com/OWNER/REPO/issues/12"
 						} } } }
 					`, func(inputs map[string]interface{}) {
-						assert.Equal(t, []interface{}{"COPILOTID", "MONAID"}, inputs["assigneeIds"])
+						if v, ok := inputs["assigneeIds"]; ok {
+							t.Errorf("did not expect assigneeIds: %v", v)
+						}
+					}))
+				r.Register(
+					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
+					`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "ISSUEID", inputs["assignableId"])
+						assert.Equal(t, []interface{}{"copilot-swe-agent[bot]", "MonaLisa"}, inputs["actorLogins"])
 					}))
 			},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
@@ -587,9 +652,9 @@ func Test_createRun(t *testing.T) {
 					}
 				}
 			},
-			httpStubs: func(r *httpmock.Registry) {
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
 						{ "data": { "repository": {
 							"id": "REPOID",
@@ -621,13 +686,254 @@ func Test_createRun(t *testing.T) {
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
 		},
+		{
+			name: "create with type",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "bug title",
+				Body:      "bug body",
+				IssueType: "Bug",
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "issueTypes": { "nodes": [
+							{ "id": "IT_1", "name": "Bug", "description": "", "color": "d73a4a" },
+							{ "id": "IT_2", "name": "Feature", "description": "", "color": "0075ca" },
+							{ "id": "IT_3", "name": "Task", "description": "", "color": "e4e669" }
+						] } } } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "updateIssueIssueType": { "issue": { "id": "ISSUE_ID_123" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "ISSUE_ID_123", inputs["issueId"])
+							assert.Equal(t, "IT_1", inputs["issueTypeId"])
+						}))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "interactive prompts for type",
+			opts: CreateOptions{
+				Interactive: true,
+				Detector:    &fd.EnabledDetectorMock{},
+				Title:       "feature request",
+				Body:        "would be nice to have",
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "Issue type":
+						return prompter.IndexFor(options, "Feature")
+					case "What's next?":
+						return prompter.IndexFor(options, "Submit")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				// Issue types are fetched up front to power the interactive prompt.
+				r.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "issueTypes": { "nodes": [
+							{ "id": "IT_1", "name": "Bug", "description": "", "color": "d73a4a" },
+							{ "id": "IT_2", "name": "Feature", "description": "", "color": "0075ca" },
+							{ "id": "IT_3", "name": "Task", "description": "", "color": "e4e669" }
+						] } } } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+				// Selected ID is reused without re-fetching the types list.
+				r.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "updateIssueIssueType": { "issue": { "id": "ISSUE_ID_123" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "ISSUE_ID_123", inputs["issueId"])
+							assert.Equal(t, "IT_2", inputs["issueTypeId"])
+						}))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "create with type not found",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "bug title",
+				Body:      "bug body",
+				IssueType: "Bugz",
+			},
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "issueTypes": { "nodes": [
+							{ "id": "IT_1", "name": "Bug", "description": "", "color": "d73a4a" },
+							{ "id": "IT_2", "name": "Feature", "description": "", "color": "0075ca" },
+							{ "id": "IT_3", "name": "Task", "description": "", "color": "e4e669" }
+						] } } } }`))
+			},
+			wantsErr: `type "Bugz" not found; available types: Bug, Feature, Task`,
+		},
+		{
+			name: "create with parent",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "child issue",
+				Body:     "child body",
+				Parent:   "100",
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query IssueNodeID\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "issue": { "id": "PARENT_ID_100" } } } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation AddSubIssue\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "addSubIssue": { "issue": { "id": "PARENT_ID_100" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "PARENT_ID_100", inputs["issueId"])
+							assert.Equal(t, "ISSUE_ID_123", inputs["subIssueId"])
+							assert.Equal(t, false, inputs["replaceParent"])
+						}))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "create with blocked-by and blocking",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "blocked issue",
+				Body:      "blocked body",
+				BlockedBy: []string{"200", "201"},
+				Blocking:  []string{"300", "301"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+				// IssueNodeID lookups for each ref, routed by number so they
+				// don't depend on parallel ordering.
+				r.Register(
+					issueNodeIDByNumberMatcher(200),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "BLOCKER_ID_200" } } } }`))
+				r.Register(
+					issueNodeIDByNumberMatcher(201),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "BLOCKER_ID_201" } } } }`))
+				r.Register(
+					issueNodeIDByNumberMatcher(300),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "BLOCKED_ID_300" } } } }`))
+				r.Register(
+					issueNodeIDByNumberMatcher(301),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "BLOCKED_ID_301" } } } }`))
+				// AddBlockedBy mutations, routed by their inputs so they
+				// also don't depend on parallel ordering.
+				// --blocked-by N: this issue is blocked by N
+				r.Register(
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+						return input["issueId"] == "ISSUE_ID_123" && input["blockingIssueId"] == "BLOCKER_ID_200"
+					}),
+					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "ISSUE_ID_123" } } } }`))
+				r.Register(
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+						return input["issueId"] == "ISSUE_ID_123" && input["blockingIssueId"] == "BLOCKER_ID_201"
+					}),
+					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "ISSUE_ID_123" } } } }`))
+				// --blocking N: N is blocked by this issue (args swapped)
+				r.Register(
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+						return input["issueId"] == "BLOCKED_ID_300" && input["blockingIssueId"] == "ISSUE_ID_123"
+					}),
+					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "BLOCKED_ID_300" } } } }`))
+				r.Register(
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+						return input["issueId"] == "BLOCKED_ID_301" && input["blockingIssueId"] == "ISSUE_ID_123"
+					}),
+					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "BLOCKED_ID_301" } } } }`))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
 			if tt.httpStubs != nil {
-				tt.httpStubs(httpReg)
+				tt.httpStubs(t, httpReg)
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
@@ -721,7 +1027,7 @@ func TestIssueCreate(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -754,7 +1060,7 @@ func TestIssueCreate_recover(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -838,7 +1144,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -901,7 +1207,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -947,17 +1253,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubRepoInfoResponse("OWNER", "REPO", "main")
-	http.Register(
-		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "suggestedActors": {
-			"nodes": [
-				{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
+	http.StubIssueRepoInfoResponse("OWNER", "REPO")
 	http.Register(
 		httpmock.GraphQL(`query RepositoryLabelList\b`),
 		httpmock.StringResponse(`
@@ -1030,18 +1326,29 @@ func TestIssueCreate_metadata(t *testing.T) {
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
+			"id": "NEWISSUEID",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
 	`, func(inputs map[string]interface{}) {
 			assert.Equal(t, "TITLE", inputs["title"])
 			assert.Equal(t, "BODY", inputs["body"])
-			assert.Equal(t, []interface{}{"MONAID"}, inputs["assigneeIds"])
+			if v, ok := inputs["assigneeIds"]; ok {
+				t.Errorf("did not expect assigneeIds: %v", v)
+			}
 			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
 			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
 			assert.NotContains(t, inputs, "userIds")
 			assert.NotContains(t, inputs, "teamIds")
 			assert.NotContains(t, inputs, "projectV2Ids")
+		}))
+	http.Register(
+		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
+	`, func(inputs map[string]interface{}) {
+			assert.Equal(t, "NEWISSUEID", inputs["assignableId"])
+			assert.Equal(t, []interface{}{"monalisa"}, inputs["actorLogins"])
 		}))
 
 	output, err := runCommand(http, true, `-t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`, nil)
@@ -1057,7 +1364,7 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -1084,7 +1391,7 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 		`),
 	)
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"id": "REPOID",
@@ -1092,26 +1399,26 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 		} } }
 	`))
 	http.Register(
-		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "suggestedActors": {
-			"nodes": [
-				{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" },
-				{ "login": "SomeOneElse", "id": "SOMEID", "name": "Someone else", "__typename": "User" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-	`))
-	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
+			"id": "NEWISSUEID",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
 	`, func(inputs map[string]interface{}) {
 			assert.Equal(t, "hello", inputs["title"])
 			assert.Equal(t, "cash rules everything around me", inputs["body"])
-			assert.Equal(t, []interface{}{"MONAID", "SOMEID"}, inputs["assigneeIds"])
+			if v, ok := inputs["assigneeIds"]; ok {
+				t.Errorf("did not expect assigneeIds: %v", v)
+			}
+		}))
+	http.Register(
+		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
+	`, func(inputs map[string]interface{}) {
+			assert.Equal(t, "NEWISSUEID", inputs["assignableId"])
+			assert.Equal(t, []interface{}{"MonaLisa", "someoneelse"}, inputs["actorLogins"])
 		}))
 
 	output, err := runCommand(http, true, `-a @me -a someoneelse -t hello -b "cash rules everything around me"`, nil)
@@ -1127,7 +1434,7 @@ func TestIssueCreate_AtCopilotAssignee(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"id": "REPOID",
@@ -1135,25 +1442,26 @@ func TestIssueCreate_AtCopilotAssignee(t *testing.T) {
 		} } }
 	`))
 	http.Register(
-		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "suggestedActors": {
-			"nodes": [
-				{ "login": "copilot-swe-agent", "id": "COPILOTID", "name": "Copilot (AI)", "__typename": "Bot" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-	`))
-	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
+			"id": "NEWISSUEID",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
 	`, func(inputs map[string]interface{}) {
 			assert.Equal(t, "hello", inputs["title"])
 			assert.Equal(t, "cash rules everything around me", inputs["body"])
-			assert.Equal(t, []interface{}{"COPILOTID"}, inputs["assigneeIds"])
+			if v, ok := inputs["assigneeIds"]; ok {
+				t.Errorf("did not expect assigneeIds: %v", v)
+			}
+		}))
+	http.Register(
+		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
+	`, func(inputs map[string]interface{}) {
+			assert.Equal(t, "NEWISSUEID", inputs["assignableId"])
+			assert.Equal(t, []interface{}{"copilot-swe-agent[bot]"}, inputs["actorLogins"])
 		}))
 
 	output, err := runCommand(http, true, `-a @copilot -t hello -b "cash rules everything around me"`, nil)
@@ -1168,7 +1476,7 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubRepoInfoResponse("OWNER", "REPO", "main")
+	http.StubIssueRepoInfoResponse("OWNER", "REPO")
 	http.Register(
 		httpmock.GraphQL(`query RepositoryProjectList\b`),
 		httpmock.StringResponse(`
@@ -1261,7 +1569,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 
 			reg := &httpmock.Registry{}
-			reg.StubRepoInfoResponse("OWNER", "REPO", "main")
+			reg.StubIssueRepoInfoResponse("OWNER", "REPO")
 			reg.Register(
 				// ( is required to avoid matching projectsV2
 				httpmock.GraphQL(`projects\(`),
@@ -1298,7 +1606,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 
 			reg := &httpmock.Registry{}
-			reg.StubRepoInfoResponse("OWNER", "REPO", "main")
+			reg.StubIssueRepoInfoResponse("OWNER", "REPO")
 			// ( is required to avoid matching projectsV2
 			reg.Exclude(t, httpmock.GraphQL(`projects\(`))
 
@@ -1393,4 +1701,31 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			reg.Verify(t)
 		})
 	})
+}
+
+// issueNodeIDByNumberMatcher matches an IssueNodeID GraphQL query whose
+// number variable equals the given value. Used by tests that issue
+// multiple IssueNodeID lookups and need stubs to route by issue number
+// rather than by registration order.
+func issueNodeIDByNumberMatcher(number int) httpmock.Matcher {
+	queryMatcher := httpmock.GraphQL(`query IssueNodeID\b`)
+	return func(req *http.Request) bool {
+		if !queryMatcher(req) {
+			return false
+		}
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return false
+		}
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		var b struct {
+			Variables struct {
+				Number int `json:"number"`
+			} `json:"variables"`
+		}
+		if err := json.Unmarshal(body, &b); err != nil {
+			return false
+		}
+		return b.Variables.Number == number
+	}
 }

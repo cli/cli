@@ -2,6 +2,9 @@ skip 'it modifies the user''s personal GitHub account SSH keys'
 
 # scopes admin:ssh_signing_key,admin:public_key
 
+# Generate a globally unique account SSH key
+generate-ssh-key sshKey.pub acceptance
+
 # Add an SSH key to the account
 exec gh ssh-key add sshKey.pub --title 'acceptance-test-key'
 
@@ -19,6 +22,3 @@ exec gh ssh-key delete --yes ${SSH_KEY_ID}
 # Check the key is deleted
 exec gh ssh-key list
 ! stdout 'acceptance-test-key'
-
--- sshKey.pub --
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAZmdeRNskfpvYL5YHB/YJaW8hTEXpnvPMkx5Ri+YwUr acceptance

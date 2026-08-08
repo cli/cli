@@ -20,14 +20,13 @@ func preloadIssueComments(client *http.Client, repo ghrepo.Interface, issue *api
 		} `graphql:"node(id: $id)"`
 	}
 
+	if !issue.Comments.PageInfo.HasNextPage {
+		return nil
+	}
+
 	variables := map[string]interface{}{
 		"id":        githubv4.ID(issue.ID),
-		"endCursor": (*githubv4.String)(nil),
-	}
-	if issue.Comments.PageInfo.HasNextPage {
-		variables["endCursor"] = githubv4.String(issue.Comments.PageInfo.EndCursor)
-	} else {
-		issue.Comments.Nodes = issue.Comments.Nodes[0:0]
+		"endCursor": githubv4.String(issue.Comments.PageInfo.EndCursor),
 	}
 
 	gql := api.NewClientFromHTTP(client)

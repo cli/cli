@@ -20,7 +20,7 @@ The organization in which the acceptance tests can manage resources in. Consider
 
 #### `GH_ACCEPTANCE_TOKEN`
 
-The token to use for authenticatin with the `GH_ACCEPTANCE_HOST`. This must already have the necessary scopes for each test, and must have permissions to act in the `GH_ACCEPTANCE_ORG`. See [Effective Test Authoring](#effective-test-authoring) for how tests must handle tokens without sufficient scopes.
+The token to use for authenticating with the `GH_ACCEPTANCE_HOST`. This must already have the necessary scopes for each test, and must have permissions to act in the `GH_ACCEPTANCE_ORG`. See [Effective Test Authoring](#effective-test-authoring) for how tests must handle tokens without sufficient scopes.
 
 It's recommended to create and use a Legacy PAT for this; Fine-Grained PATs do not offer all the necessary privileges required. You can use an OAuth token provided via `gh auth login --web` and can provide it to the acceptance tests via `GH_ACCEPTANCE_TOKEN=$(gh auth token --hostname <host>)` but this can be a bit confusing and annoying if you `gh auth login` again without `-s` and lose the required scopes.
 
@@ -101,6 +101,19 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
   # Create the PR
   exec gh pr create --title 'Feature Title' --body 'Feature Body' --assignee '@me' --label 'bug'
   stdout2env PR_URL
+  ```
+
+- `jq-assert`: evaluate a jq expression on a JSON environment variable and assert the result matches a regexp
+
+  ```txtar
+  jq-assert ISSUE_JSON '.title' 'Expected Title'
+  jq-assert DISCUSSION_JSON '.comments | length' '^2$'
+  ```
+
+- `jq2env`: evaluate a jq expression on a JSON environment variable and store the result in another environment variable
+
+  ```txtar
+  jq2env ISSUE_JSON '.title' ISSUE_TITLE
   ```
 
 ### Acceptance Test VS Code Support

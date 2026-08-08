@@ -406,7 +406,7 @@ func TestGetWorkflows(t *testing.T) {
 	}
 }
 
-// generateWorkflows returns an slice of workflows with the given count, labeled
+// generateWorkflows returns a slice of workflows with the given count, labeled
 // with the page number of testing pagination.
 // The page number is used to generate unique Names and IDs for each workflow.
 func generateWorkflows(t *testing.T, workflowCount int, pageNum int) []Workflow {

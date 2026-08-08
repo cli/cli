@@ -75,8 +75,10 @@ func searchPullRequests(httpClient *http.Client, detector fd.Detector, repo ghre
 	filters.Repo = ghrepo.FullName(repo)
 	filters.Entity = "pr"
 
+	// TODO advancedIssueSearchCleanup
 	if features.AdvancedIssueSearchAPI {
 		variables["q"] = prShared.SearchQueryBuild(filters, true)
+		// TODO advancedIssueSearchCleanup
 		if features.AdvancedIssueSearchAPIOptIn {
 			variables["type"] = "ISSUE_ADVANCED"
 		} else {

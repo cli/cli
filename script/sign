@@ -6,15 +6,25 @@
 set -e
 
 sign_macos() {
-  if [[ -z "$APPLE_DEVELOPER_ID" ]]; then
-    echo "skipping macOS code-signing; APPLE_DEVELOPER_ID not set" >&2
+  if [[ -z "$DO_SIGN_ARTIFACTS" || "$DO_SIGN_ARTIFACTS" == "false" ]]; then
+    echo "skipping macOS code-signing; DO_SIGN_ARTIFACTS not set or false" >&2
+    return 0
+  fi
+
+  if [[ -z "$DEVELOPER_ID_CERT_IDENTIFIER" ]]; then
+    echo "skipping macOS code-signing; DEVELOPER_ID_CERT_IDENTIFIER not set" >&2
+    return 0
+  fi
+
+  if [[ -z "$KEYCHAIN" ]]; then
+    echo "skipping macOS code-signing; KEYCHAIN not set" >&2
     return 0
   fi
 
   if [[ $1 == *.zip ]]; then
-    xcrun notarytool submit "$1" --apple-id "${APPLE_ID?}" --team-id "${APPLE_DEVELOPER_ID?}" --password "${APPLE_ID_PASSWORD?}"
+    xcrun notarytool submit "$1" --keychain "$KEYCHAIN" --keychain-profile "notarytool-password" --wait
   else
-    codesign --timestamp --options=runtime -s "${APPLE_DEVELOPER_ID?}" -v "$1"
+    codesign --timestamp --options=runtime -s "${DEVELOPER_ID_CERT_IDENTIFIER?}" -v "$1"
   fi
 }
 

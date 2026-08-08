@@ -15,7 +15,7 @@ func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
 		Short: "Manage GitHub secrets",
 		Long: heredoc.Docf(`
 			Secrets can be set at the repository, or organization level for use in
-			GitHub Actions or Dependabot. User, organization, and repository secrets can be set for
+			GitHub Actions, Agents, or Dependabot. User, organization, and repository secrets can be set for
 			use in GitHub Codespaces. Environment secrets can be set for use in
 			GitHub Actions. Run %[1]sgh help secret set%[1]s to learn how to get started.
 		`, "`"),

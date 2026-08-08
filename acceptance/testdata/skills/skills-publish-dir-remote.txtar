@@ -1,0 +1,58 @@
+# When a directory argument is provided to `gh skill publish --dry-run`,
+# the remote detection must use the target directory's git remotes,
+# not the current working directory's remotes.
+#
+# This test creates two separate git repos:
+#   - cwd-repo (the working directory) with remote pointing to owner/cwd-repo
+#   - target-repo (the dir argument) with remote pointing to owner/target-repo
+#
+# If the bug is present, the command would detect cwd-repo's remote instead of
+# target-repo's remote.
+
+# Set up credential helper
+exec gh auth setup-git
+
+# Create two test repos on GitHub
+exec gh repo create $ORG/$SCRIPT_NAME-cwd-$RANDOM_STRING --private --add-readme
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-cwd-$RANDOM_STRING
+
+exec gh repo create $ORG/$SCRIPT_NAME-target-$RANDOM_STRING --private --add-readme
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-target-$RANDOM_STRING
+
+# Clone both repos
+exec gh repo clone $ORG/$SCRIPT_NAME-cwd-$RANDOM_STRING cwd-repo
+exec gh repo clone $ORG/$SCRIPT_NAME-target-$RANDOM_STRING target-repo
+
+# Add a skill to the target repo only
+mkdir target-repo/skills/hello-world
+cp $WORK/skill.md target-repo/skills/hello-world/SKILL.md
+exec git -C $WORK/target-repo add -A
+exec git -C $WORK/target-repo commit -m 'Add test skill'
+exec git -C $WORK/target-repo push origin main
+
+# Run publish dry-run from cwd-repo, pointing at target-repo
+cd cwd-repo
+exec gh skill publish --dry-run $WORK/target-repo
+
+# Verify the output references the target repo, not the cwd repo
+stdout 'hello-world'
+
+# Publish with a tag from within cwd-repo, targeting target-repo
+exec gh skill publish --tag v0.1.0 $WORK/target-repo
+
+# Verify the release was created on the TARGET repo, not the cwd repo
+exec gh release view v0.1.0 --repo $ORG/$SCRIPT_NAME-target-$RANDOM_STRING
+stdout 'v0.1.0'
+
+# Verify NO release was created on the cwd repo
+! exec gh release view v0.1.0 --repo $ORG/$SCRIPT_NAME-cwd-$RANDOM_STRING
+
+-- skill.md --
+---
+name: hello-world
+description: A test skill that greets the user.
+---
+
+# Hello World
+
+Greet the user warmly.

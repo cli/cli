@@ -1,0 +1,4 @@
+# Search for something unlikely to exist returns empty stdout
+# NoResultsError is silent in non-TTY (exits 0 with no output)
+exec gh skill search zzzznonexistenttotallyfakeskillxyz123
+! stdout .

@@ -1,11 +1,99 @@
 package shared
 
 import (
+	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
+	ghmock "github.com/cli/cli/v2/internal/gh/mock"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestResolveCapiURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		resp    string
+		wantURL string
+		wantErr bool
+	}{
+		{
+			name:    "returns resolved URL",
+			resp:    `{"data":{"viewer":{"copilotEndpoints":{"api":"https://test-copilot-api.example.com"}}}}`,
+			wantURL: "https://test-copilot-api.example.com",
+		},
+		{
+			name:    "ghe.com tenant URL",
+			resp:    `{"data":{"viewer":{"copilotEndpoints":{"api":"https://test-copilot-api.tenant.example.com"}}}}`,
+			wantURL: "https://test-copilot-api.tenant.example.com",
+		},
+		{
+			name:    "empty URL returns error",
+			resp:    `{"data":{"viewer":{"copilotEndpoints":{"api":""}}}}`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			reg.Register(
+				httpmock.GraphQL(`query CopilotEndpoints\b`),
+				httpmock.StringResponse(tt.resp),
+			)
+
+			httpClient := &http.Client{Transport: reg}
+			url, err := resolveCapiURL(httpClient, "github.com")
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantURL, url)
+		})
+	}
+}
+
+func TestCapiClientFuncResolvesURL(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.GraphQL(`query CopilotEndpoints\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"copilotEndpoints":{"api":"https://test-copilot-api.example.com"}}}}`),
+	)
+
+	f := &cmdutil.Factory{
+		Config: func() (gh.Config, error) {
+			return &ghmock.ConfigMock{
+				AuthenticationFunc: func() gh.AuthConfig {
+					c := &config.AuthConfig{}
+					c.SetDefaultHost("github.com", "hosts")
+					c.SetActiveToken("gho_TOKEN", "oauth_token")
+					return c
+				},
+			}, nil
+		},
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+	}
+
+	clientFunc := CapiClientFunc(f)
+	client, err := clientFunc()
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	// Verify the GraphQL resolution was called
+	require.Len(t, reg.Requests, 1)
+}
 
 func TestIsSession(t *testing.T) {
 	assert.True(t, IsSessionID("00000000-0000-0000-0000-000000000000"))

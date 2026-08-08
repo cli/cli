@@ -169,7 +169,7 @@ func Test_transferRunSuccessfulIssueTransfer(t *testing.T) {
 			} } }`))
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 				{ "data": { "repository": {
 						"id": "dest-id",

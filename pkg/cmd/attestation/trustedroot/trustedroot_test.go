@@ -34,6 +34,9 @@ func TestNewTrustedRootCmd(t *testing.T) {
 			httpmock.ReplaceTripper(client, reg)
 			return client, nil
 		},
+		ExternalHttpClient: func() (*http.Client, error) {
+			return nil, nil
+		},
 	}
 
 	testcases := []struct {
@@ -120,6 +123,9 @@ func TestNewTrustedRootWithTenancy(t *testing.T) {
 				}, nil
 			},
 			HttpClient: httpClientFunc,
+			ExternalHttpClient: func() (*http.Client, error) {
+				return nil, nil
+			},
 		}
 
 		cmd := NewTrustedRootCmd(f, func(_ *Options) error {
@@ -148,6 +154,9 @@ func TestNewTrustedRootWithTenancy(t *testing.T) {
 				}, nil
 			},
 			HttpClient: httpClientFunc,
+			ExternalHttpClient: func() (*http.Client, error) {
+				return nil, nil
+			},
 		}
 
 		cmd := NewTrustedRootCmd(f, func(_ *Options) error {

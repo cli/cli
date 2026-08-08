@@ -1,0 +1,7 @@
+# Command completes successfully even when telemetry endpoint is unreachable
+env GH_TELEMETRY=enabled
+env GH_TELEMETRY_SAMPLE_RATE=100
+env GH_TELEMETRY_ENDPOINT_URL=http://localhost:1
+
+exec gh version
+stdout 'gh version'

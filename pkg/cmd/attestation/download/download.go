@@ -84,6 +84,11 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 				return err
 			}
 
+			externalClient, err := f.ExternalHttpClient()
+			if err != nil {
+				return err
+			}
+
 			if opts.Hostname == "" {
 				opts.Hostname, _ = ghauth.DefaultHost()
 			}
@@ -91,7 +96,7 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 				return err
 			}
 
-			opts.APIClient = api.NewLiveClient(hc, opts.Hostname, opts.Logger)
+			opts.APIClient = api.NewLiveClient(hc, externalClient, opts.Hostname, opts.Logger)
 			opts.OCIClient = oci.NewLiveClient()
 			opts.Store = NewLiveStore("")
 

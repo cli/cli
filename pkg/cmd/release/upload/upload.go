@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -43,6 +44,9 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 
 			To define a display label for an asset, append text starting with %[1]s#%[1]s after the
 			file name.
+
+			When using %[1]s--clobber%[1]s, existing assets are deleted before new assets are uploaded.
+			If the upload fails, the original assets will be lost.
 		`, "`"),
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -66,7 +70,7 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing assets of the same name")
+	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Delete and re-upload existing assets of the same name")
 
 	return cmd
 }
@@ -87,17 +91,12 @@ func uploadRun(opts *UploadOptions) error {
 		return err
 	}
 
-	uploadURL := release.UploadURL
-	if idx := strings.IndexRune(uploadURL, '{'); idx > 0 {
-		uploadURL = uploadURL[:idx]
-	}
-
 	var existingNames []string
 	for _, a := range opts.Assets {
 		sanitizedFileName := sanitizeFileName(a.Name)
 		for _, ea := range release.Assets {
 			if ea.Name == sanitizedFileName {
-				a.ExistingURL = ea.APIURL
+				a.ExistingURL = safeurl.NewImmutableSafeURL(ea.APIURL)
 				existingNames = append(existingNames, ea.Name)
 				break
 			}
@@ -108,8 +107,13 @@ func uploadRun(opts *UploadOptions) error {
 		return fmt.Errorf("asset under the same name already exists: %v", existingNames)
 	}
 
+	uploadURL := release.UploadURL
+	if idx := strings.IndexRune(uploadURL, '{'); idx > 0 {
+		uploadURL = uploadURL[:idx]
+	}
+
 	opts.IO.StartProgressIndicator()
-	err = shared.ConcurrentUpload(httpClient, uploadURL, opts.Concurrency, opts.Assets)
+	err = shared.ConcurrentUpload(httpClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err

@@ -4,45 +4,44 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"regexp"
-	"slices"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	xcolor "github.com/cli/go-gh/v2/pkg/x/color"
 )
 
 var ssoHeader string
 var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
 
-func New(appVersion string) *cmdutil.Factory {
+func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, executablePath string, telemetryDisabler ghtelemetry.Disabler) *cmdutil.Factory {
 	f := &cmdutil.Factory{
 		AppVersion:     appVersion,
-		Config:         configFunc(), // No factory dependencies
-		ExecutableName: "gh",
+		InvokingAgent:  invokingAgent,
+		Config:         cfgFunc,
+		ExecutablePath: executablePath,
 	}
 
-	f.IOStreams = ioStreams(f)                             // Depends on Config
-	f.HttpClient = httpClientFunc(f, appVersion)           // Depends on Config, IOStreams, and appVersion
-	f.PlainHttpClient = plainHttpClientFunc(f, appVersion) // Depends on IOStreams, and appVersion
-	f.GitClient = newGitClient(f)                          // Depends on IOStreams, and Executable
-	f.Remotes = remotesFunc(f)                             // Depends on Config, and GitClient
-	f.BaseRepo = BaseRepoFunc(f)                           // Depends on Remotes
-	f.Prompter = newPrompter(f)                            // Depends on Config and IOStreams
-	f.Browser = newBrowser(f)                              // Depends on Config, and IOStreams
-	f.ExtensionManager = extensionManager(f)               // Depends on Config, HttpClient, and IOStreams
-	f.Branch = branchFunc(f)                               // Depends on GitClient
+	f.IOStreams = ios
+	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
+	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
+	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
+	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
+	f.Remotes = remotesFunc(f)    // Depends on Config, and GitClient
+	f.BaseRepo = BaseRepoFunc(f.Remotes)
+	f.Prompter = newPrompter(f)              // Depends on Config and IOStreams
+	f.Browser = newBrowser(f)                // Depends on Config, and IOStreams
+	f.ExtensionManager = extensionManager(f) // Depends on Config, HttpClient, and IOStreams
+	f.Branch = branchFunc(f)                 // Depends on GitClient
 
 	return f
 }
@@ -72,9 +71,9 @@ func New(appVersion string) *cmdutil.Factory {
 // origin  https://github.com/cli/cli-fork.git (push)
 //
 // With this resolution function, the upstream will always be chosen (assuming we have authenticated with github.com).
-func BaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
+func BaseRepoFunc(remotesFunc func() (ghContext.Remotes, error)) func() (ghrepo.Interface, error) {
 	return func() (ghrepo.Interface, error) {
-		remotes, err := f.Remotes()
+		remotes, err := remotesFunc()
 		if err != nil {
 			return nil, err
 		}
@@ -186,18 +185,19 @@ func remotesFunc(f *cmdutil.Factory) func() (ghContext.Remotes, error) {
 	return rr.Resolver()
 }
 
-func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client, error) {
+func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
-		io := f.IOStreams
-		cfg, err := f.Config()
+		cfg, err := cfgFunc()
 		if err != nil {
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			Config:      cfg.Authentication(),
-			Log:         io.ErrOut,
-			LogColorize: io.ColorEnabled(),
-			AppVersion:  appVersion,
+			Config:            cfg.Authentication(),
+			Log:               ios.ErrOut,
+			LogColorize:       ios.ColorEnabled(),
+			AppVersion:        appVersion,
+			InvokingAgent:     invokingAgent,
+			TelemetryDisabler: telemetryDisabler,
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {
@@ -208,15 +208,16 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 	}
 }
 
-func plainHttpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client, error) {
+func plainHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
-		io := f.IOStreams
 		opts := api.HTTPClientOptions{
-			Log:         io.ErrOut,
-			LogColorize: io.ColorEnabled(),
-			AppVersion:  appVersion,
+			Log:           ios.ErrOut,
+			LogColorize:   ios.ColorEnabled(),
+			AppVersion:    appVersion,
+			InvokingAgent: invokingAgent,
 			// This is required to prevent automatic setting of auth and other headers.
 			SkipDefaultHeaders: true,
+			TelemetryDisabler:  telemetryDisabler,
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {
@@ -226,11 +227,20 @@ func plainHttpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Cl
 	}
 }
 
+func externalHttpClientFunc(ios *iostreams.IOStreams, appVersion string) func() (*http.Client, error) {
+	return func() (*http.Client, error) {
+		return api.NewExternalHTTPClient(api.ExternalHTTPClientOptions{
+			AppVersion:  appVersion,
+			Log:         ios.ErrOut,
+			LogColorize: ios.ColorEnabled(),
+		})
+	}
+}
+
 func newGitClient(f *cmdutil.Factory) *git.Client {
 	io := f.IOStreams
-	ghPath := f.Executable()
 	client := &git.Client{
-		GhPath: ghPath,
+		GhPath: f.ExecutablePath,
 		Stderr: io.ErrOut,
 		Stdin:  io.In,
 		Stdout: io.Out,
@@ -247,18 +257,6 @@ func newPrompter(f *cmdutil.Factory) prompter.Prompter {
 	editor, _ := cmdutil.DetermineEditor(f.Config)
 	io := f.IOStreams
 	return prompter.New(editor, io)
-}
-
-func configFunc() func() (gh.Config, error) {
-	var cachedConfig gh.Config
-	var configError error
-	return func() (gh.Config, error) {
-		if cachedConfig != nil || configError != nil {
-			return cachedConfig, configError
-		}
-		cachedConfig, configError = config.NewConfig()
-		return cachedConfig, configError
-	}
 }
 
 func branchFunc(f *cmdutil.Factory) func() (string, error) {
@@ -288,65 +286,6 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 	em.SetClient(api.NewCachedHTTPClient(client, time.Second*30))
 
 	return em
-}
-
-func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
-	io := iostreams.System()
-	cfg, err := f.Config()
-	if err != nil {
-		return io
-	}
-
-	if _, ghPromptDisabled := os.LookupEnv("GH_PROMPT_DISABLED"); ghPromptDisabled {
-		io.SetNeverPrompt(true)
-	} else if prompt := cfg.Prompt(""); prompt.Value == "disabled" {
-		io.SetNeverPrompt(true)
-	}
-
-	falseyValues := []string{"false", "0", "no", ""}
-
-	accessiblePrompterValue, accessiblePrompterIsSet := os.LookupEnv("GH_ACCESSIBLE_PROMPTER")
-	if accessiblePrompterIsSet {
-		if !slices.Contains(falseyValues, accessiblePrompterValue) {
-			io.SetAccessiblePrompterEnabled(true)
-		}
-	} else if prompt := cfg.AccessiblePrompter(""); prompt.Value == "enabled" {
-		io.SetAccessiblePrompterEnabled(true)
-	}
-
-	ghSpinnerDisabledValue, ghSpinnerDisabledIsSet := os.LookupEnv("GH_SPINNER_DISABLED")
-	if ghSpinnerDisabledIsSet {
-		if !slices.Contains(falseyValues, ghSpinnerDisabledValue) {
-			io.SetSpinnerDisabled(true)
-		}
-	} else if spinnerDisabled := cfg.Spinner(""); spinnerDisabled.Value == "disabled" {
-		io.SetSpinnerDisabled(true)
-	}
-
-	// Pager precedence
-	// 1. GH_PAGER
-	// 2. pager from config
-	// 3. PAGER
-	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
-		io.SetPager(ghPager)
-	} else if pager := cfg.Pager(""); pager.Value != "" {
-		io.SetPager(pager.Value)
-	}
-
-	if ghColorLabels, ghColorLabelsExists := os.LookupEnv("GH_COLOR_LABELS"); ghColorLabelsExists {
-		switch ghColorLabels {
-		case "", "0", "false", "no":
-			io.SetColorLabels(false)
-		default:
-			io.SetColorLabels(true)
-		}
-	} else if prompt := cfg.ColorLabels(""); prompt.Value == "enabled" {
-		io.SetColorLabels(true)
-	}
-
-	io.SetAccessibleColorsEnabled(xcolor.IsAccessibleColorsEnabled())
-
-	return io
 }
 
 // SSOURL returns the URL of a SAML SSO challenge received by the server for clients that use ExtractHeader

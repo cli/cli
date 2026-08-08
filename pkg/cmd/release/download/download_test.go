@@ -219,6 +219,37 @@ func Test_downloadRun(t *testing.T) {
 			},
 		},
 		{
+			name:  "downloads published release when the draft lookup is unauthorized",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				Destination: ".",
+				Concurrency: 2,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"),
+					httpmock.StringResponse(`{
+						"assets": [
+							{ "name": "linux.tgz", "size": 56, "url": "https://api.github.com/assets/5678" }
+						]
+					}`),
+				)
+				// An unauthenticated draft lookup fails over GraphQL and must not
+				// mask the published release found over REST.
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryReleaseByTag\b`),
+					httpmock.StatusStringResponse(403, `{"message":"This endpoint requires you to be authenticated."}`),
+				)
+				reg.Register(httpmock.REST("GET", "assets/5678"), httpmock.StringResponse(`5678`))
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantFiles: []string{
+				"linux.tgz",
+			},
+		},
+		{
 			name:  "download assets matching pattern into destination directory",
 			isTTY: true,
 			opts: DownloadOptions{
@@ -456,6 +487,129 @@ func Test_downloadRun(t *testing.T) {
 			},
 			wantStdout: `1234`,
 			wantStderr: ``,
+		},
+		{
+			name:  "download single asset to standard output refuses escape sequences on a TTY",
+			isTTY: true,
+			opts: DownloadOptions{
+				OutputFile:   "-",
+				TagName:      "v1.2.3",
+				Destination:  "",
+				Concurrency:  2,
+				FilePatterns: []string{"*windows-32bit.zip"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 12,
+						"url": "https://api.github.com/assets/1234" }
+					],
+					"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+					"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+				}`)
+
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse("\x1b[31mred\x1b[m"))
+			},
+			wantErr: "the asset contains terminal escape sequences; use `--output` to save it to a file, or pass --allow-escape-sequences to output it anyway",
+		},
+		{
+			name:  "download single asset to standard output passes escape sequences through with --allow-escape-sequences",
+			isTTY: true,
+			opts: DownloadOptions{
+				OutputFile:           "-",
+				TagName:              "v1.2.3",
+				Destination:          "",
+				Concurrency:          2,
+				FilePatterns:         []string{"*windows-32bit.zip"},
+				AllowEscapeSequences: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 12,
+						"url": "https://api.github.com/assets/1234" }
+					],
+					"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+					"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+				}`)
+
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse("\x1b[31mred\x1b[m"))
+			},
+			wantStdout: "\x1b[31mred\x1b[m",
+			wantStderr: ``,
+		},
+		{
+			name:  "download single asset to standard output refuses escape sequences when piped",
+			isTTY: false,
+			opts: DownloadOptions{
+				OutputFile:   "-",
+				TagName:      "v1.2.3",
+				Destination:  "",
+				Concurrency:  2,
+				FilePatterns: []string{"*windows-32bit.zip"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 12,
+						"url": "https://api.github.com/assets/1234" }
+					],
+					"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+					"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+				}`)
+
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse("\x1b[31mred\x1b[m"))
+			},
+			wantErr: "the asset contains terminal escape sequences; use `--output` to save it to a file, or pass --allow-escape-sequences to output it anyway",
+		},
+		{
+			name:  "download single binary asset to standard output streams raw when piped",
+			isTTY: false,
+			opts: DownloadOptions{
+				OutputFile:   "-",
+				TagName:      "v1.2.3",
+				Destination:  "",
+				Concurrency:  2,
+				FilePatterns: []string{"*windows-32bit.zip"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 24,
+						"url": "https://api.github.com/assets/1234" }
+					],
+					"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+					"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+				}`)
+
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse(string(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...))))
+			},
+			wantStdout: string(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...)),
+			wantStderr: ``,
+		},
+		{
+			name:  "download single binary asset to standard output is refused on a TTY",
+			isTTY: true,
+			opts: DownloadOptions{
+				OutputFile:   "-",
+				TagName:      "v1.2.3",
+				Destination:  "",
+				Concurrency:  2,
+				FilePatterns: []string{"*windows-32bit.zip"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 24,
+						"url": "https://api.github.com/assets/1234" }
+					],
+					"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+					"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+				}`)
+
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse(string(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...))))
+			},
+			wantErr: "refusing to output binary content (image/png) to the terminal; use `--output` to save it to a file, or pass --allow-escape-sequences to output it anyway",
 		},
 		{
 			name:  "draft release with null tarball_url and zipball_url",

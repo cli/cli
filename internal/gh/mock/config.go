@@ -4,9 +4,10 @@
 package ghmock
 
 import (
+	"sync"
+
 	"github.com/cli/cli/v2/internal/gh"
 	o "github.com/cli/cli/v2/pkg/option"
-	"sync"
 )
 
 // Ensure, that ConfigMock does implement gh.Config.
@@ -69,6 +70,9 @@ var _ gh.Config = &ConfigMock{}
 //			},
 //			SpinnerFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Spinner method")
+//			},
+//			TelemetryFunc: func() gh.ConfigEntry {
+//				panic("mock out the Telemetry method")
 //			},
 //			VersionFunc: func() o.Option[string] {
 //				panic("mock out the Version method")
@@ -133,6 +137,9 @@ type ConfigMock struct {
 
 	// SpinnerFunc mocks the Spinner method.
 	SpinnerFunc func(hostname string) gh.ConfigEntry
+
+	// TelemetryFunc mocks the Telemetry method.
+	TelemetryFunc func() gh.ConfigEntry
 
 	// VersionFunc mocks the Version method.
 	VersionFunc func() o.Option[string]
@@ -227,6 +234,9 @@ type ConfigMock struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
+		// Telemetry holds details about calls to the Telemetry method.
+		Telemetry []struct {
+		}
 		// Version holds details about calls to the Version method.
 		Version []struct {
 		}
@@ -251,6 +261,7 @@ type ConfigMock struct {
 	lockPrompt             sync.RWMutex
 	lockSet                sync.RWMutex
 	lockSpinner            sync.RWMutex
+	lockTelemetry          sync.RWMutex
 	lockVersion            sync.RWMutex
 	lockWrite              sync.RWMutex
 }
@@ -793,6 +804,33 @@ func (mock *ConfigMock) SpinnerCalls() []struct {
 	mock.lockSpinner.RLock()
 	calls = mock.calls.Spinner
 	mock.lockSpinner.RUnlock()
+	return calls
+}
+
+// Telemetry calls TelemetryFunc.
+func (mock *ConfigMock) Telemetry() gh.ConfigEntry {
+	if mock.TelemetryFunc == nil {
+		panic("ConfigMock.TelemetryFunc: method is nil but Config.Telemetry was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockTelemetry.Lock()
+	mock.calls.Telemetry = append(mock.calls.Telemetry, callInfo)
+	mock.lockTelemetry.Unlock()
+	return mock.TelemetryFunc()
+}
+
+// TelemetryCalls gets all the calls that were made to Telemetry.
+// Check the length with:
+//
+//	len(mockedConfig.TelemetryCalls())
+func (mock *ConfigMock) TelemetryCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockTelemetry.RLock()
+	calls = mock.calls.Telemetry
+	mock.lockTelemetry.RUnlock()
 	return calls
 }
 

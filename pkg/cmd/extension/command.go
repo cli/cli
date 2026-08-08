@@ -50,6 +50,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			When an extension is executed, gh will check for new versions once every 24 hours and display
 			an upgrade notice. See %[1]sgh help environment%[1]s for information on disabling extension notices.
 
+			Extensions are not verified, signed, or endorsed by GitHub. When you install or upgrade
+  			an extension, you are trusting its publisher. It is your responsibility to review the
+  			source and provenance of any extension before use.
+
 			For the list of available extensions, see <https://github.com/topics/gh-extension>.
 		`, "`"),
 		Aliases: []string{"extensions", "ext"},
@@ -415,6 +419,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			}
 			cmd.Flags().BoolVar(&forceFlag, "force", false, "Force upgrade extension, or ignore if latest already installed")
 			cmd.Flags().StringVar(&pinFlag, "pin", "", "Pin extension to a release tag or commit ref")
+			cmdutil.DisableAuthCheck(cmd)
 			return cmd
 		}(),
 		func() *cobra.Command {
@@ -453,9 +458,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			return cmd
 		}(),
 		&cobra.Command{
-			Use:   "remove <name>",
-			Short: "Remove an installed extension",
-			Args:  cobra.ExactArgs(1),
+			Use:     "remove <name>",
+			Short:   "Remove an installed extension",
+			Aliases: []string{"uninstall"},
+			Args:    cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				extName := normalizeExtensionSelector(args[0])
 				if err := m.Remove(extName); err != nil {

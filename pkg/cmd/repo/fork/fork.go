@@ -96,6 +96,16 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 
 			Additional %[1]sgit clone%[1]s flags can be passed after %[1]s--%[1]s.
 		`, "`"),
+		Example: heredoc.Doc(`
+			# Fork a repository
+			$ gh repo fork owner/repo
+
+			# Fork a repository and clone it locally
+			$ gh repo fork owner/repo --clone
+
+			# Fork a repository without cloning it, skip the prompt
+			$ gh repo fork owner/repo --clone=false
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptOk := opts.IO.CanPrompt()
 			if len(args) > 0 {
@@ -111,6 +121,10 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("--remote-name cannot be blank")
 			} else if !cmd.Flags().Changed("remote-name") {
 				opts.Rename = true // Any existing 'origin' will be renamed to upstream
+			}
+
+			if opts.Repository != "" && cmd.Flags().Changed("remote") {
+				return cmdutil.FlagErrorf("the `--remote` flag is unsupported when a repository argument is provided")
 			}
 
 			if promptOk {

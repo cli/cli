@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"time"
+
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 const defaultEventType = "gh_cli"
@@ -35,12 +36,12 @@ type Job struct {
 }
 
 type JobActor struct {
-	ID    int    `json:"id"`
+	ID    int64  `json:"id"`
 	Login string `json:"login"`
 }
 
 type JobPullRequest struct {
-	ID      int    `json:"id"`
+	ID      int64  `json:"id"`
 	Number  int    `json:"number"`
 	BaseRef string `json:"base_ref,omitempty"`
 }
@@ -51,7 +52,9 @@ type JobError struct {
 	Service            string `json:"service"`
 }
 
-const jobsBasePathV1 = baseCAPIURL + "/agents/swe/v1/jobs"
+func (c *CAPIClient) jobsBasePathV1() string {
+	return c.capiBaseURL + "/agents/swe/v1/jobs"
+}
 
 // CreateJob queues a new job using the v1 Jobs API. It may or may not
 // return Pull Request information. If Pull Request information is required
@@ -64,7 +67,10 @@ func (c *CAPIClient) CreateJob(ctx context.Context, owner, repo, problemStatemen
 		return nil, errors.New("problem statement is required")
 	}
 
-	url := fmt.Sprintf("%s/%s/%s", jobsBasePathV1, url.PathEscape(owner), url.PathEscape(repo))
+	u, err := safeurl.JoinPathWithHostPrefix(c.jobsBasePathV1(), owner, repo)
+	if err != nil {
+		return nil, err
+	}
 
 	prOpts := JobPullRequest{}
 	if baseBranch != "" {
@@ -80,7 +86,7 @@ func (c *CAPIClient) CreateJob(ctx context.Context, owner, repo, problemStatemen
 
 	b, _ := json.Marshal(payload)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +112,7 @@ func (c *CAPIClient) CreateJob(ctx context.Context, owner, repo, problemStatemen
 	if res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusOK { // accept 201 or 200
 		statusText := fmt.Sprintf("%d %s", res.StatusCode, http.StatusText(res.StatusCode))
 
-		// If the response has error embeded, we can use that.
+		// If the response has error embedded, we can use that.
 		// TODO: Does this really ever happen?
 		if j.ErrorInfo != nil {
 			return nil, fmt.Errorf("failed to create job: %s: %s", statusText, j.ErrorInfo.Message)
@@ -125,13 +131,16 @@ func (c *CAPIClient) CreateJob(ctx context.Context, owner, repo, problemStatemen
 	return &j, nil
 }
 
-// GetJob retrieves a agent job
+// GetJob retrieves an agent job
 func (c *CAPIClient) GetJob(ctx context.Context, owner, repo, jobID string) (*Job, error) {
 	if owner == "" || repo == "" || jobID == "" {
 		return nil, errors.New("owner, repo, and jobID are required")
 	}
-	url := fmt.Sprintf("%s/%s/%s/%s", jobsBasePathV1, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(jobID))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	u, err := safeurl.JoinPathWithHostPrefix(c.jobsBasePathV1(), owner, repo, jobID)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}

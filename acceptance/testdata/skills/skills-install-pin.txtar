@@ -1,0 +1,7 @@
+# Install with --pin to a specific ref
+exec gh skill install github/awesome-copilot git-commit --scope user --force --pin main
+stdout 'Installed git-commit'
+
+# Install without --pin should resolve latest version
+exec gh skill install github/awesome-copilot git-commit --scope user --force
+stdout 'Installed git-commit'

@@ -1,0 +1,3 @@
+# Installing a skill that doesn't exist in a valid repo should error
+! exec gh skill install github/awesome-copilot nonexistent-skill-xyz --force --dir $WORK/tmp
+stderr 'not found'

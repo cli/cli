@@ -173,6 +173,32 @@ func Test_listURLWithQuery(t *testing.T) {
 			want:    "https://example.com/path?q=label%3A%22help+wanted%22+label%3Adocs+milestone%3A%22Codename+%5C%22What+Was+Missing%5C%22%22+state%3Aopen+type%3Apr",
 			wantErr: false,
 		},
+		{
+			name: "issue type",
+			args: args{
+				listURL: "https://example.com/path",
+				options: FilterOptions{
+					Entity:    "issue",
+					State:     "open",
+					IssueType: "Bug",
+				},
+			},
+			want:    "https://example.com/path?q=state%3Aopen+type%3ABug+type%3Aissue",
+			wantErr: false,
+		},
+		{
+			name: "issue type with spaces is quoted",
+			args: args{
+				listURL: "https://example.com/path",
+				options: FilterOptions{
+					Entity:    "issue",
+					State:     "open",
+					IssueType: `Hot "Spicy" Bug`,
+				},
+			},
+			want:    "https://example.com/path?q=state%3Aopen+type%3A%22Hot+%5C%22Spicy%5C%22+Bug%22+type%3Aissue",
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -329,6 +355,37 @@ func TestCopilotReplacer_ReplaceSlice(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := NewCopilotReplacer(tt.returnLogin)
 			got := r.ReplaceSlice(tt.args.handles)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCopilotReviewerReplacer_ReplaceSlice(t *testing.T) {
+	tests := []struct {
+		name    string
+		handles []string
+		want    []string
+	}{
+		{
+			name:    "replaces @copilot with reviewer login",
+			handles: []string{"monalisa", "@copilot", "hubot"},
+			want:    []string{"monalisa", "copilot-pull-request-reviewer", "hubot"},
+		},
+		{
+			name:    "handles @copilot case-insensitively",
+			handles: []string{"@Copilot", "user", "@CoPiLoT"},
+			want:    []string{"copilot-pull-request-reviewer", "user", "copilot-pull-request-reviewer"},
+		},
+		{
+			name:    "handles no @copilot mentions",
+			handles: []string{"monalisa", "user", "hubot"},
+			want:    []string{"monalisa", "user", "hubot"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewCopilotReviewerReplacer()
+			got := r.ReplaceSlice(tt.handles)
 			require.Equal(t, tt.want, got)
 		})
 	}

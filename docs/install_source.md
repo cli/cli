@@ -1,6 +1,6 @@
 # Installation from source
 
-1. Verify that you have Go 1.25+ installed
+1. Verify that you have Go 1.26+ installed
 
    ```sh
    $ go version

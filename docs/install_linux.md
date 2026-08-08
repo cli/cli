@@ -2,6 +2,34 @@
 
 ## Recommended _(Official)_
 
+> [!IMPORTANT]
+> Our Linux packages and repository metadata are signed with the following PGP key fingerprints:
+> - `2C6106201985B60E6C7AC87323F3D4EA75716059`
+> - `7F38BBB59D064DBCB3D84D725612B36462313325`
+>
+> You may be prompted to confirm the import of these keys during installation.
+>
+> <details><summary>Expand for SHA256/SHA512/MD5 checksums of our official keyring files.</summary>
+> <p>
+>
+>  **For security reasons, it is strongly recommended to only rely on SHA256/SHA512 checksums. MD5 checksums below are only for legacy systems where SHA256/SHA512 tooling is not available.**
+>
+> - `https://cli.github.com/packages/githubcli-archive-keyring.gpg` (Binary):
+>    ```
+>    SHA256: 6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b
+>    SHA512: ce6b9466dbd2a90b3227e177aa9b8187bd2405b1c29f91d78de83b9699dbbe2af35efd733bf53da622e7a38c59a7bc55539d63a3deae3c9ff9c2bff8af626434
+>    MD5:    23748c0965069fb1edae1b83c17890e1
+>    ```
+> - `https://cli.github.com/packages/githubcli-archive-keyring.asc` (ASCII-armored):
+>    ```
+>    SHA256: cec6e9ed82d3949ca5f4428cc968b41ef5e7416cb3653cdfc2a421977663bbfd
+>    SHA512: 2ca9487d88a508a1c87f06b46ba336b11cc5f20bd83915b4c2acde49d2cffbbce76af1641bf8494c29a765f96bc1fd694ebde2954b28b80dcc76376b6f1b766d
+>    MD5:    97100400ef48007b69e42be348cc6582
+>    ```
+>
+> </p>
+> </details>
+
 ### Debian
 
 Debian packages are hosted on the [GitHub CLI marketing site](https://cli.github.com/) for various operating systems including:
@@ -33,6 +61,13 @@ sudo apt update
 sudo apt install gh
 ```
 
+> [!TIP]
+> To verify PGP keys before installing `gh`, you can run this and match the listed fingerprints with those at the top of this document:
+>
+> ```shell
+> curl -fsSL -o - https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --show-keys
+> ```
+
 ### RPM
 
 RPM packages are hosted on the [GitHub CLI marketing site](https://cli.github.com) for various operating systems including:
@@ -46,6 +81,15 @@ RPM packages are hosted on the [GitHub CLI marketing site](https://cli.github.co
 
 These packages are supported by the GitHub CLI maintainers with updates powered by [GitHub CLI deployment workflow](https://github.com/cli/cli/actions/workflows/deployment.yml).
 
+> [!TIP]
+> During installation, you may be prompted to confirm the import of PGP keys. You can verify the keys with the list of fingerprints at the top of this document.
+>
+> To verify the PGP keys before installing `gh`, you can run the following command and match the listed fingerprints with those at the top of this document:
+>
+> ```shell
+> curl -fsSL -o - https://cli.github.com/packages/githubcli-archive-keyring.asc | gpg --show-keys
+> ```
+
 #### DNF5
 
 > [!IMPORTANT]
@@ -56,7 +100,7 @@ To install:
 ```bash
 sudo dnf install dnf5-plugins
 sudo dnf config-manager addrepo --from-repofile=https://cli.github.com/packages/rpm/gh-cli.repo
-sudo dnf install gh --repo gh-cli
+sudo dnf install gh
 ```
 
 To upgrade:
@@ -75,7 +119,7 @@ To install:
 ```bash
 sudo dnf install 'dnf-command(config-manager)'
 sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-sudo dnf install gh --repo gh-cli
+sudo dnf install gh
 ```
 
 To upgrade:
@@ -121,7 +165,7 @@ sudo zypper update gh
 
 [Homebrew](https://brew.sh/) is a free and open-source software package management system that simplifies the installation of software on Apple's operating system, macOS, as well as Linux.
 
-The [GitHub CLI formulae](https://formulae.brew.sh/formula/gh) is supported by the GitHub CLI maintainers with help from our friends at Homebrew with updated powered by [homebrew/hoomebrew-core](https://github.com/Homebrew/homebrew-core/blob/main/Formula/g/gh.rb).
+The [GitHub CLI formulae](https://formulae.brew.sh/formula/gh) is supported by the GitHub CLI maintainers with help from our friends at Homebrew with updates powered by [homebrew/homebrew-core](https://github.com/Homebrew/homebrew-core/blob/main/Formula/g/gh.rb).
 
 To install:
 
@@ -209,7 +253,7 @@ conda update gh --channel conda-forge
 
 ### Debian Community
 
-The [GitHub CLI package](https://packages.debian.org/bookworm/gh) is supported by the Debian community with updates powered by [Debian Go Packaging Team](https://salsa.debian.org/go-team/packages/gh).
+The [GitHub CLI package](https://packages.debian.org/stable/gh) is supported by the Debian community with updates powered by [Debian Go Packaging Team](https://salsa.debian.org/go-team/packages/gh).
 
 > [!NOTE]
 > As of November 2025, GitHub CLI maintainers strongly recommend [official Debian packages](#debian) especially as the community-distributed `2.45.x` / `2.46.x` version is broken due to deprecated GitHub APIs.
@@ -422,7 +466,7 @@ The [GitHub CLI package](https://webinstall.dev/gh/) is supported by the Webi co
 To install:
 
 ```shell
-curl -sS https://webi.sh/gh \| sh
+curl -sS https://webi.sh/gh | sh
 ```
 
 To upgrade:

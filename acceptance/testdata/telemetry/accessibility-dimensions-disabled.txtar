@@ -1,0 +1,9 @@
+# Telemetry log mode records accessibility features as disabled by default
+env GH_TELEMETRY=log
+env GH_TELEMETRY_SAMPLE_RATE=100
+
+exec gh version
+stderr '"accessible_colors": "false"'
+stderr '"accessible_prompter": "false"'
+stderr '"color_labels": "false"'
+stderr '"spinner_disabled": "false"'

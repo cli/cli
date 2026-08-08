@@ -42,7 +42,7 @@ func TestFetchRefSHA(t *testing.T) {
 			tagName:         "v1.2.3",
 			responseStatus:  500,
 			responseMessage: `arbitrary error"`,
-			errorMessage:    "HTTP 500: arbitrary error\" (https://api.github.com/repos/owner/repo/git/ref/tags/v1.2.3)",
+			errorMessage:    "HTTP 500: arbitrary error\" (https://api.github.com/repos/owner/repo/git/ref/tags%2Fv1.2.3)",
 		},
 		{
 			name:           "malformed JSON with 200",
@@ -61,7 +61,7 @@ func TestFetchRefSHA(t *testing.T) {
 			repo, err := ghrepo.FromFullName("owner/repo")
 			require.NoError(t, err)
 
-			path := "repos/owner/repo/git/ref/tags/" + tt.tagName
+			path := "repos/owner/repo/git/ref/tags%2F" + tt.tagName
 			if tt.responseStatus == 404 || tt.responseStatus == 500 {
 				fakeHTTP.Register(
 					httpmock.REST("GET", path),
@@ -89,6 +89,41 @@ func TestFetchRefSHA(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedSHA, sha)
 			}
+		})
+	}
+}
+
+func TestDigestAlgForRef(t *testing.T) {
+	tests := []struct {
+		name     string
+		digest   string
+		expected string
+	}{
+		{
+			name:     "sha1 (40 hex chars)",
+			digest:   "1234567890abcdef1234567890abcdef12345678",
+			expected: "sha1",
+		},
+		{
+			name:     "sha256 (64 hex chars)",
+			digest:   "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			expected: "sha256",
+		},
+		{
+			name:     "empty string defaults to sha1",
+			digest:   "",
+			expected: "sha1",
+		},
+		{
+			name:     "unexpected length defaults to sha1",
+			digest:   "abc",
+			expected: "sha1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, DigestAlgForRef(tt.digest))
 		})
 	}
 }

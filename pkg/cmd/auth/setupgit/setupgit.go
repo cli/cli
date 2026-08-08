@@ -53,7 +53,7 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.CredentialsHelperConfig = &gitcredentials.HelperConfig{
-				SelfExecutablePath: f.Executable(),
+				SelfExecutablePath: f.ExecutablePath,
 				GitClient:          f.GitClient,
 			}
 			if opts.Hostname == "" && opts.Force {

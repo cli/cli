@@ -15,6 +15,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"golang.org/x/sync/errgroup"
 )
@@ -33,7 +34,7 @@ type AssetForUpload struct {
 	MIMEType string
 	Open     func() (io.ReadCloser, error)
 
-	ExistingURL string
+	ExistingURL safeurl.SafeURL
 }
 
 func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
@@ -111,7 +112,7 @@ func fileExt(fn string) string {
 	return path.Ext(fn)
 }
 
-func ConcurrentUpload(httpClient httpDoer, uploadURL string, numWorkers int, assets []*AssetForUpload) error {
+func ConcurrentUpload(httpClient httpDoer, uploadURL safeurl.SafeURL, numWorkers int, assets []*AssetForUpload) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -142,8 +143,8 @@ func shouldRetry(err error) bool {
 // Allow injecting backoff interval in tests.
 var retryInterval = time.Millisecond * 200
 
-func uploadWithDelete(ctx context.Context, httpClient httpDoer, uploadURL string, a AssetForUpload) error {
-	if a.ExistingURL != "" {
+func uploadWithDelete(ctx context.Context, httpClient httpDoer, uploadURL safeurl.SafeURL, a AssetForUpload) error {
+	if a.ExistingURL != nil && a.ExistingURL.String() != "" {
 		if err := deleteAsset(ctx, httpClient, a.ExistingURL); err != nil {
 			return err
 		}
@@ -158,8 +159,8 @@ func uploadWithDelete(ctx context.Context, httpClient httpDoer, uploadURL string
 	}, backoff.WithContext(backoff.WithMaxRetries(bo, 3), ctx))
 }
 
-func uploadAsset(ctx context.Context, httpClient httpDoer, uploadURL string, asset AssetForUpload) (*ReleaseAsset, error) {
-	u, err := url.Parse(uploadURL)
+func uploadAsset(ctx context.Context, httpClient httpDoer, uploadURL safeurl.SafeURL, asset AssetForUpload) (*ReleaseAsset, error) {
+	u, err := url.Parse(uploadURL.String())
 	if err != nil {
 		return nil, err
 	}
@@ -168,13 +169,16 @@ func uploadAsset(ctx context.Context, httpClient httpDoer, uploadURL string, ass
 	params.Set("label", asset.Label)
 	u.RawQuery = params.Encode()
 
+	// Since u is derived from uploadURL, an already-trusted safeurl.SafeURL, the resulting URL is safe to declare as such.
+	safeURL := safeurl.NewImmutableSafeURL(u.String())
+
 	f, err := asset.Open()
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), f)
+	req, err := http.NewRequestWithContext(ctx, "POST", safeURL.String(), f)
 	if err != nil {
 		return nil, err
 	}
@@ -202,8 +206,8 @@ func uploadAsset(ctx context.Context, httpClient httpDoer, uploadURL string, ass
 	return &newAsset, nil
 }
 
-func deleteAsset(ctx context.Context, httpClient httpDoer, assetURL string) error {
-	req, err := http.NewRequestWithContext(ctx, "DELETE", assetURL, nil)
+func deleteAsset(ctx context.Context, httpClient httpDoer, assetURL safeurl.SafeURL) error {
+	req, err := http.NewRequestWithContext(ctx, "DELETE", assetURL.String(), nil)
 	if err != nil {
 		return err
 	}

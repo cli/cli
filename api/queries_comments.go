@@ -129,7 +129,7 @@ func (c Comment) Identifier() string {
 }
 
 func (c Comment) AuthorLogin() string {
-	return c.Author.Login
+	return c.Author.DisplayName()
 }
 
 func (c Comment) Association() string {

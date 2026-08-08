@@ -9,12 +9,13 @@ import (
 )
 
 const (
-	errorProjectsV2ReadScope         = "field requires one of the following scopes: ['read:project']"
-	errorProjectsV2UserField         = "Field 'projectsV2' doesn't exist on type 'User'"
-	errorProjectsV2RepositoryField   = "Field 'projectsV2' doesn't exist on type 'Repository'"
-	errorProjectsV2OrganizationField = "Field 'projectsV2' doesn't exist on type 'Organization'"
-	errorProjectsV2IssueField        = "Field 'projectItems' doesn't exist on type 'Issue'"
-	errorProjectsV2PullRequestField  = "Field 'projectItems' doesn't exist on type 'PullRequest'"
+	errorProjectsV2ReadScope             = "field requires one of the following scopes: ['read:project']"
+	errorProjectsV2UserField             = "Field 'projectsV2' doesn't exist on type 'User'"
+	errorProjectsV2RepositoryField       = "Field 'projectsV2' doesn't exist on type 'Repository'"
+	errorProjectsV2OrganizationField     = "Field 'projectsV2' doesn't exist on type 'Organization'"
+	errorProjectsV2IssueField            = "Field 'projectItems' doesn't exist on type 'Issue'"
+	errorProjectsV2PullRequestField      = "Field 'projectItems' doesn't exist on type 'PullRequest'"
+	errorProjectsV2ResourceNotAccessible = "Resource not accessible by"
 )
 
 type ProjectV2 struct {
@@ -106,6 +107,9 @@ func ProjectsV2ItemsForIssue(client *Client, repo ghrepo.Interface, issue *Issue
 			return err
 		}
 		for _, projectItemNode := range query.Repository.Issue.ProjectItems.Nodes {
+			if projectItemNode == nil {
+				continue
+			}
 			items.Nodes = append(items.Nodes, &ProjectV2Item{
 				ID: projectItemNode.ID,
 				Project: ProjectV2ItemProject{
@@ -175,6 +179,9 @@ func ProjectsV2ItemsForPullRequest(client *Client, repo ghrepo.Interface, pr *Pu
 		}
 
 		for _, projectItemNode := range query.Repository.PullRequest.ProjectItems.Nodes {
+			if projectItemNode == nil {
+				continue
+			}
 			items.Nodes = append(items.Nodes, &ProjectV2Item{
 				ID: projectItemNode.ID,
 				Project: ProjectV2ItemProject{
@@ -314,11 +321,12 @@ func CurrentUserProjectsV2(client *Client, hostname string) ([]ProjectV2, error)
 	return projectsV2, nil
 }
 
-// When querying ProjectsV2 fields we generally dont want to show the user
-// scope errors and field does not exist errors. ProjectsV2IgnorableError
-// checks against known error strings to see if an error can be safely ignored.
-// Due to the fact that the GraphQLClient can return multiple types of errors
-// this uses brittle string comparison to check against the known error strings.
+// When querying ProjectsV2 fields we generally don't want to show the user
+// scope errors, field does not exist errors, or authorization errors.
+// ProjectsV2IgnorableError checks against known error strings to see if an
+// error can be safely ignored. Due to the fact that the GraphQLClient can
+// return multiple types of errors this uses brittle string comparison to check
+// against the known error strings.
 func ProjectsV2IgnorableError(err error) bool {
 	msg := err.Error()
 	if strings.Contains(msg, errorProjectsV2ReadScope) ||
@@ -326,7 +334,8 @@ func ProjectsV2IgnorableError(err error) bool {
 		strings.Contains(msg, errorProjectsV2RepositoryField) ||
 		strings.Contains(msg, errorProjectsV2OrganizationField) ||
 		strings.Contains(msg, errorProjectsV2IssueField) ||
-		strings.Contains(msg, errorProjectsV2PullRequestField) {
+		strings.Contains(msg, errorProjectsV2PullRequestField) ||
+		strings.Contains(msg, errorProjectsV2ResourceNotAccessible) {
 		return true
 	}
 	return false

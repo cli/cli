@@ -12,9 +12,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -58,6 +60,28 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "edit {<id> | <url>} [<filename>]",
 		Short: "Edit one of your gists",
+		Example: heredoc.Doc(`
+			# Select a gist to edit interactively
+			$ gh gist edit
+
+			# Edit a gist file in the default editor
+			$ gh gist edit 1234567890abcdef1234567890abcdef
+
+			# Edit a specific file in the gist
+			$ gh gist edit 1234567890abcdef1234567890abcdef --filename hello.py
+
+			# Replace a gist file with content from a local file
+			$ gh gist edit 1234567890abcdef1234567890abcdef --filename hello.py hello.py
+
+			# Add a new file to the gist
+			$ gh gist edit 1234567890abcdef1234567890abcdef --add newfile.py
+
+			# Change the description of the gist
+			$ gh gist edit 1234567890abcdef1234567890abcdef --desc "new description"
+
+			# Remove a file from the gist
+			$ gh gist edit 1234567890abcdef1234567890abcdef --remove hello.py
+		`),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 2 {
 				return cmdutil.FlagErrorf("too many arguments")
@@ -264,12 +288,14 @@ func editRun(opts *EditOptions) error {
 		file := gist.Files[filename]
 		if file.Truncated {
 			if _, alreadyEdited := filesToUpdate[filename]; !alreadyEdited {
-				fullContent, err := shared.GetRawGistFile(client, file.RawURL)
+				fullContent, err := shared.GetRawGistFile(client, safeurl.NewImmutableSafeURL(file.RawURL))
 				if err != nil {
 					return err
 				}
 
-				gistFile.Content = fullContent
+				// Round-trip path: the content is opened in an editor and sent
+				// back to the API, so the raw bytes must be preserved verbatim.
+				gistFile.Content = fullContent.Raw()
 			}
 		}
 
@@ -379,8 +405,11 @@ func updateGist(apiClient *api.Client, hostname string, gist gistToUpdate) error
 	requestBody := bytes.NewReader(requestByte)
 	result := shared.Gist{}
 
-	path := "gists/" + gist.id
-	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
+	path, err := safeurl.JoinPath("gists", gist.id)
+	if err != nil {
+		return err
+	}
+	err = apiClient.REST(hostname, "POST", path.String(), requestBody, &result)
 	if err != nil {
 		return err
 	}

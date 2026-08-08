@@ -84,9 +84,9 @@ func TestNewCmdDelete(t *testing.T) {
 			wantsErr: "--ref cannot be used with cache ID",
 		},
 		{
-			name:     "ref flag with all flag",
-			cli:      "--all --ref refs/heads/main",
-			wantsErr: "--ref cannot be used with --all",
+			name:  "ref flag with all flag",
+			cli:   "--all --ref refs/heads/main",
+			wants: DeleteOptions{DeleteAll: true, Ref: "refs/heads/main"},
 		},
 	}
 
@@ -373,6 +373,82 @@ func TestDeleteRun(t *testing.T) {
 			},
 			wantErr:    true,
 			wantErrMsg: "X Could not find a cache matching existing-cache-key (with ref invalid-ref) in OWNER/REPO",
+		},
+		{
+			name: "deletes all caches with ref",
+			opts: DeleteOptions{DeleteAll: true, Ref: "refs/heads/main"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/caches", url.Values{
+						"ref": []string{"refs/heads/main"},
+					}),
+					httpmock.JSONResponse(shared.CachePayload{
+						ActionsCaches: []shared.Cache{
+							{
+								Id:             123,
+								Key:            "foo",
+								Ref:            "refs/heads/main",
+								CreatedAt:      time.Date(2021, 1, 1, 1, 1, 1, 1, time.UTC),
+								LastAccessedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+							},
+							{
+								Id:             456,
+								Key:            "bar",
+								Ref:            "refs/heads/main",
+								CreatedAt:      time.Date(2021, 1, 1, 1, 1, 1, 1, time.UTC),
+								LastAccessedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+							},
+						},
+						TotalCount: 2,
+					}),
+				)
+				reg.Register(
+					httpmock.REST("DELETE", "repos/OWNER/REPO/actions/caches/123"),
+					httpmock.StatusStringResponse(204, ""),
+				)
+				reg.Register(
+					httpmock.REST("DELETE", "repos/OWNER/REPO/actions/caches/456"),
+					httpmock.StatusStringResponse(204, ""),
+				)
+			},
+			tty:        true,
+			wantStdout: "✓ Deleted 2 caches from OWNER/REPO\n",
+		},
+		{
+			name: "no caches to delete when deleting all with ref",
+			opts: DeleteOptions{DeleteAll: true, Ref: "refs/heads/main"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/caches", url.Values{
+						"ref": []string{"refs/heads/main"},
+					}),
+					httpmock.JSONResponse(shared.CachePayload{
+						ActionsCaches: []shared.Cache{},
+						TotalCount:    0,
+					}),
+				)
+			},
+			tty:        false,
+			wantErr:    true,
+			wantErrMsg: "X No caches to delete",
+		},
+		{
+			name: "no caches to delete when deleting all for ref but succeed on no cache tty",
+			opts: DeleteOptions{DeleteAll: true, SucceedOnNoCaches: true, Ref: "refs/heads/main"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/caches", url.Values{
+						"ref": []string{"refs/heads/main"},
+					}),
+					httpmock.JSONResponse(shared.CachePayload{
+						ActionsCaches: []shared.Cache{},
+						TotalCount:    0,
+					}),
+				)
+			},
+			tty:        true,
+			wantErr:    false,
+			wantStdout: "✓ No caches to delete\n",
 		},
 	}
 

@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	accept          = "Accept"
+	apiVersion      = "X-GitHub-Api-Version"
+	apiVersionValue = "2022-11-28"
 	authorization   = "Authorization"
 	cacheTTL        = "X-GH-CACHE-TTL"
 	graphqlFeatures = "GraphQL-Features"
@@ -118,14 +119,9 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 
 	resp, err := restClient.Request(method, p, body)
 	if err != nil {
-		return "", err
+		return "", handleResponse(err)
 	}
 	defer resp.Body.Close()
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return "", HandleHTTPError(resp)
-	}
 
 	if resp.StatusCode == http.StatusNoContent {
 		return "", nil
@@ -264,6 +260,7 @@ func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOpt
 		AuthToken: "none",
 		Headers: map[string]string{
 			authorization: "",
+			apiVersion:    apiVersionValue,
 		},
 		Host:               hostname,
 		SkipDefaultHeaders: true,

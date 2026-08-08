@@ -1,19 +1,16 @@
 package list
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type deployKey struct {
-	ID        int       `json:"id"`
+	ID        int64     `json:"id"`
 	Key       string    `json:"key"`
 	Title     string    `json:"title"`
 	CreatedAt time.Time `json:"created_at"`
@@ -21,30 +18,17 @@ type deployKey struct {
 }
 
 func repoKeys(httpClient *http.Client, repo ghrepo.Interface) ([]deployKey, error) {
-	path := fmt.Sprintf("repos/%s/%s/keys?per_page=100", repo.RepoOwner(), repo.RepoName())
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "keys")
 	if err != nil {
 		return nil, err
 	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
+	u.SetQuery("per_page", "100")
 
 	var keys []deployKey
-	err = json.Unmarshal(b, &keys)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), "GET", u.String(), nil, &keys)
 	if err != nil {
 		return nil, err
 	}

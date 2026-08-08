@@ -18,6 +18,7 @@ import (
 	clicontext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -76,13 +77,13 @@ type apiClient interface {
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
-	GetCodespacesMachines(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*api.Machine, error)
-	GetCodespacesPermissionsCheck(ctx context.Context, repoID int, branch string, devcontainerPath string) (bool, error)
+	GetCodespacesMachines(ctx context.Context, repoID int64, branch string, location string, devcontainerPath string) ([]*api.Machine, error)
+	GetCodespacesPermissionsCheck(ctx context.Context, repoID int64, branch string, devcontainerPath string) (bool, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
-	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
+	ListDevContainers(ctx context.Context, repoID int64, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
 	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
 	GetCodespaceBillableOwner(ctx context.Context, nwo string) (*api.User, error)
-	HTTPClient() (*http.Client, error)
+	ExternalHTTPClient() (*http.Client, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")
@@ -249,6 +250,12 @@ func addDeprecatedRepoShorthand(cmd *cobra.Command, target *string) error {
 	}
 
 	return nil
+}
+
+// validateNWO returns an error if nwo is not a valid "owner/repo" repository reference.
+func validateNWO(nwo string) error {
+	_, _, err := safeurl.RepoPartsFromNWO(nwo)
+	return err
 }
 
 // filterCodespacesByRepoOwner filters a list of codespaces by the owner of the repository.

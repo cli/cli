@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -144,10 +145,13 @@ func checkRun(opts *CheckOptions) error {
 
 	var rules []shared.RulesetRule
 
-	endpoint := fmt.Sprintf("repos/%s/%s/rules/branches/%s", repoI.RepoOwner(), repoI.RepoName(), url.PathEscape(opts.Branch))
+	endpoint, err := safeurl.JoinPath("repos", repoI.RepoOwner(), repoI.RepoName(), "rules", "branches", opts.Branch)
+	if err != nil {
+		return err
+	}
 
-	if err = client.REST(repoI.RepoHost(), "GET", endpoint, nil, &rules); err != nil {
-		return fmt.Errorf("GET %s failed: %w", endpoint, err)
+	if err = client.REST(repoI.RepoHost(), "GET", endpoint.String(), nil, &rules); err != nil {
+		return fmt.Errorf("GET %s failed: %w", endpoint.String(), err)
 	}
 
 	w := opts.IO.Out

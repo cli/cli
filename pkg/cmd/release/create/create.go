@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -534,7 +535,7 @@ func createRun(opts *CreateOptions) error {
 		if !draftWhileUploading {
 			return err
 		}
-		if cleanupErr := deleteRelease(httpClient, newRelease); cleanupErr != nil {
+		if cleanupErr := deleteRelease(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(newRelease.APIURL)); cleanupErr != nil {
 			return fmt.Errorf("%w\ncleaning up draft failed: %v", err, cleanupErr)
 		}
 		return err
@@ -547,14 +548,14 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		err = shared.ConcurrentUpload(httpClient, uploadURL, opts.Concurrency, opts.Assets)
+		err = shared.ConcurrentUpload(httpClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return cleanupDraftRelease(err)
 		}
 
 		if draftWhileUploading {
-			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory, opts.IsLatest)
+			rel, err := publishRelease(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(newRelease.APIURL), opts.DiscussionCategory, opts.IsLatest)
 			if err != nil {
 				return cleanupDraftRelease(err)
 			}

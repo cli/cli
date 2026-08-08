@@ -1,0 +1,39 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Create a release in the repo
+exec gh release create v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --notes 'awesome release' --latest
+
+# Upload an asset to the release
+exec gh release upload v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING asset.txt
+
+# Delete the asset from the release
+exec gh release delete-asset v1.2.3 asset.txt --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --yes
+
+# Verify the release has no assets
+exec gh release view v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --json assets --jq '.assets | length'
+stdout '0'
+
+# Downloading the deleted asset should fail
+! exec gh release download v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING
+stderr 'no assets to download'
+
+# Delete the release and its tag
+exec gh release delete v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --yes --cleanup-tag
+
+# Wait for tag deletion to become visible through the ref lookup
+sleep 5
+
+# Verify the release is gone
+! exec gh release view v1.2.3 --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING
+stderr 'release not found'
+
+# Verify the tag is gone
+! exec gh api repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING/git/ref/tags/v1.2.3
+stderr 'Not Found'
+
+-- asset.txt --
+Hello, world!

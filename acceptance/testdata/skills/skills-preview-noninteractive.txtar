@@ -1,0 +1,3 @@
+# Preview with repo only and non-interactive should error
+! exec gh skill preview github/awesome-copilot
+stderr 'must specify a skill name'

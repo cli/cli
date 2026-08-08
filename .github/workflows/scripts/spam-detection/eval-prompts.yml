@@ -918,7 +918,7 @@ testData:
 
       We have an automation to nudge on issues waiting for user info (like after one week), and close the issue if there's no further activity (like after one more week).
 
-      - Automatically add the stale label to issues labelled needs-user-input after 30 days of inactivity. When the stale label is added, also post a comment to the issue explaining what this means: the issue will close after 30 days of inactivity; contributors can comment on the issue to remove the stale label and keep it open. Maintainers can also add the keep label to make the stale automation ignore that issue.
+      - Automatically add the stale label to issues labelled more-info-needed after 30 days of inactivity. When the stale label is added, also post a comment to the issue explaining what this means: the issue will close after 30 days of inactivity; contributors can comment on the issue to remove the stale label and keep it open. Maintainers can also add the keep label to make the stale automation ignore that issue.
       - Automatically close issues labelled stale after they have been stale for 30 days. When the issue is closed, add a comment explaining why this happened. Encourage them to leave a comment if the close was done in error.
       - The above automation should only act on new issues after the date of the automation's implementation.
       </BODY>
@@ -5034,3 +5034,6 @@ testData:
   - name: 'not spam, #9383 (https://github.com/cli/cli/issues/9383)'
     expected: PASS
     input: "<TITLE>\nMake `gh secret` set selected repositories without re-defining the value\n</TITLE>\n\n<BODY>\n### Describe the feature or problem you’d like to solve\r\n\r\nI need to manage my organization secrets and I want to update the selected repositories.\r\n\r\nKind of how it's done with the dedicated REST API:\r\nhttps://docs.github.com/en/rest/actions/secrets?apiVersion=2022-11-28#set-selected-repositories-for-an-organization-secret (but with repository names instead of IDs)\r\n\r\nAt the moment when skipping  `--body`\r\n\r\n```sh\r\ngh secret set MY_SECRET --org my-org --visibility selected --repos repo1,repo2\r\n```\r\n\r\nit read from reads from standard input:\r\n\r\n```txt\r\n? Paste your secret:\r\n```\r\n\r\n### Proposed solution\r\n\r\nHow will it benefit CLI and its users?\r\n\r\nWe can add an extra tag that tells the CLI not to touch the previous secret value at all:\r\n\r\n```sh\r\ngh secret set MY_SECRET --org my-org --keep-previous-body --visibility selected --repos repo1,repo2\r\n```\r\n\r\nNot sure about the `-keep-previous-body` tag name.\r\n\r\nBut for sure I think it will be cumbersome to add an extra `gh secret` command for that.\r\n\r\n### Additional context\r\n\r\nMay be related to:\r\n- https://github.com/cli/cli/issues/6327\r\n\r\n</BODY>"
+  - name: 'not spam, #13783 (https://github.com/cli/cli/issues/13783)'
+    expected: PASS
+    input: "<TITLE>\nmissing installation instructions for Amazon Linux 2023\n</TITLE>\n\n<BODY>\nPR at https://github.com/cli/cli/pull/13782\n</BODY>"

@@ -1,0 +1,25 @@
+# Official extension stubs (the hidden commands suggesting installation of
+# GitHub-owned extensions) are safe to report via telemetry: their command
+# names come from a fixed, hard-coded registry and do not contain any
+# user-authored identifiers.
+
+env GH_TELEMETRY=log
+env GH_TELEMETRY_SAMPLE_RATE=100
+
+# Ensure CI auto-install behavior does not kick in for this test;
+# we want the non-TTY "print install instructions and exit non-zero" path.
+env CI=''
+env BUILD_NUMBER=''
+env RUN_ID=''
+
+# `stack` is registered in extensions.OfficialExtensions. Since no real
+# extension is installed, the hidden stub runs and, in a non-TTY session
+# outside CI, prints install instructions and exits non-zero.
+! exec gh stack
+stderr 'gh extension install github/gh-stack'
+
+# The stub invocation records a command_invocation event for the stub's
+# command path.
+stderr 'Telemetry payload:'
+stderr '"type": "command_invocation"'
+stderr '"command": "gh stack"'

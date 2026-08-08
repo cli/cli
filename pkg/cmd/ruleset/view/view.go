@@ -150,7 +150,7 @@ func viewRun(opts *ViewOptions) error {
 		}
 
 		if rs != nil {
-			opts.ID = strconv.Itoa(rs.DatabaseId)
+			opts.ID = strconv.FormatInt(rs.DatabaseId, 10)
 
 			// can't get a ruleset lower in the chain than what was queried, so no need to handle repos here
 			if rs.Source.TypeName == "Organization" {
@@ -185,7 +185,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	fmt.Fprintf(w, "\n%s\n", cs.Bold(rs.Name))
-	fmt.Fprintf(w, "ID: %s\n", cs.Cyan(strconv.Itoa(rs.Id)))
+	fmt.Fprintf(w, "ID: %s\n", cs.Cyan(strconv.FormatInt(rs.Id, 10)))
 	fmt.Fprintf(w, "Source: %s (%s)\n", rs.Source, rs.SourceType)
 
 	fmt.Fprint(w, "Enforcement: ")
@@ -262,7 +262,7 @@ func selectRulesetID(rsList *shared.RulesetList, p prompter.Prompter, cs *iostre
 	for i, rs := range rsList.Rulesets {
 		s := fmt.Sprintf(
 			"%s: %s | %s | contains %s | configured in %s",
-			cs.Cyan(strconv.Itoa(rs.DatabaseId)),
+			cs.Cyan(strconv.FormatInt(rs.DatabaseId, 10)),
 			rs.Name,
 			strings.ToLower(rs.Enforcement),
 			text.Pluralize(rs.Rules.TotalCount, "rule"),

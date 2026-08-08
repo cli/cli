@@ -1,0 +1,14 @@
+{
+  "name": "Sample: gh run watch",
+  "savedAt": "2026-06-06T19:17:45.741Z",
+  "content": "[muted]$[/muted] [b]gh run watch[/b]\n\nRefreshing run status every 3 seconds. Press Ctrl+C to quit.\n\n[brgreen]✓[/brgreen] trunk CI · [muted]4815162342[/muted]\nTriggered via push about 1 minute ago\n\n[brgreen]JOBS[/brgreen]\n[brgreen]✓[/brgreen] lint in 12s ([link]ID 8675309001[/link])\n[brgreen]✓[/brgreen] test (ubuntu-latest) in 1m4s ([link]ID 8675309002[/link])\n[brgreen]✓[/brgreen] test (macos-latest) in 1m22s ([link]ID 8675309003[/link])\n[brgreen]✓[/brgreen] test (windows-latest) in 1m41s ([link]ID 8675309004[/link])\n[brgreen]✓[/brgreen] build in 38s ([link]ID 8675309005[/link])\n\n[brgreen]✓[/brgreen] Run trunk CI completed with 'success'",
+  "options": {
+    "font": "menlo",
+    "fontSize": 14,
+    "width": 800,
+    "chrome": "macos",
+    "backdrop": "grid",
+    "bodyGradient": false,
+    "autoStyle": true
+  }
+}

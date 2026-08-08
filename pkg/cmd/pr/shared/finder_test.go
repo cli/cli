@@ -160,6 +160,11 @@ func TestParseFullReference(t *testing.T) {
 			arg:     "OWNER/#123",
 			wantErr: `invalid reference: "OWNER/#123"`,
 		},
+		{
+			name:    "invalid full form, too large number",
+			arg:     "OWNER/REPO#9999999999999999999",
+			wantErr: `invalid reference: "OWNER/REPO#9999999999999999999"; strconv.Atoi: parsing "9999999999999999999": value out of range`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -320,25 +325,6 @@ func TestFind(t *testing.T) {
 				fields:   []string{},
 			},
 			wantErr: true,
-		},
-		{
-			name: "number only",
-			args: args{
-				selector:   "13",
-				fields:     []string{"number"},
-				baseRepoFn: stubBaseRepoFn(ghrepo.New("ORIGINOWNER", "REPO"), nil),
-				branchFn: func() (string, error) {
-					return "blueberries", nil
-				},
-				gitConfigClient: stubGitConfigClient{
-					readBranchConfigFn:  stubBranchConfig(git.BranchConfig{}, nil),
-					pushDefaultFn:       stubPushDefault(git.PushDefaultSimple, nil),
-					remotePushDefaultFn: stubRemotePushDefault("", nil),
-				},
-			},
-			httpStub: nil,
-			wantPR:   13,
-			wantRepo: "https://github.com/ORIGINOWNER/REPO",
 		},
 		{
 			name: "pr number zero",

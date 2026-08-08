@@ -1,0 +1,22 @@
+# Dry-run update should find the installed skill and report status
+exec gh skill update --dry-run --all --dir $WORK/skills-dir
+stdout 'git-commit'
+
+# Force update should re-download and rewrite files
+exec gh skill update --force --all --dir $WORK/skills-dir
+stdout 'Updated'
+
+# Verify the SKILL.md was rewritten with real content (not our placeholder)
+grep 'github-repo' $WORK/skills-dir/git-commit/SKILL.md
+! grep 'Test skill content' $WORK/skills-dir/git-commit/SKILL.md
+
+-- skills-dir/git-commit/SKILL.md --
+---
+name: git-commit
+description: Git commit helper
+metadata:
+  github-repo: https://github.com/github/awesome-copilot.git
+  github-tree-sha: 0000000000000000000000000000000000000000
+  github-path: skills/git-commit
+---
+Test skill content

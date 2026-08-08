@@ -1,6 +1,7 @@
 package verify
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
@@ -39,7 +40,7 @@ func TestNewEnforcementCriteria(t *testing.T) {
 
 		c, err := newEnforcementCriteria(opts)
 		require.NoError(t, err)
-		require.Equal(t, "(?i)^https://github.com/foo/bar/", c.SANRegex)
+		require.Equal(t, `(?i)^https://github\.com/foo/bar/`, c.SANRegex)
 		require.Zero(t, c.SAN)
 	})
 
@@ -55,7 +56,7 @@ func TestNewEnforcementCriteria(t *testing.T) {
 
 		c, err := newEnforcementCriteria(opts)
 		require.NoError(t, err)
-		require.Equal(t, "(?i)^https://baz.ghe.com/foo/bar/", c.SANRegex)
+		require.Equal(t, `(?i)^https://baz\.ghe\.com/foo/bar/`, c.SANRegex)
 		require.Zero(t, c.SAN)
 	})
 
@@ -70,7 +71,7 @@ func TestNewEnforcementCriteria(t *testing.T) {
 
 		c, err := newEnforcementCriteria(opts)
 		require.NoError(t, err)
-		require.Equal(t, "^https://github.com/foo/bar/.github/workflows/attest.yml", c.SANRegex)
+		require.Equal(t, `^https://github\.com/foo/bar/\.github/workflows/attest\.yml`, c.SANRegex)
 		require.Zero(t, c.SAN)
 	})
 
@@ -83,7 +84,7 @@ func TestNewEnforcementCriteria(t *testing.T) {
 
 		c, err := newEnforcementCriteria(opts)
 		require.NoError(t, err)
-		require.Equal(t, "(?i)^https://github.com/foo/bar/", c.SANRegex)
+		require.Equal(t, `(?i)^https://github\.com/foo/bar/`, c.SANRegex)
 	})
 
 	t.Run("sets SANRegex using opts.Owner", func(t *testing.T) {
@@ -94,7 +95,23 @@ func TestNewEnforcementCriteria(t *testing.T) {
 
 		c, err := newEnforcementCriteria(opts)
 		require.NoError(t, err)
-		require.Equal(t, "(?i)^https://github.com/foo/", c.SANRegex)
+		require.Equal(t, `(?i)^https://github\.com/foo/`, c.SANRegex)
+	})
+
+	t.Run("SANRegex escapes regex metacharacters in repo names", func(t *testing.T) {
+		opts := &Options{
+			ArtifactPath: artifactPath,
+			SignerRepo:   "my.org/my.repo",
+		}
+
+		c, err := newEnforcementCriteria(opts)
+		require.NoError(t, err)
+		require.Equal(t, `(?i)^https://github\.com/my\.org/my\.repo/`, c.SANRegex)
+
+		// Verify the generated regex does NOT match a lookalike repo
+		re := regexp.MustCompile(c.SANRegex)
+		require.True(t, re.MatchString("https://github.com/my.org/my.repo/.github/workflows/build.yml"))
+		require.False(t, re.MatchString("https://github.com/myXorg/myXrepo/.github/workflows/build.yml"))
 	})
 
 	t.Run("sets Extensions.RunnerEnvironment to GitHubRunner value if opts.DenySelfHostedRunner is true", func(t *testing.T) {
@@ -280,25 +297,25 @@ func TestValidateSignerWorkflow(t *testing.T) {
 		{
 			name:                   "workflow with default host",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  "^https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
+			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml`,
 			host:                   "github.com",
 		},
 		{
 			name:                   "workflow with workflow URL included",
 			providedSignerWorkflow: "github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  "^https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
+			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml`,
 			host:                   "github.com",
 		},
 		{
 			name:                   "workflow with GH_HOST set",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  "^https://myhost.github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
+			expectedWorkflowRegex:  `^https://myhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml`,
 			host:                   "myhost.github.com",
 		},
 		{
 			name:                   "workflow with authenticated host",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  "^https://authedhost.github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
+			expectedWorkflowRegex:  `^https://authedhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml`,
 			host:                   "authedhost.github.com",
 		},
 	}

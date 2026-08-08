@@ -4,6 +4,8 @@ updates:
   directory: "/"
   schedule:
     interval: "daily"
+  cooldown:
+    default-days: 3
   ignore:
     - dependency-name: "*"
       update-types:
@@ -12,3 +14,9 @@ updates:
   directory: "/"
   schedule:
       interval: "daily"
+  cooldown:
+    default-days: 3
+  groups:
+    codeql-actions:
+      patterns:
+        - "github/codeql-action/*"

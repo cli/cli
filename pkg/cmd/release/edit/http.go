@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/shurcooL/githubv4"
 )
@@ -20,15 +22,19 @@ func editRelease(httpClient *http.Client, repo ghrepo.Interface, releaseID int64
 		return nil, err
 	}
 
-	path := fmt.Sprintf("repos/%s/%s/releases/%d", repo.RepoOwner(), repo.RepoName(), releaseID)
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(bodyBytes))
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", strconv.FormatInt(releaseID, 10))
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("PATCH", url.String(), bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client because its return shape depends on the response status code, which api.Client.REST does not expose on success.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err

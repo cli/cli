@@ -1,0 +1,64 @@
+# Full publish lifecycle: create repo, publish, install from it, clean up
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a private repo for testing
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --private --add-readme
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+cd $SCRIPT_NAME-$RANDOM_STRING
+
+# Add a test skill
+mkdir skills/hello-world/scripts
+cp $WORK/skill.md skills/hello-world/SKILL.md
+cp $WORK/setup.sh skills/hello-world/scripts/setup.sh
+exec git add -A
+exec git commit -m 'Add test skill'
+exec git push origin main
+
+# Publish with a tag
+exec gh skill publish --tag v0.1.0
+
+# Verify the release was created on GitHub
+exec gh release view v0.1.0
+stdout 'v0.1.0'
+
+# Install from our test repo
+exec gh skill install $ORG/$SCRIPT_NAME-$RANDOM_STRING hello-world --scope user --force
+stdout 'Installed hello-world'
+
+# Verify installed files exist with correct metadata
+exists $HOME/.copilot/skills/hello-world/SKILL.md
+exists $HOME/.copilot/skills/hello-world/scripts/setup.sh
+grep 'github-repo' $HOME/.copilot/skills/hello-world/SKILL.md
+
+# Install with --pin
+exec gh skill install $ORG/$SCRIPT_NAME-$RANDOM_STRING hello-world --scope user --force --pin v0.1.0
+stdout 'Installed hello-world'
+
+# Preview from our test repo
+exec gh skill preview $ORG/$SCRIPT_NAME-$RANDOM_STRING hello-world
+stdout 'Hello World'
+
+# Update dry-run should find installed skill
+exec gh skill update --dry-run --all
+stderr 'up to date'
+
+-- skill.md --
+---
+name: hello-world
+description: A test skill that greets the user.
+---
+
+# Hello World
+
+Greet the user warmly and offer to run the setup script.
+
+-- setup.sh --
+#!/bin/bash
+echo "Hello from the hello-world skill!"
+echo "Setting up environment..."
+echo "Done."

@@ -1,0 +1,31 @@
+# Updating a namespaced skill via --dir must write back to its original
+# location and must NOT delete the original directory (issue #13370).
+
+# Dry-run update should detect the namespaced skill and report an update
+exec gh skill update --dry-run --all --dir $WORK/skills-dir
+stdout 'git-commit'
+
+# Force update should re-download in-place
+exec gh skill update --force --all --dir $WORK/skills-dir
+stdout 'Updated'
+
+# Verify the SKILL.md was rewritten at the ORIGINAL namespaced location
+grep 'github-repo' $WORK/skills-dir/anthropics-skills/git-commit/SKILL.md
+! grep 'Test skill content' $WORK/skills-dir/anthropics-skills/git-commit/SKILL.md
+
+# The namespace directory must still exist (not deleted)
+exists $WORK/skills-dir/anthropics-skills/git-commit/SKILL.md
+
+# The skill must NOT have been relocated to a flat path
+! exists $WORK/skills-dir/git-commit/SKILL.md
+
+-- skills-dir/anthropics-skills/git-commit/SKILL.md --
+---
+name: git-commit
+description: Git commit helper
+metadata:
+  github-repo: https://github.com/github/awesome-copilot.git
+  github-tree-sha: 0000000000000000000000000000000000000000
+  github-path: skills/git-commit
+---
+Test skill content

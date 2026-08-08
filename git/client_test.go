@@ -2164,3 +2164,123 @@ func createMockedCommandContext(t *testing.T, commands mockedCommands) commandCt
 		return cmd
 	}
 }
+
+func TestClientRemoteURL(t *testing.T) {
+	tests := []struct {
+		name          string
+		cmdExitStatus int
+		cmdStdout     string
+		cmdStderr     string
+		wantCmdArgs   string
+		wantURL       string
+		wantErrorMsg  string
+	}{
+		{
+			name:        "returns remote URL",
+			cmdStdout:   "https://github.com/monalisa/skills-repo.git\n",
+			wantCmdArgs: "path/to/git remote get-url -- origin",
+			wantURL:     "https://github.com/monalisa/skills-repo.git",
+		},
+		{
+			name:          "git error",
+			cmdExitStatus: 1,
+			cmdStderr:     "fatal: No such remote 'nonexistent'",
+			wantCmdArgs:   "path/to/git remote get-url -- nonexistent",
+			wantErrorMsg:  "failed to run git: fatal: No such remote 'nonexistent'",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
+			client := Client{
+				GitPath:        "path/to/git",
+				commandContext: cmdCtx,
+			}
+			remoteName := "origin"
+			if tt.wantErrorMsg != "" {
+				remoteName = "nonexistent"
+			}
+			url, err := client.RemoteURL(context.Background(), remoteName)
+			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			if tt.wantErrorMsg == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantURL, url)
+			} else {
+				assert.EqualError(t, err, tt.wantErrorMsg)
+			}
+		})
+	}
+
+	// Covers the early return in RemoteURL when Command() itself fails.
+	// (e.g. git binary not resolvable).
+	t.Run("returns error when git has a fatal error", func(t *testing.T) {
+		t.Setenv("PATH", "")
+		client := Client{}
+		_, err := client.RemoteURL(context.Background(), "origin")
+		assert.Error(t, err)
+	})
+}
+
+func TestClientIsIgnored(t *testing.T) {
+	tests := []struct {
+		name          string
+		cmdExitStatus int
+		cmdStdout     string
+		cmdStderr     string
+		wantCmdArgs   string
+		wantIgnored   bool
+		wantErr       bool
+	}{
+		{
+			name:        "path is ignored",
+			wantCmdArgs: "path/to/git check-ignore -q -- .github/skills",
+			wantIgnored: true,
+		},
+		{
+			name:          "path is not ignored",
+			cmdExitStatus: 1,
+			wantCmdArgs:   "path/to/git check-ignore -q -- .github/skills",
+			wantIgnored:   false,
+		},
+		{
+			name:          "fatal git error",
+			cmdExitStatus: 128,
+			cmdStderr:     "fatal: not a git repository",
+			wantCmdArgs:   "path/to/git check-ignore -q -- .github/skills",
+			wantIgnored:   false,
+			wantErr:       true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
+			client := Client{
+				GitPath:        "path/to/git",
+				commandContext: cmdCtx,
+			}
+			ignored, err := client.IsIgnored(context.Background(), ".github/skills")
+			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			assert.Equal(t, tt.wantIgnored, ignored)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+
+	// Covers the early return in IsIgnored when Command() itself fails
+	// (e.g. git binary not resolvable).
+	t.Run("returns error when git has a fatal error", func(t *testing.T) {
+		t.Setenv("PATH", "")
+		client := Client{}
+		ignored, err := client.IsIgnored(context.Background(), ".github/skills")
+		assert.False(t, ignored)
+		assert.Error(t, err)
+	})
+}
+
+func TestShortSHA(t *testing.T) {
+	assert.Equal(t, "abc123de", ShortSHA("abc123def456789"))
+	assert.Equal(t, "short", ShortSHA("short"))
+}

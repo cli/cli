@@ -1,0 +1,39 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+cd $SCRIPT_NAME-$RANDOM_STRING
+
+# Create a parent, a sub-issue, a blocker, and a blocked target
+exec gh issue create --title 'parent' --body ''
+stdout2env PARENT_URL
+
+exec gh issue create --title 'sub' --body ''
+stdout2env SUB_URL
+
+exec gh issue create --title 'blocker' --body ''
+stdout2env BLOCKER_URL
+
+exec gh issue create --title 'blocked' --body ''
+stdout2env BLOCKED_URL
+
+# Create the main issue wired up to all four
+exec gh issue create --title 'main' --body '' --type 'Bug' --parent $PARENT_URL --blocked-by $BLOCKER_URL --blocking $BLOCKED_URL
+stdout2env MAIN_URL
+
+# Attach the sub-issue
+exec gh issue edit $MAIN_URL --add-sub-issue $SUB_URL
+
+# Non-tty view should include all the new Issues 2.0 fields
+exec gh issue view $MAIN_URL
+stdout '^issue-type:\tBug$'
+stdout '^parent:\t.+/.+#[0-9]+$'
+stdout '^sub-issues:\t.+/.+#[0-9]+$'
+stdout '^sub-issues-completed:\t0/1$'
+stdout '^blocked-by:\t.+/.+#[0-9]+$'
+stdout '^blocking:\t.+/.+#[0-9]+$'

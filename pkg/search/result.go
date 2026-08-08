@@ -114,7 +114,7 @@ type RepositoriesResult struct {
 type IssuesResult struct {
 	IncompleteResults bool    `json:"incomplete_results"`
 	Items             []Issue `json:"items"`
-	// Number of isssues matching the query on the server. Ignoring limit.
+	// Number of issues matching the query on the server. Ignoring limit.
 	Total int `json:"total_count"`
 }
 

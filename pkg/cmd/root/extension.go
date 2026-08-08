@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/update"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
@@ -26,7 +27,7 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 		checkExtensionReleaseInfo = checkForExtensionUpdate
 	}
 
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   ext.Name(),
 		Short: fmt.Sprintf("Extension %s", ext.Name()),
 		// PreRun handles looking up whether extension has a latest version only when the command is ran.
@@ -73,12 +74,21 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 				// This is being handled in non-blocking default as there is no context to cancel like in gh update checks.
 			}
 		},
-		GroupID: "extension",
-		Annotations: map[string]string{
-			"skipAuthCheck": "true",
-		},
+		GroupID:            "extension",
 		DisableFlagParsing: true,
 	}
+
+	cmdutil.DisableAuthCheck(cmd)
+	// Extensions are user-installed and their names can be arbitrary
+	// (potentially including sensitive identifiers such as project or
+	// organization names), so we must not record telemetry for them by
+	// default. Official GitHub-owned extensions are a known, fixed set and
+	// can safely contribute their command name to telemetry.
+	if !extensions.IsOfficial(ext.Name(), ext.Owner()) {
+		cmdutil.DisableTelemetry(cmd)
+	}
+
+	return cmd
 }
 
 func checkForExtensionUpdate(em extensions.ExtensionManager, ext extensions.Extension) (*update.ReleaseInfo, error) {

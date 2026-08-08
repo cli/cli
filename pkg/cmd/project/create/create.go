@@ -27,7 +27,7 @@ type createConfig struct {
 
 type createProjectMutation struct {
 	CreateProjectV2 struct {
-		ProjectV2 queries.Project `graphql:"projectV2"`
+		ProjectV2 queries.ProjectMutationQuery `graphql:"projectV2"`
 	} `graphql:"createProjectV2(input:$input)"`
 }
 
@@ -104,7 +104,7 @@ func createArgs(config createConfig) (*createProjectMutation, map[string]interfa
 	}
 }
 
-func printResults(config createConfig, project queries.Project) error {
+func printResults(config createConfig, project queries.ProjectMutationQuery) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}

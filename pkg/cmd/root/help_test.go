@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -74,7 +75,7 @@ func TestKramdownCompatibleDocs(t *testing.T) {
 		},
 	}
 
-	cmd, err := NewCmdRoot(f, "N/A", "")
+	cmd, err := NewCmdRoot(f, &telemetry.NoOpService{}, "N/A", "")
 	require.NoError(t, err)
 
 	var walk func(*cobra.Command)

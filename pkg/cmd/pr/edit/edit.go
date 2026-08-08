@@ -12,6 +12,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -68,15 +69,36 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			- %[1]s@me%[1]s: assign or unassign yourself
 			- %[1]s@copilot%[1]s: assign or unassign Copilot (not supported on GitHub Enterprise Server)
 
-			The %[1]s--add-reviewer%[1]s and %[1]s--remove-reviewer%[1]s flags do not support
-			these special values.
+			The %[1]s--add-reviewer%[1]s and %[1]s--remove-reviewer%[1]s flags support
+			the following special value:
+			- %[1]s@copilot%[1]s: request or remove review from Copilot (not supported on GitHub Enterprise Server)
 		`, "`"),
 		Example: heredoc.Doc(`
+			# Edit the title and body of a pull request
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
+
+			# Use a file as the body
+			$ gh pr edit 23 --body-file body.txt
+
+			# Manage labels
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"
-			$ gh pr edit 23 --add-reviewer monalisa,hubot  --remove-reviewer myorg/team-name
+
+			# Manage reviewers
+			$ gh pr edit 23 --add-reviewer monalisa,hubot --remove-reviewer myorg/team-name
+
+			# Re-request review
+			$ gh pr edit 23 --add-reviewer monalisa
+
+			# Request a review from GitHub Copilot
+			$ gh pr edit 23 --add-reviewer "@copilot"
+
+			# Manage assignees
 			$ gh pr edit 23 --add-assignee "@me" --remove-assignee monalisa,hubot
+
+			# Assign GitHub Copilot
 			$ gh pr edit 23 --add-assignee "@copilot"
+
+			# Manage projects and milestones
 			$ gh pr edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh pr edit 23 --milestone "Version 1"
 			$ gh pr edit 23 --remove-milestone
@@ -187,8 +209,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Editable.Body.Value, "body", "b", "", "Set the new body.")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.Editable.Base.Value, "base", "B", "", "Change the base `branch` for this pull request")
-	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Add, "add-reviewer", nil, "Add reviewers by their `login`.")
-	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Remove, "remove-reviewer", nil, "Remove reviewers by their `login`.")
+	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Add, "add-reviewer", nil, "Add or re-request reviewers by their `login`. Use \"@copilot\" to request review from Copilot.")
+	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Remove, "remove-reviewer", nil, "Remove reviewers by their `login`. Use \"@copilot\" to remove review request from Copilot.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Add, "add-assignee", nil, "Add assigned users by their `login`. Use \"@me\" to assign yourself, or \"@copilot\" to assign Copilot.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Remove, "remove-assignee", nil, "Remove assigned users by their `login`. Use \"@me\" to unassign yourself, or \"@copilot\" to unassign Copilot.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Labels.Add, "add-label", nil, "Add labels by `name`")
@@ -248,7 +270,8 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
-	if issueFeatures.ActorIsAssignable {
+	// TODO ApiActorsSupported
+	if issueFeatures.ApiActorsSupported {
 		findOptions.Fields = append(findOptions.Fields, "assignedActors")
 	} else {
 		findOptions.Fields = append(findOptions.Fields, "assignees")
@@ -260,13 +283,15 @@ func editRun(opts *EditOptions) error {
 	}
 
 	editable := opts.Editable
-	editable.Reviewers.Allowed = true
+	editable.Reviewers.Selectable = true
 	editable.Title.Default = pr.Title
 	editable.Body.Default = pr.Body
 	editable.Base.Default = pr.BaseRefName
-	editable.Reviewers.Default = pr.ReviewRequests.Logins()
-	if issueFeatures.ActorIsAssignable {
-		editable.Assignees.ActorAssignees = true
+	editable.Reviewers.Default = pr.ReviewRequests.DisplayNames()
+	editable.Reviewers.DefaultLogins = pr.ReviewRequests.Logins()
+	// TODO ApiActorsSupported
+	if issueFeatures.ApiActorsSupported {
+		editable.ApiActorsSupported = true
 		editable.Assignees.Default = pr.AssignedActors.DisplayNames()
 		editable.Assignees.DefaultLogins = pr.AssignedActors.Logins()
 	} else {
@@ -291,6 +316,15 @@ func editRun(opts *EditOptions) error {
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
+
+	// Wire up search functions for assignees and reviewers.
+	// When these aren't wired up, it triggers a downstream fallback
+	// to legacy reviewer/assignee fetching.
+	// TODO ApiActorsSupported
+	if issueFeatures.ApiActorsSupported {
+		editable.AssigneeSearchFunc = shared.AssigneeSearchFunc(apiClient, repo, pr.ID)
+		editable.ReviewerSearchFunc = reviewerSearchFunc(apiClient, repo, &editable, pr.ID)
+	}
 
 	opts.IO.StartProgressIndicator()
 	err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable, opts.Detector.ProjectsV1())
@@ -331,6 +365,51 @@ func editRun(opts *EditOptions) error {
 	return nil
 }
 
+// reviewerSearchFunc is intended to be an arg for MultiSelectWithSearch
+// to return potential reviewer candidates (users, bots, and teams).
+// It also updates the editable's metadata for later ID resolution.
+func reviewerSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *shared.Editable, prID string) func(string) prompter.MultiSelectSearchResult {
+	searchFunc := func(input string) prompter.MultiSelectSearchResult {
+		candidates, moreResults, err := api.SuggestedReviewerActors(
+			apiClient,
+			repo,
+			prID,
+			input)
+		if err != nil {
+			return prompter.MultiSelectSearchResult{
+				Keys:        nil,
+				Labels:      nil,
+				MoreResults: 0,
+				Err:         err,
+			}
+		}
+
+		keys := make([]string, 0, len(candidates))
+		labels := make([]string, 0, len(candidates))
+
+		for _, c := range candidates {
+			keys = append(keys, c.Login())
+			labels = append(labels, c.DisplayName())
+
+			// Update the teams metadata in the editable struct
+			// so that updating the PR later can resolve the team ID.
+			if team, ok := c.(api.ReviewerTeam); ok {
+				editable.Metadata.Teams = append(editable.Metadata.Teams, api.OrgTeam{
+					ID:   "", // ID not needed for REST API reviewer mutations
+					Slug: team.Slug(),
+				})
+			}
+		}
+		return prompter.MultiSelectSearchResult{
+			Keys:        keys,
+			Labels:      labels,
+			MoreResults: moreResults,
+			Err:         nil,
+		}
+	}
+	return searchFunc
+}
+
 func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, id string, number int, editable shared.Editable) error {
 	var wg errgroup.Group
 	wg.Go(func() error {
@@ -338,44 +417,84 @@ func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, id string
 	})
 	if editable.Reviewers.Edited {
 		wg.Go(func() error {
-			return updatePullRequestReviews(httpClient, repo, number, editable)
+			return updatePullRequestReviews(httpClient, repo, id, number, editable)
 		})
 	}
 	return wg.Wait()
 }
 
-func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, number int, editable shared.Editable) error {
+func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, prID string, number int, editable shared.Editable) error {
 	if !editable.Reviewers.Edited {
 		return nil
 	}
 
+	client := api.NewClientFromHTTP(httpClient)
+
 	// Rebuild the Value slice from non-interactive flag input.
 	if len(editable.Reviewers.Add) != 0 || len(editable.Reviewers.Remove) != 0 {
+		add := editable.Reviewers.Add
+		remove := editable.Reviewers.Remove
+
+		// Replace @copilot with the Copilot reviewer login (only on github.com).
+		// Also use DefaultLogins (not Default display names) for computing the set.
+		var defaultLogins []string
+		// TODO ApiActorsSupported
+		if editable.ApiActorsSupported {
+			copilotReplacer := shared.NewCopilotReviewerReplacer()
+			add = copilotReplacer.ReplaceSlice(add)
+			remove = copilotReplacer.ReplaceSlice(remove)
+			defaultLogins = editable.Reviewers.DefaultLogins
+		} else {
+			// On GHES, Default already contains logins (no display name distinction)
+			defaultLogins = editable.Reviewers.Default
+		}
+
 		s := set.NewStringSet()
-		s.AddValues(editable.Reviewers.Add)
-		s.AddValues(editable.Reviewers.Default)
-		s.RemoveValues(editable.Reviewers.Remove)
+		s.AddValues(add)
+		s.AddValues(defaultLogins)
+		s.RemoveValues(remove)
 		editable.Reviewers.Value = s.ToSlice()
 	}
 
-	addUsers, addTeams := partitionUsersAndTeams(editable.Reviewers.Value)
+	// On github.com, use the new GraphQL mutation which supports bots.
+	// On GHES, fall back to REST API.
+	// TODO ApiActorsSupported
+	if editable.ApiActorsSupported {
+		return updatePullRequestReviewsGraphQL(client, repo, prID, editable)
+	}
+	return updatePullRequestReviewsREST(client, repo, number, editable)
+}
 
-	// Reviewers in Default but not in the Value have been removed interactively.
+// updatePullRequestReviewsGraphQL uses the RequestReviewsByLogin mutation.
+// This mutation replaces the entire reviewer set (union: false).
+func updatePullRequestReviewsGraphQL(client *api.Client, repo ghrepo.Interface, prID string, editable shared.Editable) error {
+	users, bots, teams := partitionReviewersByType(editable.Reviewers.Value)
+	return api.RequestReviewsByLogin(client, repo, prID, users, bots, teams, false)
+}
+
+// updatePullRequestReviewsREST uses the REST API to add/remove reviewers.
+// This is the legacy path for GHES compatibility.
+func updatePullRequestReviewsREST(client *api.Client, repo ghrepo.Interface, number int, editable shared.Editable) error {
+	addUsers, addBots, addTeams := partitionReviewersByType(editable.Reviewers.Value)
+	// REST API doesn't distinguish bots from users, so we need to combine them.
+	allAddUsers := append(addUsers, addBots...)
+
+	// Reviewers in Default but not in Value have been removed interactively.
 	var toRemove []string
 	for _, r := range editable.Reviewers.Default {
 		if !slices.Contains(editable.Reviewers.Value, r) {
 			toRemove = append(toRemove, r)
 		}
 	}
-	removeUsers, removeTeams := partitionUsersAndTeams(toRemove)
+	removeUsers, removeBots, removeTeams := partitionReviewersByType(toRemove)
+	allRemoveUsers := append(removeUsers, removeBots...)
 
-	client := api.NewClientFromHTTP(httpClient)
 	wg := errgroup.Group{}
 	wg.Go(func() error {
-		return api.AddPullRequestReviews(client, repo, number, addUsers, addTeams)
+		return api.AddPullRequestReviews(client, repo, number, allAddUsers, addTeams)
 	})
 	wg.Go(func() error {
-		return api.RemovePullRequestReviews(client, repo, number, removeUsers, removeTeams)
+		return api.RemovePullRequestReviews(client, repo, number, allRemoveUsers, removeTeams)
 	})
 	return wg.Wait()
 }
@@ -419,16 +538,20 @@ func (e editorRetriever) Retrieve() (string, error) {
 	return cmdutil.DetermineEditor(e.config)
 }
 
-// partitionUsersAndTeams splits reviewer identifiers into user logins and team slugs.
-// Team identifiers are in the form "org/slug"; only the slug portion is returned for teams.
-func partitionUsersAndTeams(values []string) (users []string, teams []string) {
+// partitionReviewersByType splits reviewer identifiers into users, bots, and teams.
+// Team identifiers are in the form "org/slug" and are returned as-is.
+// Bot logins (currently only Copilot) are identified and returned separately.
+func partitionReviewersByType(values []string) (users []string, bots []string, teams []string) {
 	for _, v := range values {
+		if v == "" {
+			continue
+		}
 		if strings.ContainsRune(v, '/') {
-			parts := strings.SplitN(v, "/", 2)
-			if len(parts) == 2 && parts[1] != "" {
-				teams = append(teams, parts[1])
-			}
-		} else if v != "" {
+			// Team: org/slug format, pass as-is
+			teams = append(teams, v)
+		} else if v == api.CopilotReviewerLogin {
+			bots = append(bots, v)
+		} else {
 			users = append(users, v)
 		}
 	}

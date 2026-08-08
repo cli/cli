@@ -63,9 +63,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		Short: "Create or update secrets",
 		Long: heredoc.Doc(`
 			Set a value for a secret on one of the following levels:
-			- repository (default): available to GitHub Actions runs or Dependabot in a repository
+			- repository (default): available to GitHub Actions runs, Agents sessions, or Dependabot in a repository
 			- environment: available to GitHub Actions runs for a deployment environment in a repository
-			- organization: available to GitHub Actions runs, Dependabot, or Codespaces within an organization
+			- organization: available to GitHub Actions runs, Agents sessions, Dependabot, or Codespaces within an organization
 			- user: available to Codespaces for your user
 
 			Organization and user secrets can optionally be restricted to only be available to
@@ -195,7 +195,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified)")
 	cmd.Flags().BoolVar(&opts.DoNotStore, "no-store", false, "Print the encrypted, base64-encoded value instead of storing it on GitHub")
 	cmd.Flags().StringVarP(&opts.EnvFile, "env-file", "f", "", "Load secret names and values from a dotenv-formatted `file`")
-	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "Set the application for a secret")
+	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Agents, shared.Codespaces, shared.Dependabot}, "Set the application for a secret")
 
 	return cmd
 }

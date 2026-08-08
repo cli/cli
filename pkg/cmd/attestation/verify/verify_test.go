@@ -54,6 +54,9 @@ func TestNewVerifyCmd(t *testing.T) {
 			httpmock.ReplaceTripper(client, reg)
 			return client, nil
 		},
+		ExternalHttpClient: func() (*http.Client, error) {
+			return nil, nil
+		},
 	}
 
 	testcases := []struct {

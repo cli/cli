@@ -164,7 +164,7 @@ func listRun(opts *ListOptions) error {
 	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "NAME", "SOURCE", "STATUS", "RULES"))
 
 	for _, rs := range result.Rulesets {
-		tp.AddField(strconv.Itoa(rs.DatabaseId), tableprinter.WithColor(cs.Cyan))
+		tp.AddField(strconv.FormatInt(rs.DatabaseId, 10), tableprinter.WithColor(cs.Cyan))
 		tp.AddField(rs.Name, tableprinter.WithColor(cs.Bold))
 		tp.AddField(shared.RulesetSource(rs))
 		tp.AddField(strings.ToLower(rs.Enforcement))

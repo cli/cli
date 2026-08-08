@@ -7,6 +7,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/safepaths"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -28,7 +29,7 @@ type DownloadOptions struct {
 
 type platform interface {
 	List(runID string) ([]shared.Artifact, error)
-	Download(url string, dir safepaths.Absolute) error
+	Download(url safeurl.SafeURL, dir safepaths.Absolute) error
 }
 
 type iprompter interface {
@@ -187,7 +188,7 @@ func runDownload(opts *DownloadOptions) error {
 			}
 		}
 
-		err := opts.Platform.Download(a.DownloadURL, destDir)
+		err := opts.Platform.Download(safeurl.NewImmutableSafeURL(a.DownloadURL), destDir)
 		if err != nil {
 			return fmt.Errorf("error downloading %s: %w", a.Name, err)
 		}

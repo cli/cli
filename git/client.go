@@ -106,7 +106,7 @@ func (c *Client) Command(ctx context.Context, args ...string) (*Command, error) 
 // It is only usable when constructed by another function in the package because the empty pattern,
 // without allMatching set to true, will result in an error in AuthenticatedCommand.
 //
-// Callers can currently opt-in to an slightly less secure mode for backwards compatibility by using
+// Callers can currently opt-in to a slightly less secure mode for backwards compatibility by using
 // AllMatchingCredentialsPattern.
 type CredentialPattern struct {
 	allMatching bool // should only be constructable via AllMatchingCredentialsPattern
@@ -711,6 +711,47 @@ func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// RemoteURL returns the fetch URL configured for the named remote.
+func (c *Client) RemoteURL(ctx context.Context, name string) (string, error) {
+	cmd, err := c.Command(ctx, "remote", "get-url", "--", name)
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return firstLine(out), nil
+}
+
+// IsIgnored reports whether the given path is ignored by .gitignore rules.
+// Returns an error for fatal git failures (e.g. path outside repository).
+func (c *Client) IsIgnored(ctx context.Context, path string) (bool, error) {
+	cmd, err := c.Command(ctx, "check-ignore", "-q", "--", path)
+	if err != nil {
+		return false, err
+	}
+	_, err = cmd.Output()
+	if err == nil {
+		return true, nil
+	}
+	// Exit 1 here means we can confirm the path is not ignored.
+	// Any other error is a real git error.
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, err
+}
+
+// ShortSHA returns the first 8 characters of a SHA hash for display purposes.
+func ShortSHA(sha string) string {
+	if len(sha) > 8 {
+		return sha[:8]
+	}
+	return sha
 }
 
 func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {

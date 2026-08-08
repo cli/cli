@@ -1,0 +1,13 @@
+# The send-telemetry command should not itself generate a telemetry event
+env GH_TELEMETRY=log
+env GH_TELEMETRY_SAMPLE_RATE=100
+env GH_TELEMETRY_ENDPOINT_URL=http://localhost:1
+
+# Provide a minimal valid payload on stdin so the command can run.
+# It will fail to connect but that's fine — we only care about telemetry logging.
+stdin payload.json
+! exec gh send-telemetry
+stderr 'Telemetry payload: none'
+
+-- payload.json --
+{"events":[{"type":"test","dimensions":{},"measures":{}}]}

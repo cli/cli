@@ -96,3 +96,19 @@ func HostPrefix(hostname string) string {
 	}
 	return fmt.Sprintf("https://%s/", hostname)
 }
+
+func CategorizeHost(host string) string {
+	if host == defaultHostname {
+		return "github.com"
+	}
+
+	if ghauth.IsEnterprise(host) {
+		return "ghes"
+	}
+
+	if ghauth.IsTenancy(host) {
+		return "tenancy"
+	}
+
+	return "uncategorized"
+}

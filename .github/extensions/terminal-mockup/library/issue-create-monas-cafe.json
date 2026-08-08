@@ -1,0 +1,14 @@
+{
+  "name": "Issue create - Mona's Cafe",
+  "savedAt": "2026-06-06T19:21:43.055Z",
+  "content": "[muted]$[/muted] [b]gh issue create \\[/b]\n    [b]--title \"Recalibrate coffee brewing algorithm\" \\[/b]\n    [b]--type Task \\[/b]\n    [b]--parent 119 \\[/b]\n    [b]--blocked-by 134 \\[/b]\n    [b]--blocking 152[/b]\n\nCreating issue in monalisa/monas-cafe\n\n[muted]https://github.com/monalisa/monas-cafe/issues/156[/muted]",
+  "options": {
+    "font": "menlo",
+    "fontSize": 14,
+    "width": 800,
+    "chrome": "none",
+    "backdrop": "none",
+    "bodyGradient": false,
+    "autoStyle": true
+  }
+}

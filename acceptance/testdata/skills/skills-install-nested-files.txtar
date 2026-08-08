@@ -1,0 +1,3 @@
+# Install a skill that has nested subdirectories and verify file tree
+exec gh skill install github/awesome-copilot git-commit --force --dir $WORK/nested-test
+exists $WORK/nested-test/git-commit/SKILL.md

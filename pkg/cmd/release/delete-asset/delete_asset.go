@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -96,7 +97,7 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 		return fmt.Errorf("asset %s not found in release %s", opts.AssetName, release.TagName)
 	}
 
-	err = deleteAsset(httpClient, assetURL)
+	err = deleteAsset(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(assetURL))
 	if err != nil {
 		return err
 	}
@@ -111,20 +112,9 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 	return nil
 }
 
-func deleteAsset(httpClient *http.Client, assetURL string) error {
-	req, err := http.NewRequest("DELETE", assetURL, nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-	return nil
+func deleteAsset(httpClient *http.Client, host string, assetURL safeurl.SafeURL) error {
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	return api.NewClientFromHTTP(httpClient).REST(host, http.MethodDelete, assetURL.String(), nil, nil)
 }

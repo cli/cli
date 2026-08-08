@@ -7,6 +7,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type ghExecutable struct {
+	executablePath string
+}
+
+func (e *ghExecutable) Executable() string {
+	return e.executablePath
+}
+
 func NewCmdCodespace(f *cmdutil.Factory) *cobra.Command {
 	root := &cobra.Command{
 		Use:     "codespace",
@@ -17,7 +25,7 @@ func NewCmdCodespace(f *cmdutil.Factory) *cobra.Command {
 
 	app := NewApp(
 		f.IOStreams,
-		f,
+		&ghExecutable{executablePath: f.ExecutablePath},
 		codespacesAPI.New(f),
 		f.Browser,
 		f.Remotes,

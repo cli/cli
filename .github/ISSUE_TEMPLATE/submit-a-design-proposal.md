@@ -2,7 +2,7 @@
 name: "🎨 Submit a design proposal"
 about: Submit a design to resolve an open issue that has both `needs-design` and `help-wanted` labels
 title: ''
-labels: enhancement
+labels: ''
 assignees: ''
 
 ---

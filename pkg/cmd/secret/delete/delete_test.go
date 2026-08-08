@@ -89,6 +89,23 @@ func TestNewCmdDelete(t *testing.T) {
 				Application: "Codespaces",
 			},
 		},
+		{
+			name: "Agents org",
+			cli:  "cool --app agents --org UmbrellaCorporation",
+			wants: DeleteOptions{
+				SecretName:  "cool",
+				OrgName:     "UmbrellaCorporation",
+				Application: "Agents",
+			},
+		},
+		{
+			name: "Agents repo",
+			cli:  "cool --app Agents",
+			wants: DeleteOptions{
+				SecretName:  "cool",
+				Application: "Agents",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -312,6 +329,17 @@ func Test_removeRun_repo(t *testing.T) {
 			},
 		},
 		{
+			name: "Agents",
+			opts: &DeleteOptions{
+				Application: "agents",
+				SecretName:  "cool_agents_secret",
+			},
+			host: "github.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("DELETE", "repos/owner/repo/agents/secrets/cool_agents_secret"), "api.github.com"), httpmock.StatusStringResponse(204, "No Content"))
+			},
+		},
+		{
 			name: "defaults to Actions",
 			opts: &DeleteOptions{
 				SecretName: "cool_secret",
@@ -432,6 +460,14 @@ func Test_removeRun_org(t *testing.T) {
 				OrgName:     "UmbrellaCorporation",
 			},
 			wantPath: "orgs/UmbrellaCorporation/codespaces/secrets/tVirus",
+		},
+		{
+			name: "Agents org",
+			opts: &DeleteOptions{
+				Application: "agents",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantPath: "orgs/UmbrellaCorporation/agents/secrets/tVirus",
 		},
 	}
 

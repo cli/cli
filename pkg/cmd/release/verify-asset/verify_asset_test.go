@@ -54,6 +54,9 @@ func TestNewCmdVerifyAsset_Args(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return nil, nil
 				},
+				ExternalHttpClient: func() (*http.Client, error) {
+					return nil, nil
+				},
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
@@ -166,7 +169,7 @@ func Test_verifyAssetRun_SuccessNoTagArg(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_verifyAssetRun_FailedNoAttestations(t *testing.T) {
+func Test_verifyAssetRun_FailedNoAttestations_SHA1(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	tagName := "v1"
 
@@ -180,6 +183,14 @@ func Test_verifyAssetRun_FailedNoAttestations(t *testing.T) {
 
 	releaseAssetPath := test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip")
 
+	var capturedParams api.FetchParams
+	attClient := &api.MockClient{
+		OnGetByDigest: func(params api.FetchParams) ([]*api.Attestation, error) {
+			capturedParams = params
+			return api.OnGetByDigestFailure(params)
+		},
+	}
+
 	cfg := &VerifyAssetConfig{
 		Opts: &VerifyAssetOptions{
 			AssetFilePath: releaseAssetPath,
@@ -189,12 +200,55 @@ func Test_verifyAssetRun_FailedNoAttestations(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
-		AttClient:   api.NewFailTestClient(),
+		AttClient:   attClient,
 		AttVerifier: nil,
 	}
 
 	err = verifyAssetRun(cfg)
 	require.ErrorContains(t, err, "no attestations found for tag v1")
+	require.ErrorContains(t, err, "sha1:"+fakeSHA)
+	require.Equal(t, "sha1:"+fakeSHA, capturedParams.Digest)
+}
+
+func Test_verifyAssetRun_FailedNoAttestations_SHA256(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	tagName := "v1"
+
+	fakeHTTP := &httpmock.Registry{}
+	defer fakeHTTP.Verify(t)
+	fakeSHA := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	shared.StubFetchRefSHA(t, fakeHTTP, "owner", "repo", tagName, fakeSHA)
+
+	baseRepo, err := ghrepo.FromFullName("owner/repo")
+	require.NoError(t, err)
+
+	releaseAssetPath := test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip")
+
+	var capturedParams api.FetchParams
+	attClient := &api.MockClient{
+		OnGetByDigest: func(params api.FetchParams) ([]*api.Attestation, error) {
+			capturedParams = params
+			return api.OnGetByDigestFailure(params)
+		},
+	}
+
+	cfg := &VerifyAssetConfig{
+		Opts: &VerifyAssetOptions{
+			AssetFilePath: releaseAssetPath,
+			TagName:       tagName,
+			BaseRepo:      baseRepo,
+			Exporter:      nil,
+		},
+		IO:          ios,
+		HttpClient:  &http.Client{Transport: fakeHTTP},
+		AttClient:   attClient,
+		AttVerifier: nil,
+	}
+
+	err = verifyAssetRun(cfg)
+	require.ErrorContains(t, err, "no attestations found for tag v1")
+	require.ErrorContains(t, err, "sha256:"+fakeSHA)
+	require.Equal(t, "sha256:"+fakeSHA, capturedParams.Digest)
 }
 
 func Test_verifyAssetRun_FailedTagNotInAttestation(t *testing.T) {

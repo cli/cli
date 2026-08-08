@@ -32,7 +32,7 @@ type copyConfig struct {
 
 type copyProjectMutation struct {
 	CopyProjectV2 struct {
-		ProjectV2 queries.Project `graphql:"projectV2"`
+		ProjectV2 queries.ProjectMutationQuery `graphql:"projectV2"`
 	} `graphql:"copyProjectV2(input:$input)"`
 }
 
@@ -134,7 +134,7 @@ func copyArgs(config copyConfig) (*copyProjectMutation, map[string]interface{}) 
 	}
 }
 
-func printResults(config copyConfig, project queries.Project) error {
+func printResults(config copyConfig, project queries.ProjectMutationQuery) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}

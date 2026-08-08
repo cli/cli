@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	webURL = "https://accessibility.github.com/conformance/cli/"
+	acrURL             = "https://accessibility.github.com/conformance/cli/"
+	a11yDiscussionsURL = "https://github.com/orgs/community/discussions/categories/accessibility"
 )
 
 type AccessibilityOptions struct {
@@ -36,9 +37,9 @@ func NewCmdAccessibility(f *cmdutil.Factory) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Web {
 				if opts.IO.IsStdoutTTY() {
-					fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(webURL))
+					fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(acrURL))
 				}
-				return opts.Browser.Browse(webURL)
+				return opts.Browser.Browse(acrURL)
 			}
 
 			return cmd.Help()
@@ -138,5 +139,5 @@ func longDescription(io *iostreams.IOStreams) string {
 		feedback and ideas through GitHub Accessibility feedback channels:
 
 		%[7]s
-	`, "`", title, color, prompter, spinner, feedback, webURL)
+	`, "`", title, color, prompter, spinner, feedback, a11yDiscussionsURL)
 }

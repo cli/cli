@@ -38,6 +38,9 @@ var _ Prompter = &PrompterMock{}
 //			MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
 //				panic("mock out the MultiSelect method")
 //			},
+//			MultiSelectWithSearchFunc: func(prompt string, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
+//				panic("mock out the MultiSelectWithSearch method")
+//			},
 //			PasswordFunc: func(prompt string) (string, error) {
 //				panic("mock out the Password method")
 //			},
@@ -71,6 +74,9 @@ type PrompterMock struct {
 
 	// MultiSelectFunc mocks the MultiSelect method.
 	MultiSelectFunc func(prompt string, defaults []string, options []string) ([]int, error)
+
+	// MultiSelectWithSearchFunc mocks the MultiSelectWithSearch method.
+	MultiSelectWithSearchFunc func(prompt string, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error)
 
 	// PasswordFunc mocks the Password method.
 	PasswordFunc func(prompt string) (string, error)
@@ -123,6 +129,19 @@ type PrompterMock struct {
 			// Options is the options argument value.
 			Options []string
 		}
+		// MultiSelectWithSearch holds details about calls to the MultiSelectWithSearch method.
+		MultiSelectWithSearch []struct {
+			// Prompt is the prompt argument value.
+			Prompt string
+			// SearchPrompt is the searchPrompt argument value.
+			SearchPrompt string
+			// Defaults is the defaults argument value.
+			Defaults []string
+			// PersistentOptions is the persistentOptions argument value.
+			PersistentOptions []string
+			// SearchFunc is the searchFunc argument value.
+			SearchFunc func(string) MultiSelectSearchResult
+		}
 		// Password holds details about calls to the Password method.
 		Password []struct {
 			// Prompt is the prompt argument value.
@@ -138,15 +157,16 @@ type PrompterMock struct {
 			Options []string
 		}
 	}
-	lockAuthToken       sync.RWMutex
-	lockConfirm         sync.RWMutex
-	lockConfirmDeletion sync.RWMutex
-	lockInput           sync.RWMutex
-	lockInputHostname   sync.RWMutex
-	lockMarkdownEditor  sync.RWMutex
-	lockMultiSelect     sync.RWMutex
-	lockPassword        sync.RWMutex
-	lockSelect          sync.RWMutex
+	lockAuthToken             sync.RWMutex
+	lockConfirm               sync.RWMutex
+	lockConfirmDeletion       sync.RWMutex
+	lockInput                 sync.RWMutex
+	lockInputHostname         sync.RWMutex
+	lockMarkdownEditor        sync.RWMutex
+	lockMultiSelect           sync.RWMutex
+	lockMultiSelectWithSearch sync.RWMutex
+	lockPassword              sync.RWMutex
+	lockSelect                sync.RWMutex
 }
 
 // AuthToken calls AuthTokenFunc.
@@ -384,6 +404,54 @@ func (mock *PrompterMock) MultiSelectCalls() []struct {
 	mock.lockMultiSelect.RLock()
 	calls = mock.calls.MultiSelect
 	mock.lockMultiSelect.RUnlock()
+	return calls
+}
+
+// MultiSelectWithSearch calls MultiSelectWithSearchFunc.
+func (mock *PrompterMock) MultiSelectWithSearch(prompt string, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
+	if mock.MultiSelectWithSearchFunc == nil {
+		panic("PrompterMock.MultiSelectWithSearchFunc: method is nil but Prompter.MultiSelectWithSearch was just called")
+	}
+	callInfo := struct {
+		Prompt            string
+		SearchPrompt      string
+		Defaults          []string
+		PersistentOptions []string
+		SearchFunc        func(string) MultiSelectSearchResult
+	}{
+		Prompt:            prompt,
+		SearchPrompt:      searchPrompt,
+		Defaults:          defaults,
+		PersistentOptions: persistentOptions,
+		SearchFunc:        searchFunc,
+	}
+	mock.lockMultiSelectWithSearch.Lock()
+	mock.calls.MultiSelectWithSearch = append(mock.calls.MultiSelectWithSearch, callInfo)
+	mock.lockMultiSelectWithSearch.Unlock()
+	return mock.MultiSelectWithSearchFunc(prompt, searchPrompt, defaults, persistentOptions, searchFunc)
+}
+
+// MultiSelectWithSearchCalls gets all the calls that were made to MultiSelectWithSearch.
+// Check the length with:
+//
+//	len(mockedPrompter.MultiSelectWithSearchCalls())
+func (mock *PrompterMock) MultiSelectWithSearchCalls() []struct {
+	Prompt            string
+	SearchPrompt      string
+	Defaults          []string
+	PersistentOptions []string
+	SearchFunc        func(string) MultiSelectSearchResult
+} {
+	var calls []struct {
+		Prompt            string
+		SearchPrompt      string
+		Defaults          []string
+		PersistentOptions []string
+		SearchFunc        func(string) MultiSelectSearchResult
+	}
+	mock.lockMultiSelectWithSearch.RLock()
+	calls = mock.calls.MultiSelectWithSearch
+	mock.lockMultiSelectWithSearch.RUnlock()
 	return calls
 }
 

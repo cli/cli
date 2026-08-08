@@ -15,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
-	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,10 +38,10 @@ func TestNewDownloadCmd(t *testing.T) {
 	f := &cmdutil.Factory{
 		IOStreams: testIO,
 		HttpClient: func() (*http.Client, error) {
-			reg := &httpmock.Registry{}
-			client := &http.Client{}
-			httpmock.ReplaceTripper(client, reg)
-			return client, nil
+			return nil, nil
+		},
+		ExternalHttpClient: func() (*http.Client, error) {
+			return nil, nil
 		},
 	}
 

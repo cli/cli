@@ -55,6 +55,20 @@ func TestNewCmdClone(t *testing.T) {
 			},
 		},
 		{
+			name: "no-upstream flag",
+			args: "OWNER/REPO --no-upstream",
+			wantOpts: CloneOptions{
+				Repository: "OWNER/REPO",
+				GitArgs:    []string{},
+				NoUpstream: true,
+			},
+		},
+		{
+			name:    "no-upstream with upstream-remote-name",
+			args:    "OWNER/REPO --no-upstream --upstream-remote-name test",
+			wantErr: "if any flags in the group [upstream-remote-name no-upstream] are set none of the others can be; [no-upstream upstream-remote-name] were all set",
+		},
+		{
 			name:    "unknown argument",
 			args:    "OWNER/REPO --depth 1",
 			wantErr: "unknown flag: --depth\nSeparate git clone flags with '--'.",
@@ -92,6 +106,7 @@ func TestNewCmdClone(t *testing.T) {
 
 			assert.Equal(t, tt.wantOpts.Repository, opts.Repository)
 			assert.Equal(t, tt.wantOpts.GitArgs, opts.GitArgs)
+			assert.Equal(t, tt.wantOpts.NoUpstream, opts.NoUpstream)
 		})
 	}
 }
@@ -342,6 +357,70 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
+}
+
+func Test_RepoClone_hasParent_noUpstream(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+				{ "data": { "repository": {
+					"name": "REPO",
+					"owner": {
+						"login": "OWNER"
+					},
+					"parent": {
+						"name": "ORIG",
+						"owner": {
+							"login": "hubot"
+						},
+						"defaultBranchRef": {
+							"name": "trunk"
+						}
+					}
+				} } }
+				`))
+
+	httpClient := &http.Client{Transport: reg}
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	cs.Register(`git -C REPO config --add remote.origin.gh-resolved base`, 0, "")
+
+	_, err := runCloneCommand(httpClient, "OWNER/REPO --no-upstream")
+	if err != nil {
+		t.Fatalf("error running command `repo clone`: %v", err)
+	}
+}
+
+func Test_RepoClone_noParent_noUpstream(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+				{ "data": { "repository": {
+					"name": "REPO",
+					"owner": {
+						"login": "OWNER"
+					}
+				} } }
+				`))
+
+	httpClient := &http.Client{Transport: reg}
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+
+	_, err := runCloneCommand(httpClient, "OWNER/REPO --no-upstream")
+	if err != nil {
+		t.Fatalf("error running command `repo clone`: %v", err)
+	}
 }
 
 func TestSimplifyURL(t *testing.T) {

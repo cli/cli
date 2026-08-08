@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -35,6 +37,11 @@ const (
 	allowSquashMerge  = "Allow Squash Merging"
 	allowRebaseMerge  = "Allow Rebase Merging"
 
+	squashMsgDefault            = "default"
+	squashMsgPRTitle            = "pr-title"
+	squashMsgPRTitleCommits     = "pr-title-commits"
+	squashMsgPRTitleDescription = "pr-title-description"
+
 	optionAllowForking      = "Allow Forking"
 	optionDefaultBranchName = "Default Branch Name"
 	optionDescription       = "Description"
@@ -42,11 +49,13 @@ const (
 	optionIssues            = "Issues"
 	optionMergeOptions      = "Merge Options"
 	optionProjects          = "Projects"
-	optionDiscussions       = "Discussions"
 	optionTemplateRepo      = "Template Repository"
 	optionTopics            = "Topics"
 	optionVisibility        = "Visibility"
 	optionWikis             = "Wikis"
+
+	// TODO: GitHub Enterprise Server does not support has_discussions yet
+	// optionDiscussions = "Discussions"
 )
 
 type EditOptions struct {
@@ -69,24 +78,27 @@ type EditRepositoryInput struct {
 	enableAdvancedSecurity             *bool
 	enableSecretScanning               *bool
 	enableSecretScanningPushProtection *bool
+	squashMergeCommitMsg               *string
 
-	AllowForking        *bool                     `json:"allow_forking,omitempty"`
-	AllowUpdateBranch   *bool                     `json:"allow_update_branch,omitempty"`
-	DefaultBranch       *string                   `json:"default_branch,omitempty"`
-	DeleteBranchOnMerge *bool                     `json:"delete_branch_on_merge,omitempty"`
-	Description         *string                   `json:"description,omitempty"`
-	EnableAutoMerge     *bool                     `json:"allow_auto_merge,omitempty"`
-	EnableIssues        *bool                     `json:"has_issues,omitempty"`
-	EnableMergeCommit   *bool                     `json:"allow_merge_commit,omitempty"`
-	EnableProjects      *bool                     `json:"has_projects,omitempty"`
-	EnableDiscussions   *bool                     `json:"has_discussions,omitempty"`
-	EnableRebaseMerge   *bool                     `json:"allow_rebase_merge,omitempty"`
-	EnableSquashMerge   *bool                     `json:"allow_squash_merge,omitempty"`
-	EnableWiki          *bool                     `json:"has_wiki,omitempty"`
-	Homepage            *string                   `json:"homepage,omitempty"`
-	IsTemplate          *bool                     `json:"is_template,omitempty"`
-	SecurityAndAnalysis *SecurityAndAnalysisInput `json:"security_and_analysis,omitempty"`
-	Visibility          *string                   `json:"visibility,omitempty"`
+	AllowForking             *bool                     `json:"allow_forking,omitempty"`
+	AllowUpdateBranch        *bool                     `json:"allow_update_branch,omitempty"`
+	DefaultBranch            *string                   `json:"default_branch,omitempty"`
+	DeleteBranchOnMerge      *bool                     `json:"delete_branch_on_merge,omitempty"`
+	Description              *string                   `json:"description,omitempty"`
+	EnableAutoMerge          *bool                     `json:"allow_auto_merge,omitempty"`
+	EnableIssues             *bool                     `json:"has_issues,omitempty"`
+	EnableMergeCommit        *bool                     `json:"allow_merge_commit,omitempty"`
+	EnableProjects           *bool                     `json:"has_projects,omitempty"`
+	EnableDiscussions        *bool                     `json:"has_discussions,omitempty"`
+	EnableRebaseMerge        *bool                     `json:"allow_rebase_merge,omitempty"`
+	EnableSquashMerge        *bool                     `json:"allow_squash_merge,omitempty"`
+	EnableWiki               *bool                     `json:"has_wiki,omitempty"`
+	Homepage                 *string                   `json:"homepage,omitempty"`
+	IsTemplate               *bool                     `json:"is_template,omitempty"`
+	SecurityAndAnalysis      *SecurityAndAnalysisInput `json:"security_and_analysis,omitempty"`
+	SquashMergeCommitTitle   *string                   `json:"squash_merge_commit_title,omitempty"`
+	SquashMergeCommitMessage *string                   `json:"squash_merge_commit_message,omitempty"`
+	Visibility               *string                   `json:"visibility,omitempty"`
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobra.Command {
@@ -120,7 +132,15 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 			When the %[1]s--visibility%[1]s flag is used, %[1]s--accept-visibility-change-consequences%[1]s flag is required.
 
 			For information on all the potential consequences, see <https://gh.io/setting-repository-visibility>.
-		`, "`"),
+
+			When the %[1]s--enable-squash-merge%[1]s flag is used, %[1]s--squash-merge-commit-message%[1]s
+			can be used to change the default squash merge commit message behavior:
+
+			- %[1]s%[2]s%[1]s: uses commit title and message for 1 commit, or pull request title and list of commits for 2 or more
+			- %[1]s%[3]s%[1]s: uses pull request title
+			- %[1]s%[4]s%[1]s: uses pull request title and list of commits
+			- %[1]s%[5]s%[1]s: uses pull request title and description
+		`, "`", squashMsgDefault, squashMsgPRTitle, squashMsgPRTitleCommits, squashMsgPRTitleDescription),
 		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 			# Enable issues and wiki
@@ -162,6 +182,19 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				return cmdutil.FlagErrorf("use of --visibility flag requires --accept-visibility-change-consequences flag")
 			}
 
+			if opts.Edits.squashMergeCommitMsg != nil {
+				if opts.Edits.EnableSquashMerge == nil {
+					return cmdutil.FlagErrorf("--squash-merge-commit-message requires --enable-squash-merge")
+				}
+				if !*opts.Edits.EnableSquashMerge {
+					return cmdutil.FlagErrorf("--squash-merge-commit-message cannot be used when --enable-squash-merge=false")
+				}
+				if err := validateSquashMergeCommitMsg(*opts.Edits.squashMergeCommitMsg); err != nil {
+					return err
+				}
+				transformSquashMergeOpts(&opts.Edits)
+			}
+
 			if hasSecurityEdits(opts.Edits) {
 				opts.Edits.SecurityAndAnalysis = transformSecurityAndAnalysisOpts(opts)
 			}
@@ -192,6 +225,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.DeleteBranchOnMerge, "delete-branch-on-merge", "", "Delete head branch when pull requests are merged")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.AllowForking, "allow-forking", "", "Allow forking of an organization repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.AllowUpdateBranch, "allow-update-branch", "", "Allow a pull request head branch that is behind its base branch to be updated")
+	cmdutil.NilStringFlag(cmd, &opts.Edits.squashMergeCommitMsg, "squash-merge-commit-message", "", "The default value for a squash merge commit message: {default|pr-title|pr-title-commits|pr-title-description}")
 	cmd.Flags().StringSliceVar(&opts.AddTopics, "add-topic", nil, "Add repository topic")
 	cmd.Flags().StringSliceVar(&opts.RemoveTopics, "remove-topic", nil, "Remove repository topic")
 	cmd.Flags().BoolVar(&opts.AcceptVisibilityChangeConsequences, "accept-visibility-change-consequences", false, "Accept the consequences of changing the repository visibility")
@@ -233,9 +267,11 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"squashMergeAllowed",
 			"watchers",
 		}
+		// TODO repoFeaturesCleanup
 		if repoFeatures.VisibilityField {
 			fieldsToRetrieve = append(fieldsToRetrieve, "visibility")
 		}
+		// TODO repoFeaturesCleanup
 		if repoFeatures.AutoMerge {
 			fieldsToRetrieve = append(fieldsToRetrieve, "autoMergeAllowed")
 		}
@@ -263,7 +299,10 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		}
 	}
 
-	apiPath := fmt.Sprintf("repos/%s/%s", repo.RepoOwner(), repo.RepoName())
+	apiPath, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return err
+	}
 
 	body := &bytes.Buffer{}
 	enc := json.NewEncoder(body)
@@ -306,7 +345,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		})
 	}
 
-	err := g.Wait()
+	err = g.Wait()
 	if err != nil {
 		return err
 	}
@@ -472,6 +511,20 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				return fmt.Errorf("you need to allow at least one merge strategy")
 			}
 
+			if enableSquashMerge {
+				squashMsgOptions := validSquashMsgValues
+				idx, err := p.Select(
+					"Default squash merge commit message",
+					squashMsgDefault,
+					squashMsgOptions)
+				if err != nil {
+					return err
+				}
+				selected := squashMsgOptions[idx]
+				opts.Edits.squashMergeCommitMsg = &selected
+				transformSquashMergeOpts(&opts.Edits)
+			}
+
 			opts.Edits.EnableAutoMerge = &r.AutoMergeAllowed
 			c, err := p.Confirm("Enable Auto Merge?", r.AutoMergeAllowed)
 			if err != nil {
@@ -514,8 +567,11 @@ func parseTopics(s string) []string {
 }
 
 func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
-	apiPath := fmt.Sprintf("repos/%s/%s/topics", repo.RepoOwner(), repo.RepoName())
-	req, err := http.NewRequestWithContext(ctx, "GET", ghinstance.RESTPrefix(repo.RepoHost())+apiPath, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "topics")
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -552,8 +608,11 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 		return err
 	}
 
-	apiPath := fmt.Sprintf("repos/%s/%s/topics", repo.RepoOwner(), repo.RepoName())
-	req, err := http.NewRequestWithContext(ctx, "PUT", ghinstance.RESTPrefix(repo.RepoHost())+apiPath, body)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "topics")
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, "PUT", url.String(), body)
 	if err != nil {
 		return err
 	}
@@ -631,4 +690,40 @@ func transformSecurityAndAnalysisOpts(opts *EditOptions) *SecurityAndAnalysisInp
 		}
 	}
 	return securityOptions
+}
+
+var validSquashMsgValues = []string{squashMsgDefault, squashMsgPRTitle, squashMsgPRTitleCommits, squashMsgPRTitleDescription}
+
+func validateSquashMergeCommitMsg(value string) error {
+	if slices.Contains(validSquashMsgValues, value) {
+		return nil
+	}
+	return cmdutil.FlagErrorf("invalid value for --squash-merge-commit-message: %q. Valid values are: %s", value, strings.Join(validSquashMsgValues, ", "))
+}
+
+// transformSquashMergeOpts maps the user-facing squash merge commit message option
+// to the two API fields: squash_merge_commit_title and squash_merge_commit_message.
+func transformSquashMergeOpts(edits *EditRepositoryInput) {
+	if edits.squashMergeCommitMsg == nil {
+		return
+	}
+	var title, message string
+	switch *edits.squashMergeCommitMsg {
+	case squashMsgDefault:
+		title = "COMMIT_OR_PR_TITLE"
+		message = "COMMIT_MESSAGES"
+	case squashMsgPRTitle:
+		title = "PR_TITLE"
+		message = "BLANK"
+	case squashMsgPRTitleCommits:
+		title = "PR_TITLE"
+		message = "COMMIT_MESSAGES"
+	case squashMsgPRTitleDescription:
+		title = "PR_TITLE"
+		message = "PR_BODY"
+	default:
+		return
+	}
+	edits.SquashMergeCommitTitle = &title
+	edits.SquashMergeCommitMessage = &message
 }

@@ -93,6 +93,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 
 	cmdutil.DisableAuthCheck(cmd)
 	cmdutil.StringEnumFlag(cmd, &shellType, "shell", "s", "", []string{"bash", "zsh", "fish", "powershell"}, "Shell type")
+	cmdutil.DisableTelemetry(cmd)
 
 	return cmd
 }

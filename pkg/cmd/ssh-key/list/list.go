@@ -83,7 +83,7 @@ func listRun(opts *ListOptions) error {
 	now := time.Now()
 
 	for _, sshKey := range sshKeys {
-		id := strconv.Itoa(sshKey.ID)
+		id := strconv.FormatInt(sshKey.ID, 10)
 		if t.IsTTY() {
 			t.AddField(sshKey.Title)
 			t.AddField(id)

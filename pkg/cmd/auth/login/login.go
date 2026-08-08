@@ -138,7 +138,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 				opts.Hostname, _ = ghauth.DefaultHost()
 			}
 
-			opts.MainExecutable = f.Executable()
+			opts.MainExecutable = f.ExecutablePath
 			if runF != nil {
 				return runF(opts)
 			}

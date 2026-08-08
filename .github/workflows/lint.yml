@@ -8,14 +8,16 @@ on:
       - go.mod
       - go.sum
       - ".github/licenses.tmpl"
-      - "script/licenses*"
+      - ".github/workflows/lint.yml"
+      - "script/licenses"
   pull_request:
     paths:
       - "**.go"
       - go.mod
       - go.sum
       - ".github/licenses.tmpl"
-      - "script/licenses*"
+      - ".github/workflows/lint.yml"
+      - "script/licenses"
 permissions:
   contents: read
 jobs:
@@ -23,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
 
@@ -46,20 +48,20 @@ jobs:
           exit $STATUS
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@e7fa5ac41e1cf5b7d48e45e42232ce7ada589601 # v9.1.0
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.6.0
+          version: v2.12.2
 
+      # Verify that license generation succeeds for all release platforms (GOOS/GOARCH).
+      # This catches issues like new dependencies with unrecognized licenses before release time.
+      #
       # actions/setup-go does not setup the installed toolchain to be preferred over the system install,
       # which causes go-licenses to raise "Package ... does not have module info" errors.
       # For more information, https://github.com/google/go-licenses/issues/244#issuecomment-1885098633
-      #
-      # go-licenses has been pinned for automation use.
-      - name: Check licenses
+      - name: Verify license generation
         run: |
           export GOROOT=$(go env GOROOT)
           export PATH=${GOROOT}/bin:$PATH
-          go install github.com/google/go-licenses@5348b744d0983d85713295ea08a20cca1654a45e # v2.0.1
           make licenses-check
 
   # Discover vulnerabilities within Go standard libraries used to build GitHub CLI using govulncheck.
@@ -67,17 +69,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
 
       # `govulncheck` exits unsuccessfully if vulnerabilities are found, providing results in stdout.
       # See https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck#hdr-Exit_codes for more information on exit codes.
       #
-      # On go1.25, To make `-mode binary` work we need to make sure the binary is built with `go build -buildvcs=false`
+      # On go1.25+, To make `-mode binary` work we need to make sure the binary is built with `go build -buildvcs=false`
       # Since our builds do not use `-buildvcs=false`, we run in source mode here instead.
       - name: Check Go vulnerabilities
         run: |

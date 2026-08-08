@@ -71,7 +71,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		Assignees: []string{"hubot"},
 		Type:      PRMetadata,
 	}
-	err := MetadataSurvey(pm, ios, repo, fetcher, state, gh.ProjectsV1Supported)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state, gh.ProjectsV1Supported, nil, nil)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -117,7 +117,7 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 		Assignees: []string{"hubot"},
 	}
 
-	err := MetadataSurvey(pm, ios, repo, fetcher, state, gh.ProjectsV1Supported)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state, gh.ProjectsV1Supported, nil, nil)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -146,7 +146,7 @@ func TestMetadataSurveyProjectV1Deprecation(t *testing.T) {
 			return []int{0}, nil
 		})
 
-		err := MetadataSurvey(pm, ios, repo, fetcher, &IssueMetadataState{}, gh.ProjectsV1Supported)
+		err := MetadataSurvey(pm, ios, repo, fetcher, &IssueMetadataState{}, gh.ProjectsV1Supported, nil, nil)
 		require.ErrorContains(t, err, "expected test error")
 
 		require.True(t, fetcher.projectsV1Requested, "expected projectsV1 to be requested")
@@ -167,7 +167,7 @@ func TestMetadataSurveyProjectV1Deprecation(t *testing.T) {
 			return []int{0}, nil
 		})
 
-		err := MetadataSurvey(pm, ios, repo, fetcher, &IssueMetadataState{}, gh.ProjectsV1Unsupported)
+		err := MetadataSurvey(pm, ios, repo, fetcher, &IssueMetadataState{}, gh.ProjectsV1Unsupported, nil, nil)
 		require.ErrorContains(t, err, "expected test error")
 
 		require.False(t, fetcher.projectsV1Requested, "expected projectsV1 not to be requested")
@@ -259,4 +259,37 @@ func TestTitleSurvey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFieldsToEditSurvey_IssueOnlyFields(t *testing.T) {
+	t.Run("without Allowed flag omits Type", func(t *testing.T) {
+		pm := prompter.NewMockPrompter(t)
+		pm.RegisterMultiSelect("What would you like to edit?", []string{},
+			// Type should NOT appear here
+			[]string{"Title", "Body", "Assignees", "Labels", "Projects", "Milestone"},
+			func(_ string, _, _ []string) ([]int, error) {
+				return []int{0}, nil
+			})
+
+		editable := &Editable{}
+		err := FieldsToEditSurvey(pm, editable)
+		require.NoError(t, err)
+		assert.True(t, editable.Title.Edited)
+	})
+
+	t.Run("with Allowed flag includes Type", func(t *testing.T) {
+		pm := prompter.NewMockPrompter(t)
+		pm.RegisterMultiSelect("What would you like to edit?", []string{},
+			// Type should appear between Labels and Projects
+			[]string{"Title", "Body", "Assignees", "Labels", "Type", "Projects", "Milestone"},
+			func(_ string, _, _ []string) ([]int, error) {
+				return []int{4}, nil // select Type
+			})
+
+		editable := &Editable{}
+		editable.IssueType.Selectable = true
+		err := FieldsToEditSurvey(pm, editable)
+		require.NoError(t, err)
+		assert.True(t, editable.IssueType.Edited)
+	})
 }

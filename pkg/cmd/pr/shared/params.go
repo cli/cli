@@ -61,19 +61,26 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 		return nil
 	}
 
+	// TODO ApiActorsSupported
+	// When ApiActorsSupported is true, we use login-based mutation and don't need to resolve reviewer IDs.
+	needReviewerIDs := len(tb.Reviewers) > 0 && !tb.ApiActorsSupported
+
+	// TODO ApiActorsSupported
+	// When ApiActorsSupported is true, we use login-based mutation and don't need to resolve assignee IDs.
+	needAssigneeIDs := len(tb.Assignees) > 0 && !tb.ApiActorsSupported
+
 	// Retrieve minimal information needed to resolve metadata if this was not previously cached from additional metadata survey.
 	if tb.MetadataResult == nil {
 		input := api.RepoMetadataInput{
-			Reviewers: len(tb.Reviewers) > 0,
-			TeamReviewers: len(tb.Reviewers) > 0 && slices.ContainsFunc(tb.Reviewers, func(r string) bool {
+			Reviewers: needReviewerIDs,
+			TeamReviewers: needReviewerIDs && slices.ContainsFunc(tb.Reviewers, func(r string) bool {
 				return strings.ContainsRune(r, '/')
 			}),
-			Assignees:      len(tb.Assignees) > 0,
-			ActorAssignees: tb.ActorAssignees,
-			Labels:         len(tb.Labels) > 0,
-			ProjectsV1:     len(tb.ProjectTitles) > 0 && projectV1Support == gh.ProjectsV1Supported,
-			ProjectsV2:     len(tb.ProjectTitles) > 0,
-			Milestones:     len(tb.Milestones) > 0,
+			Assignees:  needAssigneeIDs,
+			Labels:     len(tb.Labels) > 0,
+			ProjectsV1: len(tb.ProjectTitles) > 0 && projectV1Support == gh.ProjectsV1Supported,
+			ProjectsV2: len(tb.ProjectTitles) > 0,
+			Milestones: len(tb.Milestones) > 0,
 		}
 
 		metadataResult, err := api.RepoMetadata(client, baseRepo, input)
@@ -83,11 +90,18 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 		tb.MetadataResult = metadataResult
 	}
 
-	assigneeIDs, err := tb.MetadataResult.MembersToIDs(tb.Assignees)
-	if err != nil {
-		return fmt.Errorf("could not assign user: %w", err)
+	// TODO ApiActorsSupported
+	// When ApiActorsSupported is true (github.com), pass logins directly for use with
+	// ReplaceActorsForAssignable mutation. The ID-based else branch is for GHES compatibility.
+	if tb.ApiActorsSupported {
+		params["assigneeLogins"] = tb.Assignees
+	} else {
+		assigneeIDs, err := tb.MetadataResult.MembersToIDs(tb.Assignees)
+		if err != nil {
+			return fmt.Errorf("could not assign user: %w", err)
+		}
+		params["assigneeIds"] = assigneeIDs
 	}
-	params["assigneeIds"] = assigneeIDs
 
 	labelIDs, err := tb.MetadataResult.LabelsToIDs(tb.Labels)
 	if err != nil {
@@ -115,26 +129,41 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	}
 
 	var userReviewers []string
+	var botReviewers []string
 	var teamReviewers []string
 	for _, r := range tb.Reviewers {
 		if strings.ContainsRune(r, '/') {
 			teamReviewers = append(teamReviewers, r)
+		} else if r == api.CopilotReviewerLogin {
+			botReviewers = append(botReviewers, r)
 		} else {
 			userReviewers = append(userReviewers, r)
 		}
 	}
 
-	userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
-	if err != nil {
-		return fmt.Errorf("could not request reviewer: %w", err)
-	}
-	params["userReviewerIds"] = userReviewerIDs
+	// TODO ApiActorsSupported
+	// When ApiActorsSupported is true (github.com), pass logins directly for use with
+	// RequestReviewsByLogin mutation. The ID-based else branch can be removed once
+	// GHES supports requestReviewsByLogin.
+	if tb.ApiActorsSupported {
+		params["userReviewerLogins"] = userReviewers
+		if len(botReviewers) > 0 {
+			params["botReviewerLogins"] = botReviewers
+		}
+		params["teamReviewerSlugs"] = teamReviewers
+	} else {
+		userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
+		if err != nil {
+			return fmt.Errorf("could not request reviewer: %w", err)
+		}
+		params["userReviewerIds"] = userReviewerIDs
 
-	teamReviewerIDs, err := tb.MetadataResult.TeamsToIDs(teamReviewers)
-	if err != nil {
-		return fmt.Errorf("could not request reviewer: %w", err)
+		teamReviewerIDs, err := tb.MetadataResult.TeamsToIDs(teamReviewers)
+		if err != nil {
+			return fmt.Errorf("could not request reviewer: %w", err)
+		}
+		params["teamReviewerIds"] = teamReviewerIDs
 	}
-	params["teamReviewerIds"] = teamReviewerIDs
 
 	return nil
 }
@@ -147,6 +176,7 @@ type FilterOptions struct {
 	Entity     string
 	Fields     []string
 	HeadBranch string
+	IssueType  string
 	Labels     []string
 	Mention    string
 	Milestone  string
@@ -183,6 +213,9 @@ func (opts *FilterOptions) IsDefault() bool {
 	if opts.Search != "" {
 		return false
 	}
+	if opts.IssueType != "" {
+		return false
+	}
 	return true
 }
 
@@ -207,6 +240,7 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 	case "merged":
 		is = "merged"
 	}
+
 	query := search.Query{
 		Qualifiers: search.Qualifiers{
 			Assignee:  options.Assignee,
@@ -214,6 +248,7 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 			Base:      options.BaseBranch,
 			Draft:     options.Draft,
 			Head:      options.HeadBranch,
+			IssueType: options.IssueType,
 			Label:     options.Labels,
 			Mentions:  options.Mention,
 			Milestone: options.Milestone,
@@ -295,11 +330,24 @@ func (r *MeReplacer) ReplaceSlice(handles []string) ([]string, error) {
 // Login is generally needed for API calls; name is used when launching web browser.
 type CopilotReplacer struct {
 	returnLogin bool
+	// copilotLogin is the login to use when replacing @copilot.
+	// Different Copilot features use different bot logins.
+	copilotLogin string
 }
 
+// NewCopilotReplacer creates a replacer for assignee @copilot references.
 func NewCopilotReplacer(returnLogin bool) *CopilotReplacer {
 	return &CopilotReplacer{
-		returnLogin: returnLogin,
+		returnLogin:  returnLogin,
+		copilotLogin: api.CopilotAssigneeLogin,
+	}
+}
+
+// NewCopilotReviewerReplacer creates a replacer for reviewer @copilot references.
+func NewCopilotReviewerReplacer() *CopilotReplacer {
+	return &CopilotReplacer{
+		returnLogin:  true,
+		copilotLogin: api.CopilotReviewerLogin,
 	}
 }
 
@@ -308,7 +356,7 @@ func (r *CopilotReplacer) replace(handle string) string {
 		return handle
 	}
 	if r.returnLogin {
-		return api.CopilotActorLogin
+		return r.copilotLogin
 	}
 	return api.CopilotActorName
 }

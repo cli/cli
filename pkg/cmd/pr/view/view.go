@@ -149,7 +149,7 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 
 	fmt.Fprintf(out, "title:\t%s\n", pr.Title)
 	fmt.Fprintf(out, "state:\t%s\n", prStateWithDraft(pr))
-	fmt.Fprintf(out, "author:\t%s\n", pr.Author.Login)
+	fmt.Fprintf(out, "author:\t%s\n", pr.Author.DisplayName())
 	fmt.Fprintf(out, "labels:\t%s\n", labels)
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "reviewers:\t%s\n", reviewers)
@@ -188,7 +188,7 @@ func printHumanPrPreview(opts *ViewOptions, baseRepo ghrepo.Interface, pr *api.P
 	fmt.Fprintf(out,
 		"%s • %s wants to merge %s into %s from %s • %s\n",
 		shared.StateTitleWithColor(cs, *pr),
-		pr.Author.Login,
+		pr.Author.DisplayName(),
 		text.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
@@ -351,7 +351,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	for _, review := range pr.Reviews.Nodes {
 		if review.Author.Login != pr.Author.Login {
-			name := review.Author.Login
+			name := review.AuthorLogin()
 			if name == "" {
 				name = ghostName
 			}
@@ -364,7 +364,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	// Overwrite reviewer's state if a review request for the same reviewer exists.
 	for _, reviewRequest := range pr.ReviewRequests.Nodes {
-		name := reviewRequest.RequestedReviewer.LoginOrSlug()
+		name := reviewRequest.RequestedReviewer.DisplayName()
 		reviewerStates[name] = &reviewerState{
 			Name:  name,
 			State: requestedReviewState,
@@ -406,7 +406,7 @@ func prAssigneeList(pr api.PullRequest) string {
 
 	AssigneeNames := make([]string, 0, len(pr.Assignees.Nodes))
 	for _, assignee := range pr.Assignees.Nodes {
-		AssigneeNames = append(AssigneeNames, assignee.Login)
+		AssigneeNames = append(AssigneeNames, assignee.DisplayName())
 	}
 
 	list := strings.Join(AssigneeNames, ", ")

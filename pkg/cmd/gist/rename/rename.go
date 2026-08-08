@@ -11,6 +11,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -119,7 +120,10 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 		Files:       gist.Files,
 	}
 
-	path := "gists/" + gist.ID
+	path, err := safeurl.JoinPath("gists", gist.ID)
+	if err != nil {
+		return err
+	}
 
 	requestByte, err := json.Marshal(body)
 	if err != nil {
@@ -130,7 +134,7 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 
 	result := shared.Gist{}
 
-	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
+	err = apiClient.REST(hostname, "POST", path.String(), requestBody, &result)
 
 	if err != nil {
 		return err

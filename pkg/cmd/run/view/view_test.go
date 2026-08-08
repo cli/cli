@@ -1049,6 +1049,64 @@ func TestViewRun(t *testing.T) {
 			wantOut: quuxTheBarfLogOutput,
 		},
 		{
+			name: "exit status respected with log-failed, failed run",
+			opts: &ViewOptions{
+				RunID:      "1234",
+				LogFailed:  true,
+				ExitStatus: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.BinaryResponse(zipArchive))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: quuxTheBarfLogOutput,
+			wantErr: true,
+		},
+		{
+			name: "exit status respected with log, failed run",
+			opts: &ViewOptions{
+				RunID:      "1234",
+				Log:        true,
+				ExitStatus: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.BinaryResponse(zipArchive))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: expectedRunLogOutput,
+			wantErr: true,
+		},
+		{
 			name: "interactive with log, with no step logs available (#10551)",
 			tty:  true,
 			opts: &ViewOptions{
@@ -2700,6 +2758,46 @@ var sadJobRunLogOutput = fmt.Sprintf("%s%s", barfTheQuuxLogOutput, quuxTheBarfLo
 var expectedRunLogOutput = fmt.Sprintf("%s%s", coolJobRunLogOutput, sadJobRunLogOutput)
 var expectedRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", coolJobRunWithNoStepLogsLogOutput, sadJobRunWithNoStepLogsLogOutput)
 var expectedLegacyRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", legacyCoolJobRunWithNoStepLogsLogOutput, legacySadJobRunWithNoStepLogsLogOutput)
+
+func TestCopyLogWithLinePrefix_TerminalEscapeSequences(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "OSC title set sequence",
+			input: "normal prefix\x1b]0;HIJACKED TITLE\x07trailing text\n",
+		},
+		{
+			name:  "CSI color sequence",
+			input: "\x1b[31mRED TEXT\x1b[0m normal text\n",
+		},
+		{
+			name:  "screen title set sequence used in original report",
+			input: "\x1bk;echo this is an arbitrary command;\x1b\\\n",
+		},
+		{
+			name:  "CSI window title query",
+			input: "before\x1b[21tafter\n",
+		},
+		{
+			name:  "multiple escape sequences",
+			input: "\x1b]0;title\x07\x1b[31mred\x1b[0m\x1b[21t\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			err := copyLogWithLinePrefix(&buf, strings.NewReader(tt.input), "jobname\tstep\t")
+			require.NoError(t, err)
+
+			output := buf.String()
+			assert.NotContains(t, output, "\x1b",
+				"output should not contain raw ESC (0x1b) bytes, got: %q", output)
+		})
+	}
+}
 
 func TestRunLog(t *testing.T) {
 	t.Run("when the cache dir doesn't exist, exists return false", func(t *testing.T) {

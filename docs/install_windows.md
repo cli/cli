@@ -11,13 +11,13 @@ The [GitHub CLI package](https://winget.run/pkg/GitHub/cli) is supported by Micr
 To install:
 
 ```pwsh
-winget install --id GitHub.cli
+winget install --id GitHub.cli --source winget
 ```
 
 To upgrade:
 
 ```pwsh
-winget upgrade --id GitHub.cli
+winget upgrade --id GitHub.cli --source winget
 ```
 
 > [!NOTE]
@@ -68,7 +68,7 @@ conda update gh --channel conda-forge
 
 ### Scoop
 
-The [GitHub CLI bucket](https://scoop.sh/#/apps?q=gh) is supported by the Scoop community with updated powered by [ScoopInstaller/Main](https://github.com/ScoopInstaller/Main/blob/master/bucket/gh.json).
+The [GitHub CLI bucket](https://scoop.sh/#/apps?q=gh) is supported by the Scoop community with updates powered by [ScoopInstaller/Main](https://github.com/ScoopInstaller/Main/blob/master/bucket/gh.json).
 
 To install:
 
@@ -91,7 +91,7 @@ The [GitHub CLI package](https://webinstall.dev/gh/) is supported by the Webi co
 To install:
 
 ```shell
-curl -sS https://webi.sh/gh \| sh
+curl -sS https://webi.sh/gh | sh
 ```
 
 To upgrade:

@@ -1,10 +1,11 @@
-//go:build !windows
+//go:build linux || darwin
 
 package prompter_test
 
 import (
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/hinshun/vt10x"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
 // The following tests are broadly testing the accessible prompter, and NOT asserting
@@ -33,8 +35,6 @@ import (
 // are sufficient to ensure that the accessible prompter behaves roughly as expected
 // but doesn't mandate that prompts always look exactly the same.
 func TestAccessiblePrompter(t *testing.T) {
-
-	beforePasswordSendTimeout := 100 * time.Microsecond
 
 	t.Run("Select", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
@@ -109,7 +109,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear without the invalid default value
-			_, err := console.ExpectString("Select a number \r\n")
+			_, err := console.ExpectString("Select a number")
 			require.NoError(t, err)
 
 			// Select option 2
@@ -128,7 +128,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Input a number between 0 and 3:")
+			_, err := console.ExpectString("Enter a number between 0 and 3:")
 			require.NoError(t, err)
 
 			// Select options 1 and 2
@@ -207,7 +207,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear without the invalid default values
-			_, err := console.ExpectString("Select a number \r\n")
+			_, err := console.ExpectString("Select a number")
 			require.NoError(t, err)
 
 			// Not selecting anything will fail because there are no defaults.
@@ -222,6 +222,217 @@ func TestAccessiblePrompter(t *testing.T) {
 		multiSelectValues, err := p.MultiSelect("Select a number", dummyDefaultValues, options)
 		require.NoError(t, err)
 		assert.Equal(t, []int{1}, multiSelectValues)
+	})
+
+	t.Run("MultiSelectWithSearch - basic flow", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		persistentOptions := []string{"persistent-option-1"}
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
+			var searchResultKeys []string
+			var searchResultLabels []string
+
+			// Initial search with no input
+			if input == "" {
+				moreResults := 2
+				searchResultKeys = []string{"initial-result-1", "initial-result-2"}
+				searchResultLabels = []string{"Initial Result Label 1", "Initial Result Label 2"}
+				return prompter.MultiSelectSearchResult{
+					Keys:        searchResultKeys,
+					Labels:      searchResultLabels,
+					MoreResults: moreResults,
+					Err:         nil,
+				}
+			}
+
+			// Subsequent search with input
+			moreResults := 0
+			searchResultKeys = []string{"search-result-1", "search-result-2"}
+			searchResultLabels = []string{"Search Result Label 1", "Search Result Label 2"}
+			return prompter.MultiSelectSearchResult{
+				Keys:        searchResultKeys,
+				Labels:      searchResultLabels,
+				MoreResults: moreResults,
+				Err:         nil,
+			}
+		}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select an option")
+			require.NoError(t, err)
+
+			// Select the search option, which will always be the first option
+			_, err = console.SendLine("1")
+			require.NoError(t, err)
+
+			// Submit search
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+
+			// Wait for the search prompt to appear
+			_, err = console.ExpectString("Search for an option")
+			require.NoError(t, err)
+
+			// Enter some search text to trigger the search
+			_, err = console.SendLine("search text")
+			require.NoError(t, err)
+
+			// Wait for the multiselect prompt to re-appear after search
+			_, err = console.ExpectString("Select an option")
+			require.NoError(t, err)
+
+			// Select the first search result
+			_, err = console.SendLine("2")
+			require.NoError(t, err)
+
+			// This confirms selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+		multiSelectValues, err := p.MultiSelectWithSearch("Select an option", "Search for an option", []string{}, persistentOptions, searchFunc)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"search-result-1"}, multiSelectValues)
+	})
+
+	t.Run("MultiSelectWithSearch - defaults are pre-selected", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		initialSearchResultKeys := []string{"initial-result-1"}
+		initialSearchResultLabels := []string{"Initial Result Label 1"}
+		defaultOptions := initialSearchResultKeys
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
+			// Initial search with no input
+			if input == "" {
+				moreResults := 2
+				return prompter.MultiSelectSearchResult{
+					Keys:        initialSearchResultKeys,
+					Labels:      initialSearchResultLabels,
+					MoreResults: moreResults,
+					Err:         nil,
+				}
+			}
+
+			// No search selected, so this should fail the test.
+			t.FailNow()
+			return prompter.MultiSelectSearchResult{
+				Keys:        nil,
+				Labels:      nil,
+				MoreResults: 0,
+				Err:         nil,
+			}
+		}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select an option (default: Initial Result Label 1)")
+			require.NoError(t, err)
+
+			// This confirms default selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+		multiSelectValues, err := p.MultiSelectWithSearch("Select an option", "Search for an option", defaultOptions, initialSearchResultKeys, searchFunc)
+		require.NoError(t, err)
+		assert.Equal(t, defaultOptions, multiSelectValues)
+	})
+
+	t.Run("MultiSelectWithSearch - selected options persist between searches", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		initialSearchResultKeys := []string{"initial-result-1"}
+		initialSearchResultLabels := []string{"Initial Result Label 1"}
+		moreResultKeys := []string{"more-result-1"}
+		moreResultLabels := []string{"More Result Label 1"}
+
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
+			// Initial search with no input
+			if input == "" {
+				moreResults := 2
+				return prompter.MultiSelectSearchResult{
+					Keys:        initialSearchResultKeys,
+					Labels:      initialSearchResultLabels,
+					MoreResults: moreResults,
+					Err:         nil,
+				}
+			}
+
+			// Subsequent search with input "more"
+			if input == "more" {
+				return prompter.MultiSelectSearchResult{
+					Keys:        moreResultKeys,
+					Labels:      moreResultLabels,
+					MoreResults: 0,
+					Err:         nil,
+				}
+			}
+
+			// No other searches expected
+			t.FailNow()
+			return prompter.MultiSelectSearchResult{
+				Keys:        nil,
+				Labels:      nil,
+				MoreResults: 0,
+				Err:         nil,
+			}
+		}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select an option")
+			require.NoError(t, err)
+
+			// Select one of our initial search results
+			_, err = console.SendLine("2")
+			require.NoError(t, err)
+
+			// Select to search
+			_, err = console.SendLine("1")
+			require.NoError(t, err)
+
+			// Submit the search selection
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+
+			// Wait for the search prompt to appear
+			_, err = console.ExpectString("Search for an option")
+			require.NoError(t, err)
+
+			// Enter some search text to trigger the search
+			_, err = console.SendLine("more")
+			require.NoError(t, err)
+
+			// Wait for the multiselect prompt to re-appear after search
+			_, err = console.ExpectString("Select up to")
+			require.NoError(t, err)
+
+			// Select the new option from the new search results
+			_, err = console.SendLine("3")
+			require.NoError(t, err)
+
+			// Submit selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+		multiSelectValues, err := p.MultiSelectWithSearch("Select an option", "Search for an option", []string{}, []string{}, searchFunc)
+		require.NoError(t, err)
+		expectedValues := append(initialSearchResultKeys, moreResultKeys...)
+		assert.Equal(t, expectedValues, multiSelectValues)
+	})
+
+	t.Run("MultiSelectWithSearch - search error propagates", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
+			return prompter.MultiSelectSearchResult{
+				Err: fmt.Errorf("search error"),
+			}
+		}
+
+		_, err := p.MultiSelectWithSearch("Select", "Search", []string{}, []string{}, searchFunc)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "search error")
 	})
 
 	t.Run("Input", func(t *testing.T) {
@@ -294,8 +505,8 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err := console.ExpectString("Enter password")
 			require.NoError(t, err)
 
-			// Wait to ensure huh has time to set the echo mode
-			time.Sleep(beforePasswordSendTimeout)
+			// Wait until huh has disabled echo mode on the TTY
+			require.NoError(t, waitForEchoDisabled(console.Tty(), 5*time.Second))
 
 			// Enter a number
 			_, err = console.SendLine(dummyPassword)
@@ -313,7 +524,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		// expected string matches any part of the stream, we have to use an
 		// anchored regexp (i.e., with ^ and $) to make sure the password/token
 		// is not printed at all.
-		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
+		_, err = console.Expect(expect.RegexpPattern(`^(\x1b\[[\d;]*m)* \r\n\r\n$`))
 		require.NoError(t, err)
 	})
 
@@ -385,8 +596,8 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err := console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
 
-			// Wait to ensure huh has time to set the echo mode
-			time.Sleep(beforePasswordSendTimeout)
+			// Wait until huh has disabled echo mode on the TTY
+			require.NoError(t, waitForEchoDisabled(console.Tty(), 5*time.Second))
 
 			// Enter some dummy auth token
 			_, err = console.SendLine(dummyAuthToken)
@@ -404,7 +615,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		// expected string matches any part of the stream, we have to use an
 		// anchored regexp (i.e., with ^ and $) to make sure the password/token
 		// is not printed at all.
-		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
+		_, err = console.Expect(expect.RegexpPattern(`^(\x1b\[[\d;]*m)* \r\n\r\n$`))
 		require.NoError(t, err)
 	})
 
@@ -430,8 +641,8 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err = console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
 
-			// Wait to ensure huh has time to set the echo mode
-			time.Sleep(beforePasswordSendTimeout)
+			// Wait until huh has disabled echo mode on the TTY
+			require.NoError(t, waitForEchoDisabled(console.Tty(), 5*time.Second))
 
 			// Now enter some dummy auth token to return control back to the test
 			_, err = console.SendLine(dummyAuthTokenForAfterFailure)
@@ -449,7 +660,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		// expected string matches any part of the stream, we have to use an
 		// anchored regexp (i.e., with ^ and $) to make sure the password/token
 		// is not printed at all.
-		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
+		_, err = console.Expect(expect.RegexpPattern(`^(\x1b\[[\d;]*m)* \r\n\r\n$`))
 		require.NoError(t, err)
 	})
 
@@ -642,6 +853,9 @@ func newTestVirtualTerminal(t *testing.T) *expect.Console {
 		failOnExpectError(t),
 		failOnSendError(t),
 		expect.WithDefaultTimeout(time.Second),
+		// Use this logger to debug expect based tests by printing the
+		// characters being read to stdout.
+		// expect.WithLogger(log.New(os.Stdout, "", 0)),
 	}
 
 	console, err := expect.NewConsole(consoleOpts...)
@@ -741,4 +955,22 @@ func testCloser(t *testing.T, closer io.Closer) {
 	if err := closer.Close(); err != nil {
 		t.Errorf("Close failed: %s", err)
 	}
+}
+
+// waitForEchoDisabled polls the TTY until echo mode is disabled or the
+// timeout is reached. This is used in password and auth token tests to
+// ensure that huh has configured the terminal before we send input.
+func waitForEchoDisabled(tty *os.File, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		termios, err := unix.IoctlGetTermios(int(tty.Fd()), ioctlGetTermios)
+		if err != nil {
+			return fmt.Errorf("getting terminal attributes: %w", err)
+		}
+		if termios.Lflag&unix.ECHO == 0 {
+			return nil
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return fmt.Errorf("timed out waiting for echo mode to be disabled")
 }

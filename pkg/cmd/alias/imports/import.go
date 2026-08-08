@@ -129,21 +129,17 @@ func importRun(opts *ImportOptions) error {
 
 		if !opts.validAliasName(alias) {
 			if !existingAlias {
-				msg.WriteString(
-					fmt.Sprintf("%s Could not import alias %s: already a gh command or extension\n",
-						cs.FailureIcon(),
-						cs.Bold(alias),
-					),
+				fmt.Fprintf(&msg, "%s Could not import alias %s: already a gh command or extension\n",
+					cs.FailureIcon(),
+					cs.Bold(alias),
 				)
 				continue
 			}
 
 			if existingAlias && !opts.OverwriteExisting {
-				msg.WriteString(
-					fmt.Sprintf("%s Could not import alias %s: name already taken\n",
-						cs.FailureIcon(),
-						cs.Bold(alias),
-					),
+				fmt.Fprintf(&msg, "%s Could not import alias %s: name already taken\n",
+					cs.FailureIcon(),
+					cs.Bold(alias),
 				)
 				continue
 			}
@@ -152,11 +148,9 @@ func importRun(opts *ImportOptions) error {
 		expansion := aliasMap[alias]
 
 		if !opts.validAliasExpansion(expansion) {
-			msg.WriteString(
-				fmt.Sprintf("%s Could not import alias %s: expansion does not correspond to a gh command, extension, or alias\n",
-					cs.FailureIcon(),
-					cs.Bold(alias),
-				),
+			fmt.Fprintf(&msg, "%s Could not import alias %s: expansion does not correspond to a gh command, extension, or alias\n",
+				cs.FailureIcon(),
+				cs.Bold(alias),
 			)
 			continue
 		}
@@ -164,18 +158,14 @@ func importRun(opts *ImportOptions) error {
 		aliasCfg.Add(alias, expansion)
 
 		if existingAlias && opts.OverwriteExisting {
-			msg.WriteString(
-				fmt.Sprintf("%s Changed alias %s\n",
-					cs.WarningIcon(),
-					cs.Bold(alias),
-				),
+			fmt.Fprintf(&msg, "%s Changed alias %s\n",
+				cs.WarningIcon(),
+				cs.Bold(alias),
 			)
 		} else {
-			msg.WriteString(
-				fmt.Sprintf("%s Added alias %s\n",
-					cs.SuccessIcon(),
-					cs.Bold(alias),
-				),
+			fmt.Fprintf(&msg, "%s Added alias %s\n",
+				cs.SuccessIcon(),
+				cs.Bold(alias),
 			)
 		}
 	}

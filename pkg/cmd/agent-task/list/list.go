@@ -25,6 +25,7 @@ type ListOptions struct {
 	CapiClient func() (capi.CapiClient, error)
 	Web        bool
 	Browser    browser.Browser
+	Exporter   cmdutil.Exporter
 }
 
 // NewCmdList creates the list command
@@ -53,6 +54,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of agent tasks to fetch")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open agent tasks in the browser")
+
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, capi.SessionFields)
 
 	return cmd
 }
@@ -87,8 +90,12 @@ func listRun(opts *ListOptions) error {
 
 	opts.IO.StopProgressIndicator()
 
-	if len(sessions) == 0 {
+	if len(sessions) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError("no agent tasks found")
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, sessions)
 	}
 
 	if err := opts.IO.StartPager(); err == nil {

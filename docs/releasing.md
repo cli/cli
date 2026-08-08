@@ -21,13 +21,14 @@ What this does is:
 - Uploads all release artifacts to a new GitHub Release;
 - A new git tag `vX.Y.Z` is created in the remote repository;
 - The changelog is [generated from the list of merged pull requests](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes);
-- Updates [GitHub CLI marketing site](https://cli.github.com) with the contents of the new release;
-- Updates the [`gh` Homebrew formula](https://github.com/williammartin/homebrew-core/blob/master/Formula/g/gh.rb) in the [`homebrew/homebrew-core` repo](https://github.com/search?q=repo%3AHomebrew%2Fhomebrew-core+%22gh%22+in%3Atitle&type=pullrequests).
+- Updates [GitHub CLI marketing site](https://cli.github.com) with the contents of the new release.
 
-> [!NOTE]
-> `Homebrew/formulae.brew.sh` makes new formula versions available every 15 minutes through scheduled [CI workflow](https://github.com/Homebrew/formulae.brew.sh/actions/workflows/tests.yml).
->
-> For more information, see https://docs.brew.sh/Formula-Cookbook#an-introduction
+## Bumping Homebrew
+
+Homebrew bumps are handled by [autobump](https://docs.brew.sh/Autobump), which runs periodically every 3 hours. In cases where a quicker rollout is required, a pull request can be opened manually with the following steps:
+ 1. Replace the version number in the url to point ot the updated version.
+ 2. Calculate and replace the sha256 value.
+ 3. Open the PR.
 
 To test out the build system while avoiding creating an actual release:
 
@@ -60,6 +61,5 @@ Occasionally, it might be necessary to clean up a bad release and re-release.
 
 1. Delete the release and associated tag
 2. Re-release and monitor the workflow run logs
-3. Open pull request updating [`gh` Homebrew formula](https://github.com/williammartin/homebrew-core/blob/master/Formula/g/gh.rb)
-   with new SHA versions, linking the previous PR
+3. Open pull request updating [`gh` Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/g/gh.rb) with new SHA versions, linking the previous PR
 4. Verify resulting Debian and RPM packages, Homebrew formula

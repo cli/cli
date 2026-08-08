@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/docs"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -53,7 +54,7 @@ func run(args []string) error {
 			return config.NewFromString(""), nil
 		},
 		ExtensionManager: &em{},
-	}, "", "")
+	}, &telemetry.NoOpService{}, "", "")
 	rootCmd.InitDefaultHelpCmd()
 
 	if err := os.MkdirAll(*dir, 0755); err != nil {

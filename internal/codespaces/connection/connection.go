@@ -30,6 +30,10 @@ type CodespaceConnection struct {
 	Options                    *tunnels.TunnelRequestOptions
 	Tunnel                     *tunnels.Tunnel
 	AllowedPortPrivacySettings []string
+
+	// ManagerMu serializes access to TunnelManager operations which mutate
+	// shared state on the Tunnel object and are not goroutine-safe.
+	ManagerMu sync.Mutex
 }
 
 // NewCodespaceConnection initializes a connection to a codespace.

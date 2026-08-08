@@ -1,0 +1,13 @@
+# Telemetry log mode records accessibility feature state as dimensions
+env GH_TELEMETRY=log
+env GH_TELEMETRY_SAMPLE_RATE=100
+env GH_ACCESSIBLE_COLORS=true
+env GH_ACCESSIBLE_PROMPTER=true
+env GH_COLOR_LABELS=true
+env GH_SPINNER_DISABLED=true
+
+exec gh version
+stderr '"accessible_colors": "true"'
+stderr '"accessible_prompter": "true"'
+stderr '"color_labels": "true"'
+stderr '"spinner_disabled": "true"'

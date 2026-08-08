@@ -2,9 +2,6 @@ package cmdutil
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
@@ -18,7 +15,8 @@ import (
 
 type Factory struct {
 	AppVersion     string
-	ExecutableName string
+	ExecutablePath string
+	InvokingAgent  string
 
 	Browser          browser.Browser
 	ExtensionManager extensions.ExtensionManager
@@ -26,79 +24,24 @@ type Factory struct {
 	IOStreams        *iostreams.IOStreams
 	Prompter         prompter.Prompter
 
-	BaseRepo   func() (ghrepo.Interface, error)
-	Branch     func() (string, error)
+	BaseRepo func() (ghrepo.Interface, error)
+	Branch   func() (string, error)
+	// It would be nice if Config were just loaded once at startup and an error
+	// were returned, but this would prevent commands like "gh version" from running.
+	// So for now, we eagerly load the config and don't fail if there is an error,
+	// and defer the error handling to commands that need it.
+	// HOWEVER, as an additional point, the root command setup currently DOES call
+	// this and errors, so we never get to "gh version" anyway.
+	// We need to revisit that, but I don't want to make it worse.
 	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	// PlainHttpClient is a special HTTP client that does not automatically set
 	// auth and other headers. This is meant to be used in situations where the
 	// client needs to specify the headers itself (e.g. during login).
 	PlainHttpClient func() (*http.Client, error)
-	Remotes         func() (context.Remotes, error)
-}
-
-// Executable is the path to the currently invoked binary
-func (f *Factory) Executable() string {
-	ghPath := os.Getenv("GH_PATH")
-	if ghPath != "" {
-		return ghPath
-	}
-	if !strings.ContainsRune(f.ExecutableName, os.PathSeparator) {
-		f.ExecutableName = executable(f.ExecutableName)
-	}
-	return f.ExecutableName
-}
-
-// Finds the location of the executable for the current process as it's found in PATH, respecting symlinks.
-// If the process couldn't determine its location, return fallbackName. If the executable wasn't found in
-// PATH, return the absolute location to the program.
-//
-// The idea is that the result of this function is callable in the future and refers to the same
-// installation of gh, even across upgrades. This is needed primarily for Homebrew, which installs software
-// under a location such as `/usr/local/Cellar/gh/1.13.1/bin/gh` and symlinks it from `/usr/local/bin/gh`.
-// When the version is upgraded, Homebrew will often delete older versions, but keep the symlink. Because of
-// this, we want to refer to the `gh` binary as `/usr/local/bin/gh` and not as its internal Homebrew
-// location.
-//
-// None of this would be needed if we could just refer to GitHub CLI as `gh`, i.e. without using an absolute
-// path. However, for some reason Homebrew does not include `/usr/local/bin` in PATH when it invokes git
-// commands to update its taps. If `gh` (no path) is being used as git credential helper, as set up by `gh
-// auth login`, running `brew update` will print out authentication errors as git is unable to locate
-// Homebrew-installed `gh`.
-func executable(fallbackName string) string {
-	exe, err := os.Executable()
-	if err != nil {
-		return fallbackName
-	}
-
-	base := filepath.Base(exe)
-	path := os.Getenv("PATH")
-	for _, dir := range filepath.SplitList(path) {
-		p, err := filepath.Abs(filepath.Join(dir, base))
-		if err != nil {
-			continue
-		}
-		f, err := os.Lstat(p)
-		if err != nil {
-			continue
-		}
-
-		if p == exe {
-			return p
-		} else if f.Mode()&os.ModeSymlink != 0 {
-			realP, err := filepath.EvalSymlinks(p)
-			if err != nil {
-				continue
-			}
-			realExe, err := filepath.EvalSymlinks(exe)
-			if err != nil {
-				continue
-			}
-			if realP == realExe {
-				return p
-			}
-		}
-	}
-
-	return exe
+	// ExternalHttpClient is an HTTP client for talking to non-GitHub hosts
+	// It includes debug logging and a User-Agent header but does not attach any
+	// authentication tokens or GitHub-specific headers.
+	ExternalHttpClient func() (*http.Client, error)
+	Remotes            func() (context.Remotes, error)
 }

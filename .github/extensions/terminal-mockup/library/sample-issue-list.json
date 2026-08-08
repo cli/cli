@@ -1,0 +1,14 @@
+{
+  "name": "Sample: gh issue list",
+  "savedAt": "2026-06-06T19:17:45.740Z",
+  "content": "[muted]$[/muted] [b]gh issue list --label bug[/b]\n\nShowing 3 of 3 issues in [b]monalisa/my-project[/b] that match the search query\n\n[brgreen]#214[/brgreen]  [b]Crash when token expires during long-running request[/b]   [muted]bug, priority:high[/muted]   2h\n[brgreen]#198[/brgreen]  [b]Incorrect error message on rate limit[/b]                  [muted]bug[/muted]                  1d\n[brgreen]#191[/brgreen]  [b]README example fails on Windows[/b]                        [muted]bug, docs[/muted]            3d",
+  "options": {
+    "font": "menlo",
+    "fontSize": 14,
+    "width": 800,
+    "chrome": "macos",
+    "backdrop": "grid",
+    "bodyGradient": false,
+    "autoStyle": true
+  }
+}

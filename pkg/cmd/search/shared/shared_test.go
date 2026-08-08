@@ -2,22 +2,27 @@ package shared
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/pkg/cmd/factory"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSearcher(t *testing.T) {
-	f := factory.New("1")
-	f.Config = func() (gh.Config, error) {
-		return config.NewBlankConfig(), nil
+	f := &cmdutil.Factory{
+		Config: func() (gh.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{}, nil
+		},
 	}
 	_, err := Searcher(f)
 	assert.NoError(t, err)

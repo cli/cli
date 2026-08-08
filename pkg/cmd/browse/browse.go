@@ -43,6 +43,8 @@ type BrowseOptions struct {
 	ReleasesFlag    bool
 	SettingsFlag    bool
 	WikiFlag        bool
+	ActionsFlag     bool
+	BlameFlag       bool
 	NoBrowserFlag   bool
 	HasRepoOverride bool
 }
@@ -90,6 +92,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			# Open main.go at line 312
 			$ gh browse main.go:312
 
+			# Open blame view for main.go at line 312
+			$ gh browse main.go:312 --blame
+
 			# Open main.go with the repository at head of bug-fix branch
 			$ gh browse main.go --branch bug-fix
 
@@ -116,26 +121,32 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"arguments not supported when using `--projects`, `--releases`, `--settings`, or `--wiki`",
+				"arguments not supported when using `--projects`, `--releases`, `--settings`, `--actions` or `--wiki`",
 				opts.SelectorArg != "",
 				opts.ProjectsFlag,
 				opts.ReleasesFlag,
 				opts.SettingsFlag,
 				opts.WikiFlag,
+				opts.ActionsFlag,
 			); err != nil {
 				return err
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--commit`, `--projects`, `--releases`, `--settings`, or `--wiki`",
+				"specify only one of `--branch`, `--commit`, `--projects`, `--releases`, `--settings`, `--actions` or `--wiki`",
 				opts.Branch != "",
 				opts.Commit != "",
 				opts.ProjectsFlag,
 				opts.ReleasesFlag,
 				opts.SettingsFlag,
 				opts.WikiFlag,
+				opts.ActionsFlag,
 			); err != nil {
 				return err
+			}
+
+			if opts.BlameFlag && opts.SelectorArg == "" {
+				return cmdutil.FlagErrorf("`--blame` requires a file path argument")
 			}
 
 			if (isNumber(opts.SelectorArg) || isCommit(opts.SelectorArg)) && (opts.Branch != "" || opts.Commit != "") {
@@ -158,7 +169,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open repository projects")
 	cmd.Flags().BoolVarP(&opts.ReleasesFlag, "releases", "r", false, "Open repository releases")
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
+	cmd.Flags().BoolVarP(&opts.ActionsFlag, "actions", "a", false, "Open repository actions")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
+	cmd.Flags().BoolVar(&opts.BlameFlag, "blame", false, "Open blame view for a file")
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
 	cmd.Flags().StringVarP(&opts.Commit, "commit", "c", "", "Select another commit by passing in the commit SHA, default is the last commit")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
@@ -223,6 +236,8 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		return "settings", nil
 	} else if opts.WikiFlag {
 		return "wiki", nil
+	} else if opts.ActionsFlag {
+		return "actions", nil
 	}
 
 	ref := opts.Branch
@@ -266,7 +281,14 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		} else {
 			rangeFragment = fmt.Sprintf("L%d", rangeStart)
 		}
+		if opts.BlameFlag {
+			return fmt.Sprintf("blame/%s/%s#%s", escapePath(ref), escapePath(filePath), rangeFragment), nil
+		}
 		return fmt.Sprintf("blob/%s/%s?plain=1#%s", escapePath(ref), escapePath(filePath), rangeFragment), nil
+	}
+
+	if opts.BlameFlag {
+		return fmt.Sprintf("blame/%s/%s", escapePath(ref), escapePath(filePath)), nil
 	}
 
 	return strings.TrimSuffix(fmt.Sprintf("tree/%s/%s", escapePath(ref), escapePath(filePath)), "/"), nil

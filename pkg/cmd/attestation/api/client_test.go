@@ -1,10 +1,14 @@
 package api
 
 import (
+	"net/http"
 	"testing"
 
+	cliAPI "github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,8 +32,8 @@ func NewClientWithMockGHClient(hasNextPage bool) Client {
 			githubAPI: mockAPIClient{
 				OnRESTWithNext: fetcher.OnRESTSuccessWithNextPage,
 			},
-			httpClient: httpClient,
-			logger:     l,
+			externalHttpClient: httpClient,
+			logger:             l,
 		}
 	}
 
@@ -37,8 +41,8 @@ func NewClientWithMockGHClient(hasNextPage bool) Client {
 		githubAPI: mockAPIClient{
 			OnRESTWithNext: fetcher.OnRESTSuccess,
 		},
-		httpClient: httpClient,
-		logger:     l,
+		externalHttpClient: httpClient,
+		logger:             l,
 	}
 }
 
@@ -137,8 +141,8 @@ func TestGetByDigest_NoAttestationsFound(t *testing.T) {
 		githubAPI: mockAPIClient{
 			OnRESTWithNext: fetcher.OnRESTWithNextNoAttestations,
 		},
-		httpClient: httpClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: httpClient,
+		logger:             io.NewTestHandler(),
 	}
 
 	attestations, err := c.GetByDigest(testFetchParamsWithRepo)
@@ -167,8 +171,8 @@ func TestGetByDigest_Error(t *testing.T) {
 func TestFetchBundleFromAttestations_BundleURL(t *testing.T) {
 	httpClient := &mockHttpClient{}
 	client := LiveClient{
-		httpClient: httpClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: httpClient,
+		logger:             io.NewTestHandler(),
 	}
 
 	att1 := makeTestAttestation()
@@ -184,8 +188,8 @@ func TestFetchBundleFromAttestations_BundleURL(t *testing.T) {
 func TestFetchBundleFromAttestations_MissingBundleAndBundleURLFields(t *testing.T) {
 	httpClient := &mockHttpClient{}
 	client := LiveClient{
-		httpClient: httpClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: httpClient,
+		logger:             io.NewTestHandler(),
 	}
 
 	// If both the BundleURL and Bundle fields are empty, the function should
@@ -207,8 +211,8 @@ func TestFetchBundleFromAttestations_FailOnTheSecondAttestation(t *testing.T) {
 	}
 
 	c := &LiveClient{
-		httpClient: mockHTTPClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: mockHTTPClient,
+		logger:             io.NewTestHandler(),
 	}
 
 	att1 := makeTestAttestation()
@@ -223,8 +227,8 @@ func TestFetchBundleFromAttestations_FailAfterRetrying(t *testing.T) {
 	mockHTTPClient := &reqFailHttpClient{}
 
 	c := &LiveClient{
-		httpClient: mockHTTPClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: mockHTTPClient,
+		logger:             io.NewTestHandler(),
 	}
 
 	a := makeTestAttestation()
@@ -239,8 +243,8 @@ func TestFetchBundleFromAttestations_FallbackToBundleField(t *testing.T) {
 	mockHTTPClient := &mockHttpClient{}
 
 	c := &LiveClient{
-		httpClient: mockHTTPClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: mockHTTPClient,
+		logger:             io.NewTestHandler(),
 	}
 
 	// If the bundle URL is empty, the code will fallback to the bundle field
@@ -257,11 +261,11 @@ func TestGetBundle(t *testing.T) {
 	mockHTTPClient := &mockHttpClient{}
 
 	c := &LiveClient{
-		httpClient: mockHTTPClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: mockHTTPClient,
+		logger:             io.NewTestHandler(),
 	}
 
-	b, err := c.getBundle("https://mybundleurl.com")
+	b, err := c.getBundle(safeurl.NewImmutableSafeURL("https://mybundleurl.com"))
 	require.NoError(t, err)
 	require.Equal(t, "application/vnd.dev.sigstore.bundle.v0.3+json", b.GetMediaType())
 	mockHTTPClient.AssertNumberOfCalls(t, "OnGetSuccess", 1)
@@ -276,11 +280,11 @@ func TestGetBundle_SuccessfulRetry(t *testing.T) {
 	}
 
 	c := &LiveClient{
-		httpClient: mockHTTPClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: mockHTTPClient,
+		logger:             io.NewTestHandler(),
 	}
 
-	b, err := c.getBundle("mybundleurl")
+	b, err := c.getBundle(safeurl.NewImmutableSafeURL("mybundleurl"))
 	require.NoError(t, err)
 	require.Equal(t, "application/vnd.dev.sigstore.bundle.v0.3+json", b.GetMediaType())
 	mockHTTPClient.AssertNumberOfCalls(t, "OnGetFailAfterNCalls", 2)
@@ -290,11 +294,11 @@ func TestGetBundle_SuccessfulRetry(t *testing.T) {
 func TestGetBundle_PermanentBackoffFail(t *testing.T) {
 	mockHTTPClient := &invalidBundleClient{}
 	c := &LiveClient{
-		httpClient: mockHTTPClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: mockHTTPClient,
+		logger:             io.NewTestHandler(),
 	}
 
-	b, err := c.getBundle("mybundleurl")
+	b, err := c.getBundle(safeurl.NewImmutableSafeURL("mybundleurl"))
 	// var permanent *backoff.PermanentError
 	//require.IsType(t, &backoff.PermanentError{}, err)
 	require.Error(t, err)
@@ -307,11 +311,11 @@ func TestGetBundle_RequestFail(t *testing.T) {
 	mockHTTPClient := &reqFailHttpClient{}
 
 	c := &LiveClient{
-		httpClient: mockHTTPClient,
-		logger:     io.NewTestHandler(),
+		externalHttpClient: mockHTTPClient,
+		logger:             io.NewTestHandler(),
 	}
 
-	b, err := c.getBundle("mybundleurl")
+	b, err := c.getBundle(safeurl.NewImmutableSafeURL("mybundleurl"))
 	require.Error(t, err)
 	require.Nil(t, b)
 	mockHTTPClient.AssertNumberOfCalls(t, "OnGetReqFail", 4)
@@ -360,8 +364,8 @@ func TestGetAttestationsRetries(t *testing.T) {
 		githubAPI: mockAPIClient{
 			OnRESTWithNext: fetcher.FlakyOnRESTSuccessWithNextPageHandler(),
 		},
-		httpClient: &mockHttpClient{},
-		logger:     io.NewTestHandler(),
+		externalHttpClient: &mockHttpClient{},
+		logger:             io.NewTestHandler(),
 	}
 
 	testFetchParamsWithRepo.Limit = 30
@@ -376,6 +380,44 @@ func TestGetAttestationsRetries(t *testing.T) {
 	require.Equal(t, len(attestations), 10)
 	bundle := (attestations)[0].Bundle
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
+}
+
+func TestGetAttestationsRetriesRESTWithNextError(t *testing.T) {
+	originalRetryInterval := getAttestationRetryInterval
+	getAttestationRetryInterval = 0
+	t.Cleanup(func() {
+		getAttestationRetryInterval = originalRetryInterval
+	})
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.MatchAny,
+		httpmock.StatusStringResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`),
+	)
+	reg.Register(
+		httpmock.MatchAny,
+		httpmock.JSONResponse(map[string]any{
+			"attestations": []any{
+				map[string]any{"bundle_url": "https://example.com/bundle"},
+			},
+		}),
+	)
+
+	c := &LiveClient{
+		githubAPI: cliAPI.NewClientFromHTTP(&http.Client{Transport: reg}),
+		host:      "github.com",
+		logger:    io.NewTestHandler(),
+	}
+	attestations, err := c.getAttestations(FetchParams{
+		Digest: testDigest,
+		Limit:  1,
+		Repo:   testRepo,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, attestations, 1)
+	require.Len(t, reg.Requests, 2)
 }
 
 // test total retries

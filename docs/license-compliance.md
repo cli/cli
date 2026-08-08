@@ -4,43 +4,31 @@ GitHub CLI complies with the software licenses of its dependencies. This documen
 
 ## Overview
 
-When a dependency is added or updated, the license information needs to be updated. We use the [`google/go-licenses`](https://github.com/google/go-licenses) tool to:
+Third-party license information is embedded into the `gh` binary at build time using [`google/go-licenses`](https://github.com/google/go-licenses). Each release binary contains the correct license listing for its target platform (GOOS/GOARCH), since the set of dependencies can vary by platform.
 
-1. Generate markdown documentation listing all Go dependencies and their licenses
-2. Copy license files for dependencies that require redistribution
+## Viewing License Information
 
-## License Files
+Users can view the third-party license information for their installed binary:
 
-The following files contain license information:
-
-- `third-party-licenses.darwin.md` - License information for macOS dependencies
-- `third-party-licenses.linux.md` - License information for Linux dependencies
-- `third-party-licenses.windows.md` - License information for Windows dependencies
-- `third-party/` - Directory containing source code and license files that require redistribution
-
-## Updating License Information
-
-When dependencies change, you need to update the license information:
-
-1. Update license information for all platforms:
-
-   ```shell
-   make licenses
-   ```
-
-2. Commit the changes:
-
-   ```shell
-   git add third-party-licenses.*.md third-party/
-   git commit -m "Update third-party license information"
-   ```
-
-## Checking License Compliance
-
-The CI workflow checks if license information is up to date. To check locally:
-
-```sh
-make licenses-check
+```shell
+gh licenses
 ```
 
-If the check fails, follow the instructions to update the license information.
+This opens a pager displaying all Go dependencies and their licenses, with links to the source code of each dependency.
+
+## How It Works
+
+1. The `script/licenses` script accepts a GOOS and GOARCH and generates a license report using `go-licenses report`
+2. The report is written to `internal/licenses/embed/third-party-licenses.md`
+3. This file is embedded into the binary via `go:embed` in `internal/licenses/licenses.go`
+4. Goreleaser pre-build hooks call `script/licenses` with the correct platform before each build
+
+## Local Development
+
+During local development (`go build`), the embedded file contains a placeholder message. To generate real license information for your current platform:
+
+```shell
+make licenses
+```
+
+This runs `go-licenses report` for your host GOOS/GOARCH and writes the output to the embed path.

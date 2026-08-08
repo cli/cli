@@ -104,6 +104,7 @@ func Test_listRun(t *testing.T) {
 				accessible_colors=disabled
 				accessible_prompter=disabled
 				spinner=enabled
+				telemetry=enabled
 			`),
 		},
 	}

@@ -1,0 +1,77 @@
+edges
+| hits_base64_after_json.go:20:2:20:99 | ... := ...[0] | hits_base64_after_json.go:24:9:24:23 | type conversion | provenance |  |
+| hits_base64_after_json.go:20:29:20:98 | call to NewDecoder | hits_base64_after_json.go:20:2:20:99 | ... := ...[0] | provenance | Config |
+| hits_base64_after_json.go:20:29:20:98 | call to NewDecoder | hits_base64_after_json.go:20:2:20:99 | ... := ...[0] | provenance | MaD:1773 |
+| hits_base64_after_json.go:24:9:24:23 | type conversion | hits_base64_after_json.go:28:2:28:32 | ... := ...[0] | provenance |  |
+| hits_base64_after_json.go:28:2:28:32 | ... := ...[0] | hits_base64_after_json.go:32:22:32:28 | content | provenance |  |
+| hits_base64_after_json.go:32:22:32:28 | content | hits_base64_after_json.go:32:2:32:29 | []type{args} | provenance |  |
+| hits_iocopy_crossfunc.go:17:9:17:17 | selection of Body | hits_iocopy_crossfunc.go:21:2:21:32 | ... := ...[0] | provenance |  |
+| hits_iocopy_crossfunc.go:21:2:21:32 | ... := ...[0] | hits_iocopy_crossfunc.go:26:28:26:28 | r | provenance |  |
+| hits_readall_intraproc.go:13:2:13:35 | ... := ...[0] | hits_readall_intraproc.go:17:24:17:35 | type conversion | provenance |  |
+| hits_readall_intraproc.go:13:26:13:34 | selection of Body | hits_readall_intraproc.go:13:2:13:35 | ... := ...[0] | provenance | Config |
+| hits_readall_intraproc.go:13:26:13:34 | selection of Body | hits_readall_intraproc.go:13:2:13:35 | ... := ...[0] | provenance | MaD:1773 |
+| hits_readall_intraproc.go:17:24:17:35 | type conversion | hits_readall_intraproc.go:17:2:17:36 | []type{args} | provenance |  |
+| hits_scanner_crossfunc.go:19:9:19:17 | selection of Body | hits_scanner_crossfunc.go:23:2:23:25 | ... := ...[0] | provenance |  |
+| hits_scanner_crossfunc.go:23:2:23:25 | ... := ...[0] | hits_scanner_crossfunc.go:28:30:28:31 | rc | provenance |  |
+| hits_scanner_crossfunc.go:28:13:28:32 | call to NewScanner | hits_scanner_crossfunc.go:30:32:30:38 | scanner | provenance |  |
+| hits_scanner_crossfunc.go:28:30:28:31 | rc | hits_scanner_crossfunc.go:28:13:28:32 | call to NewScanner | provenance | Config |
+| hits_scanner_crossfunc.go:28:30:28:31 | rc | hits_scanner_crossfunc.go:28:13:28:32 | call to NewScanner | provenance | MaD:14 |
+| hits_scanner_crossfunc.go:30:32:30:38 | scanner | hits_scanner_crossfunc.go:30:32:30:45 | call to Text | provenance | Config |
+| hits_scanner_crossfunc.go:30:32:30:38 | scanner | hits_scanner_crossfunc.go:30:32:30:45 | call to Text | provenance | MaD:26 |
+| hits_scanner_crossfunc.go:30:32:30:45 | call to Text | hits_scanner_crossfunc.go:30:3:30:46 | []type{args} | provenance |  |
+| hits_untrusted_raw.go:15:2:15:35 | ... := ...[0] | hits_untrusted_raw.go:19:35:19:38 | body | provenance |  |
+| hits_untrusted_raw.go:15:26:15:34 | selection of Body | hits_untrusted_raw.go:15:2:15:35 | ... := ...[0] | provenance | Config |
+| hits_untrusted_raw.go:15:26:15:34 | selection of Body | hits_untrusted_raw.go:15:2:15:35 | ... := ...[0] | provenance | MaD:1773 |
+| hits_untrusted_raw.go:19:7:19:39 | call to NewUntrustedBytes [raw] | hits_untrusted_raw.go:20:24:20:24 | u [raw] | provenance |  |
+| hits_untrusted_raw.go:19:35:19:38 | body | hits_untrusted_raw.go:19:7:19:39 | call to NewUntrustedBytes [raw] | provenance |  |
+| hits_untrusted_raw.go:19:35:19:38 | body | pkg/iostreams/iostreams.go:22:24:22:24 | definition of b | provenance |  |
+| hits_untrusted_raw.go:20:24:20:24 | u [raw] | hits_untrusted_raw.go:20:24:20:30 | call to Raw | provenance |  |
+| hits_untrusted_raw.go:20:24:20:24 | u [raw] | pkg/iostreams/iostreams.go:26:7:26:7 | definition of u [raw] | provenance |  |
+| hits_untrusted_raw.go:20:24:20:30 | call to Raw | hits_untrusted_raw.go:20:2:20:31 | []type{args} | provenance |  |
+| pkg/iostreams/iostreams.go:22:24:22:24 | definition of b | pkg/iostreams/iostreams.go:22:68:22:76 | type conversion | provenance |  |
+| pkg/iostreams/iostreams.go:22:68:22:76 | type conversion | pkg/iostreams/iostreams.go:22:53:22:77 | struct literal [raw] | provenance |  |
+| pkg/iostreams/iostreams.go:26:7:26:7 | definition of u [raw] | pkg/iostreams/iostreams.go:26:42:26:42 | u [raw] | provenance |  |
+| pkg/iostreams/iostreams.go:26:42:26:42 | u [raw] | pkg/iostreams/iostreams.go:26:42:26:46 | selection of raw | provenance |  |
+nodes
+| hits_base64_after_json.go:20:2:20:99 | ... := ...[0] | semmle.label | ... := ...[0] |
+| hits_base64_after_json.go:20:29:20:98 | call to NewDecoder | semmle.label | call to NewDecoder |
+| hits_base64_after_json.go:24:9:24:23 | type conversion | semmle.label | type conversion |
+| hits_base64_after_json.go:28:2:28:32 | ... := ...[0] | semmle.label | ... := ...[0] |
+| hits_base64_after_json.go:32:2:32:29 | []type{args} | semmle.label | []type{args} |
+| hits_base64_after_json.go:32:22:32:28 | content | semmle.label | content |
+| hits_iocopy_crossfunc.go:17:9:17:17 | selection of Body | semmle.label | selection of Body |
+| hits_iocopy_crossfunc.go:21:2:21:32 | ... := ...[0] | semmle.label | ... := ...[0] |
+| hits_iocopy_crossfunc.go:26:28:26:28 | r | semmle.label | r |
+| hits_readall_intraproc.go:13:2:13:35 | ... := ...[0] | semmle.label | ... := ...[0] |
+| hits_readall_intraproc.go:13:26:13:34 | selection of Body | semmle.label | selection of Body |
+| hits_readall_intraproc.go:17:2:17:36 | []type{args} | semmle.label | []type{args} |
+| hits_readall_intraproc.go:17:24:17:35 | type conversion | semmle.label | type conversion |
+| hits_scanner_crossfunc.go:19:9:19:17 | selection of Body | semmle.label | selection of Body |
+| hits_scanner_crossfunc.go:23:2:23:25 | ... := ...[0] | semmle.label | ... := ...[0] |
+| hits_scanner_crossfunc.go:28:13:28:32 | call to NewScanner | semmle.label | call to NewScanner |
+| hits_scanner_crossfunc.go:28:30:28:31 | rc | semmle.label | rc |
+| hits_scanner_crossfunc.go:30:3:30:46 | []type{args} | semmle.label | []type{args} |
+| hits_scanner_crossfunc.go:30:32:30:38 | scanner | semmle.label | scanner |
+| hits_scanner_crossfunc.go:30:32:30:45 | call to Text | semmle.label | call to Text |
+| hits_untrusted_raw.go:15:2:15:35 | ... := ...[0] | semmle.label | ... := ...[0] |
+| hits_untrusted_raw.go:15:26:15:34 | selection of Body | semmle.label | selection of Body |
+| hits_untrusted_raw.go:19:7:19:39 | call to NewUntrustedBytes [raw] | semmle.label | call to NewUntrustedBytes [raw] |
+| hits_untrusted_raw.go:19:35:19:38 | body | semmle.label | body |
+| hits_untrusted_raw.go:20:2:20:31 | []type{args} | semmle.label | []type{args} |
+| hits_untrusted_raw.go:20:24:20:24 | u [raw] | semmle.label | u [raw] |
+| hits_untrusted_raw.go:20:24:20:30 | call to Raw | semmle.label | call to Raw |
+| pkg/iostreams/iostreams.go:22:24:22:24 | definition of b | semmle.label | definition of b |
+| pkg/iostreams/iostreams.go:22:53:22:77 | struct literal [raw] | semmle.label | struct literal [raw] |
+| pkg/iostreams/iostreams.go:22:68:22:76 | type conversion | semmle.label | type conversion |
+| pkg/iostreams/iostreams.go:26:7:26:7 | definition of u [raw] | semmle.label | definition of u [raw] |
+| pkg/iostreams/iostreams.go:26:42:26:42 | u [raw] | semmle.label | u [raw] |
+| pkg/iostreams/iostreams.go:26:42:26:46 | selection of raw | semmle.label | selection of raw |
+subpaths
+| hits_untrusted_raw.go:19:35:19:38 | body | pkg/iostreams/iostreams.go:22:24:22:24 | definition of b | pkg/iostreams/iostreams.go:22:53:22:77 | struct literal [raw] | hits_untrusted_raw.go:19:7:19:39 | call to NewUntrustedBytes [raw] |
+| hits_untrusted_raw.go:20:24:20:24 | u [raw] | pkg/iostreams/iostreams.go:26:7:26:7 | definition of u [raw] | pkg/iostreams/iostreams.go:26:42:26:46 | selection of raw | hits_untrusted_raw.go:20:24:20:30 | call to Raw |
+#select
+| hits_base64_after_json.go:32:2:32:29 | []type{args} | hits_base64_after_json.go:20:29:20:98 | call to NewDecoder | hits_base64_after_json.go:32:2:32:29 | []type{args} | HTTP response content reaches a terminal writer that is not IOStreams.ContentOut. Write external content to opts.IO.ContentOut, or wrap it with the asciisanitizer. |
+| hits_iocopy_crossfunc.go:26:28:26:28 | r | hits_iocopy_crossfunc.go:17:9:17:17 | selection of Body | hits_iocopy_crossfunc.go:26:28:26:28 | r | HTTP response content reaches a terminal writer that is not IOStreams.ContentOut. Write external content to opts.IO.ContentOut, or wrap it with the asciisanitizer. |
+| hits_readall_intraproc.go:17:2:17:36 | []type{args} | hits_readall_intraproc.go:13:26:13:34 | selection of Body | hits_readall_intraproc.go:17:2:17:36 | []type{args} | HTTP response content reaches a terminal writer that is not IOStreams.ContentOut. Write external content to opts.IO.ContentOut, or wrap it with the asciisanitizer. |
+| hits_scanner_crossfunc.go:30:3:30:46 | []type{args} | hits_scanner_crossfunc.go:19:9:19:17 | selection of Body | hits_scanner_crossfunc.go:30:3:30:46 | []type{args} | HTTP response content reaches a terminal writer that is not IOStreams.ContentOut. Write external content to opts.IO.ContentOut, or wrap it with the asciisanitizer. |
+| hits_untrusted_raw.go:20:2:20:31 | []type{args} | hits_untrusted_raw.go:15:26:15:34 | selection of Body | hits_untrusted_raw.go:20:2:20:31 | []type{args} | HTTP response content reaches a terminal writer that is not IOStreams.ContentOut. Write external content to opts.IO.ContentOut, or wrap it with the asciisanitizer. |

@@ -27,7 +27,7 @@ func TestStartProgressIndicatorWithLabel(t *testing.T) {
 	// waiting for input because the console is not ready to be read.
 	// But in this case, we are not blocking waiting for input and stdout
 	// can be constantly read. This means the timeout will never be reached
-	// in the event of a expectation failure.
+	// in the event of an expectation failure.
 	// To fix this, we need to implement our own timeout that is based
 	// specifically on the total time spent reading the console and waiting
 	// for the target string instead of the max time for a single read

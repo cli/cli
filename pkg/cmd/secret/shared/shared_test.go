@@ -82,6 +82,11 @@ func TestGetSecretApp(t *testing.T) {
 			want: Actions,
 		},
 		{
+			name: "Agents",
+			app:  "agents",
+			want: Agents,
+		},
+		{
 			name: "Codespaces",
 			app:  "codespaces",
 			want: Codespaces,
@@ -157,6 +162,19 @@ func TestIsSupportedSecretEntity(t *testing.T) {
 				Environment,
 			},
 			unsupportedEntities: []SecretEntity{
+				User,
+				Unknown,
+			},
+		},
+		{
+			name: "Agents",
+			app:  Agents,
+			supportedEntities: []SecretEntity{
+				Repository,
+				Organization,
+			},
+			unsupportedEntities: []SecretEntity{
+				Environment,
 				User,
 				Unknown,
 			},

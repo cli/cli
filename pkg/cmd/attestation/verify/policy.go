@@ -24,7 +24,7 @@ func expandToGitHubURL(tenant, ownerOrRepo string) string {
 
 func expandToGitHubURLRegex(tenant, ownerOrRepo string) string {
 	url := expandToGitHubURL(tenant, ownerOrRepo)
-	return fmt.Sprintf("(?i)^%s/", url)
+	return fmt.Sprintf("(?i)^%s", regexp.QuoteMeta(url+"/"))
 }
 
 func newEnforcementCriteria(opts *Options) (verification.EnforcementCriteria, error) {
@@ -155,7 +155,7 @@ func validateSignerWorkflow(hostname, signerWorkflow string) (string, error) {
 	}
 
 	if match {
-		return fmt.Sprintf("^https://%s", signerWorkflow), nil
+		return "^" + regexp.QuoteMeta(fmt.Sprintf("https://%s", signerWorkflow)), nil
 	}
 
 	// if the provided workflow did not match the expect format
@@ -164,5 +164,5 @@ func validateSignerWorkflow(hostname, signerWorkflow string) (string, error) {
 		return "", errors.New("unknown signer workflow host")
 	}
 
-	return fmt.Sprintf("^https://%s/%s", hostname, signerWorkflow), nil
+	return "^" + regexp.QuoteMeta(fmt.Sprintf("https://%s/%s", hostname, signerWorkflow)), nil
 }

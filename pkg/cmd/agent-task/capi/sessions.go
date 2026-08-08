@@ -10,12 +10,12 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"net/url"
 	"slices"
 	"strconv"
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/shurcooL/githubv4"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -102,6 +102,94 @@ type SessionError struct {
 	Message string
 }
 
+// SessionFields defines the available fields for JSON export of a Session.
+var SessionFields = []string{
+	"id",
+	"name",
+	"state",
+	"repository",
+	"user",
+	"createdAt",
+	"updatedAt",
+	"completedAt",
+	"pullRequestNumber",
+	"pullRequestUrl",
+	"pullRequestTitle",
+	"pullRequestState",
+}
+
+// ExportData implements the exportable interface for JSON output.
+func (s *Session) ExportData(fields []string) map[string]interface{} {
+	data := make(map[string]interface{}, len(fields))
+	for _, f := range fields {
+		switch f {
+		case "id":
+			data[f] = s.ID
+		case "name":
+			data[f] = s.Name
+		case "state":
+			data[f] = s.State
+		case "repository":
+			if s.PullRequest != nil && s.PullRequest.Repository != nil {
+				data[f] = s.PullRequest.Repository.NameWithOwner
+			} else {
+				data[f] = nil
+			}
+		case "user":
+			if s.User != nil {
+				data[f] = s.User.Login
+			} else {
+				data[f] = nil
+			}
+		case "createdAt":
+			if s.CreatedAt.IsZero() {
+				data[f] = nil
+			} else {
+				data[f] = s.CreatedAt
+			}
+		case "updatedAt":
+			if s.LastUpdatedAt.IsZero() {
+				data[f] = nil
+			} else {
+				data[f] = s.LastUpdatedAt
+			}
+		case "completedAt":
+			if s.CompletedAt.IsZero() {
+				data[f] = nil
+			} else {
+				data[f] = s.CompletedAt
+			}
+		case "pullRequestNumber":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.Number
+			} else {
+				data[f] = nil
+			}
+		case "pullRequestUrl":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.URL
+			} else {
+				data[f] = nil
+			}
+		case "pullRequestTitle":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.Title
+			} else {
+				data[f] = nil
+			}
+		case "pullRequestState":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.State
+			} else {
+				data[f] = nil
+			}
+		default:
+			data[f] = nil
+		}
+	}
+	return data
+}
+
 type resource struct {
 	ID                   string            `json:"id"`
 	UserID               uint64            `json:"user_id"`
@@ -129,13 +217,16 @@ func (c *CAPIClient) ListLatestSessionsForViewer(ctx context.Context, limit int)
 		return nil, nil
 	}
 
-	url := baseCAPIURL + "/agents/sessions"
+	sessionsURL, err := safeurl.JoinPathWithHostPrefix(c.capiBaseURL, "agents", "sessions")
+	if err != nil {
+		return nil, err
+	}
 	pageSize := defaultSessionsPerPage
 
 	seenResources := make(map[int64]struct{})
 	latestSessions := make([]session, 0, limit)
 	for page := 1; ; page++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sessionsURL.String(), http.NoBody)
 		if err != nil {
 			return nil, err
 		}
@@ -208,9 +299,12 @@ func (c *CAPIClient) GetSession(ctx context.Context, id string) (*Session, error
 		return nil, fmt.Errorf("missing session ID")
 	}
 
-	url := fmt.Sprintf("%s/agents/sessions/%s", baseCAPIURL, url.PathEscape(id))
+	u, err := safeurl.JoinPathWithHostPrefix(c.capiBaseURL, "agents", "sessions", id)
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -247,9 +341,12 @@ func (c *CAPIClient) GetSessionLogs(ctx context.Context, id string) ([]byte, err
 		return nil, fmt.Errorf("missing session ID")
 	}
 
-	url := fmt.Sprintf("%s/agents/sessions/%s/logs", baseCAPIURL, url.PathEscape(id))
+	u, err := safeurl.JoinPathWithHostPrefix(c.capiBaseURL, "agents", "sessions", id, "logs")
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -280,9 +377,12 @@ func (c *CAPIClient) ListSessionsByResourceID(ctx context.Context, resourceType 
 		return nil, nil
 	}
 
-	url := fmt.Sprintf("%s/agents/resource/%s/%d", baseCAPIURL, url.PathEscape(resourceType), resourceID)
+	u, err := safeurl.JoinPathWithHostPrefix(c.capiBaseURL, "agents", "resource", resourceType, strconv.FormatInt(resourceID, 10))
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}

@@ -385,6 +385,31 @@ func Test_createRun(t *testing.T) {
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 		{
+			name: "same head and base branch should error",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "master"
+				return func() {}
+			},
+			wantErr: `head branch "master" is the same as base branch "master", cannot create a pull request`,
+		},
+		{
+			name: "same head and base branch with explicit base should error",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.BaseBranch = "feature"
+				return func() {}
+			},
+			wantErr: `head branch "feature" is the same as base branch "feature", cannot create a pull request`,
+		},
+		{
 			name: "dry-run-nontty-with-default-base",
 			tty:  false,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
@@ -405,92 +430,6 @@ func Test_createRun(t *testing.T) {
 				`maintainerCanModify:	false`,
 				`body:`,
 				`my body`,
-				``,
-			},
-			expectedErrOut: "",
-		},
-		{
-			name: "dry-run-nontty-with-all-opts",
-			tty:  false,
-			setup: func(opts *CreateOptions, t *testing.T) func() {
-				opts.TitleProvided = true
-				opts.BodyProvided = true
-				opts.Title = "TITLE"
-				opts.Body = "BODY"
-				opts.BaseBranch = "trunk"
-				opts.HeadBranch = "feature"
-				opts.Assignees = []string{"monalisa"}
-				opts.Labels = []string{"bug", "todo"}
-				opts.Projects = []string{"roadmap"}
-				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
-				opts.Milestone = "big one.oh"
-				opts.DryRun = true
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "assignableUsers": {
-						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID", "name": "" },
-							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryLabelList\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "labels": {
-						"nodes": [
-							{ "name": "TODO", "id": "TODOID" },
-							{ "name": "bug", "id": "BUGID" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "milestones": {
-						"nodes": [
-							{ "title": "GA", "id": "GAID" },
-							{ "title": "Big One.oh", "id": "BIGONEID" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				reg.Register(
-					httpmock.GraphQL(`query OrganizationTeamList\b`),
-					httpmock.StringResponse(`
-					{ "data": { "organization": { "teams": {
-						"nodes": [
-							{ "slug": "core", "id": "COREID" },
-							{ "slug": "robots", "id": "ROBOTID" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				mockRetrieveProjects(t, reg)
-			},
-			expectedOutputs: []string{
-				"Would have created a Pull Request with:",
-				`title:	TITLE`,
-				`draft:	false`,
-				`base:	trunk`,
-				`head:	feature`,
-				`labels:	bug, todo`,
-				`reviewers:	hubot, monalisa, /core, /robots`,
-				`assignees:	monalisa`,
-				`milestones:	big one.oh`,
-				`projects:	roadmap`,
-				`maintainerCanModify:	false`,
-				`body:`,
-				`BODY`,
 				``,
 			},
 			expectedErrOut: "",
@@ -523,98 +462,6 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: heredoc.Doc(`
 
 			Dry Running pull request for feature into master in OWNER/REPO
-
-		`),
-		},
-		{
-			name: "dry-run-tty-with-all-opts",
-			tty:  true,
-			setup: func(opts *CreateOptions, t *testing.T) func() {
-				opts.TitleProvided = true
-				opts.BodyProvided = true
-				opts.Title = "TITLE"
-				opts.Body = "BODY"
-				opts.BaseBranch = "trunk"
-				opts.HeadBranch = "feature"
-				opts.Assignees = []string{"monalisa"}
-				opts.Labels = []string{"bug", "todo"}
-				opts.Projects = []string{"roadmap"}
-				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
-				opts.Milestone = "big one.oh"
-				opts.DryRun = true
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "assignableUsers": {
-						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID", "name": "" },
-							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryLabelList\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "labels": {
-						"nodes": [
-							{ "name": "TODO", "id": "TODOID" },
-							{ "name": "bug", "id": "BUGID" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "milestones": {
-						"nodes": [
-							{ "title": "GA", "id": "GAID" },
-							{ "title": "Big One.oh", "id": "BIGONEID" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				reg.Register(
-					httpmock.GraphQL(`query OrganizationTeamList\b`),
-					httpmock.StringResponse(`
-					{ "data": { "organization": { "teams": {
-						"nodes": [
-							{ "slug": "core", "id": "COREID" },
-							{ "slug": "robots", "id": "ROBOTID" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				mockRetrieveProjects(t, reg)
-			},
-			expectedOutputs: []string{
-				`Would have created a Pull Request with:`,
-				`Title: TITLE`,
-				`Draft: false`,
-				`Base: trunk`,
-				`Head: feature`,
-				`Labels: bug, todo`,
-				`Reviewers: hubot, monalisa, /core, /robots`,
-				`Assignees: monalisa`,
-				`Milestones: big one.oh`,
-				`Projects: roadmap`,
-				`MaintainerCanModify: false`,
-				`Body:`,
-				``,
-				`  BODY                                                                        `,
-				``,
-				``,
-			},
-			expectedErrOut: heredoc.Doc(`
-
-			Dry Running pull request for feature into trunk in OWNER/REPO
 
 		`),
 		},
@@ -869,11 +716,13 @@ func Test_createRun(t *testing.T) {
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "monalisa"} } }`))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StatusStringResponse(201, `
+					httpmock.RESTPayload(201, `
 							{ "node_id": "NODEID",
 							  "name": "REPO",
 							  "owner": {"login": "monalisa"}
-							}`))
+							}`, func(payload map[string]interface{}) {
+						assert.Equal(t, true, payload["default_branch_only"])
+					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
@@ -1012,7 +861,7 @@ func Test_createRun(t *testing.T) {
 						{ "filename": "template1",
 						  "body": "this is a bug" },
 						{ "filename": "template2",
-						  "body": "this is a enhancement" }
+						  "body": "this is an enhancement" }
 					] } } }`))
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
@@ -1062,25 +911,11 @@ func Test_createRun(t *testing.T) {
 				opts.Assignees = []string{"monalisa"}
 				opts.Labels = []string{"bug", "todo"}
 				opts.Projects = []string{"roadmap"}
-				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
+				opts.Reviewers = []string{"hubot", "monalisa", "OWNER/core", "OWNER/robots"}
 				opts.Milestone = "big one.oh"
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "assignableUsers": {
-						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID", "name": "" },
-							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryLabelList\b`),
 					httpmock.StringResponse(`
@@ -1099,17 +934,6 @@ func Test_createRun(t *testing.T) {
 						"nodes": [
 							{ "title": "GA", "id": "GAID" },
 							{ "title": "Big One.oh", "id": "BIGONEID" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				reg.Register(
-					httpmock.GraphQL(`query OrganizationTeamList\b`),
-					httpmock.StringResponse(`
-					{ "data": { "organization": { "teams": {
-						"nodes": [
-							{ "slug": "core", "id": "COREID" },
-							{ "slug": "robots", "id": "ROBOTID" }
 						],
 						"pageInfo": { "hasNextPage": false }
 					} } } }
@@ -1140,21 +964,31 @@ func Test_createRun(t *testing.T) {
 					} } }
 				`, func(inputs map[string]interface{}) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"MONAID"}, inputs["assigneeIds"])
+						if _, ok := inputs["assigneeIds"]; ok {
+							t.Error("did not expect assigneeIds in updatePullRequest when ApiActorsSupported is true")
+						}
 						assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 						assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
 						assert.Equal(t, "BIGONEID", inputs["milestoneId"])
 					}))
 				reg.Register(
-					httpmock.GraphQL(`mutation PullRequestCreateRequestReviews\b`),
+					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 					httpmock.GraphQLMutation(`
-					{ "data": { "requestReviews": {
+					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
+				`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "NEWPULLID", inputs["assignableId"])
+						assert.Equal(t, []interface{}{"monalisa"}, inputs["actorLogins"])
+					}))
+				reg.Register(
+					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "requestReviewsByLogin": {
 						"clientMutationId": ""
 					} } }
 				`, func(inputs map[string]interface{}) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["userIds"])
-						assert.Equal(t, []interface{}{"COREID", "ROBOTID"}, inputs["teamIds"])
+						assert.Equal(t, []interface{}{"hubot", "monalisa"}, inputs["userLogins"])
+						assert.Equal(t, []interface{}{"OWNER/core", "OWNER/robots"}, inputs["teamSlugs"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -1258,7 +1092,7 @@ func Test_createRun(t *testing.T) {
 					{ "filename": "template1",
 					  "body": "this is a bug" },
 					{ "filename": "template2",
-					  "body": "this is a enhancement" }
+					  "body": "this is an enhancement" }
 				] } } }`),
 				)
 				reg.Register(
@@ -1655,6 +1489,363 @@ func Test_createRun(t *testing.T) {
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 		{
+			name: "request reviewers by login",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.Reviewers = []string{"hubot", "monalisa", "org/core", "org/robots"}
+				opts.HeadBranch = "feature"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12",
+							"id": "NEWPULLID"
+						} } } }`,
+						func(input map[string]interface{}) {}))
+				reg.Register(
+					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "requestReviewsByLogin": {
+						"clientMutationId": ""
+					} } }
+				`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
+						assert.Equal(t, []interface{}{"hubot", "monalisa"}, inputs["userLogins"])
+						assert.Equal(t, []interface{}{"org/core", "org/robots"}, inputs["teamSlugs"])
+						assert.Equal(t, true, inputs["union"])
+					}))
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "",
+		},
+		{
+			name: "@copilot reviewer resolves to bot login",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.Reviewers = []string{"hubot", "@copilot"}
+				opts.HeadBranch = "feature"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12",
+							"id": "NEWPULLID"
+						} } } }`,
+						func(input map[string]interface{}) {}))
+				reg.Register(
+					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "requestReviewsByLogin": {
+						"clientMutationId": ""
+					} } }
+				`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
+						assert.Equal(t, []interface{}{"hubot"}, inputs["userLogins"])
+						assert.Equal(t, []interface{}{"copilot-pull-request-reviewer[bot]"}, inputs["botLogins"])
+						assert.Equal(t, true, inputs["union"])
+					}))
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			branch := "feature"
+			reg := &httpmock.Registry{}
+			reg.StubRepoInfoResponse("OWNER", "REPO", "master")
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg, t)
+			}
+
+			pm := &prompter.PrompterMock{}
+
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
+			}
+
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+
+			if !tt.customBranchConfig {
+				cs.Register(`git config --get-regexp \^branch\\\..+\\\.\(remote\|merge\|pushremote\|gh-merge-base\)\$`, 0, "")
+			}
+
+			if tt.cmdStubs != nil {
+				tt.cmdStubs(cs)
+			}
+
+			opts := CreateOptions{}
+			opts.Prompter = pm
+
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+
+			browser := &browser.Stub{}
+			opts.IO = ios
+			opts.Browser = browser
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			opts.Config = func() (gh.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			opts.Remotes = func() (context.Remotes, error) {
+				return context.Remotes{
+					{
+						Remote: &git.Remote{
+							Name:     "origin",
+							Resolved: "base",
+						},
+						Repo: ghrepo.New("OWNER", "REPO"),
+					},
+				}, nil
+			}
+			opts.Branch = func() (string, error) {
+				return branch, nil
+			}
+			opts.Finder = shared.NewMockFinder(branch, nil, nil)
+			opts.GitClient = &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
+			cleanSetup := func() {}
+			if tt.setup != nil {
+				cleanSetup = tt.setup(&opts, t)
+			}
+			defer cleanSetup()
+
+			// All tests in this function use github.com behavior
+			opts.Detector = &fd.EnabledDetectorMock{}
+
+			if opts.HeadBranch == "" {
+				cs.Register(`git status --porcelain`, 0, "")
+			}
+
+			err := createRun(&opts)
+			output := &test.CmdOut{
+				OutBuf:     stdout,
+				ErrBuf:     stderr,
+				BrowsedURL: browser.BrowsedURL(),
+			}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+				if tt.expectedOut != "" {
+					assert.Equal(t, tt.expectedOut, output.String())
+				}
+				if len(tt.expectedOutputs) > 0 {
+					assert.Equal(t, tt.expectedOutputs, strings.Split(output.String(), "\n"))
+				}
+				assert.Equal(t, tt.expectedErrOut, output.Stderr())
+				assert.Equal(t, tt.expectedBrowse, output.BrowsedURL)
+			}
+		})
+	}
+}
+
+func Test_createRun_GHES(t *testing.T) {
+	tests := []struct {
+		name               string
+		setup              func(*CreateOptions, *testing.T) func()
+		cmdStubs           func(*run.CommandStubber)
+		promptStubs        func(*prompter.PrompterMock)
+		httpStubs          func(*httpmock.Registry, *testing.T)
+		expectedOutputs    []string
+		expectedOut        string
+		expectedErrOut     string
+		tty                bool
+		customBranchConfig bool
+	}{
+		{
+			name: "dry-run-nontty-with-all-opts",
+			tty:  false,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "TITLE"
+				opts.Body = "BODY"
+				opts.BaseBranch = "trunk"
+				opts.HeadBranch = "feature"
+				opts.Assignees = []string{"monalisa"}
+				opts.Labels = []string{"bug", "todo"}
+				opts.Reviewers = []string{"hubot", "monalisa", "OWNER/core", "OWNER/robots"}
+				opts.Milestone = "big one.oh"
+				opts.DryRun = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "assignableUsers": {
+						"nodes": [
+							{ "login": "hubot", "id": "HUBOTID", "name": "" },
+							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryLabelList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "labels": {
+						"nodes": [
+							{ "name": "TODO", "id": "TODOID" },
+							{ "name": "bug", "id": "BUGID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "milestones": {
+						"nodes": [
+							{ "title": "GA", "id": "GAID" },
+							{ "title": "Big One.oh", "id": "BIGONEID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationTeamList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "organization": { "teams": {
+						"nodes": [
+							{ "slug": "core", "id": "COREID" },
+							{ "slug": "robots", "id": "ROBOTID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+			},
+			expectedOutputs: []string{
+				"Would have created a Pull Request with:",
+				`title:	TITLE`,
+				`draft:	false`,
+				`base:	trunk`,
+				`head:	feature`,
+				`labels:	bug, todo`,
+				`reviewers:	hubot, monalisa, OWNER/core, OWNER/robots`,
+				`assignees:	monalisa`,
+				`milestones:	big one.oh`,
+				`maintainerCanModify:	false`,
+				`body:`,
+				`BODY`,
+				``,
+			},
+			expectedErrOut: "",
+		},
+		{
+			name: "dry-run-tty-with-all-opts",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "TITLE"
+				opts.Body = "BODY"
+				opts.BaseBranch = "trunk"
+				opts.HeadBranch = "feature"
+				opts.Assignees = []string{"monalisa"}
+				opts.Labels = []string{"bug", "todo"}
+				opts.Reviewers = []string{"hubot", "monalisa", "OWNER/core", "OWNER/robots"}
+				opts.Milestone = "big one.oh"
+				opts.DryRun = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "assignableUsers": {
+						"nodes": [
+							{ "login": "hubot", "id": "HUBOTID", "name": "" },
+							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryLabelList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "labels": {
+						"nodes": [
+							{ "name": "TODO", "id": "TODOID" },
+							{ "name": "bug", "id": "BUGID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "milestones": {
+						"nodes": [
+							{ "title": "GA", "id": "GAID" },
+							{ "title": "Big One.oh", "id": "BIGONEID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationTeamList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "organization": { "teams": {
+						"nodes": [
+							{ "slug": "core", "id": "COREID" },
+							{ "slug": "robots", "id": "ROBOTID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+			},
+			expectedOutputs: []string{
+				`Would have created a Pull Request with:`,
+				`Title: TITLE`,
+				`Draft: false`,
+				`Base: trunk`,
+				`Head: feature`,
+				`Labels: bug, todo`,
+				`Reviewers: hubot, monalisa, OWNER/core, OWNER/robots`,
+				`Assignees: monalisa`,
+				`Milestones: big one.oh`,
+				`MaintainerCanModify: false`,
+				`Body:`,
+				``,
+				`  BODY                                                                        `,
+				``,
+				``,
+			},
+			expectedErrOut: heredoc.Doc(`
+
+			Dry Running pull request for feature into trunk in OWNER/REPO
+
+		`),
+		},
+		{
 			name: "fetch org teams non-interactively if reviewer contains any team",
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.TitleProvided = true
@@ -1926,11 +2117,10 @@ func Test_createRun(t *testing.T) {
 			}
 
 			opts := CreateOptions{}
-			opts.Detector = &fd.EnabledDetectorMock{}
+			opts.Detector = &fd.DisabledDetectorMock{}
 			opts.Prompter = pm
 
 			ios, _, stdout, stderr := iostreams.Test()
-			// TODO do i need to bother with this
 			ios.SetStdoutTTY(tt.tty)
 			ios.SetStdinTTY(tt.tty)
 			ios.SetStderrTTY(tt.tty)
@@ -1974,23 +2164,17 @@ func Test_createRun(t *testing.T) {
 
 			err := createRun(&opts)
 			output := &test.CmdOut{
-				OutBuf:     stdout,
-				ErrBuf:     stderr,
-				BrowsedURL: browser.BrowsedURL(),
+				OutBuf: stdout,
+				ErrBuf: stderr,
 			}
-			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
-			} else {
-				assert.NoError(t, err)
-				if tt.expectedOut != "" {
-					assert.Equal(t, tt.expectedOut, output.String())
-				}
-				if len(tt.expectedOutputs) > 0 {
-					assert.Equal(t, tt.expectedOutputs, strings.Split(output.String(), "\n"))
-				}
-				assert.Equal(t, tt.expectedErrOut, output.Stderr())
-				assert.Equal(t, tt.expectedBrowse, output.BrowsedURL)
+			assert.NoError(t, err)
+			if tt.expectedOut != "" {
+				assert.Equal(t, tt.expectedOut, output.String())
 			}
+			if len(tt.expectedOutputs) > 0 {
+				assert.Equal(t, tt.expectedOutputs, strings.Split(output.String(), "\n"))
+			}
+			assert.Equal(t, tt.expectedErrOut, output.Stderr())
 		})
 	}
 }
@@ -2878,4 +3062,74 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			reg.Verify(t)
 		})
 	})
+}
+
+func Test_isSameRef(t *testing.T) {
+	tests := []struct {
+		name     string
+		refs     creationRefs
+		expected bool
+	}{
+		{
+			name: "same branch in same repo",
+			refs: skipPushRefs{
+				qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("main"),
+				baseRefs: baseRefs{
+					baseBranchName: "main",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "different branches in same repo",
+			refs: skipPushRefs{
+				qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
+				baseRefs: baseRefs{
+					baseBranchName: "main",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "same branch name in different repos (cross-repo PR)",
+			refs: skipPushRefs{
+				qualifiedHeadRef: shared.NewQualifiedHeadRef("other-owner", "main"),
+				baseRefs: baseRefs{
+					baseBranchName: "main",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "pushableRefs same branch same repo",
+			refs: pushableRefs{
+				headRepo:       ghrepo.New("OWNER", "REPO"),
+				headBranchName: "main",
+				baseRefs: baseRefs{
+					baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName: "main",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pushableRefs same branch different repos (fork)",
+			refs: pushableRefs{
+				headRepo:       ghrepo.New("FORK-OWNER", "REPO"),
+				headBranchName: "main",
+				baseRefs: baseRefs{
+					baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName: "main",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isSameRef(tt.refs)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

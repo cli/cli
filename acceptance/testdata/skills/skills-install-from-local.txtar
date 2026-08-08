@@ -1,0 +1,15 @@
+# Install from a local directory using --from-local
+exec gh skill install --from-local $WORK/local-repo git-commit --dir $WORK/output --force
+stdout 'Installed git-commit'
+
+# Verify the skill was copied
+exists $WORK/output/git-commit/SKILL.md
+grep 'local-path' $WORK/output/git-commit/SKILL.md
+
+-- local-repo/skills/git-commit/SKILL.md --
+---
+name: git-commit
+description: Write good git commits
+---
+# Git Commit
+Body content.

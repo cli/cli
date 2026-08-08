@@ -1,4 +1,0 @@
-NewRegistrationsPerIPAddress:
-  burst: 0
-  count: 20
-  period: 1s

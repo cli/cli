@@ -182,3 +182,34 @@ func TestSetUserSpecificKeyNoUserPresent(t *testing.T) {
 	requireKeyWithValue(t, c.cfg, []string{hostsKey, host, key}, val)
 	requireNoKey(t, c.cfg, []string{hostsKey, host, usersKey})
 }
+
+func TestTelemetry(t *testing.T) {
+	t.Run("returns default when not configured", func(t *testing.T) {
+		c := newTestConfig()
+
+		entry := c.Telemetry()
+
+		require.Equal(t, "enabled", entry.Value)
+		require.Equal(t, gh.ConfigDefaultProvided, entry.Source)
+	})
+
+	t.Run("returns user configured value", func(t *testing.T) {
+		c := newTestConfig()
+		c.Set("", telemetryKey, "disabled")
+
+		entry := c.Telemetry()
+
+		require.Equal(t, "disabled", entry.Value)
+		require.Equal(t, gh.ConfigUserProvided, entry.Source)
+	})
+
+	t.Run("returns log when configured", func(t *testing.T) {
+		c := newTestConfig()
+		c.Set("", telemetryKey, "log")
+
+		entry := c.Telemetry()
+
+		require.Equal(t, "log", entry.Value)
+		require.Equal(t, gh.ConfigUserProvided, entry.Source)
+	})
+}

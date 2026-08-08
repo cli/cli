@@ -46,6 +46,71 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 				})
 			}
 			data[f] = items
+		case "issueType":
+			data[f] = issue.IssueType
+		case "parent":
+			if issue.Parent != nil {
+				data[f] = map[string]interface{}{
+					"id":     issue.Parent.ID,
+					"number": issue.Parent.Number,
+					"title":  issue.Parent.Title,
+					"url":    issue.Parent.URL,
+					"state":  issue.Parent.State,
+				}
+			} else {
+				data[f] = nil
+			}
+		case "subIssues":
+			items := make([]map[string]interface{}, 0, len(issue.SubIssues.Nodes))
+			for _, n := range issue.SubIssues.Nodes {
+				items = append(items, map[string]interface{}{
+					"id":     n.ID,
+					"number": n.Number,
+					"title":  n.Title,
+					"url":    n.URL,
+					"state":  n.State,
+				})
+			}
+			data[f] = map[string]interface{}{
+				"nodes":      items,
+				"totalCount": issue.SubIssues.TotalCount,
+			}
+		case "subIssuesSummary":
+			data[f] = map[string]interface{}{
+				"total":            issue.SubIssuesSummary.Total,
+				"completed":        issue.SubIssuesSummary.Completed,
+				"percentCompleted": issue.SubIssuesSummary.PercentCompleted,
+			}
+		case "blockedBy":
+			items := make([]map[string]interface{}, 0, len(issue.BlockedBy.Nodes))
+			for _, n := range issue.BlockedBy.Nodes {
+				items = append(items, map[string]interface{}{
+					"id":     n.ID,
+					"number": n.Number,
+					"title":  n.Title,
+					"url":    n.URL,
+					"state":  n.State,
+				})
+			}
+			data[f] = map[string]interface{}{
+				"nodes":      items,
+				"totalCount": issue.BlockedBy.TotalCount,
+			}
+		case "blocking":
+			items := make([]map[string]interface{}, 0, len(issue.Blocking.Nodes))
+			for _, n := range issue.Blocking.Nodes {
+				items = append(items, map[string]interface{}{
+					"id":     n.ID,
+					"number": n.Number,
+					"title":  n.Title,
+					"url":    n.URL,
+					"state":  n.State,
+				})
+			}
+			data[f] = map[string]interface{}{
+				"nodes":      items,
+				"totalCount": issue.Blocking.TotalCount,
+			}
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()

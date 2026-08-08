@@ -72,6 +72,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			# List PRs authored by you
 			$ gh pr list --author "@me"
 
+			# List PRs opened by a GitHub App such as Dependabot
+			$ gh pr list --app dependabot
+
 			# List PRs with a specific head branch name
 			$ gh pr list --head "typo"
 
@@ -115,7 +118,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", `Filter by head branch ("<owner>:<branch>" syntax not supported)`)
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
-	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author (use --app to filter by a GitHub App)")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")

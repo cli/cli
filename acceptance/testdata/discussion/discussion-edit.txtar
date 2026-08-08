@@ -1,0 +1,77 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+cd $SCRIPT_NAME-$RANDOM_STRING
+
+# Enable discussions
+exec gh api repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING -X PATCH -F has_discussions=true
+
+# Create a discussion to edit
+exec gh discussion create --title 'Original Title' --body 'Original body' --category 'General'
+stdout2env DISCUSSION_URL
+
+# Update title only
+exec gh discussion edit $DISCUSSION_URL --title 'Updated Title'
+exec gh discussion view $DISCUSSION_URL --json title --jq '.title'
+stdout 'Updated Title'
+
+# Update body only
+exec gh discussion edit $DISCUSSION_URL --body 'Updated body'
+exec gh discussion view $DISCUSSION_URL --json body --jq '.body'
+stdout 'Updated body'
+
+# Update body from file
+exec gh discussion edit $DISCUSSION_URL --body-file $WORK/body.txt
+exec gh discussion view $DISCUSSION_URL --json body --jq '.body'
+stdout 'Body from file'
+
+# Update category only
+exec gh discussion edit $DISCUSSION_URL --category 'Ideas'
+exec gh discussion view $DISCUSSION_URL --json category --jq '.category.name'
+stdout 'Ideas'
+
+# Update only labels
+exec gh discussion edit $DISCUSSION_URL --add-label bug
+exec gh discussion view $DISCUSSION_URL --json labels --jq '[.labels[].name] | join(",")'
+stdout 'bug'
+
+exec gh discussion edit $DISCUSSION_URL --add-label enhancement --remove-label bug
+exec gh discussion view $DISCUSSION_URL --json labels --jq '[.labels[].name] | join(",")'
+stdout 'enhancement'
+
+exec gh discussion edit $DISCUSSION_URL --add-label bug,enhancement
+exec gh discussion view $DISCUSSION_URL --json labels --jq '[.labels[].name] | join(",")'
+stdout 'bug,enhancement'
+
+exec gh discussion edit $DISCUSSION_URL --remove-label bug
+exec gh discussion view $DISCUSSION_URL --json labels --jq '[.labels[].name] | join(",")'
+stdout 'enhancement'
+
+# Update title, body, and category together
+exec gh discussion edit $DISCUSSION_URL --title 'Final Title' --body 'Final body' --category 'General'
+exec gh discussion view $DISCUSSION_URL --json title,body,category
+stdout2env FINAL_JSON
+jq-assert FINAL_JSON '.title' 'Final Title'
+jq-assert FINAL_JSON '.body' 'Final body'
+jq-assert FINAL_JSON '.category.name' 'General'
+
+# Update title, body, category, and labels together
+exec gh discussion edit $DISCUSSION_URL --title 'All Updated' --body 'All body' --category 'Ideas' --add-label bug --remove-label enhancement
+exec gh discussion view $DISCUSSION_URL --json title,body,category,labels
+stdout2env ALL_JSON
+jq-assert ALL_JSON '.title' 'All Updated'
+jq-assert ALL_JSON '.body' 'All body'
+jq-assert ALL_JSON '.category.name' 'Ideas'
+jq-assert ALL_JSON '[.labels[].name] | join(",")' 'bug'
+
+# Failing label update (missing label)
+! exec gh discussion edit $DISCUSSION_URL --add-label nonexistent-label-xyz
+stderr 'labels not found'
+
+-- body.txt --
+Body from file

@@ -31,6 +31,7 @@ const (
 	promptKey             = "prompt"
 	preferEditorPromptKey = "prefer_editor_prompt"
 	spinnerKey            = "spinner"
+	telemetryKey          = "telemetry"
 	userKey               = "user"
 	usersKey              = "users"
 	versionKey            = "version"
@@ -167,6 +168,11 @@ func (c *cfg) PreferEditorPrompt(hostname string) gh.ConfigEntry {
 func (c *cfg) Spinner(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, spinnerKey).Unwrap()
+}
+
+func (c *cfg) Telemetry() gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault("", telemetryKey).Unwrap()
 }
 
 func (c *cfg) Version() o.Option[string] {
@@ -574,7 +580,7 @@ color_labels: disabled
 accessible_colors: disabled
 # Whether an accessible prompter should be used. Supported values: enabled, disabled
 accessible_prompter: disabled
-# Whether to use a animated spinner as a progress indicator. If disabled, a textual progress indicator is used instead. Supported values: enabled, disabled
+# Whether to use an animated spinner as a progress indicator. If disabled, a textual progress indicator is used instead. Supported values: enabled, disabled
 spinner: enabled
 `
 
@@ -675,11 +681,20 @@ var Options = []ConfigOption{
 	},
 	{
 		Key:           spinnerKey,
-		Description:   "whether to use a animated spinner as a progress indicator",
+		Description:   "whether to use an animated spinner as a progress indicator",
 		DefaultValue:  "enabled",
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Spinner(hostname).Value
+		},
+	},
+	{
+		Key:           telemetryKey,
+		Description:   "whether telemetry is enabled, disabled, or logging",
+		DefaultValue:  "enabled",
+		AllowedValues: []string{"enabled", "disabled", "log"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Telemetry().Value
 		},
 	},
 }

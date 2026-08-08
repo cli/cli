@@ -1,0 +1,20 @@
+# Preview renders skill content and file tree
+exec gh skill preview github/awesome-copilot git-commit
+stdout 'SKILL.md'
+# Verify actual content is rendered, not just the filename
+stdout 'git-commit/'
+
+# Preview a skill that doesn't exist should error
+! exec gh skill preview github/awesome-copilot nonexistent-skill-xyz
+stderr 'not found'
+
+# Telemetry: skill_preview event records repo identifiers and, for a
+# public repo, the skill name.
+env GH_TELEMETRY=log
+env GH_TELEMETRY_SAMPLE_RATE=100
+exec gh skill preview github/awesome-copilot git-commit
+stderr 'Telemetry payload:'
+stderr '"type": "skill_preview"'
+stderr '"skill_host_type": "github.com"'
+stderr '"skill_owner": "github"'
+stderr '"skill_repo": "awesome-copilot"'

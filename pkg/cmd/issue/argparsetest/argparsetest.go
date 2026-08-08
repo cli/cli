@@ -60,7 +60,7 @@ func TestArgParsing[T any](t *testing.T, fn newCmdFunc[T]) {
 		},
 		{
 			name:      "argument cannot be parsed to an issue",
-			input:     "unparseable",
+			input:     "unparsable",
 			expectErr: true,
 		},
 	}
