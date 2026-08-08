@@ -77,6 +77,60 @@ func Test_typeForFilename(t *testing.T) {
 	}
 }
 
+func Test_validateUniqueAssetNames(t *testing.T) {
+	tests := []struct {
+		name   string
+		assets []*AssetForUpload
+		want   string
+	}{
+		{
+			name: "unique",
+			assets: []*AssetForUpload{
+				{Name: "foo.zip"},
+				{Name: "bar.zip"},
+			},
+		},
+		{
+			name: "duplicate",
+			assets: []*AssetForUpload{
+				{Name: "foo.zip"},
+				{Name: "foo.zip"},
+			},
+			want: "duplicate release asset filenames are not supported: foo.zip",
+		},
+		{
+			name: "sanitized collision",
+			assets: []*AssetForUpload{
+				{Name: "foo bar.zip"},
+				{Name: "foo.bar.zip"},
+			},
+			want: "duplicate release asset filenames are not supported: foo.bar.zip",
+		},
+		{
+			name: "multiple duplicate groups are sorted",
+			assets: []*AssetForUpload{
+				{Name: "zeta.tar.gz"},
+				{Name: "alpha.zip"},
+				{Name: "alpha.zip"},
+				{Name: "zeta.tar.gz"},
+			},
+			want: "duplicate release asset filenames are not supported: alpha.zip, zeta.tar.gz",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := validateUniqueAssetNames(tt.assets); got != nil {
+				if got.Error() != tt.want {
+					t.Errorf("validateUniqueAssetNames() error = %q, want %q", got, tt.want)
+				}
+			} else if tt.want != "" {
+				t.Errorf("validateUniqueAssetNames() error = nil, want %q", tt.want)
+			}
+		})
+	}
+}
+
 func Test_uploadWithDelete_retry(t *testing.T) {
 	retryInterval = 0
 	ctx := context.Background()

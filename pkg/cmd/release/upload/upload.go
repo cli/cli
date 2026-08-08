@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -93,7 +92,7 @@ func uploadRun(opts *UploadOptions) error {
 
 	var existingNames []string
 	for _, a := range opts.Assets {
-		sanitizedFileName := sanitizeFileName(a.Name)
+		sanitizedFileName := shared.SanitizeFileName(a.Name)
 		for _, ea := range release.Assets {
 			if ea.Name == sanitizedFileName {
 				a.ExistingURL = safeurl.NewImmutableSafeURL(ea.APIURL)
@@ -127,31 +126,4 @@ func uploadRun(opts *UploadOptions) error {
 	}
 
 	return nil
-}
-
-// this method attempts to mimic the same functionality on the client that the platform does on
-// uploaded assets in order to allow the --clobber logic work correctly, since that feature is
-// one that only exists in the client
-func sanitizeFileName(name string) string {
-	value := text.RemoveDiacritics(name)
-	// Stripped all non-ascii characters, provide default name.
-	if strings.HasPrefix(value, ".") {
-		value = "default" + value
-	}
-
-	// Replace special characters with the separator
-	value = regexp.MustCompile(`(?i)[^a-z0-9\-_\+@]+`).ReplaceAllLiteralString(value, ".")
-
-	// No more than one of the separator in a row.
-	value = regexp.MustCompile(`\.{2,}`).ReplaceAllLiteralString(value, ".")
-
-	// Remove leading/trailing separator.
-	value = strings.Trim(value, ".")
-
-	// Just file extension left, add default name.
-	if name != value && !strings.Contains(value, ".") {
-		value = "default." + value
-	}
-
-	return value
 }

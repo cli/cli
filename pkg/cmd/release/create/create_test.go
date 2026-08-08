@@ -3,6 +3,7 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -426,6 +427,31 @@ func Test_NewCmdCreate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_NewCmdCreate_rejectsDuplicateAssetFilenamesBeforeHTTP(t *testing.T) {
+	firstDir := t.TempDir()
+	secondDir := t.TempDir()
+	first := filepath.Join(firstDir, "duplicate.zip")
+	second := filepath.Join(secondDir, "duplicate.zip")
+	require.NoError(t, os.WriteFile(first, nil, 0o644))
+	require.NoError(t, os.WriteFile(second, nil, 0o644))
+
+	ios, _, _, _ := iostreams.Test()
+	httpClientCalls := 0
+	f := &cmdutil.Factory{
+		IOStreams: ios,
+		HttpClient: func() (*http.Client, error) {
+			httpClientCalls++
+			return nil, errors.New("unexpected HTTP client call")
+		},
+	}
+	cmd := NewCmdCreate(f, nil)
+	cmd.SetArgs([]string{"v1.2.3", first + "#Linux", second + "#macOS"})
+
+	_, err := cmd.ExecuteC()
+	require.EqualError(t, err, "duplicate release asset filenames are not supported: duplicate.zip")
+	assert.Equal(t, 0, httpClientCalls)
 }
 
 func Test_createRun(t *testing.T) {

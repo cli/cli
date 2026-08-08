@@ -4,18 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/safeurl"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"golang.org/x/sync/errgroup"
 )
@@ -73,7 +77,59 @@ func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
 			MIMEType: typeForFilename(fi.Name()),
 		})
 	}
+	if err := validateUniqueAssetNames(assets); err != nil {
+		return nil, err
+	}
 	return
+}
+
+func validateUniqueAssetNames(assets []*AssetForUpload) error {
+	seen := make(map[string]struct{}, len(assets))
+	duplicates := make(map[string]struct{})
+	for _, asset := range assets {
+		name := SanitizeFileName(asset.Name)
+		if _, ok := seen[name]; ok {
+			duplicates[name] = struct{}{}
+		}
+		seen[name] = struct{}{}
+	}
+
+	if len(duplicates) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(duplicates))
+	for name := range duplicates {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	return fmt.Errorf("duplicate release asset filenames are not supported: %s", strings.Join(names, ", "))
+}
+
+// SanitizeFileName returns the filename used by GitHub for a release asset.
+func SanitizeFileName(name string) string {
+	value := text.RemoveDiacritics(name)
+	// Stripped all non-ascii characters, provide default name.
+	if strings.HasPrefix(value, ".") {
+		value = "default" + value
+	}
+
+	// Replace special characters with the separator.
+	value = regexp.MustCompile(`(?i)[^a-z0-9\-_\+@]+`).ReplaceAllLiteralString(value, ".")
+
+	// No more than one of the separator in a row.
+	value = regexp.MustCompile(`\.{2,}`).ReplaceAllLiteralString(value, ".")
+
+	// Remove leading/trailing separator.
+	value = strings.Trim(value, ".")
+
+	// Just file extension left, add default name.
+	if name != value && !strings.Contains(value, ".") {
+		value = "default." + value
+	}
+
+	return value
 }
 
 func typeForFilename(fn string) string {
