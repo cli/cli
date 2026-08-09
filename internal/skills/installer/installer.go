@@ -244,7 +244,12 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 			content = []byte(injected)
 		}
 
-		return os.WriteFile(destPath, content, 0o644)
+		perm := os.FileMode(0o644)
+		if info, err := os.Stat(p); err == nil && info.Mode()&0111 != 0 {
+			perm = 0o755
+		}
+
+		return os.WriteFile(destPath, content, perm)
 	})
 }
 
@@ -300,7 +305,12 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 			}
 		}
 
-		if err := os.WriteFile(destPath, []byte(content), 0o644); err != nil {
+		perm := os.FileMode(0o644)
+		if file.Mode == "100755" || strings.HasPrefix(relPath, "scripts/") || strings.Contains(relPath, "/scripts/") {
+			perm = 0o755
+		}
+
+		if err := os.WriteFile(destPath, []byte(content), perm); err != nil {
 			return fmt.Errorf("could not write %s: %w", destPath, err)
 		}
 	}

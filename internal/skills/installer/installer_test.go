@@ -66,6 +66,23 @@ func TestInstallLocal(t *testing.T) {
 			},
 		},
 		{
+			name:   "preserves executable file permissions",
+			skills: []discovery.Skill{{Name: "script-runner", Path: "skills/script-runner"}},
+			setup: func(t *testing.T, srcDir string) {
+				t.Helper()
+				scriptDir := filepath.Join(srcDir, "skills", "script-runner", "scripts")
+				require.NoError(t, os.MkdirAll(scriptDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(scriptDir, "hello.sh"), []byte("#!/bin/bash\necho hello"), 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(srcDir, "skills", "script-runner", "SKILL.md"), []byte("# Script Runner"), 0o644))
+			},
+			verify: func(t *testing.T, destDir string) {
+				t.Helper()
+				info, err := os.Stat(filepath.Join(destDir, "script-runner", "scripts", "hello.sh"))
+				require.NoError(t, err)
+				assert.NotZero(t, info.Mode()&0111, "expected executable permission bit to be preserved")
+			},
+		},
+		{
 			name:   "skips symlinks",
 			skills: []discovery.Skill{{Name: "pr-summary", Path: "skills/pr-summary"}},
 			setup: func(t *testing.T, srcDir string) {

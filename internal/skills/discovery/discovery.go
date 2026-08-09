@@ -158,6 +158,7 @@ type SkillFile struct {
 	Path string // relative path within the skill directory
 	SHA  string // blob SHA for fetching content
 	Size int    // file size in bytes
+	Mode string // git file mode (e.g. "100755")
 }
 
 type treeResponse struct {
@@ -833,6 +834,7 @@ func DiscoverSkillFiles(client *api.Client, host, owner, repo, treeSHA, skillPat
 				Path: skillPath + "/" + entry.Path,
 				SHA:  entry.SHA,
 				Size: entry.Size,
+				Mode: entry.Mode,
 			})
 		}
 	}
