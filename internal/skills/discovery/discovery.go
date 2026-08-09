@@ -158,6 +158,7 @@ type SkillFile struct {
 	Path string // relative path within the skill directory
 	SHA  string // blob SHA for fetching content
 	Size int    // file size in bytes
+	Mode string // git file mode, such as 100644 or 100755
 }
 
 type treeResponse struct {
@@ -833,6 +834,7 @@ func DiscoverSkillFiles(client *api.Client, host, owner, repo, treeSHA, skillPat
 				Path: skillPath + "/" + entry.Path,
 				SHA:  entry.SHA,
 				Size: entry.Size,
+				Mode: entry.Mode,
 			})
 		}
 	}
@@ -865,6 +867,7 @@ func ListSkillFiles(client *api.Client, host, owner, repo, treeSHA string) ([]Sk
 				Path: entry.Path,
 				SHA:  entry.SHA,
 				Size: entry.Size,
+				Mode: entry.Mode,
 			})
 		}
 	}
@@ -899,7 +902,7 @@ func walkTree(client *api.Client, host, owner, repo, sha, prefix string, depth i
 		}
 		switch entry.Type {
 		case "blob":
-			files = append(files, SkillFile{Path: entryPath, SHA: entry.SHA, Size: entry.Size})
+			files = append(files, SkillFile{Path: entryPath, SHA: entry.SHA, Size: entry.Size, Mode: entry.Mode})
 		case "tree":
 			sub, err := walkTree(client, host, owner, repo, entry.SHA, entryPath, depth+1)
 			if err != nil {

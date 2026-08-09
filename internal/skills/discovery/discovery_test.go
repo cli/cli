@@ -1598,6 +1598,7 @@ func TestDiscoverSkillFiles(t *testing.T) {
 		name      string
 		stubs     func(*httpmock.Registry)
 		wantPaths []string
+		wantModes map[string]string
 		wantErr   string
 	}{
 		{
@@ -1608,13 +1609,17 @@ func TestDiscoverSkillFiles(t *testing.T) {
 					httpmock.JSONResponse(map[string]interface{}{
 						"sha": "tree123", "truncated": false,
 						"tree": []map[string]interface{}{
-							{"path": "SKILL.md", "type": "blob", "sha": "sha1", "size": 10},
-							{"path": "scripts/setup.sh", "type": "blob", "sha": "sha2", "size": 50},
+							{"path": "SKILL.md", "type": "blob", "sha": "sha1", "size": 10, "mode": "100644"},
+							{"path": "scripts/setup.sh", "type": "blob", "sha": "sha2", "size": 50, "mode": "100755"},
 							{"path": "scripts", "type": "tree", "sha": "treesub"},
 						},
 					}))
 			},
 			wantPaths: []string{"skills/code-review/SKILL.md", "skills/code-review/scripts/setup.sh"},
+			wantModes: map[string]string{
+				"skills/code-review/SKILL.md":         "100644",
+				"skills/code-review/scripts/setup.sh": "100755",
+			},
 		},
 		{
 			name: "truncated tree falls back to walkTree",
@@ -1662,6 +1667,9 @@ func TestDiscoverSkillFiles(t *testing.T) {
 			var paths []string
 			for _, f := range files {
 				paths = append(paths, f.Path)
+				if want, ok := tt.wantModes[f.Path]; ok {
+					assert.Equal(t, want, f.Mode)
+				}
 			}
 			assert.Equal(t, tt.wantPaths, paths)
 		})

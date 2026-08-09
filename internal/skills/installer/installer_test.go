@@ -66,6 +66,24 @@ func TestInstallLocal(t *testing.T) {
 			},
 		},
 		{
+			name:   "preserves executable bit",
+			skills: []discovery.Skill{{Name: "shell-tools", Path: "skills/shell-tools"}},
+			setup: func(t *testing.T, srcDir string) {
+				t.Helper()
+				skillSrc := filepath.Join(srcDir, "skills", "shell-tools")
+				require.NoError(t, os.MkdirAll(filepath.Join(skillSrc, "scripts"), 0o755))
+				script := filepath.Join(skillSrc, "scripts", "run.sh")
+				require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\n"), 0o755))
+				require.NoError(t, os.Chmod(script, 0o755))
+			},
+			verify: func(t *testing.T, destDir string) {
+				t.Helper()
+				info, err := os.Stat(filepath.Join(destDir, "shell-tools", "scripts", "run.sh"))
+				require.NoError(t, err)
+				assert.Equal(t, os.FileMode(0o755), info.Mode().Perm())
+			},
+		},
+		{
 			name:   "skips symlinks",
 			skills: []discovery.Skill{{Name: "pr-summary", Path: "skills/pr-summary"}},
 			setup: func(t *testing.T, srcDir string) {
@@ -200,6 +218,7 @@ func TestInstallSkill(t *testing.T) {
 						"tree": []map[string]interface{}{
 							{"path": "SKILL.md", "type": "blob", "sha": "skill-sha", "size": 10},
 							{"path": "prompt.txt", "type": "blob", "sha": "prompt-sha", "size": 5},
+							{"path": "scripts/run.sh", "type": "blob", "sha": "run-sha", "size": 10, "mode": "100755"},
 						},
 					}))
 				reg.Register(
@@ -214,6 +233,12 @@ func TestInstallSkill(t *testing.T) {
 						"sha": "prompt-sha", "encoding": "base64",
 						"content": base64.StdEncoding.EncodeToString([]byte("review this PR")),
 					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/run-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "run-sha", "encoding": "base64",
+						"content": base64.StdEncoding.EncodeToString([]byte("#!/bin/sh\n")),
+					}))
 			},
 			verify: func(t *testing.T, destDir string) {
 				t.Helper()
@@ -223,6 +248,9 @@ func TestInstallSkill(t *testing.T) {
 
 				_, err = os.Stat(filepath.Join(destDir, "code-review", "SKILL.md"))
 				assert.NoError(t, err)
+				info, err := os.Stat(filepath.Join(destDir, "code-review", "scripts", "run.sh"))
+				require.NoError(t, err)
+				assert.Equal(t, os.FileMode(0o755), info.Mode().Perm())
 			},
 		},
 		{

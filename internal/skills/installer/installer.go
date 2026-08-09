@@ -52,6 +52,27 @@ type skillResult struct {
 	err  error
 }
 
+func localFileMode(mode os.FileMode) os.FileMode {
+	if mode.Perm()&0o111 != 0 {
+		return 0o755
+	}
+	return 0o644
+}
+
+func remoteFileMode(mode string) os.FileMode {
+	if mode == "100755" {
+		return 0o755
+	}
+	return 0o644
+}
+
+func writeFileWithMode(path string, content []byte, mode os.FileMode) error {
+	if err := os.WriteFile(path, content, mode); err != nil {
+		return err
+	}
+	return os.Chmod(path, mode)
+}
+
 // Install fetches and writes skills to the target directory.
 func Install(opts *Options) (*Result, error) {
 	targetDir := opts.Dir
@@ -235,6 +256,10 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 		if err != nil {
 			return fmt.Errorf("could not read %s: %w", p, err)
 		}
+		info, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("could not inspect %s: %w", p, err)
+		}
 
 		if filepath.Base(relPath) == "SKILL.md" {
 			injected, injectErr := frontmatter.InjectLocalMetadata(string(content), absSource)
@@ -244,7 +269,7 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 			content = []byte(injected)
 		}
 
-		return os.WriteFile(destPath, content, 0o644)
+		return writeFileWithMode(destPath, content, localFileMode(info.Mode()))
 	})
 }
 
@@ -300,7 +325,7 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 			}
 		}
 
-		if err := os.WriteFile(destPath, []byte(content), 0o644); err != nil {
+		if err := writeFileWithMode(destPath, []byte(content), remoteFileMode(file.Mode)); err != nil {
 			return fmt.Errorf("could not write %s: %w", destPath, err)
 		}
 	}
