@@ -191,7 +191,7 @@ Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and 
 
 ## Code Review
 
-Review pull requests with the [`cli-code-reviewer` skill](.github/skills/cli-code-reviewer/SKILL.md).
+Review pull requests with the [`code-review` skill](.github/skills/code-review/SKILL.md).
 
 ## Tech Debt
 
