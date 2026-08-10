@@ -251,7 +251,7 @@ func (q Qualifiers) Map() map[string][]string {
 		}
 		value := v.Field(i)
 		switch value.Kind() {
-		case reflect.Ptr:
+		case reflect.Pointer:
 			if value.IsNil() {
 				continue
 			}

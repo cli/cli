@@ -535,7 +535,7 @@ func createRun(opts *CreateOptions) error {
 		if !draftWhileUploading {
 			return err
 		}
-		if cleanupErr := deleteRelease(httpClient, safeurl.NewImmutableSafeURL(newRelease.APIURL)); cleanupErr != nil {
+		if cleanupErr := deleteRelease(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(newRelease.APIURL)); cleanupErr != nil {
 			return fmt.Errorf("%w\ncleaning up draft failed: %v", err, cleanupErr)
 		}
 		return err
@@ -555,7 +555,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if draftWhileUploading {
-			rel, err := publishRelease(httpClient, safeurl.NewImmutableSafeURL(newRelease.APIURL), opts.DiscussionCategory, opts.IsLatest)
+			rel, err := publishRelease(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(newRelease.APIURL), opts.DiscussionCategory, opts.IsLatest)
 			if err != nil {
 				return cleanupDraftRelease(err)
 			}

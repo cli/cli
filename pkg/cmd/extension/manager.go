@@ -128,6 +128,10 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 		forwardArgs = append([]string{"-c", `command "$@"`, "--", exe}, forwardArgs...)
 		externalCmd = m.newCommand(shExe, forwardArgs...)
 	}
+	// Signal to the extension that it is being run by gh rather than standalone, so it can
+	// adjust things like usage strings.
+	externalCmd.Env = append(externalCmd.Environ(), "GH_EXTENSION=1")
+
 	externalCmd.Stdin = stdin
 	externalCmd.Stdout = stdout
 	externalCmd.Stderr = stderr

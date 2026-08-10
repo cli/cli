@@ -1,13 +1,10 @@
 package list
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
 	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
@@ -21,33 +18,17 @@ type deployKey struct {
 }
 
 func repoKeys(httpClient *http.Client, repo ghrepo.Interface) ([]deployKey, error) {
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "keys")
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "keys")
 	if err != nil {
 		return nil, err
 	}
 	u.SetQuery("per_page", "100")
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 
 	var keys []deployKey
-	err = json.Unmarshal(b, &keys)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), "GET", u.String(), nil, &keys)
 	if err != nil {
 		return nil, err
 	}
