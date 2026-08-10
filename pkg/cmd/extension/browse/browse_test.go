@@ -76,7 +76,7 @@ func Test_getExtensionRepos(t *testing.T) {
 		"per_page": []string{"100"},
 		"q":        []string{"topic:gh-extension"},
 	}
-	cfg := config.NewBlankConfig()
+	cfg := config.NewMockConfig()
 
 	cfg.AuthenticationFunc = func() gh.AuthConfig {
 		authCfg := &config.AuthConfig{}

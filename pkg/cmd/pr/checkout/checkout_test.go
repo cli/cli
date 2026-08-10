@@ -205,7 +205,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -233,7 +233,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -263,7 +263,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -291,7 +291,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -321,7 +321,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -353,7 +353,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -386,7 +386,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -417,7 +417,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -448,7 +448,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -477,7 +477,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -506,7 +506,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -538,7 +538,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -569,7 +569,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -601,7 +601,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -634,7 +634,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -666,7 +666,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -864,7 +864,7 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cl
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Remotes: func() (context.Remotes, error) {
 			if remotes == nil {

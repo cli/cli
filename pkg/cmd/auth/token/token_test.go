@@ -58,7 +58,7 @@ func TestNewCmdToken(t *testing.T) {
 			f := &cmdutil.Factory{
 				IOStreams: ios,
 				Config: func() (gh.Config, error) {
-					cfg := config.NewBlankConfig()
+					cfg := config.NewMockConfig()
 					return cfg, nil
 				},
 			}

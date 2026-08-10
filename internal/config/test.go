@@ -13,14 +13,14 @@ import (
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
-// NewBlankConfig returns a mock config populated with gh's default config file.
-// See NewFromString for when to prefer a mock over NewIsolatedTestConfig.
-func NewBlankConfig() *ghmock.ConfigMock {
-	return NewFromString(defaultConfigStr)
+// NewMockConfig returns a mock config populated with gh's default config file.
+// See NewMockConfigFromString for when to prefer a mock over NewIsolatedTestConfig.
+func NewMockConfig() *ghmock.ConfigMock {
+	return NewMockConfigFromString(defaultConfigStr)
 }
 
-// NewFromString returns a mock config populated from cfgString, for tests that need
-// to stub config behaviour by assigning to the mock's function fields.
+// NewMockConfigFromString returns a mock config populated from cfgString, for tests
+// that need to stub config behaviour by assigning to the mock's function fields.
 //
 // The mock answers host, token, and default host lookups from cfgString alone, so it
 // ignores both the config files on disk and the environment. It never writes anything.
@@ -28,7 +28,7 @@ func NewBlankConfig() *ghmock.ConfigMock {
 // Prefer NewIsolatedTestConfig when the code under test exercises the real config
 // implementation, writes config, or reads the auth environment variables directly,
 // since none of those go through the mock.
-func NewFromString(cfgString string) *ghmock.ConfigMock {
+func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	c := ghConfig.ReadFromString(cfgString)
 	cfg := cfg{c}
 	mock := &ghmock.ConfigMock{}
@@ -114,7 +114,7 @@ func NewFromString(cfgString string) *ghmock.ConfigMock {
 //
 // Use it when the code under test exercises real config behaviour: writing config,
 // logging in and out, or reading the auth environment variables directly. Prefer
-// NewFromString when the test only needs to stub config lookups.
+// NewMockConfigFromString when the test only needs to stub config lookups.
 //
 // Isolation covers all three places config comes from. It mocks the keyring, replaces
 // the ghConfig.Read singleton so each test gets its own config, points GH_CONFIG_DIR at

@@ -142,7 +142,7 @@ func Test_newIOStreams_pager(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
 			io := newIOStreams(cfg)
 			assert.Equal(t, tt.wantPager, io.GetPager())
@@ -183,7 +183,7 @@ func Test_newIOStreams_prompt(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
 			io := newIOStreams(cfg)
 			assert.Equal(t, tt.promptDisabled, io.GetNeverPrompt())
@@ -259,7 +259,7 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
 			io := newIOStreams(cfg)
 			assert.Equal(t, tt.spinnerDisabled, io.GetSpinnerDisabled())
@@ -325,7 +325,7 @@ func Test_newIOStreams_accessiblePrompterEnabled(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
 			io := newIOStreams(cfg)
 			assert.Equal(t, tt.accessiblePrompterEnabled, io.AccessiblePrompterEnabled())
@@ -401,7 +401,7 @@ func Test_newIOStreams_colorLabels(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
 			io := newIOStreams(cfg)
 			assert.Equal(t, tt.colorLabelsEnabled, io.ColorLabels())
@@ -483,35 +483,35 @@ func Test_mightBeGHESUser(t *testing.T) {
 }
 
 func pagerConfig() gh.Config {
-	return config.NewFromString("pager: CONFIG_PAGER")
+	return config.NewMockConfigFromString("pager: CONFIG_PAGER")
 }
 
 func disablePromptConfig() gh.Config {
-	return config.NewFromString("prompt: disabled")
+	return config.NewMockConfigFromString("prompt: disabled")
 }
 
 func enableAccessiblePrompterConfig() gh.Config {
-	return config.NewFromString("accessible_prompter: enabled")
+	return config.NewMockConfigFromString("accessible_prompter: enabled")
 }
 
 func disableAccessiblePrompterConfig() gh.Config {
-	return config.NewFromString("accessible_prompter: disabled")
+	return config.NewMockConfigFromString("accessible_prompter: disabled")
 }
 
 func disableSpinnersConfig() gh.Config {
-	return config.NewFromString("spinner: disabled")
+	return config.NewMockConfigFromString("spinner: disabled")
 }
 
 func enableSpinnersConfig() gh.Config {
-	return config.NewFromString("spinner: enabled")
+	return config.NewMockConfigFromString("spinner: enabled")
 }
 
 func disableColorLabelsConfig() gh.Config {
-	return config.NewFromString("color_labels: disabled")
+	return config.NewMockConfigFromString("color_labels: disabled")
 }
 
 func enableColorLabelsConfig() gh.Config {
-	return config.NewFromString("color_labels: enabled")
+	return config.NewMockConfigFromString("color_labels: enabled")
 }
 
 func Test_authRecoveryCommand(t *testing.T) {
@@ -553,7 +553,7 @@ func Test_authRecoveryCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			authCfg := config.NewBlankConfig().Authentication()
+			authCfg := config.NewMockConfig().Authentication()
 			authCfg.SetActiveToken(tt.token, tt.source)
 			cfg := &ghmock.ConfigMock{
 				AuthenticationFunc: func() gh.AuthConfig {
