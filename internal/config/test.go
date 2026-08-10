@@ -100,10 +100,28 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 // NewIsolatedTestConfig sets up a Mock keyring, creates a blank config
 // overwrites the ghConfig.Read function that returns a singleton config
 // in the real implementation, sets the GH_CONFIG_DIR env var so that
-// any call to Write goes to a different location on disk, and then returns
-// the blank config and a function that reads any data written to disk.
+// any call to Write goes to a different location on disk, clears the
+// authentication env vars, and then returns the blank config and a
+// function that reads any data written to disk.
+//
+// Callers that want an auth env var set should set it after calling this,
+// otherwise the value is cleared along with the ambient environment.
 func NewIsolatedTestConfig(t *testing.T) (*cfg, func(io.Writer, io.Writer)) {
 	keyring.MockInit()
+
+	// go-gh reads these ahead of any stored config, so isolating the config file is
+	// not enough on its own. A developer with GH_TOKEN exported, or any CI image that
+	// provides one, would otherwise see an authenticated config here and fail tests
+	// that assert on the logged out state.
+	for _, key := range []string{
+		"GH_TOKEN",
+		"GITHUB_TOKEN",
+		"GH_ENTERPRISE_TOKEN",
+		"GITHUB_ENTERPRISE_TOKEN",
+		"GH_HOST",
+	} {
+		t.Setenv(key, "")
+	}
 
 	c := ghConfig.ReadFromString("")
 	cfg := cfg{c}

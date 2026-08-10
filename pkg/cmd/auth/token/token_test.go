@@ -165,11 +165,13 @@ func TestTokenRun(t *testing.T) {
 			ios, _, stdout, _ := iostreams.Test()
 			tt.opts.IO = ios
 
+			cfg, _ := config.NewIsolatedTestConfig(t)
+
+			// Set after isolating the config, which clears the auth env vars.
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
 
-			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
