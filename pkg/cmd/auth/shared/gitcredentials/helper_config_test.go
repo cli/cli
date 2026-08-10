@@ -2,7 +2,6 @@ package gitcredentials_test
 
 import (
 	"context"
-	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -12,19 +11,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/stretchr/testify/require"
 )
-
-func withIsolatedGitConfig(t *testing.T) {
-	t.Helper()
-
-	// https://git-scm.com/docs/git-config#ENVIRONMENT
-	// Set the global git config to a temporary file
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, ".gitconfig")
-	t.Setenv("GIT_CONFIG_GLOBAL", configFile)
-
-	// And disable git reading the system config
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "true")
-}
 
 func configureTestCredentialHelper(t *testing.T, key string) {
 	t.Helper()
@@ -38,7 +24,7 @@ func configureTestCredentialHelper(t *testing.T, key string) {
 func TestHelperConfigContract(t *testing.T) {
 	contract.HelperConfig{
 		NewHelperConfig: func(t *testing.T) shared.HelperConfig {
-			withIsolatedGitConfig(t)
+			git.IsolateConfig(t)
 
 			return &gitcredentials.HelperConfig{
 				SelfExecutablePath: "/path/to/gh",
@@ -54,7 +40,7 @@ func TestHelperConfigContract(t *testing.T) {
 // This is a whitebox test unlike the contract because although we don't use the exact configured command, it's
 // important that it is exactly right since git uses it.
 func TestSetsCorrectCommandInGitConfig(t *testing.T) {
-	withIsolatedGitConfig(t)
+	git.IsolateConfig(t)
 
 	gc := &git.Client{}
 	hc := &gitcredentials.HelperConfig{
