@@ -411,74 +411,72 @@ func Test_newIOStreams_colorLabels(t *testing.T) {
 
 func Test_mightBeGHESUser(t *testing.T) {
 	tests := []struct {
-		name   string
-		env    map[string]string
-		config gh.Config
-		want   bool
+		name      string
+		env       map[string]string
+		cfgString string
+		want      bool
 	}{
 		{
-			name:   "GH_ENTERPRISE_TOKEN set",
-			env:    map[string]string{"GH_ENTERPRISE_TOKEN": "some-token"},
-			config: config.NewBlankConfig(),
-			want:   true,
+			name: "GH_ENTERPRISE_TOKEN set",
+			env:  map[string]string{"GH_ENTERPRISE_TOKEN": "some-token"},
+			want: true,
 		},
 		{
-			name:   "GITHUB_ENTERPRISE_TOKEN set",
-			env:    map[string]string{"GITHUB_ENTERPRISE_TOKEN": "some-token"},
-			config: config.NewBlankConfig(),
-			want:   true,
+			name: "GITHUB_ENTERPRISE_TOKEN set",
+			env:  map[string]string{"GITHUB_ENTERPRISE_TOKEN": "some-token"},
+			want: true,
 		},
 		{
-			name:   "no env vars, config has enterprise host",
-			config: config.NewFromString("hosts:\n  ghes.example.com:\n    oauth_token: abc123\n"),
-			want:   true,
+			name:      "no env vars, config has enterprise host",
+			cfgString: "hosts:\n  ghes.example.com:\n    oauth_token: abc123\n",
+			want:      true,
 		},
 		{
-			name:   "no env vars, config has only github.com",
-			config: config.NewFromString("hosts:\n  github.com:\n    oauth_token: abc123\n"),
-			want:   false,
+			name:      "no env vars, config has only github.com",
+			cfgString: "hosts:\n  github.com:\n    oauth_token: abc123\n",
+			want:      false,
 		},
 		{
-			name:   "no env vars, config has no hosts",
-			config: config.NewBlankConfig(),
-			want:   false,
+			name: "no env vars, config has no hosts",
+			want: false,
 		},
 		{
-			name:   "no env vars, config has github.com and enterprise host",
-			config: config.NewFromString("hosts:\n  github.com:\n    oauth_token: abc123\n  ghes.example.com:\n    oauth_token: def456\n"),
-			want:   true,
+			name:      "no env vars, config has github.com and enterprise host",
+			cfgString: "hosts:\n  github.com:\n    oauth_token: abc123\n  ghes.example.com:\n    oauth_token: def456\n",
+			want:      true,
 		},
 		{
-			name:   "no env vars, config has tenancy host",
-			config: config.NewFromString("hosts:\n  my-company.ghe.com:\n    oauth_token: abc123\n"),
-			want:   false,
+			name:      "no env vars, config has tenancy host",
+			cfgString: "hosts:\n  my-company.ghe.com:\n    oauth_token: abc123\n",
+			want:      false,
 		},
 		{
-			name:   "GH_HOST set to enterprise host",
-			env:    map[string]string{"GH_HOST": "ghes.example.com"},
-			config: config.NewBlankConfig(),
-			want:   true,
+			name: "GH_HOST set to enterprise host",
+			env:  map[string]string{"GH_HOST": "ghes.example.com"},
+			want: true,
 		},
 		{
-			name:   "GH_HOST set to github.com",
-			env:    map[string]string{"GH_HOST": "github.com"},
-			config: config.NewBlankConfig(),
-			want:   false,
+			name: "GH_HOST set to github.com",
+			env:  map[string]string{"GH_HOST": "github.com"},
+			want: false,
 		},
 		{
-			name:   "GH_HOST set to tenancy host",
-			env:    map[string]string{"GH_HOST": "my-company.ghe.com"},
-			config: config.NewBlankConfig(),
-			want:   false,
+			name: "GH_HOST set to tenancy host",
+			env:  map[string]string{"GH_HOST": "my-company.ghe.com"},
+			want: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			cfg, _ := config.NewIsolatedTestConfig(t, tt.cfgString)
+
+			// Set after isolating the config, which clears the auth env vars.
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
-			got := mightBeGHESUser(tt.config)
+
+			got := mightBeGHESUser(cfg)
 			assert.Equal(t, tt.want, got)
 		})
 	}

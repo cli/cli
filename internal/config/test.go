@@ -97,16 +97,18 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	return mock
 }
 
-// NewIsolatedTestConfig sets up a Mock keyring, creates a blank config
-// overwrites the ghConfig.Read function that returns a singleton config
-// in the real implementation, sets the GH_CONFIG_DIR env var so that
-// any call to Write goes to a different location on disk, clears the
-// authentication env vars, and then returns the blank config and a
-// function that reads any data written to disk.
+// NewIsolatedTestConfig returns a config built from cfgString, isolated from the
+// machine running the tests. Pass "" for a config with no content.
+//
+// It sets up a Mock keyring, overwrites the ghConfig.Read function that returns a
+// singleton config in the real implementation, sets the GH_CONFIG_DIR env var so
+// that any call to Write goes to a different location on disk, clears the
+// authentication env vars, and returns the config alongside a function that reads
+// any data written to disk.
 //
 // Callers that want an auth env var set should set it after calling this,
 // otherwise the value is cleared along with the ambient environment.
-func NewIsolatedTestConfig(t *testing.T) (*cfg, func(io.Writer, io.Writer)) {
+func NewIsolatedTestConfig(t *testing.T, cfgString string) (*cfg, func(io.Writer, io.Writer)) {
 	keyring.MockInit()
 
 	// go-gh reads these ahead of any stored config, so isolating the config file is
@@ -123,7 +125,7 @@ func NewIsolatedTestConfig(t *testing.T) (*cfg, func(io.Writer, io.Writer)) {
 		t.Setenv(key, "")
 	}
 
-	c := ghConfig.ReadFromString("")
+	c := ghConfig.ReadFromString(cfgString)
 	cfg := cfg{c}
 
 	// The real implementation of config.Read uses a sync.Once
