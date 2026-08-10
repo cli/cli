@@ -67,7 +67,7 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
-	key, err := getSSHKey(httpClient, host, opts.KeyID)
+	key, keyType, err := getSSHKey(httpClient, host, opts.KeyID)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 	}
 
-	err = deleteSSHKey(httpClient, host, opts.KeyID)
+	err = deleteSSHKey(httpClient, host, opts.KeyID, keyType)
 	if err != nil {
 		return err
 	}

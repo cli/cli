@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/cmd/ssh-key/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -110,6 +111,7 @@ func TestNewCmdDelete(t *testing.T) {
 
 func Test_deleteRun(t *testing.T) {
 	keyResp := "{\"title\":\"My Key\"}"
+	signingKeyResp := "{\"title\":\"My Signing Key\"}"
 	tests := []struct {
 		name          string
 		tty           bool
@@ -146,14 +148,41 @@ func Test_deleteRun(t *testing.T) {
 			wantStdout: "✓ SSH key \"My Key\" (123) deleted from your account\n",
 		},
 		{
+			name: "delete signing key tty",
+			tty:  true,
+			opts: DeleteOptions{KeyID: "123"},
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.ConfirmDeletionFunc = func(_ string) error {
+					return nil
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(404, ""))
+				reg.Register(httpmock.REST("GET", "user/ssh_signing_keys/123"), httpmock.StatusStringResponse(200, signingKeyResp))
+				reg.Register(httpmock.REST("DELETE", "user/ssh_signing_keys/123"), httpmock.StatusStringResponse(204, ""))
+			},
+			wantStdout: "✓ SSH key \"My Signing Key\" (123) deleted from your account\n",
+		},
+		{
+			name: "delete signing key no tty",
+			opts: DeleteOptions{KeyID: "123", Confirmed: true},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(404, ""))
+				reg.Register(httpmock.REST("GET", "user/ssh_signing_keys/123"), httpmock.StatusStringResponse(200, signingKeyResp))
+				reg.Register(httpmock.REST("DELETE", "user/ssh_signing_keys/123"), httpmock.StatusStringResponse(204, ""))
+			},
+			wantStdout: "",
+		},
+		{
 			name: "not found tty",
 			tty:  true,
 			opts: DeleteOptions{KeyID: "123"},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(404, ""))
+				reg.Register(httpmock.REST("GET", "user/ssh_signing_keys/123"), httpmock.StatusStringResponse(404, `{"message":"Not Found"}`))
 			},
 			wantErr:    true,
-			wantErrMsg: "HTTP 404 (https://api.github.com/user/keys/123)",
+			wantErrMsg: "HTTP 404 (https://api.github.com/user/ssh_signing_keys/123)",
 		},
 		{
 			name: "delete no tty",
@@ -169,9 +198,10 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{KeyID: "123", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(404, ""))
+				reg.Register(httpmock.REST("GET", "user/ssh_signing_keys/123"), httpmock.StatusStringResponse(404, `{"message":"Not Found"}`))
 			},
 			wantErr:    true,
-			wantErrMsg: "HTTP 404 (https://api.github.com/user/keys/123)",
+			wantErrMsg: "HTTP 404 (https://api.github.com/user/ssh_signing_keys/123)",
 		},
 	}
 
@@ -220,7 +250,7 @@ func TestDeleteSSHKeyHTTPError(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	err := deleteSSHKey(&http.Client{Transport: reg}, "github.com", "1234")
+	err := deleteSSHKey(&http.Client{Transport: reg}, "github.com", "1234", shared.AuthenticationKey)
 
 	var httpErr api.HTTPError
 	require.ErrorAs(t, err, &httpErr)
@@ -228,15 +258,88 @@ func TestDeleteSSHKeyHTTPError(t *testing.T) {
 	assert.Contains(t, err.Error(), "HTTP 404")
 }
 
-func TestGetSSHKeyHTTPError(t *testing.T) {
+func TestDeleteSSHKeySigningKey(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("DELETE", "user/ssh_signing_keys/5678"),
+		httpmock.StatusStringResponse(http.StatusNoContent, ""),
+	)
+
+	err := deleteSSHKey(&http.Client{Transport: reg}, "github.com", "5678", shared.SigningKey)
+
+	require.NoError(t, err)
+}
+
+func TestGetSSHKeyAuthenticationKey(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("GET", "user/keys/5678"),
+		httpmock.StatusStringResponse(200, `{"title":"My Key"}`),
+	)
+	// A signing-key lookup must not happen when the authentication key is found.
+	reg.Exclude(t, httpmock.REST("GET", "user/ssh_signing_keys/5678"))
+
+	key, keyType, err := getSSHKey(&http.Client{Transport: reg}, "github.com", "5678")
+
+	require.NoError(t, err)
+	require.NotNil(t, key)
+	assert.Equal(t, "My Key", key.Title)
+	assert.Equal(t, shared.AuthenticationKey, keyType)
+}
+
+func TestGetSSHKeySigningKeyFallback(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("GET", "user/keys/5678"),
+		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+	)
+	reg.Register(
+		httpmock.REST("GET", "user/ssh_signing_keys/5678"),
+		httpmock.StatusStringResponse(200, `{"title":"My Signing Key"}`),
+	)
+
+	key, keyType, err := getSSHKey(&http.Client{Transport: reg}, "github.com", "5678")
+
+	require.NoError(t, err)
+	require.NotNil(t, key)
+	assert.Equal(t, "My Signing Key", key.Title)
+	assert.Equal(t, shared.SigningKey, keyType)
+}
+
+func TestGetSSHKeyAuthenticationEndpointErrorNotRetried(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("GET", "user/keys/5678"),
+		httpmock.StatusStringResponse(http.StatusForbidden, `{"message":"Forbidden"}`),
+	)
+	// A non-404 error from the authentication endpoint must not trigger a
+	// signing-key lookup.
+	reg.Exclude(t, httpmock.REST("GET", "user/ssh_signing_keys/5678"))
+
+	_, _, err := getSSHKey(&http.Client{Transport: reg}, "github.com", "5678")
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusForbidden, httpErr.StatusCode)
+}
+
+func TestGetSSHKeyBothEndpointsNotFound(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
 	reg.Register(
 		httpmock.REST("GET", "user/keys/1234"),
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
+	reg.Register(
+		httpmock.REST("GET", "user/ssh_signing_keys/1234"),
+		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+	)
 
-	key, err := getSSHKey(&http.Client{Transport: reg}, "github.com", "1234")
+	key, _, err := getSSHKey(&http.Client{Transport: reg}, "github.com", "1234")
 
 	assert.Nil(t, key)
 	var httpErr api.HTTPError
