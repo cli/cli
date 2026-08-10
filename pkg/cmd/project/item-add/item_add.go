@@ -124,10 +124,11 @@ func addItemArgs(config addItemConfig) (*addProjectItemMutation, map[string]inte
 }
 
 func printResults(config addItemConfig, item queries.ProjectItem) error {
-	if !config.io.IsStdoutTTY() {
-		return nil
+	if config.io.IsStdoutTTY() {
+		_, err := fmt.Fprintln(config.io.Out, "Added item")
+		return err
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "Added item\n")
+	_, err := fmt.Fprintln(config.io.Out, item.Id)
 	return err
 }
