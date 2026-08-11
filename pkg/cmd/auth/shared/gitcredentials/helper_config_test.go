@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/contract"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
-	"github.com/cli/cli/v2/test"
 	"github.com/stretchr/testify/require"
 )
 
