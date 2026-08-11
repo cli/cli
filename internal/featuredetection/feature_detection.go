@@ -56,11 +56,15 @@ type IssueFeatures struct {
 	// GHES 3.19+. Issue types and sub-issues are GA on all supported GHES
 	// versions (3.17+) and do not need feature detection.
 	IssueRelationshipsSupported bool
+
+	// IssueFieldsSupported indicates the host supports custom issue fields.
+	IssueFieldsSupported bool
 }
 
 var allIssueFeatures = IssueFeatures{
 	ApiActorsSupported:          true,
 	IssueRelationshipsSupported: true,
+	IssueFieldsSupported:        true,
 }
 
 type PullRequestFeatures struct {
@@ -190,9 +194,11 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 	}
 
 	for _, field := range featureDetection.Issue.Fields {
-		if field.Name == "blockedBy" {
+		switch field.Name {
+		case "blockedBy":
 			features.IssueRelationshipsSupported = true
-			break
+		case "issueFieldValues":
+			features.IssueFieldsSupported = true
 		}
 	}
 

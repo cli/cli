@@ -8,6 +8,7 @@ import (
 	cmdDelete "github.com/cli/cli/v2/pkg/cmd/issue/delete"
 	cmdDevelop "github.com/cli/cli/v2/pkg/cmd/issue/develop"
 	cmdEdit "github.com/cli/cli/v2/pkg/cmd/issue/edit"
+	cmdField "github.com/cli/cli/v2/pkg/cmd/issue/field"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/issue/list"
 	cmdLock "github.com/cli/cli/v2/pkg/cmd/issue/lock"
 	cmdPin "github.com/cli/cli/v2/pkg/cmd/issue/pin"
@@ -46,6 +47,7 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 		cmdList.NewCmdList(f, nil),
 		cmdCreate.NewCmdCreate(f, nil),
 		cmdStatus.NewCmdStatus(f, nil),
+		cmdField.NewCmdField(f),
 	)
 
 	cmdutil.AddGroup(cmd, "Targeted commands",

@@ -12,7 +12,7 @@ import (
 )
 
 func TestIssueFeatures(t *testing.T) {
-	issueFieldsWithRelationships := `{"data":{"Issue":{"fields":[{"name":"title"},{"name":"body"},{"name":"blockedBy"}]}}}`
+	issueFieldsWithRelationships := `{"data":{"Issue":{"fields":[{"name":"title"},{"name":"body"},{"name":"blockedBy"},{"name":"issueFieldValues"}]}}}`
 	issueFieldsWithoutRelationships := `{"data":{"Issue":{"fields":[{"name":"title"},{"name":"body"}]}}}`
 
 	tests := []struct {
@@ -28,6 +28,7 @@ func TestIssueFeatures(t *testing.T) {
 			wantFeatures: IssueFeatures{
 				ApiActorsSupported:          true,
 				IssueRelationshipsSupported: true,
+				IssueFieldsSupported:        true,
 			},
 			wantErr: false,
 		},
@@ -37,6 +38,7 @@ func TestIssueFeatures(t *testing.T) {
 			wantFeatures: IssueFeatures{
 				ApiActorsSupported:          true,
 				IssueRelationshipsSupported: true,
+				IssueFieldsSupported:        true,
 			},
 			wantErr: false,
 		},
@@ -49,6 +51,7 @@ func TestIssueFeatures(t *testing.T) {
 			wantFeatures: IssueFeatures{
 				ApiActorsSupported:          false,
 				IssueRelationshipsSupported: true,
+				IssueFieldsSupported:        true,
 			},
 			wantErr: false,
 		},

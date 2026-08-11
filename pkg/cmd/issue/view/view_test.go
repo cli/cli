@@ -54,6 +54,7 @@ func TestJSONFields(t *testing.T) {
 		"subIssuesSummary",
 		"blockedBy",
 		"blocking",
+		"issueFields",
 	})
 }
 
@@ -664,6 +665,10 @@ func issueResponseAllIssues2Fields() string {
 		"projectItems": {"nodes": [], "totalCount": 0},
 		"url": "https://github.com/OWNER/REPO/issues/123",
 		"issueType": {"id":"IT_1","name":"Bug","description":"Something is not working","color":"d73a4a"},
+		"issueFields": {"nodes": [
+			{"field":{"id":"IF_1","name":"Priority","dataType":"SINGLE_SELECT"},"name":"High"},
+			{"field":{"id":"IF_2","name":"Teams","dataType":"MULTI_SELECT"},"options":[{"id":"OPT_1","name":"CLI"},{"id":"OPT_2","name":"Desktop"}]}
+		]},
 		"parent": {"number":100,"title":"Epic: Authentication overhaul","url":"https://github.com/OWNER/REPO/issues/100","state":"OPEN","repository":{"nameWithOwner":"OWNER/REPO"}},
 		"subIssues": {
 			"nodes": [
@@ -753,6 +758,10 @@ func TestIssueView_tty_Issues2AllFields(t *testing.T) {
 	// Type metadata row
 	assert.Contains(t, out, "Type:")
 	assert.Contains(t, out, "Bug")
+	assert.Contains(t, out, "Priority:")
+	assert.Contains(t, out, "High")
+	assert.Contains(t, out, "Teams:")
+	assert.Contains(t, out, "CLI, Desktop")
 
 	// Parent metadata row
 	assert.Contains(t, out, "Parent:")
@@ -940,6 +949,31 @@ func TestIssueView_json_IssueType(t *testing.T) {
 	assert.Equal(t, "Bug", issueType["name"])
 	assert.Equal(t, "Something is not working", issueType["description"])
 	assert.Equal(t, "d73a4a", issueType["color"])
+}
+
+func TestIssueView_json_IssueFields(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(issueResponseAllIssues2Fields()),
+	)
+
+	output, err := runCommand(httpReg, false, `123 --json issueFields`)
+	require.NoError(t, err)
+
+	var data map[string]interface{}
+	require.NoError(t, json.Unmarshal(output.OutBuf.Bytes(), &data))
+	fields, ok := data["issueFields"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, fields, 2)
+	assert.Equal(t, map[string]interface{}{
+		"name": "Priority", "dataType": "single_select", "value": "High",
+	}, fields[0])
+	assert.Equal(t, map[string]interface{}{
+		"name": "Teams", "dataType": "multi_select", "value": []interface{}{"CLI", "Desktop"},
+	}, fields[1])
 }
 
 func TestIssueView_json_ParentSubIssues(t *testing.T) {
