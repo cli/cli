@@ -10,7 +10,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
-	"github.com/cli/cli/v2/test"
 	"github.com/stretchr/testify/require"
 )
 
