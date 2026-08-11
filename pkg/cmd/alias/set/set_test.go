@@ -281,7 +281,7 @@ func TestSetRun(t *testing.T) {
 				fmt.Fprint(stdin, tt.stdin)
 			}
 
-			cfg := config.NewBlankConfig()
+			cfg := config.NewMockConfig()
 			cfg.WriteFunc = func() error {
 				return nil
 			}

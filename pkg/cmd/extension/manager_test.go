@@ -61,7 +61,7 @@ func newTestManager(dataDir, updateDir string, client *http.Client, gitClient gi
 			cmd.Env = append([]string{"GH_WANT_HELPER_PROCESS=1"}, extraEnv...)
 			return cmd
 		},
-		config:    config.NewBlankConfig(),
+		config:    config.NewMockConfig(),
 		io:        ios,
 		client:    client,
 		gitClient: gitClient,

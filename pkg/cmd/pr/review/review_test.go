@@ -178,7 +178,7 @@ func runCommand(rt http.RoundTripper, prompter prompter.Prompter, isTTY bool, cl
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Prompter: prompter,
 	}

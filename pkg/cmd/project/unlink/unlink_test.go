@@ -280,7 +280,7 @@ func TestRunUnlink_Repo(t *testing.T) {
 			return http.DefaultClient, nil
 		},
 		config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		io: ios,
 	}
@@ -392,7 +392,7 @@ func TestRunUnlink_Team(t *testing.T) {
 			return http.DefaultClient, nil
 		},
 		config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		io: ios,
 	}

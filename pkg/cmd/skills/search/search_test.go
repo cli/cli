@@ -19,7 +19,7 @@ import (
 
 func TestSearchRun_UnsupportedHost(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
-	cfg := config.NewBlankConfig()
+	cfg := config.NewMockConfig()
 	authCfg := cfg.Authentication()
 	authCfg.SetDefaultHost("acme.ghes.com", "user")
 	cfg.AuthenticationFunc = func() gh.AuthConfig {
@@ -367,7 +367,7 @@ func TestSearchRun(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
@@ -623,7 +623,7 @@ func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 	err := searchRun(&SearchOptions{
 		IO:             ios,
 		HttpClient:     func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
-		Config:         func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+		Config:         func() (gh.Config, error) { return config.NewMockConfig(), nil },
 		Prompter:       pm,
 		Telemetry:      recorder,
 		ExecutablePath: "/nonexistent/gh", // install subprocess will fail; failures are logged, not fatal.

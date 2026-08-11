@@ -357,7 +357,7 @@ func Test_createRun(t *testing.T) {
 		tt.opts.HttpClient = mockClient
 
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		ios, stdin, stdout, stderr := iostreams.Test()

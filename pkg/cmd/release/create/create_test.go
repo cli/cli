@@ -1853,7 +1853,7 @@ func Test_createRun_interactive(t *testing.T) {
 			}
 
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 
 			tt.opts.Edit = func(_, _, val string, _ io.Reader, _, _ io.Writer) (string, error) {

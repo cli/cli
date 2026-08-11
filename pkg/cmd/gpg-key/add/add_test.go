@@ -204,7 +204,7 @@ func Test_runAdd(t *testing.T) {
 			tt.httpStubs(reg)
 		}
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
