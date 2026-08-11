@@ -283,6 +283,13 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 		return em
 	}
 
+	// SAML enforcement rejects a valid token even for public extension repos.
+	// Clearing ssoHeader on recovery matters because Main reports SSOURL for any
+	// later failure, which would otherwise blame SSO for an unrelated error.
+	if plainClient, plainErr := f.PlainHttpClient(); plainErr == nil {
+		client = extension.WithSAMLFallback(client, plainClient, func() { ssoHeader = "" })
+	}
+
 	em.SetClient(api.NewCachedHTTPClient(client, time.Second*30))
 
 	return em
