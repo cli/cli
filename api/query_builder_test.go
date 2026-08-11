@@ -40,7 +40,7 @@ func TestPullRequestGraphQL(t *testing.T) {
 		},
 		{
 			name:   "issue fields are filtered",
-			fields: []string{"issueFields"},
+			fields: []string{"issueFields", "issueFieldsWithoutMultiSelect"},
 			want:   "",
 		},
 	}
@@ -88,6 +88,11 @@ func TestIssueGraphQL(t *testing.T) {
 			name:   "issue fields",
 			fields: []string{"issueFields"},
 			want:   issueFields,
+		},
+		{
+			name:   "issue fields without multi-select",
+			fields: []string{"issueFieldsWithoutMultiSelect"},
+			want:   issueFieldsWithoutMultiSelect,
 		},
 	}
 	for _, tt := range tests {

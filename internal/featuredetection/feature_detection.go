@@ -59,12 +59,17 @@ type IssueFeatures struct {
 
 	// IssueFieldsSupported indicates the host supports custom issue fields.
 	IssueFieldsSupported bool
+
+	// IssueFieldMultiSelectSupported indicates the host supports multi-select
+	// issue field definitions and values.
+	IssueFieldMultiSelectSupported bool
 }
 
 var allIssueFeatures = IssueFeatures{
-	ApiActorsSupported:          true,
-	IssueRelationshipsSupported: true,
-	IssueFieldsSupported:        true,
+	ApiActorsSupported:             true,
+	IssueRelationshipsSupported:    true,
+	IssueFieldsSupported:           true,
+	IssueFieldMultiSelectSupported: true,
 }
 
 type PullRequestFeatures struct {
@@ -186,10 +191,24 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 			} `graphql:"fields(includeDeprecated: true)"`
 		} `graphql:"Issue: __type(name: \"Issue\")"`
 	}
+	var issueFieldFeatureDetection struct {
+		IssueFieldMultiSelect struct {
+			Name string
+		} `graphql:"IssueFieldMultiSelect: __type(name: \"IssueFieldMultiSelect\")"`
+		IssueFieldMultiSelectValue struct {
+			Name string
+		} `graphql:"IssueFieldMultiSelectValue: __type(name: \"IssueFieldMultiSelectValue\")"`
+	}
 
 	gql := api.NewClientFromHTTP(d.httpClient)
-	err := gql.Query(d.host, "Issue_fields", &featureDetection, nil)
-	if err != nil {
+	var wg errgroup.Group
+	wg.Go(func() error {
+		return gql.Query(d.host, "Issue_fields", &featureDetection, nil)
+	})
+	wg.Go(func() error {
+		return gql.Query(d.host, "Issue_field_types", &issueFieldFeatureDetection, nil)
+	})
+	if err := wg.Wait(); err != nil {
 		return IssueFeatures{}, err
 	}
 
@@ -201,6 +220,8 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 			features.IssueFieldsSupported = true
 		}
 	}
+	features.IssueFieldMultiSelectSupported = issueFieldFeatureDetection.IssueFieldMultiSelect.Name != "" &&
+		issueFieldFeatureDetection.IssueFieldMultiSelectValue.Name != ""
 
 	return features, nil
 }

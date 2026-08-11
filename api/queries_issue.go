@@ -123,8 +123,6 @@ func (v IssueFieldValue) ExportData() map[string]interface{} {
 // DisplayValue returns the human-readable value for an issue field.
 func (v IssueFieldValue) DisplayValue() interface{} {
 	switch v.Field.DataType {
-	case "NUMBER":
-		return fmt.Sprint(v.Value)
 	case "SINGLE_SELECT":
 		return v.Name
 	case "MULTI_SELECT":

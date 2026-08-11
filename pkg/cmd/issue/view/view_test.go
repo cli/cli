@@ -63,6 +63,14 @@ func TestNewCmdView(t *testing.T) {
 	argparsetest.TestArgParsing(t, NewCmdView)
 }
 
+type issueFieldsWithoutMultiSelectDetector struct {
+	fd.DisabledDetectorMock
+}
+
+func (d *issueFieldsWithoutMultiSelectDetector) IssueFeatures() (fd.IssueFeatures, error) {
+	return fd.IssueFeatures{IssueFieldsSupported: true}, nil
+}
+
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
@@ -141,6 +149,33 @@ func TestIssueView_web(t *testing.T) {
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n", stderr.String())
 	browser.Verify(t, "https://github.com/OWNER/REPO/issues/123")
+}
+
+func TestIssueViewIssueFieldsWithoutMultiSelect(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.GraphQLQuery(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"number":123}}}}`, func(query string, _ map[string]interface{}) {
+			assert.Contains(t, query, "IssueFieldSingleSelectValue")
+			assert.NotContains(t, query, "IssueFieldMultiSelectValue")
+		}),
+	)
+	mockEmptyV2ProjectItems(t, reg)
+
+	err := viewRun(&ViewOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		Detector:    &issueFieldsWithoutMultiSelectDetector{},
+		IssueNumber: 123,
+	})
+	require.NoError(t, err)
 }
 
 func TestIssueView_nontty_Preview(t *testing.T) {

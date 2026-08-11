@@ -80,3 +80,49 @@ func TestListRunJSON(t *testing.T) {
 		"options":[{"id":"OPT_1","name":"High"}]
 	}]`, stdout.String())
 }
+
+func TestListRunEmpty(t *testing.T) {
+	tests := []struct {
+		name       string
+		exporter   cmdutil.Exporter
+		wantOutput string
+		wantError  string
+	}{
+		{
+			name:      "human output",
+			wantError: "no issue fields found in OWNER/REPO",
+		},
+		{
+			name:       "JSON output",
+			exporter:   cmdutil.NewJSONExporter(),
+			wantOutput: "[]\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(
+				httpmock.GraphQL(`query RepositoryIssueFields\b`),
+				httpmock.StringResponse(`{"data":{"repository":{"issueFields":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}`),
+			)
+
+			ios, _, stdout, _ := iostreams.Test()
+			opts := &ListOptions{
+				HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+				BaseRepo:   func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil },
+				IO:         ios,
+				Exporter:   tt.exporter,
+			}
+
+			err := listRun(opts)
+			if tt.wantError != "" {
+				require.EqualError(t, err, tt.wantError)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantOutput, stdout.String())
+		})
+	}
+}

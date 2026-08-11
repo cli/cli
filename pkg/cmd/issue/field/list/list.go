@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -21,6 +23,7 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Exporter   cmdutil.Exporter
+	Detector   fd.Detector
 }
 
 // NewCmdList creates the issue field list command.
@@ -61,14 +64,22 @@ func listRun(opts *ListOptions) error {
 	if err != nil {
 		return err
 	}
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, 24*time.Hour)
+		opts.Detector = fd.NewDetector(cachedClient, repo.RepoHost())
+	}
+	issueFeatures, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
 
 	opts.IO.StartProgressIndicator()
-	fields, err := api.RepoIssueFields(api.NewClientFromHTTP(httpClient), repo)
+	fields, err := api.RepoIssueFields(api.NewClientFromHTTP(httpClient), repo, issueFeatures.IssueFieldMultiSelectSupported)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
-	if len(fields) == 0 {
+	if len(fields) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("no issue fields found in %s", ghrepo.FullName(repo)))
 	}
 	if opts.Exporter != nil {

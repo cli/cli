@@ -6,16 +6,21 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-const issueFieldDefinitions = `
+const issueFieldDefinitionsWithoutMultiSelect = `
 	...on IssueFieldText{id,name,dataType}
 	...on IssueFieldNumber{id,name,dataType}
 	...on IssueFieldDate{id,name,dataType}
 	...on IssueFieldSingleSelect{id,name,dataType,options{id,name}}
-	...on IssueFieldMultiSelect{id,name,dataType,options{id,name}}
 `
 
+const issueFieldMultiSelectDefinition = `...on IssueFieldMultiSelect{id,name,dataType,options{id,name}}`
+
 // RepoIssueFields fetches all issue fields available to a repository.
-func RepoIssueFields(client *Client, repo ghrepo.Interface) ([]IssueFieldDefinition, error) {
+func RepoIssueFields(client *Client, repo ghrepo.Interface, includeMultiSelect bool) ([]IssueFieldDefinition, error) {
+	definitions := issueFieldDefinitionsWithoutMultiSelect
+	if includeMultiSelect {
+		definitions += issueFieldMultiSelectDefinition
+	}
 	query := fmt.Sprintf(`
 	query RepositoryIssueFields($owner: String!, $name: String!, $endCursor: String) {
 		repository(owner: $owner, name: $name) {
@@ -24,7 +29,7 @@ func RepoIssueFields(client *Client, repo ghrepo.Interface) ([]IssueFieldDefinit
 				pageInfo{hasNextPage,endCursor}
 			}
 		}
-	}`, issueFieldDefinitions)
+	}`, definitions)
 	variables := map[string]interface{}{
 		"owner": repo.RepoOwner(),
 		"name":  repo.RepoName(),

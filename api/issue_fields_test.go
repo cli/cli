@@ -42,10 +42,26 @@ func TestRepoIssueFields(t *testing.T) {
 	)
 
 	client := NewClientFromHTTP(&http.Client{Transport: reg})
-	fields, err := RepoIssueFields(client, ghrepo.New("OWNER", "REPO"))
+	fields, err := RepoIssueFields(client, ghrepo.New("OWNER", "REPO"), true)
 	require.NoError(t, err)
 	require.Len(t, fields, 2)
 	assert.Equal(t, "Priority", fields[0].Name)
 	assert.Equal(t, []IssueFieldOption{{ID: "OPT_1", Name: "High"}}, fields[0].Options)
 	assert.Equal(t, "Due date", fields[1].Name)
+}
+
+func TestRepoIssueFieldsWithoutMultiSelect(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryIssueFields\b`),
+		httpmock.GraphQLQuery(`{"data":{"repository":{"issueFields":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}`, func(query string, _ map[string]interface{}) {
+			assert.NotContains(t, query, "IssueFieldMultiSelect")
+		}),
+	)
+
+	client := NewClientFromHTTP(&http.Client{Transport: reg})
+	fields, err := RepoIssueFields(client, ghrepo.New("OWNER", "REPO"), false)
+	require.NoError(t, err)
+	assert.Empty(t, fields)
 }

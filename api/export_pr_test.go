@@ -47,7 +47,7 @@ func TestIssue_ExportData(t *testing.T) {
 			outputJSON: heredoc.Doc(`
 				{ "issueFields": [
 					{ "name": "Priority", "dataType": "single_select", "value": "High" },
-					{ "name": "Estimate", "dataType": "number", "value": "3.5" },
+					{ "name": "Estimate", "dataType": "number", "value": 3.5 },
 					{ "name": "Teams", "dataType": "multi_select", "value": ["CLI", "Desktop"] }
 				] }
 			`),

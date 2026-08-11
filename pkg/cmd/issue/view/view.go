@@ -136,8 +136,13 @@ func viewRun(opts *ViewOptions) error {
 			if issueFeatures.IssueRelationshipsSupported {
 				lookupFields.AddValues([]string{"blockedBy", "blocking"})
 			}
+			// TODO IssueFieldsCleanup - remove when all supported GHES versions include issue fields.
 			if issueFeatures.IssueFieldsSupported {
-				lookupFields.Add("issueFields")
+				if issueFeatures.IssueFieldMultiSelectSupported {
+					lookupFields.Add("issueFields")
+				} else {
+					lookupFields.Add("issueFieldsWithoutMultiSelect")
+				}
 			}
 		}
 	}
