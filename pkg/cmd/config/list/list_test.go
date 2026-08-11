@@ -39,7 +39,7 @@ func TestNewCmdConfigList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 			}
 
@@ -81,7 +81,7 @@ func Test_listRun(t *testing.T) {
 		{
 			name: "list",
 			config: func() gh.Config {
-				cfg := config.NewBlankConfig()
+				cfg := config.NewMockConfig()
 				cfg.Set("HOST", "git_protocol", "ssh")
 				cfg.Set("HOST", "editor", "/usr/bin/vim")
 				cfg.Set("HOST", "prompt", "disabled")

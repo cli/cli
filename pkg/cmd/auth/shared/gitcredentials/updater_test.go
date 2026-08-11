@@ -44,7 +44,7 @@ func fillCredentials(t *testing.T) string {
 func TestUpdateAddsNewCredentials(t *testing.T) {
 	// Given we have an isolated git config and we're using the built in store credential helper
 	// https://git-scm.com/docs/git-credential-store
-	test.IsolateGitConfig(t)
+	git.IsolateConfig(t)
 	configureStoreCredentialHelper(t)
 
 	// When we add new credentials
@@ -66,7 +66,7 @@ func TestUpdateReplacesOldCredentials(t *testing.T) {
 	// Given we have an isolated git config and we're using the built in store credential helper
 	// https://git-scm.com/docs/git-credential-store
 	// and we have existing credentials
-	test.IsolateGitConfig(t)
+	git.IsolateConfig(t)
 	configureStoreCredentialHelper(t)
 
 	// When we replace old credentials

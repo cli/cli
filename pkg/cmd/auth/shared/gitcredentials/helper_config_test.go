@@ -25,7 +25,7 @@ func configureTestCredentialHelper(t *testing.T, key string) {
 func TestHelperConfigContract(t *testing.T) {
 	contract.HelperConfig{
 		NewHelperConfig: func(t *testing.T) shared.HelperConfig {
-			test.IsolateGitConfig(t)
+			git.IsolateConfig(t)
 
 			return &gitcredentials.HelperConfig{
 				SelfExecutablePath: "/path/to/gh",
@@ -41,7 +41,7 @@ func TestHelperConfigContract(t *testing.T) {
 // This is a whitebox test unlike the contract because although we don't use the exact configured command, it's
 // important that it is exactly right since git uses it.
 func TestSetsCorrectCommandInGitConfig(t *testing.T) {
-	test.IsolateGitConfig(t)
+	git.IsolateConfig(t)
 
 	gc := &git.Client{}
 	hc := &gitcredentials.HelperConfig{

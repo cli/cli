@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -100,10 +101,7 @@ func TestNewCmdaddItem(t *testing.T) {
 	}
 }
 
-func TestRunAddItem_User(t *testing.T) {
-	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
-
+func setupRunAddItemUserMocks() {
 	// get user ID
 	gock.New("https://api.github.com").
 		Post("/graphql").
@@ -184,32 +182,55 @@ func TestRunAddItem_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"addProjectV2ItemById": map[string]interface{}{
 					"item": map[string]interface{}{
-						"id": "item ID",
+						"id": "project item ID",
 					},
 				},
 			},
 		})
+}
 
-	client := queries.NewTestClient()
-
-	ios, _, stdout, _ := iostreams.Test()
-	ios.SetStdoutTTY(true)
-	config := addItemConfig{
-		opts: addItemOpts{
-			owner:   "monalisa",
-			number:  1,
-			itemURL: "https://github.com/cli/go-gh/issues/1",
+func TestRunAddItem_User(t *testing.T) {
+	tests := []struct {
+		name      string
+		stdoutTTY bool
+		want      string
+	}{
+		{
+			name:      "tty",
+			stdoutTTY: true,
+			want:      "Added item\n",
 		},
-		client: client,
-		io:     ios,
+		{
+			name: "non-tty",
+			want: "project item ID\n",
+		},
 	}
 
-	err := runAddItem(config)
-	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"Added item\n",
-		stdout.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			gock.Observe(gock.DumpRequest)
+			setupRunAddItemUserMocks()
+
+			client := queries.NewTestClient()
+
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.stdoutTTY)
+			config := addItemConfig{
+				opts: addItemOpts{
+					owner:   "monalisa",
+					number:  1,
+					itemURL: "https://github.com/cli/go-gh/issues/1",
+				},
+				client: client,
+				io:     ios,
+			}
+
+			err := runAddItem(config)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, stdout.String())
+		})
+	}
 }
 
 func TestRunAddItem_Org(t *testing.T) {
