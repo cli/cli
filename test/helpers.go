@@ -2,17 +2,8 @@ package test
 
 import (
 	"bytes"
-	"path/filepath"
 	"regexp"
-	"testing"
 )
-
-// IsolateGitConfig prevents tests from reading global and system Git configuration.
-func IsolateGitConfig(t *testing.T) {
-	t.Helper()
-	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), ".gitconfig"))
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "true")
-}
 
 // TODO copypasta from command package
 type CmdOut struct {

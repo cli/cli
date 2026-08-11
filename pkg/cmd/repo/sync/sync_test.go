@@ -16,7 +16,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -107,7 +106,7 @@ func TestNewCmdSync(t *testing.T) {
 }
 
 func TestExecuteLocalRepoSyncBranchCheckedOutInOtherWorktree(t *testing.T) {
-	test.IsolateGitConfig(t)
+	git.IsolateConfig(t)
 
 	repoDir := t.TempDir()
 	worktreeDir := filepath.Join(t.TempDir(), "trunk-worktree")
@@ -143,7 +142,7 @@ func TestExecuteLocalRepoSyncBranchCheckedOutInOtherWorktree(t *testing.T) {
 }
 
 func TestExecuteLocalRepoSyncFastForwardsNonCurrentBranch(t *testing.T) {
-	test.IsolateGitConfig(t)
+	git.IsolateConfig(t)
 
 	repoDir := t.TempDir()
 
@@ -171,7 +170,7 @@ func TestExecuteLocalRepoSyncFastForwardsNonCurrentBranch(t *testing.T) {
 }
 
 func TestExecuteLocalRepoSyncForceUpdatesDivergedNonCurrentBranch(t *testing.T) {
-	test.IsolateGitConfig(t)
+	git.IsolateConfig(t)
 
 	repoDir := t.TempDir()
 
@@ -203,7 +202,7 @@ func TestExecuteLocalRepoSyncForceUpdatesDivergedNonCurrentBranch(t *testing.T) 
 }
 
 func TestUpdateBranchInSingleWorktreeRepository(t *testing.T) {
-	test.IsolateGitConfig(t)
+	git.IsolateConfig(t)
 
 	repoDir := t.TempDir()
 
