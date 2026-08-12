@@ -1426,6 +1426,54 @@ func TestClientCheckoutNewBranch(t *testing.T) {
 	}
 }
 
+func TestClientAddWorktree(t *testing.T) {
+	tests := []struct {
+		name          string
+		path          string
+		remoteName    string
+		cmdExitStatus int
+		cmdStderr     string
+		wantCmdArgs   string
+		wantErrorMsg  string
+	}{
+		{
+			name:        "existing local branch",
+			path:        "/path/to/work tree",
+			wantCmdArgs: `path/to/git worktree add -- /path/to/work tree trunk`,
+		},
+		{
+			name:        "new tracking branch",
+			path:        "/path/to/worktree",
+			remoteName:  "origin",
+			wantCmdArgs: `path/to/git worktree add --track -b trunk -- /path/to/worktree origin/trunk`,
+		},
+		{
+			name:          "git error",
+			path:          "/occupied/path",
+			cmdExitStatus: 1,
+			cmdStderr:     "git error message",
+			wantCmdArgs:   `path/to/git worktree add -- /occupied/path trunk`,
+			wantErrorMsg:  "failed to run git: git error message",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, "", tt.cmdStderr)
+			client := Client{
+				GitPath:        "path/to/git",
+				commandContext: cmdCtx,
+			}
+			err := client.AddWorktree(context.Background(), tt.path, "trunk", tt.remoteName)
+			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			if tt.wantErrorMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErrorMsg)
+			}
+		})
+	}
+}
+
 func TestClientToplevelDir(t *testing.T) {
 	tests := []struct {
 		name          string

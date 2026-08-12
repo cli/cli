@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"net/http"
+	"path/filepath"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -23,6 +24,9 @@ import (
 func TestNewCmdDevelop(t *testing.T) {
 	// Test shared parsing of issue number / URL.
 	argparsetest.TestArgParsing(t, NewCmdDevelop)
+
+	absWorktree, err := filepath.Abs("work trees/issue-1")
+	require.NoError(t, err)
 
 	tests := []struct {
 		name             string
@@ -56,6 +60,15 @@ func TestNewCmdDevelop(t *testing.T) {
 			output: DevelopOptions{
 				IssueNumber: 1,
 				Checkout:    true,
+			},
+		},
+		{
+			name:  "worktree flag",
+			input: `1 --checkout --worktree "work trees/issue-1"`,
+			output: DevelopOptions{
+				IssueNumber: 1,
+				Checkout:    true,
+				Worktree:    absWorktree,
 			},
 		},
 		{
@@ -106,6 +119,24 @@ func TestNewCmdDevelop(t *testing.T) {
 			wantErr: true,
 			errMsg:  "specify only one of `--list` or `--name`",
 		},
+		{
+			name:    "blank worktree flag",
+			input:   `1 --checkout --worktree ""`,
+			wantErr: true,
+			errMsg:  "--worktree cannot be blank",
+		},
+		{
+			name:    "worktree without checkout",
+			input:   "1 --worktree worktree",
+			wantErr: true,
+			errMsg:  "--worktree requires --checkout",
+		},
+		{
+			name:    "list and worktree flags",
+			input:   "1 --list --worktree worktree",
+			wantErr: true,
+			errMsg:  "specify only one of `--list` or `--worktree`",
+		},
 	}
 
 	for _, tt := range tests {
@@ -138,6 +169,7 @@ func TestNewCmdDevelop(t *testing.T) {
 			assert.Equal(t, tt.output.BaseBranch, gotOpts.BaseBranch)
 			assert.Equal(t, tt.output.Checkout, gotOpts.Checkout)
 			assert.Equal(t, tt.output.List, gotOpts.List)
+			assert.Equal(t, tt.output.Worktree, gotOpts.Worktree)
 			assert.Equal(t, tt.wantStdout, stdOut.String())
 			assert.Equal(t, tt.wantStderr, stdErr.String())
 			if tt.expectedBaseRepo != nil {
@@ -763,6 +795,86 @@ func TestDevelopRun(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedOut, stdout.String())
 				assert.Equal(t, tt.expectedErrOut, stderr.String())
+			}
+		})
+	}
+}
+
+func TestCheckoutBranchWorktree(t *testing.T) {
+	tests := []struct {
+		name       string
+		branchRepo ghrepo.Interface
+		remotes    context.Remotes
+		worktree   string
+		runStubs   func(*run.CommandStubber)
+		wantErr    bool
+	}{
+		{
+			name:       "existing local branch",
+			branchRepo: ghrepo.New("OWNER", "REPO"),
+			remotes: context.Remotes{
+				{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.New("OWNER", "REPO")},
+			},
+			worktree: "/path/to/work tree",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
+				cs.Register(`git worktree add -- /path/to/work tree my-branch`, 0, "")
+				cs.Register(`git -C /path/to/work tree pull --ff-only origin my-branch`, 0, "")
+			},
+		},
+		{
+			name:       "new branch from cross-repository remote",
+			branchRepo: ghrepo.New("BRANCH-OWNER", "BRANCH-REPO"),
+			remotes: context.Remotes{
+				{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.New("OWNER", "REPO")},
+				{Remote: &git.Remote{Name: "fork"}, Repo: ghrepo.New("BRANCH-OWNER", "BRANCH-REPO")},
+			},
+			worktree: "/path/to/worktree",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch fork \+refs/heads/my-branch:refs/remotes/fork/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
+				cs.Register(`git worktree add --track -b my-branch -- /path/to/worktree fork/my-branch`, 0, "")
+			},
+		},
+		{
+			name:       "worktree add error",
+			branchRepo: ghrepo.New("OWNER", "REPO"),
+			remotes: context.Remotes{
+				{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.New("OWNER", "REPO")},
+			},
+			worktree: "/occupied/path",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
+				cs.Register(`git worktree add -- /occupied/path my-branch`, 1, "")
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			opts := &DevelopOptions{
+				Checkout:  true,
+				Worktree:  tt.worktree,
+				GitClient: &git.Client{GhPath: "some/path/gh", GitPath: "some/path/git"},
+				IO:        ios,
+				Remotes: func() (context.Remotes, error) {
+					return tt.remotes, nil
+				},
+			}
+
+			cmdStubs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+			tt.runStubs(cmdStubs)
+
+			err := checkoutBranch(opts, tt.branchRepo, "my-branch")
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
