@@ -11,6 +11,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSearcherCode(t *testing.T) {
@@ -1271,10 +1272,10 @@ func TestSearcherIssuesSemanticSearch(t *testing.T) {
 			}
 
 			query := Query{
-				Kind:       KindIssues,
-				Limit:      30,
-				Keywords:   []string{"keyword"},
-				SearchType: tt.searchType,
+				Kind:            KindIssues,
+				Limit:           30,
+				Keywords:        []string{"keyword"},
+				IssueSearchType: tt.searchType,
 			}
 
 			client := &http.Client{Transport: reg}
@@ -1282,9 +1283,9 @@ func TestSearcherIssuesSemanticSearch(t *testing.T) {
 
 			_, err := searcher.Issues(query)
 			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
+				require.EqualError(t, err, tt.wantErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -1311,17 +1312,17 @@ func TestSearcherIssuesSemanticSearchIsBoundedToSinglePage(t *testing.T) {
 	)
 
 	query := Query{
-		Kind:       KindIssues,
-		Limit:      100,
-		Keywords:   []string{"keyword"},
-		SearchType: "semantic",
+		Kind:            KindIssues,
+		Limit:           100,
+		Keywords:        []string{"keyword"},
+		IssueSearchType: "semantic",
 	}
 
 	client := &http.Client{Transport: reg}
 	searcher := NewSearcher(client, "github.com", fd.SemanticSearchSupported())
 
 	result, err := searcher.Issues(query)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(result.Items))
 }
 

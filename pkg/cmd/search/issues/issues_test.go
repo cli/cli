@@ -166,11 +166,11 @@ func TestNewCmdIssues(t *testing.T) {
 			input: "test --search-type semantic",
 			output: shared.IssuesOptions{
 				Query: search.Query{
-					Keywords:   []string{"test"},
-					Kind:       "issues",
-					Limit:      30,
-					SearchType: "semantic",
-					Qualifiers: search.Qualifiers{Type: "issue"},
+					Keywords:        []string{"test"},
+					Kind:            "issues",
+					Limit:           30,
+					IssueSearchType: "semantic",
+					Qualifiers:      search.Qualifiers{Type: "issue"},
 				},
 			},
 		},
@@ -179,11 +179,11 @@ func TestNewCmdIssues(t *testing.T) {
 			input: "test --search-type hybrid",
 			output: shared.IssuesOptions{
 				Query: search.Query{
-					Keywords:   []string{"test"},
-					Kind:       "issues",
-					Limit:      30,
-					SearchType: "hybrid",
-					Qualifiers: search.Qualifiers{Type: "issue"},
+					Keywords:        []string{"test"},
+					Kind:            "issues",
+					Limit:           30,
+					IssueSearchType: "hybrid",
+					Qualifiers:      search.Qualifiers{Type: "issue"},
 				},
 			},
 		},

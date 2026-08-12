@@ -164,7 +164,7 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 
 	// Semantic and hybrid searches use a separate, smaller rate-limit bucket and
 	// are relevance-ranked, so bound fetching to a single page.
-	singlePage := query.SearchType == "semantic" || query.SearchType == "hybrid"
+	singlePage := query.IssueSearchType == "semantic" || query.IssueSearchType == "hybrid"
 
 	numItemsToRetrieve := query.Limit
 	query.Limit = min(numItemsToRetrieve, maxPerPage)
@@ -235,17 +235,19 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 			}
 		}
 
-		switch query.SearchType {
+		switch query.IssueSearchType {
 		case "semantic":
+			// TODO semanticSearchCleanup
 			if !features.SemanticSearch {
 				return "", fmt.Errorf("semantic search is not supported on this host: %s", s.host)
 			}
-			qs.Set("search_type", query.SearchType)
+			u.SetQuery("search_type", query.IssueSearchType)
 		case "hybrid":
+			// TODO semanticSearchCleanup
 			if !features.HybridSearch {
 				return "", fmt.Errorf("hybrid search is not supported on this host: %s", s.host)
 			}
-			qs.Set("search_type", query.SearchType)
+			u.SetQuery("search_type", query.IssueSearchType)
 		}
 	} else {
 		u.SetQuery("q", query.StandardSearchString())
