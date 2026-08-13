@@ -173,6 +173,8 @@ if features.SomeCapability {
 
 Use feature detection only when an API is not GA on all supported GHES versions; skip it for long-established APIs.
 
+Note that a cleanup comment is only needed when a feature will eventually be available on all GitHub API server (i.e. `github.com`, GHEC, and GHES). Those that are not going to be supported on GHES should not have a cleanup comment.
+
 ## API Patterns
 
 ```go
