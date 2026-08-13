@@ -160,7 +160,7 @@ Use `cmdutil.MutuallyExclusive("message", cond1, cond2)` for mutually exclusive 
 
 ## Feature Detection
 
-Commands using feature detection must include a `// TODO <cleanupIdentifier>` comment directly above the if-statement for linter compliance:
+Commands using feature detection for a temporary gate (one that will eventually be available on all GitHub API servers, i.e. `github.com`, GHEC, and GHES) must include a `// TODO <cleanupIdentifier>` comment directly above the if-statement for linter compliance:
 
 ```go
 // TODO someFeatureCleanup
@@ -173,7 +173,7 @@ if features.SomeCapability {
 
 Use feature detection only when an API is not GA on all supported GHES versions; skip it for long-established APIs.
 
-Note that a cleanup comment is only needed when a feature will eventually be available on all GitHub API server (i.e. `github.com`, GHEC, and GHES). Those that are not going to be supported on GHES should not have a cleanup comment.
+A cleanup comment is not needed when the gate is permanent, i.e. the feature is not going to be supported on GHES.
 
 ## API Patterns
 
