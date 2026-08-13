@@ -237,13 +237,11 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 
 		switch query.IssueSearchType {
 		case "semantic":
-			// TODO semanticSearchCleanup
 			if !features.SemanticSearch {
 				return "", fmt.Errorf("semantic search is not supported on this host: %s", s.host)
 			}
 			u.SetQuery("search_type", query.IssueSearchType)
 		case "hybrid":
-			// TODO semanticSearchCleanup
 			if !features.HybridSearch {
 				return "", fmt.Errorf("hybrid search is not supported on this host: %s", s.host)
 			}
