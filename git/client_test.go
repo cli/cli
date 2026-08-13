@@ -1466,9 +1466,9 @@ func TestClientAddWorktree(t *testing.T) {
 			err := client.AddWorktree(context.Background(), tt.path, "trunk", tt.remoteName)
 			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
 			if tt.wantErrorMsg == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tt.wantErrorMsg)
+				require.EqualError(t, err, tt.wantErrorMsg)
 			}
 		})
 	}
