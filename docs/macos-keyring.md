@@ -20,7 +20,7 @@ Access to keyring items is protected via an ACL (Access Control List). When an a
 
 Since the binary accessing the `gh` keyring items is `/usr/bin/security`, calling `security` directly from a terminal can also access the stored `gh` tokens for a given host and user.
 
-Historically, this has not been a significant concern with downsides to the alternatives (see below), primarily because `gh` offers direct access to the token via `gh auth token`. There is an argument to be made that `gh` should be less _surprising_ in this behaviour, and with the rise in agentic development, this probably has more merit.
+Historically, this has not been a significant concern with downsides to the alternatives (see below), primarily because `gh` offers direct access to the token via `gh auth token`. Treat the output of `gh auth token` as a secret: do not paste it into issue reports, shell transcripts, or chat messages. There is an argument to be made that `gh` should be less _surprising_ in this behaviour, and with the rise in agentic development, this probably has more merit.
 
 ### Consequences of using Apple native APIs
 
