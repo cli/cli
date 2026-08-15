@@ -115,6 +115,14 @@ func TestInstallDir(t *testing.T) {
 			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
 		},
 		{
+			name:    "codex user scope",
+			hostID:  "codex",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".agents", "skills"),
+		},
+		{
 			name:    "gemini project scope",
 			hostID:  "gemini-cli",
 			scope:   ScopeProject,
