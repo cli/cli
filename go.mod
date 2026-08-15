@@ -7,6 +7,7 @@ toolchain go1.27.3
 require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.0
+	charm.land/glamour/v2 v2.0.2-0.20261015065741-010543cac1a0
 	charm.land/huh/v2 v2.0.3
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -16,10 +17,8 @@ require (
 	github.com/briandowns/spinner v1.23.2
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cenkalti/backoff/v5 v5.0.3
-	github.com/charmbracelet/glamour v0.10.0
-	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/charmbracelet/x/ansi v0.11.9
-	github.com/cli/go-gh/v2 v2.16.2
+	github.com/cli/go-gh/v2 v2.17.0
 	github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24
 	github.com/cli/oauth v1.2.2
 	github.com/cli/safeexec v1.0.1
@@ -81,7 +80,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4 // indirect
-	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
 	github.com/charmbracelet/x/exp/ordered v0.1.0 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250630141444-821143405392 // indirect
 	github.com/charmbracelet/x/exp/strings v0.0.0-20250630141444-821143405392 // indirect
@@ -165,7 +163,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
-	github.com/thlib/go-timezone-local v0.0.8 // indirect
+	github.com/thlib/go-timezone-local v0.0.9 // indirect
 	github.com/transparency-dev/formats v0.1.1 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
