@@ -39,8 +39,8 @@ View README.md
 Bash: Check git status to understand current state
 $ cd /home/runner/work/foo/foo && git --no-pager status                   
     On branch copilot/fix-5b1c2fcb-9248-492c-84fa-04a3e0304d25                
-    Your branch is up to date with 'origin/copilot/fix-5b1c2fcb-9248-492c-84fa-
-  04a3e0304d25'.                                                              
+    Your branch is up to date with 'origin/copilot/fix-5b1c2fcb-9248-492c-    
+  84fa-04a3e0304d25'.                                                         
                                                                               
     nothing to commit, working tree clean                                     
     <exited with exit code 0>
@@ -239,8 +239,8 @@ Perfect! Let me also check the file contents and verify the current status:
 Bash: Check git status to see the new file
 $ cd /home/runner/work/foo/foo && git --no-pager status                   
     On branch copilot/fix-5b1c2fcb-9248-492c-84fa-04a3e0304d25                
-    Your branch is up to date with 'origin/copilot/fix-5b1c2fcb-9248-492c-84fa-
-  04a3e0304d25'.                                                              
+    Your branch is up to date with 'origin/copilot/fix-5b1c2fcb-9248-492c-    
+  84fa-04a3e0304d25'.                                                         
                                                                               
     Untracked files:                                                          
       (use "git add <file>..." to include in what will be committed)          
@@ -332,8 +332,7 @@ Great! The security check came back clean with no vulnerabilities detected.
   ### ✅ **Task Completed Successfully**                                      
                                                                               
   **Created**: sample-data.yaml - A comprehensive YAML file with diverse      
-  random                                                                      
-  fields                                                                      
+  random fields                                                               
                                                                               
   ### 📋 **What the YAML file contains:**                                     
                                                                               
