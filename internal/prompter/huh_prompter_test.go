@@ -2,6 +2,7 @@ package prompter
 
 import (
 	"io"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -32,7 +33,7 @@ func newInteraction(steps ...interactionStep) interaction {
 	return interaction{steps: steps}
 }
 
-func (ix interaction) run(t *testing.T, w *io.PipeWriter) {
+func (ix interaction) run(t *testing.T, w io.Writer) {
 	t.Helper()
 	for _, s := range ix.steps {
 		if s.waitFn != nil {
@@ -152,10 +153,15 @@ func newTestHuhPrompter() *huhPrompter {
 }
 
 // runForm runs a huh form with the given interaction, returning any error.
-// The form runs in a goroutine using bubbletea's real event loop via io.Pipe.
+// The form runs in a goroutine using bubbletea's real event loop via os.Pipe.
 func runForm(t *testing.T, f *huh.Form, ix interaction) {
 	t.Helper()
-	r, w := io.Pipe()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, r.Close())
+		require.NoError(t, w.Close())
+	})
 	f.WithInput(r).WithOutput(io.Discard).WithWidth(80)
 
 	errCh := make(chan error, 1)

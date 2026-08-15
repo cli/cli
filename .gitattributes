@@ -1,3 +1,5 @@
 .github/actions/*/lib/* linguist-generated
 
 .github/workflows/*.lock.yml linguist-generated=true merge=ours
+
+*.go text eol=lf

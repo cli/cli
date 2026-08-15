@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -16,6 +17,7 @@ import (
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_printError(t *testing.T) {
@@ -85,6 +87,18 @@ check your internet connection or https://githubstatus.com
 }
 
 func Test_newIOStreams_pager(t *testing.T) {
+	for _, key := range []string{"GH_PAGER", "PAGER"} {
+		value, exists := os.LookupEnv(key)
+		require.NoError(t, os.Unsetenv(key))
+		t.Cleanup(func() {
+			if exists {
+				require.NoError(t, os.Setenv(key, value))
+			} else {
+				require.NoError(t, os.Unsetenv(key))
+			}
+		})
+	}
+
 	tests := []struct {
 		name      string
 		env       map[string]string

@@ -19,7 +19,7 @@ func configureStoreCredentialHelper(t *testing.T) {
 
 	gc := &git.Client{}
 	// Use `--file` to store credentials in a temporary file that gets cleaned up when the test has finished running
-	cmd, err := gc.Command(context.Background(), "config", "--global", "--add", "credential.helper", fmt.Sprintf("store --file %s", tmpCredentialsFile))
+	cmd, err := gc.Command(context.Background(), "config", "--global", "--add", "credential.helper", fmt.Sprintf("store --file %q", filepath.ToSlash(tmpCredentialsFile)))
 	require.NoError(t, err)
 	require.NoError(t, cmd.Run())
 }
