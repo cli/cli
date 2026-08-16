@@ -2,8 +2,10 @@ package list
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -213,6 +215,51 @@ func TestSearchIssuesAndAdvancedSearch(t *testing.T) {
 			searchIssues(client, tt.detector, ghrepo.New("OWNER", "REPO"), prShared.FilterOptions{State: "open"}, 30)
 		})
 	}
+}
+
+func TestSearchIssues_pagination(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	makeNodes := func(n int) string {
+		nodes := make([]string, n)
+		for i := range nodes {
+			nodes[i] = `{"title": "issue"}`
+		}
+		return "[" + strings.Join(nodes, ",") + "]"
+	}
+
+	var firstLimit, secondLimit float64
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.GraphQLQuery(
+			fmt.Sprintf(`{"data":{"repository":{"hasIssuesEnabled":true},"search":{"issueCount":150,"nodes":%s,"pageInfo":{"hasNextPage":true,"endCursor":"ENDCURSOR"}}}}`, makeNodes(100)),
+			func(_ string, vars map[string]interface{}) {
+				firstLimit = vars["limit"].(float64)
+			},
+		),
+	)
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.GraphQLQuery(
+			fmt.Sprintf(`{"data":{"repository":{"hasIssuesEnabled":true},"search":{"issueCount":150,"nodes":%s,"pageInfo":{"hasNextPage":false,"endCursor":""}}}}`, makeNodes(50)),
+			func(_ string, vars map[string]interface{}) {
+				secondLimit = vars["limit"].(float64)
+			},
+		),
+	)
+
+	httpClient := &http.Client{Transport: reg}
+	client := api.NewClientFromHTTP(httpClient)
+
+	res, err := searchIssues(client, fd.AdvancedIssueSearchSupportedAsOnlyBackend(), ghrepo.New("OWNER", "REPO"), prShared.FilterOptions{State: "open"}, 150)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assert.Equal(t, 150, len(res.Issues))
+	assert.Equal(t, float64(100), firstLimit, "first page should request the full page size")
+	assert.Equal(t, float64(50), secondLimit, "second page should only request the remaining count, not another full page")
 }
 
 func TestSearchIssues_rejectsPullRequestQualifiers(t *testing.T) {
