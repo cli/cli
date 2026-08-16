@@ -338,6 +338,7 @@ func TestCloseRun(t *testing.T) {
 			name: "issue already closed",
 			opts: &CloseOptions{
 				IssueNumber: 13,
+				Comment:     "closing comment",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -347,6 +348,16 @@ func TestCloseRun(t *testing.T) {
               "hasIssuesEnabled": true,
               "issue": { "number": 13, "title": "The title of the issue", "state": "CLOSED"}
             } } }`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CommentCreate\b`),
+					httpmock.GraphQLMutation(`
+            { "data": { "addComment": { "commentEdge": { "node": {
+              "url": "https://github.com/OWNER/REPO/issues/13#issuecomment-456"
+            } } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "closing comment", inputs["body"])
+						}),
 				)
 			},
 			wantStderr: "! Issue OWNER/REPO#13 (The title of the issue) is already closed\n",
