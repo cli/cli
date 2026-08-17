@@ -93,7 +93,11 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		}
 		activeStr := fmt.Sprintf("%v", e.Active)
 		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
-		sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.TokenSource))
+		if e.Error != "" {
+			sb.WriteString(fmt.Sprintf("  - %s\n", e.Error))
+		} else {
+			sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.TokenSource))
+		}
 		if authTokenWriteable(e.TokenSource) {
 			loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
 			if shared.AuthTokenRefreshable(e.Token, e.TokenSource) {
@@ -382,6 +386,16 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 		TokenSource: tokenSource,
 		Token:       opts.token,
 		GitProtocol: opts.gitProtocol,
+	}
+
+	// If the token is empty, the keyring is inaccessible (e.g. macOS system daemon
+	// without a graphical session). Report the keyring error instead of making an
+	// API call that would produce a misleading "invalid token" message.
+	if opts.token == "" {
+		entry.State = authEntryStateError
+		entry.Error = "The auth token could not be read from the keyring; " +
+			"try setting the GH_TOKEN environment variable or re-authenticating with --insecure-storage"
+		return entry
 	}
 
 	// If token is not writeable, then it came from an environment variable and
