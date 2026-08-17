@@ -78,7 +78,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 	}
 
-	err = deleteSSHKey(httpClient, host, opts.KeyID)
+	err = deleteSSHKey(httpClient, host, opts.KeyID, key.IsSigningKey)
 	if err != nil {
 		return err
 	}
