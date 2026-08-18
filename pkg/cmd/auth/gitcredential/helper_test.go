@@ -105,6 +105,74 @@ func Test_helperRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
+			name: "gist prefix with tenancy host should match",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                       "/Users/monalisa/.config/gh/hosts.yml",
+						"mytenant.ghe.com:user":        "monalisa",
+						"mytenant.ghe.com:oauth_token": "TENANT_TOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=gist.mytenant.ghe.com
+				username=monalisa
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=gist.mytenant.ghe.com
+				username=monalisa
+				password=TENANT_TOKEN
+			`),
+			wantStderr: "",
+		},
+		{
+			name: "gist prefix with non-GitHub host should not match",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                  "/Users/monalisa/.config/gh/hosts.yml",
+						"evil.com:user":            "monalisa",
+						"evil.com:oauth_token":     "EVIL_TOKEN",
+						"github.com:user":          "monalisa",
+						"github.com:oauth_token":   "GITHUB_TOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=gist.evil.com
+			`),
+			wantErr:    true,
+			wantStdout: "",
+			wantStderr: "",
+		},
+		{
+			name: "gist prefix with custom corp host should not match",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                    "/Users/monalisa/.config/gh/hosts.yml",
+						"mycorp.com:user":            "monalisa",
+						"mycorp.com:oauth_token":     "CORP_TOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=gist.mycorp.com
+			`),
+			wantErr:    true,
+			wantStdout: "",
+			wantStderr: "",
+		},
+		{
 			name: "url input",
 			opts: CredentialOptions{
 				Operation: "get",

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -113,9 +114,28 @@ func helperRun(opts *CredentialOptions) error {
 	lookupHost := wants["host"]
 	var gotUser string
 	gotToken, source := cfg.ActiveToken(lookupHost)
-	if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
-		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-		gotToken, source = cfg.ActiveToken(lookupHost)
+	if gotToken == "" {
+		// Check if the lookup host is the gist subdomain for the default
+		// GitHub host (gist.github.com) or a tenancy host (gist.<tenant>.ghe.com).
+		// For GHES and other instances, gist uses path-based routing
+		// (e.g. ghes.example.com/gist/) so the credential host is the base host.
+		//
+		// Previously this used strings.HasPrefix(lookupHost, "gist.") without
+		// host validation, which incorrectly matched any host starting with
+		// "gist." (e.g. gist.evil.com), potentially returning credentials for
+		// a different host.
+		defaultHost := ghinstance.Default()
+		gistHost := strings.TrimSuffix(ghinstance.GistHost(defaultHost), "/")
+		if strings.EqualFold(lookupHost, gistHost) {
+			lookupHost = defaultHost
+			gotToken, source = cfg.ActiveToken(lookupHost)
+		} else if strings.HasPrefix(lookupHost, "gist.") {
+			baseHost := strings.TrimPrefix(lookupHost, "gist.")
+			if _, isTenancy := ghinstance.TenantName(baseHost); isTenancy {
+				lookupHost = baseHost
+				gotToken, source = cfg.ActiveToken(lookupHost)
+			}
+		}
 	}
 
 	if strings.HasSuffix(source, "_TOKEN") {
