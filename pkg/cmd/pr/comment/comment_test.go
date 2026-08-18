@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -26,13 +29,22 @@ func TestNewCmdComment(t *testing.T) {
 	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
+	tmpImage := filepath.Join(t.TempDir(), "login.png")
+	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
+
 	tests := []struct {
-		name     string
-		input    string
-		stdin    string
-		output   shared.CommentableOptions
-		wantsErr bool
-		isTTY    bool
+		name             string
+		input            string
+		stdin            string
+		output           shared.CommentableOptions
+		wantsErr         bool
+		wantsErrContains string
+		isTTY            bool
+
+		// Which fields the lookup asks for is decided at construction, so it
+		// can only be proved here.
+		queryWants string
+		queryOmits string
 	}{
 		{
 			name:  "no arguments",
@@ -89,9 +101,10 @@ func TestNewCmdComment(t *testing.T) {
 			name:  "body flag",
 			input: "1 --body test",
 			output: shared.CommentableOptions{
-				Interactive: false,
-				InputType:   shared.InputTypeInline,
-				Body:        "test",
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "test",
+				BodyProvided: true,
 			},
 			isTTY:    true,
 			wantsErr: false,
@@ -101,9 +114,10 @@ func TestNewCmdComment(t *testing.T) {
 			input: "1 --body-file -",
 			stdin: "this is on standard input",
 			output: shared.CommentableOptions{
-				Interactive: false,
-				InputType:   shared.InputTypeInline,
-				Body:        "this is on standard input",
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "this is on standard input",
+				BodyProvided: true,
 			},
 			isTTY:    true,
 			wantsErr: false,
@@ -112,9 +126,10 @@ func TestNewCmdComment(t *testing.T) {
 			name:  "body from file",
 			input: fmt.Sprintf("1 --body-file '%s'", tmpFile),
 			output: shared.CommentableOptions{
-				Interactive: false,
-				InputType:   shared.InputTypeInline,
-				Body:        "a body from file",
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "a body from file",
+				BodyProvided: true,
 			},
 			isTTY:    true,
 			wantsErr: false,
@@ -269,6 +284,99 @@ func TestNewCmdComment(t *testing.T) {
 			isTTY:    true,
 			wantsErr: true,
 		},
+		{
+			name:  "--attach alone is enough of a body to post without prompting",
+			input: fmt.Sprintf("1 --attach '%s'", tmpImage),
+			output: shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "",
+			},
+			isTTY:    false,
+			wantsErr: false,
+		},
+		{
+			name:  "--attach with --body keeps the body and records that one was given",
+			input: fmt.Sprintf("1 --body test --attach '%s'", tmpImage),
+			output: shared.CommentableOptions{
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "test",
+				BodyProvided: true,
+			},
+			isTTY:    true,
+			wantsErr: false,
+		},
+		{
+			name:  "--attach with --edit-last is accepted and needs no body",
+			input: fmt.Sprintf("1 --edit-last --attach '%s'", tmpImage),
+			output: shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "",
+			},
+			isTTY:    true,
+			wantsErr: false,
+		},
+		{
+			// KeepExistingBody is set either way. BodyProvided is what decides
+			// that this one replaces the comment rather than keeping it.
+			name:  "--attach with --edit-last and --body records the body that replaces the comment",
+			input: fmt.Sprintf("1 --edit-last --body 'a new body' --attach '%s'", tmpImage),
+			output: shared.CommentableOptions{
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "a new body",
+				BodyProvided: true,
+			},
+			isTTY:    true,
+			wantsErr: false,
+		},
+		{
+			name:             "--attach is rejected with --web",
+			input:            fmt.Sprintf("1 --web --attach '%s'", tmpImage),
+			isTTY:            true,
+			wantsErr:         true,
+			wantsErrContains: "`--attach` is not supported when using `--web`",
+		},
+		{
+			name:             "--attach is rejected with --delete-last",
+			input:            fmt.Sprintf("1 --delete-last --attach '%s'", tmpImage),
+			isTTY:            true,
+			wantsErr:         true,
+			wantsErrContains: "`--attach` is not supported when using `--delete-last`",
+		},
+		{
+			// Only the prefix, since the rest comes from the operating system.
+			name:             "--attach rejects a missing file",
+			input:            "1 --attach ./nope.png",
+			isTTY:            true,
+			wantsErr:         true,
+			wantsErrContains: "./nope.png: ",
+		},
+		{
+			name:  "--attach asks the pull request lookup for the repository id",
+			input: fmt.Sprintf("1 --attach '%s'", tmpImage),
+			output: shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "",
+			},
+			isTTY:      true,
+			queryWants: "databaseId",
+		},
+		{
+			name:  "the pull request lookup does not ask for the repository id without --attach",
+			input: "1 --body test",
+			output: shared.CommentableOptions{
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "test",
+				BodyProvided: true,
+			},
+			isTTY:      true,
+			queryOmits: "databaseId",
+		},
 	}
 
 	for _, tt := range tests {
@@ -283,9 +391,39 @@ func TestNewCmdComment(t *testing.T) {
 				_, _ = stdin.WriteString(tt.stdin)
 			}
 
+			checksQuery := tt.queryWants != "" || tt.queryOmits != ""
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			var lookupQuery string
+			if checksQuery {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestByNumber\b`),
+					func(req *http.Request) (*http.Response, error) {
+						body, err := io.ReadAll(req.Body)
+						require.NoError(t, err)
+						lookupQuery = string(body)
+						return httpmock.StringResponse(`{"data":{"repository":{"pullRequest":{
+							"id": "PR_id",
+							"number": 1,
+							"url": "https://github.com/OWNER/REPO/pull/1",
+							"repository": {
+								"id": "R_kgDOAA",
+								"name": "REPO",
+								"nameWithOwner": "OWNER/REPO",
+								"databaseId": 42
+							}
+						}}}}`)(req)
+					},
+				)
+			}
+
 			f := &cmdutil.Factory{
-				IOStreams: ios,
-				Browser:   &browser.Stub{},
+				IOStreams:  ios,
+				Browser:    &browser.Stub{},
+				HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+				BaseRepo:   func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil },
+				Config:     testConfig(),
 			}
 
 			argv, err := shlex.Split(tt.input)
@@ -306,6 +444,9 @@ func TestNewCmdComment(t *testing.T) {
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				assert.Error(t, err)
+				if tt.wantsErrContains != "" {
+					assert.ErrorContains(t, err, tt.wantsErrContains)
+				}
 				return
 			}
 
@@ -315,11 +456,33 @@ func TestNewCmdComment(t *testing.T) {
 			assert.Equal(t, tt.output.Body, gotOpts.Body)
 			assert.Equal(t, tt.output.DeleteLast, gotOpts.DeleteLast)
 			assert.Equal(t, tt.output.DeleteLastConfirmed, gotOpts.DeleteLastConfirmed)
+			assert.Equal(t, tt.output.BodyProvided, gotOpts.BodyProvided)
+
+			assert.NotNil(t, gotOpts.Config)
+			// Asserted here rather than per row, because no input changes it.
+			assert.True(t, gotOpts.KeepExistingBody)
+
+			if checksQuery {
+				_, _, err := gotOpts.RetrieveCommentable()
+				require.NoError(t, err)
+				if tt.queryWants != "" {
+					assert.Contains(t, lookupQuery, tt.queryWants)
+				}
+				if tt.queryOmits != "" {
+					assert.NotContains(t, lookupQuery, tt.queryOmits)
+				}
+			}
 		})
 	}
 }
 
 func Test_commentRun(t *testing.T) {
+	dir := t.TempDir()
+	shot := filepath.Join(dir, "shot.png")
+	require.NoError(t, os.WriteFile(shot, []byte("shot bytes"), 0600))
+	clip := filepath.Join(dir, "clip.mp4")
+	require.NoError(t, os.WriteFile(clip, []byte("clip bytes"), 0600))
+
 	tests := []struct {
 		name          string
 		input         *shared.CommentableOptions
@@ -329,6 +492,7 @@ func Test_commentRun(t *testing.T) {
 		stdout        string
 		stderr        string
 		wantsErr      bool
+		wantsErrMsg   string
 	}{
 		{
 			name: "creating new comment with interactive editor succeeds",
@@ -341,7 +505,7 @@ func Test_commentRun(t *testing.T) {
 				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentCreate(t, reg)
+				mockCommentCreate(t, reg, "comment body")
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
@@ -373,7 +537,7 @@ func Test_commentRun(t *testing.T) {
 				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentUpdate(t, reg)
+				mockCommentUpdate(t, reg, "comment body")
 			},
 			emptyComments: false,
 			stdout:        "https://github.com/OWNER/REPO/pull/123#issuecomment-111\n",
@@ -392,7 +556,7 @@ func Test_commentRun(t *testing.T) {
 				ConfirmSubmitSurvey:       func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentCreate(t, reg)
+				mockCommentCreate(t, reg, "comment body")
 			},
 			emptyComments: true,
 			stderr:        "No comments found. Creating a new comment.\n",
@@ -448,7 +612,7 @@ func Test_commentRun(t *testing.T) {
 				EditSurvey: func(string) (string, error) { return "comment body", nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentCreate(t, reg)
+				mockCommentCreate(t, reg, "comment body")
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
@@ -477,7 +641,7 @@ func Test_commentRun(t *testing.T) {
 				EditSurvey: func(string) (string, error) { return "comment body", nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentUpdate(t, reg)
+				mockCommentUpdate(t, reg, "comment body")
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-111\n",
 		},
@@ -494,7 +658,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentCreate(t, reg)
+				mockCommentCreate(t, reg, "comment body")
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
@@ -506,7 +670,7 @@ func Test_commentRun(t *testing.T) {
 				Body:        "comment body",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentCreate(t, reg)
+				mockCommentCreate(t, reg, "comment body")
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
@@ -519,7 +683,7 @@ func Test_commentRun(t *testing.T) {
 				EditLast:    true,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentUpdate(t, reg)
+				mockCommentUpdate(t, reg, "comment body")
 			},
 			emptyComments: false,
 			stdout:        "https://github.com/OWNER/REPO/pull/123#issuecomment-111\n",
@@ -535,7 +699,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentCreate(t, reg)
+				mockCommentCreate(t, reg, "comment body")
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
@@ -659,6 +823,9 @@ func Test_commentRun(t *testing.T) {
 
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
+		// An attach run must never look the repository id up on its own.
+		// Excluding the query fails loudly if one is ever reintroduced.
+		reg.Exclude(t, httpmock.GraphQL(`query MapRepositoryNames\b`))
 		if tt.httpStubs != nil {
 			tt.httpStubs(t, reg)
 		}
@@ -690,6 +857,9 @@ func Test_commentRun(t *testing.T) {
 			err := shared.CommentableRun(tt.input)
 			if tt.wantsErr {
 				assert.Error(t, err)
+				if tt.wantsErrMsg != "" {
+					assert.EqualError(t, err, tt.wantsErrMsg)
+				}
 				assert.Equal(t, tt.stderr, stderr.String())
 				return
 			}
@@ -700,7 +870,12 @@ func Test_commentRun(t *testing.T) {
 	}
 }
 
-func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {
+func testConfig() func() (gh.Config, error) {
+	cfg := config.NewMockConfigFromString("hosts:\n  github.com:\n    oauth_token: gho_a_token_that_can_upload\n")
+	return func() (gh.Config, error) { return cfg, nil }
+}
+
+func mockCommentCreate(t *testing.T, reg *httpmock.Registry, wantBody string) {
 	reg.Register(
 		httpmock.GraphQL(`mutation CommentCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -708,12 +883,12 @@ func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {
 			"url": "https://github.com/OWNER/REPO/pull/123#issuecomment-456"
 		} } } } }`,
 			func(inputs map[string]interface{}) {
-				assert.Equal(t, "comment body", inputs["body"])
+				assert.Equal(t, wantBody, inputs["body"])
 			}),
 	)
 }
 
-func mockCommentUpdate(t *testing.T, reg *httpmock.Registry) {
+func mockCommentUpdate(t *testing.T, reg *httpmock.Registry, wantBody string) {
 	reg.Register(
 		httpmock.GraphQL(`mutation CommentUpdate\b`),
 		httpmock.GraphQLMutation(`
@@ -722,7 +897,7 @@ func mockCommentUpdate(t *testing.T, reg *httpmock.Registry) {
 		} } } }`,
 			func(inputs map[string]interface{}) {
 				assert.Equal(t, "id1", inputs["id"])
-				assert.Equal(t, "comment body", inputs["body"])
+				assert.Equal(t, wantBody, inputs["body"])
 			}),
 	)
 }
