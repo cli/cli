@@ -464,6 +464,26 @@ func TestPullRequest_ExportData(t *testing.T) {
 			`),
 		},
 		{
+			// The upload path needs a numeric id and a viewer permission,
+			// which this selection cannot provide. Sharing one Go type with
+			// that path once put both keys here, always zero. This row fails
+			// if that happens again.
+			name:   "head repository",
+			fields: []string{"headRepository"},
+			inputJSON: heredoc.Doc(`
+				{ "headRepository": {"id": "R_kgDOAAA", "name": "REPO", "nameWithOwner": "OWNER/REPO"} }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"headRepository": {
+						"id": "R_kgDOAAA",
+						"name": "REPO",
+						"nameWithOwner": "OWNER/REPO"
+					}
+				}
+			`),
+		},
+		{
 			name:   "status checks",
 			fields: []string{"statusCheckRollup"},
 			inputJSON: heredoc.Doc(`

@@ -29,6 +29,7 @@ const (
 // Repository contains information about a GitHub repo
 type Repository struct {
 	ID                       string
+	DatabaseID               int64
 	Name                     string
 	NameWithOwner            string
 	Owner                    RepositoryOwner
@@ -323,6 +324,7 @@ func IssueRepoInfo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query IssueRepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
 			id
+			databaseId
 			name
 			owner { login }
 			hasIssuesEnabled
@@ -360,6 +362,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	fragment repo on Repository {
 		id
+		databaseId
 		name
 		owner { login }
 		hasIssuesEnabled
@@ -498,6 +501,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 	err := client.GraphQL(hostname, fmt.Sprintf(`
 	fragment repo on Repository {
 		id
+		databaseId
 		name
 		owner { login }
 		viewerPermission

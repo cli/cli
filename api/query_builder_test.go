@@ -38,6 +38,20 @@ func TestPullRequestGraphQL(t *testing.T) {
 			fields: []string{"projectItems"},
 			want:   `projectItems(first:100){nodes{id, project{id,title}, status:fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},totalCount}`,
 		},
+		{
+			name:   "repository",
+			fields: []string{"repository"},
+			want:   "repository{id,name,nameWithOwner,databaseId,viewerPermission}",
+		},
+		{
+			// headRepository shares a Go type with the selection above, which
+			// carries two more fields. They are omitted from JSON when empty,
+			// so adding either name here would put them back into the output
+			// of `gh pr view --json headRepository`.
+			name:   "headRepository",
+			fields: []string{"headRepository"},
+			want:   "headRepository{id,name,nameWithOwner}",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -78,6 +92,11 @@ func TestIssueGraphQL(t *testing.T) {
 			name:   "projectItems",
 			fields: []string{"projectItems"},
 			want:   `projectItems(first:100){nodes{id, project{id,title}, status:fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},totalCount}`,
+		},
+		{
+			name:   "repository",
+			fields: []string{"repository"},
+			want:   "repository{id,name,nameWithOwner,databaseId,viewerPermission}",
 		},
 	}
 	for _, tt := range tests {
