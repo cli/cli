@@ -186,9 +186,10 @@ type CreateContext struct {
 	// of PRRefs, but a huge amount of refactoring was done to introduce that struct,
 	// and this is a small price to pay for the convenience of not having to do a lot
 	// more design.
-	BaseTrackingBranch string
-	Client             *api.Client
-	GitClient          *git.Client
+	BaseTrackingBranch           string
+	fallbackBaseTrackingBranches []string
+	Client                       *api.Client
+	GitClient                    *git.Client
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -643,9 +644,23 @@ func createRun(opts *CreateOptions) error {
 var regexPattern = regexp.MustCompile(`(?m)^`)
 
 func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool, addBody bool) error {
-	commits, err := ctx.GitClient.Commits(context.Background(), ctx.BaseTrackingBranch, ctx.PRRefs.UnqualifiedHeadRef())
-	if err != nil {
-		return err
+	var commits []*git.Commit
+	var firstErr error
+	var succeeded bool
+	baseTrackingBranches := append([]string{ctx.BaseTrackingBranch}, ctx.fallbackBaseTrackingBranches...)
+	for _, baseTrackingBranch := range baseTrackingBranches {
+		var err error
+		commits, err = ctx.GitClient.Commits(context.Background(), baseTrackingBranch, ctx.PRRefs.UnqualifiedHeadRef())
+		if err == nil {
+			succeeded = true
+			break
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	if !succeeded {
+		return firstErr
 	}
 
 	if len(commits) == 1 || useFirstCommit {
@@ -743,27 +758,66 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	// This closure provides an easy way to instantiate a CreateContext with everything other than
 	// the refs. This probably indicates that CreateContext could do with some rework, but the refactor
 	// to introduce PRRefs is already large enough.
-	var newCreateContext = func(refs creationRefs) *CreateContext {
-		baseTrackingBranch := refs.BaseRef()
+	var newCreateContext = func(refs creationRefs, baseTrackingBranches []string) *CreateContext {
+		return &CreateContext{
+			ResolvedRemotes:              resolvedRemotes,
+			Client:                       client,
+			GitClient:                    opts.GitClient,
+			PRRefs:                       refs,
+			BaseTrackingBranch:           baseTrackingBranches[0],
+			fallbackBaseTrackingBranches: baseTrackingBranches[1:],
+		}
+	}
 
-		// The baseTrackingBranch is used later for a command like:
-		// `git commit upstream/main feature` in order to create a PR message showing the commits
-		// between these two refs. I'm not really sure what is expected to happen if we don't have a remote,
-		// which seems like it would be possible with a command `gh pr create --repo owner/repo-that-is-not-a-remote`.
-		// In that case, we might just have a mess? In any case, this is what the old code did, so I don't want to change
-		// it as part of an already large refactor.
+	resolveBase := func(base string) (*api.Repository, string, []string, error) {
+		owner, branch, qualified := strings.Cut(base, ":")
+		if qualified {
+			if owner == "" || branch == "" || strings.Contains(branch, ":") {
+				return nil, "", nil, fmt.Errorf("invalid qualified base ref format %q", base)
+			}
+
+			var trackingBranches []string
+			var baseRemote *ghContext.Remote
+			for _, remote := range remotes {
+				if strings.EqualFold(remote.RepoOwner(), owner) &&
+					strings.EqualFold(remote.RepoHost(), baseRepo.RepoHost()) {
+					if baseRemote == nil {
+						baseRemote = remote
+					}
+					trackingBranches = append(trackingBranches, fmt.Sprintf("%s/%s", remote.Name, branch))
+				}
+			}
+			if len(trackingBranches) == 0 {
+				return nil, "", nil, fmt.Errorf("no git remote for base repository owner %q", owner)
+			}
+			resolvedBaseRepo := baseRepo
+			if !ghrepo.IsSame(baseRemote, baseRepo) {
+				resolvedBaseRepo, err = api.GitHubRepo(client, baseRemote)
+				if err != nil {
+					return nil, "", nil, err
+				}
+			}
+			return resolvedBaseRepo, branch, trackingBranches, nil
+		}
+		branch = base
+
+		trackingBranches := make([]string, 0, len(remotes))
 		baseRemote, _ := resolvedRemotes.RemoteForRepo(baseRepo)
 		if baseRemote != nil {
-			baseTrackingBranch = fmt.Sprintf("%s/%s", baseRemote.Name, baseTrackingBranch)
+			trackingBranches = append(trackingBranches, fmt.Sprintf("%s/%s", baseRemote.Name, branch))
 		}
-
-		return &CreateContext{
-			ResolvedRemotes:    resolvedRemotes,
-			Client:             client,
-			GitClient:          opts.GitClient,
-			PRRefs:             refs,
-			BaseTrackingBranch: baseTrackingBranch,
+		for _, remote := range remotes {
+			if remote == baseRemote ||
+				!strings.EqualFold(remote.RepoName(), baseRepo.RepoName()) ||
+				!strings.EqualFold(remote.RepoHost(), baseRepo.RepoHost()) {
+				continue
+			}
+			trackingBranches = append(trackingBranches, fmt.Sprintf("%s/%s", remote.Name, branch))
 		}
+		if len(trackingBranches) == 0 {
+			trackingBranches = append(trackingBranches, branch)
+		}
+		return baseRepo, branch, trackingBranches, nil
 	}
 
 	// If the user provided a head branch we're going to use that without any interrogation
@@ -793,6 +847,10 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		if baseBranch == "" {
 			baseBranch = baseRepo.DefaultBranchRef.Name
 		}
+		baseRepo, baseBranch, baseTrackingBranches, err := resolveBase(baseBranch)
+		if err != nil {
+			return nil, err
+		}
 
 		return newCreateContext(skipPushRefs{
 			qualifiedHeadRef: qualifiedHeadRef,
@@ -800,7 +858,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 				baseRepo:       baseRepo,
 				baseBranchName: baseBranch,
 			},
-		}), nil
+		}, baseTrackingBranches), nil
 	}
 
 	if ucc, err := opts.GitClient.UncommittedChangeCount(context.Background()); err == nil && ucc > 0 {
@@ -825,6 +883,10 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 	if baseBranch == "" {
 		baseBranch = baseRepo.DefaultBranchRef.Name
+	}
+	baseRepo, baseBranch, baseTrackingBranches, err := resolveBase(baseBranch)
+	if err != nil {
+		return nil, err
 	}
 
 	// First we check with the git information we have to see if we can figure out the default
@@ -876,7 +938,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 				return newCreateContext(skipPushRefs{
 					qualifiedHeadRef: qualifiedHeadRef,
 					baseRefs:         baseRefs,
-				}), nil
+				}, baseTrackingBranches), nil
 			}
 		}
 	}
@@ -942,7 +1004,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			return newCreateContext(skipPushRefs{
 				qualifiedHeadRef: qualifiedHeadRef,
 				baseRefs:         baseRefs,
-			}), nil
+			}, baseTrackingBranches), nil
 		}
 	}
 
@@ -999,7 +1061,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			headRepo:       pushableRepos[selectedOption],
 			headBranchName: currentBranch,
 			baseRefs:       baseRefs,
-		}), nil
+		}, baseTrackingBranches), nil
 	} else if pushOptions[selectedOption] == "Skip pushing the branch" {
 		// We're going to skip pushing the branch altogether, meaning, use whatever SHA is already pushed.
 		// It's not exactly clear what repo the user expects to use here for the HEAD, and maybe we should
@@ -1008,7 +1070,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		return newCreateContext(skipPushRefs{
 			qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner(currentBranch),
 			baseRefs:         baseRefs,
-		}), nil
+		}, baseTrackingBranches), nil
 	} else if pushOptions[selectedOption] == "Cancel" {
 		return nil, cmdutil.CancelError
 	} else {
@@ -1016,7 +1078,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		return newCreateContext(forkableRefs{
 			qualifiedHeadRef: shared.NewQualifiedHeadRef(currentLogin, currentBranch),
 			baseRefs:         baseRefs,
-		}), nil
+		}, baseTrackingBranches), nil
 	}
 }
 
