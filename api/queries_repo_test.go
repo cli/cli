@@ -39,6 +39,7 @@ func TestGitHubRepo_success(t *testing.T) {
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"id": "REPOID",
+			"databaseId": 1234,
 			"name": "REPO",
 			"owner": {"login": "OWNER"},
 			"hasIssuesEnabled": true,
@@ -57,6 +58,7 @@ func TestGitHubRepo_success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &Repository{
 		ID:                 "REPOID",
+		DatabaseID:         1234,
 		Name:               "REPO",
 		Owner:              RepositoryOwner{Login: "OWNER"},
 		HasIssuesEnabled:   true,
@@ -130,6 +132,87 @@ func TestGitHubRepo_withParent(t *testing.T) {
 	}, repo)
 	assert.False(t, repo.ViewerCanPush())
 	assert.False(t, repo.ViewerCanTriage())
+}
+
+// TestBaseRepoQueriesSelectDatabaseID guards the 3 queries that build the base
+// repository. Each selection is written by hand, and a field left out of one
+// of them is silently zero rather than an error, so the selection is asserted
+// against the request instead of the response.
+func TestBaseRepoQueriesSelectDatabaseID(t *testing.T) {
+	tests := []struct {
+		name    string
+		matcher httpmock.Matcher
+		body    string
+		call    func(*Client) error
+	}{
+		{
+			name:    "GitHubRepo",
+			matcher: httpmock.GraphQL(`query RepositoryInfo\b`),
+			body:    `{ "data": { "repository": { "id": "REPOID", "databaseId": 1234 } } }`,
+			call: func(client *Client) error {
+				_, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
+				return err
+			},
+		},
+		{
+			name:    "RepoNetwork",
+			matcher: httpmock.GraphQL(`query RepositoryNetwork\b`),
+			body:    `{ "data": { "repo_000": { "id": "REPOID", "databaseId": 1234 } } }`,
+			call: func(client *Client) error {
+				_, err := RepoNetwork(client, []ghrepo.Interface{ghrepo.New("OWNER", "REPO")})
+				return err
+			},
+		},
+		{
+			name:    "IssueRepoInfo",
+			matcher: httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+			body:    `{ "data": { "repository": { "id": "REPOID", "databaseId": 1234 } } }`,
+			call: func(client *Client) error {
+				_, err := IssueRepoInfo(client, ghrepo.New("OWNER", "REPO"))
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpReg := &httpmock.Registry{}
+			defer httpReg.Verify(t)
+
+			var query string
+			httpReg.Register(tt.matcher, httpmock.GraphQLQuery(tt.body, func(q string, _ map[string]interface{}) {
+				query = q
+			}))
+
+			require.NoError(t, tt.call(newTestClient(httpReg)))
+			assert.Contains(t, query, "databaseId")
+		})
+	}
+}
+
+func TestRepoNetworkUnmarshalsDatabaseID(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query RepositoryNetwork\b`),
+		httpmock.StringResponse(`
+		{ "data": {
+			"viewer": {"login": "OWNER"},
+			"repo_000": {
+				"id": "REPOID",
+				"databaseId": 1234,
+				"name": "REPO",
+				"owner": {"login": "OWNER"},
+				"viewerPermission": "WRITE",
+				"defaultBranchRef": {"name": "main"}
+			}
+		} }`))
+
+	result, err := RepoNetwork(newTestClient(httpReg), []ghrepo.Interface{ghrepo.New("OWNER", "REPO")})
+	require.NoError(t, err)
+	require.Len(t, result.Repositories, 1)
+	assert.Equal(t, int64(1234), result.Repositories[0].DatabaseID)
 }
 
 func TestIssueRepoInfo_notFound(t *testing.T) {

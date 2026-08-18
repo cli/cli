@@ -57,6 +57,9 @@ type Issue struct {
 	Blocking         LinkedIssueConnection
 
 	ClosedByPullRequestsReferences ClosedByPullRequestsReferences
+
+	// Repository is only populated when the "repository" field was requested.
+	Repository *PRRepository
 }
 
 // IssueType represents an issue type configured for a repository.
@@ -479,6 +482,24 @@ func (i Issue) Identifier() string {
 
 func (i Issue) CurrentUserComments() []Comment {
 	return i.Comments.CurrentUserComments()
+}
+
+// RepositoryDatabaseID returns the numeric REST id of the repository, or zero
+// when the "repository" field was not requested.
+func (i Issue) RepositoryDatabaseID() int64 {
+	if i.Repository == nil {
+		return 0
+	}
+	return i.Repository.DatabaseID
+}
+
+// RepositoryViewerPermission returns the requesting user's role on the
+// repository, or an empty string when the "repository" field was not requested.
+func (i Issue) RepositoryViewerPermission() string {
+	if i.Repository == nil {
+		return ""
+	}
+	return i.Repository.ViewerPermission
 }
 
 // UpdateIssueIssueType sets or clears the issue type on an issue. Pass an
