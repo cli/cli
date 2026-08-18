@@ -16,7 +16,7 @@ on:
       tag_name:
         required: true
         type: string
-        description: "The tag name for the release (e.g. v2.100.0)."
+        description: "The tag name for the release (e.g. v2.100.0, or v2.100.0-rc.1 for a pre-release)."
       environment:
         default: production
         type: environment
@@ -42,8 +42,9 @@ jobs:
         env:
           TAG_NAME: ${{ inputs.tag_name }}
         run: |
-          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag name format. Must be in the form v1.2.3"
+          # Build metadata (v1.2.3+001) is rejected: later steps detect a pre-release by its hyphen.
+          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Invalid tag name format. Must be in the form v1.2.3 or v1.2.3-rc.1"
             exit 1
           fi
   linux:
