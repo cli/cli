@@ -99,6 +99,24 @@ type Migration interface {
 	Do(*ghConfig.Config) error
 }
 
+// TokenType is the kind of credential a token is, told by its prefix. The
+// zero value covers a token gh does not recognise, including an empty one.
+//
+// See the [token formats] GitHub documents.
+//
+// [token formats]: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github#githubs-token-formats
+type TokenType string
+
+const (
+	TokenTypeUnknown        TokenType = ""
+	TokenTypeOAuth          TokenType = "oauth"            // gho_
+	TokenTypePersonalAccess TokenType = "personal access"  // ghp_
+	TokenTypeFineGrainedPAT TokenType = "fine-grained pat" // github_pat_
+	TokenTypeUserToServer   TokenType = "user-to-server"   // ghu_
+	TokenTypeServerToServer TokenType = "server-to-server" // ghs_
+	TokenTypeRefresh        TokenType = "refresh"          // ghr_
+)
+
 // AuthConfig is used for interacting with some persistent configuration for gh,
 // with knowledge on how to access encrypted storage when necessary.
 // Behavior is scoped to authentication specific tasks.
@@ -109,6 +127,14 @@ type AuthConfig interface {
 	// ActiveToken will retrieve the active auth token for the given hostname, searching environment variables,
 	// general configuration, and finally encrypted storage.
 	ActiveToken(hostname string) (token string, source string)
+
+	// ActiveTokenType reports what kind of credential the active token for the
+	// hostname is, so a caller can decide whether it will do without handling
+	// the token itself.
+	//
+	// TODO: gh auth status, AuthTokenWriteable and agent-task each read a
+	// token and match its prefix themselves. They should ask here instead.
+	ActiveTokenType(hostname string) TokenType
 
 	// HasEnvToken returns true when a token has been specified in an environment variable, else returns false.
 	HasEnvToken() bool
