@@ -33,6 +33,23 @@ func attachCmd(t *testing.T, withAttach bool, input string) *cobra.Command {
 	return cmd
 }
 
+// Resolved through the public entry point, so a fixture is built the way a
+// command builds one.
+func assetsFromArgs(t *testing.T, args ...string) ([]UserAsset, error) {
+	t.Helper()
+
+	cmd := &cobra.Command{}
+	AddFlag(cmd)
+
+	argv := make([]string, 0, len(args)*2)
+	for _, arg := range args {
+		argv = append(argv, "--attach", arg)
+	}
+	require.NoError(t, cmd.Flags().Parse(argv))
+
+	return FromFlagValues(cmd)
+}
+
 func TestAddFlag(t *testing.T) {
 	tests := []struct {
 		name  string
