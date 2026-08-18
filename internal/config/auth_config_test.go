@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config/migration"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 	"github.com/stretchr/testify/require"
@@ -946,4 +947,32 @@ func preMigrationLogin(c *AuthConfig, hostname, username, token, gitProtocol str
 		c.cfg.Set([]string{hostsKey, hostname, gitProtocolKey}, gitProtocol)
 	}
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
+}
+
+func TestActiveTokenType(t *testing.T) {
+	tests := []struct {
+		name  string
+		token string
+		want  gh.TokenType
+	}{
+		{name: "oauth", token: "gho_test", want: gh.TokenTypeOAuth},
+		{name: "personal access", token: "ghp_test", want: gh.TokenTypePersonalAccess},
+		{name: "fine-grained pat", token: "github_pat_test", want: gh.TokenTypeFineGrainedPAT},
+		{name: "user-to-server", token: "ghu_test", want: gh.TokenTypeUserToServer},
+		{name: "server-to-server", token: "ghs_test", want: gh.TokenTypeServerToServer},
+		{name: "refresh", token: "ghr_test", want: gh.TokenTypeRefresh},
+		{name: "a prefix gh does not know", token: "test", want: gh.TokenTypeUnknown},
+		{name: "no token at all", token: "", want: gh.TokenTypeUnknown},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authCfg := newTestAuthConfig(t)
+			if tt.token != "" {
+				require.NoError(t, keyring.Set(keyringServiceName("github.com"), "", tt.token))
+				authCfg.SetActiveToken(tt.token, "keyring")
+			}
+
+			require.Equal(t, tt.want, authCfg.ActiveTokenType("github.com"))
+		})
+	}
 }
