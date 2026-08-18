@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -17,6 +18,7 @@ import (
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_printError(t *testing.T) {
@@ -277,6 +279,8 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GH_SPINNER_DISABLED", "")
+			require.NoError(t, os.Unsetenv("GH_SPINNER_DISABLED"))
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
