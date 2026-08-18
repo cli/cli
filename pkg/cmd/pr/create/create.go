@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
@@ -74,6 +75,8 @@ type CreateOptions struct {
 	Template            string
 
 	DryRun bool
+
+	Assets []attachments.UserAsset
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
@@ -238,6 +241,15 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			request. If the body text mentions %[1]sFixes #123%[1]s or %[1]sCloses #123%[1]s, the referenced issue
 			will automatically get closed when the pull request gets merged.
 
+			Use %[1]s--attach%[1]s to upload an image or video. The attachment is appended to the
+			body. If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
+			reference is rewritten to point at the uploaded asset instead.
+
+			Alt text for an image follows the path after %[1]s#%[1]s, as in
+			%[1]s--attach './login.png#The login error state'%[1]s. Without it the filename is used.
+			A reference already in the body keeps the alt text written there. Video renders
+			as a player and has no alt text, so it cannot be given any.
+
 			By default, users with write access to the base repository can push new commits to the
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
 
@@ -250,6 +262,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
 			$ gh pr create --template "pull_request_template.md"
+			$ gh pr create --attach './login.png#The login error state'
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
@@ -331,6 +344,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
+			opts.Assets, err = attachments.FromFlagValues(cmd)
+			if err != nil {
+				return err
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -359,6 +377,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
+	attachments.AddFlag(cmd)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -482,6 +501,23 @@ func createRun(opts *CreateOptions) error {
 			ctx.PRRefs.QualifiedHeadRef(), ctx.PRRefs.BaseRef(), existingPR.URL)
 	}
 
+	// Built before the prompts, so a run that cannot upload stops early.
+	var uploader *attachments.Uploader
+	if len(opts.Assets) > 0 {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+		baseRepo := ctx.PRRefs.BaseRepo()
+		host := baseRepo.RepoHost()
+		tokenType := cfg.Authentication().ActiveTokenType(host)
+
+		uploader, err = attachments.NewUploader(httpClient, tokenType, host, baseRepo.DatabaseID, baseRepo.ViewerPermission)
+		if err != nil {
+			return err
+		}
+	}
+
 	message := "\nCreating pull request for %s into %s in %s\n\n"
 	if state.Draft {
 		message = "\nCreating draft pull request for %s into %s in %s\n\n"
@@ -504,7 +540,7 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		return submitPR(*opts, *ctx, *state, projectsV1Support)
+		return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
 	}
 
 	if opts.RecoverFile != "" {
@@ -586,7 +622,8 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
-		allowPreview := !state.HasMetadata() && shared.ValidURL(openURL) && !opts.DryRun
+		// Preview opens the browser, which cannot carry an upload.
+		allowPreview := !state.HasMetadata() && shared.ValidURL(openURL) && !opts.DryRun && len(opts.Assets) == 0
 		allowMetadata := ctx.PRRefs.BaseRepo().ViewerCanTriage()
 		action, err = shared.ConfirmPRSubmission(opts.Prompter, allowPreview, allowMetadata, state.Draft)
 		if err != nil {
@@ -605,7 +642,7 @@ func createRun(opts *CreateOptions) error {
 				return err
 			}
 
-			action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata() && !opts.DryRun, false, state.Draft)
+			action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata() && !opts.DryRun && len(opts.Assets) == 0, false, state.Draft)
 			if err != nil {
 				return err
 			}
@@ -629,11 +666,11 @@ func createRun(opts *CreateOptions) error {
 
 	if action == shared.SubmitDraftAction {
 		state.Draft = true
-		return submitPR(*opts, *ctx, *state, projectsV1Support)
+		return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
 	}
 
 	if action == shared.SubmitAction {
-		return submitPR(*opts, *ctx, *state, projectsV1Support)
+		return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
 	}
 
 	err = errors.New("expected to cancel, preview, or submit")
@@ -1033,7 +1070,7 @@ func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
 	return remotes, nil
 }
 
-func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support) error {
+func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support, uploader *attachments.Uploader) error {
 	client := ctx.Client
 
 	params := map[string]interface{}{
@@ -1062,6 +1099,20 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		}
 	}
 
+	var uploadErr error
+	if uploader != nil {
+		body, uploaded, err := uploader.UploadAndAttach(context.Background(), state.Body, opts.Assets)
+		// With nothing uploaded, a body that lost the files it was written
+		// around is not what the caller asked to create. The branch is already
+		// pushed by now, so the message says what was not created rather than
+		// claiming the run had no effect.
+		if err != nil && uploaded == 0 {
+			return fmt.Errorf("%w\nno pull request was created", err)
+		}
+		uploadErr = err
+		params["body"] = body
+	}
+
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.PRRefs.BaseRepo(), params)
 	opts.IO.StopProgressIndicator()
@@ -1070,11 +1121,16 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	}
 	if err != nil {
 		if pr != nil {
-			return fmt.Errorf("pull request update failed: %w", err)
+			err = fmt.Errorf("pull request update failed: %w", err)
+		} else {
+			err = fmt.Errorf("pull request create failed: %w", err)
 		}
-		return fmt.Errorf("pull request create failed: %w", err)
+		// A failed upload and a failed create have different remedies, and a
+		// failed create leaves the uploaded assets referenced by nothing, so
+		// that error reads first.
+		return errors.Join(uploadErr, err)
 	}
-	return nil
+	return uploadErr
 }
 
 func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *shared.IssueMetadataState) error {
