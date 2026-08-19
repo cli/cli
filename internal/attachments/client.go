@@ -107,7 +107,7 @@ func checkPermission(viewerPermission string) error {
 // upload sends the file's bytes and returns the asset URL to reference
 // from the markdown.
 func (u *Uploader) upload(ctx context.Context, a UserAsset) (string, error) {
-	assetURL, err := u.postAsset(ctx, a.file())
+	assetURL, err := u.postAsset(ctx, a.getAsset())
 	if err != nil {
 		return "", newUploadError(err, a)
 	}
@@ -118,7 +118,7 @@ func (u *Uploader) upload(ctx context.Context, a UserAsset) (string, error) {
 // rather than the UserAsset, because nothing about sending the bytes depends on
 // how they render. It is separate so every way it can fail picks up the same
 // explanation on the way out.
-func (u *Uploader) postAsset(ctx context.Context, a *asset) (string, error) {
+func (u *Uploader) postAsset(ctx context.Context, a asset) (string, error) {
 	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.UserAssetUploadPrefix(u.host), "user-attachments", "assets")
 	if err != nil {
 		return "", err

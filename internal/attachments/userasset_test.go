@@ -167,21 +167,21 @@ func TestNewAsset(t *testing.T) {
 			file:    "clip.mp4",
 			size:    105 * 1024 * 1024,
 			path:    "./clip.mp4",
-			wantErr: "./clip.mp4: videos must be under 100 MB",
+			wantErr: "./clip.mp4: videos must be at most 100.0 MB",
 		},
 		{
 			name:    "image one byte over the limit",
 			file:    "big.png",
 			size:    maxImageBytes + 1,
 			path:    "./big.png",
-			wantErr: "./big.png: images must be under 10 MB",
+			wantErr: "./big.png: images must be at most 10.0 MB",
 		},
 		{
 			name:    "image well over the size limit",
 			file:    "huge.png",
 			size:    14889779,
 			path:    "./huge.png",
-			wantErr: "./huge.png: images must be under 10 MB",
+			wantErr: "./huge.png: images must be at most 10.0 MB",
 		},
 		{
 			name:    "unsupported extension",
@@ -256,14 +256,14 @@ func TestNewAsset(t *testing.T) {
 				wantPath = tt.path
 			}
 			assert.Equal(t, wantPath, a.Path())
-			assert.Equal(t, tt.wantAlt, a.file().alt)
-			assert.Equal(t, tt.wantContentType, a.file().contentType)
+			assert.Equal(t, tt.wantAlt, a.getAsset().alt)
+			assert.Equal(t, tt.wantContentType, a.getAsset().contentType)
 
 			// The identity the duplicate check compares, which has to be the
 			// file this path led to.
 			wantInfo, err := os.Stat(tt.file)
 			require.NoError(t, err)
-			assert.True(t, os.SameFile(wantInfo, a.file().info))
+			assert.True(t, os.SameFile(wantInfo, a.getAsset().info))
 		})
 	}
 }

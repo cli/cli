@@ -7,26 +7,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/cli/cli/v2/internal/text"
 )
 
-// bytesPerMB is the multiplier for the limits below, which are declared in
-// megabytes because that is the unit every message states them in.
-const bytesPerMB = 1024 * 1024
+// maxImageBytes is the largest image gh uploads.
+const maxImageBytes int64 = 10 * 1024 * 1024
 
-// maxImageMB is the largest image gh uploads. The byte form is typed, since it
-// is only ever measured against a file size.
-const (
-	maxImageMB          = 10
-	maxImageBytes int64 = maxImageMB * bytesPerMB
-)
-
-// maxVideoMB is the largest video gh uploads. The real limit depends on the
+// maxVideoBytes is the largest video gh uploads. The real limit depends on the
 // account plan, which gh cannot know before the request, so this is the
 // generous bound and the server refuses the rest.
-const (
-	maxVideoMB          = 100
-	maxVideoBytes int64 = maxVideoMB * bytesPerMB
-)
+const maxVideoBytes int64 = 100 * 1024 * 1024
 
 // contentTypes maps every accepted extension to the content type the endpoint
 // expects, in the order gh lists them back to the user.
@@ -52,9 +43,8 @@ type UserAsset interface {
 	// what they typed.
 	Path() string
 
-	file() *asset
 	rendersAsPlayer() bool
-	sizeLimit() (maxBytes int64, maxMB int, kind string)
+	getAsset() asset
 	markdown(assetURL string) string
 }
 
@@ -65,12 +55,11 @@ type asset struct {
 	contentType string
 }
 
-func (a *asset) file() *asset { return a }
-
-func (a *asset) Path() string { return a.path }
-
 // imageAsset renders as a markdown image.
 type imageAsset struct{ asset }
+
+func (a *imageAsset) Path() string    { return a.asset.path }
+func (a *imageAsset) getAsset() asset { return a.asset }
 
 func (*imageAsset) rendersAsPlayer() bool { return false }
 
@@ -79,7 +68,7 @@ func (*imageAsset) rendersAsPlayer() bool { return false }
 // and replacing the remaining dots with spaces.
 func newImageAsset(f asset, alt string) (UserAsset, error) {
 	a := &imageAsset{f}
-	if err := checkMaxSizeForType(a); err != nil {
+	if err := checkMaxSize(a.asset, maxImageBytes, "images"); err != nil {
 		return nil, err
 	}
 
@@ -92,10 +81,6 @@ func newImageAsset(f asset, alt string) (UserAsset, error) {
 	return a, nil
 }
 
-func (*imageAsset) sizeLimit() (int64, int, string) {
-	return maxImageBytes, maxImageMB, "images"
-}
-
 func (a *imageAsset) markdown(assetURL string) string {
 	return fmt.Sprintf("![%s](%s)", escapeAlt(a.alt), assetURL)
 }
@@ -104,6 +89,9 @@ func (a *imageAsset) markdown(assetURL string) string {
 // promotes a bare URL that is the whole content of a paragraph.
 type videoAsset struct{ asset }
 
+func (a *videoAsset) Path() string    { return a.asset.path }
+func (a *videoAsset) getAsset() asset { return a.asset }
+
 func (*videoAsset) rendersAsPlayer() bool { return true }
 
 // newVideoAsset applies what only holds for a video: a player has no alt
@@ -111,7 +99,7 @@ func (*videoAsset) rendersAsPlayer() bool { return true }
 // in keeps its extension because it goes where a filename would in a link.
 func newVideoAsset(f asset, alt string) (UserAsset, error) {
 	a := &videoAsset{f}
-	if err := checkMaxSizeForType(a); err != nil {
+	if err := checkMaxSize(a.asset, maxVideoBytes, "videos"); err != nil {
 		return nil, err
 	}
 
@@ -121,10 +109,6 @@ func newVideoAsset(f asset, alt string) (UserAsset, error) {
 	a.alt = filepath.Base(a.path)
 
 	return a, nil
-}
-
-func (*videoAsset) sizeLimit() (int64, int, string) {
-	return maxVideoBytes, maxVideoMB, "videos"
 }
 
 func (*videoAsset) markdown(assetURL string) string { return assetURL }
@@ -169,13 +153,13 @@ func newAsset(path, alt string) (UserAsset, error) {
 	return newImageAsset(f, alt)
 }
 
-// checkMaxSizeForType rejects a file over the limit for its kind.
-func checkMaxSizeForType(a UserAsset) error {
-	maxBytes, maxMB, kind := a.sizeLimit()
-	if a.file().info.Size() <= maxBytes {
+// checkMaxSize rejects a file over the limit for its kind. The limit is
+// inclusive, so the message says at most rather than under.
+func checkMaxSize(a asset, maxBytes int64, kind string) error {
+	if a.info.Size() <= maxBytes {
 		return nil
 	}
-	return fmt.Errorf("%s: %s must be under %d MB", a.Path(), kind, maxMB)
+	return fmt.Errorf("%s: %s must be at most %s", a.path, kind, text.FormatSize(maxBytes))
 }
 
 // supportedContentType maps a file extension to the content type the endpoint

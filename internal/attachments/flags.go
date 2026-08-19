@@ -59,7 +59,7 @@ func FromFlagValues(cmd *cobra.Command) ([]UserAsset, error) {
 
 		// The same file under two names is a user error.
 		for _, seen := range resolvedAssets {
-			if os.SameFile(seen.file().info, a.file().info) {
+			if os.SameFile(seen.getAsset().info, a.getAsset().info) {
 				return nil, fmt.Errorf("%s and %s are the same file; attached files must be unique", seen.Path(), a.Path())
 			}
 		}
