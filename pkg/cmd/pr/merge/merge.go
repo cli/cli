@@ -399,90 +399,84 @@ func (m *mergeContext) deleteLocalBranch() error {
 		return nil
 	}
 
-	currentBranch, err := m.opts.Branch()
-	if err != nil {
-		return err
-	}
-
 	ctx := context.Background()
 
-	worktrees, _ := m.opts.GitClient.Worktrees(ctx)
-	currentWorkdir, _ := m.opts.GitClient.ToplevelDir(ctx)
-
-	// worktrees[0] is always the main worktree (the initially cloned repo).
-	// If our workdir differs we are inside a linked worktree.
-	isInLinkedWorktree := len(worktrees) > 1 && worktrees[0].Path != currentWorkdir
-
-	if currentBranch == m.pr.HeadRefName && isInLinkedWorktree {
-		_ = m.warnf("%s Branch %s is checked out in the current worktree (%s); skipping local delete\n",
-			m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), currentWorkdir)
-		_ = m.warnf("  To finish cleanup, first navigate out of the worktree, then run:\n")
-		_ = m.warnf("  git worktree remove %s && git branch -D %s\n",
-			currentWorkdir, m.pr.HeadRefName)
+	worktrees, err := m.opts.GitClient.Worktrees(ctx)
+	if err != nil {
+		_ = m.warnf("%s Could not inspect worktrees; skipping local branch delete: %s\n", m.cs.WarningIcon(), err)
 		return nil
 	}
 
-	// The head branch may be checked out in the main worktree while the command
-	// runs from a different worktree. git refuses to delete a branch checked out
-	// elsewhere, and the main worktree cannot be removed, so warn and skip rather
-	// than failing solely due to local worktree cleanup.
-	if isInLinkedWorktree && worktrees[0].Branch == "refs/heads/"+m.pr.HeadRefName {
-		_ = m.warnf("%s Branch %s is checked out in the main worktree (%s); skipping local delete\n",
-			m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), worktrees[0].Path)
-		_ = m.warnf("  To finish cleanup, switch the main worktree off %s, then run:\n", m.cs.Cyan(m.pr.HeadRefName))
-		_ = m.warnf("  git branch -D %s\n", m.pr.HeadRefName)
+	currentWorkdir, err := m.opts.GitClient.ToplevelDir(ctx)
+	if err != nil {
+		_ = m.warnf("%s Could not determine the current worktree; skipping local branch delete: %s\n", m.cs.WarningIcon(), err)
 		return nil
-	}
-
-	if prHeadWorktree := linkedWorktreeForBranch(worktrees, m.pr.HeadRefName); prHeadWorktree != "" {
-		if err := m.opts.GitClient.WorktreeRemove(ctx, prHeadWorktree); err != nil {
-			_ = m.warnf("%s Could not remove worktree %s; skipping local branch delete: %s\n", m.cs.WarningIcon(), prHeadWorktree, err)
-			return nil
-		}
-		_ = m.infof("%s Removed worktree %s\n", m.cs.SuccessIconWithColor(m.cs.Red), prHeadWorktree)
 	}
 
 	switchedToBranch := ""
-	if currentBranch == m.pr.HeadRefName {
-		// git refuses to delete the branch we are currently on, so we normally
-		// check out the base branch first. If the base branch is checked out in
-		// another worktree, that checkout would fail with a fatal error. The
-		// checkout is only a convenience, so warn and skip rather than failing
-		// solely due to local worktree cleanup.
-		if baseWorktree := worktreeForBranch(worktrees, m.pr.BaseRefName); baseWorktree != "" {
-			_ = m.warnf("%s Base branch %s is checked out in another worktree (%s); skipping local delete\n",
-				m.cs.WarningIcon(), m.cs.Cyan(m.pr.BaseRefName), baseWorktree)
-			_ = m.warnf("  To finish cleanup, switch off %s in another worktree, then run:\n", m.cs.Cyan(m.pr.HeadRefName))
+	headWorktree := worktreeForBranch(worktrees, m.pr.HeadRefName)
+	if headWorktree != nil {
+		mainWorktree := &worktrees[0]
+
+		switch {
+		case headWorktree.Path == currentWorkdir && headWorktree.Path != mainWorktree.Path:
+			_ = m.warnf("%s Branch %s is checked out in the current worktree (%s); skipping local delete\n",
+				m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), currentWorkdir)
+			_ = m.warnf("  To finish cleanup, first navigate out of the worktree, then run:\n")
+			_ = m.warnf("  git worktree remove %s && git branch -D %s\n",
+				currentWorkdir, m.pr.HeadRefName)
+			return nil
+
+		case headWorktree.Path == currentWorkdir:
+			if baseWorktree := worktreeForBranch(worktrees, m.pr.BaseRefName); baseWorktree != nil && baseWorktree.Path != currentWorkdir {
+				_ = m.warnf("%s Base branch %s is checked out in another worktree (%s); skipping local delete\n",
+					m.cs.WarningIcon(), m.cs.Cyan(m.pr.BaseRefName), baseWorktree.Path)
+				_ = m.warnf("  To finish cleanup, switch off %s in another worktree, then run:\n", m.cs.Cyan(m.pr.HeadRefName))
+				_ = m.warnf("  git branch -D %s\n", m.pr.HeadRefName)
+				return nil
+			}
+
+			remotes, err := m.opts.Remotes()
+			if err != nil {
+				return err
+			}
+
+			baseRemote, err := remotes.FindByRepo(m.baseRepo.RepoOwner(), m.baseRepo.RepoName())
+			if err != nil {
+				return err
+			}
+
+			targetBranch := m.pr.BaseRefName
+			if m.opts.GitClient.HasLocalBranch(ctx, targetBranch) {
+				if err := m.opts.GitClient.CheckoutBranch(ctx, targetBranch); err != nil {
+					return err
+				}
+			} else {
+				if err := m.opts.GitClient.CheckoutNewBranch(ctx, baseRemote.Name, targetBranch); err != nil {
+					return err
+				}
+			}
+
+			if err := m.opts.GitClient.Pull(ctx, baseRemote.Name, targetBranch); err != nil {
+				_ = m.warnf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch)
+			}
+
+			switchedToBranch = targetBranch
+
+		case headWorktree.Path == mainWorktree.Path:
+			_ = m.warnf("%s Branch %s is checked out in the main worktree (%s); skipping local delete\n",
+				m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), mainWorktree.Path)
+			_ = m.warnf("  To finish cleanup, switch the main worktree off %s, then run:\n", m.cs.Cyan(m.pr.HeadRefName))
 			_ = m.warnf("  git branch -D %s\n", m.pr.HeadRefName)
 			return nil
-		}
 
-		remotes, err := m.opts.Remotes()
-		if err != nil {
-			return err
-		}
-
-		baseRemote, err := remotes.FindByRepo(m.baseRepo.RepoOwner(), m.baseRepo.RepoName())
-		if err != nil {
-			return err
-		}
-
-		targetBranch := m.pr.BaseRefName
-		if m.opts.GitClient.HasLocalBranch(ctx, targetBranch) {
-			if err := m.opts.GitClient.CheckoutBranch(ctx, targetBranch); err != nil {
-				return err
+		default:
+			if err := m.opts.GitClient.WorktreeRemove(ctx, headWorktree.Path); err != nil {
+				_ = m.warnf("%s Could not remove worktree %s; skipping local branch delete: %s\n", m.cs.WarningIcon(), headWorktree.Path, err)
+				return nil
 			}
-		} else {
-			if err := m.opts.GitClient.CheckoutNewBranch(ctx, baseRemote.Name, targetBranch); err != nil {
-				return err
-			}
+			_ = m.infof("%s Removed worktree %s\n", m.cs.SuccessIconWithColor(m.cs.Red), headWorktree.Path)
 		}
-
-		if err := m.opts.GitClient.Pull(ctx, baseRemote.Name, targetBranch); err != nil {
-			_ = m.warnf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch)
-		}
-
-		switchedToBranch = targetBranch
 	}
 
 	if err := m.opts.GitClient.DeleteLocalBranch(ctx, m.pr.HeadRefName); err != nil {
@@ -535,33 +529,16 @@ func (m *mergeContext) shouldAddToMergeQueue() bool {
 	return m.mergeQueueRequired && !m.opts.UseAdmin
 }
 
-// linkedWorktreeForBranch returns the path of a linked worktree that has the
-// given branch checked out. It skips worktrees[0] (always the main worktree)
-// so only linked worktrees are considered. Returns empty string if no linked
-// worktree uses the branch.
-func linkedWorktreeForBranch(worktrees []git.Worktree, branch string) string {
-	if len(worktrees) <= 1 {
-		return ""
-	}
+// worktreeForBranch returns the worktree that has the given branch checked out,
+// or nil if the branch is not checked out in any worktree.
+func worktreeForBranch(worktrees []git.Worktree, branch string) *git.Worktree {
 	branchRef := "refs/heads/" + branch
-	for _, wt := range worktrees[1:] {
-		if wt.Branch == branchRef {
-			return wt.Path
+	for i := range worktrees {
+		if worktrees[i].Branch == branchRef {
+			return &worktrees[i]
 		}
 	}
-	return ""
-}
-
-// worktreeForBranch returns the path of any worktree (including the main
-// worktree) that has the given branch checked out, or "" if none does.
-func worktreeForBranch(worktrees []git.Worktree, branch string) string {
-	branchRef := "refs/heads/" + branch
-	for _, wt := range worktrees {
-		if wt.Branch == branchRef {
-			return wt.Path
-		}
-	}
-	return ""
+	return nil
 }
 
 func (m *mergeContext) warnf(format string, args ...interface{}) error {

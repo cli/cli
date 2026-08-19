@@ -249,6 +249,12 @@ func stubCommit(pr *api.PullRequest, oid string) {
 
 // TODO port to new style tests
 func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithBranchFunc(rt, pm, func() (string, error) {
+		return branch, nil
+	}, isTTY, cli)
+}
+
+func runCommandWithBranchFunc(rt http.RoundTripper, pm *prompter.PrompterMock, branch func() (string, error), isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -259,9 +265,7 @@ func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, 
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Branch: func() (string, error) {
-			return branch, nil
-		},
+		Branch: branch,
 		Remotes: func() (context.Remotes, error) {
 			return []*context.Remote{
 				{
@@ -298,6 +302,10 @@ func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, 
 		OutBuf: stdout,
 		ErrBuf: stderr,
 	}, err
+}
+
+func singleWorktree(branch string) string {
+	return fmt.Sprintf("worktree /path/to/repo\nHEAD abc123\nbranch refs/heads/%s\n", branch)
 }
 
 func initFakeHTTP() *httpmock.Registry {
@@ -644,7 +652,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
-	cs.Register(`git worktree list --porcelain`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
 	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
@@ -743,7 +751,7 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 			cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 			cs.Register(`git checkout main`, 0, "")
 			cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
-			cs.Register(`git worktree list --porcelain`, 0, "")
+			cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
 			cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 			cs.Register(`git branch -D blueberries`, 0, "")
 			cs.Register(`git pull --ff-only`, 0, "")
@@ -819,7 +827,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/fruit`, 0, "")
 	cs.Register(`git checkout fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
-	cs.Register(`git worktree list --porcelain`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
 	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
@@ -870,7 +878,7 @@ func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
-	cs.Register(`git worktree list --porcelain`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
 	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
@@ -922,7 +930,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/fruit`, 1, "")
 	cs.Register(`git checkout -b fruit --track origin/fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
-	cs.Register(`git worktree list --porcelain`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
 	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
@@ -972,7 +980,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
-	cs.Register(`git worktree list --porcelain`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("main"))
 	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 
@@ -1213,7 +1221,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
-	cs.Register(`git worktree list --porcelain`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
 	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
@@ -1287,7 +1295,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
-	cs.Register(`git worktree list --porcelain`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
 	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D `, 0, "")
 
@@ -1460,7 +1468,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
-	cs.Register(`git worktree list --porcelain`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
 	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
@@ -2055,14 +2063,40 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 		output   string
 	}
 	tests := []struct {
-		name            string
-		worktreeList    string
-		toplevel        string
-		branch          string
-		extraStubs      []stub
-		wantContains    []string
-		wantNotContains []string
+		name             string
+		worktreeList     string
+		worktreeExitCode int
+		toplevel         string
+		toplevelExitCode int
+		branch           string
+		branchFunc       func() (string, error)
+		extraStubs       []stub
+		wantContains     []string
+		wantNotContains  []string
 	}{
+		{
+			name: "head branch is checked out nowhere from detached worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/detached-wt
+				HEAD def456
+				detached
+			`),
+			toplevel: "/path/to/detached-wt",
+			branchFunc: func() (string, error) {
+				return "", errors.New("current branch is unavailable for detached HEAD")
+			},
+			extraStubs: []stub{
+				{pattern: `git branch -D feature`, exitCode: 0},
+			},
+			wantContains: []string{
+				"Deleted local branch feature",
+				"Deleted remote branch feature",
+			},
+		},
 		{
 			name: "cwd is the head branch's linked worktree",
 			worktreeList: heredoc.Doc(`
@@ -2169,6 +2203,33 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 			},
 			wantNotContains: []string{"Deleted local branch"},
 		},
+		{
+			name:             "worktree discovery fails",
+			worktreeList:     "fatal: worktree discovery failed",
+			worktreeExitCode: 1,
+			branch:           "feature",
+			wantContains: []string{
+				"Could not inspect worktrees; skipping local branch delete",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{"Deleted local branch"},
+		},
+		{
+			name: "current worktree discovery fails",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/feature
+			`),
+			toplevel:         "fatal: cannot determine top-level directory",
+			toplevelExitCode: 1,
+			branch:           "feature",
+			wantContains: []string{
+				"Could not determine the current worktree; skipping local branch delete",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{"Deleted local branch"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2203,13 +2264,21 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 			defer cmdTeardown(t)
 
 			cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
-			cs.Register(`git worktree list --porcelain`, 0, tt.worktreeList)
-			cs.Register(`git rev-parse --show-toplevel`, 0, tt.toplevel)
+			cs.Register(`git worktree list --porcelain`, tt.worktreeExitCode, tt.worktreeList)
+			if tt.worktreeExitCode == 0 {
+				cs.Register(`git rev-parse --show-toplevel`, tt.toplevelExitCode, tt.toplevel)
+			}
 			for _, s := range tt.extraStubs {
 				cs.Register(s.pattern, s.exitCode, s.output)
 			}
 
-			output, err := runCommand(http, nil, tt.branch, true, "pr merge --merge -d")
+			branchFunc := tt.branchFunc
+			if branchFunc == nil {
+				branchFunc = func() (string, error) {
+					return tt.branch, nil
+				}
+			}
+			output, err := runCommandWithBranchFunc(http, nil, branchFunc, true, "pr merge --merge -d")
 			require.NoError(t, err)
 
 			assert.Equal(t, "", output.String())
