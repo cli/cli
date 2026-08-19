@@ -6,9 +6,11 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDownloadWorkflowArtifactsPageinates(t *testing.T) {
@@ -63,4 +65,25 @@ func TestDownloadWorkflowArtifactsPageinates(t *testing.T) {
 	result, err := ListArtifacts(httpClient, repo, testRunId)
 	assert.NoError(t, err)
 	assert.Equal(t, []Artifact{firstArtifact, secondArtifact}, result)
+}
+
+func TestListArtifactsReturnsAPIErrorMessage(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.QueryMatcher(
+			"GET",
+			"repos/OWNER/REPO/actions/artifacts",
+			url.Values{"per_page": []string{"100"}},
+		),
+		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+	)
+
+	_, err := ListArtifacts(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), "")
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	require.Equal(t, http.StatusNotFound, httpErr.StatusCode)
+	require.EqualError(t, err, "HTTP 404 (https://api.github.com/repos/OWNER/REPO/actions/artifacts?per_page=100)")
 }

@@ -161,6 +161,74 @@ func TestNewCmdIssues(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "search-type semantic flag",
+			input: "test --search-type semantic",
+			output: shared.IssuesOptions{
+				Query: search.Query{
+					Keywords:        []string{"test"},
+					Kind:            "issues",
+					Limit:           30,
+					IssueSearchType: "semantic",
+					Qualifiers:      search.Qualifiers{Type: "issue"},
+				},
+			},
+		},
+		{
+			name:  "search-type hybrid flag",
+			input: "test --search-type hybrid",
+			output: shared.IssuesOptions{
+				Query: search.Query{
+					Keywords:        []string{"test"},
+					Kind:            "issues",
+					Limit:           30,
+					IssueSearchType: "hybrid",
+					Qualifiers:      search.Qualifiers{Type: "issue"},
+				},
+			},
+		},
+		{
+			name:  "search-type lexical flag sends no search type",
+			input: "test --search-type lexical",
+			output: shared.IssuesOptions{
+				Query: search.Query{
+					Keywords:   []string{"test"},
+					Kind:       "issues",
+					Limit:      30,
+					Qualifiers: search.Qualifiers{Type: "issue"},
+				},
+			},
+		},
+		{
+			name:    "invalid search-type flag",
+			input:   "test --search-type bogus",
+			wantErr: true,
+			errMsg:  "invalid argument \"bogus\" for \"--search-type\" flag: valid values are {lexical|semantic|hybrid}",
+		},
+		{
+			name:    "search-type semantic with include-prs flag",
+			input:   "test --search-type semantic --include-prs",
+			wantErr: true,
+			errMsg:  "semantic search is scoped to issues and cannot be combined with `--include-prs`",
+		},
+		{
+			name:    "search-type semantic with web flag",
+			input:   "test --search-type semantic --web",
+			wantErr: true,
+			errMsg:  "`--web` is not supported with semantic search",
+		},
+		{
+			name:    "search-type semantic with sort flag",
+			input:   "test --search-type semantic --sort comments",
+			wantErr: true,
+			errMsg:  "`--sort` and `--order` are not supported with semantic search",
+		},
+		{
+			name:    "search-type semantic with order flag",
+			input:   "test --search-type semantic --order asc",
+			wantErr: true,
+			errMsg:  "`--sort` and `--order` are not supported with semantic search",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

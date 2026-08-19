@@ -184,7 +184,7 @@ func Test_listRun(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 			opts := tt.opts
 			opts.IO = ios
-			opts.Config = func() (gh.Config, error) { return config.NewBlankConfig(), nil }
+			opts.Config = func() (gh.Config, error) { return config.NewMockConfig(), nil }
 			err := listRun(&opts)
 			if tt.wantErr {
 				assert.Error(t, err)

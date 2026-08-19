@@ -61,6 +61,10 @@ Pass `--repo OWNER/REPO` (`-R`) to override the resolved CWD repo.
 - Bots author as GitHub Apps, so `--author dependabot` matches nothing. Use
   `--app dependabot` (on `pr`/`issue list` and `search prs|issues`; expands
   to `author:app/<slug>`) or `--author "dependabot[bot]"`.
+- `gh search issues` also takes `--search-type <lexical|semantic|hybrid>`
+  (github.com/GHEC only, issues only): use `semantic` when the user describes a
+  problem in natural language rather than exact terms, and `hybrid` to blend
+  keyword and semantic ranking; `lexical` (default) is exact matching.
 
 ## Issue types, sub-issues, and relationships
 

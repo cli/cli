@@ -168,7 +168,7 @@ func TestRenameRun(t *testing.T) {
 		tt.opts.IO = ios
 
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		t.Run(tt.name, func(t *testing.T) {

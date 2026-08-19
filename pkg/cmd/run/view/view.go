@@ -471,6 +471,8 @@ func shouldFetchJobs(opts *ViewOptions) bool {
 }
 
 func getLog(httpClient *http.Client, logURL safeurl.SafeURL) (io.ReadCloser, error) {
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to streaming the run log ZIP response body for archive processing instead of decoding JSON.
 	req, err := http.NewRequest("GET", logURL.String(), nil)
 	if err != nil {
 		return nil, err

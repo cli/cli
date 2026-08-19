@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
@@ -24,7 +23,7 @@ type AutolinkCreateRequest struct {
 }
 
 func (a *AutolinkCreator) Create(repo ghrepo.Interface, request AutolinkCreateRequest) (*shared.Autolink, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "autolinks")
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "autolinks")
 	if err != nil {
 		return nil, err
 	}
@@ -35,47 +34,19 @@ func (a *AutolinkCreator) Create(repo ghrepo.Interface, request AutolinkCreateRe
 	}
 	requestBody := bytes.NewReader(requestByte)
 
-	req, err := http.NewRequest(http.MethodPost, url.String(), requestBody)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := a.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	err = handleAutolinkCreateError(resp)
-
-	if err != nil {
-		return nil, err
-	}
-
 	var autolink shared.Autolink
-
-	err = json.NewDecoder(resp.Body).Decode(&autolink)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(a.HTTPClient).REST(repo.RepoHost(), http.MethodPost, path.String(), requestBody, &autolink)
 	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			httpErr.Message = "Must have admin rights to Repository."
+			return nil, httpErr
+		}
 		return nil, err
 	}
 
 	return &autolink, nil
-}
-
-func handleAutolinkCreateError(resp *http.Response) error {
-	switch resp.StatusCode {
-	case http.StatusCreated:
-		return nil
-	case http.StatusNotFound:
-		err := api.HandleHTTPError(resp)
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) {
-			httpErr.Message = "Must have admin rights to Repository."
-			return httpErr
-		}
-		return err
-	default:
-		return api.HandleHTTPError(resp)
-	}
 }

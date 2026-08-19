@@ -29,6 +29,8 @@ func (p *apiPlatform) Download(url safeurl.SafeURL, dir safepaths.Absolute) erro
 }
 
 func downloadArtifact(httpClient *http.Client, url safeurl.SafeURL, destDir safepaths.Absolute) error {
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to streaming the artifact ZIP response body to disk instead of decoding JSON.
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return err

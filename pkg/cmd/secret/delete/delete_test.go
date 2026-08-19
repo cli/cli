@@ -363,7 +363,7 @@ func Test_removeRun_repo(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullNameWithHost("owner/repo", tt.host)
@@ -424,7 +424,7 @@ func Test_removeRun_env(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		err := removeRun(tt.opts)
@@ -482,7 +482,7 @@ func Test_removeRun_org(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
@@ -516,7 +516,7 @@ func Test_removeRun_user(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		SecretName:  "cool_secret",
 		UserSecrets: true,

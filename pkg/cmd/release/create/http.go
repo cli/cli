@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -61,36 +59,17 @@ func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName str
 }
 
 func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, error) {
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "tags")
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "tags")
 	if err != nil {
 		return nil, err
 	}
 	u.SetQuery("per_page", strconv.Itoa(limit))
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 
 	var tags []tag
-	err = json.Unmarshal(b, &tags)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodGet, u.String(), nil, &tags)
 	return tags, err
 }
 
@@ -110,41 +89,24 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 		return nil, err
 	}
 
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "generate-notes")
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		return nil, notImplementedError
-	}
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", "generate-notes")
 	if err != nil {
 		return nil, err
 	}
 
 	var rn releaseNotes
-	err = json.Unmarshal(b, &rn)
-	return &rn, err
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes), &rn)
+	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return nil, notImplementedError
+		}
+		return nil, err
+	}
+	return &rn, nil
 }
 
 func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
@@ -157,6 +119,8 @@ func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagN
 		return false, err
 	}
 
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to HEAD responses having no body while REST decodes non-204/205 2xx responses as JSON.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return false, err
@@ -180,22 +144,10 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 		return nil, err
 	}
 
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases")
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases")
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
 
 	// Check if we received a 404 while attempting to create a release without
 	// the workflow scope, and if so, return an error message that explains a possible
@@ -208,29 +160,27 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	// beyond returning a 404.
 	//
 	// https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps#available-scopes
-	if resp.StatusCode == http.StatusNotFound && !tokenHasWorkflowScope(resp) {
-		normalizedHostname := ghauth.NormalizeHostname(resp.Request.URL.Hostname())
-		return nil, &errMissingRequiredWorkflowScope{
-			Hostname: normalizedHostname,
-		}
-	}
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
+	var newRelease shared.Release
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes), &newRelease)
 	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) &&
+			httpErr.StatusCode == http.StatusNotFound &&
+			!tokenHasWorkflowScope(httpErr.Headers) {
+			normalizedHostname := ghauth.NormalizeHostname(httpErr.RequestURL.Hostname())
+			return nil, &errMissingRequiredWorkflowScope{
+				Hostname: normalizedHostname,
+			}
+		}
 		return nil, err
 	}
-
-	var newRelease shared.Release
-	err = json.Unmarshal(b, &newRelease)
-	return &newRelease, err
+	return &newRelease, nil
 }
 
-func publishRelease(httpClient *http.Client, releaseURL safeurl.SafeURL, discussionCategory string, isLatest *bool) (*shared.Release, error) {
+func publishRelease(httpClient *http.Client, host string, releaseURL safeurl.SafeURL, discussionCategory string, isLatest *bool) (*shared.Release, error) {
 	params := map[string]interface{}{"draft": false}
 	if discussionCategory != "" {
 		params["discussion_category_name"] = discussionCategory
@@ -244,62 +194,29 @@ func publishRelease(httpClient *http.Client, releaseURL safeurl.SafeURL, discuss
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("PATCH", releaseURL.String(), bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 
 	var release shared.Release
-	err = json.Unmarshal(b, &release)
-	return &release, err
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(host, http.MethodPatch, releaseURL.String(), bytes.NewBuffer(bodyBytes), &release)
+	if err != nil {
+		return nil, err
+	}
+	return &release, nil
 }
 
-func deleteRelease(httpClient *http.Client, releaseURL safeurl.SafeURL) error {
-	req, err := http.NewRequest("DELETE", releaseURL.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return api.HandleHTTPError(resp)
-	}
-
-	if resp.StatusCode != 204 {
-		_, _ = io.Copy(io.Discard, resp.Body)
-	}
-	return nil
+func deleteRelease(httpClient *http.Client, host string, releaseURL safeurl.SafeURL) error {
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	return api.NewClientFromHTTP(httpClient).REST(host, http.MethodDelete, releaseURL.String(), nil, nil)
 }
 
-// tokenHasWorkflowScope checks if the given http.Response's token has the workflow scope.
+// tokenHasWorkflowScope checks if the response token has the workflow scope.
 // Tokens that do not have OAuth scopes are assumed to have the workflow scope.
-func tokenHasWorkflowScope(resp *http.Response) bool {
-	scopes := resp.Header.Get("X-Oauth-Scopes")
+func tokenHasWorkflowScope(headers http.Header) bool {
+	scopes := headers.Get("X-Oauth-Scopes")
 
 	// Return true when no scopes are present - no scopes in this header
 	// means that the user is probably authenticating with a token type other
@@ -308,7 +225,14 @@ func tokenHasWorkflowScope(resp *http.Response) bool {
 		return true
 	}
 
-	return slices.Contains(strings.Split(scopes, ","), "workflow")
+	// The API returns scopes separated by a comma and a space, so each element
+	// must be trimmed before comparison.
+	for _, s := range strings.Split(scopes, ",") {
+		if strings.TrimSpace(s) == "workflow" {
+			return true
+		}
+	}
+	return false
 }
 
 // isNewRelease checks if there are new commits since the latest release.

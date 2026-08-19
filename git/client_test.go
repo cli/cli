@@ -110,6 +110,7 @@ func TestClientAuthenticatedCommand(t *testing.T) {
 }
 
 func TestClientRemotes(t *testing.T) {
+	IsolateConfig(t)
 	tempDir := t.TempDir()
 	initRepo(t, tempDir)
 	gitDir := filepath.Join(tempDir, ".git")
@@ -149,6 +150,7 @@ func TestClientRemotes(t *testing.T) {
 }
 
 func TestClientRemotes_no_resolved_remote(t *testing.T) {
+	IsolateConfig(t)
 	tempDir := t.TempDir()
 	initRepo(t, tempDir)
 	gitDir := filepath.Join(tempDir, ".git")
@@ -708,6 +710,7 @@ func createCommitsCommandContext(t *testing.T, testData stubbedCommitsCommandDat
 }
 
 func TestClientLastCommit(t *testing.T) {
+	IsolateConfig(t)
 	client := Client{
 		RepoDir: "./fixtures/simple.git",
 	}
@@ -718,6 +721,7 @@ func TestClientLastCommit(t *testing.T) {
 }
 
 func TestClientCommitBody(t *testing.T) {
+	IsolateConfig(t)
 	client := Client{
 		RepoDir: "./fixtures/simple.git",
 	}
