@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -188,18 +189,22 @@ func TestNewCmdDevelop(t *testing.T) {
 func TestDevelopRun(t *testing.T) {
 	featureEnabledPayload := `{"data":{"LinkedBranch":{"fields":[{"name":"id"},{"name":"ref"}]}}}`
 	featureDisabledPayload := `{"data":{"LinkedBranch":null}}`
+	unsafeTargetDir := t.TempDir()
+	unsafeTarget := filepath.Join(unsafeTargetDir, "worktree-link")
+	require.NoError(t, os.Symlink(unsafeTargetDir, unsafeTarget))
 
 	tests := []struct {
-		name           string
-		opts           *DevelopOptions
-		cmdStubs       func(*run.CommandStubber)
-		runStubs       func(*run.CommandStubber)
-		remotes        map[string]string
-		httpStubs      func(*httpmock.Registry, *testing.T)
-		expectedOut    string
-		expectedErrOut string
-		wantErr        string
-		tty            bool
+		name            string
+		opts            *DevelopOptions
+		cmdStubs        func(*run.CommandStubber)
+		runStubs        func(*run.CommandStubber)
+		remotes         map[string]string
+		httpStubs       func(*httpmock.Registry, *testing.T)
+		expectedOut     string
+		expectedErrOut  string
+		wantErr         string
+		wantErrContains string
+		tty             bool
 	}{
 		{
 			name: "returns an error when the feature is not supported by the API",
@@ -708,6 +713,132 @@ func TestDevelopRun(t *testing.T) {
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
 		{
+			name: "develop branch into a fresh worktree when local branch exists",
+			opts: &DevelopOptions{
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "/path/to/work tree",
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: registerWorktreeDevelopHTTPStubs,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
+				cs.Register(`git -C .+path.to.work tree rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
+				cs.Register(`git worktree add -- /path/to/work tree my-branch`, 0, "")
+				cs.Register(`git -C /path/to/work tree pull --ff-only origin my-branch`, 0, "")
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
+		},
+		{
+			name: "develop branch into a fresh worktree from a cross-repository remote",
+			opts: &DevelopOptions{
+				IssueNumber: 123,
+				BranchRepo:  "BRANCH-OWNER/BRANCH-REPO",
+				Checkout:    true,
+				Worktree:    "/path/to/worktree",
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+				"fork":   "BRANCH-OWNER/BRANCH-REPO",
+			},
+			httpStubs: registerWorktreeDevelopHTTPStubs,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
+				cs.Register(`git -C .+path.to.worktree rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
+				cs.Register(`git fetch fork \+refs/heads/my-branch:refs/remotes/fork/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
+				cs.Register(`git worktree add --track -b my-branch -- /path/to/worktree fork/my-branch`, 0, "")
+			},
+			expectedOut: "github.com/BRANCH-OWNER/BRANCH-REPO/tree/my-branch\n",
+		},
+		{
+			name: "develop branch into an existing linked worktree",
+			opts: &DevelopOptions{
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "/path/to/worktree",
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: registerWorktreeDevelopHTTPStubs,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
+				cs.Register(`git -C .+path.to.worktree rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/worktree\n\n/repo/.git\n")
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
+				cs.Register(`git -C /path/to/worktree checkout my-branch`, 0, "")
+				cs.Register(`git -C /path/to/worktree pull --ff-only origin my-branch`, 0, "")
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
+		},
+		{
+			name: "develop missing branch inside an existing linked worktree",
+			opts: &DevelopOptions{
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "/path/to/worktree",
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: registerWorktreeDevelopHTTPStubs,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
+				cs.Register(`git -C .+path.to.worktree rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/worktree\n\n/repo/.git\n")
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
+				cs.Register(`git -C /path/to/worktree checkout -b my-branch --track origin/my-branch`, 0, "")
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
+		},
+		{
+			name: "worktree command error",
+			opts: &DevelopOptions{
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "/occupied/path",
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: registerWorktreeDevelopHTTPStubs,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
+				cs.Register(`git -C .+occupied.path rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
+				cs.Register(`git worktree add -- /occupied/path my-branch`, 1, "")
+			},
+			wantErrContains: "failed to run git",
+		},
+		{
+			name: "unsafe worktree target is rejected before creating a linked branch",
+			opts: &DevelopOptions{
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    unsafeTarget,
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, _ *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+			},
+			wantErrContains: "--worktree path must not be a symlink",
+		},
+		{
 			name: "develop with base branch which does not exist",
 			opts: &DevelopOptions{
 				IssueNumber: 123,
@@ -789,10 +920,14 @@ func TestDevelopRun(t *testing.T) {
 
 			err := developRun(opts)
 			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else if tt.wantErrContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrContains)
 				return
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedOut, stdout.String())
 				assert.Equal(t, tt.expectedErrOut, stderr.String())
 			}
@@ -800,82 +935,21 @@ func TestDevelopRun(t *testing.T) {
 	}
 }
 
-func TestCheckoutBranchWorktree(t *testing.T) {
-	tests := []struct {
-		name       string
-		branchRepo ghrepo.Interface
-		remotes    context.Remotes
-		worktree   string
-		runStubs   func(*run.CommandStubber)
-		wantErr    bool
-	}{
-		{
-			name:       "existing local branch",
-			branchRepo: ghrepo.New("OWNER", "REPO"),
-			remotes: context.Remotes{
-				{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.New("OWNER", "REPO")},
-			},
-			worktree: "/path/to/work tree",
-			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
-				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
-				cs.Register(`git worktree add -- /path/to/work tree my-branch`, 0, "")
-				cs.Register(`git -C /path/to/work tree pull --ff-only origin my-branch`, 0, "")
-			},
-		},
-		{
-			name:       "new branch from cross-repository remote",
-			branchRepo: ghrepo.New("BRANCH-OWNER", "BRANCH-REPO"),
-			remotes: context.Remotes{
-				{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.New("OWNER", "REPO")},
-				{Remote: &git.Remote{Name: "fork"}, Repo: ghrepo.New("BRANCH-OWNER", "BRANCH-REPO")},
-			},
-			worktree: "/path/to/worktree",
-			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git fetch fork \+refs/heads/my-branch:refs/remotes/fork/my-branch`, 0, "")
-				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
-				cs.Register(`git worktree add --track -b my-branch -- /path/to/worktree fork/my-branch`, 0, "")
-			},
-		},
-		{
-			name:       "worktree add error",
-			branchRepo: ghrepo.New("OWNER", "REPO"),
-			remotes: context.Remotes{
-				{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.New("OWNER", "REPO")},
-			},
-			worktree: "/occupied/path",
-			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
-				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
-				cs.Register(`git worktree add -- /occupied/path my-branch`, 1, "")
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ios, _, _, _ := iostreams.Test()
-			opts := &DevelopOptions{
-				Checkout:  true,
-				Worktree:  tt.worktree,
-				GitClient: &git.Client{GhPath: "some/path/gh", GitPath: "some/path/git"},
-				IO:        ios,
-				Remotes: func() (context.Remotes, error) {
-					return tt.remotes, nil
-				},
-			}
-
-			cmdStubs, cmdTeardown := run.Stub()
-			defer cmdTeardown(t)
-			tt.runStubs(cmdStubs)
-
-			err := checkoutBranch(opts, tt.branchRepo, "my-branch")
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
+func registerWorktreeDevelopHTTPStubs(reg *httpmock.Registry, _ *testing.T) {
+	reg.Register(
+		httpmock.GraphQL(`query LinkedBranchFeature\b`),
+		httpmock.StringResponse(`{"data":{"LinkedBranch":{"fields":[{"name":"id"},{"name":"ref"}]}}}`),
+	)
+	reg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+	)
+	reg.Register(
+		httpmock.GraphQL(`query FindRepoBranchID\b`),
+		httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","defaultBranchRef":{"target":{"oid":"DEFAULTOID"}},"ref":{"target":{"oid":""}}}}}`),
+	)
+	reg.Register(
+		httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+		httpmock.StringResponse(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`),
+	)
 }

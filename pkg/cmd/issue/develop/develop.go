@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -69,7 +70,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			$ gh issue develop 123 --checkout
 
 			# Create a branch for issue 123 and check it out in a worktree
-			$ gh issue develop 123 --checkout --worktree /path/to/worktree
+			$ gh issue develop 123 --checkout --worktree /path/to/wt-feature
 
 			# Create a branch in repo monalisa/cli for issue 123 in repo cli/cli
 			$ gh issue develop 123 --repo cli/cli --branch-repo monalisa/cli
@@ -207,6 +208,15 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 		}
 	}
 
+	var worktreeTarget prShared.WorktreeTarget
+	if opts.Worktree != "" {
+		var err error
+		worktreeTarget, err = prShared.ResolveWorktreeTarget(opts.GitClient, opts.Worktree)
+		if err != nil {
+			return err
+		}
+	}
+
 	opts.IO.StartProgressIndicatorWithLabel("Preparing linked branch")
 	defer opts.IO.StopProgressIndicator()
 
@@ -274,7 +284,7 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 
 	fmt.Fprintf(opts.IO.Out, "%s/%s/tree/%s\n", branchRepo.RepoHost(), ghrepo.FullName(branchRepo), branchName)
 
-	return checkoutBranch(opts, branchRepo, branchName)
+	return checkoutBranch(opts, branchRepo, branchName, worktreeTarget)
 }
 
 func findExistingLinkedBranchName(branches []api.LinkedBranch, branchRepo ghrepo.Interface, branchName string) string {
@@ -340,7 +350,7 @@ func printLinkedBranches(io *iostreams.IOStreams, branches []api.LinkedBranch) {
 	_ = table.Render()
 }
 
-func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutBranch string) (err error) {
+func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutBranch string, worktreeTarget prShared.WorktreeTarget) (err error) {
 	remotes, err := opts.Remotes()
 	if err != nil {
 		// If the user specified the branch to be checked out and no remotes are found
@@ -374,35 +384,50 @@ func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutB
 		return nil
 	}
 
+	if opts.Worktree != "" {
+		commands, branchExists := prShared.WorktreeCheckoutCommands(
+			gc,
+			worktreeTarget,
+			checkoutBranch,
+			fmt.Sprintf("%s/%s", baseRemote.Name, checkoutBranch),
+		)
+		if err := runGitCommands(gc, commands); err != nil {
+			return err
+		}
+		if branchExists {
+			if err := gc.Pull(ctx.Background(), baseRemote.Name, checkoutBranch, git.WithRepoDir(opts.Worktree)); err != nil {
+				_, _ = fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", opts.IO.ColorScheme().WarningIcon(), checkoutBranch)
+			}
+		}
+		return nil
+	}
+
 	if gc.HasLocalBranch(ctx.Background(), checkoutBranch) {
-		if opts.Worktree != "" {
-			if err := gc.AddWorktree(ctx.Background(), opts.Worktree, checkoutBranch, ""); err != nil {
-				return err
-			}
-		} else {
-			if err := gc.CheckoutBranch(ctx.Background(), checkoutBranch); err != nil {
-				return err
-			}
+		if err := gc.CheckoutBranch(ctx.Background(), checkoutBranch); err != nil {
+			return err
 		}
 
-		var pullMods []git.CommandModifier
-		if opts.Worktree != "" {
-			pullMods = append(pullMods, git.WithRepoDir(opts.Worktree))
-		}
-		if err := gc.Pull(ctx.Background(), baseRemote.Name, checkoutBranch, pullMods...); err != nil {
+		if err := gc.Pull(ctx.Background(), baseRemote.Name, checkoutBranch); err != nil {
 			_, _ = fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", opts.IO.ColorScheme().WarningIcon(), checkoutBranch)
 		}
 	} else {
-		if opts.Worktree != "" {
-			if err := gc.AddWorktree(ctx.Background(), opts.Worktree, checkoutBranch, baseRemote.Name); err != nil {
-				return err
-			}
-		} else {
-			if err := gc.CheckoutNewBranch(ctx.Background(), baseRemote.Name, checkoutBranch); err != nil {
-				return err
-			}
+		if err := gc.CheckoutNewBranch(ctx.Background(), baseRemote.Name, checkoutBranch); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func runGitCommands(client *git.Client, commands [][]string) error {
+	for _, args := range commands {
+		cmd, err := client.Command(ctx.Background(), args...)
+		if err != nil {
+			return err
+		}
+		if _, err := cmd.Output(); err != nil {
+			return err
+		}
+	}
 	return nil
 }

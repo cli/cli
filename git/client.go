@@ -642,28 +642,6 @@ func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch strin
 	return nil
 }
 
-// AddWorktree creates a worktree for an existing local branch, or creates a new
-// local branch tracking remoteName when it is non-empty.
-func (c *Client) AddWorktree(ctx context.Context, path, branch, remoteName string) error {
-	args := []string{"worktree", "add"}
-	if remoteName != "" {
-		args = append(args, "--track", "-b", branch)
-	}
-	args = append(args, "--", path)
-	if remoteName != "" {
-		args = append(args, fmt.Sprintf("%s/%s", remoteName, branch))
-	} else {
-		args = append(args, branch)
-	}
-
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return err
-	}
-	_, err = cmd.Output()
-	return err
-}
-
 func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
 	_, err := c.revParse(ctx, "--verify", "refs/heads/"+branch)
 	return err == nil
