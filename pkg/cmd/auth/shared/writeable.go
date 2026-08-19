@@ -8,6 +8,9 @@ import (
 
 // AuthTokenRefreshable reports whether the token is stored by gh and can be
 // renewed with `gh auth refresh`.
+//
+// TODO: this matches a token prefix itself. It could ask
+// gh.AuthConfig.ActiveTokenType instead.
 func AuthTokenRefreshable(token, src string) bool {
 	return token != "" && !strings.HasSuffix(src, "_TOKEN") && strings.HasPrefix(token, "gho_")
 }

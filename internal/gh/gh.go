@@ -144,9 +144,6 @@ type AuthConfig interface {
 	// ActiveTokenType reports what kind of credential the active token for the
 	// hostname is, so a caller can decide whether it will do without handling
 	// the token itself.
-	//
-	// TODO: gh auth status, AuthTokenWriteable and agent-task each read a
-	// token and match its prefix themselves. They should ask here instead.
 	ActiveTokenType(hostname string) TokenType
 
 	// HasEnvToken returns true when a token has been specified in an environment variable, else returns false.
