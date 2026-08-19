@@ -20,7 +20,7 @@ import (
 func (u *Uploader) UploadAndAttach(ctx context.Context, md string, assets []UserAsset) (string, int, error) {
 	refs := make([]attachmentArg, len(assets))
 	for i, a := range assets {
-		f := a.file()
+		f := a.getAsset()
 		refs[i] = attachmentArg{Path: f.path, Alt: f.alt, RendersAsPlayer: a.rendersAsPlayer()}
 	}
 
