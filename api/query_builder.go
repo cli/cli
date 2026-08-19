@@ -408,7 +408,6 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `milestone{number,title,description,dueOn}`)
 		case "repository":
 			// Selects every field PRRepository declares.
-			// TestPRRepositorySelectionMatchesStruct enforces that.
 			q = append(q, `repository{id,name,nameWithOwner,databaseId,viewerPermission}`)
 		case "reactionGroups":
 			q = append(q, `reactionGroups{content,users{totalCount}}`)
