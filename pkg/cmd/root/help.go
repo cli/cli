@@ -11,6 +11,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -109,6 +110,14 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, _ []string) {
 		return
 	}
 
+	WriteHelp(f.IOStreams.Out, cs, command)
+}
+
+// WriteHelp renders the full help text for command to w. This is the same
+// output produced by `gh <command> --help`, exposed separately so that callers
+// such as error reporting can render help to a stream of their choosing rather
+// than always writing to stdout.
+func WriteHelp(w io.Writer, cs *iostreams.ColorScheme, command *cobra.Command) {
 	type helpEntry struct {
 		Title string
 		Body  string
@@ -193,17 +202,16 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, _ []string) {
 		Learn about accessibility experiences using %[1]sgh help accessibility%[1]s
 	`, "`")})
 
-	out := f.IOStreams.Out
 	for _, e := range helpEntries {
 		if e.Title != "" {
 			// If there is a title, add indentation to each line in the body
-			fmt.Fprintln(out, cs.Bold(e.Title))
-			fmt.Fprintln(out, text.Indent(strings.Trim(e.Body, "\r\n"), "  "))
+			fmt.Fprintln(w, cs.Bold(e.Title))
+			fmt.Fprintln(w, text.Indent(strings.Trim(e.Body, "\r\n"), "  "))
 		} else {
 			// If there is no title print the body as is
-			fmt.Fprintln(out, e.Body)
+			fmt.Fprintln(w, e.Body)
 		}
-		fmt.Fprintln(out)
+		fmt.Fprintln(w)
 	}
 }
 

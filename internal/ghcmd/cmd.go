@@ -223,7 +223,7 @@ func Main() exitCode {
 			return exitCode(extError.ExitCode())
 		}
 
-		printError(stderr, err, cmd, hasDebug)
+		printError(stderr, ioStreams.ColorScheme(), err, cmd, hasDebug, invokingAgent != "")
 
 		if strings.Contains(err.Error(), "Incorrect function") {
 			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
@@ -279,7 +279,12 @@ func isExtensionCommand(rootCmd *cobra.Command, args []string) bool {
 	return err == nil && c != nil && c.GroupID == "extension"
 }
 
-func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
+// printError writes err to out, followed by usage information when the error
+// is the result of command misuse. When fullHelp is set the complete help text
+// is written instead of the terse usage string, giving AI agents the examples,
+// JSON fields and environment variables they need to correct themselves without
+// a second round trip.
+func printError(out io.Writer, cs *iostreams.ColorScheme, err error, cmd *cobra.Command, debug, fullHelp bool) {
 	var dnsError *net.DNSError
 	if errors.As(err, &dnsError) {
 		fmt.Fprintf(out, "error connecting to %s\n", dnsError.Name)
@@ -296,6 +301,13 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 	if errors.As(err, &flagError) || strings.HasPrefix(err.Error(), "unknown command ") {
 		if !strings.HasSuffix(err.Error(), "\n") {
 			fmt.Fprintln(out)
+		}
+		if fullHelp {
+			// Render into out rather than calling cmd.Help(), which would send
+			// the help text to stdout and split a single failure across two
+			// streams.
+			root.WriteHelp(out, cs, cmd)
+			return
 		}
 		fmt.Fprintln(out, cmd.UsageString())
 	}
