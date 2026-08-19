@@ -232,26 +232,13 @@ type AuthConfig struct {
 	tokenOverride       func(string) (string, string)
 }
 
-// tokenTypesByPrefix maps a token's prefix to what kind of credential it is.
-var tokenTypesByPrefix = []struct {
-	prefix    string
-	tokenType gh.TokenType
-}{
-	{"github_pat_", gh.TokenTypeFineGrainedPAT},
-	{"gho_", gh.TokenTypeOAuth},
-	{"ghp_", gh.TokenTypePersonalAccess},
-	{"ghu_", gh.TokenTypeUserToServer},
-	{"ghs_", gh.TokenTypeServerToServer},
-	{"ghr_", gh.TokenTypeRefresh},
-}
-
 // ActiveTokenType reports what kind of credential the active token is, so a
 // caller that only needs to know that can avoid handling the token.
 func (c *AuthConfig) ActiveTokenType(hostname string) gh.TokenType {
 	token, _ := c.ActiveToken(hostname)
-	for _, t := range tokenTypesByPrefix {
-		if strings.HasPrefix(token, t.prefix) {
-			return t.tokenType
+	for _, tokenType := range gh.TokenTypes {
+		if strings.HasPrefix(token, string(tokenType)) {
+			return tokenType
 		}
 	}
 	return gh.TokenTypeUnknown

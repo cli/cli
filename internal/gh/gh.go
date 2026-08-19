@@ -99,8 +99,9 @@ type Migration interface {
 	Do(*ghConfig.Config) error
 }
 
-// TokenType is the kind of credential a token is, told by its prefix. The
-// zero value covers a token gh does not recognise, including an empty one.
+// TokenType is the kind of credential a token is, and its value is the prefix
+// that identifies it. The zero value covers a token gh does not recognise,
+// including an empty one.
 //
 // See the [token formats] GitHub documents.
 //
@@ -109,13 +110,25 @@ type TokenType string
 
 const (
 	TokenTypeUnknown        TokenType = ""
-	TokenTypeOAuth          TokenType = "oauth"            // gho_
-	TokenTypePersonalAccess TokenType = "personal access"  // ghp_
-	TokenTypeFineGrainedPAT TokenType = "fine-grained pat" // github_pat_
-	TokenTypeUserToServer   TokenType = "user-to-server"   // ghu_
-	TokenTypeServerToServer TokenType = "server-to-server" // ghs_
-	TokenTypeRefresh        TokenType = "refresh"          // ghr_
+	TokenTypeOAuth          TokenType = "gho_"
+	TokenTypePersonalAccess TokenType = "ghp_"
+	TokenTypeFineGrainedPAT TokenType = "github_pat_"
+	TokenTypeUserToServer   TokenType = "ghu_"
+	TokenTypeServerToServer TokenType = "ghs_"
+	TokenTypeRefresh        TokenType = "ghr_"
 )
+
+// TokenTypes lists every recognised credential. TokenTypeUnknown is absent
+// because its empty value prefixes every string, so matching against it would
+// claim any token.
+var TokenTypes = []TokenType{
+	TokenTypeOAuth,
+	TokenTypePersonalAccess,
+	TokenTypeFineGrainedPAT,
+	TokenTypeUserToServer,
+	TokenTypeServerToServer,
+	TokenTypeRefresh,
+}
 
 // AuthConfig is used for interacting with some persistent configuration for gh,
 // with knowledge on how to access encrypted storage when necessary.
