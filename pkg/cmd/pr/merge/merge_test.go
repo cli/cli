@@ -2176,7 +2176,8 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 			branch:   "feature",
 			wantContains: []string{
 				"Base branch main is checked out in another worktree (/path/to/base-wt); skipping local delete",
-				"git branch -D feature",
+				"To finish cleanup, switch the worktree at /path/to/base-wt off main, then run in /path/to/main:",
+				"git checkout main && git branch -D feature",
 				"Deleted remote branch feature",
 			},
 			wantNotContains: []string{"Deleted local branch"},

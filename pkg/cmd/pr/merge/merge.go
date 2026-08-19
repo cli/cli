@@ -419,6 +419,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 		mainWorktree := &worktrees[0]
 
 		switch {
+		// The head is checked out in the current linked worktree.
 		case headWorktree.Path == currentWorkdir && headWorktree.Path != mainWorktree.Path:
 			_ = m.warnf("%s Branch %s is checked out in the current worktree (%s); skipping local delete\n",
 				m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), currentWorkdir)
@@ -427,12 +428,14 @@ func (m *mergeContext) deleteLocalBranch() error {
 				currentWorkdir, m.pr.HeadRefName)
 			return nil
 
+		// The head is checked out in the current main worktree.
 		case headWorktree.Path == currentWorkdir:
 			if baseWorktree := worktreeForBranch(worktrees, m.pr.BaseRefName); baseWorktree != nil && baseWorktree.Path != currentWorkdir {
 				_ = m.warnf("%s Base branch %s is checked out in another worktree (%s); skipping local delete\n",
 					m.cs.WarningIcon(), m.cs.Cyan(m.pr.BaseRefName), baseWorktree.Path)
-				_ = m.warnf("  To finish cleanup, switch off %s in another worktree, then run:\n", m.cs.Cyan(m.pr.HeadRefName))
-				_ = m.warnf("  git branch -D %s\n", m.pr.HeadRefName)
+				_ = m.warnf("  To finish cleanup, switch the worktree at %s off %s, then run in %s:\n",
+					baseWorktree.Path, m.cs.Cyan(m.pr.BaseRefName), currentWorkdir)
+				_ = m.warnf("  git checkout %s && git branch -D %s\n", m.pr.BaseRefName, m.pr.HeadRefName)
 				return nil
 			}
 
@@ -463,6 +466,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 
 			switchedToBranch = targetBranch
 
+		// The head is checked out in the main worktree, but the command is running elsewhere.
 		case headWorktree.Path == mainWorktree.Path:
 			_ = m.warnf("%s Branch %s is checked out in the main worktree (%s); skipping local delete\n",
 				m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), mainWorktree.Path)
@@ -470,6 +474,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 			_ = m.warnf("  git branch -D %s\n", m.pr.HeadRefName)
 			return nil
 
+		// The head is checked out in another linked worktree.
 		default:
 			if err := m.opts.GitClient.WorktreeRemove(ctx, headWorktree.Path); err != nil {
 				_ = m.warnf("%s Could not remove worktree %s; skipping local branch delete: %s\n", m.cs.WarningIcon(), headWorktree.Path, err)
