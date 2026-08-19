@@ -79,8 +79,9 @@ func TestNewAsset(t *testing.T) {
 			wantContentType: "image/svg+xml",
 		},
 		{
-			// A video has no alt attribute to fill, so Alt stays empty and
-			// Label carries the filename for a degraded link.
+			// A video has no alt attribute to fill, so the author cannot supply
+			// one. The filename stands in, extension included, because it
+			// becomes the link text when the reference degrades to a link.
 			name:            "mp4",
 			file:            "repro.mp4",
 			path:            "./repro.mp4",
