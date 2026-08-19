@@ -1,4 +1,4 @@
-// Package assets implements the --attach flag.
+// Package attachments implements the --attach flag.
 // It uploads local user assets to GitHub and optionally rewrites user provided
 // markdown references to point at the remote asset path rather than the local
 // path. In the absence of a markdown reference, a new reference is appended to
