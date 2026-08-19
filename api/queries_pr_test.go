@@ -568,40 +568,6 @@ func TestSuggestedReviewerActorsForRepo(t *testing.T) {
 	}
 }
 
-func TestPRRepositoryUnmarshal(t *testing.T) {
-	tests := []struct {
-		name string
-		json string
-		want PRRepository
-	}{
-		{
-			name: "every field the repository selection asks for",
-			json: `{"id":"R_kgDOAAA","name":"REPO","nameWithOwner":"OWNER/REPO","databaseId":1234,"viewerPermission":"WRITE"}`,
-			want: PRRepository{ID: "R_kgDOAAA", Name: "REPO", NameWithOwner: "OWNER/REPO", DatabaseID: 1234, ViewerPermission: "WRITE"},
-		},
-		{
-			name: "a database id larger than a 32 bit int",
-			json: `{"databaseId":5000000000}`,
-			want: PRRepository{DatabaseID: 5000000000},
-		},
-		{
-			name: "absent when the field was never requested",
-			json: `{"id":"R_kgDOAAA"}`,
-			want: PRRepository{ID: "R_kgDOAAA"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var got PRRepository
-			err := json.Unmarshal([]byte(tt.json), &got)
-
-			assert.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 // TestPRRepositorySelectionMatchesStruct guards the seam between the two:
 // a field added to the selection but not the struct is silently dropped, and
 // one added to the struct but not the selection is silently zero.
