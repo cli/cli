@@ -258,6 +258,7 @@ type PRRepository struct {
 
 	// Fields below are omitted when empty because this type is used by
 	// headRepository.
+
 	DatabaseID int64 `json:"databaseId,omitempty"`
 	// One of ADMIN, MAINTAIN, WRITE, TRIAGE, READ.
 	ViewerPermission string `json:"viewerPermission,omitempty"`
