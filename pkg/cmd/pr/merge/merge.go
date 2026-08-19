@@ -534,7 +534,7 @@ func (m *mergeContext) shouldAddToMergeQueue() bool {
 func worktreeForBranch(worktrees []git.Worktree, branch string) *git.Worktree {
 	branchRef := "refs/heads/" + branch
 	for i := range worktrees {
-		if worktrees[i].Branch == branchRef {
+		if worktrees[i].Ref == branchRef {
 			return &worktrees[i]
 		}
 	}

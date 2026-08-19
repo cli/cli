@@ -76,8 +76,8 @@ type BranchConfig struct {
 type Worktree struct {
 	// Path is the absolute path to the worktree's working directory.
 	Path string
-	// Branch is the fully qualified ref checked out in the worktree
+	// Ref is the fully qualified ref checked out in the worktree
 	// (e.g. "refs/heads/main"). It is empty when the worktree has a detached
 	// HEAD or is the bare main worktree.
-	Branch string
+	Ref string
 }

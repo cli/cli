@@ -2304,7 +2304,7 @@ func TestParseWorktrees(t *testing.T) {
 				branch refs/heads/main
 			`),
 			want: []Worktree{
-				{Path: "/path/to/main", Branch: "refs/heads/main"},
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
 			},
 		},
 		{
@@ -2319,8 +2319,8 @@ func TestParseWorktrees(t *testing.T) {
 				branch refs/heads/feature
 			`),
 			want: []Worktree{
-				{Path: "/path/to/main", Branch: "refs/heads/main"},
-				{Path: "/path/to/feature-wt", Branch: "refs/heads/feature"},
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
+				{Path: "/path/to/feature-wt", Ref: "refs/heads/feature"},
 			},
 		},
 		{
@@ -2335,15 +2335,15 @@ func TestParseWorktrees(t *testing.T) {
 				detached
 			`),
 			want: []Worktree{
-				{Path: "/path/to/main", Branch: "refs/heads/main"},
-				{Path: "/path/to/detached", Branch: ""},
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
+				{Path: "/path/to/detached", Ref: ""},
 			},
 		},
 		{
 			name: "no trailing blank line",
 			out:  "worktree /path/to/main\nHEAD abc123\nbranch refs/heads/main",
 			want: []Worktree{
-				{Path: "/path/to/main", Branch: "refs/heads/main"},
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
 			},
 		},
 		{
@@ -2357,8 +2357,8 @@ func TestParseWorktrees(t *testing.T) {
 				branch refs/heads/feature
 			`),
 			want: []Worktree{
-				{Path: "/path/to/bare", Branch: ""},
-				{Path: "/path/to/feature-wt", Branch: "refs/heads/feature"},
+				{Path: "/path/to/bare", Ref: ""},
+				{Path: "/path/to/feature-wt", Ref: "refs/heads/feature"},
 			},
 		},
 	}

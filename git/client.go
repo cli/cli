@@ -301,7 +301,7 @@ func parseWorktrees(output []byte) []Worktree {
 			case "worktree":
 				worktree.Path = value
 			case "branch":
-				worktree.Branch = value
+				worktree.Ref = value
 			}
 		}
 		if worktree.Path != "" {
