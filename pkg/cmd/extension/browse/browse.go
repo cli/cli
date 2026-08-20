@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/glamour/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/charmbracelet/glamour"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
