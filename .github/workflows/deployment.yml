@@ -427,34 +427,6 @@ jobs:
           cp -a dists/ pool/ upload/
           mkdir -p site/packages
           cp -a upload/* site/packages/
-      # TEMPORARY: this step verifies the APT and RPM repositories are signed with the
-      # expected keys. It is intended for a one-off dry-run confirmation and will be
-      # dropped once the signing has been confirmed.
-      - name: Verify repository signatures
-        if: ${{ inputs.environment == 'production' }}
-        run: |
-          set -euo pipefail
-
-          # Start from a clean gpg database so the signing keys loaded earlier (including
-          # private key material) are gone, then import only the published public keyring
-          # and verify against that. Nothing sensitive is left in the environment afterwards.
-          rm -rf ~/.gnupg
-          gpg --batch --import site/packages/githubcli-archive-keyring.gpg >/dev/null 2>&1
-
-          # Fingerprints published in docs/install_linux.md.
-          # gpg's human-readable output goes to stderr and is discarded; only the
-          # machine-readable VALIDSIG lines (which contain public fingerprints) are grepped.
-
-          # APT repository: signed with both the old and new keys.
-          apt_status="$(gpg --batch --status-fd 1 --verify site/packages/dists/stable/Release.gpg site/packages/dists/stable/Release 2>/dev/null)"
-          echo "$apt_status" | grep -q "VALIDSIG.*2C6106201985B60E6C7AC87323F3D4EA75716059"
-          echo "$apt_status" | grep -q "VALIDSIG.*7F38BBB59D064DBCB3D84D725612B36462313325"
-
-          # RPM repository: signed with the old key.
-          rpm_status="$(gpg --batch --status-fd 1 --verify site/packages/rpm/repodata/repomd.xml.asc site/packages/rpm/repodata/repomd.xml 2>/dev/null)"
-          echo "$rpm_status" | grep -q "VALIDSIG.*2C6106201985B60E6C7AC87323F3D4EA75716059"
-
-          echo "Repository signatures verified."
       - name: Create the release
         env:
           # In non-production environments, the assets will not have been signed
