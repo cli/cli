@@ -60,6 +60,18 @@ func TestJSONFields(t *testing.T) {
 func TestNewCmdView(t *testing.T) {
 	// Test shared parsing of issue number / URL.
 	argparsetest.TestArgParsing(t, NewCmdView)
+
+	t.Run("comments and JSON are mutually exclusive", func(t *testing.T) {
+		cmd := NewCmdView(&cmdutil.Factory{}, func(*ViewOptions) error {
+			return nil
+		})
+		cmd.SetArgs([]string{"123", "--comments", "--json", "number"})
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+
+		_, err := cmd.ExecuteC()
+		require.EqualError(t, err, "specify only one of --comments or --json")
+	})
 }
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
