@@ -777,6 +777,28 @@ func TestDevelopRun(t *testing.T) {
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
 		{
+			name: "failed pull in an existing linked worktree warns and succeeds",
+			opts: &DevelopOptions{
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    "/path/to/worktree",
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: registerWorktreeDevelopHTTPStubs,
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
+				cs.Register(`git -C .+path.to.worktree rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/worktree\n\n/repo/.git\n")
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
+				cs.Register(`git -C /path/to/worktree checkout my-branch`, 0, "")
+				cs.Register(`git -C /path/to/worktree pull --ff-only origin my-branch`, 1, "")
+			},
+			expectedOut:    "github.com/OWNER/REPO/tree/my-branch\n",
+			expectedErrOut: "! warning: not possible to fast-forward to: \"my-branch\"\n",
+		},
+		{
 			name: "develop missing branch inside an existing linked worktree",
 			opts: &DevelopOptions{
 				IssueNumber: 123,
