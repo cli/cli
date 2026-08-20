@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -615,6 +616,32 @@ func TestRunCopilot_execFailureHint(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, execErr)
 	require.Contains(t, err.Error(), "try running `copilot` directly without `gh`.")
+}
+
+func TestRunCopilot_declinedInstallEndsWithNewline(t *testing.T) {
+	ios, _, _, stderr := iostreams.Test()
+	ios.SetStdinTTY(true)
+	ios.SetStdoutTTY(true)
+
+	pm := prompter.NewMockPrompter(t)
+	pm.RegisterConfirm("GitHub Copilot CLI is not installed. Would you like to install it?", func(_ string, _ bool) (bool, error) {
+		return false, nil
+	})
+
+	opts := &CopilotOptions{
+		IO:       ios,
+		Prompter: pm,
+	}
+
+	origFind := findCopilotBinaryFunc
+	findCopilotBinaryFunc = func() string {
+		return ""
+	}
+	t.Cleanup(func() { findCopilotBinaryFunc = origFind })
+
+	err := runCopilot(opts)
+	require.ErrorIs(t, err, cmdutil.SilentError)
+	require.Equal(t, "! Copilot CLI was not installed\n", stderr.String())
 }
 
 func TestCopilotCommandIsSampledAt100(t *testing.T) {
