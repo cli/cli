@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -591,30 +592,89 @@ func TestDownloadCopilot(t *testing.T) {
 	})
 }
 
-func TestRunCopilot_execFailureHint(t *testing.T) {
-	ios, _, _, _ := iostreams.Test()
-	opts := &CopilotOptions{
-		IO:          ios,
-		CopilotArgs: []string{},
-	}
-
-	origFind := findCopilotBinaryFunc
-	findCopilotBinaryFunc = func() string {
-		return "/usr/bin/copilot"
-	}
-	t.Cleanup(func() { findCopilotBinaryFunc = origFind })
-
+func TestRunCopilot(t *testing.T) {
 	execErr := fmt.Errorf("exec failed: something went wrong")
-	origRun := runExternalCmdFunc
-	runExternalCmdFunc = func(_ *exec.Cmd) error {
-		return execErr
+	tests := []struct {
+		name             string
+		isTTY            bool
+		prompter         prompter.Prompter
+		findCopilot      func() string
+		runExternal      func(*exec.Cmd) error
+		wantErr          error
+		wantErrSubstring string
+		wantStderr       string
+	}{
+		{
+			name:  "declining install prints trailing newline",
+			isTTY: true,
+			prompter: &prompter.PrompterMock{
+				ConfirmFunc: func(_ string, _ bool) (bool, error) {
+					return false, nil
+				},
+			},
+			findCopilot: func() string {
+				return ""
+			},
+			wantErr:    cmdutil.SilentError,
+			wantStderr: "! Copilot CLI was not installed\n",
+		},
+		{
+			name: "non-interactive missing install prints trailing newline",
+			findCopilot: func() string {
+				return ""
+			},
+			wantErr:    cmdutil.SilentError,
+			wantStderr: "! Copilot CLI not installed\n",
+		},
+		{
+			name: "execution failure includes direct command hint",
+			findCopilot: func() string {
+				return "/usr/bin/copilot"
+			},
+			runExternal: func(_ *exec.Cmd) error {
+				return execErr
+			},
+			wantErr:          execErr,
+			wantErrSubstring: "try running `copilot` directly without `gh`.",
+		},
 	}
-	t.Cleanup(func() { runExternalCmdFunc = origRun })
 
-	err := runCopilot(opts)
-	require.Error(t, err)
-	require.ErrorIs(t, err, execErr)
-	require.Contains(t, err.Error(), "try running `copilot` directly without `gh`.")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("CI", "")
+			t.Setenv("BUILD_NUMBER", "")
+			t.Setenv("RUN_ID", "")
+
+			ios, _, _, stderr := iostreams.Test()
+			if tt.isTTY {
+				ios.SetStdinTTY(true)
+				ios.SetStdoutTTY(true)
+			}
+
+			opts := &CopilotOptions{
+				IO:          ios,
+				Prompter:    tt.prompter,
+				CopilotArgs: []string{},
+			}
+
+			origFind := findCopilotBinaryFunc
+			findCopilotBinaryFunc = tt.findCopilot
+			t.Cleanup(func() { findCopilotBinaryFunc = origFind })
+
+			if tt.runExternal != nil {
+				origRun := runExternalCmdFunc
+				runExternalCmdFunc = tt.runExternal
+				t.Cleanup(func() { runExternalCmdFunc = origRun })
+			}
+
+			err := runCopilot(opts)
+			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantErrSubstring != "" {
+				require.ErrorContains(t, err, tt.wantErrSubstring)
+			}
+			assert.Equal(t, tt.wantStderr, stderr.String())
+		})
+	}
 }
 
 func TestCopilotCommandIsSampledAt100(t *testing.T) {
