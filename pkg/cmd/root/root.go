@@ -250,7 +250,6 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, versi
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
-	cmdutil.RecordTelemetryForSubcommands(cmd, telemetry)
 
 	// The reference command produces paged output that displays information on every other command.
 	// Therefore, we explicitly set the Long text and HelpFunc here after all other commands are registered.
@@ -260,4 +259,10 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, versi
 	referenceCmd.Long = stringifyReference(cmd)
 	referenceCmd.SetHelpFunc(longPager(f.IOStreams))
 	return cmd, nil
+}
+
+// IsExtensionCommand returns true if args resolve to an extension command.
+func IsExtensionCommand(rootCmd *cobra.Command, args []string) bool {
+	c, _, err := rootCmd.Find(args)
+	return err == nil && c != nil && c.GroupID == "extension"
 }

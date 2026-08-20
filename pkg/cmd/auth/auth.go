@@ -31,7 +31,7 @@ func NewCmdAuth(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(authTokenCmd.NewCmdToken(f, nil))
 	cmd.AddCommand(authSwitchCmd.NewCmdSwitch(f, nil))
 
-	cmdutil.DisableTelemetryForSubcommands(cmd)
+	cmdutil.DisableTelemetryRecursively(cmd)
 
 	return cmd
 }

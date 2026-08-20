@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"maps"
 	"net"
 	"os"
 	"os/exec"
@@ -24,6 +24,7 @@ import (
 	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/gherrs"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
@@ -37,16 +38,14 @@ import (
 	"github.com/cli/safeexec"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type exitCode int
 
 const (
-	exitOK      exitCode = 0
-	exitError   exitCode = 1
-	exitCancel  exitCode = 2
-	exitAuth    exitCode = 4
-	exitPending exitCode = 8
+	exitOK    exitCode = 0
+	exitError exitCode = 1
 )
 
 func Main() exitCode {
@@ -184,69 +183,144 @@ func Main() exitCode {
 	}
 
 	// translate `gh help <command>` to `gh <command> --help` for extensions.
-	if len(expandedArgs) >= 2 && expandedArgs[0] == "help" && isExtensionCommand(rootCmd, expandedArgs[1:]) {
+	if len(expandedArgs) >= 2 && expandedArgs[0] == "help" && root.IsExtensionCommand(rootCmd, expandedArgs[1:]) {
 		expandedArgs = expandedArgs[1:]
 		expandedArgs = append(expandedArgs, "--help")
 	}
 
 	rootCmd.SetArgs(expandedArgs)
 
-	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
-		var pagerPipeError *iostreams.ErrClosedPagerPipe
-		var noResultsError cmdutil.NoResultsError
-		var extError *root.ExternalCommandExitError
-		var authError *root.AuthError
-		if err == cmdutil.SilentError {
-			return exitError
-		} else if err == cmdutil.PendingError {
-			return exitPending
-		} else if cmdutil.IsUserCancellation(err) {
+	var executedCmd *cobra.Command
+	var errorDims ghtelemetry.Dimensions
+	defer func() {
+		if executedCmd == nil {
+			telemetryService.Record(ghtelemetry.Event{
+				Type: "missing_command",
+			})
+			return
+		}
+
+		// For telemetry-disabled commands, skip telemetry entirely.
+		commandPath := executedCmd.CommandPath()
+		if cmdutil.IsTelemetryDisabled(executedCmd) {
+			return
+		}
+
+		var flags []string
+		executedCmd.Flags().Visit(func(f *pflag.Flag) {
+			flags = append(flags, f.Name)
+		})
+		slices.Sort(flags)
+
+		var dimensions = ghtelemetry.Dimensions{
+			"command": commandPath,
+			"flags":   strings.Join(flags, ","),
+		}
+		maps.Copy(dimensions, errorDims)
+
+		telemetryService.Record(ghtelemetry.Event{
+			Type:       "command_invocation",
+			Dimensions: dimensions,
+		})
+	}()
+
+	if executedCmd, err = rootCmd.ExecuteContextC(ctx); err != nil {
+		// Preserve the original error before the switch may replace it with a
+		// gherrs sentinel. This lets telemetry capture the real error chain.
+		originalErr := err
+
+		var pagerPipeErr *iostreams.ErrClosedPagerPipe
+		var noResultsErr cmdutil.NoResultsError
+		var extErr *root.ExternalCommandExitError
+		var authErr *root.AuthError
+		var dnsErr *net.DNSError
+		var flagErr *cmdutil.FlagError
+		var httpErr api.HTTPError
+
+		switch {
+		case errors.Is(err, cmdutil.SilentError):
+			err = gherrs.SilentError
+		case errors.Is(err, cmdutil.PendingError):
+			err = gherrs.PendingError
+		case cmdutil.IsUserCancellation(err):
+			// This should be fixed at the prompting layer.
 			if errors.Is(err, terminal.InterruptErr) {
-				// ensure the next shell prompt will start on its own line
 				fmt.Fprint(stderr, "\n")
 			}
-			return exitCancel
-		} else if errors.As(err, &authError) {
-			return exitAuth
-		} else if errors.As(err, &pagerPipeError) {
-			// ignore the error raised when piping to a closed pager
-			return exitOK
-		} else if errors.As(err, &noResultsError) {
+			err = gherrs.UserCancellationError
+		case errors.As(err, &authErr):
+			err = gherrs.AuthError
+		case errors.As(err, &pagerPipeErr):
+			err = nil // user quit the pager, not really an error
+		case errors.As(err, &noResultsErr):
 			if cmdFactory.IOStreams.IsStdoutTTY() {
-				fmt.Fprintln(stderr, noResultsError.Error())
+				fmt.Fprintln(stderr, noResultsErr.Error())
 			}
-			// no results is not a command failure
+			err = nil // no data to show, not really an error
+		case errors.As(err, &extErr):
+			err = &gherrs.ExtensionExecError{Code: extErr.ExitCode()}
+		case errors.As(err, &dnsErr):
+			var s strings.Builder
+			fmt.Fprintf(&s, "error connecting to %s\n", dnsErr.Name)
+			if hasDebug {
+				fmt.Fprintf(&s, "%v\n", dnsErr)
+			}
+			fmt.Fprint(&s, "check your internet connection or https://githubstatus.com")
+			// Do not set WrappedErr here - the original DNS error is captured
+			// separately via originalErr for telemetry, and including it in the
+			// displayed Error() would prepend the raw DNS message before the
+			// user-friendly guidance.
+			err = gherrs.GeneralError{Message: s.String()}
+		case strings.Contains(err.Error(), "Incorrect function"):
+			var s strings.Builder
+			fmt.Fprintln(&s, "You appear to be running in MinTTY without pseudo terminal support.")
+			fmt.Fprint(&s, "To learn about workarounds for this error, run:  gh help mintty")
+			err = gherrs.GeneralError{WrappedErr: err, Message: s.String()}
+		default:
+			httpErrMatched := errors.As(err, &httpErr)
+
+			if errors.As(err, &flagErr) || strings.HasPrefix(err.Error(), "unknown command ") {
+				var s strings.Builder
+				if !strings.HasSuffix(err.Error(), "\n") {
+					fmt.Fprintln(&s)
+				}
+				fmt.Fprint(&s, executedCmd.UsageString())
+				err = gherrs.GeneralError{WrappedErr: err, Message: s.String()}
+			} else if httpErrMatched && httpErr.StatusCode == 401 {
+				authCommand := "gh auth login"
+				if cfg, cfgErr := cmdFactory.Config(); cfgErr == nil {
+					authCommand = authRecoveryCommand(cfg, httpErr)
+				}
+				err = gherrs.GeneralError{WrappedErr: err, Message: fmt.Sprintf("Try authenticating with:  %s", authCommand)}
+			} else if httpErrMatched {
+				if u := factory.SSOURL(); u != "" {
+					err = gherrs.GeneralError{WrappedErr: err, Message: fmt.Sprintf("Authorize in your web browser:  %s", u)}
+				} else if msg := httpErr.ScopesSuggestion(); msg != "" {
+					err = gherrs.GeneralError{WrappedErr: err, Message: msg}
+				}
+			}
+		}
+
+		if err == nil {
 			return exitOK
-		} else if errors.As(err, &extError) {
-			// pass on exit codes from extensions and shell aliases
-			return exitCode(extError.ExitCode())
 		}
 
-		printError(stderr, err, cmd, hasDebug)
+		errorDims = newErrDims(err, originalErr)
 
-		if strings.Contains(err.Error(), "Incorrect function") {
-			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
-			fmt.Fprintln(stderr, "To learn about workarounds for this error, run:  gh help mintty")
-			return exitError
+		var silenced gherrs.Silenced
+		if !errors.As(err, &silenced) {
+			fmt.Fprintln(stderr, err)
 		}
 
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
-			authCommand := "gh auth login"
-			if cfg, cfgErr := cmdFactory.Config(); cfgErr == nil {
-				authCommand = authRecoveryCommand(cfg, httpErr)
-			}
-			fmt.Fprintf(stderr, "Try authenticating with:  %s\n", authCommand)
-		} else if u := factory.SSOURL(); u != "" {
-			// handles organization SAML enforcement error
-			fmt.Fprintf(stderr, "Authorize in your web browser:  %s\n", u)
-		} else if msg := httpErr.ScopesSuggestion(); msg != "" {
-			fmt.Fprintln(stderr, msg)
+		if exitCoder, ok := errors.AsType[gherrs.ExitCoder](err); ok {
+			return exitCode(exitCoder.ExitCode())
 		}
 
 		return exitError
 	}
+
 	if root.HasFailed() {
+		errorDims = ghtelemetry.Dimensions{"outcome": "error"}
 		return exitError
 	}
 
@@ -272,32 +346,55 @@ func Main() exitCode {
 	return exitOK
 }
 
-// isExtensionCommand returns true if args resolve to an extension command.
-func isExtensionCommand(rootCmd *cobra.Command, args []string) bool {
-	c, _, err := rootCmd.Find(args)
-	return err == nil && c != nil && c.GroupID == "extension"
+func newErrDims(mappedErr, originalErr error) ghtelemetry.Dimensions {
+	errTypes := grabAllUnwrappableNestedErrorTypes(originalErr)
+
+	if errors.Is(mappedErr, gherrs.PendingError) || errors.Is(mappedErr, gherrs.UserCancellationError) {
+		return ghtelemetry.Dimensions{"outcome": "success", "errTypes": errTypes}
+	}
+
+	return ghtelemetry.Dimensions{
+		"outcome":  "error",
+		"errTypes": errTypes,
+	}
 }
 
-func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
-	var dnsError *net.DNSError
-	if errors.As(err, &dnsError) {
-		fmt.Fprintf(out, "error connecting to %s\n", dnsError.Name)
-		if debug {
-			fmt.Fprintln(out, dnsError)
-		}
-		fmt.Fprintln(out, "check your internet connection or https://githubstatus.com")
-		return
-	}
+// noiseErrorTypes are common stdlib wrapper types that provide no analytical
+// value in telemetry. We skip them to keep the errTypes dimension focused on
+// domain-specific error types that are actually interesting.
+var noiseErrorTypes = map[string]bool{
+	"errors.errorString": true,
+	"errors.joinError":   true,
+	"fmt.wrapError":      true,
+}
 
-	fmt.Fprintln(out, err)
-
-	var flagError *cmdutil.FlagError
-	if errors.As(err, &flagError) || strings.HasPrefix(err.Error(), "unknown command ") {
-		if !strings.HasSuffix(err.Error(), "\n") {
-			fmt.Fprintln(out)
+// This is a pretty janky way to get some privacy-respecting visibility into
+// what kind of error we're dealing with. It is not at all intended to be comprehensive.
+func grabAllUnwrappableNestedErrorTypes(err error) string {
+	var types []string
+	queue := []error{err}
+	for len(queue) > 0 && len(types) < 100 {
+		current := queue[0]
+		queue = queue[1:]
+		if current == nil {
+			continue
 		}
-		fmt.Fprintln(out, cmd.UsageString())
+
+		t := strings.TrimPrefix(fmt.Sprintf("%T", current), "*")
+		if !noiseErrorTypes[t] {
+			types = append(types, t)
+		}
+
+		// Traverse single-wrapped errors and multi-errors (e.g. errors.Join).
+		if u, ok := current.(interface{ Unwrap() error }); ok {
+			if next := u.Unwrap(); next != nil {
+				queue = append(queue, next)
+			}
+		} else if u, ok := current.(interface{ Unwrap() []error }); ok {
+			queue = append(queue, u.Unwrap()...)
+		}
 	}
+	return strings.Join(types, ",")
 }
 
 func authRecoveryCommand(cfg gh.Config, httpErr api.HTTPError) string {
