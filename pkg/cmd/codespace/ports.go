@@ -310,7 +310,7 @@ func newPortsForwardCmd(app *App, selector *CodespaceSelector) *cobra.Command {
 			Ports bind to loopback (%[1]s127.0.0.1%[1]s) by default. Use %[1]s--all-interfaces%[1]s
 			to bind to all interfaces.
 		`, "`"),
-		Args:  cobra.MinimumNArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.ForwardPorts(cmd.Context(), selector, args, allInterfaces)
 		},
