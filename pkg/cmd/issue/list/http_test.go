@@ -2,8 +2,10 @@ package list
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -266,4 +268,59 @@ func TestSearchIssues_rejectsPullRequestQualifiers(t *testing.T) {
 			assert.Len(t, reg.Requests, 0)
 		})
 	}
+}
+
+func TestSearchIssues_pagination(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	firstPageNodes := make([]string, 100)
+	for i := 0; i < 100; i++ {
+		firstPageNodes[i] = fmt.Sprintf(`{"number": %d}`, i+1)
+	}
+
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.GraphQLQuery(fmt.Sprintf(`{
+			"data": {
+				"repository": { "hasIssuesEnabled": true },
+				"search": {
+					"issueCount": 150,
+					"nodes": [%s],
+					"pageInfo": { "hasNextPage": true, "endCursor": "ENDCURSOR" }
+				}
+			}
+		}`, strings.Join(firstPageNodes, ",")), func(query string, vars map[string]interface{}) {
+			assert.Equal(t, float64(100), vars["limit"])
+			assert.Nil(t, vars["after"])
+		}))
+
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.GraphQLQuery(`{
+			"data": {
+				"repository": { "hasIssuesEnabled": true },
+				"search": {
+					"issueCount": 150,
+					"nodes": [ { "number": 101 } ],
+					"pageInfo": { "hasNextPage": false, "endCursor": "ENDCURSOR2" }
+				}
+			}
+		}`, func(query string, vars map[string]interface{}) {
+			assert.Equal(t, float64(50), vars["limit"])
+			assert.Equal(t, "ENDCURSOR", vars["after"])
+		}))
+
+	httpClient := &http.Client{Transport: reg}
+	client := api.NewClientFromHTTP(httpClient)
+
+	res, err := searchIssues(
+		client,
+		fd.AdvancedIssueSearchSupportedAsOnlyBackend(),
+		ghrepo.New("OWNER", "REPO"),
+		prShared.FilterOptions{Search: "is:open"},
+		150,
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, 101, len(res.Issues))
 }
