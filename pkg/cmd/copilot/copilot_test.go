@@ -115,7 +115,8 @@ func TestNewCmdCopilot(t *testing.T) {
 			assert.NoError(t, err)
 
 			var gotOpts *CopilotOptions
-			cmd := NewCmdCopilot(f, &telemetry.CommandRecorderSpy{}, func(opts *CopilotOptions) error {
+			spy := &telemetry.CommandRecorderSpy{}
+			cmd := NewCmdCopilot(f, spy, func(opts *CopilotOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -126,6 +127,7 @@ func TestNewCmdCopilot(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			assert.Equal(t, ghtelemetry.SAMPLE_ALL, spy.LastSampleRate)
 			if tt.wantErrString != "" {
 				require.EqualError(t, err, tt.wantErrString)
 				return
@@ -675,20 +677,4 @@ func TestRunCopilot(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
-}
-
-func TestCopilotCommandIsSampledAt100(t *testing.T) {
-	spy := &telemetry.CommandRecorderSpy{}
-	factory := &cmdutil.Factory{}
-	cmd := NewCmdCopilot(factory, spy, func(opts *CopilotOptions) error {
-		return nil
-	})
-	cmd.SetArgs([]string{})
-	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	_, err := cmd.ExecuteC()
-	require.NoError(t, err)
-	require.Equal(t, ghtelemetry.SAMPLE_ALL, spy.LastSampleRate)
 }
