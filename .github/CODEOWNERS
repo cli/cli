@@ -1,17 +1,1 @@
-* @cli/code-reviewers
 
-pkg/cmd/codespace/ @cli/codespaces @cli/code-reviewers
-internal/codespaces/ @cli/codespaces @cli/code-reviewers
-
-# Limit Package Security team ownership to the attestation command package and related integration tests
-pkg/cmd/attestation/ @cli/package-security @cli/code-reviewers
-pkg/cmd/release/verify/ @cli/package-security @cli/code-reviewers
-pkg/cmd/release/verify-asset/ @cli/package-security @cli/code-reviewers
-pkg/cmd/release/shared/ @cli/package-security @cli/code-reviewers
-
-test/integration/attestation-cmd @cli/package-security @cli/code-reviewers
-
-pkg/cmd/attestation/verification/embed/tuf-repo.github.com/ @cli/tuf-root-reviewers @cli/code-reviewers
-
-pkg/cmd/skills/ @cli/skills @cli/code-reviewers
-internal/skills/ @cli/skills @cli/code-reviewers
