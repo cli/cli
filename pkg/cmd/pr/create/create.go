@@ -73,8 +73,11 @@ type CreateOptions struct {
 	MaintainerCanModify bool
 	Template            string
 
-	DryRun bool
+	DryRun   bool
+	Exporter cmdutil.Exporter
 }
+
+var createOutputFields = []string{"id", "url", "number"}
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
 // Upcasting to concrete implementations can provide further context on other operations (forking and pushing).
@@ -331,6 +334,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
+			if opts.DryRun && opts.Exporter != nil {
+				return cmdutil.FlagErrorf("`--dry-run` is not supported with `--json`")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -359,6 +366,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
+	cmdutil.AddJSONAndJQFlags(cmd, &opts.Exporter, createOutputFields)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -1065,7 +1073,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.PRRefs.BaseRepo(), params)
 	opts.IO.StopProgressIndicator()
-	if pr != nil {
+	if pr != nil && opts.Exporter == nil {
 		fmt.Fprintln(opts.IO.Out, pr.URL)
 	}
 	if err != nil {
@@ -1073,6 +1081,9 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 			return fmt.Errorf("pull request update failed: %w", err)
 		}
 		return fmt.Errorf("pull request create failed: %w", err)
+	}
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, pr)
 	}
 	return nil
 }
