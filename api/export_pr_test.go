@@ -228,6 +228,37 @@ func TestIssue_ExportData(t *testing.T) {
 			`),
 		},
 		{
+			name:   "issue field values - single select",
+			fields: []string{"issueFieldValues"},
+			inputJSON: heredoc.Doc(`
+				{ "issueFieldValues": { "nodes": [
+					{
+						"__typename": "IssueFieldSingleSelectValue",
+						"name": "P2",
+						"optionId": "IFSSO_kgAC",
+						"color": "BLUE",
+						"field": { "name": "Priority", "dataType": "SINGLE_SELECT" }
+					}
+				] } }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"issueFieldValues": [
+						{
+							"__typename": "IssueFieldSingleSelectValue",
+							"color": "BLUE",
+							"field": {
+								"dataType": "SINGLE_SELECT",
+								"name": "Priority"
+							},
+							"name": "P2",
+							"optionId": "IFSSO_kgAC"
+						}
+					]
+				}
+			`),
+		},
+		{
 			name:   "parent",
 			fields: []string{"parent"},
 			inputJSON: heredoc.Doc(`

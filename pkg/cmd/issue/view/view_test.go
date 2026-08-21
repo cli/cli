@@ -54,6 +54,7 @@ func TestJSONFields(t *testing.T) {
 		"subIssuesSummary",
 		"blockedBy",
 		"blocking",
+		"issueFieldValues",
 	})
 }
 

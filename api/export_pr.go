@@ -111,6 +111,31 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 				"nodes":      items,
 				"totalCount": issue.Blocking.TotalCount,
 			}
+		case "issueFieldValues":
+			items := make([]map[string]interface{}, 0, len(issue.IssueFieldValues.Nodes))
+			for _, n := range issue.IssueFieldValues.Nodes {
+				item := map[string]interface{}{
+					"__typename": n.Typename,
+					"field": map[string]interface{}{
+						"name":     n.Field.Name,
+						"dataType": n.Field.DataType,
+					},
+				}
+				switch n.Typename {
+				case "IssueFieldSingleSelectValue":
+					item["name"] = n.Name
+					item["optionId"] = n.OptionID
+					item["color"] = n.Color
+				case "IssueFieldTextValue":
+					item["text"] = n.Text
+				case "IssueFieldNumberValue":
+					item["number"] = n.Number
+				case "IssueFieldDateValue":
+					item["date"] = n.Date
+				}
+				items = append(items, item)
+			}
+			data[f] = items
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()

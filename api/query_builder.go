@@ -346,6 +346,7 @@ var issueOnlyFields = []string{
 	"subIssuesSummary",
 	"blockedBy",
 	"blocking",
+	"issueFieldValues",
 }
 
 var IssueFields = append(sharedIssuePRFields, issueOnlyFields...)
@@ -454,6 +455,14 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `blockedBy(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}`)
 		case "blocking":
 			q = append(q, `blocking(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}`)
+		case "issueFieldValues":
+			q = append(q, `issueFieldValues(first:50){nodes{`+
+				`__typename,`+
+				`...on IssueFieldSingleSelectValue{name,optionId,color,field{...on IssueFieldSingleSelect{name,dataType}}},`+
+				`...on IssueFieldTextValue{text:value,field{...on IssueFieldText{name,dataType}}},`+
+				`...on IssueFieldNumberValue{number:value,field{...on IssueFieldNumber{name,dataType}}},`+
+				`...on IssueFieldDateValue{date:value,field{...on IssueFieldDate{name,dataType}}}`+
+				`}}`)
 		default:
 			q = append(q, field)
 		}
