@@ -279,6 +279,10 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// t.Setenv registers the cleanup that restores the caller's environment;
+			// os.Unsetenv then clears the variable outright. Both are needed because
+			// newIOStreams branches on os.LookupEnv, so leaving GH_SPINNER_DISABLED
+			// set-but-empty would take the env branch and never reach agent or config.
 			t.Setenv("GH_SPINNER_DISABLED", "")
 			require.NoError(t, os.Unsetenv("GH_SPINNER_DISABLED"))
 			for k, v := range tt.env {
