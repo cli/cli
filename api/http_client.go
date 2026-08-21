@@ -22,6 +22,7 @@ type HTTPClientOptions struct {
 	InvokingAgent      string
 	CacheTTL           time.Duration
 	Config             tokenGetter
+	TokenResolver      func(string) (string, error)
 	EnableCache        bool
 	Log                io.Writer
 	LogColorize        bool
@@ -72,7 +73,9 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		return nil, err
 	}
 
-	if opts.Config != nil {
+	if opts.TokenResolver != nil {
+		client.Transport = addAuthTokenHeader(client.Transport, opts.TokenResolver)
+	} else if opts.Config != nil {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
 	}
 
@@ -150,6 +153,13 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 
 // AddAuthTokenHeader adds an authentication token header for the host specified by the request.
 func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper {
+	return addAuthTokenHeader(rt, func(hostname string) (string, error) {
+		token, _ := cfg.ActiveToken(hostname)
+		return token, nil
+	})
+}
+
+func addAuthTokenHeader(rt http.RoundTripper, tokenResolver func(string) (string, error)) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
 		if req.Header.Get(authorization) == "" {
@@ -157,11 +167,14 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 			if req.Response != nil && req.Response.Request != nil {
 				redirectHostnameChange = getHost(req) != getHost(req.Response.Request)
 			}
-			// Only set header if an initial request or redirect request to the same host as the initial request.
-			// If the host has changed during a redirect do not add the authentication token header.
-			if !redirectHostnameChange {
+			// The Zen endpoint is intentionally usable without authentication.
+			if !redirectHostnameChange && req.URL.Path != "/zen" {
 				hostname := ghauth.NormalizeHostname(getHost(req))
-				if token, _ := cfg.ActiveToken(hostname); token != "" {
+				token, err := tokenResolver(hostname)
+				if err != nil {
+					return nil, err
+				}
+				if token != "" {
 					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 				}
 			}
