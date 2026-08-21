@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -117,7 +118,13 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, _ []string) {
 // output produced by `gh <command> --help`, exposed separately so that callers
 // such as error reporting can render help to a stream of their choosing rather
 // than always writing to stdout.
+//
+// A user-defined alias is resolved to the command it expands to, so that
+// callers see the target's flags and examples rather than the alias stub. This
+// mirrors the usage and help funcs configured for aliases in NewCmdRoot.
 func WriteHelp(w io.Writer, cs *iostreams.ColorScheme, command *cobra.Command) {
+	command = resolveAliasTarget(command)
+
 	type helpEntry struct {
 		Title string
 		Body  string
@@ -339,4 +346,27 @@ func BuildAliasList(cmd *cobra.Command, aliases []string) []string {
 	}
 
 	return BuildAliasList(cmd.Parent(), aliasesWithParentAliases)
+}
+
+// aliasExpansionAnnotation records the command line a user-defined alias
+// expands to, so that help rendering can resolve the alias to its target.
+const aliasExpansionAnnotation = "gh:alias-expansion"
+
+// resolveAliasTarget returns the command a user-defined alias expands to, or
+// command unchanged when it is not an alias or the target cannot be resolved.
+// Shell aliases have no target command and are always returned unchanged.
+func resolveAliasTarget(command *cobra.Command) *cobra.Command {
+	expansion, ok := command.Annotations[aliasExpansionAnnotation]
+	if !ok {
+		return command
+	}
+	args, err := shlex.Split(expansion)
+	if err != nil || len(args) == 0 {
+		return command
+	}
+	target, _, err := command.Root().Find(args)
+	if err != nil || target == nil {
+		return command
+	}
+	return target
 }
