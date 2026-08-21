@@ -263,6 +263,54 @@ func (c *Client) ShowRefs(ctx context.Context, refs []string) ([]Ref, error) {
 	return verified, err
 }
 
+// Worktrees lists the repository's worktrees by parsing the output of
+// `git worktree list --porcelain`.
+func (c *Client) Worktrees(ctx context.Context) ([]Worktree, error) {
+	cmd, err := c.Command(ctx, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	return parseWorktrees(out), nil
+}
+
+// WorktreeRemove removes the worktree at the given path via
+// `git worktree remove <path>`.
+func (c *Client) WorktreeRemove(ctx context.Context, path string) error {
+	cmd, err := c.Command(ctx, "worktree", "remove", "--", path)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	return err
+}
+
+// parseWorktrees parses the output of `git worktree list --porcelain` into a
+// slice of Worktree. Each record begins with a "worktree <path>" line followed
+// by attribute lines; attributes other than "branch" are ignored.
+func parseWorktrees(output []byte) []Worktree {
+	var worktrees []Worktree
+	for _, record := range strings.Split(string(output), "\n\n") {
+		var worktree Worktree
+		for _, line := range strings.Split(record, "\n") {
+			key, value, _ := strings.Cut(line, " ")
+			switch key {
+			case "worktree":
+				worktree.Path = value
+			case "branch":
+				worktree.Ref = value
+			}
+		}
+		if worktree.Path != "" {
+			worktrees = append(worktrees, worktree)
+		}
+	}
+	return worktrees
+}
+
 func (c *Client) Config(ctx context.Context, name string) (string, error) {
 	args := []string{"config", name}
 	cmd, err := c.Command(ctx, args...)
