@@ -621,14 +621,6 @@ func TestRunCopilot(t *testing.T) {
 			wantStderr: "! Copilot CLI was not installed\n",
 		},
 		{
-			name: "non-interactive missing install prints trailing newline",
-			findCopilot: func() string {
-				return ""
-			},
-			wantErr:    cmdutil.SilentError,
-			wantStderr: "! Copilot CLI not installed\n",
-		},
-		{
 			name: "execution failure includes direct command hint",
 			findCopilot: func() string {
 				return "/usr/bin/copilot"

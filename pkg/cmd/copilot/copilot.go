@@ -156,7 +156,7 @@ func runCopilot(opts *CopilotOptions) error {
 				return cmdutil.SilentError
 			}
 		} else if !ci.IsCI() {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI not installed\n", opts.IO.ColorScheme().WarningIcon())
+			fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI not installed", opts.IO.ColorScheme().WarningIcon())
 			return cmdutil.SilentError
 		}
 
