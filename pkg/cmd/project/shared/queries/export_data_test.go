@@ -365,3 +365,67 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.
 		string(out))
 
 }
+
+func TestJSONProjectItem_Issue_ProjectV2ItemIssueFieldValue(t *testing.T) {
+	// Issue fields surface on a project item as ProjectV2ItemIssueFieldValue,
+	// whose value lives on the issue itself (the ProjectV2IssueFieldValues
+	// union). Each supported value type must serialize to the same shape as its
+	// project-field counterpart.
+	textField := ProjectField{TypeName: "ProjectV2Field"}
+	textField.Field.ID = "issueTextField"
+	textField.Field.Name = "Team"
+
+	selectField := ProjectField{TypeName: "ProjectV2SingleSelectField"}
+	selectField.SingleSelectField.ID = "issueSelectField"
+	selectField.SingleSelectField.Name = "Priority"
+
+	numberField := ProjectField{TypeName: "ProjectV2Field"}
+	numberField.Field.ID = "issueNumberField"
+	numberField.Field.Name = "Story Points"
+
+	textValue := FieldValueNodes{Type: "ProjectV2ItemIssueFieldValue"}
+	textValue.ProjectV2ItemIssueFieldValue.Field = textField
+	textValue.ProjectV2ItemIssueFieldValue.IssueFieldValue.Type = "IssueFieldTextValue"
+	textValue.ProjectV2ItemIssueFieldValue.IssueFieldValue.IssueFieldTextValue.Value = "Platform"
+
+	selectValue := FieldValueNodes{Type: "ProjectV2ItemIssueFieldValue"}
+	selectValue.ProjectV2ItemIssueFieldValue.Field = selectField
+	selectValue.ProjectV2ItemIssueFieldValue.IssueFieldValue.Type = "IssueFieldSingleSelectValue"
+	selectValue.ProjectV2ItemIssueFieldValue.IssueFieldValue.IssueFieldSingleSelectValue.Name = "High"
+
+	numberValue := FieldValueNodes{Type: "ProjectV2ItemIssueFieldValue"}
+	numberValue.ProjectV2ItemIssueFieldValue.Field = numberField
+	numberValue.ProjectV2ItemIssueFieldValue.IssueFieldValue.Type = "IssueFieldNumberValue"
+	numberValue.ProjectV2ItemIssueFieldValue.IssueFieldValue.IssueFieldNumberValue.Value = 5
+
+	issue := ProjectItem{
+		Id: "issueId",
+		Content: ProjectItemContent{
+			TypeName: "Issue",
+			Issue: Issue{
+				Title:  "Issue title",
+				Body:   "a body",
+				Number: 1,
+				URL:    "issue-url",
+				Repository: struct {
+					NameWithOwner string
+				}{
+					NameWithOwner: "cli/go-gh",
+				},
+			},
+		},
+	}
+	issue.FieldValues.Nodes = []FieldValueNodes{textValue, selectValue, numberValue}
+
+	p := &Project{}
+	p.Fields.Nodes = []ProjectField{textField, selectField, numberField}
+	p.Items.TotalCount = 1
+	p.Items.Nodes = []ProjectItem{issue}
+
+	out, err := json.Marshal(p.DetailedItems())
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"items":[{"team":"Platform","priority":"High","story Points":5,"content":{"type":"Issue","body":"a body","title":"Issue title","number":1,"repository":"cli/go-gh","url":"issue-url"},"id":"issueId"}],"totalCount":1}`,
+		string(out))
+}

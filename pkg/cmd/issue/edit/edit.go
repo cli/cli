@@ -47,6 +47,10 @@ type EditOptions struct {
 	AddBlocking     []string
 	RemoveBlocking  []string
 
+	IssueFieldName  string
+	IssueFieldID    string
+	IssueFieldValue string
+
 	prShared.Editable
 }
 
@@ -94,6 +98,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --remove-parent
 			$ gh issue edit 100 --add-sub-issue 123,124
 			$ gh issue edit 123 --add-blocked-by 200 --add-blocking 300,301
+			$ gh issue edit 23 --field "Team" --value "Platform"
 		`),
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -161,6 +166,21 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--field` or `--field-id`",
+				opts.IssueFieldName != "",
+				opts.IssueFieldID != "",
+			); err != nil {
+				return err
+			}
+			issueFieldSelected := opts.IssueFieldName != "" || opts.IssueFieldID != ""
+			if issueFieldSelected && !flags.Changed("value") {
+				return cmdutil.FlagErrorf("`--value` is required with `--field` or `--field-id`")
+			}
+			if flags.Changed("value") && !issueFieldSelected {
+				return cmdutil.FlagErrorf("`--value` requires `--field` or `--field-id`")
+			}
+
 			if flags.Changed("title") {
 				opts.Editable.Title.Edited = true
 			}
@@ -198,7 +218,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				len(opts.AddBlocking) > 0 || len(opts.RemoveBlocking) > 0
 
 			// Drop into interactive mode only if the user passed no edit flags at all.
-			if !opts.Editable.Dirty() && !hasDeferredFlags {
+			if !opts.Editable.Dirty() && !hasDeferredFlags && !issueFieldSelected {
 				opts.Interactive = true
 			}
 
@@ -243,6 +263,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.RemoveBlockedBy, "remove-blocked-by", nil, "Remove 'blocked by' relationships by issue `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.AddBlocking, "add-blocking", nil, "Add 'blocking' relationships by issue `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.RemoveBlocking, "remove-blocking", nil, "Remove 'blocking' relationships by issue `number` or URL")
+	cmd.Flags().StringVar(&opts.IssueFieldName, "field", "", "Set an issue field value by field `name`")
+	cmd.Flags().StringVar(&opts.IssueFieldID, "field-id", "", "Set an issue field value by field `id`")
+	cmd.Flags().StringVar(&opts.IssueFieldValue, "value", "", "Value for the issue field set with `--field` or `--field-id`")
 
 	return cmd
 }
@@ -333,6 +356,16 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
+	// Resolve the issue field value once; it is written on each issue below.
+	var issueFieldInput *issueShared.IssueFieldCreateOrUpdateInput
+	if opts.IssueFieldName != "" || opts.IssueFieldID != "" {
+		built, err := issueShared.BuildIssueFieldValueInput(httpClient, baseRepo, opts.IssueFieldName, opts.IssueFieldID, opts.IssueFieldValue)
+		if err != nil {
+			return err
+		}
+		issueFieldInput = &built
+	}
+
 	// Update all issues in parallel.
 	editedIssueChan := make(chan string, len(issues))
 	failedIssueChan := make(chan string, len(issues))
@@ -415,6 +448,13 @@ func editRun(opts *EditOptions) error {
 			if err := api.DeferredUpdateIssue(apiClient, mutations); err != nil {
 				failedIssueChan <- fmt.Sprintf("failed to update %s:\n%s", issue.URL, err)
 				return
+			}
+
+			if issueFieldInput != nil {
+				if err := issueShared.UpdateIssueFieldValue(httpClient, baseRepo, issue.ID, *issueFieldInput); err != nil {
+					failedIssueChan <- fmt.Sprintf("failed to update %s: %s", issue.URL, err)
+					return
+				}
 			}
 
 			editedIssueChan <- issue.URL
