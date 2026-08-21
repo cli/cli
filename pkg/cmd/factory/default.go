@@ -32,7 +32,10 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	}
 
 	f.IOStreams = ios
-	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
+	// remotesForAccountFunc resolves git remotes lazily and API-free so that
+	// account resolution can determine the base repository owner without a token.
+	remotesForAccountFunc := func() (ghContext.Remotes, error) { return f.Remotes() }
+	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler, remotesForAccountFunc)
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
 	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
 	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
@@ -185,14 +188,18 @@ func remotesFunc(f *cmdutil.Factory) func() (ghContext.Remotes, error) {
 	return rr.Resolver()
 }
 
-func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
+func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler, remotesFn func() (ghContext.Remotes, error)) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
 		cfg, err := cfgFunc()
 		if err != nil {
 			return nil, err
 		}
+		// Wrap authentication with context-scoped account resolution. When no
+		// account rules or override are configured this returns the auth config
+		// unchanged, preserving today's behavior exactly.
+		tokenSource := newAccountResolvingTokenGetter(cfg.Authentication(), remotesFn, ios.ErrOut)
 		opts := api.HTTPClientOptions{
-			Config:            cfg.Authentication(),
+			Config:            tokenSource,
 			Log:               ios.ErrOut,
 			LogColorize:       ios.ColorEnabled(),
 			AppVersion:        appVersion,

@@ -153,6 +153,10 @@ type AuthConfig interface {
 	// TokenForUser retrieves the authentication token and its source for a specified user and hostname.
 	TokenForUser(hostname, user string) (token string, source string, err error)
 
+	// AccountRules returns the configured context-scoped account selection rules.
+	// When no rules are configured the returned value reports IsEmpty() == true.
+	AccountRules() AccountRules
+
 	// The following methods are only for testing and that is a design smell we should consider fixing.
 
 	// SetActiveToken will override any token resolution and return the given token and source for all calls to
@@ -168,6 +172,29 @@ type AuthConfig interface {
 	// DefaultHost.
 	// Use for testing purposes only.
 	SetDefaultHost(host, source string)
+}
+
+// AccountRules holds context-scoped account selection rules, allowing gh to
+// automatically choose which authenticated account to act as based on the local
+// working directory or the repository owner, rather than the single global
+// active account.
+//
+// Both maps use the account value form "user" or "user@host". When the host is
+// omitted it defaults to the host of the command being executed.
+type AccountRules struct {
+	// GitDir maps a directory prefix (with optional leading "~") to an account.
+	// The rule with the longest matching prefix for the current working
+	// directory wins.
+	GitDir map[string]string
+	// Owner maps a repository owner (organization or user login, matched
+	// case-insensitively) to an account.
+	Owner map[string]string
+}
+
+// IsEmpty reports whether no account rules are configured. When empty, account
+// resolution is a no-op and gh behaves exactly as it does without this feature.
+func (r AccountRules) IsEmpty() bool {
+	return len(r.GitDir) == 0 && len(r.Owner) == 0
 }
 
 // AliasConfig defines an interface for managing command aliases.
