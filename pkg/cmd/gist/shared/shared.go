@@ -6,17 +6,18 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/gabriel-vasile/mimetype"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -199,30 +200,29 @@ pagination:
 }
 
 func IsBinaryFile(file string) (bool, error) {
-	detectedMime, err := mimetype.DetectFile(file)
+	contents, err := os.ReadFile(file)
 	if err != nil {
 		return false, err
 	}
-
-	isBinary := true
-	for mime := detectedMime; mime != nil; mime = mime.Parent() {
-		if mime.Is("text/plain") {
-			isBinary = false
-			break
-		}
-	}
-	return isBinary, nil
+	return IsBinaryContents(contents), nil
 }
 
+// IsBinaryContents reports whether contents cannot be sent to the Gists API.
+//
+// Gist contents travel as a JSON string. encoding/json does not reject invalid
+// UTF-8, it rewrites every offending byte to U+FFFD, so contents that are not
+// valid UTF-8 are mangled by gh itself before they are ever sent, and the
+// original bytes cannot be recovered from the gist afterwards.
+//
+// Valid UTF-8 is encoded losslessly, control characters included. The API
+// accepts those and normalises them the same way the web UI does.
+//
+// Detecting binary by MIME type answered a different question, and was wrong in
+// both directions: most ASCII control characters sniff as binary, so plain text
+// files containing one were rejected, while latin-1 and UTF-16 text sniff as
+// text/plain and were uploaded and corrupted.
 func IsBinaryContents(contents []byte) bool {
-	isBinary := true
-	for mime := mimetype.Detect(contents); mime != nil; mime = mime.Parent() {
-		if mime.Is("text/plain") {
-			isBinary = false
-			break
-		}
-	}
-	return isBinary
+	return !utf8.Valid(contents)
 }
 
 func PromptGists(prompter prompter.Prompter, client *http.Client, host string, cs *iostreams.ColorScheme) (gist *Gist, err error) {

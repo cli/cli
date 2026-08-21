@@ -1,8 +1,11 @@
 package shared
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_GetGistIDFromURL(t *testing.T) {
@@ -60,37 +64,160 @@ func Test_GetGistIDFromURL(t *testing.T) {
 
 func TestIsBinaryContents(t *testing.T) {
 	tests := []struct {
+		name        string
 		fileContent []byte
 		want        bool
 	}{
 		{
-			want:        false,
+			name:        "ASCII text",
 			fileContent: []byte("package main"),
+			want:        false,
 		},
 		{
-			want:        false,
+			name:        "empty",
 			fileContent: []byte(""),
-		},
-		{
 			want:        false,
-			fileContent: []byte(nil),
 		},
 		{
-			want: true,
-			fileContent: []byte{239, 191, 189, 239, 191, 189, 239, 191, 189, 239,
-				191, 189, 239, 191, 189, 16, 74, 70, 73, 70, 239, 191, 189, 1, 1, 1,
-				1, 44, 1, 44, 239, 191, 189, 239, 191, 189, 239, 191, 189, 239, 191,
-				189, 239, 191, 189, 67, 239, 191, 189, 8, 6, 6, 7, 6, 5, 8, 7, 7, 7,
-				9, 9, 8, 10, 12, 20, 10, 12, 11, 11, 12, 25, 18, 19, 15, 20, 29, 26,
-				31, 30, 29, 26, 28, 28, 32, 36, 46, 39, 32, 34, 44, 35, 28, 28, 40,
-				55, 41, 44, 48, 49, 52, 52, 52, 31, 39, 57, 61, 56, 50, 60, 46, 51,
-				52, 50, 239, 191, 189, 239, 191, 189, 239, 191, 189, 67, 1, 9, 9, 9, 12},
+			name:        "nil",
+			fileContent: []byte(nil),
+			want:        false,
+		},
+		{
+			name:        "multi-byte UTF-8",
+			fileContent: []byte("café 👋 日本語"),
+			want:        false,
+		},
+		{
+			// https://github.com/cli/cli/issues/9761
+			name:        "control character in the middle",
+			fileContent: []byte("hello\x01world"),
+			want:        false,
+		},
+		{
+			name:        "control character at the start",
+			fileContent: []byte("\x01hello"),
+			want:        false,
+		},
+		{
+			name:        "control character at the end",
+			fileContent: []byte("hello\x01"),
+			want:        false,
+		},
+		{
+			name:        "every ASCII control character",
+			fileContent: allASCIIControlChars(),
+			want:        false,
+		},
+		{
+			// Invalid UTF-8 is silently rewritten to U+FFFD when encoded as
+			// JSON, so it must not be uploaded.
+			name:        "latin-1 text",
+			fileContent: []byte{'c', 'a', 'f', 0xe9},
+			want:        true,
+		},
+		{
+			name:        "UTF-16 text",
+			fileContent: []byte{0xff, 0xfe, 'h', 0x00, 'i', 0x00},
+			want:        true,
+		},
+		{
+			name:        "JPEG",
+			fileContent: []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F'},
+			want:        true,
+		},
+		{
+			name:        "PNG",
+			fileContent: []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a},
+			want:        true,
 		},
 	}
 
 	for _, tt := range tests {
-		assert.Equal(t, tt.want, IsBinaryContents(tt.fileContent))
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsBinaryContents(tt.fileContent))
+		})
 	}
+}
+
+// Contents that IsBinaryContents reports as text must survive a JSON round
+// trip unchanged, since that is how they reach the Gists API.
+func TestIsBinaryContentsMatchesJSONRoundTrip(t *testing.T) {
+	contents := [][]byte{
+		[]byte("package main"),
+		[]byte("café 👋 日本語"),
+		[]byte("hello\x01world"),
+		allASCIIControlChars(),
+		{'c', 'a', 'f', 0xe9},
+		{0xff, 0xfe, 'h', 0x00, 'i', 0x00},
+		{0xff, 0xd8, 0xff, 0xe0},
+		{0x89, 'P', 'N', 'G'},
+	}
+
+	for _, c := range contents {
+		encoded, err := json.Marshal(string(c))
+		require.NoError(t, err)
+
+		var decoded string
+		require.NoError(t, json.Unmarshal(encoded, &decoded))
+
+		lossless := decoded == string(c)
+		assert.Equal(t, lossless, !IsBinaryContents(c),
+			"contents %q: survives JSON round trip = %v, treated as text = %v",
+			c, lossless, !IsBinaryContents(c))
+	}
+}
+
+func TestIsBinaryFile(t *testing.T) {
+	tests := []struct {
+		name        string
+		fileContent []byte
+		want        bool
+	}{
+		{
+			name:        "text file",
+			fileContent: []byte("package main"),
+			want:        false,
+		},
+		{
+			// https://github.com/cli/cli/issues/9761
+			name:        "text file containing control characters",
+			fileContent: []byte("hello\x01world\n"),
+			want:        false,
+		},
+		{
+			name:        "JPEG file",
+			fileContent: []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F'},
+			want:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), "gistfile.txt")
+			require.NoError(t, os.WriteFile(file, tt.fileContent, 0600))
+
+			got, err := IsBinaryFile(file)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestIsBinaryFileMissing(t *testing.T) {
+	_, err := IsBinaryFile(filepath.Join(t.TempDir(), "does-not-exist"))
+	assert.Error(t, err)
+}
+
+// allASCIIControlChars returns the 33 ASCII control characters, surrounded by
+// ordinary text.
+func allASCIIControlChars() []byte {
+	contents := []byte("start")
+	for i := 0x00; i <= 0x1f; i++ {
+		contents = append(contents, byte(i))
+	}
+	contents = append(contents, 0x7f)
+	return append(contents, []byte("end")...)
 }
 
 func TestPromptGists(t *testing.T) {
