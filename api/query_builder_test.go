@@ -38,6 +38,11 @@ func TestPullRequestGraphQL(t *testing.T) {
 			fields: []string{"projectItems"},
 			want:   `projectItems(first:100){nodes{id, project{id,title}, status:fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},totalCount}`,
 		},
+		{
+			name:   "issue fields are filtered",
+			fields: []string{"issueFields", "issueFieldsWithoutMultiSelect"},
+			want:   "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -78,6 +83,16 @@ func TestIssueGraphQL(t *testing.T) {
 			name:   "projectItems",
 			fields: []string{"projectItems"},
 			want:   `projectItems(first:100){nodes{id, project{id,title}, status:fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},totalCount}`,
+		},
+		{
+			name:   "issue fields",
+			fields: []string{"issueFields"},
+			want:   issueFields,
+		},
+		{
+			name:   "issue fields without multi-select",
+			fields: []string{"issueFieldsWithoutMultiSelect"},
+			want:   issueFieldsWithoutMultiSelect,
 		},
 	}
 	for _, tt := range tests {

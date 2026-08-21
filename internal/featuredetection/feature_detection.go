@@ -56,11 +56,20 @@ type IssueFeatures struct {
 	// GHES 3.19+. Issue types and sub-issues are GA on all supported GHES
 	// versions (3.17+) and do not need feature detection.
 	IssueRelationshipsSupported bool
+
+	// IssueFieldsSupported indicates the host supports custom issue fields.
+	IssueFieldsSupported bool
+
+	// IssueFieldMultiSelectSupported indicates the host supports multi-select
+	// issue field definitions and values.
+	IssueFieldMultiSelectSupported bool
 }
 
 var allIssueFeatures = IssueFeatures{
-	ApiActorsSupported:          true,
-	IssueRelationshipsSupported: true,
+	ApiActorsSupported:             true,
+	IssueRelationshipsSupported:    true,
+	IssueFieldsSupported:           true,
+	IssueFieldMultiSelectSupported: true,
 }
 
 type PullRequestFeatures struct {
@@ -205,19 +214,37 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 			} `graphql:"fields(includeDeprecated: true)"`
 		} `graphql:"Issue: __type(name: \"Issue\")"`
 	}
+	var issueFieldFeatureDetection struct {
+		IssueFieldMultiSelect struct {
+			Name string
+		} `graphql:"IssueFieldMultiSelect: __type(name: \"IssueFieldMultiSelect\")"`
+		IssueFieldMultiSelectValue struct {
+			Name string
+		} `graphql:"IssueFieldMultiSelectValue: __type(name: \"IssueFieldMultiSelectValue\")"`
+	}
 
 	gql := api.NewClientFromHTTP(d.httpClient)
-	err := gql.Query(d.host, "Issue_fields", &featureDetection, nil)
-	if err != nil {
+	var wg errgroup.Group
+	wg.Go(func() error {
+		return gql.Query(d.host, "Issue_fields", &featureDetection, nil)
+	})
+	wg.Go(func() error {
+		return gql.Query(d.host, "Issue_field_types", &issueFieldFeatureDetection, nil)
+	})
+	if err := wg.Wait(); err != nil {
 		return IssueFeatures{}, err
 	}
 
 	for _, field := range featureDetection.Issue.Fields {
-		if field.Name == "blockedBy" {
+		switch field.Name {
+		case "blockedBy":
 			features.IssueRelationshipsSupported = true
-			break
+		case "issueFieldValues":
+			features.IssueFieldsSupported = true
 		}
 	}
+	features.IssueFieldMultiSelectSupported = issueFieldFeatureDetection.IssueFieldMultiSelect.Name != "" &&
+		issueFieldFeatureDetection.IssueFieldMultiSelectValue.Name != ""
 
 	return features, nil
 }

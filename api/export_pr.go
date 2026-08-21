@@ -111,6 +111,12 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 				"nodes":      items,
 				"totalCount": issue.Blocking.TotalCount,
 			}
+		case "issueFields":
+			items := make([]map[string]interface{}, 0, len(issue.IssueFields.Nodes))
+			for _, field := range issue.IssueFields.Nodes {
+				items = append(items, field.ExportData())
+			}
+			data[f] = items
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()

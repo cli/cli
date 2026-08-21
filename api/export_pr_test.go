@@ -32,6 +32,27 @@ func TestIssue_ExportData(t *testing.T) {
 			`),
 		},
 		{
+			name:   "issue fields",
+			fields: []string{"issueFields"},
+			inputJSON: heredoc.Doc(`
+				{ "issueFields": { "nodes": [
+					{ "field": { "name": "Priority", "dataType": "SINGLE_SELECT" }, "name": "High" },
+					{ "field": { "name": "Estimate", "dataType": "NUMBER" }, "value": 3.5 },
+					{ "field": { "name": "Teams", "dataType": "MULTI_SELECT" }, "options": [
+						{ "id": "OPT_1", "name": "CLI" },
+						{ "id": "OPT_2", "name": "Desktop" }
+					] }
+				] } }
+			`),
+			outputJSON: heredoc.Doc(`
+				{ "issueFields": [
+					{ "name": "Priority", "dataType": "single_select", "value": "High" },
+					{ "name": "Estimate", "dataType": "number", "value": 3.5 },
+					{ "name": "Teams", "dataType": "multi_select", "value": ["CLI", "Desktop"] }
+				] }
+			`),
+		},
+		{
 			name:   "milestone",
 			fields: []string{"number", "milestone"},
 			inputJSON: heredoc.Doc(`

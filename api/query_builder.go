@@ -346,6 +346,7 @@ var issueOnlyFields = []string{
 	"subIssuesSummary",
 	"blockedBy",
 	"blocking",
+	"issueFields",
 }
 
 var IssueFields = append(sharedIssuePRFields, issueOnlyFields...)
@@ -454,6 +455,10 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `blockedBy(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}`)
 		case "blocking":
 			q = append(q, `blocking(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}`)
+		case "issueFields":
+			q = append(q, issueFields)
+		case "issueFieldsWithoutMultiSelect":
+			q = append(q, issueFieldsWithoutMultiSelect)
 		default:
 			q = append(q, field)
 		}
@@ -461,12 +466,43 @@ func IssueGraphQL(fields []string) string {
 	return strings.Join(q, ",")
 }
 
+const issueFieldMetadataWithoutMultiSelect = `field{
+	...on IssueFieldText{id,name,dataType}
+	...on IssueFieldNumber{id,name,dataType}
+	...on IssueFieldDate{id,name,dataType}
+	...on IssueFieldSingleSelect{id,name,dataType}
+}`
+
+const issueFieldMetadata = `field{
+	...on IssueFieldText{id,name,dataType}
+	...on IssueFieldNumber{id,name,dataType}
+	...on IssueFieldDate{id,name,dataType}
+	...on IssueFieldSingleSelect{id,name,dataType}
+	...on IssueFieldMultiSelect{id,name,dataType}
+}`
+
+var issueFieldsWithoutMultiSelect = fmt.Sprintf(`issueFields:issueFieldValues(first:100){nodes{
+	...on IssueFieldTextValue{id,%[1]s,value}
+	...on IssueFieldNumberValue{id,%[1]s,value}
+	...on IssueFieldDateValue{id,%[1]s,value}
+	...on IssueFieldSingleSelectValue{id,%[1]s,name}
+}}`, issueFieldMetadataWithoutMultiSelect)
+
+var issueFields = fmt.Sprintf(`issueFields:issueFieldValues(first:100){nodes{
+	...on IssueFieldTextValue{id,%[1]s,value}
+	...on IssueFieldNumberValue{id,%[1]s,value}
+	...on IssueFieldDateValue{id,%[1]s,value}
+	...on IssueFieldSingleSelectValue{id,%[1]s,name}
+	...on IssueFieldMultiSelectValue{id,%[1]s,options{id,name}}
+}}`, issueFieldMetadata)
+
 // PullRequestGraphQL constructs a GraphQL query fragment for a set of pull request fields.
 // It will try to sanitize the fields to just those available on pull request.
 func PullRequestGraphQL(fields []string) string {
 	s := set.NewStringSet()
 	s.AddValues(fields)
 	s.RemoveValues(issueOnlyFields)
+	s.Remove("issueFieldsWithoutMultiSelect")
 	return IssueGraphQL(s.ToSlice())
 }
 

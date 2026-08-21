@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,8 +56,84 @@ type Issue struct {
 	SubIssuesSummary SubIssuesSummary
 	BlockedBy        LinkedIssueConnection
 	Blocking         LinkedIssueConnection
+	IssueFields      IssueFieldValues `json:"issueFields"`
 
 	ClosedByPullRequestsReferences ClosedByPullRequestsReferences
+}
+
+// IssueFieldValues is a connection of issue field values.
+type IssueFieldValues struct {
+	Nodes []IssueFieldValue `json:"nodes"`
+}
+
+// IssueFieldValue represents the union of issue field value types.
+type IssueFieldValue struct {
+	ID    string `json:"id"`
+	Field struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		DataType string `json:"dataType"`
+	} `json:"field"`
+	Value   interface{}        `json:"value"`
+	Name    string             `json:"name"`
+	Options []IssueFieldOption `json:"options"`
+}
+
+// IssueFieldDefinition represents an issue field configured for an organization or repository.
+type IssueFieldDefinition struct {
+	ID       string             `json:"id"`
+	Name     string             `json:"name"`
+	DataType string             `json:"dataType"`
+	Options  []IssueFieldOption `json:"options"`
+}
+
+// ExportData returns selected public JSON fields for an issue field definition.
+func (f IssueFieldDefinition) ExportData(fields []string) map[string]interface{} {
+	data := make(map[string]interface{}, len(fields))
+	for _, field := range fields {
+		switch field {
+		case "id":
+			data[field] = f.ID
+		case "name":
+			data[field] = f.Name
+		case "dataType":
+			data[field] = strings.ToLower(f.DataType)
+		case "options":
+			data[field] = f.Options
+		}
+	}
+	return data
+}
+
+// IssueFieldOption represents an option configured for a select issue field.
+type IssueFieldOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ExportData returns the public JSON representation of an issue field value.
+func (v IssueFieldValue) ExportData() map[string]interface{} {
+	return map[string]interface{}{
+		"name":     v.Field.Name,
+		"dataType": strings.ToLower(v.Field.DataType),
+		"value":    v.DisplayValue(),
+	}
+}
+
+// DisplayValue returns the human-readable value for an issue field.
+func (v IssueFieldValue) DisplayValue() interface{} {
+	switch v.Field.DataType {
+	case "SINGLE_SELECT":
+		return v.Name
+	case "MULTI_SELECT":
+		values := make([]string, len(v.Options))
+		for i, option := range v.Options {
+			values[i] = option.Name
+		}
+		return values
+	default:
+		return v.Value
+	}
 }
 
 // IssueType represents an issue type configured for a repository.

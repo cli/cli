@@ -12,8 +12,10 @@ import (
 )
 
 func TestIssueFeatures(t *testing.T) {
-	issueFieldsWithRelationships := `{"data":{"Issue":{"fields":[{"name":"title"},{"name":"body"},{"name":"blockedBy"}]}}}`
+	issueFieldsWithRelationships := `{"data":{"Issue":{"fields":[{"name":"title"},{"name":"body"},{"name":"blockedBy"},{"name":"issueFieldValues"}]}}}`
 	issueFieldsWithoutRelationships := `{"data":{"Issue":{"fields":[{"name":"title"},{"name":"body"}]}}}`
+	issueFieldMultiSelectTypes := `{"data":{"IssueFieldMultiSelect":{"name":"IssueFieldMultiSelect"},"IssueFieldMultiSelectValue":{"name":"IssueFieldMultiSelectValue"}}}`
+	noIssueFieldMultiSelectTypes := `{"data":{"IssueFieldMultiSelect":null,"IssueFieldMultiSelectValue":null}}`
 
 	tests := []struct {
 		name          string
@@ -26,8 +28,10 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "github.com",
 			hostname: "github.com",
 			wantFeatures: IssueFeatures{
-				ApiActorsSupported:          true,
-				IssueRelationshipsSupported: true,
+				ApiActorsSupported:             true,
+				IssueRelationshipsSupported:    true,
+				IssueFieldsSupported:           true,
+				IssueFieldMultiSelectSupported: true,
 			},
 			wantErr: false,
 		},
@@ -35,8 +39,10 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "ghec data residency (ghe.com)",
 			hostname: "stampname.ghe.com",
 			wantFeatures: IssueFeatures{
-				ApiActorsSupported:          true,
-				IssueRelationshipsSupported: true,
+				ApiActorsSupported:             true,
+				IssueRelationshipsSupported:    true,
+				IssueFieldsSupported:           true,
+				IssueFieldMultiSelectSupported: true,
 			},
 			wantErr: false,
 		},
@@ -44,11 +50,14 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "GHE with relationship support",
 			hostname: "git.my.org",
 			queryResponse: map[string]string{
-				`query Issue_fields`: issueFieldsWithRelationships,
+				`query Issue_fields`:      issueFieldsWithRelationships,
+				`query Issue_field_types`: issueFieldMultiSelectTypes,
 			},
 			wantFeatures: IssueFeatures{
-				ApiActorsSupported:          false,
-				IssueRelationshipsSupported: true,
+				ApiActorsSupported:             false,
+				IssueRelationshipsSupported:    true,
+				IssueFieldsSupported:           true,
+				IssueFieldMultiSelectSupported: true,
 			},
 			wantErr: false,
 		},
@@ -56,11 +65,26 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "GHE without relationship support",
 			hostname: "git.my.org",
 			queryResponse: map[string]string{
-				`query Issue_fields`: issueFieldsWithoutRelationships,
+				`query Issue_fields`:      issueFieldsWithoutRelationships,
+				`query Issue_field_types`: noIssueFieldMultiSelectTypes,
 			},
 			wantFeatures: IssueFeatures{
 				ApiActorsSupported:          false,
 				IssueRelationshipsSupported: false,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE with issue fields without multi-select support",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Issue_fields`:      issueFieldsWithRelationships,
+				`query Issue_field_types`: noIssueFieldMultiSelectTypes,
+			},
+			wantFeatures: IssueFeatures{
+				ApiActorsSupported:          false,
+				IssueRelationshipsSupported: true,
+				IssueFieldsSupported:        true,
 			},
 			wantErr: false,
 		},

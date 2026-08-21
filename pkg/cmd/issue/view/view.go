@@ -132,8 +132,18 @@ func viewRun(opts *ViewOptions) error {
 
 		// TODO IssueRelationshipsCleanup
 		issueFeatures, issueErr := opts.Detector.IssueFeatures()
-		if issueErr == nil && issueFeatures.IssueRelationshipsSupported {
-			lookupFields.AddValues([]string{"blockedBy", "blocking"})
+		if issueErr == nil {
+			if issueFeatures.IssueRelationshipsSupported {
+				lookupFields.AddValues([]string{"blockedBy", "blocking"})
+			}
+			// TODO IssueFieldsCleanup - remove when all supported GHES versions include issue fields.
+			if issueFeatures.IssueFieldsSupported {
+				if issueFeatures.IssueFieldMultiSelectSupported {
+					lookupFields.Add("issueFields")
+				} else {
+					lookupFields.Add("issueFieldsWithoutMultiSelect")
+				}
+			}
 		}
 	}
 
@@ -276,6 +286,9 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 		fmt.Fprint(out, cs.Bold("Type: "))
 		fmt.Fprintln(out, issue.IssueType.Name)
 	}
+	for _, field := range issue.IssueFields.Nodes {
+		fmt.Fprintf(out, "%s %s\n", cs.Bold(field.Field.Name+":"), formatIssueFieldValue(field.DisplayValue()))
+	}
 	if issue.Parent != nil {
 		fmt.Fprint(out, cs.Bold("Parent: "))
 		fmt.Fprintln(out, formatLinkedIssueRef(issue.Parent)+" "+issue.Parent.Title)
@@ -350,6 +363,13 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 	fmt.Fprintf(out, cs.Muted("View this issue on GitHub: %s\n"), issue.URL)
 
 	return nil
+}
+
+func formatIssueFieldValue(value interface{}) string {
+	if values, ok := value.([]string); ok {
+		return strings.Join(values, ", ")
+	}
+	return fmt.Sprint(value)
 }
 
 // formatLinkedIssueRef formats an issue reference as owner/repo#N.

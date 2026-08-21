@@ -54,12 +54,21 @@ func TestJSONFields(t *testing.T) {
 		"subIssuesSummary",
 		"blockedBy",
 		"blocking",
+		"issueFields",
 	})
 }
 
 func TestNewCmdView(t *testing.T) {
 	// Test shared parsing of issue number / URL.
 	argparsetest.TestArgParsing(t, NewCmdView)
+}
+
+type issueFieldsWithoutMultiSelectDetector struct {
+	fd.DisabledDetectorMock
+}
+
+func (d *issueFieldsWithoutMultiSelectDetector) IssueFeatures() (fd.IssueFeatures, error) {
+	return fd.IssueFeatures{IssueFieldsSupported: true}, nil
 }
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
@@ -140,6 +149,33 @@ func TestIssueView_web(t *testing.T) {
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n", stderr.String())
 	browser.Verify(t, "https://github.com/OWNER/REPO/issues/123")
+}
+
+func TestIssueViewIssueFieldsWithoutMultiSelect(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.GraphQLQuery(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"number":123}}}}`, func(query string, _ map[string]interface{}) {
+			assert.Contains(t, query, "IssueFieldSingleSelectValue")
+			assert.NotContains(t, query, "IssueFieldMultiSelectValue")
+		}),
+	)
+	mockEmptyV2ProjectItems(t, reg)
+
+	err := viewRun(&ViewOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		Detector:    &issueFieldsWithoutMultiSelectDetector{},
+		IssueNumber: 123,
+	})
+	require.NoError(t, err)
 }
 
 func TestIssueView_nontty_Preview(t *testing.T) {
@@ -664,6 +700,10 @@ func issueResponseAllIssues2Fields() string {
 		"projectItems": {"nodes": [], "totalCount": 0},
 		"url": "https://github.com/OWNER/REPO/issues/123",
 		"issueType": {"id":"IT_1","name":"Bug","description":"Something is not working","color":"d73a4a"},
+		"issueFields": {"nodes": [
+			{"field":{"id":"IF_1","name":"Priority","dataType":"SINGLE_SELECT"},"name":"High"},
+			{"field":{"id":"IF_2","name":"Teams","dataType":"MULTI_SELECT"},"options":[{"id":"OPT_1","name":"CLI"},{"id":"OPT_2","name":"Desktop"}]}
+		]},
 		"parent": {"number":100,"title":"Epic: Authentication overhaul","url":"https://github.com/OWNER/REPO/issues/100","state":"OPEN","repository":{"nameWithOwner":"OWNER/REPO"}},
 		"subIssues": {
 			"nodes": [
@@ -753,6 +793,10 @@ func TestIssueView_tty_Issues2AllFields(t *testing.T) {
 	// Type metadata row
 	assert.Contains(t, out, "Type:")
 	assert.Contains(t, out, "Bug")
+	assert.Contains(t, out, "Priority:")
+	assert.Contains(t, out, "High")
+	assert.Contains(t, out, "Teams:")
+	assert.Contains(t, out, "CLI, Desktop")
 
 	// Parent metadata row
 	assert.Contains(t, out, "Parent:")
@@ -940,6 +984,31 @@ func TestIssueView_json_IssueType(t *testing.T) {
 	assert.Equal(t, "Bug", issueType["name"])
 	assert.Equal(t, "Something is not working", issueType["description"])
 	assert.Equal(t, "d73a4a", issueType["color"])
+}
+
+func TestIssueView_json_IssueFields(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(issueResponseAllIssues2Fields()),
+	)
+
+	output, err := runCommand(httpReg, false, `123 --json issueFields`)
+	require.NoError(t, err)
+
+	var data map[string]interface{}
+	require.NoError(t, json.Unmarshal(output.OutBuf.Bytes(), &data))
+	fields, ok := data["issueFields"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, fields, 2)
+	assert.Equal(t, map[string]interface{}{
+		"name": "Priority", "dataType": "single_select", "value": "High",
+	}, fields[0])
+	assert.Equal(t, map[string]interface{}{
+		"name": "Teams", "dataType": "multi_select", "value": []interface{}{"CLI", "Desktop"},
+	}, fields[1])
 }
 
 func TestIssueView_json_ParentSubIssues(t *testing.T) {

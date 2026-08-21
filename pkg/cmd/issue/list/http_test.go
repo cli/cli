@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -12,7 +13,60 @@ import (
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestIssueListIssueFields(t *testing.T) {
+	tests := []struct {
+		name      string
+		queryName string
+		list      func(*api.Client, ghrepo.Interface, prShared.FilterOptions) (*api.IssuesAndTotalCount, error)
+		response  string
+	}{
+		{
+			name:      "repository list",
+			queryName: `query IssueList\b`,
+			list: func(client *api.Client, repo ghrepo.Interface, filters prShared.FilterOptions) (*api.IssuesAndTotalCount, error) {
+				return listIssues(client, repo, filters, 30)
+			},
+			response: `{"data":{"repository":{"hasIssuesEnabled":true,"issues":{"totalCount":1,"nodes":[{"issueFields":{"nodes":[{"field":{"name":"Priority","dataType":"SINGLE_SELECT"},"name":"High"}]}}],"pageInfo":{"hasNextPage":false}}}}}`,
+		},
+		{
+			name:      "search list",
+			queryName: `query IssueSearch\b`,
+			list: func(client *api.Client, repo ghrepo.Interface, filters prShared.FilterOptions) (*api.IssuesAndTotalCount, error) {
+				return searchIssues(client, fd.AdvancedIssueSearchSupportedAsOnlyBackend(), repo, filters, 30)
+			},
+			response: `{"data":{"repository":{"hasIssuesEnabled":true},"search":{"issueCount":1,"nodes":[{"issueFields":{"nodes":[{"field":{"name":"Priority","dataType":"SINGLE_SELECT"},"name":"High"}]} }],"pageInfo":{"hasNextPage":false}}}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(
+				httpmock.GraphQL(tt.queryName),
+				httpmock.GraphQLQuery(tt.response, func(query string, _ map[string]interface{}) {
+					assert.True(t, strings.Contains(query, "issueFields:issueFieldValues"))
+				}),
+			)
+
+			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			result, err := tt.list(client, ghrepo.New("OWNER", "REPO"), prShared.FilterOptions{
+				Entity: "issue",
+				State:  "open",
+				Fields: []string{"issueFields"},
+			})
+			require.NoError(t, err)
+			require.Len(t, result.Issues, 1)
+			require.Len(t, result.Issues[0].IssueFields.Nodes, 1)
+			assert.Equal(t, map[string]interface{}{
+				"name": "Priority", "dataType": "single_select", "value": "High",
+			}, result.Issues[0].IssueFields.Nodes[0].ExportData())
+		})
+	}
+}
 
 func TestIssueList(t *testing.T) {
 	reg := &httpmock.Registry{}
