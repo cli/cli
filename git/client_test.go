@@ -2373,3 +2373,16 @@ func TestParseWorktrees(t *testing.T) {
 		})
 	}
 }
+
+func TestClientWorktreeRemove(t *testing.T) {
+	cmd, cmdCtx := createCommandContext(t, 0, "", "")
+	client := Client{
+		GitPath:        "path/to/git",
+		commandContext: cmdCtx,
+	}
+
+	err := client.WorktreeRemove(context.Background(), "-feature")
+
+	require.NoError(t, err)
+	assert.Equal(t, "path/to/git worktree remove -- -feature", strings.Join(cmd.Args[3:], " "))
+}

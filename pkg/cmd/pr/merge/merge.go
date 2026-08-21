@@ -433,8 +433,8 @@ func (m *mergeContext) deleteLocalBranch() error {
 			if baseWorktree := worktreeForBranch(worktrees, m.pr.BaseRefName); baseWorktree != nil && baseWorktree.Path != currentWorkdir {
 				_ = m.warnf("%s Base branch %s is checked out in another worktree (%s); skipping local delete\n",
 					m.cs.WarningIcon(), m.cs.Cyan(m.pr.BaseRefName), baseWorktree.Path)
-				_ = m.warnf("  To finish cleanup, switch the worktree at %s off %s, then run in %s:\n",
-					baseWorktree.Path, m.cs.Cyan(m.pr.BaseRefName), currentWorkdir)
+				_ = m.warnf("  To finish cleanup, switch the worktree at %s off %s, then run in the current path:\n",
+					baseWorktree.Path, m.cs.Cyan(m.pr.BaseRefName))
 				_ = m.warnf("  git checkout %s && git branch -D %s\n", m.pr.BaseRefName, m.pr.HeadRefName)
 				return nil
 			}

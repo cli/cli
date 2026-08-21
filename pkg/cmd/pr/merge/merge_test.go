@@ -2132,7 +2132,7 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 			toplevel: "/path/to/main",
 			branch:   "main",
 			extraStubs: []stub{
-				{pattern: `git worktree remove /path/to/feature-wt`, exitCode: 0},
+				{pattern: `git worktree remove -- /path/to/feature-wt`, exitCode: 0},
 				{pattern: `git branch -D feature`, exitCode: 0},
 			},
 			wantContains: []string{
@@ -2176,7 +2176,7 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 			branch:   "feature",
 			wantContains: []string{
 				"Base branch main is checked out in another worktree (/path/to/base-wt); skipping local delete",
-				"To finish cleanup, switch the worktree at /path/to/base-wt off main, then run in /path/to/main:",
+				"To finish cleanup, switch the worktree at /path/to/base-wt off main, then run in the current path:",
 				"git checkout main && git branch -D feature",
 				"Deleted remote branch feature",
 			},
@@ -2196,7 +2196,7 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 			toplevel: "/path/to/main",
 			branch:   "main",
 			extraStubs: []stub{
-				{pattern: `git worktree remove /path/to/feature-wt`, exitCode: 128, output: "fatal: '/path/to/feature-wt' contains modified or untracked files, use --force to delete it"},
+				{pattern: `git worktree remove -- /path/to/feature-wt`, exitCode: 128, output: "fatal: '/path/to/feature-wt' contains modified or untracked files, use --force to delete it"},
 			},
 			wantContains: []string{
 				"Could not remove worktree /path/to/feature-wt",
