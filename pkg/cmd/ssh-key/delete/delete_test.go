@@ -173,6 +173,34 @@ func Test_deleteRun(t *testing.T) {
 			wantErr:    true,
 			wantErrMsg: "HTTP 404 (https://api.github.com/user/keys/123)",
 		},
+		{
+			// Regression for https://github.com/cli/cli/issues/14064 — signing
+			// keys live at /user/ssh_signing_keys/{id}, not /user/keys/{id}.
+			name: "delete signing key tty",
+			tty:  true,
+			opts: DeleteOptions{KeyID: "456"},
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.ConfirmDeletionFunc = func(_ string) error {
+					return nil
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "user/keys/456"), httpmock.StatusStringResponse(404, ""))
+				reg.Register(httpmock.REST("GET", "user/ssh_signing_keys/456"), httpmock.StatusStringResponse(200, keyResp))
+				reg.Register(httpmock.REST("DELETE", "user/ssh_signing_keys/456"), httpmock.StatusStringResponse(204, ""))
+			},
+			wantStdout: "✓ SSH key \"My Key\" (456) deleted from your account\n",
+		},
+		{
+			name: "delete signing key no tty",
+			opts: DeleteOptions{KeyID: "456", Confirmed: true},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "user/keys/456"), httpmock.StatusStringResponse(404, ""))
+				reg.Register(httpmock.REST("GET", "user/ssh_signing_keys/456"), httpmock.StatusStringResponse(200, keyResp))
+				reg.Register(httpmock.REST("DELETE", "user/ssh_signing_keys/456"), httpmock.StatusStringResponse(204, ""))
+			},
+			wantStdout: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -243,4 +271,42 @@ func TestGetSSHKeyHTTPError(t *testing.T) {
 	require.ErrorAs(t, err, &httpErr)
 	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 	assert.Contains(t, err.Error(), "HTTP 404")
+}
+
+// TestDeleteSSHKeySigningKeyFallback covers the 404-on-auth-then-204-on-signing
+// path that fixes https://github.com/cli/cli/issues/14064.
+func TestDeleteSSHKeySigningKeyFallback(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("DELETE", "user/keys/456"),
+		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+	)
+	reg.Register(
+		httpmock.REST("DELETE", "user/ssh_signing_keys/456"),
+		httpmock.StatusStringResponse(http.StatusNoContent, ""),
+	)
+
+	err := deleteSSHKey(&http.Client{Transport: reg}, "github.com", "456")
+	require.NoError(t, err)
+}
+
+// TestGetSSHKeySigningKeyFallback covers the 404-on-auth-then-200-on-signing
+// path that fixes https://github.com/cli/cli/issues/14064.
+func TestGetSSHKeySigningKeyFallback(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("GET", "user/keys/456"),
+		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+	)
+	reg.Register(
+		httpmock.REST("GET", "user/ssh_signing_keys/456"),
+		httpmock.StatusStringResponse(http.StatusOK, `{"title":"My Signing Key"}`),
+	)
+
+	key, err := getSSHKey(&http.Client{Transport: reg}, "github.com", "456")
+	require.NoError(t, err)
+	assert.Equal(t, "My Signing Key", key.Title)
+	assert.Equal(t, "signing", key.Type)
 }
