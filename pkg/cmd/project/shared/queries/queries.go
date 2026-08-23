@@ -1046,9 +1046,10 @@ func (p ProjectField) Options() []SingleSelectFieldOptions {
 
 func (p ProjectField) ExportData(_ []string) map[string]interface{} {
 	v := map[string]interface{}{
-		"id":   p.ID(),
-		"name": p.Name(),
-		"type": p.Type(),
+		"id":       p.ID(),
+		"name":     p.Name(),
+		"type":     p.Type(),
+		"dataType": p.DataType(),
 	}
 	// Emulate omitempty
 	if opts := p.Options(); len(opts) != 0 {

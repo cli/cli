@@ -97,11 +97,12 @@ func TestJSONProjectField_FieldType(t *testing.T) {
 	field.TypeName = "ProjectV2Field"
 	field.Field.ID = "123"
 	field.Field.Name = "name"
+	field.Field.DataType = "TEXT"
 
 	b, err := json.Marshal(field.ExportData(nil))
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"id":"123","name":"name","type":"ProjectV2Field"}`, string(b))
+	assert.Equal(t, `{"dataType":"TEXT","id":"123","name":"name","type":"ProjectV2Field"}`, string(b))
 }
 
 func TestJSONProjectField_SingleSelectType(t *testing.T) {
@@ -109,6 +110,7 @@ func TestJSONProjectField_SingleSelectType(t *testing.T) {
 	field.TypeName = "ProjectV2SingleSelectField"
 	field.SingleSelectField.ID = "123"
 	field.SingleSelectField.Name = "name"
+	field.SingleSelectField.DataType = "SINGLE_SELECT"
 	field.SingleSelectField.Options = []SingleSelectFieldOptions{
 		{
 			ID:   "123",
@@ -123,7 +125,7 @@ func TestJSONProjectField_SingleSelectType(t *testing.T) {
 	b, err := json.Marshal(field.ExportData(nil))
 	assert.NoError(t, err)
 
-	assert.JSONEq(t, `{"id":"123","name":"name","type":"ProjectV2SingleSelectField","options":[{"id":"123","name":"name"},{"id":"456","name":"name2"}]}`, string(b))
+	assert.JSONEq(t, `{"id":"123","name":"name","type":"ProjectV2SingleSelectField","dataType":"SINGLE_SELECT","options":[{"id":"123","name":"name"},{"id":"456","name":"name2"}]}`, string(b))
 }
 
 func TestJSONProjectField_ProjectV2IterationField(t *testing.T) {
@@ -131,11 +133,12 @@ func TestJSONProjectField_ProjectV2IterationField(t *testing.T) {
 	field.TypeName = "ProjectV2IterationField"
 	field.IterationField.ID = "123"
 	field.IterationField.Name = "name"
+	field.IterationField.DataType = "ITERATION"
 
 	b, err := json.Marshal(field.ExportData(nil))
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"id":"123","name":"name","type":"ProjectV2IterationField"}`, string(b))
+	assert.Equal(t, `{"dataType":"ITERATION","id":"123","name":"name","type":"ProjectV2IterationField"}`, string(b))
 }
 
 func TestJSONProjectFields(t *testing.T) {
@@ -143,11 +146,13 @@ func TestJSONProjectFields(t *testing.T) {
 	field.TypeName = "ProjectV2Field"
 	field.Field.ID = "123"
 	field.Field.Name = "name"
+	field.Field.DataType = "TEXT"
 
 	field2 := ProjectField{}
 	field2.TypeName = "ProjectV2SingleSelectField"
 	field2.SingleSelectField.ID = "123"
 	field2.SingleSelectField.Name = "name"
+	field2.SingleSelectField.DataType = "SINGLE_SELECT"
 	field2.SingleSelectField.Options = []SingleSelectFieldOptions{
 		{
 			ID:   "123",
@@ -172,7 +177,7 @@ func TestJSONProjectFields(t *testing.T) {
 	b, err := json.Marshal(p.Fields.ExportData(nil))
 	assert.NoError(t, err)
 
-	assert.JSONEq(t, `{"fields":[{"id":"123","name":"name","type":"ProjectV2Field"},{"id":"123","name":"name","type":"ProjectV2SingleSelectField","options":[{"id":"123","name":"name"},{"id":"456","name":"name2"}]}],"totalCount":5}`, string(b))
+	assert.JSONEq(t, `{"fields":[{"id":"123","name":"name","type":"ProjectV2Field","dataType":"TEXT"},{"id":"123","name":"name","type":"ProjectV2SingleSelectField","dataType":"SINGLE_SELECT","options":[{"id":"123","name":"name"},{"id":"456","name":"name2"}]}],"totalCount":5}`, string(b))
 }
 
 func TestJSONProjectItem_DraftIssue(t *testing.T) {

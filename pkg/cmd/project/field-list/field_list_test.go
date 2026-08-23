@@ -142,16 +142,19 @@ func TestRunList_User_tty(t *testing.T) {
 									"__typename": "ProjectV2Field",
 									"name":       "FieldTitle",
 									"id":         "field ID",
+									"dataType":   "TEXT",
 								},
 								{
 									"__typename": "ProjectV2SingleSelectField",
 									"name":       "Status",
 									"id":         "status ID",
+									"dataType":   "SINGLE_SELECT",
 								},
 								{
 									"__typename": "ProjectV2IterationField",
 									"name":       "Iterations",
 									"id":         "iteration ID",
+									"dataType":   "ITERATION",
 								},
 							},
 						},
@@ -176,10 +179,10 @@ func TestRunList_User_tty(t *testing.T) {
 	err := runList(config)
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Doc(`
-		NAME        DATA TYPE                   ID
-		FieldTitle  ProjectV2Field              field ID
-		Status      ProjectV2SingleSelectField  status ID
-		Iterations  ProjectV2IterationField     iteration ID
+		NAME        DATA TYPE      ID
+		FieldTitle  TEXT           field ID
+		Status      SINGLE_SELECT  status ID
+		Iterations  ITERATION      iteration ID
   `), stdout.String())
 }
 
@@ -237,16 +240,19 @@ func TestRunList_User(t *testing.T) {
 									"__typename": "ProjectV2Field",
 									"name":       "FieldTitle",
 									"id":         "field ID",
+									"dataType":   "TEXT",
 								},
 								{
 									"__typename": "ProjectV2SingleSelectField",
 									"name":       "Status",
 									"id":         "status ID",
+									"dataType":   "SINGLE_SELECT",
 								},
 								{
 									"__typename": "ProjectV2IterationField",
 									"name":       "Iterations",
 									"id":         "iteration ID",
+									"dataType":   "ITERATION",
 								},
 							},
 						},
@@ -271,7 +277,7 @@ func TestRunList_User(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"FieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
+		"FieldTitle\tTEXT\tfield ID\nStatus\tSINGLE_SELECT\tstatus ID\nIterations\tITERATION\titeration ID\n",
 		stdout.String())
 }
 
@@ -329,16 +335,19 @@ func TestRunList_Org(t *testing.T) {
 									"__typename": "ProjectV2Field",
 									"name":       "FieldTitle",
 									"id":         "field ID",
+									"dataType":   "TEXT",
 								},
 								{
 									"__typename": "ProjectV2SingleSelectField",
 									"name":       "Status",
 									"id":         "status ID",
+									"dataType":   "SINGLE_SELECT",
 								},
 								{
 									"__typename": "ProjectV2IterationField",
 									"name":       "Iterations",
 									"id":         "iteration ID",
+									"dataType":   "ITERATION",
 								},
 							},
 						},
@@ -363,7 +372,7 @@ func TestRunList_Org(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"FieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
+		"FieldTitle\tTEXT\tfield ID\nStatus\tSINGLE_SELECT\tstatus ID\nIterations\tITERATION\titeration ID\n",
 		stdout.String())
 }
 
@@ -411,16 +420,19 @@ func TestRunList_Me(t *testing.T) {
 									"__typename": "ProjectV2Field",
 									"name":       "FieldTitle",
 									"id":         "field ID",
+									"dataType":   "TEXT",
 								},
 								{
 									"__typename": "ProjectV2SingleSelectField",
 									"name":       "Status",
 									"id":         "status ID",
+									"dataType":   "SINGLE_SELECT",
 								},
 								{
 									"__typename": "ProjectV2IterationField",
 									"name":       "Iterations",
 									"id":         "iteration ID",
+									"dataType":   "ITERATION",
 								},
 							},
 						},
@@ -445,7 +457,7 @@ func TestRunList_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"FieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
+		"FieldTitle\tTEXT\tfield ID\nStatus\tSINGLE_SELECT\tstatus ID\nIterations\tITERATION\titeration ID\n",
 		stdout.String())
 }
 
@@ -568,16 +580,19 @@ func TestRunList_JSON(t *testing.T) {
 									"__typename": "ProjectV2Field",
 									"name":       "FieldTitle",
 									"id":         "field ID",
+									"dataType":   "TEXT",
 								},
 								{
 									"__typename": "ProjectV2SingleSelectField",
 									"name":       "Status",
 									"id":         "status ID",
+									"dataType":   "SINGLE_SELECT",
 								},
 								{
 									"__typename": "ProjectV2IterationField",
 									"name":       "Iterations",
 									"id":         "iteration ID",
+									"dataType":   "ITERATION",
 								},
 							},
 							"totalCount": 3,
@@ -604,6 +619,6 @@ func TestRunList_JSON(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(
 		t,
-		`{"fields":[{"id":"field ID","name":"FieldTitle","type":"ProjectV2Field"},{"id":"status ID","name":"Status","type":"ProjectV2SingleSelectField"},{"id":"iteration ID","name":"Iterations","type":"ProjectV2IterationField"}],"totalCount":3}`,
+		`{"fields":[{"id":"field ID","name":"FieldTitle","type":"ProjectV2Field","dataType":"TEXT"},{"id":"status ID","name":"Status","type":"ProjectV2SingleSelectField","dataType":"SINGLE_SELECT"},{"id":"iteration ID","name":"Iterations","type":"ProjectV2IterationField","dataType":"ITERATION"}],"totalCount":3}`,
 		stdout.String())
 }

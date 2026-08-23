@@ -109,7 +109,7 @@ func printResults(config listConfig, fields []queries.ProjectField, login string
 
 	for _, f := range fields {
 		tp.AddField(f.Name())
-		tp.AddField(f.Type())
+		tp.AddField(f.DataType())
 		tp.AddField(f.ID(), tableprinter.WithTruncate(nil))
 		tp.EndRow()
 	}

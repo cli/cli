@@ -131,6 +131,7 @@ func TestRunDeleteField_JSON(t *testing.T) {
 						"__typename": "ProjectV2Field",
 						"id":         "Field ID",
 						"name":       "a name",
+						"dataType":   "TEXT",
 					},
 				},
 			},
@@ -152,6 +153,6 @@ func TestRunDeleteField_JSON(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(
 		t,
-		`{"id":"Field ID","name":"a name","type":"ProjectV2Field"}`,
+		`{"id":"Field ID","name":"a name","type":"ProjectV2Field","dataType":"TEXT"}`,
 		stdout.String())
 }
