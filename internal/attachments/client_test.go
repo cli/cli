@@ -73,11 +73,7 @@ func TestUpload(t *testing.T) {
 	require.Len(t, reg.Requests, 1)
 	req := reg.Requests[0]
 	assert.Equal(t, "POST", req.Method)
-	assert.Equal(t, "uploads.github.com", req.URL.Host)
-	assert.Equal(t, "/user-attachments/assets", req.URL.Path)
-	assert.Equal(t, "shot.png", req.URL.Query().Get("name"))
-	assert.Equal(t, "image/png", req.URL.Query().Get("content_type"))
-	assert.Equal(t, "1234", req.URL.Query().Get("repository_id"))
+	assert.Equal(t, "https://uploads.github.com/user-attachments/assets?content_type=image%2Fpng&name=shot.png&repository_id=1234", req.URL.String())
 	assert.Equal(t, "application/octet-stream", req.Header.Get("Content-Type"))
 	assert.Equal(t, "application/vnd.github+json", req.Header.Get("Accept"))
 	assert.Equal(t, int64(9), req.ContentLength)
@@ -161,11 +157,9 @@ func TestUploadErrors(t *testing.T) {
 		contentType string
 		status      int
 		response    string
-		// nonJSON labels the stubbed response as something other than JSON.
-		// The endpoint always sends JSON, so only the row about an unreadable
-		// body sets this. Without the JSON label the error body is never
-		// parsed, and a row asserting a message from it would pass for the
-		// wrong reason.
+		// nonJSON sends response bytes verbatim instead of marshaling them as
+		// json.RawMessage. The "unreadable response" row uses it so the decoder
+		// receives invalid JSON rather than an empty body from a failed marshal.
 		nonJSON        bool
 		wantErr        string
 		wantErrPrefix  string
