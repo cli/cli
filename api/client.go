@@ -59,7 +59,8 @@ func (err MissingScopesError) Error() string {
 	)
 }
 
-// GraphQLMissingScopes returns the OAuth scopes reported as missing by a GraphQL response.
+// GraphQLMissingScopes returns OAuth scopes that a GraphQL response reports as individually required.
+// Scope alternatives are excluded because satisfying any one of them is sufficient.
 func GraphQLMissingScopes(err error) []string {
 	var gerr GraphQLError
 	if !errors.As(err, &gerr) {
@@ -75,9 +76,11 @@ func GraphQLMissingScopes(err error) []string {
 		if m == nil {
 			continue
 		}
-		for _, scope := range strings.Split(m[1], ",") {
-			missing[strings.Trim(scope, "' ")] = struct{}{}
+		scopes := strings.Split(m[1], ",")
+		if len(scopes) != 1 {
+			continue
 		}
+		missing[strings.Trim(scopes[0], "' ")] = struct{}{}
 	}
 
 	scopes := make([]string, 0, len(missing))
@@ -88,13 +91,14 @@ func GraphQLMissingScopes(err error) []string {
 	return scopes
 }
 
-// GraphQLMissingScopesError returns a user-facing error when a GraphQL response reports missing OAuth scopes.
-func GraphQLMissingScopesError(err error) error {
-	scopes := GraphQLMissingScopes(err)
-	if len(scopes) == 0 {
-		return nil
+// GraphQLMissingScopeError returns a user-facing error when a GraphQL response reports scope as individually required.
+func GraphQLMissingScopeError(err error, scope string) error {
+	for _, missingScope := range GraphQLMissingScopes(err) {
+		if missingScope == scope {
+			return MissingScopesError{Scopes: []string{scope}}
+		}
 	}
-	return MissingScopesError{Scopes: scopes}
+	return nil
 }
 
 type HTTPError struct {

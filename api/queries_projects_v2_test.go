@@ -344,6 +344,7 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 
 func TestProjectsV2IgnorableError_missingProjectScope(t *testing.T) {
 	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
 	client := newTestClient(reg)
 
 	reg.Register(
@@ -357,6 +358,7 @@ func TestProjectsV2IgnorableError_missingProjectScope(t *testing.T) {
 	)
 
 	err := client.GraphQL("github.com", "", nil, &struct{}{})
+	require.Error(t, err)
 	assert.True(t, ProjectsV2IgnorableError(err))
 }
 

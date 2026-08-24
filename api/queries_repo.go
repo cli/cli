@@ -1619,7 +1619,9 @@ func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, []string, e
 	missingScopes := make(map[string]struct{})
 	for _, err := range []error{userErr, repoErr, orgErr} {
 		for _, scope := range GraphQLMissingScopes(err) {
-			missingScopes[scope] = struct{}{}
+			if scope == "read:project" {
+				missingScopes[scope] = struct{}{}
+			}
 		}
 	}
 	scopes := make([]string, 0, len(missingScopes))
