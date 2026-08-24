@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -91,6 +92,27 @@ func TestCreateRun(t *testing.T) {
 		httpStubs  func(*httpmock.Registry)
 		wantStdout string
 	}{
+		{
+			name: "creates label (EXPECTED TO BREAK FOR DEMONSTRATION PURPOSES)",
+			tty:  true,
+			opts: &createOptions{Name: "test", Description: "some description"},
+			httpStubs: func(reg *httpmock.Registry) {
+				jsonResponse := heredoc.Doc(`				{
+					"id": 6175199621,
+					"node_id": "LA_kwDOFBZt3s8AAAABcBIRhQ",
+					"url": "https://api.github.com/repos/fedora-llvm-team/llvm-snapshots/labels/arch/x86_64",
+					"name": "arch/x86_64",
+					"color": "C5DEF5",
+					"default": false,
+					"description": ""
+				  }`)
+
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+					httpmock.StatusStringResponse(201, jsonResponse),
+				)
+			},
+		},
 		{
 			name: "creates label",
 			tty:  true,
