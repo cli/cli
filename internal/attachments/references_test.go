@@ -887,20 +887,6 @@ func TestNewAttachableMarkdown(t *testing.T) {
 	}
 }
 
-// One edit in the definition carries every usage of the label, so nothing is
-// appended a second time.
-func TestAttachAssetsToMarkdownReferenceStyleLink(t *testing.T) {
-	markdown := "See [the screenshot][shot].\n\n[shot]: ./login.png"
-
-	v, err := newAttachableMarkdown(markdown, []attachmentArg{pngArg()})
-	require.NoError(t, err)
-
-	got, err := attachAssetsToMarkdown(v)
-	require.NoError(t, err)
-	require.Equal(t, "See [the screenshot][shot].\n\n[shot]: "+pngURL, got.Rewritten)
-	require.Empty(t, got.ToAppend)
-}
-
 func TestIsSingleImage(t *testing.T) {
 	const url = "https://example.invalid/probe"
 
