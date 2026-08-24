@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/issue/argparsetest"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -974,4 +975,95 @@ func registerWorktreeDevelopHTTPStubs(reg *httpmock.Registry, _ *testing.T) {
 		httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
 		httpmock.StringResponse(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`),
 	)
+}
+
+func TestDevelopRunCreate_invalidBranchNameBeforeSetBranchConfig(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	featureEnabledPayload := `{"data":{"LinkedBranch":{"fields":[{"name":"id"},{"name":"ref"}]}}}`
+	reg.Register(
+		httpmock.GraphQL(`query LinkedBranchFeature\b`),
+		httpmock.StringResponse(featureEnabledPayload),
+	)
+	reg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+	)
+	reg.Register(
+		httpmock.GraphQL(`query ListLinkedBranches\b`),
+		httpmock.GraphQLQuery(`
+                        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}
+                `, func(query string, inputs map[string]interface{}) {
+			assert.Equal(t, float64(123), inputs["number"])
+			assert.Equal(t, "OWNER", inputs["owner"])
+			assert.Equal(t, "REPO", inputs["name"])
+		}),
+	)
+	reg.Register(
+		httpmock.GraphQL(`query FindRepoBranchID\b`),
+		httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`),
+	)
+	reg.Register(
+		httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+		httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"-foo"}}}}}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, "REPOID", inputs["repositoryId"])
+				assert.Equal(t, "SOMEID", inputs["issueId"])
+				assert.Equal(t, "OID", inputs["oid"])
+				assert.Equal(t, "my-branch", inputs["name"])
+			}),
+	)
+
+	ios, _, _, _ := iostreams.Test()
+
+	opts := &DevelopOptions{
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		GitClient: &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
+		},
+		IO: ios,
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		Remotes: func() (context.Remotes, error) {
+			return context.Remotes{
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("OWNER", "REPO"),
+				},
+			}, nil
+		},
+		Name:        "my-branch",
+		BaseBranch:  "main",
+		IssueNumber: 123,
+	}
+
+	err := developRun(opts)
+	require.EqualError(t, err, `invalid branch name: "-foo"`)
+}
+
+func TestCheckoutBranch_invalidBranchName(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+
+	err := checkoutBranch(&DevelopOptions{
+		IO:        ios,
+		GitClient: &git.Client{GitPath: "some/path/git"},
+		Remotes: func() (context.Remotes, error) {
+			return context.Remotes{
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("OWNER", "REPO"),
+				},
+			}, nil
+		},
+		Checkout: true,
+	}, ghrepo.New("OWNER", "REPO"), "-foo", prShared.WorktreeTarget{})
+
+	require.EqualError(t, err, `invalid branch name: "-foo"`)
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
 }

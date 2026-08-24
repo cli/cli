@@ -268,6 +268,9 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 	if branchName == "" {
 		return fmt.Errorf("failed to create linked branch: API returned empty branch name")
 	}
+	if err := validateBranchName(branchName); err != nil {
+		return err
+	}
 
 	opts.IO.StopProgressIndicator()
 
@@ -351,6 +354,10 @@ func printLinkedBranches(io *iostreams.IOStreams, branches []api.LinkedBranch) {
 }
 
 func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutBranch string, worktreeTarget prShared.WorktreeTarget) (err error) {
+	if err := validateBranchName(checkoutBranch); err != nil {
+		return err
+	}
+
 	remotes, err := opts.Remotes()
 	if err != nil {
 		// If the user specified the branch to be checked out and no remotes are found
@@ -428,6 +435,13 @@ func runGitCommands(client *git.Client, commands [][]string) error {
 		if _, err := cmd.Output(); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateBranchName(branchName string) error {
+	if strings.HasPrefix(branchName, "-") {
+		return fmt.Errorf("invalid branch name: %q", branchName)
 	}
 	return nil
 }
