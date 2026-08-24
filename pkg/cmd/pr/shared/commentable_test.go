@@ -413,7 +413,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			attach:               []string{"shot.png"},
 			repositoryDatabaseID: 1234,
 			viewerPermission:     "none",
-			wantErr:              "could not determine your permission on the repository",
+			wantErr:              "could not determine your permission on the repository to attach files",
 		},
 		{
 			name:                 "a missing repository id stops the upload",

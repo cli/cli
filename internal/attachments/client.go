@@ -95,7 +95,7 @@ func checkPermission(viewerPermission string) error {
 	// A caller that never requested the field hands over an empty string. That
 	// is a different fault from a permission that is too low.
 	if viewerPermission == "" {
-		return errors.New("could not determine your permission on the repository")
+		return errors.New("could not determine your permission on the repository to attach files")
 	}
 
 	if slices.Contains(uploadPermissions, viewerPermission) {

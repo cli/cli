@@ -475,7 +475,7 @@ func TestNewUploader(t *testing.T) {
 			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: 42,
-			viewerPermission: "WRTIE",
+			viewerPermission: "UNKNOWN",
 			wantErr:          badPermissionErr,
 		},
 		{
@@ -485,7 +485,7 @@ func TestNewUploader(t *testing.T) {
 			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: 42,
-			wantErr:          "could not determine your permission on the repository",
+			wantErr:          "could not determine your permission on the repository to attach files",
 		},
 	}
 
