@@ -830,6 +830,21 @@ func TestNewAttachableMarkdown(t *testing.T) {
 			wantErr:        "cannot embed a video as a reference-style image: ./repro.mp4",
 		},
 		{
+			// Both orderings, because the reported videos are deduplicated by
+			// argument. A link is the allowed shape, so marking the argument
+			// seen while skipping it would swallow the embed that follows.
+			name:           "a video used as both a link and an image is reported (image first)",
+			markdown:       "![one][a] and [two][a]\n\n[a]: ./repro.mp4",
+			attachmentArgs: []attachmentArg{mp4},
+			wantErr:        "cannot embed a video as a reference-style image: ./repro.mp4",
+		},
+		{
+			name:           "a video used as both a link and an image is reported (link first)",
+			markdown:       "[one][a] and ![two][a]\n\n[a]: ./repro.mp4",
+			attachmentArgs: []attachmentArg{mp4},
+			wantErr:        "cannot embed a video as a reference-style image: ./repro.mp4",
+		},
+		{
 			// The degrade rule handles this shape, so it must not be caught
 			// here.
 			name:           "an inline video embed is not a reference-style image",
