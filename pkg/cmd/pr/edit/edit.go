@@ -193,13 +193,16 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				// see the `Editable.MilestoneId` method.
 			}
 
-			editorMode, err := shared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
-			if err != nil {
-				return err
+			editorFlagExplicit := flags.Changed("editor")
+			if editorFlagExplicit || !opts.Editable.Dirty() {
+				editorMode, err := shared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
+				if err != nil {
+					return err
+				}
+				opts.EditorMode = editorMode
 			}
-			opts.EditorMode = editorMode
 
-			if opts.EditorMode && (bodyProvided || bodyFileProvided) {
+			if editorFlagExplicit && (bodyProvided || bodyFileProvided) {
 				return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, or `--editor`")
 			}
 
@@ -324,9 +327,13 @@ func editRun(opts *EditOptions) error {
 	}
 
 	if opts.EditorMode {
+		initialTitle := pr.Title
+		if editable.Title.Edited {
+			initialTitle = editable.Title.Value
+		}
 		editable.Title.Edited = true
 		editable.Body.Edited = true
-		editable.Title.Value, editable.Body.Value, err = opts.TitledEditSurvey(pr.Title, pr.Body)
+		editable.Title.Value, editable.Body.Value, err = opts.TitledEditSurvey(initialTitle, pr.Body)
 		if err != nil {
 			return err
 		}
@@ -342,8 +349,12 @@ func editRun(opts *EditOptions) error {
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	// Skip metadata fetch when in editor mode since we only need title and body.
-	if !opts.EditorMode {
+	metadataEditRequested := editable.Reviewers.Edited ||
+		editable.Assignees.Edited ||
+		editable.Labels.Edited ||
+		editable.Projects.Edited ||
+		editable.Milestone.Edited
+	if !opts.EditorMode || metadataEditRequested {
 		// Wire up search functions for assignees and reviewers.
 		// When these aren't wired up, it triggers a downstream fallback
 		// to legacy reviewer/assignee fetching.

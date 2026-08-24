@@ -34,6 +34,7 @@ func TestNewCmdEdit(t *testing.T) {
 		output           EditOptions
 		expectedBaseRepo ghrepo.Interface
 		wantsErr         bool
+		nonTTY           bool
 		config           func() (gh.Config, error)
 	}{
 		{
@@ -309,6 +310,23 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:     "editor flag in non-TTY mode",
+			input:    "23 --editor",
+			nonTTY:   true,
+			wantsErr: true,
+		},
+		{
+			name:  "editor flag with title flag",
+			input: "23 --editor --title draft",
+			output: EditOptions{
+				SelectorArg: "23",
+				EditorMode:  true,
+				Editable: shared.Editable{
+					Title: shared.EditableString{Value: "draft", Edited: true},
+				},
+			},
+		},
+		{
 			name:     "editor flag with body flag",
 			input:    "23 --editor --body test",
 			wantsErr: true,
@@ -319,28 +337,52 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:  "prefer_editor_prompt config with body flag errors",
-			input: "23 --body test",
+			name:  "prefer_editor_prompt config without edit flags",
+			input: "23",
+			output: EditOptions{
+				SelectorArg: "23",
+				EditorMode:  true,
+			},
 			config: func() (gh.Config, error) {
 				return config.NewMockConfigFromString("prefer_editor_prompt: enabled"), nil
 			},
-			wantsErr: true,
 		},
 		{
-			name:  "prefer_editor_prompt config with body-file flag errors",
-			input: fmt.Sprintf("23 --body-file '%s'", tmpFile),
+			name:  "prefer_editor_prompt config with body flag in TTY mode",
+			input: "23 --body test",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Body: shared.EditableString{Value: "test", Edited: true},
+				},
+			},
 			config: func() (gh.Config, error) {
 				return config.NewMockConfigFromString("prefer_editor_prompt: enabled"), nil
 			},
-			wantsErr: true,
+		},
+		{
+			name:   "prefer_editor_prompt config with body-file flag in non-TTY mode",
+			input:  fmt.Sprintf("23 --body-file '%s'", tmpFile),
+			nonTTY: true,
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Body: shared.EditableString{Value: "a body from file", Edited: true},
+				},
+			},
+			config: func() (gh.Config, error) {
+				return config.NewMockConfigFromString("prefer_editor_prompt: enabled"), nil
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, stdin, _, _ := iostreams.Test()
-			ios.SetStdoutTTY(true)
-			ios.SetStdinTTY(true)
-			ios.SetStderrTTY(true)
+			if !tt.nonTTY {
+				ios.SetStdoutTTY(true)
+				ios.SetStdinTTY(true)
+				ios.SetStderrTTY(true)
+			}
 
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
@@ -1201,18 +1243,23 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
 		{
-			name: "editor mode",
+			name: "editor mode with title and metadata flags",
 			input: &EditOptions{
 				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					ID:    "PRID",
 					URL:   "https://github.com/OWNER/REPO/pull/123",
 					Title: "pr title",
 					Body:  "pr body",
 				}, ghrepo.New("OWNER", "REPO")),
 				EditorMode: true,
+				Editable: shared.Editable{
+					Title:  shared.EditableString{Value: "flag title", Edited: true},
+					Labels: shared.EditableSlice{Add: []string{"bug"}, Edited: true},
+				},
 				TitledEditSurvey: func(title, body string) (string, string, error) {
-					assert.Equal(t, "pr title", title)
+					assert.Equal(t, "flag title", title)
 					assert.Equal(t, "pr body", body)
 					return "edited title", "edited body", nil
 				},
@@ -1229,7 +1276,24 @@ func Test_editRun(t *testing.T) {
 				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestUpdate(reg)
+				mockRepoMetadata(reg, mockRepoMetadataOptions{labels: true})
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestUpdate\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "updatePullRequest": { "__typename": "PullRequest" } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "edited title", inputs["title"])
+							assert.Equal(t, "edited body", inputs["body"])
+						}),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation LabelAdd\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "addLabelsToLabelable": { "__typename": "" } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, []interface{}{"BUGID"}, inputs["labelIds"])
+						}),
+				)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},

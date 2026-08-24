@@ -201,12 +201,16 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				len(opts.AddBlockedBy) > 0 || len(opts.RemoveBlockedBy) > 0 ||
 				len(opts.AddBlocking) > 0 || len(opts.RemoveBlocking) > 0
 
-			opts.EditorMode, err = prShared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
-			if err != nil {
-				return err
+			editorFlagExplicit := flags.Changed("editor")
+			hasExplicitEdit := opts.Editable.Dirty() || hasDeferredFlags
+			if editorFlagExplicit || !hasExplicitEdit {
+				opts.EditorMode, err = prShared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
+				if err != nil {
+					return err
+				}
 			}
 
-			if opts.EditorMode && (bodyProvided || bodyFileProvided) {
+			if editorFlagExplicit && (bodyProvided || bodyFileProvided) {
 				return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, or `--editor`")
 			}
 
@@ -278,6 +282,7 @@ func editRun(opts *EditOptions) error {
 
 	// Prompt the user which fields they'd like to edit.
 	editable := opts.Editable
+	editorTitle, editorTitleProvided := editable.Title.Value, editable.Title.Edited
 	editable.IssueType.Selectable = true
 	if opts.Interactive {
 		err = opts.FieldsToEditSurvey(opts.Prompter, &editable)
@@ -342,8 +347,12 @@ func editRun(opts *EditOptions) error {
 	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	// Skip the metadata fetch when in editor mode since we only need title and body.
-	if !opts.EditorMode {
+	metadataEditRequested := editable.Assignees.Edited ||
+		editable.Labels.Edited ||
+		editable.Projects.Edited ||
+		editable.Milestone.Edited ||
+		editable.IssueType.Edited
+	if !opts.EditorMode || metadataEditRequested {
 		// Wire up search function for assignees when ApiActorsSupported is available.
 		// Interactive mode only supports a single issue, so we use its ID for the search query.
 		if issueFeatures.ApiActorsSupported && opts.Interactive && len(issues) == 1 {
@@ -409,7 +418,11 @@ func editRun(opts *EditOptions) error {
 
 		// Allow interactive prompts for one issue; failed earlier if multiple issues specified.
 		if opts.EditorMode {
-			editable.Title.Value, editable.Body.Value, err = opts.TitledEditSurvey(issue.Title, issue.Body)
+			initialTitle := issue.Title
+			if editorTitleProvided {
+				initialTitle = editorTitle
+			}
+			editable.Title.Value, editable.Body.Value, err = opts.TitledEditSurvey(initialTitle, issue.Body)
 			if err != nil {
 				return err
 			}
