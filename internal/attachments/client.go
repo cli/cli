@@ -115,6 +115,11 @@ func (u *Uploader) upload(ctx context.Context, a UserAsset) (string, error) {
 	return assetURL, nil
 }
 
+// openFile is indirected so tests can stub file opening.
+var openFile = func(path string) (io.ReadCloser, error) {
+	return os.Open(path)
+}
+
 // postAsset does the request and reads the asset URL back. It takes the file
 // rather than the UserAsset, because nothing about sending the bytes depends on
 // how they render. It is separate so every way it can fail picks up the same
@@ -128,7 +133,7 @@ func (u *Uploader) postAsset(ctx context.Context, a asset) (string, error) {
 	url.SetQuery("content_type", a.contentType)
 	url.SetQuery("repository_id", strconv.FormatInt(u.targetRepository, 10))
 
-	open := func() (io.ReadCloser, error) { return os.Open(a.path) }
+	open := func() (io.ReadCloser, error) { return openFile(a.path) }
 
 	f, err := open()
 	if err != nil {
