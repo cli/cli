@@ -247,7 +247,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantQuery:   `mutation CommentCreate\b`,
 			wantBody:    "see below\n\n![a](https://example.com/1)",
 			wantStdout:  "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
-			wantErr:     "could not upload ./b.png\nattaching files requires write access to the repository",
+			wantErr:     "could not upload ./b.png: attaching files requires write access to the repository",
 			wantUploads: 2,
 		},
 		{
@@ -256,7 +256,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			attach:               []string{"a.png"},
 			repositoryDatabaseID: 1234,
 			uploads:              []attachments.UploadStub{{Name: "a.png", Status: 404, Body: `{"message":"Not Found"}`}},
-			wantErr:              "could not upload ./a.png\nattaching files requires write access to the repository\nno comment was posted",
+			wantErr:              "could not upload ./a.png: attaching files requires write access to the repository\nno comment was posted",
 			wantUploads:          1,
 		},
 		{
@@ -265,7 +265,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			attach:               []string{"a.png"},
 			repositoryDatabaseID: 1234,
 			uploads:              []attachments.UploadStub{{Name: "a.png", Status: 404, Body: `{"message":"Not Found"}`}},
-			wantErr:              "could not upload ./a.png\nattaching files requires write access to the repository\nno comment was posted",
+			wantErr:              "could not upload ./a.png: attaching files requires write access to the repository\nno comment was posted",
 			wantUploads:          1,
 		},
 		{
@@ -286,7 +286,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			},
 			wantQuery:   `mutation CommentCreate\b`,
 			writeFails:  true,
-			wantErr:     "could not upload ./b.png\nattaching files requires write access to the repository\nGraphQL: the write failed",
+			wantErr:     "could not upload ./b.png: attaching files requires write access to the repository\nGraphQL: the write failed",
 			wantUploads: 2,
 		},
 		{
@@ -332,7 +332,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			attach:               []string{"a.png"},
 			repositoryDatabaseID: 1234,
 			uploads:              []attachments.UploadStub{{Name: "a.png", Status: 404, Body: `{"message":"Not Found"}`}},
-			wantErr:              "could not upload ./a.png\nattaching files requires write access to the repository\nthe comment was not changed",
+			wantErr:              "could not upload ./a.png: attaching files requires write access to the repository\nthe comment was not changed",
 			wantUploads:          1,
 		},
 		{

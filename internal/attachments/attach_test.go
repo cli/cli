@@ -128,7 +128,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{201, `{"url":"https://example.com/1"}`}, {404, `{"message":"Not Found"}`}},
 			wantBody:     "Three files\n\n![a](https://example.com/1)",
 			wantUploaded: 1,
-			wantErr:      "could not upload ./b.png\nattaching files requires write access to the repository",
+			wantErr:      "could not upload ./b.png: attaching files requires write access to the repository",
 		},
 		{
 			name:         "leaves a failed reference as the author wrote it",
@@ -138,7 +138,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{404, `{"message":"Not Found"}`}},
 			wantBody:     "![the login screen](./login.png)",
 			wantUploaded: 0,
-			wantErr:      "could not upload ./login.png\nattaching files requires write access to the repository",
+			wantErr:      "could not upload ./login.png: attaching files requires write access to the repository",
 		},
 		{
 			name:         "writes nothing when the first upload fails",
@@ -148,7 +148,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{404, `{"message":"Not Found"}`}},
 			wantBody:     "",
 			wantUploaded: 0,
-			wantErr:      "could not upload ./a.png\nattaching files requires write access to the repository",
+			wantErr:      "could not upload ./a.png: attaching files requires write access to the repository",
 		},
 		{
 			// Refused before the upload loop, so nothing is stranded, and the

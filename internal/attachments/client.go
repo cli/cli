@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
@@ -175,6 +176,7 @@ func newUploadError(err error, a UserAsset) error {
 	if httpError, ok := errors.AsType[api.HTTPError](err); ok {
 		uploadErr.StatusCode = httpError.StatusCode
 		uploadErr.Message = httpError.Message
+		uploadErr.RetryAfter = httpError.Headers.Get("Retry-After")
 	}
 	return uploadErr
 }
@@ -184,6 +186,7 @@ func newUploadError(err error, a UserAsset) error {
 type uploadError struct {
 	Path       string
 	StatusCode int
+	RetryAfter string
 	// Message is what the endpoint said, which api.HandleHTTPError has already
 	// joined from the top level message and the per field ones.
 	Message string
@@ -195,12 +198,17 @@ func (e *uploadError) Error() string {
 	case http.StatusNotFound:
 		// The endpoint answers 404 rather than 403 when the token cannot write,
 		// so the status code alone points at the wrong problem.
-		return fmt.Sprintf("could not upload %s\nattaching files requires write access to the repository", e.Path)
+		return fmt.Sprintf("could not upload %s: attaching files requires write access to the repository", e.Path)
 	case http.StatusUnprocessableEntity:
 		if e.Message == "" {
 			return fmt.Sprintf("could not upload %s", e.Path)
 		}
-		return fmt.Sprintf("could not upload %s\n%s", e.Path, e.Message)
+		return fmt.Sprintf("could not upload %s: %s", e.Path, strings.ReplaceAll(e.Message, "\n", "; "))
+	case http.StatusTooManyRequests:
+		if e.RetryAfter == "" {
+			return fmt.Sprintf("could not upload %s: rate limited; wait and try again", e.Path)
+		}
+		return fmt.Sprintf("could not upload %s: rate limited; retry after %s", e.Path, e.RetryAfter)
 	}
 	return fmt.Sprintf("failed to upload %s: %v", e.Path, e.err)
 }

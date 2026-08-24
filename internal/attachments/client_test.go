@@ -157,6 +157,7 @@ func TestUploadErrors(t *testing.T) {
 		contentType string
 		status      int
 		response    string
+		retryAfter  string
 		// nonJSON sends response bytes verbatim instead of marshaling them as
 		// json.RawMessage. The "unreadable response" row uses it so the decoder
 		// receives invalid JSON rather than an empty body from a failed marshal.
@@ -171,7 +172,7 @@ func TestUploadErrors(t *testing.T) {
 			contentType:    "image/png",
 			status:         404,
 			response:       `{"message":"Not Found"}`,
-			wantErr:        "could not upload ./login.png\nattaching files requires write access to the repository",
+			wantErr:        "could not upload ./login.png: attaching files requires write access to the repository",
 			wantStatusCode: 404,
 		},
 		{
@@ -192,7 +193,7 @@ func TestUploadErrors(t *testing.T) {
 			status:      422,
 			response: `{"message":"Validation Failed","errors":[
 				{"field":"content_type","message":"content_type is not included in the list of allowed content types"}]}`,
-			wantErr:        "could not upload ./clip.mp4\nValidation Failed\ncontent_type is not included in the list of allowed content types",
+			wantErr:        "could not upload ./clip.mp4: Validation Failed; content_type is not included in the list of allowed content types",
 			wantStatusCode: 422,
 		},
 		{
@@ -203,7 +204,7 @@ func TestUploadErrors(t *testing.T) {
 			response: `{"message":"Validation Failed","errors":[
 				{"field":"content_type","message":"content_type is not included in the list of allowed content types"},
 				{"field":"name","message":"name has a file extension that does not match the content type"}]}`,
-			wantErr:        "could not upload ./shot.png\nValidation Failed\ncontent_type is not included in the list of allowed content types\nname has a file extension that does not match the content type",
+			wantErr:        "could not upload ./shot.png: Validation Failed; content_type is not included in the list of allowed content types; name has a file extension that does not match the content type",
 			wantStatusCode: 422,
 		},
 		{
@@ -212,7 +213,7 @@ func TestUploadErrors(t *testing.T) {
 			contentType:    "image/png",
 			status:         422,
 			response:       `{"message":"Validation Failed","errors":[{"resource":"Asset","field":"name","code":"invalid"}]}`,
-			wantErr:        "could not upload ./shot.png\nValidation Failed\nAsset.name is invalid",
+			wantErr:        "could not upload ./shot.png: Validation Failed; Asset.name is invalid",
 			wantStatusCode: 422,
 		},
 		{
@@ -221,7 +222,7 @@ func TestUploadErrors(t *testing.T) {
 			contentType:    "image/png",
 			status:         422,
 			response:       `{"message":"Validation Failed","errors":[]}`,
-			wantErr:        "could not upload ./shot.png\nValidation Failed",
+			wantErr:        "could not upload ./shot.png: Validation Failed",
 			wantStatusCode: 422,
 		},
 		{
@@ -239,7 +240,17 @@ func TestUploadErrors(t *testing.T) {
 			contentType:    "image/png",
 			status:         429,
 			response:       `{"message":"Too Many Requests"}`,
-			wantErrPrefix:  "failed to upload ./shot.png: ",
+			wantErr:        "could not upload ./shot.png: rate limited; wait and try again",
+			wantStatusCode: 429,
+		},
+		{
+			name:           "rate limited with retry window",
+			file:           "shot.png",
+			contentType:    "image/png",
+			status:         429,
+			response:       `{"message":"Too Many Requests"}`,
+			retryAfter:     "120",
+			wantErr:        "could not upload ./shot.png: rate limited; retry after 120",
 			wantStatusCode: 429,
 		},
 		{
@@ -280,6 +291,16 @@ func TestUploadErrors(t *testing.T) {
 			if tt.nonJSON {
 				responder = httpmock.StatusStringResponse(tt.status, tt.response)
 			}
+			if tt.retryAfter != "" {
+				next := responder
+				responder = func(req *http.Request) (*http.Response, error) {
+					resp, err := next(req)
+					if err == nil {
+						resp.Header.Set("Retry-After", tt.retryAfter)
+					}
+					return resp, err
+				}
+			}
 			reg.Register(
 				httpmock.REST("POST", "user-attachments/assets"),
 				responder,
@@ -293,6 +314,7 @@ func TestUploadErrors(t *testing.T) {
 			} else {
 				assert.Contains(t, err.Error(), tt.wantErrPrefix)
 			}
+			assert.NotContains(t, err.Error(), "\n")
 
 			var uploadErr *uploadError
 			require.True(t, errors.As(err, &uploadErr))
