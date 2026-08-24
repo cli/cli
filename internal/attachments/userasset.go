@@ -78,6 +78,10 @@ func newImageAsset(f asset, alt string) (UserAsset, error) {
 	}
 	a.alt = alt
 
+	if err := checkAltStaysInside(a); err != nil {
+		return nil, err
+	}
+
 	return a, nil
 }
 
@@ -193,4 +197,19 @@ var altEscaper = strings.NewReplacer(
 
 func escapeAlt(s string) string {
 	return altEscaper.Replace(s)
+}
+
+// checkAltStaysInside renders the image this asset will produce and parses it
+// back, so alt text that escapeAlt failed to neutralize is refused before the
+// upload rather than discovered after it. An upload cannot be undone, which is
+// why the check runs at validation.
+//
+// The URL is a stand-in, since the real one does not exist until the asset has
+// uploaded. Only the alt text varies, so a stand-in proves the same thing.
+func checkAltStaysInside(a *imageAsset) error {
+	const probeURL = "https://example.invalid/probe"
+	if !isSingleImage(a.markdown(probeURL), probeURL) {
+		return fmt.Errorf("%s: alt text cannot be rendered safely", a.path)
+	}
+	return nil
 }

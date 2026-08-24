@@ -758,3 +758,21 @@ func standsAlone(src []byte, block ast.Node, node byteRange) bool {
 	}
 	return true
 }
+
+// isSingleImage reports whether src is one image pointing at wantURL and
+// nothing besides. Asset validation uses it to confirm that escaped alt text
+// cannot restructure the markdown it is placed in.
+func isSingleImage(src, wantURL string) bool {
+	doc := goldmark.New().Parser().Parse(text.NewReader([]byte(src)))
+
+	block := doc.FirstChild()
+	if block == nil || block.NextSibling() != nil {
+		return false
+	}
+	inline := block.FirstChild()
+	if inline == nil || inline.NextSibling() != nil {
+		return false
+	}
+	image, ok := inline.(*ast.Image)
+	return ok && string(image.Destination) == wantURL
+}

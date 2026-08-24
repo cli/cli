@@ -844,3 +844,70 @@ func TestAttachAssetsToMarkdownReferenceStyleLink(t *testing.T) {
 	require.Equal(t, "See [the screenshot][shot].\n\n[shot]: "+pngURL, got.Rewritten)
 	require.Empty(t, got.ToAppend)
 }
+
+func TestIsSingleImage(t *testing.T) {
+	const url = "https://example.invalid/probe"
+
+	tests := []struct {
+		name     string
+		markdown string
+		want     bool
+	}{
+		{
+			name:     "one image pointing where it should",
+			markdown: "![a caption](" + url + ")",
+			want:     true,
+		},
+		{
+			name:     "empty alt text",
+			markdown: "![](" + url + ")",
+			want:     true,
+		},
+		{
+			name:     "brackets that stay inside because they are escaped",
+			markdown: `![a \[bracketed\] caption](` + url + `)`,
+			want:     true,
+		},
+		{
+			name:     "alt text that closes the image early takes the destination",
+			markdown: "![](https://evil.example.com/x.png)](" + url + ")",
+			want:     false,
+		},
+		{
+			name:     "alt text that adds a second image",
+			markdown: "![a](" + url + ")![b](" + url + ")",
+			want:     false,
+		},
+		{
+			name:     "alt text that leaves trailing prose outside the image",
+			markdown: "![a](" + url + ") and more",
+			want:     false,
+		},
+		{
+			name:     "alt text that opens a second paragraph",
+			markdown: "![a](" + url + ")\n\nsecond",
+			want:     false,
+		},
+		{
+			name:     "an image pointing somewhere else",
+			markdown: "![a](https://evil.example.com/x.png)",
+			want:     false,
+		},
+		{
+			name:     "no image at all",
+			markdown: "just prose",
+			want:     false,
+		},
+		{
+			name:     "nothing",
+			markdown: "",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, isSingleImage(tt.markdown, url))
+		})
+	}
+}
