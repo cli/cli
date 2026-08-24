@@ -258,16 +258,17 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 		}
 	} else {
 		if hasLocalBranch {
-			// Updating a branch checked out in another worktree would leave that
-			// worktree's index and working tree stale, so refuse and point the user at it.
-			worktreePath, err := git.BranchWorktreePath(branch)
-			if err != nil {
-				return err
-			}
-			if worktreePath != "" {
-				return fmt.Errorf("can't sync %q because it's checked out in another worktree at %s\ntip: run `gh repo sync` from that worktree instead", branch, worktreePath)
-			}
 			if err := git.UpdateBranch(branch, "FETCH_HEAD"); err != nil {
+				worktrees, worktreeErr := git.Worktrees()
+				if worktreeErr != nil {
+					return err
+				}
+				if worktree := gitpkg.WorktreeForBranch(worktrees, branch); worktree != nil {
+					if worktree.Prunable {
+						return fmt.Errorf("can't sync %q because stale worktree metadata still associates it with %s\ntip: run `git worktree prune` and retry", branch, worktree.Path)
+					}
+					return fmt.Errorf("can't sync %q because it's checked out in another worktree at %s\ntip: run `gh repo sync` from that worktree instead", branch, worktree.Path)
+				}
 				return err
 			}
 		} else {

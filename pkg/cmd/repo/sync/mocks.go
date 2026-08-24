@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"github.com/cli/cli/v2/git"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -13,9 +14,9 @@ func (g *mockGitClient) UpdateBranch(b, r string) error {
 	return args.Error(0)
 }
 
-func (g *mockGitClient) BranchWorktreePath(b string) (string, error) {
-	args := g.Called(b)
-	return args.String(0), args.Error(1)
+func (g *mockGitClient) Worktrees() ([]git.Worktree, error) {
+	args := g.Called()
+	return args.Get(0).([]git.Worktree), args.Error(1)
 }
 
 func (g *mockGitClient) CreateBranch(b, r, u string) error {

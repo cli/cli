@@ -80,4 +80,19 @@ type Worktree struct {
 	// (e.g. "refs/heads/main"). It is empty when the worktree has a detached
 	// HEAD or is the bare main worktree.
 	Ref string
+	// Prunable indicates that the worktree's administrative files reference
+	// a working directory that no longer exists.
+	Prunable bool
+}
+
+// WorktreeForBranch returns the worktree that has branch checked out, or nil
+// when the branch is not associated with any worktree.
+func WorktreeForBranch(worktrees []Worktree, branch string) *Worktree {
+	branchRef := "refs/heads/" + branch
+	for i := range worktrees {
+		if worktrees[i].Ref == branchRef {
+			return &worktrees[i]
+		}
+	}
+	return nil
 }

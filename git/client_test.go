@@ -2365,6 +2365,14 @@ func TestParseWorktrees(t *testing.T) {
 				{Path: "/path/to/feature-wt", Ref: "refs/heads/feature"},
 			},
 		},
+		{
+			name: "prunable worktree with spaces and windows line endings",
+			out:  "worktree /path/to/main\r\nHEAD abc123\r\nbranch refs/heads/main\r\n\r\nworktree /path/to/feature work\r\nHEAD def456\r\nbranch refs/heads/feature/one\r\nprunable gitdir file points to non-existent location\r\n",
+			want: []Worktree{
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
+				{Path: "/path/to/feature work", Ref: "refs/heads/feature/one", Prunable: true},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2372,6 +2380,17 @@ func TestParseWorktrees(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestWorktreeForBranch(t *testing.T) {
+	worktrees := []Worktree{
+		{Path: "/path/to/main", Ref: "refs/heads/main"},
+		{Path: "/path/to/feature", Ref: "refs/heads/feature/one"},
+	}
+
+	assert.Equal(t, &worktrees[1], WorktreeForBranch(worktrees, "feature/one"))
+	assert.Nil(t, WorktreeForBranch(worktrees, "feature"))
+	assert.Nil(t, WorktreeForBranch(worktrees, "missing"))
 }
 
 func TestClientWorktreeRemove(t *testing.T) {
@@ -2385,4 +2404,17 @@ func TestClientWorktreeRemove(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "path/to/git worktree remove -- -feature", strings.Join(cmd.Args[3:], " "))
+}
+
+func TestClientWorktreePrune(t *testing.T) {
+	cmd, cmdCtx := createCommandContext(t, 0, "", "")
+	client := Client{
+		GitPath:        "path/to/git",
+		commandContext: cmdCtx,
+	}
+
+	err := client.WorktreePrune(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, "path/to/git worktree prune", strings.Join(cmd.Args[3:], " "))
 }

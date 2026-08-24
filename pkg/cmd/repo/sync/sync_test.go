@@ -3,6 +3,7 @@ package sync
 import (
 	"bytes"
 	stdctx "context"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -139,6 +140,33 @@ func TestExecuteLocalRepoSyncBranchCheckedOutInOtherWorktree(t *testing.T) {
 	require.ErrorContains(t, err, "tip: run `gh repo sync` from that worktree instead")
 	require.Equal(t, originalBranch, runGit(t, repoDir, "rev-parse", "trunk"))
 	require.Empty(t, runGit(t, worktreeDir, "status", "--porcelain"))
+}
+
+func TestExecuteLocalRepoSyncBranchAssociatedWithPrunableWorktree(t *testing.T) {
+	git.IsolateConfig(t)
+
+	repoDir := t.TempDir()
+	worktreeDir := filepath.Join(t.TempDir(), "missing-trunk-worktree")
+
+	runGit(t, repoDir, "init", "--quiet", "--initial-branch=trunk")
+	runGit(t, repoDir, "config", "user.name", "Test User")
+	runGit(t, repoDir, "config", "user.email", "test@example.com")
+	runGit(t, repoDir, "commit", "--quiet", "--allow-empty", "--message=initial")
+	runGit(t, repoDir, "switch", "--quiet", "--create", "test")
+	runGit(t, repoDir, "worktree", "add", "--quiet", worktreeDir, "trunk")
+	require.NoError(t, os.RemoveAll(worktreeDir))
+	runGit(t, repoDir, "commit", "--quiet", "--allow-empty", "--message=upstream")
+	runGit(t, repoDir, "fetch", "--quiet", ".", "test")
+
+	opts := &SyncOptions{
+		Branch: "trunk",
+		Git:    &gitExecuter{client: &git.Client{RepoDir: repoDir}},
+	}
+
+	err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
+	require.ErrorContains(t, err, `can't sync "trunk" because stale worktree metadata still associates it with `)
+	require.ErrorContains(t, err, filepath.Base(worktreeDir))
+	require.ErrorContains(t, err, "tip: run `git worktree prune` and retry")
 }
 
 func TestExecuteLocalRepoSyncFastForwardsNonCurrentBranch(t *testing.T) {
@@ -392,7 +420,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
-				mgc.On("BranchWorktreePath", "trunk").Return("", nil).Once()
 				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(nil).Once()
 			},
 			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
@@ -408,10 +435,28 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
-				mgc.On("BranchWorktreePath", "trunk").Return("/path/to/worktree", nil).Once()
+				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(errors.New("branch is checked out in another worktree")).Once()
+				mgc.On("Worktrees").Return([]git.Worktree{{Path: "/path/to/worktree", Ref: "refs/heads/trunk"}}, nil).Once()
 			},
 			wantErr: true,
 			errMsg:  "can't sync \"trunk\" because it's checked out in another worktree at /path/to/worktree\ntip: run `gh repo sync` from that worktree instead",
+		},
+		{
+			name: "sync local repo with parent - existing branch associated with prunable worktree",
+			tty:  true,
+			opts: &SyncOptions{
+				Branch: "trunk",
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
+				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
+				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(errors.New("branch is checked out in another worktree")).Once()
+				mgc.On("Worktrees").Return([]git.Worktree{{Path: "/path/to/missing-worktree", Ref: "refs/heads/trunk", Prunable: true}}, nil).Once()
+			},
+			wantErr: true,
+			errMsg:  "can't sync \"trunk\" because stale worktree metadata still associates it with /path/to/missing-worktree\ntip: run `git worktree prune` and retry",
 		},
 		{
 			name: "sync local repo with parent - create new branch",
