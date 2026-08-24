@@ -74,10 +74,7 @@ func (s Skill) DisplayName() string {
 	}
 }
 
-// InstallName returns the relative path used for the install directory.
-// For namespaced skills it returns "namespace/name" (creating a nested directory),
-// otherwise it returns the plain name. Callers should use filepath.FromSlash
-// when building OS-specific paths from this value.
+// InstallName returns "namespace/name" when a namespace is present, or the skill name otherwise.
 func (s Skill) InstallName() string {
 	if s.Namespace != "" {
 		return s.Namespace + "/" + s.Name

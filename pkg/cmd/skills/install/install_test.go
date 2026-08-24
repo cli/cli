@@ -1880,6 +1880,7 @@ func TestRunLocalInstall(t *testing.T) {
 				assert.Contains(t, string(content), "alice xlsx-pro")
 			},
 			wantStdout: "Installed",
+			wantStderr: "xlsx-pro/\n  └── SKILL.md",
 		},
 		{
 			name:  "local install existing skill without force non-interactive errors",
