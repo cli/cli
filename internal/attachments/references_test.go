@@ -32,7 +32,6 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 		wantToAppend   []attachmentArg
 		wantErr        string
 	}{
-		// The four cells of the image column.
 		{
 			name:           "image embed on its own line keeps its markdown",
 			markdown:       "Before\n\n![the login screen](./login.png)\n\nAfter",
@@ -59,7 +58,6 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 			wantToAppend:   []attachmentArg{pngArg()},
 		},
 
-		// The four cells of the video column.
 		{
 			name:           "video embed alone in its own paragraph becomes a bare url",
 			markdown:       "Watch:\n\n![screen recording](./repro.mp4)\n\nEnd",
