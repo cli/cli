@@ -327,7 +327,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "prefer_editor_prompt config with body flag errors",
 			input: "23 --body test",
 			config: func() (gh.Config, error) {
-				return config.NewFromString("prefer_editor_prompt: enabled"), nil
+				return config.NewMockConfigFromString("prefer_editor_prompt: enabled"), nil
 			},
 			wantsErr: true,
 		},
@@ -335,7 +335,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "prefer_editor_prompt config with body-file flag errors",
 			input: fmt.Sprintf("23 --body-file '%s'", tmpFile),
 			config: func() (gh.Config, error) {
-				return config.NewFromString("prefer_editor_prompt: enabled"), nil
+				return config.NewMockConfigFromString("prefer_editor_prompt: enabled"), nil
 			},
 			wantsErr: true,
 		},
@@ -343,7 +343,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "prefer_editor_prompt config with multiple issues and label errors",
 			input: "23 34 --add-label bug",
 			config: func() (gh.Config, error) {
-				return config.NewFromString("prefer_editor_prompt: enabled"), nil
+				return config.NewMockConfigFromString("prefer_editor_prompt: enabled"), nil
 			},
 			wantsErr: true,
 		},
@@ -449,7 +449,7 @@ func TestNewCmdEdit(t *testing.T) {
 			cfgFunc := tt.config
 			if cfgFunc == nil {
 				cfgFunc = func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				}
 			}
 
