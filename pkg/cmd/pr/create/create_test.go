@@ -2447,7 +2447,7 @@ func Test_generateCompareURL(t *testing.T) {
 				},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				// Ensure no v1 projects are requestd
+				// Ensure no v1 projects are requested
 				// ( is required to avoid matching projectsV2
 				reg.Exclude(t, httpmock.GraphQL(`projects\(`))
 				reg.Register(

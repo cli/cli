@@ -701,7 +701,7 @@ func Test_editRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "gists/1234"), httpmock.StatusStringResponse(201, "{}"))
-				// Explicity exclude also-truncated.txt raw URL to ensure it is not fetched since we did not select it.
+				// Explicitly exclude also-truncated.txt raw URL to ensure it is not fetched since we did not select it.
 				reg.Exclude(t, httpmock.REST("GET", "user/1234/raw/also-truncated.txt"))
 			},
 			wantLastRequestParameters: map[string]interface{}{

@@ -26,7 +26,7 @@ What this does is:
 ## Bumping Homebrew
 
 Homebrew bumps are handled by [autobump](https://docs.brew.sh/Autobump), which runs periodically every 3 hours. In cases where a quicker rollout is required, a pull request can be opened manually with the following steps:
- 1. Replace the version number in the url to point ot the updated version.
+ 1. Replace the version number in the url to point to the updated version.
  2. Calculate and replace the sha256 value.
  3. Open the PR.
 

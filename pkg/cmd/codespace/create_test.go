@@ -326,7 +326,7 @@ func TestApp_Create(t *testing.T) {
 			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 		},
 		{
-			name: "create codespace with default branch does not show idle timeout notice if not conntected to terminal",
+			name: "create codespace with default branch does not show idle timeout notice if not connected to terminal",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
