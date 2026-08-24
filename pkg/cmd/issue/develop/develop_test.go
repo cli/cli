@@ -192,6 +192,8 @@ func TestDevelopRun(t *testing.T) {
 	unsafeTargetDir := t.TempDir()
 	unsafeTarget := filepath.Join(unsafeTargetDir, "worktree-link")
 	require.NoError(t, os.Symlink(unsafeTargetDir, unsafeTarget))
+	nonEmptyTarget := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(nonEmptyTarget, "file"), []byte("x"), 0o644))
 
 	tests := []struct {
 		name            string
@@ -859,6 +861,32 @@ func TestDevelopRun(t *testing.T) {
 				)
 			},
 			wantErrContains: "--worktree path must not be a symlink",
+		},
+		{
+			name: "non-empty worktree target is rejected before creating a linked branch",
+			opts: &DevelopOptions{
+				IssueNumber: 123,
+				Checkout:    true,
+				Worktree:    nonEmptyTarget,
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, _ *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
+				cs.Register(`git -C .+ rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
+			},
+			wantErrContains: "--worktree path must be empty",
 		},
 		{
 			name: "develop with base branch which does not exist",

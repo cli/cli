@@ -103,6 +103,10 @@ func TestResolveWorktreeTargetPathSafety(t *testing.T) {
 	existingDir := filepath.Join(base, "dir")
 	require.NoError(t, os.Mkdir(existingDir, 0o755))
 
+	nonEmptyDir := filepath.Join(base, "non-empty-dir")
+	require.NoError(t, os.Mkdir(nonEmptyDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(nonEmptyDir, "file"), []byte("x"), 0o644))
+
 	regularFile := filepath.Join(base, "file")
 	require.NoError(t, os.WriteFile(regularFile, []byte("x"), 0o644))
 
@@ -123,6 +127,11 @@ func TestResolveWorktreeTargetPathSafety(t *testing.T) {
 			path: existingDir,
 		},
 		{
+			name:    "existing non-empty directory is rejected",
+			path:    nonEmptyDir,
+			wantErr: "--worktree path must be empty",
+		},
+		{
 			name:    "leaf symlink is rejected",
 			path:    symlink,
 			wantErr: "--worktree path must not be a symlink",
@@ -138,7 +147,7 @@ func TestResolveWorktreeTargetPathSafety(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cs, teardown := run.Stub()
 			defer teardown(t)
-			if tt.wantErr == "" {
+			if tt.wantErr == "" || tt.path == nonEmptyDir {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 128, "")
 			}
 
