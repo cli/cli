@@ -40,6 +40,10 @@ func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, ba
 	if len(state.ProjectTitles) > 0 {
 		projectPaths, err := api.ProjectTitlesToPaths(client, baseRepo, state.ProjectTitles, projectsV1Support)
 		if err != nil {
+			var missingScopesErr api.MissingScopesError
+			if errors.As(err, &missingScopesErr) {
+				return "", missingScopesErr
+			}
 			return "", fmt.Errorf("could not add to project: %w", err)
 		}
 		q.Set("projects", strings.Join(projectPaths, ","))
@@ -86,7 +90,7 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 
 		metadataResult, err := api.RepoMetadata(client, baseRepo, input)
 		if err != nil {
-			if missingScopesErr := api.GraphQLMissingScopesError(err); missingScopesErr != nil {
+			if missingScopesErr := api.GraphQLMissingScopeError(err, "read:project"); missingScopesErr != nil {
 				return missingScopesErr
 			}
 			return err

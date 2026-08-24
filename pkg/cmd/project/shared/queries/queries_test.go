@@ -3,13 +3,13 @@ package queries
 import (
 	"io"
 	"net/http"
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -564,35 +564,28 @@ func TestProjectFields_NoLimit(t *testing.T) {
 	assert.Len(t, project.Fields.Nodes, 3)
 }
 
-func Test_requiredScopesFromServerMessage(t *testing.T) {
-	tests := []struct {
-		name string
-		msg  string
-		want []string
-	}{
-		{
-			name: "no scopes",
-			msg:  "SERVER OOPSIE",
-			want: []string(nil),
-		},
-		{
-			name: "one scope",
-			msg:  "Your token has not been granted the required scopes to execute this query. The 'dataType' field requires one of the following scopes: ['read:project'], but your token has only been granted the: ['codespace', repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
-			want: []string{"read:project"},
-		},
-		{
-			name: "multiple scopes",
-			msg:  "Your token has not been granted the required scopes to execute this query. The 'dataType' field requires one of the following scopes: ['read:project', 'read:discussion', 'codespace'], but your token has only been granted the: [repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
-			want: []string{"read:project", "read:discussion", "codespace"},
-		},
+func TestProjectMutationScopeError(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	httpClient := &http.Client{
+		Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Header: http.Header{
+					"Content-Type": []string{"application/json"},
+				},
+				Body: io.NopCloser(strings.NewReader(`{
+					"errors": [{
+						"type": "INSUFFICIENT_SCOPES",
+						"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
+					}]
+				}`)),
+			}, nil
+		}),
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := requiredScopesFromServerMessage(tt.msg); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("requiredScopesFromServerMessage() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+
+	client := NewClient(httpClient, "github.com", ios)
+	err := client.Mutate("UpdateProjectV2", &struct{}{}, nil)
+	require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project]\nTo request it, run:  gh auth refresh -s read:project")
 }
 
 func TestNewProject_nonTTY(t *testing.T) {

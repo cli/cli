@@ -47,6 +47,7 @@ func TestGraphQL(t *testing.T) {
 
 func TestGraphQLMissingScopes(t *testing.T) {
 	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
 	client := newTestClient(reg)
 
 	reg.Register(
@@ -55,21 +56,43 @@ func TestGraphQLMissingScopes(t *testing.T) {
 			"errors": [
 				{
 					"type": "INSUFFICIENT_SCOPES",
-					"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'read:discussion']."
+					"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
 				},
 				{
 					"type": "INSUFFICIENT_SCOPES",
-					"message": "The 'other' field requires one of the following scopes: ['read:project']."
+					"message": "The 'other' field requires one of the following scopes: ['read:discussion']."
 				}
 			]
 		}`),
 	)
 
 	err := client.GraphQL("github.com", "", nil, &struct{}{})
+	require.Error(t, err)
 	assert.Equal(t, []string{"read:discussion", "read:project"}, GraphQLMissingScopes(err))
-	assert.EqualError(t, GraphQLMissingScopesError(err), "error: your authentication token is missing required scopes [read:discussion read:project]\nUpdate your authentication token to include: read:discussion,read:project")
+	require.EqualError(t, GraphQLMissingScopeError(err, "read:project"), "error: your authentication token is missing required scopes [read:project]\nUpdate your authentication token to include: read:project")
 	assert.Empty(t, GraphQLMissingScopes(errors.New("not a GraphQL error")))
-	assert.NoError(t, GraphQLMissingScopesError(errors.New("not a GraphQL error")))
+	require.NoError(t, GraphQLMissingScopeError(errors.New("not a GraphQL error"), "read:project"))
+}
+
+func TestGraphQLMissingScopesDoesNotFlattenAlternatives(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(
+		httpmock.GraphQL(""),
+		httpmock.StringResponse(`{
+			"errors": [{
+				"type": "INSUFFICIENT_SCOPES",
+				"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'project']."
+			}]
+		}`),
+	)
+
+	err := client.GraphQL("github.com", "", nil, &struct{}{})
+	require.Error(t, err)
+	assert.Empty(t, GraphQLMissingScopes(err))
+	require.NoError(t, GraphQLMissingScopeError(err, "read:project"))
 }
 
 func TestGraphQLError(t *testing.T) {
