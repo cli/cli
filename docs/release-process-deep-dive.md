@@ -38,18 +38,20 @@ Although this workflow is used to do our production releases for Linux, MacOS an
     runs-on: ubuntu-latest
     steps:
       - name: Validate tag name format
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
         run: |
-          if [[ ! "${{ inputs.tag_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag name format. Must be in the form v1.2.3"
+          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Invalid tag name format. Must be in the form v1.2.3 or v1.2.3-rc.1"
             exit 1
           fi
 ```
 </details>
 
-The purpose of this job is to [prevent incorrectly tagged releases](https://github.com/cli/cli/pull/10121), by ensuring they conform to the `major.minor.patch` form of semantic versioning, preceded by a `v`.
+The purpose of this job is to [prevent incorrectly tagged releases](https://github.com/cli/cli/pull/10121), by ensuring they conform to the `major.minor.patch` form of semantic versioning, preceded by a `v`. An optional pre-release suffix such as `-rc.1` is allowed. Build metadata after a `+` is not, because the rest of the workflow identifies a pre-release by looking for a hyphen.
 
-> [!WARNING]
-> The `release` job can [create the GitHub release as a pre-release based on the existence of a hyphen in the tag name](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L362-L364), but the later addition of `validate-tag-name` disallows this.
+> [!NOTE]
+> A hyphen in the tag name changes three things: the `release` job [creates the GitHub release as a pre-release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L362-L364), the site is not published, and the Windows MSI drops the suffix so its `ProductVersion` stays numeric.
 
 ## <a id="os-builds">[OS Builds](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L40-L248)</a>
 

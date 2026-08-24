@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
@@ -16,6 +18,7 @@ import (
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_printError(t *testing.T) {
@@ -144,7 +147,7 @@ func Test_newIOStreams_pager(t *testing.T) {
 			} else {
 				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, "")
 			assert.Equal(t, tt.wantPager, io.GetPager())
 		})
 	}
@@ -185,7 +188,7 @@ func Test_newIOStreams_prompt(t *testing.T) {
 			} else {
 				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, "")
 			assert.Equal(t, tt.promptDisabled, io.GetNeverPrompt())
 		})
 	}
@@ -195,12 +198,18 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 	tests := []struct {
 		name            string
 		config          gh.Config
+		invokingAgent   agents.AgentName
 		spinnerDisabled bool
 		env             map[string]string
 	}{
 		{
 			name:            "default config",
 			spinnerDisabled: false,
+		},
+		{
+			name:            "agent detected",
+			invokingAgent:   "some-agent",
+			spinnerDisabled: true,
 		},
 		{
 			name:            "config with spinner disabled",
@@ -213,12 +222,30 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 			spinnerDisabled: false,
 		},
 		{
+			name:            "agent overrides config enabled",
+			config:          enableSpinnersConfig(),
+			invokingAgent:   "some-agent",
+			spinnerDisabled: true,
+		},
+		{
+			name:            "config disabled with agent",
+			config:          disableSpinnersConfig(),
+			invokingAgent:   "some-agent",
+			spinnerDisabled: true,
+		},
+		{
 			name:            "spinner disabled via GH_SPINNER_DISABLED env var = 0",
 			env:             map[string]string{"GH_SPINNER_DISABLED": "0"},
 			spinnerDisabled: false,
 		},
 		{
 			name:            "spinner disabled via GH_SPINNER_DISABLED env var = false",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "false"},
+			spinnerDisabled: false,
+		},
+		{
+			name:            "GH_SPINNER_DISABLED false overrides agent",
+			invokingAgent:   "some-agent",
 			env:             map[string]string{"GH_SPINNER_DISABLED": "false"},
 			spinnerDisabled: false,
 		},
@@ -252,6 +279,12 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// t.Setenv registers the cleanup that restores the caller's environment;
+			// os.Unsetenv then clears the variable outright. Both are needed because
+			// newIOStreams branches on os.LookupEnv, so leaving GH_SPINNER_DISABLED
+			// set-but-empty would take the env branch and never reach agent or config.
+			t.Setenv("GH_SPINNER_DISABLED", "")
+			require.NoError(t, os.Unsetenv("GH_SPINNER_DISABLED"))
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
@@ -261,7 +294,7 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 			} else {
 				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, tt.invokingAgent)
 			assert.Equal(t, tt.spinnerDisabled, io.GetSpinnerDisabled())
 		})
 	}
@@ -327,7 +360,7 @@ func Test_newIOStreams_accessiblePrompterEnabled(t *testing.T) {
 			} else {
 				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, "")
 			assert.Equal(t, tt.accessiblePrompterEnabled, io.AccessiblePrompterEnabled())
 		})
 	}
@@ -403,7 +436,7 @@ func Test_newIOStreams_colorLabels(t *testing.T) {
 			} else {
 				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, "")
 			assert.Equal(t, tt.colorLabelsEnabled, io.ColorLabels())
 		})
 	}
