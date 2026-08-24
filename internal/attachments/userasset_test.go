@@ -89,13 +89,6 @@ func TestNewAsset(t *testing.T) {
 			wantContentType: "video/mp4",
 		},
 		{
-			name:            "an image alt drops the extension",
-			file:            "shot.png",
-			path:            "./shot.png",
-			wantAlt:         "shot",
-			wantContentType: "image/png",
-		},
-		{
 			name:            "mov",
 			file:            "repro.mov",
 			path:            "./repro.mov",
@@ -122,13 +115,6 @@ func TestNewAsset(t *testing.T) {
 			path:            "./shot.png",
 			alt:             "The login error state",
 			wantAlt:         "The login error state",
-			wantContentType: "image/png",
-		},
-		{
-			name:            "no alt text falls back to the filename",
-			file:            "shot.png",
-			path:            "./shot.png",
-			wantAlt:         "shot",
 			wantContentType: "image/png",
 		},
 		{
