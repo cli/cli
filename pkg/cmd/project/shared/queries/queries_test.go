@@ -1,11 +1,13 @@
 package queries
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
@@ -565,27 +567,55 @@ func TestProjectFields_NoLimit(t *testing.T) {
 }
 
 func TestProjectMutationScopeError(t *testing.T) {
-	ios, _, _, _ := iostreams.Test()
-	httpClient := &http.Client{
-		Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: 200,
-				Header: http.Header{
-					"Content-Type": []string{"application/json"},
-				},
-				Body: io.NopCloser(strings.NewReader(`{
-					"errors": [{
-						"type": "INSUFFICIENT_SCOPES",
-						"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
-					}]
-				}`)),
-			}, nil
-		}),
+	tests := []struct {
+		name             string
+		scopeClause      string
+		wantError        string
+		wantRequirements api.ScopeRequirements
+	}{
+		{
+			name:             "singleton",
+			scopeClause:      "['read:project']",
+			wantError:        "error: your authentication token is missing required scopes [read:project]\nTo request it, run:  gh auth refresh -s read:project",
+			wantRequirements: api.ScopeRequirements{{Scopes: []string{"read:project"}}},
+		},
+		{
+			name:             "alternatives",
+			scopeClause:      "['read:project', 'project']",
+			wantError:        "error: your authentication token is missing required scopes [read:project or project]\nTo request one valid set, run:  gh auth refresh -s read:project",
+			wantRequirements: api.ScopeRequirements{{Scopes: []string{"read:project", "project"}}},
+		},
 	}
 
-	client := NewClient(httpClient, "github.com", ios)
-	err := client.Mutate("UpdateProjectV2", &struct{}{}, nil)
-	require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project]\nTo request it, run:  gh auth refresh -s read:project")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			httpClient := &http.Client{
+				Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+					response := fmt.Sprintf(`{
+						"errors": [{
+							"type": "INSUFFICIENT_SCOPES",
+							"message": "The 'dataType' field requires one of the following scopes: %s."
+						}]
+					}`, tt.scopeClause)
+					return &http.Response{
+						StatusCode: 200,
+						Header: http.Header{
+							"Content-Type": []string{"application/json"},
+						},
+						Body: io.NopCloser(strings.NewReader(response)),
+					}, nil
+				}),
+			}
+
+			client := NewClient(httpClient, "github.com", ios)
+			err := client.Mutate("UpdateProjectV2", &struct{}{}, nil)
+			require.EqualError(t, err, tt.wantError)
+			var missingScopesErr api.MissingScopesError
+			require.ErrorAs(t, err, &missingScopesErr)
+			require.Equal(t, tt.wantRequirements, missingScopesErr.Requirements)
+		})
+	}
 }
 
 func TestNewProject_nonTTY(t *testing.T) {
