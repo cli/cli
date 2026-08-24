@@ -535,7 +535,7 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 		{
 			name:           "a file that produced no asset url is left as the author wrote it",
 			markdown:       "![the login screen](./login.png)",
-			attachmentArgs: []attachmentArg{{Path: "./login.png", Alt: "login"}},
+			attachmentArgs: []attachmentArg{{Path: "./login.png", Alt: "login"}}, // no url
 			wantMarkdown:   "![the login screen](./login.png)",
 		},
 
@@ -869,7 +869,7 @@ func TestNewAttachableMarkdown(t *testing.T) {
 				return
 			}
 			require.EqualError(t, err, tt.wantErr)
-			require.Empty(t, v, "refused markdown must not be usable")
+			require.Zero(t, v, "refused markdown must not be usable")
 		})
 	}
 }
