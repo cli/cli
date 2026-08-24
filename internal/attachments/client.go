@@ -21,9 +21,9 @@ import (
 
 // Uploader attaches files to one upload target.
 //
-// TODO kw: hold an api.Client here once go-gh can set Content-Type and
-// Content-Length per request. The endpoint requires both and RESTClient sets
-// neither, so the request is built by hand.
+// TODO kw: hold an api.Client here and send uploads with DoRequest once #14104
+// lands. The request stays hand-built so it can set Content-Type,
+// Content-Length and GetBody.
 type Uploader struct {
 	httpClient       *http.Client
 	host             string
