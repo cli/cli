@@ -379,14 +379,15 @@ func isRemoteDestination(dest string) bool {
 }
 
 // candidatePaths returns the ways a destination could name a file on disk.
-// goldmark strips angle brackets but leaves backslash escapes and percent
-// encoding intact, and either can stand in for a character legal in a
-// filename. A space must be written as "<./my file.png>" or "./my%20file.png"
-// to parse at all.
+// goldmark reports the destination alone, without the angle brackets or the
+// whitespace that separated it from the rest of the link, so what arrives is
+// already the name. Backslash escapes and percent encoding survive, and either
+// can stand in for a character legal in a filename. A space must be written as
+// "<./my file.png>" or "./my%20file.png" to parse at all, which is also why a
+// space inside the brackets belongs to the name and is kept.
 func candidatePaths(dest string) []string {
-	raw := trimAngles(strings.TrimSpace(dest))
-	out := []string{raw}
-	if unescaped := unescapePunctuation(raw); unescaped != raw {
+	out := []string{dest}
+	if unescaped := unescapePunctuation(dest); unescaped != dest {
 		out = append(out, unescaped)
 	}
 	for _, s := range append([]string{}, out...) {
@@ -397,12 +398,21 @@ func candidatePaths(dest string) []string {
 	return out
 }
 
-// comparableDestination reduces a link destination to the single form used to
-// decide whether a run of source is the node goldmark reported. Percent
+// comparableDestination reduces a destination goldmark reported to the single
+// form used to decide whether a run of source is the node it came from. Percent
 // encoding is left as written, since goldmark reports it unchanged and both
 // sides of every comparison therefore carry it.
 func comparableDestination(dest string) string {
-	return unescapePunctuation(trimAngles(strings.TrimSpace(dest)))
+	return unescapePunctuation(dest)
+}
+
+// comparableSource reduces a destination read straight from the source to that
+// same form. It still carries the syntax goldmark had already removed: the
+// whitespace separating the destination from the rest of the link, and the
+// angle brackets that let a destination hold a space. Whitespace inside those
+// brackets is part of the name, so only the whitespace outside them goes.
+func comparableSource(raw string) string {
+	return comparableDestination(trimAngles(strings.TrimSpace(raw)))
 }
 
 func trimAngles(s string) string {
@@ -675,7 +685,7 @@ func linkReferenceDestination(src []byte, def *ast.LinkReferenceDefinition) (byt
 	// that reaches here: the block range still carries the ">" prefix of the
 	// continuation, so the destination read from the source is that marker
 	// rather than the path, and rewriting it would eat the blockquote.
-	if comparableDestination(string(src[start:stop])) != comparableDestination(string(def.Destination)) {
+	if comparableSource(string(src[start:stop])) != comparableDestination(string(def.Destination)) {
 		return byteRange{}, false
 	}
 	return byteRange{start: start, stop: stop}, true
