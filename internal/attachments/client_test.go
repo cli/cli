@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -39,6 +40,12 @@ func newTestUploader(t *testing.T, reg *httpmock.Registry, host string, targetRe
 	uploader, err := NewUploader(&http.Client{Transport: reg}, gh.TokenTypeOAuth, host, targetRepository, "WRITE")
 	require.NoError(t, err)
 	return uploader
+}
+
+type staticTokenConfig map[string]string
+
+func (c staticTokenConfig) ActiveToken(host string) (string, string) {
+	return c[host], "oauth_token"
 }
 
 func TestUpload(t *testing.T) {
@@ -91,6 +98,60 @@ func TestUploadHostForTenant(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, reg.Requests, 1)
 	assert.Equal(t, "uploads.acme.ghe.com", reg.Requests[0].URL.Host)
+}
+
+func TestUploadAuthentication(t *testing.T) {
+	tests := []struct {
+		name              string
+		configuredHost    string
+		configuredToken   string
+		wantRequestHost   string
+		wantAuthorization string
+	}{
+		{
+			name:              "GitHub upload host uses github.com token",
+			configuredHost:    "github.com",
+			configuredToken:   "github-token",
+			wantRequestHost:   "uploads.github.com",
+			wantAuthorization: "token github-token",
+		},
+		{
+			name:              "tenant upload host uses tenant token",
+			configuredHost:    "acme.ghe.com",
+			configuredToken:   "tenant-token",
+			wantRequestHost:   "uploads.acme.ghe.com",
+			wantAuthorization: "token tenant-token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := testAsset(t, "shot.png", "image/png", "x")
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(
+				httpmock.REST("POST", "user-attachments/assets"),
+				httpmock.StatusStringResponse(201, `{"url":"https://github.com/user-attachments/assets/1"}`),
+			)
+
+			client := &http.Client{
+				Transport: api.AddAuthTokenHeader(
+					reg,
+					staticTokenConfig{tt.configuredHost: tt.configuredToken},
+				),
+			}
+			uploader, err := NewUploader(client, gh.TokenTypeOAuth, tt.configuredHost, 1, "WRITE")
+			require.NoError(t, err)
+
+			_, err = uploader.upload(context.Background(), a)
+
+			require.NoError(t, err)
+			require.Len(t, reg.Requests, 1)
+			assert.Equal(t, tt.wantRequestHost, reg.Requests[0].URL.Host)
+			assert.Equal(t, tt.wantAuthorization, reg.Requests[0].Header.Get("Authorization"))
+		})
+	}
 }
 
 func TestUploadErrors(t *testing.T) {
