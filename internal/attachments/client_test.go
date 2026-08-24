@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
@@ -17,13 +18,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// testAsset writes a real file, because upload opens the path it is given.
+// testAsset stubs file opening so upload reads body without touching the
+// filesystem.
 func testAsset(t *testing.T, name, contentType, body string) UserAsset {
 	t.Helper()
 
-	t.Chdir(t.TempDir())
-	require.NoError(t, os.WriteFile(name, []byte(body), 0o600))
-	info, err := os.Stat(name)
+	previousOpenFile := openFile
+	openFile = func(string) (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader(body)), nil
+	}
+	t.Cleanup(func() { openFile = previousOpenFile })
+
+	info, err := fs.Stat(fstest.MapFS{
+		name: &fstest.MapFile{Data: []byte(body)},
+	}, name)
 	require.NoError(t, err)
 
 	base := asset{path: "./" + name, info: info, contentType: contentType}
@@ -333,7 +341,9 @@ func TestUploadErrors(t *testing.T) {
 // with nothing behind it.
 func TestUploadMissingFile(t *testing.T) {
 	a := testAsset(t, "gone.png", "image/png", "the bytes")
-	require.NoError(t, os.Remove("gone.png"))
+	openFile = func(path string) (io.ReadCloser, error) {
+		return nil, &fs.PathError{Op: "open", Path: path, Err: fs.ErrNotExist}
+	}
 
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
