@@ -13,9 +13,12 @@ import (
 
 func TestResolveWorktreeTarget(t *testing.T) {
 	dir := t.TempDir()
+	nonEmptyLinkedWorktree := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(nonEmptyLinkedWorktree, "file"), []byte("x"), 0o644))
 
 	tests := []struct {
 		name      string
+		path      string
 		stubs     func(*run.CommandStubber)
 		wantReuse bool
 		wantErr   string
@@ -38,6 +41,7 @@ func TestResolveWorktreeTarget(t *testing.T) {
 		},
 		{
 			name: "path is a different worktree of this repo",
+			path: nonEmptyLinkedWorktree,
 			stubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+ rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
@@ -85,14 +89,18 @@ func TestResolveWorktreeTarget(t *testing.T) {
 				GhPath:  "/some/path/gh",
 				GitPath: "/some/path/git",
 			}
-			target, err := ResolveWorktreeTarget(client, dir)
+			path := tt.path
+			if path == "" {
+				path = dir
+			}
+			target, err := ResolveWorktreeTarget(client, path)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 				return
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantReuse, target.Reuse)
-			assert.Equal(t, dir, target.Path)
+			assert.Equal(t, path, target.Path)
 		})
 	}
 }
