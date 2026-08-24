@@ -1108,7 +1108,7 @@ func Test_createRun(t *testing.T) {
 				attachments.StubUpload(r, 1234, "shot.png", 404, `{ "message": "Not Found" }`)
 				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
 			},
-			wantsErr: "could not upload ./shot.png\nattaching files requires write access to the repository",
+			wantsErr: "could not upload ./shot.png: attaching files requires write access to the repository",
 		},
 		{
 			name: "an upload that fails alongside one that succeeds still creates the issue",
@@ -1140,7 +1140,7 @@ func Test_createRun(t *testing.T) {
 							assert.Equal(t, "a body\n\n![first](https://github.com/user-attachments/assets/AAA)", inputs["body"])
 						}))
 			},
-			wantsErr: "could not upload ./second.png\nattaching files requires write access to the repository",
+			wantsErr: "could not upload ./second.png: attaching files requires write access to the repository",
 		},
 		{
 			name: "a create that fails after an upload failed reports both",
@@ -1166,7 +1166,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation IssueCreate\b`),
 					httpmock.StringResponse(`{ "errors": [{ "message": "the create failed" }] }`))
 			},
-			wantsErr: "could not upload ./second.png\nattaching files requires write access to the repository\nGraphQL: the create failed",
+			wantsErr: "could not upload ./second.png: attaching files requires write access to the repository\nGraphQL: the create failed",
 		},
 		{
 			name: "a body the attachment cannot be written into creates no issue",

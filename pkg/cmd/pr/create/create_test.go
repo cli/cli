@@ -1855,7 +1855,7 @@ func Test_createRun(t *testing.T) {
 						}))
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
-			wantErr:     "could not upload ./bad.png\nattaching files requires write access to the repository",
+			wantErr:     "could not upload ./bad.png: attaching files requires write access to the repository",
 		},
 		{
 			name: "the only upload failing creates no pull request",
@@ -1873,7 +1873,7 @@ func Test_createRun(t *testing.T) {
 				attachments.StubUpload(reg, 1234, "shot.png", 404, `{}`)
 				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestCreate\b`))
 			},
-			wantErr: "could not upload ./shot.png\nattaching files requires write access to the repository\nno pull request was created",
+			wantErr: "could not upload ./shot.png: attaching files requires write access to the repository\nno pull request was created",
 		},
 		{
 			name: "a body the attachment cannot be written into creates no pull request",
@@ -1912,7 +1912,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.StringResponse(`{"errors":[{"message":"the create failed"}]}`))
 			},
-			wantErr: "could not upload ./bad.png\nattaching files requires write access to the repository\npull request create failed: GraphQL: the create failed",
+			wantErr: "could not upload ./bad.png: attaching files requires write access to the repository\npull request create failed: GraphQL: the create failed",
 		},
 		{
 			name: "a permission that cannot upload stops the command before it prompts",

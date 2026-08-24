@@ -1362,7 +1362,7 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdateWithBody(t, reg, "the original body\n\n![a](https://example.com/1)")
 			},
 			stdout:  "https://github.com/OWNER/REPO/pull/123\n",
-			wantErr: "could not upload ./b.png\nattaching files requires write access to the repository",
+			wantErr: "could not upload ./b.png: attaching files requires write access to the repository",
 		},
 		{
 			name: "a sole failed upload leaves the body alone and still edits the title",
@@ -1386,7 +1386,7 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdateWithoutBody(t, reg, "new title")
 			},
 			stdout:  "https://github.com/OWNER/REPO/pull/123\n",
-			wantErr: "could not upload ./a.png\nattaching files requires write access to the repository",
+			wantErr: "could not upload ./a.png: attaching files requires write access to the repository",
 		},
 		{
 			name: "a validation failure leaves the body alone and still edits the title",
@@ -1430,7 +1430,7 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestUpdate\b`))
 			},
-			wantErr: "could not upload ./a.png\nattaching files requires write access to the repository\nthe pull request was not changed",
+			wantErr: "could not upload ./a.png: attaching files requires write access to the repository\nthe pull request was not changed",
 		},
 		{
 			name: "an upload failure and a write failure are both reported",
@@ -1456,7 +1456,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.StatusStringResponse(500, `{"message":"the write failed"}`),
 				)
 			},
-			wantErr: "could not upload ./a.png\nattaching files requires write access to the repository\nnon-200 OK status code:  body: \"{\\\"message\\\":\\\"the write failed\\\"}\"",
+			wantErr: "could not upload ./a.png: attaching files requires write access to the repository\nnon-200 OK status code:  body: \"{\\\"message\\\":\\\"the write failed\\\"}\"",
 		},
 		{
 			// This predates --attach, which is why the not-changed message the
@@ -1505,7 +1505,7 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdateWithoutBody(t, reg, "new title")
 			},
 			stdout:  "https://github.com/OWNER/REPO/pull/123\n",
-			wantErr: "could not upload ./a.png\nattaching files requires write access to the repository",
+			wantErr: "could not upload ./a.png: attaching files requires write access to the repository",
 		},
 		{
 			// The default host deliberately holds a token that cannot upload,
