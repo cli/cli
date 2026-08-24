@@ -2,6 +2,8 @@ package close
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -672,26 +674,39 @@ func registerInteractiveCloseResponses(projectID string, closed bool, projectURL
 		})
 }
 
+func TestMatchProjectStateMutation_MissingClosed(t *testing.T) {
+	req, err := http.NewRequest(http.MethodPost, "/graphql", strings.NewReader(`{"query":"mutation CloseProjectV2","variables":{"input":{"projectId":"project-ID"}}}`))
+	require.NoError(t, err)
+
+	matched, err := matchProjectStateMutation("project-ID", false)(req, nil)
+
+	assert.False(t, matched)
+	assert.EqualError(t, err, "variables.input.closed is missing")
+}
+
 func matchProjectStateMutation(projectID string, closed bool) gock.MatchFunc {
 	return func(req *http.Request, _ *gock.Request) (bool, error) {
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("read project state mutation request: %w", err)
 		}
 		var payload struct {
 			Query     string `json:"query"`
 			Variables struct {
 				Input struct {
 					ProjectID string `json:"projectId"`
-					Closed    bool   `json:"closed"`
+					Closed    *bool  `json:"closed"`
 				} `json:"input"`
 			} `json:"variables"`
 		}
 		if err := json.Unmarshal(body, &payload); err != nil {
-			return false, err
+			return false, fmt.Errorf("decode project state mutation request: %w", err)
+		}
+		if payload.Variables.Input.Closed == nil {
+			return false, errors.New("variables.input.closed is missing")
 		}
 		return strings.Contains(payload.Query, "mutation CloseProjectV2") &&
 			payload.Variables.Input.ProjectID == projectID &&
-			payload.Variables.Input.Closed == closed, nil
+			*payload.Variables.Input.Closed == closed, nil
 	}
 }
