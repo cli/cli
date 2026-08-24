@@ -90,8 +90,6 @@ func runClose(config closeConfig) error {
 	}
 
 	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, false, func(p *queries.Project) bool {
-		// When closing: show only open projects.
-		// When reopening (--undo): show only closed projects.
 		return p.Closed == config.opts.reopen
 	})
 	if err != nil {

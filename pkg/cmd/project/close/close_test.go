@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -555,27 +556,79 @@ func TestRunClose_JSON(t *testing.T) {
 		stdout.String())
 }
 
-func TestRunClose_PromptFiltersOpenProjects(t *testing.T) {
-	defer gock.Off()
+func TestRunClose_InteractiveProjectFilter(t *testing.T) {
+	tests := []struct {
+		name       string
+		reopen     bool
+		wantOption string
+		wantID     string
+		wantClosed bool
+		wantURL    string
+	}{
+		{
+			name:       "close offers open projects",
+			wantOption: "Open Project (#1)",
+			wantID:     "open-project-ID",
+			wantClosed: true,
+			wantURL:    "http://open-url.com",
+		},
+		{
+			name:       "undo offers closed projects",
+			reopen:     true,
+			wantOption: "Closed Project (#2)",
+			wantID:     "closed-project-ID",
+			wantURL:    "http://closed-url.com",
+		},
+	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			registerInteractiveCloseResponses(tt.wantID, tt.wantClosed, tt.wantURL)
+
+			pm := &prompter.PrompterMock{}
+			pm.SelectFunc = func(prompt, _ string, options []string) (int, error) {
+				switch prompt {
+				case "Which owner would you like to use?":
+					return prompter.IndexFor(options, "monalisa")
+				case "Which project would you like to use?":
+					assert.Equal(t, []string{tt.wantOption}, options)
+					return 0, nil
+				default:
+					return -1, prompter.NoSuchPromptErr(prompt)
+				}
+			}
+
+			client := queries.NewTestClient(queries.WithPrompter(pm))
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+
+			err := runClose(closeConfig{
+				io:     ios,
+				opts:   closeOpts{reopen: tt.reopen},
+				client: client,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantURL+"\n", stdout.String())
+		})
+	}
+}
+
+func registerInteractiveCloseResponses(projectID string, closed bool, projectURL string) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLoginAndOrgs.*",
-			"variables": map[string]interface{}{
-				"after": nil,
-			},
+			"query":     "query ViewerLoginAndOrgs.*",
+			"variables": map[string]interface{}{"after": nil},
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
 				"viewer": map[string]interface{}{
-					"id":    "viewer-ID",
-					"login": "monalisa",
-					"organizations": map[string]interface{}{
-						"nodes": []interface{}{},
-					},
+					"id": "viewer-ID", "login": "monalisa",
+					"organizations": map[string]interface{}{"nodes": []interface{}{}},
 				},
 			},
 		})
@@ -597,17 +650,9 @@ func TestRunClose_PromptFiltersOpenProjects(t *testing.T) {
 					"login": "monalisa",
 					"projectsV2": map[string]interface{}{
 						"totalCount": 2,
-						"nodes": []interface{}{
-							map[string]interface{}{
-								"id": "open-project-ID", "number": 1,
-								"title": "Open Project", "closed": false,
-								"url": "http://open-url.com",
-							},
-							map[string]interface{}{
-								"id": "closed-project-ID", "number": 2,
-								"title": "Closed Project", "closed": true,
-								"url": "http://closed-url.com",
-							},
+						"nodes": []map[string]interface{}{
+							{"id": "open-project-ID", "number": 1, "title": "Open Project", "closed": false},
+							{"id": "closed-project-ID", "number": 2, "title": "Closed Project", "closed": true},
 						},
 					},
 				},
@@ -616,176 +661,27 @@ func TestRunClose_PromptFiltersOpenProjects(t *testing.T) {
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		AddMatcher(matchCloseProjectV2Request("open-project-ID", true)).
+		AddMatcher(matchProjectStateMutation(projectID, closed)).
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
 				"updateProjectV2": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"title": "Open Project",
-						"url":   "http://open-url.com",
-						"owner": map[string]interface{}{
-							"__typename": "User",
-							"login":      "monalisa",
-						},
-					},
+					"projectV2": map[string]interface{}{"url": projectURL},
 				},
 			},
 		})
-
-	pm := &prompter.PrompterMock{}
-	pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
-		switch prompt {
-		case "Which owner would you like to use?":
-			return prompter.IndexFor(opts, "monalisa")
-		case "Which project would you like to use?":
-			// Only open projects should appear when closing
-			assert.NotContains(t, opts, "Closed Project (#2)")
-			return prompter.IndexFor(opts, "Open Project (#1)")
-		default:
-			return -1, prompter.NoSuchPromptErr(prompt)
-		}
-	}
-
-	client := queries.NewTestClient(queries.WithPrompter(pm))
-	ios, _, stdout, _ := iostreams.Test()
-	ios.SetStdoutTTY(true)
-	ios.SetStdinTTY(true)
-
-	config := closeConfig{
-		io:     ios,
-		opts:   closeOpts{},
-		client: client,
-	}
-
-	err := runClose(config)
-	assert.NoError(t, err)
-	assert.Equal(t, "http://open-url.com\n", stdout.String())
 }
 
-func TestRunClose_PromptFiltersClosedProjectsOnUndo(t *testing.T) {
-	defer gock.Off()
-
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		MatchType("json").
-		JSON(map[string]interface{}{
-			"query": "query ViewerLoginAndOrgs.*",
-			"variables": map[string]interface{}{
-				"after": nil,
-			},
-		}).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
-					"id":    "viewer-ID",
-					"login": "monalisa",
-					"organizations": map[string]interface{}{
-						"nodes": []interface{}{},
-					},
-				},
-			},
-		})
-
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		MatchType("json").
-		JSON(map[string]interface{}{
-			"query": "query ViewerProjects.*",
-			"variables": map[string]interface{}{
-				"after": nil, "afterFields": nil, "afterItems": nil,
-				"first": 30, "firstFields": 0, "firstItems": 0,
-			},
-		}).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
-					"login": "monalisa",
-					"projectsV2": map[string]interface{}{
-						"totalCount": 2,
-						"nodes": []interface{}{
-							map[string]interface{}{
-								"id": "open-project-ID", "number": 1,
-								"title": "Open Project", "closed": false,
-								"url": "http://open-url.com",
-							},
-							map[string]interface{}{
-								"id": "closed-project-ID", "number": 2,
-								"title": "Closed Project", "closed": true,
-								"url": "http://closed-url.com",
-							},
-						},
-					},
-				},
-			},
-		})
-
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		AddMatcher(matchCloseProjectV2Request("closed-project-ID", false)).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"title": "Closed Project",
-						"url":   "http://closed-url.com",
-						"owner": map[string]interface{}{
-							"__typename": "User",
-							"login":      "monalisa",
-						},
-					},
-				},
-			},
-		})
-
-	pm := &prompter.PrompterMock{}
-	pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
-		switch prompt {
-		case "Which owner would you like to use?":
-			return prompter.IndexFor(opts, "monalisa")
-		case "Which project would you like to use?":
-			// Only closed projects should appear when reopening
-			assert.NotContains(t, opts, "Open Project (#1)")
-			return prompter.IndexFor(opts, "Closed Project (#2)")
-		default:
-			return -1, prompter.NoSuchPromptErr(prompt)
-		}
-	}
-
-	client := queries.NewTestClient(queries.WithPrompter(pm))
-	ios, _, stdout, _ := iostreams.Test()
-	ios.SetStdoutTTY(true)
-	ios.SetStdinTTY(true)
-
-	config := closeConfig{
-		io:     ios,
-		opts:   closeOpts{reopen: true},
-		client: client,
-	}
-
-	err := runClose(config)
-	assert.NoError(t, err)
-	assert.Equal(t, "http://closed-url.com\n", stdout.String())
-}
-
-func matchCloseProjectV2Request(projectID string, closed bool) gock.MatchFunc {
+func matchProjectStateMutation(projectID string, closed bool) gock.MatchFunc {
 	return func(req *http.Request, _ *gock.Request) (bool, error) {
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
 			return false, err
 		}
-
 		var payload struct {
 			Query     string `json:"query"`
 			Variables struct {
-				AfterFields *string `json:"afterFields"`
-				AfterItems  *string `json:"afterItems"`
-				FirstFields int     `json:"firstFields"`
-				FirstItems  int     `json:"firstItems"`
-				Input       struct {
+				Input struct {
 					ProjectID string `json:"projectId"`
 					Closed    bool   `json:"closed"`
 				} `json:"input"`
@@ -794,12 +690,7 @@ func matchCloseProjectV2Request(projectID string, closed bool) gock.MatchFunc {
 		if err := json.Unmarshal(body, &payload); err != nil {
 			return false, err
 		}
-
 		return strings.Contains(payload.Query, "mutation CloseProjectV2") &&
-			payload.Variables.AfterFields == nil &&
-			payload.Variables.AfterItems == nil &&
-			payload.Variables.FirstFields == 0 &&
-			payload.Variables.FirstItems == 0 &&
 			payload.Variables.Input.ProjectID == projectID &&
 			payload.Variables.Input.Closed == closed, nil
 	}

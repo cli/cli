@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -597,7 +598,7 @@ func Test_requiredScopesFromServerMessage(t *testing.T) {
 
 func TestNewProject_nonTTY(t *testing.T) {
 	client := NewTestClient()
-	_, err := client.NewProject(false, &Owner{}, 0, false, nil)
+	_, err := client.NewProject(false, &Owner{}, 0, false)
 	assert.EqualError(t, err, "project number is required when not running interactively")
 }
 
@@ -643,201 +644,77 @@ func registerViewerProjectsResponse(projects []map[string]interface{}) {
 		})
 }
 
-func TestNewProject_filter_opensOnly(t *testing.T) {
-	defer gock.Off()
+func TestNewProject_filters(t *testing.T) {
+	projects := []map[string]interface{}{
+		{"id": "open-1", "number": 1, "title": "Open Project", "closed": false},
+		{"id": "closed-2", "number": 2, "title": "Closed Project", "closed": true},
+		{"id": "open-3", "number": 3, "title": "Another Open Project", "closed": false},
+	}
+	open := func(p *Project) bool { return !p.Closed }
+	closed := func(p *Project) bool { return p.Closed }
+	numberThree := func(p *Project) bool { return p.Number == 3 }
+	noMatch := func(p *Project) bool { return p.Number == 99 }
 
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		MatchType("json").
-		JSON(map[string]interface{}{
-			"query": "query ViewerProjects.*",
-			"variables": map[string]interface{}{
-				"first":       30,
-				"after":       nil,
-				"firstItems":  0,
-				"afterItems":  nil,
-				"firstFields": 0,
-				"afterFields": nil,
-			},
-		}).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
-					"projectsV2": map[string]interface{}{
-						"totalCount": 2,
-						"pageInfo": map[string]interface{}{
-							"hasNextPage": false,
-							"endCursor":   "",
-						},
-						"nodes": []map[string]interface{}{
-							{"number": 1, "title": "Open Project", "closed": false},
-							{"number": 2, "title": "Closed Project", "closed": true},
-						},
-					},
-				},
-			},
+	tests := []struct {
+		name          string
+		filters       []func(*Project) bool
+		selectedIndex int
+		wantOptions   []string
+		wantNumber    int32
+		wantErr       string
+	}{
+		{
+			name:          "open only maps the filtered index to the project",
+			filters:       []func(*Project) bool{open},
+			selectedIndex: 1,
+			wantOptions:   []string{"Open Project (#1)", "Another Open Project (#3)"},
+			wantNumber:    3,
+		},
+		{
+			name:        "closed only",
+			filters:     []func(*Project) bool{closed},
+			wantOptions: []string{"Closed Project (#2)"},
+			wantNumber:  2,
+		},
+		{
+			name:        "all filters use AND semantics",
+			filters:     []func(*Project) bool{open, numberThree},
+			wantOptions: []string{"Another Open Project (#3)"},
+			wantNumber:  3,
+		},
+		{
+			name:    "no matches",
+			filters: []func(*Project) bool{noMatch},
+			wantErr: "no matching projects found for monalisa",
+		},
+		{
+			name:          "no filter",
+			selectedIndex: 1,
+			wantOptions:   []string{"Open Project (#1)", "Closed Project (#2)", "Another Open Project (#3)"},
+			wantNumber:    2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			registerViewerProjectsResponse(projects)
+
+			mock := &mockPrompter{selectedIndex: tt.selectedIndex}
+			client := NewTestClient(WithPrompter(mock))
+			owner := &Owner{Type: ViewerOwner, Login: "monalisa"}
+			project, err := client.NewProject(true, owner, 0, false, tt.filters...)
+
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				assert.Nil(t, mock.capturedOpts)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantOptions, mock.capturedOpts)
+			assert.Equal(t, tt.wantNumber, project.Number)
 		})
-
-	mock := &mockPrompter{selectedIndex: 0}
-	client := NewTestClient(WithPrompter(mock))
-	ios, _, _, _ := iostreams.Test()
-	ios.SetStdinTTY(true)
-	ios.SetStdoutTTY(true)
-	client.io = ios
-
-	owner := &Owner{Type: ViewerOwner, Login: ""}
-	project, err := client.NewProject(true, owner, 0, false, func(p *Project) bool {
-		return !p.Closed
-	})
-
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"Open Project (#1)"}, mock.capturedOpts)
-	assert.Equal(t, "Open Project", project.Title)
-}
-
-func TestNewProject_filter_closedOnly(t *testing.T) {
-	defer gock.Off()
-
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		MatchType("json").
-		JSON(map[string]interface{}{
-			"query": "query ViewerProjects.*",
-			"variables": map[string]interface{}{
-				"first":       30,
-				"after":       nil,
-				"firstItems":  0,
-				"afterItems":  nil,
-				"firstFields": 0,
-				"afterFields": nil,
-			},
-		}).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
-					"projectsV2": map[string]interface{}{
-						"totalCount": 2,
-						"pageInfo": map[string]interface{}{
-							"hasNextPage": false,
-							"endCursor":   "",
-						},
-						"nodes": []map[string]interface{}{
-							{"number": 1, "title": "Open Project", "closed": false},
-							{"number": 2, "title": "Closed Project", "closed": true},
-						},
-					},
-				},
-			},
-		})
-
-	mock := &mockPrompter{selectedIndex: 0}
-	client := NewTestClient(WithPrompter(mock))
-	ios, _, _, _ := iostreams.Test()
-	ios.SetStdinTTY(true)
-	ios.SetStdoutTTY(true)
-	client.io = ios
-
-	owner := &Owner{Type: ViewerOwner, Login: ""}
-	project, err := client.NewProject(true, owner, 0, false, func(p *Project) bool {
-		return p.Closed
-	})
-
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"Closed Project (#2)"}, mock.capturedOpts)
-	assert.Equal(t, "Closed Project", project.Title)
-}
-
-func TestNewProject_filter_appliesAllFilters(t *testing.T) {
-	defer gock.Off()
-
-	registerViewerProjectsResponse([]map[string]interface{}{
-		{"number": 1, "title": "Open Project", "closed": false},
-		{"number": 2, "title": "Another Open Project", "closed": false},
-		{"number": 3, "title": "Closed Project", "closed": true},
-	})
-
-	mock := &mockPrompter{selectedIndex: 0}
-	client := NewTestClient(WithPrompter(mock))
-	owner := &Owner{Type: ViewerOwner, Login: ""}
-	project, err := client.NewProject(true, owner, 0, false,
-		func(p *Project) bool { return !p.Closed },
-		func(p *Project) bool { return p.Number == 2 },
-	)
-
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"Another Open Project (#2)"}, mock.capturedOpts)
-	assert.Equal(t, "Another Open Project", project.Title)
-}
-
-func TestNewProject_filter_noMatches(t *testing.T) {
-	defer gock.Off()
-
-	registerViewerProjectsResponse([]map[string]interface{}{
-		{"number": 1, "title": "Closed Project", "closed": true},
-	})
-
-	mock := &mockPrompter{selectedIndex: 0}
-	client := NewTestClient(WithPrompter(mock))
-	owner := &Owner{Type: ViewerOwner, Login: "monalisa"}
-	_, err := client.NewProject(true, owner, 0, false, func(p *Project) bool {
-		return !p.Closed
-	})
-
-	assert.EqualError(t, err, "no matching projects found for monalisa")
-	assert.Nil(t, mock.capturedOpts)
-}
-
-func TestNewProject_noFilter(t *testing.T) {
-	defer gock.Off()
-
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		MatchType("json").
-		JSON(map[string]interface{}{
-			"query": "query ViewerProjects.*",
-			"variables": map[string]interface{}{
-				"first":       30,
-				"after":       nil,
-				"firstItems":  0,
-				"afterItems":  nil,
-				"firstFields": 0,
-				"afterFields": nil,
-			},
-		}).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
-					"projectsV2": map[string]interface{}{
-						"totalCount": 2,
-						"pageInfo": map[string]interface{}{
-							"hasNextPage": false,
-							"endCursor":   "",
-						},
-						"nodes": []map[string]interface{}{
-							{"number": 1, "title": "Open Project", "closed": false},
-							{"number": 2, "title": "Closed Project", "closed": true},
-						},
-					},
-				},
-			},
-		})
-
-	mock := &mockPrompter{selectedIndex: 1}
-	client := NewTestClient(WithPrompter(mock))
-	ios, _, _, _ := iostreams.Test()
-	ios.SetStdinTTY(true)
-	ios.SetStdoutTTY(true)
-	client.io = ios
-
-	owner := &Owner{Type: ViewerOwner, Login: ""}
-	project, err := client.NewProject(true, owner, 0, false, nil)
-
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"Open Project (#1)", "Closed Project (#2)"}, mock.capturedOpts)
-	assert.Equal(t, "Closed Project", project.Title)
+	}
 }
 
 func TestNewOwner_nonTTY(t *testing.T) {

@@ -1478,12 +1478,9 @@ func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 	}, nil
 }
 
-// NewProject creates a project based on the owner and project number
-// if canPrompt is false, number is required as we cannot prompt for it
-// if number is 0 it will prompt the user to select a project interactively
-// otherwise it will make a request to get the project by number
-// set `fields` to true to get the project's field data
-// filters, when provided, limit which projects appear in the interactive prompt
+// NewProject creates a project based on the owner and project number.
+// Filters limit the projects offered by the interactive prompt. They are not
+// applied when a project number is supplied.
 func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool, filters ...func(*Project) bool) (*Project, error) {
 	if number != 0 {
 		variables := map[string]any{
@@ -1528,8 +1525,6 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool,
 		return nil, fmt.Errorf("no projects found for %s", o.Login)
 	}
 
-	// Build the filtered list of projects for the interactive prompt.
-	// When a filter is provided, only matching projects are shown.
 	filtered := make([]*Project, 0, len(projects.Nodes))
 	for i := range projects.Nodes {
 		p := &projects.Nodes[i]
@@ -1539,10 +1534,7 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool,
 	}
 
 	if len(filtered) == 0 {
-		if len(projects.Nodes) > 0 {
-			return nil, fmt.Errorf("no matching projects found for %s", o.Login)
-		}
-		return nil, fmt.Errorf("no projects found for %s", o.Login)
+		return nil, fmt.Errorf("no matching projects found for %s", o.Login)
 	}
 
 	options := make([]string, 0, len(filtered))
