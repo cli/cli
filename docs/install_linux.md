@@ -449,7 +449,7 @@ The [GitHub CLI package](https://packages.ubuntu.com/noble/gh) is synced from [u
 
 ### Void Linux
 
-The [GitHub CLI package](https://voidlinux.org/packages/?arch=x86_64&q=github-cli): is supported by the Void Linux community with updates powered by [void-linux/void-packages](https://github.com/void-linux/void-packages/tree/master/srcpkgs/github-cli).
+The [GitHub CLI package](https://voidlinux.org/packages/?arch=x86_64&q=github-cli) is supported by the Void Linux community with updates powered by [void-linux/void-packages](https://github.com/void-linux/void-packages/tree/master/srcpkgs/github-cli).
 
 To install:
 
