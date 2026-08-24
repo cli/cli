@@ -411,7 +411,7 @@ func (e *UserEditor) Edit(filename, initialValue string) (string, error) {
 const editorHintMarker = "------------------------ >8 ------------------------"
 const editorHint = `
 Please Enter the title on the first line and the body on subsequent lines.
-Lines below dotted lines will be ignored, and an empty title aborts the creation process.`
+Lines below dotted lines will be ignored, and an empty title aborts the process.`
 
 func TitledEditSurvey(editor Editor) func(string, string) (string, string, error) {
 	return func(initialTitle, initialBody string) (string, string, error) {

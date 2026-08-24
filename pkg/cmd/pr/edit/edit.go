@@ -25,28 +25,31 @@ type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
-	Finder          shared.PRFinder
-	Surveyor        Surveyor
-	Fetcher         EditableOptionsFetcher
-	EditorRetriever EditorRetriever
-	Prompter        shared.EditPrompter
-	Detector        fd.Detector
-	BaseRepo        func() (ghrepo.Interface, error)
+	Finder           shared.PRFinder
+	Surveyor         Surveyor
+	Fetcher          EditableOptionsFetcher
+	EditorRetriever  EditorRetriever
+	Prompter         shared.EditPrompter
+	Detector         fd.Detector
+	BaseRepo         func() (ghrepo.Interface, error)
+	TitledEditSurvey func(string, string) (string, string, error)
 
 	SelectorArg string
 	Interactive bool
+	EditorMode  bool
 
 	shared.Editable
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
-		IO:              f.IOStreams,
-		HttpClient:      f.HttpClient,
-		Surveyor:        surveyor{P: f.Prompter},
-		Fetcher:         fetcher{},
-		EditorRetriever: editorRetriever{config: f.Config},
-		Prompter:        f.Prompter,
+		IO:               f.IOStreams,
+		HttpClient:       f.HttpClient,
+		Surveyor:         surveyor{P: f.Prompter},
+		Fetcher:          fetcher{},
+		EditorRetriever:  editorRetriever{config: f.Config},
+		Prompter:         f.Prompter,
+		TitledEditSurvey: shared.TitledEditSurvey(&shared.UserEditor{Config: f.Config, IO: f.IOStreams}),
 	}
 
 	var bodyFile string
@@ -102,6 +105,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh pr edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh pr edit 23 --milestone "Version 1"
 			$ gh pr edit 23 --remove-milestone
+			$ gh pr edit 23 --editor
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -189,7 +193,21 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				// see the `Editable.MilestoneId` method.
 			}
 
-			if !opts.Editable.Dirty() {
+			editorFlagChanged := flags.Changed("editor")
+			editorModeExplicit := editorFlagChanged && opts.EditorMode
+			if editorModeExplicit || (!editorFlagChanged && !opts.Editable.Dirty()) {
+				editorMode, err := shared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
+				if err != nil {
+					return err
+				}
+				opts.EditorMode = editorMode
+			}
+
+			if editorModeExplicit && (bodyProvided || bodyFileProvided) {
+				return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, or `--editor`")
+			}
+
+			if !opts.Editable.Dirty() && !opts.EditorMode {
 				opts.Interactive = true
 			}
 
@@ -219,6 +237,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the pull request from projects by `title`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the pull request belongs to by `name`")
 	cmd.Flags().BoolVar(&removeMilestone, "remove-milestone", false, "Remove the milestone association from the pull request")
+	cmd.Flags().BoolVarP(&opts.EditorMode, "editor", "e", false, "Skip prompts and open the text editor to write the title and body in. The first line is the title and the remaining text is the body.")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base")
 
@@ -308,7 +327,21 @@ func editRun(opts *EditOptions) error {
 		editable.Milestone.Default = pr.Milestone.Title
 	}
 
-	if opts.Interactive {
+	if opts.EditorMode {
+		initialTitle := pr.Title
+		if editable.Title.Edited {
+			initialTitle = editable.Title.Value
+		}
+		editable.Title.Edited = true
+		editable.Body.Edited = true
+		editable.Title.Value, editable.Body.Value, err = opts.TitledEditSurvey(initialTitle, pr.Body)
+		if err != nil {
+			return err
+		}
+		if editable.Title.Value == "" {
+			return fmt.Errorf("title can't be blank")
+		}
+	} else if opts.Interactive {
 		err = opts.Surveyor.FieldsToEdit(&editable)
 		if err != nil {
 			return err
@@ -317,20 +350,27 @@ func editRun(opts *EditOptions) error {
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	// Wire up search functions for assignees and reviewers.
-	// When these aren't wired up, it triggers a downstream fallback
-	// to legacy reviewer/assignee fetching.
-	// TODO ApiActorsSupported
-	if issueFeatures.ApiActorsSupported {
-		editable.AssigneeSearchFunc = shared.AssigneeSearchFunc(apiClient, repo, pr.ID)
-		editable.ReviewerSearchFunc = reviewerSearchFunc(apiClient, repo, &editable, pr.ID)
-	}
+	metadataEditRequested := editable.Reviewers.Edited ||
+		editable.Assignees.Edited ||
+		editable.Labels.Edited ||
+		editable.Projects.Edited ||
+		editable.Milestone.Edited
+	if !opts.EditorMode || metadataEditRequested {
+		// Wire up search functions for assignees and reviewers.
+		// When these aren't wired up, it triggers a downstream fallback
+		// to legacy reviewer/assignee fetching.
+		// TODO ApiActorsSupported
+		if issueFeatures.ApiActorsSupported {
+			editable.AssigneeSearchFunc = shared.AssigneeSearchFunc(apiClient, repo, pr.ID)
+			editable.ReviewerSearchFunc = reviewerSearchFunc(apiClient, repo, &editable, pr.ID)
+		}
 
-	opts.IO.StartProgressIndicator()
-	err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable, opts.Detector.ProjectsV1())
-	opts.IO.StopProgressIndicator()
-	if err != nil {
-		return err
+		opts.IO.StartProgressIndicator()
+		err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable, opts.Detector.ProjectsV1())
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
 	}
 
 	if opts.Interactive {
