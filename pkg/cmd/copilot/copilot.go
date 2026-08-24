@@ -23,6 +23,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safepaths"
+	"github.com/cli/cli/v2/internal/safeurl"
 	ghzip "github.com/cli/cli/v2/internal/zip"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -151,7 +152,7 @@ func runCopilot(opts *CopilotOptions) error {
 				return err
 			}
 			if !confirmed {
-				fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI was not installed", opts.IO.ColorScheme().WarningIcon())
+				fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI was not installed\n", opts.IO.ColorScheme().WarningIcon())
 				return cmdutil.SilentError
 			}
 		} else if !ci.IsCI() {
@@ -250,32 +251,37 @@ func downloadCopilot(httpClient *http.Client, ios *iostreams.IOStreams, installD
 		return "", fmt.Errorf("unsupported architecture: %s (supported: x64, arm64)", arch)
 	}
 
-	var archiveURL string
 	var archiveName string
 	var isZip bool
 	switch platform {
 	case "win32":
 		archiveName = fmt.Sprintf("copilot-%s-%s.zip", platform, arch)
-		archiveURL = fmt.Sprintf("https://github.com/github/copilot-cli/releases/latest/download/%s", archiveName)
 		isZip = true
 	case "linux", "darwin":
 		archiveName = fmt.Sprintf("copilot-%s-%s.tar.gz", platform, arch)
-		archiveURL = fmt.Sprintf("https://github.com/github/copilot-cli/releases/latest/download/%s", archiveName)
 	default:
 		return "", fmt.Errorf("unsupported platform: %s (supported: linux, darwin, windows)", platform)
 	}
 
-	checksumsURL := "https://github.com/github/copilot-cli/releases/latest/download/SHA256SUMS.txt"
+	archiveURL, err := safeurl.JoinPathWithHostPrefix("https://github.com/", "github", "copilot-cli", "releases", "latest", "download", archiveName)
+	if err != nil {
+		return "", err
+	}
+
+	checksumsURL, err := safeurl.JoinPathWithHostPrefix("https://github.com/", "github", "copilot-cli", "releases", "latest", "download", "SHA256SUMS.txt")
+	if err != nil {
+		return "", err
+	}
 
 	expectedChecksum, err := fetchExpectedChecksum(httpClient, checksumsURL, archiveName)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch checksums: %w", err)
 	}
 
-	ios.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading Copilot CLI from %s", archiveURL))
+	ios.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading Copilot CLI from %s", archiveURL.String()))
 	defer ios.StopProgressIndicator()
 
-	resp, err := httpClient.Get(archiveURL)
+	resp, err := httpClient.Get(archiveURL.String())
 	if err != nil {
 		return "", fmt.Errorf("failed to download: %w", err)
 	}
@@ -333,8 +339,8 @@ func downloadCopilot(httpClient *http.Client, ios *iostreams.IOStreams, installD
 }
 
 // fetchExpectedChecksum downloads the SHA256SUMS.txt file and returns the expected checksum for the given archive name.
-func fetchExpectedChecksum(httpClient *http.Client, checksumsURL, archiveName string) (string, error) {
-	resp, err := httpClient.Get(checksumsURL)
+func fetchExpectedChecksum(httpClient *http.Client, checksumsURL safeurl.SafeURL, archiveName string) (string, error) {
+	resp, err := httpClient.Get(checksumsURL.String())
 	if err != nil {
 		return "", err
 	}

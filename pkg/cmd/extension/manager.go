@@ -20,6 +20,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/findsh"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -127,6 +128,10 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 		forwardArgs = append([]string{"-c", `command "$@"`, "--", exe}, forwardArgs...)
 		externalCmd = m.newCommand(shExe, forwardArgs...)
 	}
+	// Signal to the extension that it is being run by gh rather than standalone, so it can
+	// adjust things like usage strings.
+	externalCmd.Env = append(externalCmd.Environ(), "GH_EXTENSION=1")
+
 	externalCmd.Stdin = stdin
 	externalCmd.Stdout = stdout
 	externalCmd.Stderr = stderr
@@ -346,7 +351,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	err = downloadAsset(m.client, *asset, binPath)
+	err = downloadAsset(m.client, safeurl.NewImmutableSafeURL(asset.APIURL), binPath)
 	if err != nil {
 		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
 	}

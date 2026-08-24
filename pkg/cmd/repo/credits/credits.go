@@ -15,6 +15,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
@@ -142,9 +143,12 @@ func creditsRun(opts *CreditsOptions) error {
 
 	result := Result{}
 	body := bytes.NewBufferString("")
-	path := fmt.Sprintf("repos/%s/%s/contributors", baseRepo.RepoOwner(), baseRepo.RepoName())
+	path, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "contributors")
+	if err != nil {
+		return err
+	}
 
-	err = client.REST(baseRepo.RepoHost(), "GET", path, body, &result)
+	err = client.REST(baseRepo.RepoHost(), "GET", path.String(), body, &result)
 	if err != nil {
 		return err
 	}

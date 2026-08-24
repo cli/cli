@@ -35,6 +35,12 @@ func newListCmd(app *App) *cobra.Command {
 		Aliases: []string{"ls"},
 		Args:    noArgsConstraint,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if opts.repo != "" {
+				if err := validateNWO(opts.repo); err != nil {
+					return cmdutil.FlagErrorf("invalid value for --repo: %v", err)
+				}
+			}
+
 			if err := cmdutil.MutuallyExclusive(
 				"using `--org` or `--user` with `--repo` is not allowed",
 				opts.repo != "",

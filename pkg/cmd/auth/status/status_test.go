@@ -312,7 +312,7 @@ func Test_statusRun(t *testing.T) {
 			name: "PAT V2 token",
 			opts: StatusOptions{},
 			cfgStubs: func(t *testing.T, c gh.Config) {
-				login(t, c, "github.com", "monalisa", "github_pat_abc123", "https")
+				login(t, c, "github.com", "monalisa", "github_pat_abc_123456", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mocks for HeaderHasMinimumScopes api requests to github.com
@@ -325,7 +325,7 @@ func Test_statusRun(t *testing.T) {
 				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
 				  - Git operations protocol: https
-				  - Token: github_pat_******
+				  - Token: github_pat_**********
 			`),
 		},
 		{
@@ -718,7 +718,7 @@ func Test_statusRun(t *testing.T) {
 			ios.SetStdoutTTY(true)
 			tt.opts.IO = ios
 
-			cfg, _ := config.NewIsolatedTestConfig(t)
+			cfg, _ := config.NewIsolatedTestConfig(t, "")
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
@@ -781,4 +781,73 @@ func replaceAll(s string, old string, new string) string {
 	replaced := strings.ReplaceAll(s, string(jsonEscapedOld), string(jsonEscapedNew))
 	replaced = strings.ReplaceAll(replaced, old, new)
 	return replaced
+}
+
+func TestMaskToken(t *testing.T) {
+	tests := []struct {
+		name  string
+		token string
+		want  string
+	}{
+		{
+			name:  "empty token",
+			token: "",
+			want:  "",
+		},
+		{
+			name:  "classic personal access token",
+			token: "ghp_abc123",
+			want:  "ghp_******",
+		},
+		{
+			name:  "oauth token",
+			token: "gho_abc123",
+			want:  "gho_******",
+		},
+		{
+			name:  "user-to-server token",
+			token: "ghu_abc123",
+			want:  "ghu_******",
+		},
+		{
+			name:  "server-to-server token",
+			token: "ghs_abc123",
+			want:  "ghs_******",
+		},
+		{
+			name:  "refresh token",
+			token: "ghr_abc123",
+			want:  "ghr_******",
+		},
+		{
+			name:  "fine-grained personal access token with internal underscore",
+			token: "github_pat_abc_123456",
+			want:  "github_pat_**********",
+		},
+		{
+			name:  "token with multiple internal underscores masks everything after prefix",
+			token: "ghs_aaa_bbb_ccc",
+			want:  "ghs_***********",
+		},
+		{
+			name:  "unknown prefix is fully masked",
+			token: "unknown_abc123",
+			want:  "**************",
+		},
+		{
+			name:  "token without underscore is fully masked",
+			token: "abc123",
+			want:  "******",
+		},
+		{
+			name:  "token equal to known prefix has nothing to mask",
+			token: "gho_",
+			want:  "gho_",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, maskToken(tt.token))
+		})
+	}
 }

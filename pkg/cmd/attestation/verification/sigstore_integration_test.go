@@ -144,6 +144,28 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 		require.Len(t, results, 2)
 		require.NoError(t, err)
 	})
+
+	t.Run("returns an error instead of panicking when the GitHub verifier failed to initialize", func(t *testing.T) {
+		githubArtifactPath := test.NormalizeRelativePath("../test/data/github_provenance_demo-0.0.12-py3-none-any.whl")
+		githubArtifact, err := artifact.NewDigestedArtifact(nil, githubArtifactPath, "sha256")
+		require.NoError(t, err)
+
+		githubPolicy := buildPolicy(t, *githubArtifact)
+		attestations := getAttestationsFor(t, "../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle.jsonl")
+
+		verifier, err := NewLiveSigstoreVerifier(SigstoreConfig{
+			ExternalHttpClient: http.DefaultClient,
+			Logger:             io.NewTestHandler(),
+			TrustDomain:        "missing-trust-domain",
+			TUFMetadataDir:     o.Some(t.TempDir()),
+		})
+		require.NoError(t, err)
+		results, verifyErr := verifier.Verify(attestations, githubPolicy)
+		require.Nil(t, results)
+		require.Error(t, verifyErr)
+		require.ErrorContains(t, verifyErr, "failed to choose verifier based on provided bundle issuer")
+		require.ErrorContains(t, verifyErr, "GitHub verifier is not available")
+	})
 }
 
 func publicGoodPolicy(t *testing.T) verify.PolicyBuilder {

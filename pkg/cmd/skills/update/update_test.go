@@ -345,7 +345,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "commit1", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/commit1"),
@@ -355,7 +355,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -371,7 +371,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -401,7 +401,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -434,7 +434,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -464,7 +464,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdinTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -494,7 +494,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -532,7 +532,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "commitsha123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -544,7 +544,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -576,7 +576,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v2.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/hubot/octocat-skills/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/hubot/octocat-skills/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit456", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -589,7 +589,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -624,7 +624,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v2.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/hubot/octocat-skills/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/hubot/octocat-skills/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit456", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -637,7 +637,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdinTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -672,7 +672,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -689,7 +689,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -735,7 +735,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -752,7 +752,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -806,7 +806,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -822,7 +822,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -865,7 +865,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -884,7 +884,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -927,7 +927,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -939,7 +939,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -975,7 +975,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -1011,7 +1011,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "commit123", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/commit123"),
@@ -1030,7 +1030,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -1081,7 +1081,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/octocat/hubot-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v2.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/octocat/hubot-skills/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/octocat/hubot-skills/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/hubot-skills/git/trees/newcommit789"),
@@ -1098,7 +1098,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -1139,7 +1139,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -1174,7 +1174,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/octocat/hubot-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v2.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/octocat/hubot-skills/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/octocat/hubot-skills/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/hubot-skills/git/trees/newcommit789"),
@@ -1185,7 +1185,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},

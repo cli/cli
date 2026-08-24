@@ -8,11 +8,6 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 )
 
-const (
-	GetAttestationByRepoAndSubjectDigestPath  = "repos/%s/attestations/%s"
-	GetAttestationByOwnerAndSubjectDigestPath = "orgs/%s/attestations/%s"
-)
-
 var ErrNoAttestationsFound = errors.New("no attestations found")
 
 type Attestation struct {

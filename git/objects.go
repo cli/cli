@@ -71,3 +71,13 @@ type BranchConfig struct {
 	// MergeBase is the optional base branch to target in a new PR if `--base` is not specified.
 	MergeBase string
 }
+
+// Worktree represents a single entry from `git worktree list --porcelain`.
+type Worktree struct {
+	// Path is the absolute path to the worktree's working directory.
+	Path string
+	// Ref is the fully qualified ref checked out in the worktree
+	// (e.g. "refs/heads/main"). It is empty when the worktree has a detached
+	// HEAD or is the bare main worktree.
+	Ref string
+}

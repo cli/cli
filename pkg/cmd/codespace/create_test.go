@@ -32,6 +32,11 @@ func TestCreateCmdFlagError(t *testing.T) {
 			args:     "--web --idle-timeout 30m",
 			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
 		},
+		{
+			name:     "return error when --repo is not in owner/repo format",
+			args:     "--repo foo",
+			wantsErr: fmt.Errorf(`invalid value for --repo: expected the "OWNER/REPO" format, got "foo"`),
+		},
 	}
 
 	for _, tt := range tests {

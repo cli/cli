@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -627,7 +628,7 @@ func Test_listRun(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			tt.opts.Now = func() time.Time {
 				t, _ := time.Parse(time.RFC822, "15 Mar 23 00:00 UTC")
@@ -820,7 +821,7 @@ func Test_listRun_populatesNumSelectedReposIfRequired(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			opts.Now = func() time.Time {
 				t, _ := time.Parse(time.RFC822, "4 Apr 24 00:00 UTC")
@@ -857,7 +858,9 @@ func Test_getSecrets_pagination(t *testing.T) {
 		httpmock.StringResponse(`{"secrets":[{},{}]}`),
 	)
 	client := &http.Client{Transport: reg}
-	secrets, err := getSecrets(client, "github.com", "path/to")
+	u, err := safeurl.JoinPath("path", "to")
+	require.NoError(t, err)
+	secrets, err := getSecrets(client, "github.com", u)
 	assert.NoError(t, err)
 	assert.Equal(t, 4, len(secrets))
 }

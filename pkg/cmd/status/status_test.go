@@ -61,7 +61,7 @@ func TestNewCmdStatus(t *testing.T) {
 		f := &cmdutil.Factory{
 			IOStreams: ios,
 			Config: func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			},
 		}
 		t.Run(tt.name, func(t *testing.T) {
@@ -104,6 +104,25 @@ func TestStatusRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "notifications"),
 					httpmock.StringResponse(`[]`))
+				reg.Register(
+					httpmock.REST("GET", "users/jillvalentine/received_events"),
+					httpmock.StringResponse(`[]`))
+			},
+			opts:    &StatusOptions{},
+			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nReview Requests                       │ Mentions                              \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nRepository Activity\nNothing here ^_^\n\n",
+		},
+		{
+			name: "notifications 404 is tolerated",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL("UserCurrent"),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
+				reg.Register(
+					httpmock.GraphQL("AssignedSearch"),
+					httpmock.StringResponse(`{"data": { "assignments": {"nodes": [] }, "reviewRequested": {"nodes": []}}}`))
+				reg.Register(
+					httpmock.REST("GET", "notifications"),
+					httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`))
 				reg.Register(
 					httpmock.REST("GET", "users/jillvalentine/received_events"),
 					httpmock.StringResponse(`[]`))

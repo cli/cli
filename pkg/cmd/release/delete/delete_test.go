@@ -7,10 +7,12 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -210,7 +212,7 @@ func Test_deleteRun(t *testing.T) {
 			}`)
 
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
-			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags/v1.2.3"), httpmock.StatusStringResponse(204, ""))
+			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags%2Fv1.2.3"), httpmock.StatusStringResponse(204, ""))
 
 			rs, teardown := run.Stub()
 			defer teardown(t)
@@ -240,4 +242,43 @@ func Test_deleteRun(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
+}
+
+func Test_deleteRelease_httpError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		func(req *http.Request) bool {
+			return req.Method == http.MethodDelete &&
+				req.URL.EscapedPath() == "/repos/OWNER/REPO/releases/23456" &&
+				req.URL.Host == "api.github.com"
+		},
+		httpmock.StatusStringResponse(404, `{"message":"Not Found"}`),
+	)
+
+	httpClient := &http.Client{Transport: reg}
+	err := deleteRelease(httpClient, "example.com", safeurl.NewImmutableSafeURL("https://api.github.com/repos/OWNER/REPO/releases/23456"))
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
+	assert.Contains(t, err.Error(), "HTTP 404")
+}
+
+func Test_deleteTag_httpError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags%2Fv1.2.3"),
+		httpmock.StatusStringResponse(404, `{"message":"Not Found"}`),
+	)
+
+	httpClient := &http.Client{Transport: reg}
+	baseRepo, _ := ghrepo.FromFullName("OWNER/REPO")
+	err := deleteTag(httpClient, baseRepo, "v1.2.3")
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
+	assert.Contains(t, err.Error(), "HTTP 404")
 }

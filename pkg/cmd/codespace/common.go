@@ -18,6 +18,7 @@ import (
 	clicontext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -249,6 +250,12 @@ func addDeprecatedRepoShorthand(cmd *cobra.Command, target *string) error {
 	}
 
 	return nil
+}
+
+// validateNWO returns an error if nwo is not a valid "owner/repo" repository reference.
+func validateNWO(nwo string) error {
+	_, _, err := safeurl.RepoPartsFromNWO(nwo)
+	return err
 }
 
 // filterCodespacesByRepoOwner filters a list of codespaces by the owner of the repository.

@@ -7,7 +7,7 @@ exec gh repo create ${ORG}/${REPO} --private
 # Defer repo cleanup
 defer gh repo delete --yes ${ORG}/${REPO}
 
-# Set the GH_REPO env var to reduce redunant flags
+# Set the GH_REPO env var to reduce redundant flags
 env GH_REPO=${ORG}/${REPO}
 
 # Create a custom label

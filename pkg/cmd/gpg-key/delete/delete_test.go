@@ -3,18 +3,62 @@ package delete
 import (
 	"bytes"
 	"net/http"
+	"net/url"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/api"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func Test_deleteGPGKeyHTTPError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("DELETE", "user/gpg_keys/123"),
+		httpmock.WithHeader(
+			httpmock.StatusStringResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`),
+			"Content-Type", "application/json",
+		),
+	)
+
+	err := deleteGPGKey(&http.Client{Transport: reg}, "github.com", "123")
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
+	assert.Contains(t, err.Error(), "HTTP 500")
+	assert.EqualError(t, err, "HTTP 500: Internal Server Error (https://api.github.com/user/gpg_keys/123)")
+}
+
+func Test_getGPGKeysHTTPError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.QueryMatcher("GET", "user/gpg_keys", url.Values{"per_page": []string{"100"}}),
+		httpmock.WithHeader(
+			httpmock.StatusStringResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`),
+			"Content-Type", "application/json",
+		),
+	)
+
+	keys, err := getGPGKeys(&http.Client{Transport: reg}, "github.com")
+
+	assert.Nil(t, keys)
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
+	assert.Contains(t, err.Error(), "HTTP 500")
+	assert.EqualError(t, err, "HTTP 500: Internal Server Error (https://api.github.com/user/gpg_keys?per_page=100)")
+}
 
 func TestNewCmdDelete(t *testing.T) {
 	tests := []struct {
@@ -177,7 +221,7 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{KeyID: "ABC123", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "user/gpg_keys"), httpmock.StatusStringResponse(200, keysResp))
-				reg.Register(httpmock.REST("DELETE", "user/gpg_keys/123"), httpmock.JSONErrorResponse(404, api.HTTPError{
+				reg.Register(httpmock.REST("DELETE", "user/gpg_keys/123"), httpmock.JSONErrorResponse(404, ghAPI.HTTPError{
 					StatusCode: 404,
 					Message:    "GPG key 123 not found",
 				}))
@@ -203,7 +247,7 @@ func Test_deleteRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 		ios, _, stdout, _ := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)

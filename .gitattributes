@@ -1,1 +1,3 @@
 .github/actions/*/lib/* linguist-generated
+
+.github/workflows/*.lock.yml linguist-generated=true

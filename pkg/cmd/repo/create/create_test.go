@@ -1051,7 +1051,7 @@ func Test_createRun(t *testing.T) {
 
 		if tt.opts.Config == nil {
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 		}
 

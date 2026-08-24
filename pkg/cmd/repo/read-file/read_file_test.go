@@ -751,47 +751,9 @@ func Test_contentsAPIPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := contentsAPIPath(repo, tt.filePath, tt.ref)
-			assert.Equal(t, tt.want, got)
+			got, err := contentsAPIPath(repo, tt.filePath, tt.ref)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got.String())
 		})
 	}
-}
-
-func Test_binaryContentType(t *testing.T) {
-	tests := []struct {
-		name       string
-		content    []byte
-		wantMIME   string
-		wantBinary bool
-	}{
-		{
-			name:       "empty content is not binary",
-			content:    []byte{},
-			wantBinary: false,
-		},
-		{
-			name:       "plain text is not binary",
-			content:    []byte("hello world\n"),
-			wantBinary: false,
-		},
-		{
-			name:       "png is binary",
-			content:    append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...),
-			wantMIME:   "image/png",
-			wantBinary: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mime, ok := binaryContentType(tt.content)
-			assert.Equal(t, tt.wantBinary, ok)
-			assert.Equal(t, tt.wantMIME, mime)
-		})
-	}
-}
-
-func Test_containsEscapeSequence(t *testing.T) {
-	assert.False(t, containsEscapeSequence([]byte("plain text")))
-	assert.True(t, containsEscapeSequence([]byte("danger\x1b[31m")))
 }

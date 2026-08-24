@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 // repoFile is the resolved file content and metadata for a single path.
@@ -83,9 +83,12 @@ type contentsResponse struct {
 // It requests the unified object media type so directories, files, symlinks, and
 // submodules all come back as a single JSON object distinguished by the type field.
 func fetchContent(httpClient *http.Client, repo ghrepo.Interface, filePath, ref string) (*contentsResponse, error) {
-	apiPath := contentsAPIPath(repo, filePath, ref)
+	apiPath, err := contentsAPIPath(repo, filePath, ref)
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequest("GET", apiPath, nil)
+	req, err := http.NewRequest("GET", apiPath.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -171,9 +174,12 @@ func fetchFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref str
 // fetchRawFile retrieves the raw bytes of a file, used for files larger than the
 // 1 MB inline content limit of the Contents API.
 func fetchRawFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref string) ([]byte, error) {
-	apiPath := contentsAPIPath(repo, filePath, ref)
+	apiPath, err := contentsAPIPath(repo, filePath, ref)
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequest("GET", apiPath, nil)
+	req, err := http.NewRequest("GET", apiPath.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -193,16 +199,15 @@ func fetchRawFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref 
 }
 
 // contentsAPIPath builds the absolute Contents API URL for a path and optional ref.
-func contentsAPIPath(repo ghrepo.Interface, filePath, ref string) string {
+func contentsAPIPath(repo ghrepo.Interface, filePath, ref string) (safeurl.SafeURL, error) {
 	// The Contents API accepts a fully percent-encoded path, including path separators
 	// encoded as %2F, so spaces and other special characters are handled transparently.
-	p := fmt.Sprintf("%srepos/%s/%s/contents/%s",
-		ghinstance.RESTPrefix(repo.RepoHost()),
-		repo.RepoOwner(), repo.RepoName(),
-		url.PathEscape(strings.TrimPrefix(filePath, "/")),
-	)
-	if ref != "" {
-		p += "?ref=" + url.QueryEscape(ref)
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "contents", strings.TrimPrefix(filePath, "/"))
+	if err != nil {
+		return nil, err
 	}
-	return p
+	if ref != "" {
+		u.SetQuery("ref", ref)
+	}
+	return u, nil
 }

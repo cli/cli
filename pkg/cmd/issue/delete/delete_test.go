@@ -38,7 +38,7 @@ func runCommand(rt http.RoundTripper, pm *prompter.MockPrompter, isTTY bool, cli
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil

@@ -97,9 +97,9 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 		}
 
 		if len(choice.Delta.ToolCalls) == 0 {
-			if choice.Delta.Content != "" && choice.Delta.Role == "assistant" {
+			if !choice.Delta.Content.Empty() && choice.Delta.Role == "assistant" {
 				// Copilot message and we should display.
-				renderRawMarkdown(choice.Delta.Content, w, io)
+				renderRawMarkdown(choice.Delta.Content.String(), w, io)
 			}
 			continue
 		}
@@ -107,14 +107,14 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 		// Since we don't want to clear-and-reprint live progress of events, we
 		// need to only process entries that correspond to a finished tool call.
 		// Such entries have a non-empty Content field.
-		if choice.Delta.Content == "" {
+		if choice.Delta.Content.Empty() {
 			continue
 		}
 
-		if choice.Delta.ReasoningText != "" {
+		if !choice.Delta.ReasoningText.Empty() {
 			// Note that this should be formatted as a normal "thought" message,
 			// without the heading.
-			renderRawMarkdown(choice.Delta.ReasoningText, w, io)
+			renderRawMarkdown(choice.Delta.ReasoningText.String(), w, io)
 		}
 
 		for _, tc := range choice.Delta.ToolCalls {
@@ -139,7 +139,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 				}
 				renderToolCallTitle(w, cs, fmt.Sprintf("View %s", cs.Bold(relativeFilePath(args.Path))), "")
 
-				content := stripDiffFormat(choice.Delta.Content)
+				content := stripDiffFormat(choice.Delta.Content.String())
 
 				if err := renderFileContentAsMarkdown(args.Path, content, w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render viewed file content: %v\n\n", err)
@@ -153,9 +153,9 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 						renderToolCallTitle(w, cs, "Run Bash command", "")
 					}
 
-					contentWithCommand := choice.Delta.Content
+					contentWithCommand := choice.Delta.Content.String()
 					if v.Command != "" {
-						contentWithCommand = fmt.Sprintf("$ %s\n%s", v.Command, choice.Delta.Content)
+						contentWithCommand = fmt.Sprintf("$ %s\n%s", v.Command, choice.Delta.Content.String())
 					}
 					if err := renderFileContentAsMarkdown("commands.sh", contentWithCommand, w, io); err != nil {
 						fmt.Fprintf(io.ErrOut, "\nfailed to render bash command output: %v\n\n", err)
@@ -220,9 +220,9 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 				}
 
 				// TODO: KW I wasn't able to get this case to populate ever.
-				if choice.Delta.Content != "" {
+				if !choice.Delta.Content.Empty() {
 					// Try to treat this as JSON
-					if err := renderContentAsJSONMarkdown("", choice.Delta.Content, w, io); err != nil {
+					if err := renderContentAsJSONMarkdown("", choice.Delta.Content.String(), w, io); err != nil {
 						fmt.Fprintf(io.ErrOut, "\nfailed to render progress update content: %v\n", err)
 					}
 				}
@@ -247,9 +247,9 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 				}
 
 				renderToolCallTitle(w, cs, "Edit", cs.Bold(relativeFilePath(args.Path)))
-				if err := renderFileContentAsMarkdown("output.diff", choice.Delta.Content, w, io); err != nil {
+				if err := renderFileContentAsMarkdown("output.diff", choice.Delta.Content.String(), w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render str_replace diff: %v\n\n", err)
-					fmt.Fprintln(io.ErrOut, choice.Delta.Content)
+					fmt.Fprintln(io.ErrOut, choice.Delta.Content.String())
 				}
 			default:
 				// Unknown tool call. For example for "codeql_checker":
@@ -257,7 +257,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 				renderGenericToolCall(w, cs, name)
 
 				// If it's JSON, treat it as such, otherwise we skip whatever the content is.
-				_ = renderContentAsJSONMarkdown("Output:", choice.Delta.Content, w, io)
+				_ = renderContentAsJSONMarkdown("Output:", choice.Delta.Content.String(), w, io)
 
 				// The entirety of the args can be treated as "input" to the tool call.
 				// We try to render it as JSON, but if that fails, just skip it.
@@ -500,9 +500,9 @@ type chatCompletionChunkEntry struct {
 	Object  string `json:"object"`
 	Choices []struct {
 		Delta struct {
-			ReasoningText string `json:"reasoning_text"`
-			Content       string `json:"content"`
-			Role          string `json:"role"`
+			ReasoningText iostreams.Untrusted `json:"reasoning_text"`
+			Content       iostreams.Untrusted `json:"content"`
+			Role          string              `json:"role"`
 			ToolCalls     []struct {
 				Function struct {
 					Name      string `json:"name"`
