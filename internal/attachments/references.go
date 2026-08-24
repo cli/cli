@@ -348,7 +348,7 @@ func attachmentArgsByPath(attachmentArgs []attachmentArg) (map[string]int, error
 // Only a local path can name one, and markdown offers several spellings for
 // the same path, so each is resolved to an absolute path and looked up.
 func attachmentArgForDestination(dest string, byPath map[string]int) (int, bool) {
-	if dest == "" || strings.HasPrefix(dest, "#") || strings.Contains(dest, "://") {
+	if dest == "" || strings.HasPrefix(dest, "#") || isRemoteDestination(dest) {
 		return 0, false
 	}
 	for _, path := range candidatePaths(dest) {
@@ -361,6 +361,21 @@ func attachmentArgForDestination(dest string, byPath map[string]int) (int, bool)
 		}
 	}
 	return 0, false
+}
+
+// isRemoteDestination reports whether a destination addresses somewhere other
+// than the filesystem, so that an attached file is never confused with a URI.
+//
+// A one letter scheme is a Windows volume rather than a scheme, which keeps
+// "C:\pictures\login.png" a path. A host with no scheme is the protocol
+// relative form, which inherits the scheme of the page it sits on. Anything too
+// malformed to parse is left to the path lookup, which will not match it.
+func isRemoteDestination(dest string) bool {
+	u, err := url.Parse(dest)
+	if err != nil {
+		return false
+	}
+	return len(u.Scheme) > 1 || u.Host != ""
 }
 
 // candidatePaths returns the ways a destination could name a file on disk.
