@@ -341,7 +341,6 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 			attachmentArgs: []attachmentArg{pngArg()},
 			wantMarkdown:   `![the login screen](` + pngURL + ` "he said \"hi\"")`,
 		},
-		{},
 		{
 			// The backslash escapes the ")", so it belongs to the path
 			// rather than closing the destination.
