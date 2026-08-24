@@ -2142,6 +2142,30 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 			},
 		},
 		{
+			name: "head branch is associated with a prunable worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/missing-feature-wt
+				HEAD def456
+				branch refs/heads/feature
+				prunable gitdir file points to non-existent location
+			`),
+			toplevel: "/path/to/main",
+			branch:   "main",
+			extraStubs: []stub{
+				{pattern: `git worktree prune`, exitCode: 0},
+				{pattern: `git branch -D feature`, exitCode: 0},
+			},
+			wantContains: []string{
+				"Pruned stale worktree metadata for /path/to/missing-feature-wt",
+				"Deleted local branch feature",
+				"Deleted remote branch feature",
+			},
+		},
+		{
 			name: "head branch is checked out in the main worktree",
 			worktreeList: heredoc.Doc(`
 				worktree /path/to/main
@@ -2181,6 +2205,33 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 				"Deleted remote branch feature",
 			},
 			wantNotContains: []string{"Deleted local branch"},
+		},
+		{
+			name: "base branch is associated with a prunable worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/feature
+
+				worktree /path/to/missing-base-wt
+				HEAD def456
+				branch refs/heads/main
+				prunable gitdir file points to non-existent location
+			`),
+			toplevel: "/path/to/main",
+			branch:   "feature",
+			extraStubs: []stub{
+				{pattern: `git worktree prune`, exitCode: 0},
+				{pattern: `git rev-parse --verify refs/heads/main`, exitCode: 0},
+				{pattern: `git checkout main`, exitCode: 0},
+				{pattern: `git .*pull --ff-only origin main`, exitCode: 0},
+				{pattern: `git branch -D feature`, exitCode: 0},
+			},
+			wantContains: []string{
+				"Pruned stale worktree metadata for /path/to/missing-base-wt",
+				"Deleted local branch feature and switched to branch main",
+				"Deleted remote branch feature",
+			},
 		},
 		{
 			name: "sibling worktree is dirty and cannot be removed",

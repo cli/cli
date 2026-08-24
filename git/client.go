@@ -288,11 +288,23 @@ func (c *Client) WorktreeRemove(ctx context.Context, path string) error {
 	return err
 }
 
+// WorktreePrune removes administrative files for worktrees that no longer
+// exist on disk.
+func (c *Client) WorktreePrune(ctx context.Context) error {
+	cmd, err := c.Command(ctx, "worktree", "prune")
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	return err
+}
+
 // parseWorktrees parses the output of `git worktree list --porcelain` into a
 // slice of Worktree. Each record begins with a "worktree <path>" line followed
-// by attribute lines; attributes other than "branch" are ignored.
+// by attribute lines.
 func parseWorktrees(output []byte) []Worktree {
 	var worktrees []Worktree
+	output = bytes.ReplaceAll(output, []byte("\r\n"), []byte("\n"))
 	for _, record := range strings.Split(string(output), "\n\n") {
 		var worktree Worktree
 		for _, line := range strings.Split(record, "\n") {
@@ -302,6 +314,8 @@ func parseWorktrees(output []byte) []Worktree {
 				worktree.Path = value
 			case "branch":
 				worktree.Ref = value
+			case "prunable":
+				worktree.Prunable = true
 			}
 		}
 		if worktree.Path != "" {
