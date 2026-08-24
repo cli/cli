@@ -1708,14 +1708,41 @@ func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) error {
 	return c.Mutate("UnlinkProjectV2FromTeam", &mutation, variables)
 }
 
+type projectMissingScopesError struct {
+	api.MissingScopesError
+}
+
+func (err projectMissingScopesError) Error() string {
+	requirements := make([]string, 0, len(err.Requirements))
+	requestedScopes := make([]string, 0, len(err.Requirements))
+	for _, requirement := range err.Requirements {
+		formattedRequirement := strings.Join(requirement.Scopes, " or ")
+		if len(err.Requirements) > 1 && len(requirement.Scopes) > 1 {
+			formattedRequirement = fmt.Sprintf("(%s)", formattedRequirement)
+		}
+		requirements = append(requirements, formattedRequirement)
+		requestedScopes = append(requestedScopes, requirement.Scopes[0])
+	}
+	requestMessage := "To request one valid set, run:"
+	if len(err.Requirements) == 1 && len(err.Requirements[0].Scopes) == 1 {
+		requestMessage = "To request it, run:"
+	}
+	return fmt.Sprintf(
+		"error: your authentication token is missing required scopes [%s]\n"+
+			"%s  gh auth refresh -s %s",
+		strings.Join(requirements, ", "),
+		requestMessage,
+		strings.Join(requestedScopes, ","))
+}
+
+func (err projectMissingScopesError) Unwrap() error {
+	return err.MissingScopesError
+}
+
 func handleError(err error) error {
-	missing := api.GraphQLMissingScopes(err)
-	if len(missing) > 0 {
-		return fmt.Errorf(
-			"error: your authentication token is missing required scopes %v\n"+
-				"To request it, run:  gh auth refresh -s %s",
-			missing,
-			strings.Join(missing, ","))
+	requirements := api.GraphQLScopeRequirements(err)
+	if len(requirements) > 0 {
+		return projectMissingScopesError{MissingScopesError: api.MissingScopesError{Requirements: requirements}}
 	}
 	return err
 }

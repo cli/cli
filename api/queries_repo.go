@@ -747,7 +747,7 @@ type RepoMetadataResult struct {
 	Milestones       []RepoMilestone
 	Teams            []OrgTeam
 
-	missingProjectsV2Scopes []string
+	missingProjectsV2ScopeRequirements ScopeRequirements
 }
 
 func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
@@ -843,8 +843,8 @@ func (m *RepoMetadataResult) ProjectsTitlesToIDs(titles []string) ([]string, []s
 			continue
 		}
 
-		if len(m.missingProjectsV2Scopes) > 0 {
-			return nil, nil, MissingScopesError{Scopes: m.missingProjectsV2Scopes}
+		if len(m.missingProjectsV2ScopeRequirements) > 0 {
+			return nil, nil, MissingScopesError{Requirements: m.missingProjectsV2ScopeRequirements}
 		}
 
 		return nil, nil, fmt.Errorf("'%s' not found", title)
@@ -907,7 +907,7 @@ func ProjectTitlesToPaths(client *Client, repo ghrepo.Interface, titles []string
 	}
 
 	// Then we'll try to match against v2 projects
-	v2Projects, missingScopes, err := v2Projects(client, repo)
+	v2Projects, missingScopeRequirements, err := v2Projects(client, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -935,8 +935,8 @@ func ProjectTitlesToPaths(client *Client, repo ghrepo.Interface, titles []string
 		}
 
 		if !found {
-			if len(missingScopes) > 0 {
-				return nil, MissingScopesError{Scopes: missingScopes}
+			if len(missingScopeRequirements) > 0 {
+				return nil, MissingScopesError{Requirements: missingScopeRequirements}
 			}
 			return nil, fmt.Errorf("'%s' not found", title)
 		}
@@ -1074,7 +1074,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if input.ProjectsV2 {
 		g.Go(func() error {
 			var err error
-			result.ProjectsV2, result.missingProjectsV2Scopes, err = v2Projects(client, repo)
+			result.ProjectsV2, result.missingProjectsV2ScopeRequirements, err = v2Projects(client, repo)
 			return err
 		})
 	}
@@ -1560,7 +1560,7 @@ func v1Projects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 // - ProjectsV2 owned by current user
 // - ProjectsV2 linked to repository
 // - ProjectsV2 owned by repository organization, if it belongs to one
-func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, []string, error) {
+func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, ScopeRequirements, error) {
 	var userProjectsV2 []ProjectV2
 	var repoProjectsV2 []ProjectV2
 	var orgProjectsV2 []ProjectV2
@@ -1616,21 +1616,12 @@ func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, []string, e
 		projectsV2 = append(projectsV2, p)
 	}
 
-	missingScopes := make(map[string]struct{})
+	var missingScopeRequirements ScopeRequirements
 	for _, err := range []error{userErr, repoErr, orgErr} {
-		for _, scope := range GraphQLMissingScopes(err) {
-			if scope == "read:project" {
-				missingScopes[scope] = struct{}{}
-			}
-		}
+		missingScopeRequirements = append(missingScopeRequirements, GraphQLScopeRequirements(err).containingAny("read:project", "project")...)
 	}
-	scopes := make([]string, 0, len(missingScopes))
-	for scope := range missingScopes {
-		scopes = append(scopes, scope)
-	}
-	sort.Strings(scopes)
 
-	return projectsV2, scopes, nil
+	return projectsV2, normalizeScopeRequirements(missingScopeRequirements), nil
 }
 
 func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path safeurl.SafeURL, body io.Reader) (*Repository, error) {

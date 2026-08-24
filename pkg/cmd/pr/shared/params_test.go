@@ -626,7 +626,7 @@ func TestWithPrAndIssueQueryParamsProjectsV1Deprecation(t *testing.T) {
 		)
 	})
 
-	t.Run("missing read project scope", func(t *testing.T) {
+	t.Run("missing project scope alternative", func(t *testing.T) {
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
 		client := api.NewClientFromHTTP(&http.Client{Transport: reg})
@@ -642,7 +642,7 @@ func TestWithPrAndIssueQueryParamsProjectsV1Deprecation(t *testing.T) {
 				httpmock.StringResponse(`{
 					"errors": [{
 						"type": "INSUFFICIENT_SCOPES",
-						"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
+						"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'project']."
 					}]
 				}`),
 			)
@@ -655,6 +655,9 @@ func TestWithPrAndIssueQueryParamsProjectsV1Deprecation(t *testing.T) {
 			IssueMetadataState{ProjectTitles: []string{"TriageV2"}},
 			gh.ProjectsV1Unsupported,
 		)
-		require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project]\nUpdate your authentication token to include: read:project")
+		require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project or project]\nUpdate your authentication token to include one of: read:project, project")
+		var missingScopesErr api.MissingScopesError
+		require.ErrorAs(t, err, &missingScopesErr)
+		require.Equal(t, api.ScopeRequirements{{Scopes: []string{"read:project", "project"}}}, missingScopesErr.Requirements)
 	})
 }

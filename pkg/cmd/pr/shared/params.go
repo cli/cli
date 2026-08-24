@@ -90,7 +90,7 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 
 		metadataResult, err := api.RepoMetadata(client, baseRepo, input)
 		if err != nil {
-			if missingScopesErr := api.GraphQLMissingScopeError(err, "read:project"); missingScopesErr != nil {
+			if missingScopesErr := api.GraphQLMissingScopeError(err, "read:project", "project"); missingScopesErr != nil {
 				return missingScopesErr
 			}
 			return err

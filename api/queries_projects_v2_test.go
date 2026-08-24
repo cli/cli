@@ -342,7 +342,7 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 	}
 }
 
-func TestProjectsV2IgnorableError_missingProjectScope(t *testing.T) {
+func TestProjectsV2IgnorableError_missingProjectScopeAlternative(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
 	client := newTestClient(reg)
@@ -352,7 +352,7 @@ func TestProjectsV2IgnorableError_missingProjectScope(t *testing.T) {
 		httpmock.StringResponse(`{
 			"errors": [{
 				"type": "INSUFFICIENT_SCOPES",
-				"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
+				"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'project']."
 			}]
 		}`),
 	)

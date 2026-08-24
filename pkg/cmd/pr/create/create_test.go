@@ -396,7 +396,7 @@ func Test_createRun(t *testing.T) {
 				opts.Projects = []string{"roadmap"}
 				return func() {}
 			},
-			wantErr: "error: your authentication token is missing required scopes [read:project]\nUpdate your authentication token to include: read:project",
+			wantErr: "error: your authentication token is missing required scopes [read:project or project]\nUpdate your authentication token to include one of: read:project, project",
 		},
 		{
 			name: "same head and base branch should error",
@@ -2661,7 +2661,7 @@ func mockProjectMissingReadScope(reg *httpmock.Registry, _ *testing.T) {
 			httpmock.StringResponse(`{
 				"errors": [{
 					"type": "INSUFFICIENT_SCOPES",
-					"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
+					"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'project']."
 				}]
 			}`),
 		)

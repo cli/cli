@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
@@ -1085,14 +1086,17 @@ func TestIssueCreate_projectMissingReadScope(t *testing.T) {
 			httpmock.StringResponse(`{
 				"errors": [{
 					"type": "INSUFFICIENT_SCOPES",
-					"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
+					"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'project']."
 				}]
 			}`),
 		)
 	}
 
 	_, err := runCommand(http, false, `-t hello -b body -p roadmap`, nil)
-	require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project]\nUpdate your authentication token to include: read:project")
+	require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project or project]\nUpdate your authentication token to include one of: read:project, project")
+	var missingScopesErr api.MissingScopesError
+	require.ErrorAs(t, err, &missingScopesErr)
+	require.Equal(t, api.ScopeRequirements{{Scopes: []string{"read:project", "project"}}}, missingScopesErr.Requirements)
 }
 
 func TestIssueCreate_recover(t *testing.T) {

@@ -384,8 +384,8 @@ func Test_RepoMetadata(t *testing.T) {
 func TestRepoMetadataResultProjectsTitlesToIDsWithMissingProjectsV2Scopes(t *testing.T) {
 	result := RepoMetadataResult{
 		Projects: []RepoProject{{Name: "Classic", ID: "CLASSICID"}},
-		missingProjectsV2Scopes: []string{
-			"read:project",
+		missingProjectsV2ScopeRequirements: ScopeRequirements{
+			{Scopes: []string{"read:project", "project"}},
 		},
 	}
 
@@ -397,7 +397,7 @@ func TestRepoMetadataResultProjectsTitlesToIDsWithMissingProjectsV2Scopes(t *tes
 	_, _, err = result.ProjectsTitlesToIDs([]string{"ProjectV2"})
 	var missingScopesErr MissingScopesError
 	require.ErrorAs(t, err, &missingScopesErr)
-	assert.Equal(t, []string{"read:project"}, missingScopesErr.Scopes)
+	require.Equal(t, ScopeRequirements{{Scopes: []string{"read:project", "project"}}}, missingScopesErr.Requirements)
 }
 
 // Test that RepoMetadata only fetches teams if the input specifies it
@@ -506,6 +506,41 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 		if !slices.Equal(projectPaths, expectedProjectPaths) {
 			t.Errorf("expected projects paths %v, got %v", expectedProjectPaths, projectPaths)
 		}
+	})
+
+	t.Run("classic project matches when ProjectsV2 requires an alternative scope", func(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+		client := newTestClient(reg)
+		repo, _ := ghrepo.FromFullName("OWNER/REPO")
+
+		reg.Register(
+			httpmock.GraphQL(`query RepositoryProjectList\b`),
+			httpmock.StringResponse(`{ "data": { "repository": { "projects": { "nodes": [{ "name": "Roadmap", "id": "ROADMAPID", "resourcePath": "/OWNER/REPO/projects/2" }], "pageInfo": { "hasNextPage": false } } } } }`),
+		)
+		reg.Register(
+			httpmock.GraphQL(`query OrganizationProjectList\b`),
+			httpmock.StringResponse(`{ "data": { "organization": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`),
+		)
+		for _, query := range []string{
+			`query RepositoryProjectV2List\b`,
+			`query OrganizationProjectV2List\b`,
+			`query UserProjectV2List\b`,
+		} {
+			reg.Register(
+				httpmock.GraphQL(query),
+				httpmock.StringResponse(`{
+					"errors": [{
+						"type": "INSUFFICIENT_SCOPES",
+						"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'project']."
+					}]
+				}`),
+			)
+		}
+
+		projectPaths, err := ProjectTitlesToPaths(client, repo, []string{"Roadmap"}, gh.ProjectsV1Supported)
+		require.NoError(t, err)
+		require.Equal(t, []string{"OWNER/REPO/2"}, projectPaths)
 	})
 
 	t.Run("when projectsV1 is not supported, does not request them", func(t *testing.T) {
