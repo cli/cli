@@ -113,6 +113,13 @@ func attachAssetsToMarkdown(v attachableMarkdown) (attachedMarkdown, error) {
 		if r.referenceStyle() {
 			for _, def := range r.defs {
 				dest, ok := linkReferenceDestination(src, def)
+				// TODO: We skip the edit because a definition split across a blockquote
+				// carries the ">" marker, and rewriting it would mangle the quote. The
+				// fallback that appends unrewritten files operates per file. A rewritable
+				// reference to the same file elsewhere suppresses the append fallback,
+				// leaving this definition pointing at its original local path. We accept
+				// this because the tool leaves the reference exactly as the author wrote
+				// it, rewriting only what can be safely rewritten.
 				if !ok {
 					continue
 				}
