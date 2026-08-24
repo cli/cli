@@ -208,6 +208,28 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 			attachmentArgs: []attachmentArg{{Path: "C:/Users/me/login.png", URL: pngURL}},
 			wantMarkdown:   "![the login screen](" + pngURL + ")",
 		},
+		{
+			// goldmark keeps whitespace inside angle brackets, because that is
+			// the only way to write a name holding a space. The padded
+			// destination and the attached file are two different names.
+			name:           "a padded angle destination is not the file it pads",
+			markdown:       "![the login screen](< login.png >)",
+			attachmentArgs: []attachmentArg{pngArg()},
+			wantMarkdown:   "![the login screen](< login.png >)",
+			wantToAppend:   []attachmentArg{pngArg()},
+		},
+		{
+			name:           "a padded angle destination is rewritten when it names an attached file",
+			markdown:       "![the login screen](< login.png >)",
+			attachmentArgs: []attachmentArg{{Path: " login.png ", URL: pngURL, Alt: "login"}},
+			wantMarkdown:   "![the login screen](" + pngURL + ")",
+		},
+		{
+			name:           "a padded angle definition is rewritten when it names an attached file",
+			markdown:       "![the login screen][shot]\n\n[shot]: < login.png >",
+			attachmentArgs: []attachmentArg{{Path: " login.png ", URL: pngURL, Alt: "login"}},
+			wantMarkdown:   "![the login screen][shot]\n\n[shot]: " + pngURL,
+		},
 
 		// One file, several references.
 		{
