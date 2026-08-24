@@ -1516,7 +1516,13 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool,
 		return nil, fmt.Errorf("project number is required when not running interactively")
 	}
 
-	projects, err := c.Projects(o.Login, o.Type, 0, fields)
+	var projects Projects
+	var err error
+	if hasProjectFilters(filters) {
+		projects, err = c.projects(o.Login, o.Type, 0, fields)
+	} else {
+		projects, err = c.Projects(o.Login, o.Type, 0, fields)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1560,21 +1566,37 @@ func projectMatchesFilters(p *Project, filters []func(*Project) bool) bool {
 	return true
 }
 
+func hasProjectFilters(filters []func(*Project) bool) bool {
+	for _, filter := range filters {
+		if filter != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // Projects returns all the projects for an Owner. If the OwnerType is VIEWER, no login is required.
 // If limit is 0, the default limit is used.
 func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) (Projects, error) {
+	if limit == 0 {
+		limit = LimitDefault
+	}
+	return c.projects(login, t, limit, fields)
+}
+
+// projects returns projects up to limit, or exhausts all pages when limit is 0.
+func (c *Client) projects(login string, t OwnerType, limit int, fields bool) (Projects, error) {
 	projects := Projects{
 		Nodes: make([]Project, 0),
 	}
 	cursor := (*githubv4.String)(nil)
 	hasNextPage := false
 
-	if limit == 0 {
-		limit = LimitDefault
+	// Keep unbounded requests at the default page size to avoid making each query larger.
+	first := LimitDefault
+	if limit != 0 {
+		first = min(limit, LimitMax)
 	}
-
-	// set first to the min of limit and LimitMax
-	first := min(limit, LimitMax)
 
 	variables := map[string]any{
 		"first":       githubv4.Int(first),
@@ -1632,11 +1654,11 @@ func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) (Pr
 			projects.TotalCount = query.Owner.Projects.TotalCount
 		}
 
-		if !hasNextPage || len(projects.Nodes) >= limit {
+		if !hasNextPage || (limit != 0 && len(projects.Nodes) >= limit) {
 			return projects, nil
 		}
 
-		if len(projects.Nodes)+LimitMax > limit {
+		if limit != 0 && len(projects.Nodes)+LimitMax > limit {
 			first := limit - len(projects.Nodes)
 			variables["first"] = githubv4.Int(first)
 		}

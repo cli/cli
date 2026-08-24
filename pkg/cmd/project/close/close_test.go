@@ -621,16 +621,16 @@ func registerInteractiveCloseResponses(projectID string, closed bool, projectURL
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query":     "query ViewerLoginAndOrgs.*",
-			"variables": map[string]interface{}{"after": nil},
+			"variables": map[string]any{"after": nil},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"id": "viewer-ID", "login": "monalisa",
-					"organizations": map[string]interface{}{"nodes": []interface{}{}},
+					"organizations": map[string]any{"nodes": []any{}},
 				},
 			},
 		})
@@ -638,21 +638,21 @@ func registerInteractiveCloseResponses(projectID string, closed bool, projectURL
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerProjects.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"after": nil, "afterFields": nil, "afterItems": nil,
 				"first": 30, "firstFields": 0, "firstItems": 0,
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"login": "monalisa",
-					"projectsV2": map[string]interface{}{
+					"projectsV2": map[string]any{
 						"totalCount": 2,
-						"nodes": []map[string]interface{}{
+						"nodes": []map[string]any{
 							{"id": "open-project-ID", "number": 1, "title": "Open Project", "closed": false},
 							{"id": "closed-project-ID", "number": 2, "title": "Closed Project", "closed": true},
 						},
@@ -665,10 +665,10 @@ func registerInteractiveCloseResponses(projectID string, closed bool, projectURL
 		Post("/graphql").
 		AddMatcher(matchProjectStateMutation(projectID, closed)).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2": map[string]interface{}{
-					"projectV2": map[string]interface{}{"url": projectURL},
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2": map[string]any{
+					"projectV2": map[string]any{"url": projectURL},
 				},
 			},
 		})
