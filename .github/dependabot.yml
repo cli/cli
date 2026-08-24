@@ -20,3 +20,6 @@ updates:
     codeql-actions:
       patterns:
         - "github/codeql-action/*"
+    aw-actions:
+      patterns:
+        - "github/gh-aw-actions/*"

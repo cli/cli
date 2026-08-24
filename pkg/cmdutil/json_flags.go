@@ -258,7 +258,7 @@ func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 
 func (e *jsonExporter) exportData(v reflect.Value) interface{} {
 	switch v.Kind() {
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		if !v.IsNil() {
 			return e.exportData(v.Elem())
 		}
@@ -306,7 +306,7 @@ var emptyInterfaceType = reflect.TypeOf(sliceOfEmptyInterface).Elem()
 // need to be explicitly used.
 func StructExportData(s interface{}, fields []string) map[string]interface{} {
 	v := reflect.ValueOf(s)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	if v.Kind() != reflect.Struct {

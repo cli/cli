@@ -933,7 +933,7 @@ func TestNewCmdExtension(t *testing.T) {
 
 			f := cmdutil.Factory{
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				IOStreams:        ios,
 				ExtensionManager: em,

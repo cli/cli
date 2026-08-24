@@ -268,9 +268,9 @@ func TestNewCmdCreate(t *testing.T) {
 				IOStreams: ios,
 				Config: func() (gh.Config, error) {
 					if tt.config != "" {
-						return config.NewFromString(tt.config), nil
+						return config.NewMockConfigFromString(tt.config), nil
 					}
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 			}
 
@@ -989,7 +989,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil

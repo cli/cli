@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -14,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -32,6 +34,7 @@ type DevelopOptions struct {
 	BaseBranch  string
 	Checkout    bool
 	List        bool
+	Worktree    string
 }
 
 func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.Command {
@@ -66,6 +69,9 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			# Create a branch for issue 123 and check it out
 			$ gh issue develop 123 --checkout
 
+			# Create a branch for issue 123 and check it out in a worktree
+			$ gh issue develop 123 --checkout --worktree /path/to/wt-feature
+
 			# Create a branch in repo monalisa/cli for issue 123 in repo cli/cli
 			$ gh issue develop 123 --repo cli/cli --branch-repo monalisa/cli
 		`),
@@ -91,6 +97,10 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("worktree") && opts.Worktree == "" {
+				return cmdutil.FlagErrorf("--worktree cannot be blank")
+			}
+
 			issueNumber, baseRepo, err := shared.ParseIssueFromArg(args[0])
 			if err != nil {
 				return err
@@ -120,6 +130,18 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			if err := cmdutil.MutuallyExclusive("specify only one of `--list` or `--name`", opts.List, opts.Name != ""); err != nil {
 				return err
 			}
+			if err := cmdutil.MutuallyExclusive("specify only one of `--list` or `--worktree`", opts.List, opts.Worktree != ""); err != nil {
+				return err
+			}
+			if opts.Worktree != "" && !opts.Checkout {
+				return cmdutil.FlagErrorf("--worktree requires --checkout")
+			}
+			if opts.Worktree != "" {
+				opts.Worktree, err = filepath.Abs(opts.Worktree)
+				if err != nil {
+					return err
+				}
+			}
 			if runF != nil {
 				return runF(opts)
 			}
@@ -133,6 +155,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 	fl.BoolVarP(&opts.Checkout, "checkout", "c", false, "Checkout the branch after creating it")
 	fl.BoolVarP(&opts.List, "list", "l", false, "List linked branches for the issue")
 	fl.StringVarP(&opts.Name, "name", "n", "", "Name of the branch to create")
+	fl.StringVar(&opts.Worktree, "worktree", "", "Check out the branch into a worktree at the given `path`")
 
 	var issueRepoSelector string
 	fl.StringVarP(&issueRepoSelector, "issue-repo", "i", "", "Name or URL of the issue's repository")
@@ -180,6 +203,15 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 	if opts.BranchRepo != "" {
 		var err error
 		branchRepo, err = ghrepo.FromFullName(opts.BranchRepo)
+		if err != nil {
+			return err
+		}
+	}
+
+	var worktreeTarget prShared.WorktreeTarget
+	if opts.Worktree != "" {
+		var err error
+		worktreeTarget, err = prShared.ResolveWorktreeTarget(opts.GitClient, opts.Worktree)
 		if err != nil {
 			return err
 		}
@@ -252,7 +284,7 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 
 	fmt.Fprintf(opts.IO.Out, "%s/%s/tree/%s\n", branchRepo.RepoHost(), ghrepo.FullName(branchRepo), branchName)
 
-	return checkoutBranch(opts, branchRepo, branchName)
+	return checkoutBranch(opts, branchRepo, branchName, worktreeTarget)
 }
 
 func findExistingLinkedBranchName(branches []api.LinkedBranch, branchRepo ghrepo.Interface, branchName string) string {
@@ -318,7 +350,7 @@ func printLinkedBranches(io *iostreams.IOStreams, branches []api.LinkedBranch) {
 	_ = table.Render()
 }
 
-func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutBranch string) (err error) {
+func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutBranch string, worktreeTarget prShared.WorktreeTarget) (err error) {
 	remotes, err := opts.Remotes()
 	if err != nil {
 		// If the user specified the branch to be checked out and no remotes are found
@@ -352,6 +384,24 @@ func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutB
 		return nil
 	}
 
+	if opts.Worktree != "" {
+		commands, branchExists := prShared.WorktreeCheckoutCommands(
+			gc,
+			worktreeTarget,
+			checkoutBranch,
+			fmt.Sprintf("%s/%s", baseRemote.Name, checkoutBranch),
+		)
+		if err := runGitCommands(gc, commands); err != nil {
+			return err
+		}
+		if branchExists {
+			if err := gc.Pull(ctx.Background(), baseRemote.Name, checkoutBranch, git.WithRepoDir(opts.Worktree)); err != nil {
+				_, _ = fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", opts.IO.ColorScheme().WarningIcon(), checkoutBranch)
+			}
+		}
+		return nil
+	}
+
 	if gc.HasLocalBranch(ctx.Background(), checkoutBranch) {
 		if err := gc.CheckoutBranch(ctx.Background(), checkoutBranch); err != nil {
 			return err
@@ -366,5 +416,18 @@ func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutB
 		}
 	}
 
+	return nil
+}
+
+func runGitCommands(client *git.Client, commands [][]string) error {
+	for _, args := range commands {
+		cmd, err := client.Command(ctx.Background(), args...)
+		if err != nil {
+			return err
+		}
+		if _, err := cmd.Output(); err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -61,6 +61,10 @@ Pass `--repo OWNER/REPO` (`-R`) to override the resolved CWD repo.
 - Bots author as GitHub Apps, so `--author dependabot` matches nothing. Use
   `--app dependabot` (on `pr`/`issue list` and `search prs|issues`; expands
   to `author:app/<slug>`) or `--author "dependabot[bot]"`.
+- `gh search issues` also takes `--search-type <lexical|semantic|hybrid>`
+  (github.com/GHEC only, issues only): use `semantic` when the user describes a
+  problem in natural language rather than exact terms, and `hybrid` to blend
+  keyword and semantic ranking; `lexical` (default) is exact matching.
 
 ## Issue types, sub-issues, and relationships
 
@@ -160,6 +164,8 @@ Sometimes useful data isn't on the typed commands. Examples:
 
 - `gh pr checkout <n>` switches branches. Use `gh pr diff <n>` or
   `gh pr view <n>` if you only need to read.
+- `gh pr checkout <n> --worktree <path>` checks the PR out into a git worktree
+  at `<path>` instead of switching the current branch.
 - `NO_COLOR`, `CLICOLOR_FORCE`, and `GH_FORCE_TTY` are honored. Set
   `GH_FORCE_TTY=1` if you want TTY-style output (colors, tables, the
   pager, interactivity) inside an agent harness; leave it unset unless needed.

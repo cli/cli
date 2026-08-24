@@ -1210,7 +1210,7 @@ func Test_createRun(t *testing.T) {
 				)
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
-					httpmock.StatusScopesResponder(404, `repo,read:org`))
+					httpmock.StatusScopesResponder(404, `repo, read:org`))
 			},
 			wantStderr: heredoc.Doc(`
 				! Failed to create release, "workflow" scope may be required.
@@ -1236,7 +1236,7 @@ func Test_createRun(t *testing.T) {
 				)
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
-					httpmock.StatusScopesResponder(404, `repo,read:org,workflow`))
+					httpmock.StatusScopesResponder(404, `gist, project, read:org, repo, user, workflow`))
 			},
 			wantErr: "HTTP 404 (https://api.github.com/repos/OWNER/REPO/releases)",
 		},
@@ -1853,7 +1853,7 @@ func Test_createRun_interactive(t *testing.T) {
 			}
 
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 
 			tt.opts.Edit = func(_, _, val string, _ io.Reader, _, _ io.Writer) (string, error) {

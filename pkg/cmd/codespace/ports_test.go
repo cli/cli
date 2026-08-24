@@ -118,7 +118,7 @@ func TestPendingOperationDisallowsForwardPorts(t *testing.T) {
 	app := testingPortsApp()
 	selector := &CodespaceSelector{api: app.apiClient, codespaceName: "disabledCodespace"}
 
-	if err := app.ForwardPorts(context.Background(), selector, nil); err != nil {
+	if err := app.ForwardPorts(context.Background(), selector, nil, false); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}

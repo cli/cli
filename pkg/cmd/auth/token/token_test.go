@@ -58,7 +58,7 @@ func TestNewCmdToken(t *testing.T) {
 			f := &cmdutil.Factory{
 				IOStreams: ios,
 				Config: func() (gh.Config, error) {
-					cfg := config.NewBlankConfig()
+					cfg := config.NewMockConfig()
 					return cfg, nil
 				},
 			}
@@ -165,11 +165,13 @@ func TestTokenRun(t *testing.T) {
 			ios, _, stdout, _ := iostreams.Test()
 			tt.opts.IO = ios
 
+			cfg, _ := config.NewIsolatedTestConfig(t, "")
+
+			// Set after isolating the config, which clears the auth env vars.
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
 
-			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
@@ -252,7 +254,7 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			tt.opts.IO = ios
 			tt.opts.SecureStorage = true
 
-			cfg, _ := config.NewIsolatedTestConfig(t)
+			cfg, _ := config.NewIsolatedTestConfig(t, "")
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}

@@ -605,7 +605,7 @@ func Test_ViewRun_WithoutUsername(t *testing.T) {
 		},
 		IO: io,
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 	}
 

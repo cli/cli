@@ -160,7 +160,7 @@ Use `cmdutil.MutuallyExclusive("message", cond1, cond2)` for mutually exclusive 
 
 ## Feature Detection
 
-Commands using feature detection must include a `// TODO <cleanupIdentifier>` comment directly above the if-statement for linter compliance:
+Commands using feature detection for a temporary gate (one that will eventually be available on all GitHub API servers, i.e. `github.com`, GHEC, and GHES) must include a `// TODO <cleanupIdentifier>` comment directly above the if-statement for linter compliance:
 
 ```go
 // TODO someFeatureCleanup
@@ -172,6 +172,8 @@ if features.SomeCapability {
 ```
 
 Use feature detection only when an API is not GA on all supported GHES versions; skip it for long-established APIs.
+
+A cleanup comment is not needed when the gate is permanent, i.e. the feature is not going to be supported on GHES.
 
 ## API Patterns
 
@@ -185,6 +187,14 @@ For host resolution, use `cfg.Authentication().DefaultHost()`; do not use `ghins
 
 Avoid extra round-trips.
 
+## Pull Requests
+
+Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the PR body. Keep its headings and HTML comments, and fill in every section; write "N/A" rather than deleting one.
+
 ## Code Review
 
-Review pull requests with the [`cli-code-reviewer` skill](.github/skills/cli-code-reviewer/SKILL.md).
+Review pull requests with the [`code-review` skill](.github/skills/code-review/SKILL.md).
+
+## Tech Debt
+
+Pay down tech debt with the [`tech-debt-burndown` skill](.github/skills/tech-debt-burndown/SKILL.md). It fixes one small, verifiable piece per run and opens a ready-to-review pull request. It is built to run unattended on a schedule, so it never asks questions, and it declines to run when the working tree is dirty or another burndown pull request is already open.

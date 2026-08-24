@@ -1,0 +1,8 @@
+# Telemetry log mode records the invoking agent and adapted spinner state
+env GH_TELEMETRY=log
+env GH_TELEMETRY_SAMPLE_RATE=100
+env AI_AGENT=some-agent
+
+exec gh version
+stderr '"agent": "some-agent"'
+stderr '"spinner_disabled": "true"'

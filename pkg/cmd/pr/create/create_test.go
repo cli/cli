@@ -285,9 +285,9 @@ func TestNewCmdCreate(t *testing.T) {
 				IOStreams: ios,
 				Config: func() (gh.Config, error) {
 					if tt.config != "" {
-						return config.NewFromString(tt.config), nil
+						return config.NewMockConfigFromString(tt.config), nil
 					}
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 			}
 
@@ -1617,7 +1617,7 @@ func Test_createRun(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			opts.Remotes = func() (context.Remotes, error) {
 				return context.Remotes{
@@ -2145,7 +2145,7 @@ func Test_createRun_GHES(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			opts.Remotes = func() (context.Remotes, error) {
 				return context.Remotes{
@@ -2233,7 +2233,7 @@ func TestRemoteGuessing(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Browser:  &browser.Stub{},
 		IO:       ios,
@@ -2308,7 +2308,7 @@ func TestNoRepoCanBeDetermined(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Browser:  &browser.Stub{},
 		IO:       ios,
@@ -2856,7 +2856,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Browser:  &browser.Stub{},
 				IO:       ios,
@@ -2951,7 +2951,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Browser:  &browser.Stub{},
 				IO:       ios,

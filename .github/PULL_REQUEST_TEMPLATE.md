@@ -18,9 +18,21 @@ background they need before the problem makes sense, and avoid jargon.
 ### How did you test this change?
 
 <!--
-Demonstrate the code is solid, and how you know it solves the problem in the description.
-Give the exact commands you ran and their output.
-If this changes command output, show it before and after. Screenshot images are preferred over pasted text.
+Show how you exercised the change yourself, as a user of `gh` would.
+
+Automated test results do not belong here. Passing unit tests, `go test ./...` output, and
+coverage numbers tell a reviewer nothing they cannot see from CI, so do not paste them.
+
+Use one or more of these, whichever communicates best:
+
+1. Screenshots or GIFs of the real command running. Preferred whenever the change is visible
+   in terminal output. If output changed, show it before and after.
+2. Given/When/Then scenarios. For example:
+   Given I am in a repo with no open pull requests
+   When I run `gh pr list`
+   Then I see "no open pull requests in cli/cli"
+3. A natural language walkthrough of what you did by hand, the states you covered, and what
+   you saw, including error and edge cases.
 
 If you leave this empty, your pull request will very likely be closed.
 -->

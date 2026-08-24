@@ -226,7 +226,7 @@ cli
 
 			tt.opts.IO = ios
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 
 			err := listRun(&tt.opts)

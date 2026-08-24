@@ -470,7 +470,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			ios.SetStdoutTTY(false)
 			tt.opts.IO = ios
 
-			cfg, readConfigs := config.NewIsolatedTestConfig(t)
+			cfg, readConfigs := config.NewIsolatedTestConfig(t, "")
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
@@ -766,7 +766,7 @@ func Test_loginRun_Survey(t *testing.T) {
 
 			tt.opts.IO = ios
 
-			cfg, readConfigs := config.NewIsolatedTestConfig(t)
+			cfg, readConfigs := config.NewIsolatedTestConfig(t, "")
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
