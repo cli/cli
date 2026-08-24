@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var update = flag.Bool("update", false, "rewrite the expected output in testdata")
+var updateMDFixture = flag.Bool("update-md-fixture", false, "rewrite the expected output in testdata")
 
 // fixtureAttachmentArgs is the set of attached files testdata/references_input.md is
 // written against. Every asset URL is recognisable on sight so the expected
@@ -19,7 +19,7 @@ func fixtureAttachmentArgs() []attachmentArg {
 		return attachmentArg{Path: path, URL: "https://example.com/" + name, Alt: name}
 	}
 	return []attachmentArg{
-		img("./login.png", "login"),
+		img("login.png", "login"),
 		{Path: "./repro.mp4", URL: "https://example.com/repro", Alt: "repro.mp4", RendersAsPlayer: true},
 		img("./Screenshot 2026-08-10 at 5.38.10 PM.png", "screenshot"),
 		img("./f(1).png", "parens"),
@@ -41,9 +41,9 @@ func fixtureAttachmentArgs() []attachmentArg {
 // One markdown document covering every syntax this package handles, so the
 // behaviour can be read as markdown rather than as Go string literals.
 //
-// Run with -update to rewrite the expected output, then read the diff: that is
-// the review, since output regenerated from the code under test agrees with
-// that code by construction.
+// Run with -update-md-fixture to rewrite the expected output, then read the diff:
+// that is the review, since output regenerated from the code under test agrees
+// with that code by construction.
 func TestAttachAssetsToMarkdownFixture(t *testing.T) {
 	const (
 		input    = "testdata/references_input.md"
@@ -60,12 +60,12 @@ func TestAttachAssetsToMarkdownFixture(t *testing.T) {
 	got, err := attachAssetsToMarkdown(v)
 	require.NoError(t, err)
 
-	if *update {
+	if *updateMDFixture {
 		require.NoError(t, os.WriteFile(filepath.Clean(expected), []byte(got.Rewritten), 0o600))
 	}
 
 	want, err := os.ReadFile(expected)
-	require.NoError(t, err, "run go test -update to create it")
+	require.NoError(t, err, "run go test -update-md-fixture to create it")
 	require.Equal(t, string(want), got.Rewritten)
 
 	// Asserted here rather than in the expected output, since appending them

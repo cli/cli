@@ -4,6 +4,8 @@ An embed alone in its paragraph:
 
 ![the login screen](./login.png)
 
+![the login screen without dot-slash](login.png)
+
 An embed inline in ![the login screen](./login.png) a sentence.
 
 A link to [the screenshot](./login.png) instead of an embed.
