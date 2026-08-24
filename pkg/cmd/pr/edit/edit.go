@@ -193,8 +193,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				// see the `Editable.MilestoneId` method.
 			}
 
-			editorFlagExplicit := flags.Changed("editor")
-			if editorFlagExplicit || !opts.Editable.Dirty() {
+			editorFlagChanged := flags.Changed("editor")
+			editorModeExplicit := editorFlagChanged && opts.EditorMode
+			if editorModeExplicit || (!editorFlagChanged && !opts.Editable.Dirty()) {
 				editorMode, err := shared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
 				if err != nil {
 					return err
@@ -202,7 +203,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				opts.EditorMode = editorMode
 			}
 
-			if editorFlagExplicit && (bodyProvided || bodyFileProvided) {
+			if editorModeExplicit && (bodyProvided || bodyFileProvided) {
 				return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, or `--editor`")
 			}
 

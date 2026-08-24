@@ -337,6 +337,27 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:  "editor false with body flag",
+			input: "23 --editor=false --body test",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Body: shared.EditableString{Value: "test", Edited: true},
+				},
+			},
+		},
+		{
+			name:  "editor false disables prefer_editor_prompt",
+			input: "23 --editor=false",
+			output: EditOptions{
+				SelectorArg: "23",
+				Interactive: true,
+			},
+			config: func() (gh.Config, error) {
+				return config.NewMockConfigFromString("prefer_editor_prompt: enabled"), nil
+			},
+		},
+		{
 			name:  "prefer_editor_prompt config without edit flags",
 			input: "23",
 			output: EditOptions{

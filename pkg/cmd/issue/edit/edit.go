@@ -201,16 +201,17 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				len(opts.AddBlockedBy) > 0 || len(opts.RemoveBlockedBy) > 0 ||
 				len(opts.AddBlocking) > 0 || len(opts.RemoveBlocking) > 0
 
-			editorFlagExplicit := flags.Changed("editor")
+			editorFlagChanged := flags.Changed("editor")
+			editorModeExplicit := editorFlagChanged && opts.EditorMode
 			hasExplicitEdit := opts.Editable.Dirty() || hasDeferredFlags
-			if editorFlagExplicit || !hasExplicitEdit {
+			if editorModeExplicit || (!editorFlagChanged && !hasExplicitEdit) {
 				opts.EditorMode, err = prShared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
 				if err != nil {
 					return err
 				}
 			}
 
-			if editorFlagExplicit && (bodyProvided || bodyFileProvided) {
+			if editorModeExplicit && (bodyProvided || bodyFileProvided) {
 				return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, or `--editor`")
 			}
 
