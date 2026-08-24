@@ -186,6 +186,28 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 			wantMarkdown:   "[jump](#login.png)",
 			wantToAppend:   []attachmentArg{{Path: "#login.png", URL: pngURL}},
 		},
+		{
+			name:           "a scheme without slashes is not treated as a path",
+			markdown:       "[write me](mailto:me@example.com)",
+			attachmentArgs: []attachmentArg{{Path: "mailto:me@example.com", URL: pngURL}},
+			wantMarkdown:   "[write me](mailto:me@example.com)",
+			wantToAppend:   []attachmentArg{{Path: "mailto:me@example.com", URL: pngURL}},
+		},
+		{
+			name:           "a protocol-relative url is not treated as a path",
+			markdown:       "![hosted](//example.com/login.png)",
+			attachmentArgs: []attachmentArg{{Path: "/example.com/login.png", URL: pngURL}},
+			wantMarkdown:   "![hosted](//example.com/login.png)",
+			wantToAppend:   []attachmentArg{{Path: "/example.com/login.png", URL: pngURL}},
+		},
+		{
+			// The one letter that a scheme test has to let through, since it is
+			// how Windows names a volume.
+			name:           "a windows volume path is treated as a path",
+			markdown:       `![the login screen](C:/Users/me/login.png)`,
+			attachmentArgs: []attachmentArg{{Path: "C:/Users/me/login.png", URL: pngURL}},
+			wantMarkdown:   "![the login screen](" + pngURL + ")",
+		},
 
 		// One file, several references.
 		{
