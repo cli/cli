@@ -213,7 +213,11 @@ func (e *uploadError) Error() string {
 		if e.RetryAfter == "" {
 			return fmt.Sprintf("could not upload %s: rate limited; wait and try again", e.Path)
 		}
-		return fmt.Sprintf("could not upload %s: rate limited; retry after %s", e.Path, e.RetryAfter)
+		retryAfter := e.RetryAfter
+		if seconds, err := strconv.Atoi(e.RetryAfter); err == nil {
+			retryAfter = fmt.Sprintf("%d seconds", seconds)
+		}
+		return fmt.Sprintf("could not upload %s: rate limited; retry after %s", e.Path, retryAfter)
 	}
 	return fmt.Sprintf("failed to upload %s: %v", e.Path, e.err)
 }
