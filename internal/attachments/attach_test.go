@@ -269,7 +269,7 @@ func TestAppendParagraph(t *testing.T) {
 		{name: "separates with a blank line", md: "text", addition: "more", want: "text\n\nmore"},
 		{name: "empty markdown", md: "", addition: "more", want: "more"},
 		{name: "whitespace only markdown", md: "  \n\n", addition: "more", want: "more"},
-		{name: "empty addition", md: "text", addition: "", want: "text"},
+		{name: "empty addition preserves markdown", md: "text  \n", addition: "", want: "text  \n"},
 		{name: "trailing newlines", md: "text\n\n\n", addition: "more", want: "text\n\nmore"},
 		{name: "trailing spaces", md: "text  ", addition: "more", want: "text\n\nmore"},
 	}

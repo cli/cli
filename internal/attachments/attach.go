@@ -77,12 +77,12 @@ func appendUnreferenced(attachedMD attachedMarkdown, assets []UserAsset) string 
 
 // appendParagraph joins two pieces of markdown as separate paragraphs.
 func appendParagraph(md, addition string) string {
+	if addition == "" {
+		return md
+	}
 	md = strings.TrimRight(md, " \t\r\n")
 	if md == "" {
 		return addition
-	}
-	if addition == "" {
-		return md
 	}
 	return md + "\n\n" + addition
 }
