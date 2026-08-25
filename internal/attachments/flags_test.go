@@ -99,6 +99,7 @@ func TestFromFlagValues(t *testing.T) {
 		setup      func(t *testing.T)
 		input      string
 		wantPaths  []string
+		wantAlts   []string
 		wantErr    string
 		// wantErrIs covers an error whose text the operating system words
 		// differently, so the assertion cannot be on the message.
@@ -119,6 +120,34 @@ func TestFromFlagValues(t *testing.T) {
 			withAttach: true,
 			input:      "--attach ./shot.png",
 			wantPaths:  []string{"./shot.png"},
+		},
+		{
+			name:       "a filename containing a hash stays whole",
+			withAttach: true,
+			input:      "--attach './shot#dark.png'",
+			wantPaths:  []string{"./shot#dark.png"},
+			wantAlts:   []string{"shot#dark"},
+		},
+		{
+			name:       "alt text can contain a hash",
+			withAttach: true,
+			input:      "--attach './caption.png#first#second'",
+			wantPaths:  []string{"./caption.png"},
+			wantAlts:   []string{"first#second"},
+		},
+		{
+			name:       "the longest existing path wins",
+			withAttach: true,
+			input:      "--attach './shot#dark.png#first.png#second'",
+			wantPaths:  []string{"./shot#dark.png#first.png"},
+			wantAlts:   []string{"second"},
+		},
+		{
+			name:       "a missing path falls back at the last hash",
+			withAttach: true,
+			input:      "--attach './gone.png#caption'",
+			wantErr:    "./gone.png: ",
+			wantErrIs:  fs.ErrNotExist,
 		},
 		{
 			name:       "several files, in the order written",
@@ -267,7 +296,17 @@ func TestFromFlagValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			for _, name := range []string{"shot.png", "a.png", "b.png", "c.mp4", "before,after.png", "notes.txt"} {
+			for _, name := range []string{
+				"shot.png",
+				"shot#dark.png",
+				"shot#dark.png#first.png",
+				"caption.png",
+				"a.png",
+				"b.png",
+				"c.mp4",
+				"before,after.png",
+				"notes.txt",
+			} {
 				require.NoError(t, os.WriteFile(name, []byte("the bytes"), 0o600))
 			}
 			if tt.setup != nil {
@@ -291,11 +330,15 @@ func TestFromFlagValues(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			var paths []string
+			var paths, alts []string
 			for _, a := range resolved {
 				paths = append(paths, a.Path())
+				alts = append(alts, a.getAsset().alt)
 			}
 			assert.Equal(t, tt.wantPaths, paths)
+			if tt.wantAlts != nil {
+				assert.Equal(t, tt.wantAlts, alts)
+			}
 		})
 	}
 }
