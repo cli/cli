@@ -106,6 +106,8 @@ blocked-by/blocking relationships.
   shell does not treat `#` as a comment:
   `gh pr create --attach './login.png#The login error state'`. Without alt
   text, the filename is used.
+- `--attach` paths and local Markdown destinations may be absolute or relative
+  to the directory where `gh` runs.
 - If the body references an attached path, `gh` rewrites that Markdown
   reference to the uploaded URL. The reference keeps its existing alt text.
   Otherwise, `gh` appends the attachment to the body. For example:
