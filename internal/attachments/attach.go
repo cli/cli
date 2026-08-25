@@ -6,14 +6,17 @@ import (
 	"strings"
 )
 
-// UploadAndAttach uploads every asset, points the references the markdown
-// already wrote at their asset URLs, and appends the rest. It reports how many
-// assets reached the server.
+// UploadAndAttach uploads assets in order and stops at the first failure. It
+// points existing references at the URLs of successful uploads and appends only
+// successful uploads the markdown did not reference. Assets after a failure
+// are not attempted.
 //
-// That count is the only reason to write markdown alongside an error. An upload
-// cannot be undone and there is no endpoint to delete one, so markdown that does
-// not reference an uploaded asset orphans it for good. A count of zero means
-// nothing was uploaded and nothing is lost by writing nothing.
+// The returned count reports how many assets reached the server. A caller must
+// write the returned markdown when that count is above zero, even when the
+// returned error is non-nil. An upload cannot be undone and there is no endpoint
+// to delete one, so discarding that markdown would orphan the successful assets.
+// A count of zero means nothing was uploaded and nothing is lost by writing
+// nothing.
 //
 // The markdown is returned unchanged when it could not be rewritten, so a
 // caller that assigns the result in place never destroys what it was given.
