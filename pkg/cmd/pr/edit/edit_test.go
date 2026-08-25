@@ -1247,15 +1247,8 @@ func Test_editRun(t *testing.T) {
 					Body:       "the original body",
 					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
 				}, ghrepo.New("OWNER", "REPO")),
-				Interactive: true,
-				Surveyor: testSurveyor{
-					fieldsToEdit: func(e *shared.Editable) error {
-						return errors.New("no prompt may run")
-					},
-					editFields: func(e *shared.Editable, editorCmd string) error {
-						return errors.New("no prompt may run")
-					},
-				},
+				Interactive:     true,
+				Surveyor:        testSurveyor{},
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
