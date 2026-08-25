@@ -19,7 +19,7 @@ var errEmptyPath = errors.New("cannot attach an empty path; --attach needs a fil
 // AddFlag registers the repeatable --attach flag on cmd.
 func AddFlag(cmd *cobra.Command) {
 	// A string slice would split on commas, which are legal in filenames.
-	cmd.Flags().StringArray(flagName, nil, "Attach an image or video `file`, in <file>#<alt text> format")
+	cmd.Flags().StringArray(flagName, nil, "Attach an image or video `file`, in '<file>#<image alt text>' format")
 }
 
 // FromFlagValues validates every file --attach named on cmd, keeping them in
