@@ -88,6 +88,7 @@ func TestAddFlag(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, tt.want, slice.GetSlice())
 			assert.Empty(t, cmd.Flags().Lookup(flagName).Shorthand)
+			assert.Equal(t, "Attach an image or video `file`, in '<file>#<image alt text>' format", cmd.Flags().Lookup(flagName).Usage)
 		})
 	}
 }
