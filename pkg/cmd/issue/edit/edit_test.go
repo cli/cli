@@ -947,6 +947,38 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
 		{
+			name: "an invalid issue type fails before upload",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					IssueType: prShared.EditableString{
+						Value:  "NotAType",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach: []string{"shot.png"},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issueTypes": { "nodes": [
+						{ "id": "BUG_TYPE_ID", "name": "Bug", "description": "", "color": "" }
+					] } } } }
+					`),
+				)
+				reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
+				reg.Exclude(t, httpmock.GraphQL(`mutation IssueUpdate\b`))
+				reg.Exclude(t, httpmock.GraphQL(`mutation UpdateIssueIssueType\b`))
+			},
+			wantErr:    true,
+			wantErrMsg: `type "NotAType" not found; available types: Bug`,
+		},
+		{
 			name: "remove type",
 			input: &EditOptions{
 				Detector:        &fd.EnabledDetectorMock{},
