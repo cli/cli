@@ -1084,11 +1084,6 @@ func Test_createRun(t *testing.T) {
 				Body:        "a body",
 			},
 			attach: []string{"shot.png"},
-			promptStubs: func(_ *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
-					return 0, fmt.Errorf("prompted before checking the permission: %s", message)
-				}
-			},
 			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
