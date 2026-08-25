@@ -107,7 +107,7 @@ func parseArg(arg string) (path, alt string) {
 }
 
 // checkFlagConflicts rejects the modes an asset cannot be written in. Only
-// ResolveFlag calls it, so --attach has been passed by the time it runs.
+// FromFlagValues calls it, so --attach has been passed by the time it runs.
 func checkFlagConflicts(cmd *cobra.Command) error {
 	if web, _ := cmd.Flags().GetBool("web"); web {
 		return cmdutil.FlagErrorf("`--attach` is not supported when using `--web`")
