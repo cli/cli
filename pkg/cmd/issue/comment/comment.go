@@ -32,8 +32,8 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		Long: heredoc.Docf(`
 			Add a comment to a GitHub issue.
 
-			Without the body text supplied through flags, the command will interactively
-			prompt for the comment text.
+			Without body text or attachments supplied through flags, the command will
+			interactively prompt for the comment text.
 
 			Use %[1]s--attach%[1]s to upload an image or video. If the body already references an
 			attached file, such as %[1]s![alt](./login.png)%[1]s, that reference is rewritten to point
@@ -51,6 +51,9 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 
 			# Attach a screenshot, with alt text after "#"
 			$ gh issue comment 12 --attach './login.png#The login error state'
+
+			# Attach multiple files by repeating the flag
+			$ gh issue comment 12 --attach ./before.png --attach ./after.png
 		`),
 		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
