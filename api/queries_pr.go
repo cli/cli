@@ -255,6 +255,13 @@ type PRRepository struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
 	NameWithOwner string `json:"nameWithOwner"`
+
+	// Fields below are omitted when empty because this type is used by
+	// headRepository.
+
+	DatabaseID int64 `json:"databaseId,omitempty"`
+	// One of ADMIN, MAINTAIN, WRITE, TRIAGE, READ.
+	ViewerPermission string `json:"viewerPermission,omitempty"`
 }
 
 type AutoMergeRequest struct {
@@ -316,6 +323,24 @@ func (pr PullRequest) Identifier() string {
 
 func (pr PullRequest) CurrentUserComments() []Comment {
 	return pr.Comments.CurrentUserComments()
+}
+
+// RepositoryDatabaseID returns the numeric REST id of the repository, or zero
+// when the "repository" field was not requested.
+func (pr PullRequest) RepositoryDatabaseID() int64 {
+	if pr.Repository == nil {
+		return 0
+	}
+	return pr.Repository.DatabaseID
+}
+
+// RepositoryViewerPermission returns the requesting user's role on the
+// repository, or an empty string when the "repository" field was not requested.
+func (pr PullRequest) RepositoryViewerPermission() string {
+	if pr.Repository == nil {
+		return ""
+	}
+	return pr.Repository.ViewerPermission
 }
 
 func (pr PullRequest) IsOpen() bool {

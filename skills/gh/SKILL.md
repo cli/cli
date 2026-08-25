@@ -93,6 +93,42 @@ blocked-by/blocking relationships.
 - GHES: issue types and sub-issues need 3.17+; blocked-by/blocking
   relationships need 3.19+.
 
+## Attaching images and videos
+
+`--attach <path>` is available on `gh issue create`, `gh issue edit`,
+`gh issue comment`, `gh pr create`, `gh pr edit`, and `gh pr comment`.
+
+- Repeat `--attach` to upload multiple files:
+  `gh issue comment 12 --attach ./before.png --attach ./after.png`.
+- Supported files are `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `mp4`,
+  `mov`, and `webm`.
+- For an image, append alt text to the path after `#`. Quote the value so the
+  shell does not treat `#` as a comment:
+  `gh pr create --attach './login.png#The login error state'`. Without alt
+  text, the filename is used.
+- `--attach` paths and local Markdown destinations may be absolute or relative
+  to the directory where `gh` runs.
+- If the body references an attached path, `gh` rewrites that Markdown
+  reference to the uploaded URL. The reference keeps its existing alt text.
+  Otherwise, `gh` appends the attachment to the body. For example:
+  `gh pr edit 23 --body '![error](./login.png)' --attach ./login.png`.
+- Videos cannot take alt text. A standalone `![recording](./repro.mp4)` becomes
+  a bare player URL, while an inline video image becomes a link. A
+  reference-style video image such as `![recording][clip]` with
+  `[clip]: ./repro.mp4` is rejected; use a reference-style link instead.
+- `gh issue create` and `gh pr create`: `--attach` cannot be used with
+  `--web`. `gh pr create --attach` also cannot be used with `--dry-run`.
+- `gh issue edit`: `--attach` can edit only one issue at a time.
+- `gh issue comment` and `gh pr comment`: `--attach` cannot be used with
+  `--web` or `--delete-last`. It works alone, with `--edit-last`, or with one
+  of `--body`, `--body-file`, or `--editor`.
+- Uploads require GitHub.com or a GHE.com tenant, an OAuth token, classic PAT,
+  or fine-grained PAT, and `WRITE`, `MAINTAIN`, or `ADMIN` repository
+  permission. GitHub Enterprise Server and GitHub App tokens are unsupported.
+- Uploads stop at the first failure. If earlier files uploaded, `gh` still
+  writes those attachments and exits non-zero. Create and edit commands also
+  print the issue or pull request URL.
+
 ## Discussions (`gh discussion`)
 
 Preview command set, subject to change. Subcommands:

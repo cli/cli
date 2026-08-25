@@ -5,13 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/attachments"
+	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -30,13 +36,21 @@ func TestNewCmdEdit(t *testing.T) {
 	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
+	tmpImage := filepath.Join(t.TempDir(), "shot.png")
+	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
+
 	tests := []struct {
 		name             string
 		input            string
 		stdin            string
 		output           EditOptions
 		expectedBaseRepo ghrepo.Interface
+		wantAssetPaths   []string
 		wantsErr         bool
+		wantsErrMsg      string
+		// wantErrIsNotExist covers an error whose text the operating system
+		// words differently, so the assertion cannot be on the message.
+		wantErrIsNotExist bool
 	}{
 		{
 			name:     "no argument",
@@ -384,6 +398,43 @@ func TestNewCmdEdit(t *testing.T) {
 				RemoveBlocking: []string{"300"},
 			},
 		},
+		{
+			name:  "attach flag",
+			input: fmt.Sprintf("23 --attach '%s'", tmpImage),
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				Interactive:  false,
+			},
+			wantAssetPaths: []string{tmpImage},
+		},
+		{
+			name:  "attach flag beside another edit flag",
+			input: fmt.Sprintf("23 --add-label bug --attach '%s'", tmpImage),
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					Labels: prShared.EditableSlice{
+						Add:    []string{"bug"},
+						Edited: true,
+					},
+				},
+			},
+			wantAssetPaths: []string{tmpImage},
+		},
+		{
+			name:        "attach flag with more than one issue",
+			input:       fmt.Sprintf("23 34 --attach '%s'", tmpImage),
+			wantsErr:    true,
+			wantsErrMsg: "`--attach` cannot be used when editing multiple issues",
+		},
+		{
+			name:              "attach flag naming a file that does not exist",
+			input:             "23 --attach ./nope.png",
+			wantsErr:          true,
+			wantsErrMsg:       "./nope.png: ",
+			wantErrIsNotExist: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -418,6 +469,14 @@ func TestNewCmdEdit(t *testing.T) {
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				require.Error(t, err)
+				if tt.wantsErrMsg != "" {
+					if tt.wantErrIsNotExist {
+						require.ErrorIs(t, err, fs.ErrNotExist)
+						require.ErrorContains(t, err, tt.wantsErrMsg)
+					} else {
+						require.EqualError(t, err, tt.wantsErrMsg)
+					}
+				}
 				return
 			}
 
@@ -433,6 +492,13 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.Equal(t, tt.output.RemoveBlockedBy, gotOpts.RemoveBlockedBy)
 			assert.Equal(t, tt.output.AddBlocking, gotOpts.AddBlocking)
 			assert.Equal(t, tt.output.RemoveBlocking, gotOpts.RemoveBlocking)
+
+			var assetPaths []string
+			for _, a := range gotOpts.Assets {
+				assetPaths = append(assetPaths, a.Path())
+			}
+			assert.Equal(t, tt.wantAssetPaths, assetPaths)
+
 			if tt.expectedBaseRepo != nil {
 				baseRepo, err := gotOpts.BaseRepo()
 				require.NoError(t, err)
@@ -448,12 +514,24 @@ func TestNewCmdEdit(t *testing.T) {
 
 func Test_editRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     *EditOptions
-		httpStubs func(*testing.T, *httpmock.Registry)
-		stdout    string
-		stderr    string
-		wantErr   bool
+		name       string
+		input      *EditOptions
+		httpStubs  func(*testing.T, *httpmock.Registry)
+		attach     []string
+		host       string
+		hostTokens map[string]string
+		uploads    []attachments.UploadStub
+		// The lookup builds its field list from a set, so the order varies and
+		// a row cannot assert the whole query.
+		wantLookupSelections   []string
+		wantNoLookupSelections []string
+		stdout                 string
+		stderr                 string
+		wantErr                bool
+		wantErrMsg             string
+		// Used instead of wantErrMsg when the subject is which errors survive,
+		// leaving their wording to the layer that formats them.
+		wantErrContains []string
 	}{
 		{
 			name: "non-interactive",
@@ -869,6 +947,38 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
 		{
+			name: "an invalid issue type fails before upload",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					IssueType: prShared.EditableString{
+						Value:  "NotAType",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach: []string{"shot.png"},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issueTypes": { "nodes": [
+						{ "id": "BUG_TYPE_ID", "name": "Bug", "description": "", "color": "" }
+					] } } } }
+					`),
+				)
+				reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
+				reg.Exclude(t, httpmock.GraphQL(`mutation IssueUpdate\b`))
+				reg.Exclude(t, httpmock.GraphQL(`mutation UpdateIssueIssueType\b`))
+			},
+			wantErr:    true,
+			wantErrMsg: `type "NotAType" not found; available types: Bug`,
+		},
+		{
 			name: "remove type",
 			input: &EditOptions{
 				Detector:        &fd.EnabledDetectorMock{},
@@ -1240,6 +1350,350 @@ func Test_editRun(t *testing.T) {
 				https://github.com/OWNER/REPO/issue/456
 			`),
 		},
+		{
+			name: "attaching with no body flag keeps the body already on the issue",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach:  []string{"shot.png"},
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				mockIssueUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "a body flag replaces the body the attachment is then appended to",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Editable: prShared.Editable{
+					Body: prShared.EditableString{
+						Value:  "a new body",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach:  []string{"shot.png"},
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				mockIssueUpdateWithBody(t, reg, "a new body\n\n![shot](https://example.com/1)")
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "an empty body flag clears the body and leaves the attachment",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Editable: prShared.Editable{
+					Body: prShared.EditableString{
+						Value:  "",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach:  []string{"shot.png"},
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				mockIssueUpdateWithBody(t, reg, "![shot](https://example.com/1)")
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "a run that attaches nothing does not write the body",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Editable: prShared.Editable{
+					Title: prShared.EditableString{
+						Value:  "a new title",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				reg.Register(
+					httpmock.GraphQL(`mutation IssueUpdate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "updateIssue": { "__typename": "" } } }`,
+						func(inputs map[string]interface{}) {
+							assert.NotContains(t, inputs, "body")
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "a permission that cannot upload fails before the write",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach: []string{"shot.png"},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "READ")
+				reg.Exclude(t, httpmock.GraphQL(`mutation IssueUpdate\b`))
+			},
+			wantErr:    true,
+			wantErrMsg: "attaching files requires write access to the repository",
+		},
+		{
+			name: "a missing repository id fails before the write",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach: []string{"shot.png"},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 0, "WRITE")
+				reg.Exclude(t, httpmock.GraphQL(`mutation IssueUpdate\b`))
+			},
+			wantErr:    true,
+			wantErrMsg: "could not determine which repository to attach files to",
+		},
+		{
+			name: "attaching asks the issue lookup for the repository fields",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach:  []string{"shot.png"},
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				mockIssueUpdate(t, reg)
+			},
+			wantLookupSelections: []string{"databaseId", "viewerPermission"},
+			stdout:               "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "the lookup does not ask for the repository fields without an attachment",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Editable: prShared.Editable{
+					Title: prShared.EditableString{
+						Value:  "a new title",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				mockIssueUpdate(t, reg)
+			},
+			wantNoLookupSelections: []string{"databaseId", "viewerPermission"},
+			stdout:                 "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "a partial upload writes the body so the uploaded asset is not orphaned",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach: []string{"first.png", "second.png"},
+			uploads: []attachments.UploadStub{
+				{Name: "first.png", Status: 201, Body: `{"url":"https://example.com/1"}`},
+				{Name: "second.png", Status: 404, Body: `{}`},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				mockIssueUpdateWithBody(t, reg, "the original body\n\n![first](https://example.com/1)")
+			},
+			stdout:          "https://github.com/OWNER/REPO/issue/123\n",
+			wantErr:         true,
+			wantErrContains: []string{"./second.png"},
+		},
+		{
+			name: "a sole failed upload does not write the body",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach:  []string{"shot.png"},
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 404, Body: `{}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				reg.Exclude(t, httpmock.GraphQL(`mutation IssueUpdate\b`))
+			},
+			wantErr:         true,
+			wantErrContains: []string{"./shot.png"},
+		},
+		{
+			name: "a body that fails validation is left alone",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach: []string{"clip.mp4"},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "![clip][ref]\n\n[ref]: ./clip.mp4", 1234, "WRITE")
+				reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
+				reg.Exclude(t, httpmock.GraphQL(`mutation IssueUpdate\b`))
+			},
+			wantErr:         true,
+			wantErrContains: []string{"cannot embed a video as a reference-style image"},
+		},
+		{
+			name: "a body flag is not written on its own when nothing uploaded",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Editable: prShared.Editable{
+					Body: prShared.EditableString{
+						Value:  "See below",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach:  []string{"shot.png"},
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 404, Body: `{}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				reg.Exclude(t, httpmock.GraphQL(`mutation IssueUpdate\b`))
+			},
+			wantErr:         true,
+			wantErrContains: []string{"./shot.png"},
+		},
+		{
+			name: "another field is written when nothing uploaded",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Editable: prShared.Editable{
+					Title: prShared.EditableString{
+						Value:  "a new title",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach:  []string{"shot.png"},
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 404, Body: `{}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				reg.Register(
+					httpmock.GraphQL(`mutation IssueUpdate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "updateIssue": { "__typename": "" } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "a new title", inputs["title"])
+							assert.NotContains(t, inputs, "body")
+						}),
+				)
+			},
+			stdout:          "https://github.com/OWNER/REPO/issue/123\n",
+			wantErr:         true,
+			wantErrContains: []string{"./shot.png"},
+		},
+		{
+			name: "a deferred edit is written when nothing uploaded",
+			input: &EditOptions{
+				Detector:        &fd.EnabledDetectorMock{},
+				IssueNumbers:    []int{123},
+				RemoveIssueType: true,
+				FetchOptions:    prShared.FetchOptions,
+			},
+			attach:  []string{"shot.png"},
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 404, Body: `{}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				reg.Exclude(t, httpmock.GraphQL(`mutation IssueUpdate\b`))
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
+						func(inputs map[string]interface{}) {}),
+				)
+			},
+			stdout:          "https://github.com/OWNER/REPO/issue/123\n",
+			wantErr:         true,
+			wantErrContains: []string{"./shot.png"},
+		},
+		{
+			name: "an interactive run that edits nothing still reports the issue",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Interactive:  true,
+				FieldsToEditSurvey: func(p prShared.EditPrompter, eo *prShared.Editable) error {
+					return nil
+				},
+				EditFieldsSurvey: func(p prShared.EditPrompter, eo *prShared.Editable, _ string) error {
+					return nil
+				},
+				DetermineEditor: func() (string, error) { return "vim", nil },
+				FetchOptions:    prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				reg.Exclude(t, httpmock.GraphQL(`mutation IssueUpdate\b`))
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "the token comes from the host the issue was fetched from",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach: []string{"shot.png"},
+			// A ghe.com tenant rather than a GHES host, which NewUploader
+			// refuses before it looks at the token at all.
+			host:       "acme.ghe.com",
+			hostTokens: map[string]string{"github.com": "ghs_anactionstoken", "acme.ghe.com": "gho_atenanttoken"},
+			uploads:    []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				mockIssueUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "a failed write does not swallow a failed upload",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Editable: prShared.Editable{
+					Title: prShared.EditableString{
+						Value:  "a new title",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach:  []string{"shot.png"},
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 413, Body: `{}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				reg.Register(
+					httpmock.GraphQL(`mutation IssueUpdate\b`),
+					httpmock.StatusStringResponse(500, `{}`),
+				)
+			},
+			stderr:          `failed to update https://github\.com/OWNER/REPO/issue/123`,
+			wantErr:         true,
+			wantErrContains: []string{"./shot.png", "failed to update 1 issue"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1248,32 +1702,131 @@ func Test_editRun(t *testing.T) {
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
 
+			host := tt.host
+			if host == "" {
+				host = "github.com"
+			}
+
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
+			for _, u := range tt.uploads {
+				attachments.StubUploadToHost(t, reg, "uploads."+host, 1234, u.Name, u.Status, u.Body)
+			}
 			tt.httpStubs(t, reg)
 
-			httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
-			baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
+			recorder := &graphQLRecorder{inner: reg}
+			httpClient := func() (*http.Client, error) {
+				return &http.Client{Transport: recorder}, nil
+			}
+			baseRepo := func() (ghrepo.Interface, error) {
+				return ghrepo.NewWithHost("OWNER", "REPO", host), nil
+			}
 
 			tt.input.IO = ios
 			tt.input.HttpClient = httpClient
 			tt.input.BaseRepo = baseRepo
 
+			// NewTestAssets moves into a temporary directory, so it runs before
+			// anything else reads a relative path.
+			if len(tt.attach) > 0 {
+				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
+			}
+
+			hostTokens := tt.hostTokens
+			if hostTokens == nil {
+				hostTokens = map[string]string{host: "gho_atokenthatcanupload"}
+			}
+			tt.input.Config = func() (gh.Config, error) {
+				return config.NewMockConfigFromString(hostsConfig(hostTokens)), nil
+			}
+
 			err := editRun(tt.input)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
+				if tt.wantErrMsg != "" {
+					require.EqualError(t, err, tt.wantErrMsg)
+				}
+				for _, substring := range tt.wantErrContains {
+					assert.ErrorContains(t, err, substring)
+				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.stdout, stdout.String())
 			// Use regex match since mock errors and service errors will differ.
 			assert.Regexp(t, tt.stderr, stderr.String())
+
+			queries := recorder.recorded()
+			for _, selection := range tt.wantLookupSelections {
+				assert.Contains(t, queries, selection)
+			}
+			for _, selection := range tt.wantNoLookupSelections {
+				assert.NotContains(t, queries, selection)
+			}
 		})
 	}
 }
 
+// graphQLRecorder records the GraphQL queries a run sends, then delegates to
+// the registry it wraps. A run can look up several things at once, so the
+// mutex guards the recorded queries against concurrent requests.
+type graphQLRecorder struct {
+	inner http.RoundTripper
+
+	mu      sync.Mutex
+	queries []string
+}
+
+func (g *graphQLRecorder) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Body != nil && strings.HasSuffix(req.URL.Path, "/graphql") {
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, err
+		}
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		g.mu.Lock()
+		g.queries = append(g.queries, string(body))
+		g.mu.Unlock()
+	}
+	return g.inner.RoundTrip(req)
+}
+
+// recorded returns every query seen so far, joined for substring matching.
+func (g *graphQLRecorder) recorded() string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return strings.Join(g.queries, "\n")
+}
+
+// hostsConfig renders a config holding one token per host.
+func hostsConfig(tokens map[string]string) string {
+	var b strings.Builder
+	b.WriteString("hosts:\n")
+	for host, token := range tokens {
+		fmt.Fprintf(&b, "  %s:\n    user: monalisa\n    oauth_token: %s\n", host, token)
+	}
+	return b.String()
+}
+
 func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
 	mockIssueNumberGet(nil, reg, 123)
+}
+
+// mockIssueGetWithRepository stubs the issue lookup with a body and the two
+// repository fields the uploader reads. A row states both, so an empty
+// permission is a value a row can ask for.
+func mockIssueGetWithRepository(reg *httpmock.Registry, body string, databaseID int64, viewerPermission string) {
+	reg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(fmt.Sprintf(`
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+				"id": "123",
+				"number": 123,
+				"url": "https://github.com/OWNER/REPO/issue/123",
+				"body": %s,
+				"repository": { "databaseId": %d, "viewerPermission": %s }
+			} } } }`, strconv.Quote(body), databaseID, strconv.Quote(viewerPermission))),
+	)
 }
 
 func mockIssueNumberGet(_ *testing.T, reg *httpmock.Registry, number int) {
@@ -1419,6 +1972,19 @@ func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQLMutation(`
 				{ "data": { "updateIssue": { "__typename": "" } } }`,
 			func(inputs map[string]interface{}) {}),
+	)
+}
+
+// mockIssueUpdateWithBody stubs the issue update and asserts the body it
+// carries.
+func mockIssueUpdateWithBody(t *testing.T, reg *httpmock.Registry, wantBody string) {
+	reg.Register(
+		httpmock.GraphQL(`mutation IssueUpdate\b`),
+		httpmock.GraphQLMutation(`
+				{ "data": { "updateIssue": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, wantBody, inputs["body"])
+			}),
 	)
 }
 

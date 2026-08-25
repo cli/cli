@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -563,6 +564,74 @@ func TestSuggestedReviewerActorsForRepo(t *testing.T) {
 				logins[i] = c.Login()
 			}
 			assert.Equal(t, tt.expectedLogins, logins)
+		})
+	}
+}
+
+// TestPRRepositorySelectionMatchesStruct guards the seam between the two:
+// a field added to the selection but not the struct is silently dropped, and
+// one added to the struct but not the selection is silently zero.
+func TestPRRepositorySelectionMatchesStruct(t *testing.T) {
+	selection := PullRequestGraphQL([]string{"repository"})
+	inner := strings.TrimSuffix(strings.TrimPrefix(selection, "repository{"), "}")
+	selected := strings.Split(inner, ",")
+
+	var declared []string
+	repositoryType := reflect.TypeOf(PRRepository{})
+	for i := range repositoryType.NumField() {
+		name, _, _ := strings.Cut(repositoryType.Field(i).Tag.Get("json"), ",")
+		declared = append(declared, name)
+	}
+
+	assert.ElementsMatch(t, declared, selected)
+}
+
+func TestPullRequestRepositoryDatabaseID(t *testing.T) {
+	tests := []struct {
+		name string
+		pr   PullRequest
+		want int64
+	}{
+		{
+			name: "the repository field was requested",
+			pr:   PullRequest{Repository: &PRRepository{DatabaseID: 1234}},
+			want: 1234,
+		},
+		{
+			name: "the repository field was not requested",
+			pr:   PullRequest{},
+			want: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.pr.RepositoryDatabaseID())
+		})
+	}
+}
+
+func TestPullRequestRepositoryViewerPermission(t *testing.T) {
+	tests := []struct {
+		name string
+		pr   PullRequest
+		want string
+	}{
+		{
+			name: "the repository field was requested",
+			pr:   PullRequest{Repository: &PRRepository{ViewerPermission: "WRITE"}},
+			want: "WRITE",
+		},
+		{
+			name: "the repository field was not requested",
+			pr:   PullRequest{},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.pr.RepositoryViewerPermission())
 		})
 	}
 }
