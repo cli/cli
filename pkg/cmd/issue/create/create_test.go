@@ -548,6 +548,41 @@ func Test_createRun(t *testing.T) {
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
 		},
 		{
+			name: "editor attachment reference is rewritten",
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "shot.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://github.com/OWNER/REPO/issues/12"
+						} } } }
+					`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "title", inputs["title"])
+						assert.Equal(t, "from editor ![shot](https://github.com/user-attachments/assets/AAA)", inputs["body"])
+					}))
+			},
+			opts: CreateOptions{
+				Detector:   &fd.EnabledDetectorMock{},
+				EditorMode: true,
+				TitledEditSurvey: func(string, string) (string, string, error) {
+					return "title", "from editor ![shot](./shot.png)", nil
+				},
+			},
+			attach:      []string{"shot.png"},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
 			name: "editor and template",
 			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
