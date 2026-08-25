@@ -8,6 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 const flagName = "attach"
@@ -16,10 +17,33 @@ const flagName = "attach"
 // held nothing else or the empty value sat beside a real one.
 var errEmptyPath = errors.New("cannot attach an empty path; --attach needs a file path")
 
+// Flag holds the repeatable attachment flag and the values it parsed.
+type Flag struct {
+	flag   *pflag.Flag
+	values []string
+}
+
 // AddFlag registers the repeatable --attach flag on cmd.
-func AddFlag(cmd *cobra.Command) {
+func AddFlag(cmd *cobra.Command) *Flag {
+	f := &Flag{}
 	// A string slice would split on commas, which are legal in filenames.
-	cmd.Flags().StringArray(flagName, nil, "Attach an image or video `file`, in '<file>#<image alt text>' format")
+	cmd.Flags().StringArrayVar(&f.values, flagName, nil, "Attach an image or video `file`, in '<file>#<image alt text>' format")
+	f.flag = cmd.Flags().Lookup(flagName)
+	return f
+}
+
+// Changed reports whether the attachment flag was passed.
+func (f *Flag) Changed() bool {
+	return f.flag.Changed
+}
+
+// UserAssets validates the files named by the attachment flag, keeping them in
+// the order they were written. It returns nothing when the flag was not passed.
+func (f *Flag) UserAssets() ([]UserAsset, error) {
+	if !f.Changed() {
+		return nil, nil
+	}
+	return userAssetsFromArgs(f.values)
 }
 
 // FromFlagValues validates every file --attach named on cmd, keeping them in
@@ -45,6 +69,10 @@ func FromFlagValues(cmd *cobra.Command) ([]UserAsset, error) {
 		return nil, err
 	}
 
+	return userAssetsFromArgs(args)
+}
+
+func userAssetsFromArgs(args []string) ([]UserAsset, error) {
 	// --attach "" is a user error.
 	if len(args) == 0 {
 		return nil, errEmptyPath

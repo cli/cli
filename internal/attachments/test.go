@@ -31,10 +31,10 @@ func NewTestAssets(t *testing.T, names ...string) []UserAsset {
 	}
 
 	cmd := &cobra.Command{}
-	AddFlag(cmd)
+	attachFlag := AddFlag(cmd)
 	require.NoError(t, cmd.Flags().Parse(argv))
 
-	assets, err := FromFlagValues(cmd)
+	assets, err := attachFlag.UserAssets()
 	require.NoError(t, err)
 	return assets
 }
