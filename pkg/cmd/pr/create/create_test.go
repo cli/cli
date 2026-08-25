@@ -1941,14 +1941,6 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 			},
-			promptStubs: func(pm *prompter.PrompterMock) {
-				pm.InputFunc = func(p, d string) (string, error) {
-					return "", errors.New("the command prompted before it checked the permission")
-				}
-				pm.SelectFunc = func(p, _ string, options []string) (int, error) {
-					return -1, errors.New("the command prompted before it checked the permission")
-				}
-			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
 				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestCreate\b`))
