@@ -90,6 +90,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			A reference already in the body keeps the alt text written there. Video renders
 			as a player and has no alt text, so it cannot be given any.
 
+			If some attachments upload and others fail, the issue is still updated with the
+			ones that succeeded. The command then exits with a non-zero status, but the edited
+			issue URLs are still printed to stdout.
+
 			The %[1]s--add-assignee%[1]s and %[1]s--remove-assignee%[1]s flags both support
 			the following special values:
 			- %[1]s@me%[1]s: assign or unassign yourself
@@ -105,6 +109,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --remove-milestone
 			$ gh issue edit 23 --body-file body.txt
 			$ gh issue edit 23 --attach './login.png#The login error state'
+			$ gh issue edit 23 --attach ./before.png --attach ./after.png
 			$ gh issue edit 23 34 --add-label "help wanted"
 			$ gh issue edit 23 --type Bug
 			$ gh issue edit 23 --remove-type
