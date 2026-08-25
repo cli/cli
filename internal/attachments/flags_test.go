@@ -14,7 +14,7 @@ import (
 
 // attachCmd builds a command shaped like the ones that take --attach.
 // withAttach is false for a command that has not registered the flag.
-func attachCmd(t *testing.T, withAttach bool, input string) *cobra.Command {
+func attachCmd(t *testing.T, withAttach bool, input string) (*cobra.Command, *Flag) {
 	t.Helper()
 
 	cmd := &cobra.Command{Use: "comment"}
@@ -22,15 +22,16 @@ func attachCmd(t *testing.T, withAttach bool, input string) *cobra.Command {
 	cmd.Flags().Bool("delete-last", false, "")
 	cmd.Flags().Bool("dry-run", false, "")
 
+	var attachFlag *Flag
 	if withAttach {
-		AddFlag(cmd)
+		attachFlag = AddFlag(cmd)
 	}
 
 	argv, err := shlex.Split(input)
 	require.NoError(t, err)
 	require.NoError(t, cmd.Flags().Parse(argv))
 
-	return cmd
+	return cmd, attachFlag
 }
 
 // Resolved through the public entry point, so a fixture is built the way a
@@ -39,7 +40,7 @@ func assetsFromArgs(t *testing.T, args ...string) ([]UserAsset, error) {
 	t.Helper()
 
 	cmd := &cobra.Command{}
-	AddFlag(cmd)
+	attachFlag := AddFlag(cmd)
 
 	argv := make([]string, 0, len(args)*2)
 	for _, arg := range args {
@@ -47,7 +48,7 @@ func assetsFromArgs(t *testing.T, args ...string) ([]UserAsset, error) {
 	}
 	require.NoError(t, cmd.Flags().Parse(argv))
 
-	return FromFlagValues(cmd)
+	return attachFlag.UserAssets()
 }
 
 func TestAddFlag(t *testing.T) {
@@ -80,15 +81,15 @@ func TestAddFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := attachCmd(t, true, tt.input)
+			cmd, attachFlag := attachCmd(t, true, tt.input)
 
-			// Read the way FromFlagValues does, so this cannot pass while
-			// the flag it describes reads differently.
-			slice, ok := cmd.Flags().Lookup(flagName).Value.(pflag.SliceValue)
+			slice, ok := attachFlag.flag.Value.(pflag.SliceValue)
 			require.True(t, ok)
 			assert.Equal(t, tt.want, slice.GetSlice())
-			assert.Empty(t, cmd.Flags().Lookup(flagName).Shorthand)
-			assert.Equal(t, "Attach an image or video `file`, in '<file>#<image alt text>' format", cmd.Flags().Lookup(flagName).Usage)
+			assert.Equal(t, tt.input != "", attachFlag.Changed())
+			assert.Empty(t, attachFlag.flag.Shorthand)
+			assert.Equal(t, "Attach an image or video `file`, in '<file>#<image alt text>' format", attachFlag.flag.Usage)
+			assert.Same(t, attachFlag.flag, cmd.Flags().Lookup(flagName))
 		})
 	}
 }
@@ -314,7 +315,7 @@ func TestFromFlagValues(t *testing.T) {
 				tt.setup(t)
 			}
 
-			cmd := attachCmd(t, tt.withAttach, tt.input)
+			cmd, _ := attachCmd(t, tt.withAttach, tt.input)
 
 			resolved, err := FromFlagValues(cmd)
 
