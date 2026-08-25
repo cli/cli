@@ -258,7 +258,17 @@ func TestUploadErrors(t *testing.T) {
 			status:         429,
 			response:       `{"message":"Too Many Requests"}`,
 			retryAfter:     "120",
-			wantErr:        "could not upload ./shot.png: rate limited; retry after 120",
+			wantErr:        "could not upload ./shot.png: rate limited; retry after 120 seconds",
+			wantStatusCode: 429,
+		},
+		{
+			name:           "rate limited until a date",
+			file:           "shot.png",
+			contentType:    "image/png",
+			status:         429,
+			response:       `{"message":"Too Many Requests"}`,
+			retryAfter:     "Wed, 21 Oct 2015 07:28:00 GMT",
+			wantErr:        "could not upload ./shot.png: rate limited; retry after Wed, 21 Oct 2015 07:28:00 GMT",
 			wantStatusCode: 429,
 		},
 		{
