@@ -88,6 +88,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			A reference already in the body keeps the alt text written there. Video renders
 			as a player and has no alt text, so it cannot be given any.
 
+			If some attachments upload and others fail, the issue is still created with the
+			ones that succeeded. The command then exits with a non-zero status, but the new
+			issue's URL is still printed to stdout.
+
 			Adding an issue to projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 
@@ -98,6 +102,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Example: heredoc.Doc(`
 			$ gh issue create --title "I found a bug" --body "Nothing works"
 			$ gh issue create --attach './login.png#The login error state'
+			$ gh issue create --attach ./before.png --attach ./after.png
 			$ gh issue create --label "bug,help wanted"
 			$ gh issue create --label bug --label "help wanted"
 			$ gh issue create --assignee monalisa,hubot
