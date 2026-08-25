@@ -104,9 +104,6 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 			Validate a local repository's skills against the Agent Skills specification
 			and publish them by creating a GitHub release.
 
-			The directory must be the root of a Git repository so that all skills are
-			validated before the repository is tagged and released.
-
 			Skills are discovered using the same conventions as install:
 
 			  - %[1]sskills/*/SKILL.md%[1]s
@@ -183,14 +180,6 @@ func publishRun(opts *PublishOptions) error {
 		return fmt.Errorf("could not resolve path: %w", err)
 	}
 
-	if opts.GitClient != nil {
-		dirGitClient := opts.GitClient.Copy()
-		dirGitClient.RepoDir = dir
-		if dirGitClient.PathFromRoot(context.Background()) != "" {
-			return fmt.Errorf("%s is not a repository root; gh skill publish must target the repository root", dir)
-		}
-	}
-
 	canPrompt := opts.IO.CanPrompt()
 
 	// Client initialization is deferred until after local validation so that
@@ -204,6 +193,15 @@ func publishRun(opts *PublishOptions) error {
 	skills, err := discovery.DiscoverLocalSkills(dir)
 	if err != nil {
 		return err
+	}
+
+	// Discovery uses "." when the supplied directory is itself a skill.
+	if len(skills) == 1 && skills[0].Path == "." && opts.GitClient != nil {
+		dirGitClient := opts.GitClient.Copy()
+		dirGitClient.RepoDir = dir
+		if dirGitClient.PathFromRoot(context.Background()) != "" {
+			return fmt.Errorf("%s is a skill directory within a repository; gh skill publish must target the repository root", dir)
+		}
 	}
 
 	for _, skill := range skills {
