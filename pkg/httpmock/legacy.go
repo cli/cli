@@ -10,6 +10,8 @@ func (r *Registry) StubRepoInfoResponse(owner, repo, branch string) {
 	r.StubRepoInfoResponseWithPermission(owner, repo, branch, "WRITE")
 }
 
+// StubRepoInfoResponseWithPermission is StubRepoInfoResponse with a
+// caller-selected viewer permission.
 func (r *Registry) StubRepoInfoResponseWithPermission(owner, repo, branch, permission string) {
 	r.Register(
 		GraphQL(`query RepositoryInfo\b`),
