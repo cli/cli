@@ -26,6 +26,10 @@ func newTestGitClient() *git.Client {
 	return &git.Client{GitPath: "some/path/git"}
 }
 
+func stubGitRepositoryRoot(cs *run.CommandStubber) {
+	cs.Register(`git( .+)? rev-parse --show-prefix`, 0, "\n")
+}
+
 // stubGitRemote registers CommandStubber stubs for git remote detection.
 func stubGitRemote(cs *run.CommandStubber, remoteURLs map[string]string) {
 	var remoteLines string
@@ -161,6 +165,7 @@ func TestPublishRun_UnsupportedHost(t *testing.T) {
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+	stubGitRepositoryRoot(cs)
 	stubGitRemote(cs, map[string]string{"origin": "https://github.com/monalisa/skills-repo.git"})
 
 	ios, _, _, _ := iostreams.Test()
@@ -172,6 +177,33 @@ func TestPublishRun_UnsupportedHost(t *testing.T) {
 		host:       "acme.ghes.com",
 	})
 	require.ErrorContains(t, err, "does not currently support GitHub Enterprise Server")
+}
+
+func TestPublishRun_RejectsDirectoryWithinRepository(t *testing.T) {
+	repoDir := t.TempDir()
+	writeSkill(t, repoDir, "reskill", heredoc.Doc(`
+		---
+		name: reskill
+		description: A test skill
+		license: MIT
+		---
+		Body.
+	`))
+	skillDir := filepath.Join(repoDir, "skills", "reskill")
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git( .+)? rev-parse --show-prefix`, 0, "skills/reskill/\n")
+
+	ios, _, _, _ := iostreams.Test()
+	err := publishRun(&PublishOptions{
+		IO:        ios,
+		Dir:       skillDir,
+		GitClient: newTestGitClient(),
+	})
+
+	require.ErrorContains(t, err, "is not a repository root; gh skill publish must target the repository root")
+	assert.NotContains(t, err.Error(), `does not match directory name "."`)
 }
 
 func TestPublishRun(t *testing.T) {
@@ -1506,6 +1538,7 @@ func TestPublishRun(t *testing.T) {
 			if tt.cmdStubs != nil {
 				cs, cmdTeardown := run.Stub()
 				defer cmdTeardown(t)
+				stubGitRepositoryRoot(cs)
 				tt.cmdStubs(cs)
 			}
 
@@ -1553,6 +1586,7 @@ func TestDetectGitHubRemote_UsesDir(t *testing.T) {
 func TestPublishRun_DirArgUsesTargetRemote(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+	stubGitRepositoryRoot(cs)
 	stubGitRemote(cs, map[string]string{
 		"origin": "https://github.com/monalisa/target-repo.git",
 	})
