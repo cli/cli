@@ -60,6 +60,7 @@ type CommentableOptions struct {
 
 	BodyProvided     bool
 	KeepExistingBody bool
+	AttachFlag       *attachments.Flag
 	Assets           []attachments.UserAsset
 	Config           func() (gh.Config, error)
 }
@@ -76,7 +77,8 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 		opts.BodyProvided = true
 		inputFlags++
 	}
-	if web, _ := cmd.Flags().GetBool("web"); web {
+	web, _ := cmd.Flags().GetBool("web")
+	if web {
 		opts.InputType = InputTypeWeb
 		inputFlags++
 	}
@@ -85,9 +87,23 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 		inputFlags++
 	}
 
-	// Resolved in shared code so a command that registers --attach cannot
-	// forget to.
-	resolved, err := attachments.FromFlagValues(cmd)
+	if err := cmdutil.MutuallyExclusive(
+		"`--attach` is not supported when using `--web`",
+		opts.AttachFlag.Changed(),
+		web,
+	); err != nil {
+		return err
+	}
+
+	if err := cmdutil.MutuallyExclusive(
+		"`--attach` is not supported when using `--delete-last`",
+		opts.AttachFlag.Changed(),
+		opts.DeleteLast,
+	); err != nil {
+		return err
+	}
+
+	resolved, err := opts.AttachFlag.UserAssets()
 	if err != nil {
 		return err
 	}

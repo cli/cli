@@ -50,8 +50,9 @@ type EditOptions struct {
 	AddBlocking     []string
 	RemoveBlocking  []string
 
-	Assets []attachments.UserAsset
-	Config func() (gh.Config, error)
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
+	Config     func() (gh.Config, error)
 
 	prShared.Editable
 }
@@ -208,7 +209,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				opts.Editable.IssueType.Edited = true
 			}
 
-			resolved, err := attachments.FromFlagValues(cmd)
+			resolved, err := opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
 			}
@@ -268,7 +269,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.RemoveBlockedBy, "remove-blocked-by", nil, "Remove 'blocked by' relationships by issue `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.AddBlocking, "add-blocking", nil, "Add 'blocking' relationships by issue `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.RemoveBlocking, "remove-blocking", nil, "Remove 'blocking' relationships by issue `number` or URL")
-	attachments.AddFlag(cmd)
+	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	return cmd
 }

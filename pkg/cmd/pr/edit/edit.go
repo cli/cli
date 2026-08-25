@@ -39,8 +39,9 @@ type EditOptions struct {
 	SelectorArg string
 	Interactive bool
 
-	Assets []attachments.UserAsset
-	Config func() (gh.Config, error)
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
+	Config     func() (gh.Config, error)
 
 	shared.Editable
 }
@@ -216,7 +217,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				// see the `Editable.MilestoneId` method.
 			}
 
-			resolved, err := attachments.FromFlagValues(cmd)
+			resolved, err := opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
 			}
@@ -252,7 +253,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the pull request from projects by `title`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the pull request belongs to by `name`")
 	cmd.Flags().BoolVar(&removeMilestone, "remove-milestone", false, "Remove the milestone association from the pull request")
-	attachments.AddFlag(cmd)
+	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base")
 

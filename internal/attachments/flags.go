@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -44,32 +43,6 @@ func (f *Flag) UserAssets() ([]UserAsset, error) {
 		return nil, nil
 	}
 	return userAssetsFromArgs(f.values)
-}
-
-// FromFlagValues validates every file --attach named on cmd, keeping them in
-// the order they were written. It returns nothing when the flag was passed no
-// values, so a caller reads the length rather than asking a second question.
-//
-// A command that does not register --attach cannot have any, and asking for
-// them is a mistake in the command rather than in what the user typed.
-func FromFlagValues(cmd *cobra.Command) ([]UserAsset, error) {
-	flag := cmd.Flags().Lookup(flagName)
-	if flag == nil {
-		return nil, fmt.Errorf("%s does not register --attach", cmd.Name())
-	}
-	if !flag.Changed {
-		return nil, nil
-	}
-	if err := checkFlagConflicts(cmd); err != nil {
-		return nil, err
-	}
-
-	args, err := cmd.Flags().GetStringArray(flagName)
-	if err != nil {
-		return nil, err
-	}
-
-	return userAssetsFromArgs(args)
 }
 
 func userAssetsFromArgs(args []string) ([]UserAsset, error) {
@@ -132,22 +105,4 @@ func parseArg(arg string) (path, alt string) {
 		return arg[:idx], arg[idx+1:]
 	}
 	return arg, ""
-}
-
-// checkFlagConflicts rejects the modes an asset cannot be written in. Only
-// FromFlagValues calls it, so --attach has been passed by the time it runs.
-func checkFlagConflicts(cmd *cobra.Command) error {
-	if web, _ := cmd.Flags().GetBool("web"); web {
-		return cmdutil.FlagErrorf("`--attach` is not supported when using `--web`")
-	}
-
-	if deleteLast, _ := cmd.Flags().GetBool("delete-last"); deleteLast {
-		return cmdutil.FlagErrorf("`--attach` is not supported when using `--delete-last`")
-	}
-
-	if dryRun, _ := cmd.Flags().GetBool("dry-run"); dryRun {
-		return cmdutil.FlagErrorf("`--attach` is not supported when using `--dry-run`")
-	}
-
-	return nil
 }

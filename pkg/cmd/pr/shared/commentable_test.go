@@ -24,9 +24,7 @@ import (
 
 // commentableCmd builds the flag set the comment commands share, so that
 // CommentablePreRun sees the same command shape it does in production.
-// withAttach is false for a command that has not registered --attach, which
-// shared code still has to run on.
-func commentableCmd(t *testing.T, opts *CommentableOptions, withAttach bool, input string) *cobra.Command {
+func commentableCmd(t *testing.T, opts *CommentableOptions, input string) *cobra.Command {
 	t.Helper()
 
 	cmd := &cobra.Command{Use: "comment"}
@@ -38,9 +36,7 @@ func commentableCmd(t *testing.T, opts *CommentableOptions, withAttach bool, inp
 	cmd.Flags().BoolVar(&opts.DeleteLast, "delete-last", false, "")
 	cmd.Flags().BoolVar(&opts.DeleteLastConfirmed, "yes", false, "")
 	cmd.Flags().BoolVar(&opts.CreateIfNone, "create-if-none", false, "")
-	if withAttach {
-		attachments.AddFlag(cmd)
-	}
+	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	argv, err := shlex.Split(input)
 	require.NoError(t, err)
@@ -51,11 +47,10 @@ func commentableCmd(t *testing.T, opts *CommentableOptions, withAttach bool, inp
 
 func TestCommentablePreRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		input      string
-		withAttach bool
-		canPrompt  bool
-		wantErr    string
+		name      string
+		input     string
+		canPrompt bool
+		wantErr   string
 		// wantErrIsNotExist covers an error whose text the operating system
 		// words differently, so the assertion cannot be on the message.
 		wantErrIsNotExist bool
@@ -69,14 +64,12 @@ func TestCommentablePreRun(t *testing.T) {
 			// fails here, since this row asserts both from one run.
 			name:           "attach alone is a body input and is resolved",
 			input:          "--attach ./shot.png",
-			withAttach:     true,
 			wantInputType:  InputTypeInline,
 			wantAssetPaths: []string{"./shot.png"},
 		},
 		{
 			name:             "attach with body is still resolved",
 			input:            "--attach ./shot.png --body 'see below'",
-			withAttach:       true,
 			wantInputType:    InputTypeInline,
 			wantBodyProvided: true,
 			wantAssetPaths:   []string{"./shot.png"},
@@ -84,7 +77,6 @@ func TestCommentablePreRun(t *testing.T) {
 		{
 			name:              "a file that does not exist stops the command",
 			input:             "--attach ./gone.png",
-			withAttach:        true,
 			wantErr:           "./gone.png: ",
 			wantErrIsNotExist: true,
 		},
@@ -93,7 +85,6 @@ func TestCommentablePreRun(t *testing.T) {
 			// say so.
 			name:             "attach with an empty body",
 			input:            "--attach ./shot.png --body ''",
-			withAttach:       true,
 			wantInputType:    InputTypeInline,
 			wantBodyProvided: true,
 			wantAssetPaths:   []string{"./shot.png"},
@@ -101,7 +92,6 @@ func TestCommentablePreRun(t *testing.T) {
 		{
 			name:             "attach with body-file",
 			input:            "--attach ./shot.png --body-file ./body.md",
-			withAttach:       true,
 			wantInputType:    InputTypeInline,
 			wantBodyProvided: true,
 			wantAssetPaths:   []string{"./shot.png"},
@@ -109,58 +99,38 @@ func TestCommentablePreRun(t *testing.T) {
 		{
 			name:           "attach with editor",
 			input:          "--attach ./shot.png --editor",
-			withAttach:     true,
 			wantInputType:  InputTypeEditor,
 			wantAssetPaths: []string{"./shot.png"},
 		},
 		{
-			name:       "attach with web",
-			input:      "--attach ./shot.png --web",
-			withAttach: true,
-			wantErr:    "`--attach` is not supported when using `--web`",
+			name:    "attach with web",
+			input:   "--attach ./shot.png --web",
+			wantErr: "`--attach` is not supported when using `--web`",
 		},
 		{
-			name:       "a flag conflict is reported before a missing file",
-			input:      "--attach ./gone.png --web",
-			withAttach: true,
-			wantErr:    "`--attach` is not supported when using `--web`",
+			name:    "a flag conflict is reported before a missing file",
+			input:   "--attach ./gone.png --web",
+			wantErr: "`--attach` is not supported when using `--web`",
 		},
 		{
-			name:       "attach with delete-last",
-			input:      "--attach ./shot.png --delete-last --yes",
-			withAttach: true,
-			wantErr:    "`--attach` is not supported when using `--delete-last`",
+			name:    "attach with delete-last",
+			input:   "--attach ./shot.png --delete-last --yes",
+			wantErr: "`--attach` is not supported when using `--delete-last`",
 		},
 		{
-			// Reaching shared code without registering --attach is a missing
-			// AddFlag call rather than a bad invocation.
-			name:      "attach not registered",
-			input:     "",
-			canPrompt: true,
-			wantErr:   "comment does not register --attach",
+			name:    "attach not passed",
+			input:   "",
+			wantErr: "flags required when not running interactively",
 		},
 		{
-			name:    "attach not registered and body passed",
-			input:   "--body 'hello'",
-			wantErr: "comment does not register --attach",
+			name:    "body and editor still conflict",
+			input:   "--attach ./shot.png --body hello --editor",
+			wantErr: "specify only one of `--body`, `--body-file`, `--editor`, or `--web`",
 		},
 		{
-			name:       "attach registered but not passed",
-			input:      "",
-			withAttach: true,
-			wantErr:    "flags required when not running interactively",
-		},
-		{
-			name:       "body and editor still conflict",
-			input:      "--attach ./shot.png --body hello --editor",
-			withAttach: true,
-			wantErr:    "specify only one of `--body`, `--body-file`, `--editor`, or `--web`",
-		},
-		{
-			name:       "delete-last with a body",
-			input:      "--delete-last --yes --body hello",
-			withAttach: true,
-			wantErr:    "should not provide comment body when using `--delete-last`",
+			name:    "delete-last with a body",
+			input:   "--delete-last --yes --body hello",
+			wantErr: "should not provide comment body when using `--delete-last`",
 		},
 	}
 
@@ -175,7 +145,7 @@ func TestCommentablePreRun(t *testing.T) {
 			ios.SetStderrTTY(tt.canPrompt)
 
 			opts := &CommentableOptions{IO: ios}
-			cmd := commentableCmd(t, opts, tt.withAttach, tt.input)
+			cmd := commentableCmd(t, opts, tt.input)
 
 			err := CommentablePreRun(cmd, opts)
 

@@ -12,7 +12,9 @@
 // It must call UploadAndAttach after every possible prompt has been exercised,
 // not before, because nothing that can cancel may follow an upload.
 //
-//	attachmentArgs, err := attachments.FromFlagValues(cmd)
+//	attachFlag := attachments.AddFlag(cmd)
+//	...
+//	attachmentArgs, err := attachFlag.UserAssets()
 //	...
 //
 //	// repositoryID and viewerPermission come from the lookup the command
