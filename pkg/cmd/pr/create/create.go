@@ -250,6 +250,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			A reference already in the body keeps the alt text written there. Video renders
 			as a player and has no alt text, so it cannot be given any.
 
+			If some attachments upload and others fail, the pull request is still created with the
+			ones that succeeded. The command then exits with a non-zero status, but the new pull
+			request's URL is still printed to stdout.
+
 			By default, users with write access to the base repository can push new commits to the
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
 
@@ -263,6 +267,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --base develop --head monalisa:feature
 			$ gh pr create --template "pull_request_template.md"
 			$ gh pr create --attach './login.png#The login error state'
+			$ gh pr create --attach ./before.png --attach ./after.png
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},

@@ -81,6 +81,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			A reference already in the body keeps the alt text written there. Video renders
 			as a player and has no alt text, so it cannot be given any.
 
+			If some attachments upload and others fail, the pull request is still updated with the
+			ones that succeeded. The command then exits with a non-zero status, but the pull
+			request's URL is still printed to stdout.
+
 			The %[1]s--add-assignee%[1]s and %[1]s--remove-assignee%[1]s flags both support
 			the following special values:
 			- %[1]s@me%[1]s: assign or unassign yourself
@@ -99,6 +103,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			# Append a screenshot to the body, with alt text after "#"
 			$ gh pr edit 23 --attach './login.png#The login error state'
+
+			# Append multiple files by repeating the flag
+			$ gh pr edit 23 --attach ./before.png --attach ./after.png
 
 			# Manage labels
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"
