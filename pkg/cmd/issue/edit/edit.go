@@ -391,6 +391,16 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
+	// Resolve issue type ID before uploading in non-interactive mode.
+	// Interactive mode resolves after the survey sets the value.
+	var issueTypeID string
+	if !opts.Interactive {
+		issueTypeID, err = lookupIssueTypeID(&editable)
+		if err != nil {
+			return err
+		}
+	}
+
 	var uploadErr error
 	if uploader != nil {
 		// A body the caller supplied replaces the issue's, including an empty
@@ -425,16 +435,6 @@ func editRun(opts *EditOptions) error {
 	// Only show progress if we will not prompt below or the survey will break up the progress indicator.
 	if !opts.Interactive {
 		opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
-	}
-
-	// Resolve issue type ID up front for non-interactive mode; interactive
-	// mode resolves after the survey sets the value (inside the loop).
-	var issueTypeID string
-	if !opts.Interactive {
-		issueTypeID, err = lookupIssueTypeID(&editable)
-		if err != nil {
-			return err
-		}
 	}
 
 	for _, issue := range issues {
