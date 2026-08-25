@@ -21,13 +21,13 @@ import (
 // The markdown is returned unchanged when it could not be rewritten, so a
 // caller that assigns the result in place never destroys what it was given.
 func (u *Uploader) UploadAndAttach(ctx context.Context, md string, assets []UserAsset) (string, int, error) {
-	refs := make([]attachmentArg, len(assets))
+	args := make([]attachmentArg, len(assets))
 	for i, a := range assets {
 		f := a.getAsset()
-		refs[i] = attachmentArg{Path: f.path, Alt: f.alt, RendersAsPlayer: a.rendersAsPlayer()}
+		args[i] = attachmentArg{Path: f.path, Alt: f.alt, RendersAsPlayer: a.rendersAsPlayer()}
 	}
 
-	attachableMD, err := newAttachableMarkdown(md, refs)
+	attachableMD, err := newAttachableMarkdown(md, args)
 	if err != nil {
 		return md, 0, err
 	}
@@ -41,7 +41,7 @@ func (u *Uploader) UploadAndAttach(ctx context.Context, md string, assets []User
 			failures = append(failures, err)
 			break
 		}
-		refs[i].URL = assetURL
+		args[i].URL = assetURL
 		uploaded++
 	}
 
