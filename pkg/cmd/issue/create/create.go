@@ -57,7 +57,8 @@ type CreateOptions struct {
 	BlockedBy   []string
 	Blocking    []string
 
-	Assets []attachments.UserAsset
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -153,7 +154,15 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
 			}
 
-			opts.Assets, err = attachments.FromFlagValues(cmd)
+			if err := cmdutil.MutuallyExclusive(
+				"`--attach` is not supported when using `--web`",
+				opts.AttachFlag.Changed(),
+				opts.WebMode,
+			); err != nil {
+				return err
+			}
+
+			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
 			}
@@ -180,7 +189,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVar(&opts.Parent, "parent", "", "Add the new issue as a sub-issue of the specified parent `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.BlockedBy, "blocked-by", nil, "Mark the new issue as blocked by these issue `numbers` or URLs")
 	cmd.Flags().StringSliceVar(&opts.Blocking, "blocking", nil, "Mark the new issue as blocking these issue `numbers` or URLs")
-	attachments.AddFlag(cmd)
+	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	return cmd
 }

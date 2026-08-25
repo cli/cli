@@ -302,8 +302,8 @@ func TestNewCmdCreate(t *testing.T) {
 			wantErrIsNotExist: true,
 		},
 		{
-			name:        "attach is not supported with web",
-			cli:         fmt.Sprintf("--web --attach '%s'", tmpImage),
+			name:        "attach conflict is reported before a missing file",
+			cli:         "--web --attach ./nope.png",
 			wantsErr:    true,
 			wantsErrMsg: "`--attach` is not supported when using `--web`",
 		},

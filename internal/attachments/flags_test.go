@@ -13,19 +13,11 @@ import (
 )
 
 // attachCmd builds a command shaped like the ones that take --attach.
-// withAttach is false for a command that has not registered the flag.
-func attachCmd(t *testing.T, withAttach bool, input string) (*cobra.Command, *Flag) {
+func attachCmd(t *testing.T, input string) (*cobra.Command, *Flag) {
 	t.Helper()
 
 	cmd := &cobra.Command{Use: "comment"}
-	cmd.Flags().Bool("web", false, "")
-	cmd.Flags().Bool("delete-last", false, "")
-	cmd.Flags().Bool("dry-run", false, "")
-
-	var attachFlag *Flag
-	if withAttach {
-		attachFlag = AddFlag(cmd)
-	}
+	attachFlag := AddFlag(cmd)
 
 	argv, err := shlex.Split(input)
 	require.NoError(t, err)
@@ -81,7 +73,7 @@ func TestAddFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, attachFlag := attachCmd(t, true, tt.input)
+			cmd, attachFlag := attachCmd(t, tt.input)
 
 			slice, ok := attachFlag.flag.Value.(pflag.SliceValue)
 			require.True(t, ok)
@@ -94,172 +86,102 @@ func TestAddFlag(t *testing.T) {
 	}
 }
 
-func TestFromFlagValues(t *testing.T) {
+func TestFlagUserAssets(t *testing.T) {
 	tests := []struct {
-		name       string
-		withAttach bool
-		setup      func(t *testing.T)
-		input      string
-		wantPaths  []string
-		wantAlts   []string
-		wantErr    string
+		name      string
+		setup     func(t *testing.T)
+		input     string
+		wantPaths []string
+		wantAlts  []string
+		wantErr   string
 		// wantErrIs covers an error whose text the operating system words
 		// differently, so the assertion cannot be on the message.
 		wantErrIs error
 	}{
 		{
-			name:       "not registered",
-			withAttach: false,
-			wantErr:    "comment does not register --attach",
+			name:  "not passed",
+			input: "",
 		},
 		{
-			name:       "registered but not passed",
-			withAttach: true,
-			input:      "",
+			name:      "one file",
+			input:     "--attach ./shot.png",
+			wantPaths: []string{"./shot.png"},
 		},
 		{
-			name:       "one file",
-			withAttach: true,
-			input:      "--attach ./shot.png",
-			wantPaths:  []string{"./shot.png"},
+			name:      "a filename containing a hash stays whole",
+			input:     "--attach './shot#dark.png'",
+			wantPaths: []string{"./shot#dark.png"},
+			wantAlts:  []string{"shot#dark"},
 		},
 		{
-			name:       "a filename containing a hash stays whole",
-			withAttach: true,
-			input:      "--attach './shot#dark.png'",
-			wantPaths:  []string{"./shot#dark.png"},
-			wantAlts:   []string{"shot#dark"},
+			name:      "alt text can contain a hash",
+			input:     "--attach './caption.png#first#second'",
+			wantPaths: []string{"./caption.png"},
+			wantAlts:  []string{"first#second"},
 		},
 		{
-			name:       "alt text can contain a hash",
-			withAttach: true,
-			input:      "--attach './caption.png#first#second'",
-			wantPaths:  []string{"./caption.png"},
-			wantAlts:   []string{"first#second"},
+			name:      "the longest existing path wins",
+			input:     "--attach './shot#dark.png#first.png#second'",
+			wantPaths: []string{"./shot#dark.png#first.png"},
+			wantAlts:  []string{"second"},
 		},
 		{
-			name:       "the longest existing path wins",
-			withAttach: true,
-			input:      "--attach './shot#dark.png#first.png#second'",
-			wantPaths:  []string{"./shot#dark.png#first.png"},
-			wantAlts:   []string{"second"},
+			name:      "a missing path falls back at the last hash",
+			input:     "--attach './gone.png#caption'",
+			wantErr:   "./gone.png: ",
+			wantErrIs: fs.ErrNotExist,
 		},
 		{
-			name:       "a missing path falls back at the last hash",
-			withAttach: true,
-			input:      "--attach './gone.png#caption'",
-			wantErr:    "./gone.png: ",
-			wantErrIs:  fs.ErrNotExist,
+			name:      "several files, in the order written",
+			input:     "--attach ./b.png --attach ./a.png",
+			wantPaths: []string{"./b.png", "./a.png"},
 		},
 		{
-			name:       "several files, in the order written",
-			withAttach: true,
-			input:      "--attach ./b.png --attach ./a.png",
-			wantPaths:  []string{"./b.png", "./a.png"},
-		},
-		{
-			name:       "a file that does not exist",
-			withAttach: true,
-			input:      "--attach ./gone.png",
-			wantErr:    "./gone.png: ",
-			wantErrIs:  fs.ErrNotExist,
+			name:      "a file that does not exist",
+			input:     "--attach ./gone.png",
+			wantErr:   "./gone.png: ",
+			wantErrIs: fs.ErrNotExist,
 		},
 		{
 			// pflag reads this flag back as holding nothing at all, so
 			// without the length check the command would post with no
 			// attachment and no error.
-			name:       "a lone empty value",
-			withAttach: true,
-			input:      `--attach ""`,
-			wantErr:    "cannot attach an empty path; --attach needs a file path",
+			name:    "a lone empty value",
+			input:   `--attach ""`,
+			wantErr: "cannot attach an empty path; --attach needs a file path",
 		},
 		{
-			name:       "an empty value beside a real one",
-			withAttach: true,
-			input:      `--attach ./shot.png --attach ""`,
-			wantErr:    "cannot attach an empty path; --attach needs a file path",
+			name:    "an empty value beside a real one",
+			input:   `--attach ./shot.png --attach ""`,
+			wantErr: "cannot attach an empty path; --attach needs a file path",
 		},
 		{
-			name:       "standard input",
-			withAttach: true,
-			input:      "--attach -",
-			wantErr:    "cannot attach standard input; --attach needs a file path",
+			name:    "standard input",
+			input:   "--attach -",
+			wantErr: "cannot attach standard input; --attach needs a file path",
 		},
 		{
-			name:       "a value holding a comma stays one path",
-			withAttach: true,
-			input:      `--attach ./before,after.png`,
-			wantPaths:  []string{"./before,after.png"},
+			name:      "a value holding a comma stays one path",
+			input:     `--attach ./before,after.png`,
+			wantPaths: []string{"./before,after.png"},
 		},
 		{
-			name:       "web without attach",
-			withAttach: true,
-			input:      "--web",
+			name:      "keeps the order the arguments were written in",
+			input:     "--attach './b.png#Second' --attach ./a.png --attach ./c.mp4",
+			wantPaths: []string{"./b.png", "./a.png", "./c.mp4"},
 		},
 		{
-			name:       "delete-last without attach",
-			withAttach: true,
-			input:      "--delete-last",
+			name:    "the same file twice",
+			input:   "--attach ./a.png --attach './a.png#Another caption'",
+			wantErr: "./a.png and ./a.png are the same file; attached files must be unique",
 		},
 		{
-			name:       "dry-run without attach",
-			withAttach: true,
-			input:      "--dry-run",
+			name:    "the same file under two different paths",
+			input:   "--attach ./a.png --attach a.png",
+			wantErr: "./a.png and a.png are the same file; attached files must be unique",
 		},
 		{
-			name:       "web on a command with no attach flag",
-			withAttach: false,
-			input:      "--web",
-			wantErr:    "comment does not register --attach",
-		},
-		{
-			name:       "attach with web",
-			withAttach: true,
-			input:      "--attach ./shot.png --web",
-			wantErr:    "`--attach` is not supported when using `--web`",
-		},
-		{
-			name:       "attach with delete-last",
-			withAttach: true,
-			input:      "--attach ./shot.png --delete-last",
-			wantErr:    "`--attach` is not supported when using `--delete-last`",
-		},
-		{
-			name:       "attach with dry-run",
-			withAttach: true,
-			input:      "--attach ./shot.png --dry-run",
-			wantErr:    "`--attach` is not supported when using `--dry-run`",
-		},
-		{
-			// The conflict is checked before the paths are read, so a caller
-			// cannot reach the disk in a mode the asset could never be written
-			// in.
-			name:       "a flag conflict is reported before a missing file",
-			withAttach: true,
-			input:      "--attach ./gone.png --web",
-			wantErr:    "`--attach` is not supported when using `--web`",
-		},
-		{
-			name:       "keeps the order the arguments were written in",
-			withAttach: true,
-			input:      "--attach './b.png#Second' --attach ./a.png --attach ./c.mp4",
-			wantPaths:  []string{"./b.png", "./a.png", "./c.mp4"},
-		},
-		{
-			name:       "the same file twice",
-			withAttach: true,
-			input:      "--attach ./a.png --attach './a.png#Another caption'",
-			wantErr:    "./a.png and ./a.png are the same file; attached files must be unique",
-		},
-		{
-			name:       "the same file under two different paths",
-			withAttach: true,
-			input:      "--attach ./a.png --attach a.png",
-			wantErr:    "./a.png and a.png are the same file; attached files must be unique",
-		},
-		{
-			name:       "a symlink and the file it points at",
-			withAttach: true,
+			name: "a symlink and the file it points at",
 			setup: func(t *testing.T) {
 				// Creating one needs a privilege Windows does not grant by
 				// default, so a machine that cannot make a symlink cannot run
@@ -272,8 +194,7 @@ func TestFromFlagValues(t *testing.T) {
 			wantErr: "./a.png and ./link.png are the same file; attached files must be unique",
 		},
 		{
-			name:       "a hard link and the file it shares",
-			withAttach: true,
+			name: "a hard link and the file it shares",
 			setup: func(t *testing.T) {
 				require.NoError(t, os.Link("a.png", "hard.png"))
 			},
@@ -282,16 +203,14 @@ func TestFromFlagValues(t *testing.T) {
 		},
 		{
 			// GitHub gives each its own asset URL.
-			name:       "two separate files with identical contents",
-			withAttach: true,
-			input:      "--attach ./a.png --attach ./b.png",
-			wantPaths:  []string{"./a.png", "./b.png"},
+			name:      "two separate files with identical contents",
+			input:     "--attach ./a.png --attach ./b.png",
+			wantPaths: []string{"./a.png", "./b.png"},
 		},
 		{
-			name:       "reports the first invalid file",
-			withAttach: true,
-			input:      "--attach ./a.png --attach ./notes.txt",
-			wantErr:    "./notes.txt is not a supported file type (supported: png, jpg, jpeg, gif, webp, svg, mp4, mov, webm)",
+			name:    "reports the first invalid file",
+			input:   "--attach ./a.png --attach ./notes.txt",
+			wantErr: "./notes.txt is not a supported file type (supported: png, jpg, jpeg, gif, webp, svg, mp4, mov, webm)",
 		},
 	}
 
@@ -315,9 +234,9 @@ func TestFromFlagValues(t *testing.T) {
 				tt.setup(t)
 			}
 
-			cmd, _ := attachCmd(t, tt.withAttach, tt.input)
+			_, attachFlag := attachCmd(t, tt.input)
 
-			resolved, err := FromFlagValues(cmd)
+			resolved, err := attachFlag.UserAssets()
 
 			if tt.wantErrIs != nil {
 				require.ErrorIs(t, err, tt.wantErrIs)

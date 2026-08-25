@@ -76,7 +76,8 @@ type CreateOptions struct {
 
 	DryRun bool
 
-	Assets []attachments.UserAsset
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
@@ -349,7 +350,23 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
-			opts.Assets, err = attachments.FromFlagValues(cmd)
+			if err := cmdutil.MutuallyExclusive(
+				"`--attach` is not supported when using `--web`",
+				opts.AttachFlag.Changed(),
+				opts.WebMode,
+			); err != nil {
+				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"`--attach` is not supported when using `--dry-run`",
+				opts.AttachFlag.Changed(),
+				opts.DryRun,
+			); err != nil {
+				return err
+			}
+
+			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
 			}
@@ -382,7 +399,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
-	attachments.AddFlag(cmd)
+	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 

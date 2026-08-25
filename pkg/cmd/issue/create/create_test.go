@@ -275,9 +275,9 @@ func TestNewCmdCreate(t *testing.T) {
 			wantAssetPaths: []string{tmpImage},
 		},
 		{
-			name:        "attach flag with web",
+			name:        "attach conflict is reported before a missing file",
 			tty:         false,
-			cli:         fmt.Sprintf(`-t mytitle -b mybody --web --attach '%s'`, tmpImage),
+			cli:         `-t mytitle -b mybody --web --attach ./nope.png`,
 			wantsErr:    true,
 			wantsErrMsg: "`--attach` is not supported when using `--web`",
 		},
