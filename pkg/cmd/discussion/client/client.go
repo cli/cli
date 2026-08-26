@@ -1041,10 +1041,10 @@ func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionI
 			DiscussionID: githubv4.ID(input.DiscussionID),
 		}
 		if input.Title != nil {
-			gqlInput.Title = githubv4.NewString(githubv4.String(*input.Title))
+			gqlInput.Title = new(githubv4.String(*input.Title))
 		}
 		if input.Body != nil {
-			gqlInput.Body = githubv4.NewString(githubv4.String(*input.Body))
+			gqlInput.Body = new(githubv4.String(*input.Body))
 		}
 		if input.CategoryID != nil {
 			id := githubv4.ID(*input.CategoryID)

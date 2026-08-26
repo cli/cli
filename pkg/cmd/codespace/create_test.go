@@ -866,6 +866,7 @@ func apiCreateDefaults(c *apiClientMock) *apiClientMock {
 	return c
 }
 
+//go:fix inline
 func durationPtr(d time.Duration) *time.Duration {
-	return &d
+	return new(d)
 }

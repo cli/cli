@@ -278,7 +278,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided:  false,
 				Draft:         false,
 				Prerelease:    false,
-				IsLatest:      boolPtr(true),
+				IsLatest:      new(true),
 				RepoOverride:  "",
 				Concurrency:   5,
 				Assets:        []*shared.AssetForUpload(nil),
@@ -298,7 +298,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided:  false,
 				Draft:         false,
 				Prerelease:    false,
-				IsLatest:      boolPtr(false),
+				IsLatest:      new(false),
 				RepoOverride:  "",
 				Concurrency:   5,
 				Assets:        []*shared.AssetForUpload(nil),
@@ -665,7 +665,7 @@ func Test_createRun(t *testing.T) {
 				Name:          "",
 				Body:          "",
 				Target:        "",
-				IsLatest:      boolPtr(true),
+				IsLatest:      new(true),
 				BodyProvided:  true,
 				GenerateNotes: false,
 			},
@@ -865,7 +865,7 @@ func Test_createRun(t *testing.T) {
 				Body:         "",
 				BodyProvided: true,
 				Draft:        false,
-				IsLatest:     boolPtr(false),
+				IsLatest:     new(false),
 				Target:       "",
 				Assets: []*shared.AssetForUpload{
 					{
@@ -2008,6 +2008,7 @@ func Test_gitTagInfo(t *testing.T) {
 	}
 }
 
+//go:fix inline
 func boolPtr(b bool) *bool {
-	return &b
+	return new(b)
 }
