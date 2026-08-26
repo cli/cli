@@ -261,7 +261,7 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 			if err := git.UpdateBranch(branch, "FETCH_HEAD"); err != nil {
 				worktrees, worktreeErr := git.Worktrees()
 				if worktreeErr != nil {
-					return err
+					return fmt.Errorf("cannot update branch %q: %w; also cannot retrieve worktrees: %w", branch, err, worktreeErr)
 				}
 				if worktree := gitpkg.WorktreeForBranch(worktrees, branch); worktree != nil {
 					if worktree.Prunable {
