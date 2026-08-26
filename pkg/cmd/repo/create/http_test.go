@@ -1,6 +1,7 @@
 package create
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -747,4 +748,11 @@ func Test_repoCreate(t *testing.T) {
 			assert.Equal(t, tt.wantRepo, ghrepo.GenerateRepoURL(r, ""))
 		})
 	}
+}
+
+func TestUserFacingGraphQLError(t *testing.T) {
+	err := userFacingGraphQLError(errors.New("GraphQL: Name already exists on this account (createRepository)"))
+	assert.EqualError(t, err, "Name already exists on this account (createRepository)")
+	plain := errors.New("not graphql")
+	assert.Equal(t, plain, userFacingGraphQLError(plain))
 }

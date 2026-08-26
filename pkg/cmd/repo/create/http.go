@@ -244,7 +244,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 	}
 	`, variables, &response)
 	if err != nil {
-		return nil, err
+		return nil, userFacingGraphQLError(err)
 	}
 
 	return api.InitRepoHostname(&response.CreateRepository.Repository, hostname), nil
@@ -257,6 +257,17 @@ type ownerResponse struct {
 
 func (r *ownerResponse) IsOrganization() bool {
 	return r.Type == "Organization"
+}
+
+// userFacingGraphQLError strips the "GraphQL: " prefix go-gh puts on
+// GraphQLError.Error() so CLI users see the server message (#14257).
+func userFacingGraphQLError(err error) error {
+	const prefix = "GraphQL: "
+	msg := err.Error()
+	if strings.HasPrefix(msg, prefix) {
+		return fmt.Errorf("%s", strings.TrimPrefix(msg, prefix))
+	}
+	return err
 }
 
 func resolveOwner(client *api.Client, hostname, orgName string) (*ownerResponse, error) {
