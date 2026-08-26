@@ -132,8 +132,8 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 
 	currentPRHeadRef := options.HeadRef
 	branchWithoutOwner := currentPRHeadRef
-	if idx := strings.Index(currentPRHeadRef, ":"); idx >= 0 {
-		branchWithoutOwner = currentPRHeadRef[idx+1:]
+	if _, after, ok := strings.Cut(currentPRHeadRef, ":"); ok {
+		branchWithoutOwner = after
 	}
 
 	variables := map[string]any{
