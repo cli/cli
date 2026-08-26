@@ -136,7 +136,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		branchWithoutOwner = currentPRHeadRef[idx+1:]
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"viewerQuery":   viewerQuery,
 		"reviewerQuery": reviewerQuery,
 		"owner":         repo.RepoOwner(),

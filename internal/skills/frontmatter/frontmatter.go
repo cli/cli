@@ -13,17 +13,17 @@ const delimiter = "---"
 
 // Metadata represents the parsed YAML frontmatter of a SKILL.md file.
 type Metadata struct {
-	Name        string                 `yaml:"name"`
-	Description string                 `yaml:"description"`
-	License     string                 `yaml:"license,omitempty"`
-	Meta        map[string]interface{} `yaml:"metadata,omitempty"`
+	Name        string         `yaml:"name"`
+	Description string         `yaml:"description"`
+	License     string         `yaml:"license,omitempty"`
+	Meta        map[string]any `yaml:"metadata,omitempty"`
 }
 
 // ParseResult contains the parsed frontmatter and remaining body.
 type ParseResult struct {
 	Metadata Metadata
 	Body     string
-	RawYAML  map[string]interface{}
+	RawYAML  map[string]any
 }
 
 // Parse extracts YAML frontmatter from a SKILL.md file.
@@ -45,7 +45,7 @@ func Parse(content string) (*ParseResult, error) {
 	body := rest[endIdx+len("\n"+delimiter):]
 	body = strings.TrimLeft(body, "\r\n")
 
-	var rawYAML map[string]interface{}
+	var rawYAML map[string]any
 	if err := yaml.Unmarshal([]byte(yamlContent), &rawYAML); err != nil {
 		return nil, fmt.Errorf("invalid frontmatter YAML: %w", err)
 	}
@@ -74,12 +74,12 @@ func InjectGitHubMetadata(content string, host, owner, repo, ref, treeSHA, pinne
 	}
 
 	if result.RawYAML == nil {
-		result.RawYAML = make(map[string]interface{})
+		result.RawYAML = make(map[string]any)
 	}
 
-	meta, _ := result.RawYAML["metadata"].(map[string]interface{})
+	meta, _ := result.RawYAML["metadata"].(map[string]any)
 	if meta == nil {
-		meta = make(map[string]interface{})
+		meta = make(map[string]any)
 	}
 	delete(meta, "github-owner")
 	meta["github-repo"] = source.BuildRepoURL(host, owner, repo)
@@ -106,12 +106,12 @@ func InjectLocalMetadata(content string, sourcePath string) (string, error) {
 	}
 
 	if result.RawYAML == nil {
-		result.RawYAML = make(map[string]interface{})
+		result.RawYAML = make(map[string]any)
 	}
 
-	meta, _ := result.RawYAML["metadata"].(map[string]interface{})
+	meta, _ := result.RawYAML["metadata"].(map[string]any)
 	if meta == nil {
-		meta = make(map[string]interface{})
+		meta = make(map[string]any)
 	}
 	delete(meta, "github-owner")
 	delete(meta, "github-repo")
@@ -127,7 +127,7 @@ func InjectLocalMetadata(content string, sourcePath string) (string, error) {
 }
 
 // Serialize writes a frontmatter map and body back to a SKILL.md string.
-func Serialize(frontmatter map[string]interface{}, body string) (string, error) {
+func Serialize(frontmatter map[string]any, body string) (string, error) {
 	var buf bytes.Buffer
 
 	yamlBytes, err := yaml.Marshal(frontmatter)

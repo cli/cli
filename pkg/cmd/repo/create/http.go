@@ -120,7 +120,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			}
 		}
 
-		variables := map[string]interface{}{
+		variables := map[string]any{
 			"input": cloneTemplateRepositoryInput{
 				Name:               input.Name,
 				Description:        input.Description,
@@ -148,7 +148,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		}
 
 		if !input.HasWikiEnabled || !input.HasIssuesEnabled || input.HomepageURL != "" {
-			updateVariables := map[string]interface{}{
+			updateVariables := map[string]any{
 				"input": updateRepositoryInput{
 					RepositoryID:     response.CloneTemplateRepository.Repository.ID,
 					HasWikiEnabled:   input.HasWikiEnabled,
@@ -218,7 +218,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		}
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": createRepositoryInput{
 			Name:             input.Name,
 			Description:      input.Description,
@@ -290,7 +290,7 @@ func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug str
 func listTemplateRepositories(client *http.Client, hostname, owner string) ([]api.Repository, error) {
 	ownerConnection := "repositoryOwner(login: $owner)"
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"perPage": githubv4.Int(100),
 		"owner":   githubv4.String(owner),
 	}

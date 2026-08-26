@@ -732,29 +732,29 @@ func Test_editRun(t *testing.T) {
 				mockIssueNumberGet(t, reg, 456)
 				// Updating 123 should succeed.
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation ReplaceActorsForAssignable\b`, func(m map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation ReplaceActorsForAssignable\b`, func(m map[string]any) bool {
 						return m["assignableId"] == "123"
 					}),
 					httpmock.GraphQLMutation(`
 					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
-						func(inputs map[string]interface{}) {}),
+						func(inputs map[string]any) {}),
 				)
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]any) bool {
 						return m["id"] == "123"
 					}),
 					httpmock.GraphQLMutation(`
 							{ "data": { "updateIssue": { "__typename": "" } } }`,
-						func(inputs map[string]interface{}) {}),
+						func(inputs map[string]any) {}),
 				)
 				// Updating 456 should fail.
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation ReplaceActorsForAssignable\b`, func(m map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation ReplaceActorsForAssignable\b`, func(m map[string]any) bool {
 						return m["assignableId"] == "456"
 					}),
 					httpmock.GraphQLMutation(`
 							{ "errors": [ { "message": "test error" } ] }`,
-						func(inputs map[string]interface{}) {}),
+						func(inputs map[string]any) {}),
 				)
 			},
 			stdout: heredoc.Doc(`
@@ -833,8 +833,8 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
-						func(inputs map[string]interface{}) {
-							require.Subset(t, inputs["actorLogins"], []interface{}{"hubot", "MonaLisa"})
+						func(inputs map[string]any) {
+							require.Subset(t, inputs["actorLogins"], []any{"hubot", "MonaLisa"})
 						}),
 				)
 			},
@@ -901,7 +901,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation IssueUpdate\b`),
 					httpmock.GraphQLMutation(`
 								{ "data": { "updateIssue": { "__typename": "" } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							// Checking that we still assigned the expected ID.
 							require.Contains(t, inputs["assigneeIds"], "MONAID")
 						}),
@@ -938,7 +938,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "123", inputs["issueId"])
 							assert.Equal(t, "BUG_TYPE_ID", inputs["issueTypeId"])
 						}),
@@ -993,7 +993,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "123", inputs["issueId"])
 							assert.Nil(t, inputs["issueTypeId"])
 						}),
@@ -1039,7 +1039,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "123", inputs["issueId"])
 							assert.Equal(t, "FEATURE_TYPE_ID", inputs["issueTypeId"])
 						}),
@@ -1070,7 +1070,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation AddSubIssue\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "addSubIssue": { "issue": { "id": "PARENT_100_ID" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "PARENT_100_ID", inputs["issueId"])
 							assert.Equal(t, "123", inputs["subIssueId"])
 							assert.Equal(t, true, inputs["replaceParent"])
@@ -1113,7 +1113,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation RemoveSubIssue\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "removeSubIssue": { "issue": { "id": "PARENT_100_ID" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "PARENT_100_ID", inputs["issueId"])
 							assert.Equal(t, "123", inputs["subIssueId"])
 						}),
@@ -1143,21 +1143,21 @@ func Test_editRun(t *testing.T) {
 					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "SUB_124_ID" } } } }`),
 				)
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddSubIssue\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddSubIssue\b`, func(input map[string]any) bool {
 						return input["subIssueId"] == "SUB_123_ID"
 					}),
 					httpmock.GraphQLMutation(`{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "100", inputs["issueId"])
 							assert.Equal(t, true, inputs["replaceParent"])
 						}),
 				)
 				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddSubIssue\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddSubIssue\b`, func(input map[string]any) bool {
 						return input["subIssueId"] == "SUB_124_ID"
 					}),
 					httpmock.GraphQLMutation(`{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "100", inputs["issueId"])
 							assert.Equal(t, true, inputs["replaceParent"])
 						}),
@@ -1188,7 +1188,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation RemoveSubIssue\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "removeSubIssue": { "issue": { "id": "100" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "100", inputs["issueId"])
 							assert.Equal(t, "SUB_123_ID", inputs["subIssueId"])
 						}),
@@ -1220,7 +1220,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation AddBlockedBy\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "addBlockedBy": { "issue": { "id": "123" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "123", inputs["issueId"])
 							assert.Equal(t, "BLOCKING_200_ID", inputs["blockingIssueId"])
 						}),
@@ -1235,7 +1235,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation RemoveBlockedBy\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "removeBlockedBy": { "issue": { "id": "123" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "123", inputs["issueId"])
 							assert.Equal(t, "BLOCKING_201_ID", inputs["blockingIssueId"])
 						}),
@@ -1266,7 +1266,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation AddBlockedBy\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "addBlockedBy": { "issue": { "id": "BLOCKED_300_ID" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							// --add-blocking swaps: OTHER issue is blocked BY this issue
 							assert.Equal(t, "BLOCKED_300_ID", inputs["issueId"])
 							assert.Equal(t, "123", inputs["blockingIssueId"])
@@ -1298,7 +1298,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation RemoveBlockedBy\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "removeBlockedBy": { "issue": { "id": "BLOCKED_300_ID" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							// --remove-blocking swaps: OTHER issue is no longer blocked BY this issue
 							assert.Equal(t, "BLOCKED_300_ID", inputs["issueId"])
 							assert.Equal(t, "123", inputs["blockingIssueId"])
@@ -1336,13 +1336,13 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
-						func(inputs map[string]interface{}) {}),
+						func(inputs map[string]any) {}),
 				)
 				reg.Register(
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "updateIssueIssueType": { "issue": { "id": "456" } } } }`,
-						func(inputs map[string]interface{}) {}),
+						func(inputs map[string]any) {}),
 				)
 			},
 			stdout: heredoc.Doc(`
@@ -1426,7 +1426,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation IssueUpdate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "updateIssue": { "__typename": "" } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.NotContains(t, inputs, "body")
 						}),
 				)
@@ -1594,7 +1594,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation IssueUpdate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "updateIssue": { "__typename": "" } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "a new title", inputs["title"])
 							assert.NotContains(t, inputs, "body")
 						}),
@@ -1621,7 +1621,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
-						func(inputs map[string]interface{}) {}),
+						func(inputs map[string]any) {}),
 				)
 			},
 			stdout:          "https://github.com/OWNER/REPO/issue/123\n",
@@ -1971,7 +1971,7 @@ func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation IssueUpdate\b`),
 		httpmock.GraphQLMutation(`
 				{ "data": { "updateIssue": { "__typename": "" } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 }
 
@@ -1982,7 +1982,7 @@ func mockIssueUpdateWithBody(t *testing.T, reg *httpmock.Registry, wantBody stri
 		httpmock.GraphQL(`mutation IssueUpdate\b`),
 		httpmock.GraphQLMutation(`
 				{ "data": { "updateIssue": { "__typename": "" } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, wantBody, inputs["body"])
 			}),
 	)
@@ -1993,7 +1993,7 @@ func mockIssueUpdateApiActors(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 }
 
@@ -2002,13 +2002,13 @@ func mockIssueUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation LabelAdd\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "addLabelsToLabelable": { "__typename": "" } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 	reg.Register(
 		httpmock.GraphQL(`mutation LabelRemove\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "removeLabelsFromLabelable": { "__typename": "" } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 }
 
@@ -2017,7 +2017,7 @@ func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "add_000": { "item": { "id": "1" } }, "delete_001": { "item": { "id": "2" } } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 }
 

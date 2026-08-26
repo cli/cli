@@ -710,10 +710,10 @@ func TestBuildDisplayName(t *testing.T) {
 }
 
 type MockSurveyPrompter struct {
-	AskFunc func(qs []*survey.Question, response interface{}) error
+	AskFunc func(qs []*survey.Question, response any) error
 }
 
-func (m *MockSurveyPrompter) Ask(qs []*survey.Question, response interface{}) error {
+func (m *MockSurveyPrompter) Ask(qs []*survey.Question, response any) error {
 	return m.AskFunc(qs, response)
 }
 
@@ -815,7 +815,7 @@ func TestHandleAdditionalPermissions(t *testing.T) {
 
 			params := &api.CreateCodespaceParams{}
 			_, err := a.handleAdditionalPermissions(context.Background(), &MockSurveyPrompter{
-				AskFunc: func(qs []*survey.Question, response interface{}) error {
+				AskFunc: func(qs []*survey.Question, response any) error {
 					*response.(*struct{ Accept string }) = struct{ Accept string }{Accept: tt.accept}
 					return nil
 				},

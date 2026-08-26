@@ -327,7 +327,7 @@ func resolveItemEditNames(config editItemConfig) (editItemConfig, error) {
 
 func fetchDraftIssueByID(config editItemConfig, draftIssueID string) (*queries.DraftIssue, error) {
 	var query DraftIssueQuery
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"id": githubv4.ID(draftIssueID),
 	}
 
@@ -339,7 +339,7 @@ func fetchDraftIssueByID(config editItemConfig, draftIssueID string) (*queries.D
 	return &query.DraftIssueNode.DraftIssue, nil
 }
 
-func buildEditDraftIssue(config editItemConfig, currentDraftIssue *queries.DraftIssue) (*EditProjectDraftIssue, map[string]interface{}) {
+func buildEditDraftIssue(config editItemConfig, currentDraftIssue *queries.DraftIssue) (*EditProjectDraftIssue, map[string]any) {
 	input := githubv4.UpdateProjectV2DraftIssueInput{
 		DraftIssueID: githubv4.ID(config.opts.itemID),
 	}
@@ -358,12 +358,12 @@ func buildEditDraftIssue(config editItemConfig, currentDraftIssue *queries.Draft
 		input.Body = githubv4.NewString(githubv4.String(currentDraftIssue.Body))
 	}
 
-	return &EditProjectDraftIssue{}, map[string]interface{}{
+	return &EditProjectDraftIssue{}, map[string]any{
 		"input": input,
 	}
 }
 
-func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2FieldValue, map[string]interface{}) {
+func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2FieldValue, map[string]any) {
 	var value githubv4.ProjectV2FieldValue
 	if config.opts.text != "" {
 		value = githubv4.ProjectV2FieldValue{
@@ -387,7 +387,7 @@ func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2Fie
 		}
 	}
 
-	return &UpdateProjectV2FieldValue{}, map[string]interface{}{
+	return &UpdateProjectV2FieldValue{}, map[string]any{
 		"input": githubv4.UpdateProjectV2ItemFieldValueInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
 			ItemID:    githubv4.ID(config.opts.itemID),
@@ -397,8 +397,8 @@ func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2Fie
 	}
 }
 
-func buildClearItem(config editItemConfig) (*ClearProjectV2FieldValue, map[string]interface{}) {
-	return &ClearProjectV2FieldValue{}, map[string]interface{}{
+func buildClearItem(config editItemConfig) (*ClearProjectV2FieldValue, map[string]any) {
+	return &ClearProjectV2FieldValue{}, map[string]any{
 		"input": githubv4.ClearProjectV2ItemFieldValueInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
 			ItemID:    githubv4.ID(config.opts.itemID),

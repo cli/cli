@@ -222,8 +222,8 @@ func Test_editRun(t *testing.T) {
 				TagName: "v1.2.4",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name": "v1.2.4",
 					}, params)
 				})
@@ -238,8 +238,8 @@ func Test_editRun(t *testing.T) {
 				Target: "c0ff33",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name":         "v1.2.3",
 						"target_commitish": "c0ff33",
 					}, params)
@@ -255,8 +255,8 @@ func Test_editRun(t *testing.T) {
 				Name: stringPtr("Hot Release #1"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name": "v1.2.3",
 						"name":     "Hot Release #1",
 					}, params)
@@ -272,8 +272,8 @@ func Test_editRun(t *testing.T) {
 				DiscussionCategory: stringPtr("some-category"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name":                 "v1.2.3",
 						"discussion_category_name": "some-category",
 					}, params)
@@ -289,8 +289,8 @@ func Test_editRun(t *testing.T) {
 				IsLatest: boolPtr(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name":    "v1.2.3",
 						"make_latest": "true",
 					}, params)
@@ -306,8 +306,8 @@ func Test_editRun(t *testing.T) {
 				Name: stringPtr(""),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name": "v1.2.3",
 						"name":     "",
 					}, params)
@@ -323,8 +323,8 @@ func Test_editRun(t *testing.T) {
 				Body: stringPtr("Release Notes:\n- Fix Bug #1\n- Fix Bug #2"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name": "v1.2.3",
 						"body":     "Release Notes:\n- Fix Bug #1\n- Fix Bug #2",
 					}, params)
@@ -340,8 +340,8 @@ func Test_editRun(t *testing.T) {
 				Body: stringPtr(""),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name": "v1.2.3",
 						"body":     "",
 					}, params)
@@ -357,8 +357,8 @@ func Test_editRun(t *testing.T) {
 				Draft: boolPtr(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name": "v1.2.3",
 						"draft":    true,
 					}, params)
@@ -374,8 +374,8 @@ func Test_editRun(t *testing.T) {
 				Draft: boolPtr(false),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name": "v1.2.3",
 						"draft":    false,
 					}, params)
@@ -391,8 +391,8 @@ func Test_editRun(t *testing.T) {
 				Prerelease: boolPtr(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name":   "v1.2.3",
 						"prerelease": true,
 					}, params)
@@ -408,8 +408,8 @@ func Test_editRun(t *testing.T) {
 				Prerelease: boolPtr(false),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
+				mockSuccessfulEditResponse(reg, func(params map[string]any) {
+					assert.Equal(t, map[string]any{
 						"tag_name":   "v1.2.3",
 						"prerelease": false,
 					}, params)
@@ -474,7 +474,7 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
-func mockSuccessfulEditResponse(reg *httpmock.Registry, cb func(params map[string]interface{})) {
+func mockSuccessfulEditResponse(reg *httpmock.Registry, cb func(params map[string]any)) {
 	matcher := httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345")
 	responder := httpmock.RESTPayload(201, `{
 		"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
@@ -495,7 +495,7 @@ func Test_editRelease_httpError(t *testing.T) {
 	)
 
 	httpClient := &http.Client{Transport: reg}
-	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]interface{}{"tag_name": "v1.2.3"})
+	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]any{"tag_name": "v1.2.3"})
 
 	var httpErr api.HTTPError
 	require.ErrorAs(t, err, &httpErr)
@@ -517,7 +517,7 @@ func Test_editRelease_decodeError(t *testing.T) {
 	)
 
 	httpClient := &http.Client{Transport: reg}
-	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]interface{}{"tag_name": "v1.2.3"})
+	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]any{"tag_name": "v1.2.3"})
 
 	require.Error(t, err)
 	assert.NotNil(t, release) // decode was attempted - non-nil pointer even on decode error
@@ -536,7 +536,7 @@ func Test_editRelease_204(t *testing.T) {
 	)
 
 	httpClient := &http.Client{Transport: reg}
-	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]interface{}{"tag_name": "v1.2.3"})
+	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]any{"tag_name": "v1.2.3"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unexpected end of JSON input")
@@ -563,7 +563,7 @@ func Test_editRelease_bodyReadError(t *testing.T) {
 	)
 
 	httpClient := &http.Client{Transport: reg}
-	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]interface{}{"tag_name": "v1.2.3"})
+	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]any{"tag_name": "v1.2.3"})
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, readErr)

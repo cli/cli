@@ -24,7 +24,7 @@ func TestGraphQL(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := newTestClient(http)
 
-	vars := map[string]interface{}{"name": "Mona"}
+	vars := map[string]any{"name": "Mona"}
 	response := struct {
 		Viewer struct {
 			Login string

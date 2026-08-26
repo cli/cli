@@ -17,7 +17,7 @@ func (b *Stub) BrowsedURL() string {
 }
 
 type _testing interface {
-	Errorf(string, ...interface{})
+	Errorf(string, ...any)
 	Helper()
 }
 

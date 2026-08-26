@@ -317,7 +317,7 @@ func apiRun(opts *ApiOptions) error {
 	}
 	method := opts.RequestMethod
 	requestHeaders := opts.RequestHeaders
-	var requestBody interface{}
+	var requestBody any
 	if len(params) > 0 {
 		requestBody = params
 	}

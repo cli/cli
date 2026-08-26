@@ -65,17 +65,17 @@ type hostScopedClient struct {
 	hostname string
 }
 
-func (c *hostScopedClient) Query(queryName string, query interface{}, variables map[string]interface{}) error {
+func (c *hostScopedClient) Query(queryName string, query any, variables map[string]any) error {
 	return c.Client.Query(c.hostname, queryName, query, variables)
 }
 
-func (c *hostScopedClient) Mutate(queryName string, query interface{}, variables map[string]interface{}) error {
+func (c *hostScopedClient) Mutate(queryName string, query any, variables map[string]any) error {
 	return c.Client.Mutate(c.hostname, queryName, query, variables)
 }
 
 type graphqlClient interface {
-	Query(queryName string, query interface{}, variables map[string]interface{}) error
-	Mutate(queryName string, query interface{}, variables map[string]interface{}) error
+	Query(queryName string, query any, variables map[string]any) error
+	Mutate(queryName string, query any, variables map[string]any) error
 }
 
 type Client struct {
@@ -91,7 +91,7 @@ const (
 
 // doQueryWithProgressIndicator wraps API calls with a progress indicator.
 // The query name is used in the progress indicator label.
-func (c *Client) doQueryWithProgressIndicator(name string, query interface{}, variables map[string]interface{}) error {
+func (c *Client) doQueryWithProgressIndicator(name string, query any, variables map[string]any) error {
 	c.io.StartProgressIndicatorWithLabel(fmt.Sprintf("Fetching %s", name))
 	defer c.io.StopProgressIndicator()
 	err := c.apiClient.Query(name, query, variables)
@@ -99,12 +99,12 @@ func (c *Client) doQueryWithProgressIndicator(name string, query interface{}, va
 }
 
 // TODO: un-export this since it couples the caller heavily to api.GraphQLClient
-func (c *Client) Mutate(operationName string, query interface{}, variables map[string]interface{}) error {
+func (c *Client) Mutate(operationName string, query any, variables map[string]any) error {
 	err := c.apiClient.Mutate(operationName, query, variables)
 	return handleError(err)
 }
 
-func (c *Client) Query(operationName string, query interface{}, variables map[string]interface{}) error {
+func (c *Client) Query(operationName string, query any, variables map[string]any) error {
 	err := c.apiClient.Query(operationName, query, variables)
 	return handleError(err)
 }
@@ -258,15 +258,15 @@ func newProjectFromQueryWithoutItemsQuery(source projectQueryWithoutQueryableIte
 	return project
 }
 
-func (p Project) DetailedItems() map[string]interface{} {
-	return map[string]interface{}{
+func (p Project) DetailedItems() map[string]any {
+	return map[string]any{
 		"items":      serializeProjectWithItems(&p),
 		"totalCount": p.Items.TotalCount,
 	}
 }
 
-func (p Project) ExportData(_ []string) map[string]interface{} {
-	return map[string]interface{}{
+func (p Project) ExportData(_ []string) map[string]any {
+	return map[string]any{
 		"number":           p.Number,
 		"url":              p.URL,
 		"shortDescription": p.ShortDescription,
@@ -275,13 +275,13 @@ func (p Project) ExportData(_ []string) map[string]interface{} {
 		"title":            p.Title,
 		"id":               p.ID,
 		"readme":           p.Readme,
-		"items": map[string]interface{}{
+		"items": map[string]any{
 			"totalCount": p.Items.TotalCount,
 		},
-		"fields": map[string]interface{}{
+		"fields": map[string]any{
 			"totalCount": p.Fields.TotalCount,
 		},
-		"owner": map[string]interface{}{
+		"owner": map[string]any{
 			"type":  p.OwnerType(),
 			"login": p.OwnerLogin(),
 		},
@@ -299,8 +299,8 @@ func (p Project) OwnerLogin() string {
 	return p.Owner.Organization.Login
 }
 
-func (p ProjectMutationQuery) ExportData(_ []string) map[string]interface{} {
-	return map[string]interface{}{
+func (p ProjectMutationQuery) ExportData(_ []string) map[string]any {
+	return map[string]any{
 		"number":           p.Number,
 		"url":              p.URL,
 		"shortDescription": p.ShortDescription,
@@ -309,13 +309,13 @@ func (p ProjectMutationQuery) ExportData(_ []string) map[string]interface{} {
 		"title":            p.Title,
 		"id":               p.ID,
 		"readme":           p.Readme,
-		"items": map[string]interface{}{
+		"items": map[string]any{
 			"totalCount": p.Items.TotalCount,
 		},
-		"fields": map[string]interface{}{
+		"fields": map[string]any{
 			"totalCount": p.Fields.TotalCount,
 		},
-		"owner": map[string]interface{}{
+		"owner": map[string]any{
 			"type":  p.OwnerType(),
 			"login": p.OwnerLogin(),
 		},
@@ -338,12 +338,12 @@ type Projects struct {
 	TotalCount int
 }
 
-func (p Projects) ExportData(_ []string) map[string]interface{} {
-	v := make([]map[string]interface{}, len(p.Nodes))
+func (p Projects) ExportData(_ []string) map[string]any {
+	v := make([]map[string]any, len(p.Nodes))
 	for i := range p.Nodes {
 		v[i] = p.Nodes[i].ExportData(nil)
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"projects":   v,
 		"totalCount": p.TotalCount,
 	}
@@ -489,7 +489,7 @@ func (v FieldValueNodes) DisplayValue() string {
 		value = strconv.FormatFloat(data, 'f', -1, 64)
 	case []string:
 		value = strings.Join(data, ", ")
-	case map[string]interface{}:
+	case map[string]any:
 		title, _ := data["title"].(string)
 		value = title
 	default:
@@ -511,8 +511,8 @@ type DraftIssue struct {
 	Title string
 }
 
-func (i DraftIssue) ExportData(_ []string) map[string]interface{} {
-	v := map[string]interface{}{
+func (i DraftIssue) ExportData(_ []string) map[string]any {
+	v := map[string]any{
 		"title": i.Title,
 		"body":  i.Body,
 		"type":  "DraftIssue",
@@ -534,8 +534,8 @@ type PullRequest struct {
 	}
 }
 
-func (pr PullRequest) ExportData(_ []string) map[string]interface{} {
-	return map[string]interface{}{
+func (pr PullRequest) ExportData(_ []string) map[string]any {
+	return map[string]any{
 		"type":       "PullRequest",
 		"body":       pr.Body,
 		"title":      pr.Title,
@@ -555,8 +555,8 @@ type Issue struct {
 	}
 }
 
-func (i Issue) ExportData(_ []string) map[string]interface{} {
-	return map[string]interface{}{
+func (i Issue) ExportData(_ []string) map[string]any {
+	return map[string]any{
 		"type":       "Issue",
 		"body":       i.Body,
 		"title":      i.Title,
@@ -670,8 +670,8 @@ func (p ProjectItem) URL() string {
 	return ""
 }
 
-func (p ProjectItem) ExportData(_ []string) map[string]interface{} {
-	v := map[string]interface{}{
+func (p ProjectItem) ExportData(_ []string) map[string]any {
+	v := map[string]any{
 		"id":    p.ID(),
 		"title": p.Title(),
 		"body":  p.Body(),
@@ -700,7 +700,7 @@ func (c *Client) ProjectItems(o *Owner, number int32, limit int, queryStr string
 		first = limit
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"firstItems":  githubv4.Int(first),
 		"afterItems":  (*githubv4.String)(nil),
 		"firstFields": githubv4.Int(LimitMax),
@@ -1023,8 +1023,8 @@ type SingleSelectFieldOptions struct {
 	Name string
 }
 
-func (f SingleSelectFieldOptions) ExportData(_ []string) map[string]interface{} {
-	return map[string]interface{}{
+func (f SingleSelectFieldOptions) ExportData(_ []string) map[string]any {
+	return map[string]any{
 		"id":   f.ID,
 		"name": f.Name,
 	}
@@ -1044,15 +1044,15 @@ func (p ProjectField) Options() []SingleSelectFieldOptions {
 	return nil
 }
 
-func (p ProjectField) ExportData(_ []string) map[string]interface{} {
-	v := map[string]interface{}{
+func (p ProjectField) ExportData(_ []string) map[string]any {
+	v := map[string]any{
 		"id":   p.ID(),
 		"name": p.Name(),
 		"type": p.Type(),
 	}
 	// Emulate omitempty
 	if opts := p.Options(); len(opts) != 0 {
-		options := make([]map[string]interface{}, len(opts))
+		options := make([]map[string]any, len(opts))
 		for i, opt := range opts {
 			options[i] = opt.ExportData(nil)
 		}
@@ -1067,12 +1067,12 @@ type ProjectFields struct {
 	PageInfo   PageInfo
 }
 
-func (p ProjectFields) ExportData(_ []string) map[string]interface{} {
-	fields := make([]map[string]interface{}, len(p.Nodes))
+func (p ProjectFields) ExportData(_ []string) map[string]any {
+	fields := make([]map[string]any, len(p.Nodes))
 	for i := range p.Nodes {
 		fields[i] = p.Nodes[i].ExportData(nil)
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"fields":     fields,
 		"totalCount": p.TotalCount,
 	}
@@ -1091,7 +1091,7 @@ func (c *Client) ProjectFields(o *Owner, number int32, limit int) (*Project, err
 	if limit < first {
 		first = limit
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"firstItems":  githubv4.Int(LimitMax),
 		"afterItems":  (*githubv4.String)(nil),
 		"firstFields": githubv4.Int(first),
@@ -1235,7 +1235,7 @@ const ViewerOwner OwnerType = "VIEWER"
 // ViewerLoginName returns the login name of the viewer.
 func (c *Client) ViewerLoginName() (string, error) {
 	var query viewerLogin
-	err := c.doQueryWithProgressIndicator("Viewer", &query, map[string]interface{}{})
+	err := c.doQueryWithProgressIndicator("Viewer", &query, map[string]any{})
 	if err != nil {
 		return "", err
 	}
@@ -1253,7 +1253,7 @@ func (c *Client) OwnerIDAndType(login string) (string, OwnerType, error) {
 		return query.Viewer.Id, ViewerOwner, nil
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"login": githubv4.String(login),
 	}
 	var query struct {
@@ -1306,7 +1306,7 @@ func (c *Client) IssueOrPullRequestID(rawURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"url": githubv4.URI{URL: uri},
 	}
 	var query issueOrPullRequest
@@ -1368,7 +1368,7 @@ type loginTypes struct {
 func (c *Client) userOrgLogins() ([]loginTypes, error) {
 	l := make([]loginTypes, 0)
 	var v viewerLoginOrgs
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"after": (*githubv4.String)(nil),
 	}
 
@@ -1406,7 +1406,7 @@ func (c *Client) userOrgLogins() ([]loginTypes, error) {
 // paginateOrgLogins after cursor and append them to the list of logins.
 func (c *Client) paginateOrgLogins(l []loginTypes, cursor string) ([]loginTypes, error) {
 	var v viewerLoginOrgs
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"after": githubv4.String(cursor),
 	}
 
@@ -1491,7 +1491,7 @@ func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 // set `fields“ to true to get the project's field data
 func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool) (*Project, error) {
 	if number != 0 {
-		variables := map[string]interface{}{
+		variables := map[string]any{
 			"number":      githubv4.Int(number),
 			"firstItems":  githubv4.Int(0),
 			"afterItems":  (*githubv4.String)(nil),
@@ -1566,7 +1566,7 @@ func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) (Pr
 		first = limit
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"first":       githubv4.Int(first),
 		"after":       cursor,
 		"firstItems":  githubv4.Int(0),
@@ -1661,7 +1661,7 @@ type unlinkProjectFromTeamMutation struct {
 // LinkProjectToRepository links a project to a repository.
 func (c *Client) LinkProjectToRepository(projectID string, repoID string) error {
 	var mutation linkProjectToRepoMutation
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.LinkProjectV2ToRepositoryInput{
 			ProjectID:    githubv4.String(projectID),
 			RepositoryID: githubv4.ID(repoID),
@@ -1674,7 +1674,7 @@ func (c *Client) LinkProjectToRepository(projectID string, repoID string) error 
 // LinkProjectToTeam links a project to a team.
 func (c *Client) LinkProjectToTeam(projectID string, teamID string) error {
 	var mutation linkProjectToTeamMutation
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.LinkProjectV2ToTeamInput{
 			ProjectID: githubv4.String(projectID),
 			TeamID:    githubv4.ID(teamID),
@@ -1687,7 +1687,7 @@ func (c *Client) LinkProjectToTeam(projectID string, teamID string) error {
 // UnlinkProjectFromRepository unlinks a project from a repository.
 func (c *Client) UnlinkProjectFromRepository(projectID string, repoID string) error {
 	var mutation unlinkProjectFromRepoMutation
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.UnlinkProjectV2FromRepositoryInput{
 			ProjectID:    githubv4.String(projectID),
 			RepositoryID: githubv4.ID(repoID),
@@ -1700,7 +1700,7 @@ func (c *Client) UnlinkProjectFromRepository(projectID string, repoID string) er
 // UnlinkProjectFromTeam unlinks a project from a team.
 func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) error {
 	var mutation unlinkProjectFromTeamMutation
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.UnlinkProjectV2FromTeamInput{
 			ProjectID: githubv4.String(projectID),
 			TeamID:    githubv4.ID(teamID),
@@ -1747,12 +1747,12 @@ func requiredScopesFromServerMessage(msg string) []string {
 	return scopes
 }
 
-func projectFieldValueData(v FieldValueNodes) interface{} {
+func projectFieldValueData(v FieldValueNodes) any {
 	switch v.Type {
 	case "ProjectV2ItemFieldDateValue":
 		return v.ProjectV2ItemFieldDateValue.Date
 	case "ProjectV2ItemFieldIterationValue":
-		return map[string]interface{}{
+		return map[string]any{
 			"title":       v.ProjectV2ItemFieldIterationValue.Title,
 			"startDate":   v.ProjectV2ItemFieldIterationValue.StartDate,
 			"duration":    v.ProjectV2ItemFieldIterationValue.Duration,
@@ -1765,7 +1765,7 @@ func projectFieldValueData(v FieldValueNodes) interface{} {
 	case "ProjectV2ItemFieldTextValue":
 		return v.ProjectV2ItemFieldTextValue.Text
 	case "ProjectV2ItemFieldMilestoneValue":
-		return map[string]interface{}{
+		return map[string]any{
 			"title":       v.ProjectV2ItemFieldMilestoneValue.Milestone.Title,
 			"description": v.ProjectV2ItemFieldMilestoneValue.Milestone.Description,
 			"dueOn":       v.ProjectV2ItemFieldMilestoneValue.Milestone.DueOn,
@@ -1807,19 +1807,19 @@ func projectFieldValueData(v FieldValueNodes) interface{} {
 }
 
 // serialize creates a map from field to field values
-func serializeProjectWithItems(project *Project) []map[string]interface{} {
+func serializeProjectWithItems(project *Project) []map[string]any {
 	fields := make(map[string]string)
 
 	// make a map of fields by ID
 	for _, f := range project.Fields.Nodes {
 		fields[f.ID()] = camelCase(f.Name())
 	}
-	itemsSlice := make([]map[string]interface{}, 0)
+	itemsSlice := make([]map[string]any, 0)
 
 	// for each value, look up the name by ID
 	// and set the value to the field value
 	for _, i := range project.Items.Nodes {
-		o := make(map[string]interface{})
+		o := make(map[string]any)
 		o["id"] = i.Id
 		if projectItem := i.DetailedItem(); projectItem != nil {
 			o["content"] = projectItem.ExportData(nil)
@@ -1849,5 +1849,5 @@ func camelCase(s string) string {
 }
 
 type exportable interface {
-	ExportData([]string) map[string]interface{}
+	ExportData([]string) map[string]any
 }

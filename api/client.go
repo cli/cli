@@ -54,7 +54,7 @@ func (err HTTPError) ScopesSuggestion() string {
 
 // GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
-func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
+func (c Client) GraphQL(hostname string, query string, variables map[string]any, data any) error {
 	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
@@ -66,7 +66,7 @@ func (c Client) GraphQL(hostname string, query string, variables map[string]inte
 
 // Mutate performs a GraphQL mutation based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
-func (c Client) Mutate(hostname, name string, mutation interface{}, variables map[string]interface{}) error {
+func (c Client) Mutate(hostname, name string, mutation any, variables map[string]any) error {
 	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
@@ -78,7 +78,7 @@ func (c Client) Mutate(hostname, name string, mutation interface{}, variables ma
 
 // Query performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
-func (c Client) Query(hostname, name string, query interface{}, variables map[string]interface{}) error {
+func (c Client) Query(hostname, name string, query any, variables map[string]any) error {
 	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
@@ -90,7 +90,7 @@ func (c Client) Query(hostname, name string, query interface{}, variables map[st
 
 // QueryWithContext performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
-func (c Client) QueryWithContext(ctx context.Context, hostname, name string, query interface{}, variables map[string]interface{}) error {
+func (c Client) QueryWithContext(ctx context.Context, hostname, name string, query any, variables map[string]any) error {
 	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := ghAPI.NewGraphQLClient(opts)
@@ -101,7 +101,7 @@ func (c Client) QueryWithContext(ctx context.Context, hostname, name string, que
 }
 
 // REST performs a REST request and parses the response.
-func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
+func (c Client) REST(hostname string, method string, p string, body io.Reader, data any) error {
 	opts := clientOptions(hostname, c.http.Transport)
 	restClient, err := ghAPI.NewRESTClient(opts)
 	if err != nil {
@@ -110,7 +110,7 @@ func (c Client) REST(hostname string, method string, p string, body io.Reader, d
 	return handleResponse(restClient.Do(method, p, body, data))
 }
 
-func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data interface{}) (string, error) {
+func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data any) (string, error) {
 	opts := clientOptions(hostname, c.http.Transport)
 	restClient, err := ghAPI.NewRESTClient(opts)
 	if err != nil {

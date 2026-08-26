@@ -50,7 +50,7 @@ func (w *Workflow) Base() string {
 	return path.Base(w.Path)
 }
 
-func (w *Workflow) ExportData(fields []string) map[string]interface{} {
+func (w *Workflow) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(w, fields)
 }
 

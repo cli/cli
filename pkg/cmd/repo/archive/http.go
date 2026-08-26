@@ -16,7 +16,7 @@ func archiveRepo(client *http.Client, repo *api.Repository) error {
 		} `graphql:"archiveRepository(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.ArchiveRepositoryInput{
 			RepositoryID: repo.ID,
 		},

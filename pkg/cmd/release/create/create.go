@@ -445,7 +445,7 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"tag_name":   opts.TagName,
 		"draft":      opts.Draft,
 		"prerelease": opts.Prerelease,

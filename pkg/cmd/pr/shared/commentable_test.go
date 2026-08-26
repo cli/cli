@@ -423,7 +423,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 				}
 				reg.Register(
 					httpmock.GraphQL(tt.wantQuery),
-					httpmock.GraphQLMutation(response, func(inputs map[string]interface{}) {
+					httpmock.GraphQLMutation(response, func(inputs map[string]any) {
 						gotBody, _ = inputs["body"].(string)
 					}),
 				)

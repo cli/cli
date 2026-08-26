@@ -61,7 +61,7 @@ func GraphQL(q string) Matcher {
 	}
 }
 
-func GraphQLMutationMatcher(q string, cb func(map[string]interface{}) bool) Matcher {
+func GraphQLMutationMatcher(q string, cb func(map[string]any) bool) Matcher {
 	re := regexp.MustCompile(q)
 
 	return func(req *http.Request) bool {
@@ -75,7 +75,7 @@ func GraphQLMutationMatcher(q string, cb func(map[string]interface{}) bool) Matc
 		var bodyData struct {
 			Query     string
 			Variables struct {
-				Input map[string]interface{}
+				Input map[string]any
 			}
 		}
 		_ = decodeJSONBody(req, &bodyData)
@@ -113,7 +113,7 @@ func readBody(req *http.Request) ([]byte, error) {
 	return io.ReadAll(r)
 }
 
-func decodeJSONBody(req *http.Request, dest interface{}) error {
+func decodeJSONBody(req *http.Request, dest any) error {
 	b, err := readBody(req)
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func StatusStringResponse(status int, body string) Responder {
 	}
 }
 
-func JSONResponse(body interface{}) Responder {
+func JSONResponse(body any) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		b, _ := json.Marshal(body)
 		header := http.Header{
@@ -172,7 +172,7 @@ func JSONResponse(body interface{}) Responder {
 // StatusJSONResponse turns the given argument into a JSON response.
 //
 // The argument is not meant to be a JSON string, unless it's intentional.
-func StatusJSONResponse(status int, body interface{}) Responder {
+func StatusJSONResponse(status int, body any) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		b, _ := json.Marshal(body)
 		header := http.Header{
@@ -198,9 +198,9 @@ func FileResponse(filename string) Responder {
 	}
 }
 
-func RESTPayload(responseStatus int, responseBody string, cb func(payload map[string]interface{})) Responder {
+func RESTPayload(responseStatus int, responseBody string, cb func(payload map[string]any)) Responder {
 	return func(req *http.Request) (*http.Response, error) {
-		bodyData := make(map[string]interface{})
+		bodyData := make(map[string]any)
 		err := decodeJSONBody(req, &bodyData)
 		if err != nil {
 			return nil, err
@@ -214,11 +214,11 @@ func RESTPayload(responseStatus int, responseBody string, cb func(payload map[st
 	}
 }
 
-func GraphQLMutation(body string, cb func(map[string]interface{})) Responder {
+func GraphQLMutation(body string, cb func(map[string]any)) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		var bodyData struct {
 			Variables struct {
-				Input map[string]interface{}
+				Input map[string]any
 			}
 		}
 		err := decodeJSONBody(req, &bodyData)
@@ -231,11 +231,11 @@ func GraphQLMutation(body string, cb func(map[string]interface{})) Responder {
 	}
 }
 
-func GraphQLQuery(body string, cb func(string, map[string]interface{})) Responder {
+func GraphQLQuery(body string, cb func(string, map[string]any)) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		var bodyData struct {
 			Query     string
-			Variables map[string]interface{}
+			Variables map[string]any
 		}
 		err := decodeJSONBody(req, &bodyData)
 		if err != nil {

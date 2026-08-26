@@ -747,7 +747,7 @@ func (e *testExporter) Fields() []string {
 	return e.fields
 }
 
-func (e *testExporter) Write(io *iostreams.IOStreams, data interface{}) error {
+func (e *testExporter) Write(io *iostreams.IOStreams, data any) error {
 	r := data.(*api.Repository)
 	fmt.Fprintf(io.Out, "name: %s\n", r.Name)
 	fmt.Fprintf(io.Out, "defaultBranchRef: %s\n", r.DefaultBranchRef.Name)

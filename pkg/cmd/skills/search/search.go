@@ -183,8 +183,8 @@ func (s skillResult) qualifiedName() string {
 }
 
 // ExportData implements cmdutil.exportable for --json output.
-func (s skillResult) ExportData(fields []string) map[string]interface{} {
-	data := map[string]interface{}{}
+func (s skillResult) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "repo":

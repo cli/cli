@@ -109,9 +109,9 @@ func runClose(config closeConfig) error {
 	return printResults(config, query.UpdateProjectV2.ProjectV2)
 }
 
-func closeArgs(config closeConfig) (*updateProjectMutation, map[string]interface{}) {
+func closeArgs(config closeConfig) (*updateProjectMutation, map[string]any) {
 	closed := !config.opts.reopen
-	return &updateProjectMutation{}, map[string]interface{}{
+	return &updateProjectMutation{}, map[string]any{
 		"input": githubv4.UpdateProjectV2Input{
 			ProjectID: githubv4.ID(config.opts.projectID),
 			Closed:    githubv4.NewBoolean(githubv4.Boolean(closed)),

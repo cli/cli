@@ -114,8 +114,8 @@ func runAddItem(config addItemConfig) error {
 
 }
 
-func addItemArgs(config addItemConfig) (*addProjectItemMutation, map[string]interface{}) {
-	return &addProjectItemMutation{}, map[string]interface{}{
+func addItemArgs(config addItemConfig) (*addProjectItemMutation, map[string]any) {
+	return &addProjectItemMutation{}, map[string]any{
 		"input": githubv4.AddProjectV2ItemByIdInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
 			ContentID: githubv4.ID(config.opts.itemID),

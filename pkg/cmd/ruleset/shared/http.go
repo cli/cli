@@ -28,7 +28,7 @@ type RulesetList struct {
 }
 
 func ListRepoRulesets(httpClient *http.Client, repo ghrepo.Interface, limit int, includeParents bool) (*RulesetList, error) {
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":          repo.RepoOwner(),
 		"repo":           repo.RepoName(),
 		"includeParents": includeParents,
@@ -38,7 +38,7 @@ func ListRepoRulesets(httpClient *http.Client, repo ghrepo.Interface, limit int,
 }
 
 func ListOrgRulesets(httpClient *http.Client, orgLogin string, limit int, host string, includeParents bool) (*RulesetList, error) {
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"login":          orgLogin,
 		"includeParents": includeParents,
 	}
@@ -46,7 +46,7 @@ func ListOrgRulesets(httpClient *http.Client, orgLogin string, limit int, host s
 	return listRulesets(httpClient, rulesetsQuery(true), variables, limit, host)
 }
 
-func listRulesets(httpClient *http.Client, query string, variables map[string]interface{}, limit int, host string) (*RulesetList, error) {
+func listRulesets(httpClient *http.Client, query string, variables map[string]any, limit int, host string) (*RulesetList, error) {
 	pageLimit := min(limit, 100)
 
 	res := RulesetList{

@@ -655,11 +655,11 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "requestReviewsByLogin": { "clientMutationId": "" } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							// Verify that empty slices are sent to properly clear all reviewer types
-							require.Equal(t, []interface{}{}, inputs["userLogins"], "userLogins should be an empty slice")
-							require.Equal(t, []interface{}{}, inputs["botLogins"], "botLogins should be an empty slice")
-							require.Equal(t, []interface{}{}, inputs["teamSlugs"], "teamSlugs should be an empty slice")
+							require.Equal(t, []any{}, inputs["userLogins"], "userLogins should be an empty slice")
+							require.Equal(t, []any{}, inputs["botLogins"], "botLogins should be an empty slice")
+							require.Equal(t, []any{}, inputs["teamSlugs"], "teamSlugs should be an empty slice")
 							require.Equal(t, false, inputs["union"], "union should be false for replace mode")
 						}),
 				)
@@ -981,8 +981,8 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
-						func(inputs map[string]interface{}) {
-							require.Subset(t, inputs["actorLogins"], []interface{}{"hubot", "monalisa"})
+						func(inputs map[string]any) {
+							require.Subset(t, inputs["actorLogins"], []any{"hubot", "monalisa"})
 						}),
 				)
 			},
@@ -1854,7 +1854,7 @@ func mockPullRequestUpdate(reg *httpmock.Registry) {
 func mockPullRequestUpdateWithBody(t *testing.T, reg *httpmock.Registry, wantBody string) {
 	reg.Register(
 		httpmock.GraphQL(`mutation PullRequestUpdate\b`),
-		httpmock.GraphQLMutation(`{}`, func(inputs map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(inputs map[string]any) {
 			assert.Equal(t, wantBody, inputs["body"])
 		}),
 	)
@@ -1865,7 +1865,7 @@ func mockPullRequestUpdateWithBody(t *testing.T, reg *httpmock.Registry, wantBod
 func mockPullRequestUpdateWithoutBody(t *testing.T, reg *httpmock.Registry, wantTitle string) {
 	reg.Register(
 		httpmock.GraphQL(`mutation PullRequestUpdate\b`),
-		httpmock.GraphQLMutation(`{}`, func(inputs map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(inputs map[string]any) {
 			assert.Equal(t, wantTitle, inputs["title"])
 			assert.NotContains(t, inputs, "body")
 		}),
@@ -1877,7 +1877,7 @@ func mockPullRequestUpdateApiActors(reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 }
 
@@ -1900,7 +1900,7 @@ func mockRequestReviewsByLogin(reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "requestReviewsByLogin": { "clientMutationId": "" } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 }
 
@@ -1909,13 +1909,13 @@ func mockPullRequestUpdateLabels(reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation LabelAdd\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "addLabelsToLabelable": { "__typename": "" } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 	reg.Register(
 		httpmock.GraphQL(`mutation LabelRemove\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "removeLabelsFromLabelable": { "__typename": "" } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 }
 
@@ -1924,7 +1924,7 @@ func mockProjectV2ItemUpdate(reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "add_000": { "item": { "id": "1" } }, "delete_001": { "item": { "id": "2" } } } }`,
-			func(inputs map[string]interface{}) {}),
+			func(inputs map[string]any) {}),
 	)
 }
 

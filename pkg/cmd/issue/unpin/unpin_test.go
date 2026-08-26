@@ -42,7 +42,7 @@ func TestUnpinRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation IssueUnpin\b`),
 					httpmock.GraphQLMutation(`{"id": "ISSUE-ID"}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, inputs["issueId"], "ISSUE-ID")
 						},
 					),

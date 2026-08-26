@@ -54,8 +54,8 @@ func (p *FetchParams) Validate() error {
 
 // githubApiClient makes REST calls to the GitHub API
 type githubApiClient interface {
-	REST(hostname, method, p string, body io.Reader, data interface{}) error
-	RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error)
+	REST(hostname, method, p string, body io.Reader, data any) error
+	RESTWithNext(hostname, method, p string, body io.Reader, data any) (string, error)
 }
 
 // httpClient makes HTTP calls to all non-GitHub API endpoints

@@ -133,8 +133,8 @@ func editRun(tag string, opts *EditOptions) error {
 	return nil
 }
 
-func getParams(opts *EditOptions) map[string]interface{} {
-	params := map[string]interface{}{}
+func getParams(opts *EditOptions) map[string]any {
+	params := map[string]any{}
 
 	if opts.Body != nil {
 		params["body"] = opts.Body
