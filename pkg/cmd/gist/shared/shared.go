@@ -122,10 +122,7 @@ func ListGists(client *http.Client, hostname string, limit int, filter *regexp.R
 		}
 	}
 
-	perPage := limit
-	if perPage > maxPerPage {
-		perPage = maxPerPage
-	}
+	perPage := min(limit, maxPerPage)
 
 	variables := map[string]any{
 		"per_page":       githubv4.Int(perPage),

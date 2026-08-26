@@ -374,10 +374,7 @@ func noResults(opts *SearchOptions, msg string) error {
 // potentially a repo fetch (stars), so keeping this small matters for
 // performance. Pre-ranking ensures the best candidates are at the top.
 func truncateForProcessing(skills []skillResult, page, limit int) []skillResult {
-	maxToProcess := page * limit * 3
-	if maxToProcess < limit*3 {
-		maxToProcess = limit * 3
-	}
+	maxToProcess := max(page*limit*3, limit*3)
 	if len(skills) > maxToProcess {
 		return skills[:maxToProcess]
 	}
@@ -421,10 +418,7 @@ func paginate(skills []skillResult, page, limit int) ([]skillResult, int) {
 	if start >= total {
 		return nil, totalPages
 	}
-	end := start + limit
-	if end > total {
-		end = total
-	}
+	end := min(start+limit, total)
 	return skills[start:end], totalPages
 }
 
@@ -494,10 +488,7 @@ func renderResults(opts *SearchOptions, skills []skillResult, totalPages int) er
 func renderTable(io *iostreams.IOStreams, skills []skillResult) error {
 	isTTY := io.IsStdoutTTY()
 	tw := io.TerminalWidth()
-	descWidth := tw - 70
-	if descWidth < 20 {
-		descWidth = 20
-	}
+	descWidth := max(tw-70, 20)
 
 	table := tableprinter.New(io, tableprinter.WithHeader("REPOSITORY", "SKILL", "DESCRIPTION", "STARS"))
 	for _, s := range skills {
@@ -524,10 +515,7 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 	// Reserve space for the checkbox UI prefix ("[ ] ") and the description
 	// indent ("\n       " = 7 chars), then use the remaining terminal width.
 	tw := opts.IO.TerminalWidth()
-	descWidth := tw - 11
-	if descWidth < 30 {
-		descWidth = 30
-	}
+	descWidth := max(tw-11, 30)
 
 	options := make([]string, len(skills))
 	for i, s := range skills {
@@ -758,10 +746,7 @@ func fetchPrimaryPages(client *api.Client, host, query string, displayPage, disp
 	// good buffer for typical filter rates while staying well within
 	// the rate-limit budget.
 	needed := displayPage * displayLimit * 3
-	numPages := (needed + searchPageSize - 1) / searchPageSize
-	if numPages < 1 {
-		numPages = 1
-	}
+	numPages := max((needed+searchPageSize-1)/searchPageSize, 1)
 	maxAPIPages := maxResults / searchPageSize
 	if numPages > maxAPIPages {
 		numPages = maxAPIPages

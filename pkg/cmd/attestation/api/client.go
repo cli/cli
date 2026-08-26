@@ -126,10 +126,7 @@ func (c *LiveClient) buildRequestURL(params FetchParams) (safeurl.SafeURL, error
 		}
 	}
 
-	perPage := params.Limit
-	if perPage > maxLimitForFetch {
-		perPage = maxLimitForFetch
-	}
+	perPage := min(params.Limit, maxLimitForFetch)
 
 	// ref: https://github.com/cli/go-gh/blob/d32c104a9a25c9de3d7c7b07a43ae0091441c858/example_gh_test.go#L96
 	u.SetQuery("per_page", strconv.Itoa(perPage))
