@@ -32,7 +32,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Ensure go.mod and go.sum are up to date
+      - name: Ensure Go source and modules are up to date
         run: |
           STATUS=0
           assert-nothing-changed() {
@@ -45,6 +45,7 @@ jobs:
             fi
           }
           assert-nothing-changed go mod tidy
+          assert-nothing-changed go fix ./...
           exit $STATUS
 
       - name: golangci-lint
