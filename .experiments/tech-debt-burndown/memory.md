@@ -71,3 +71,8 @@ None yet.
 ## Failed attempts
 
 None yet.
+
+## Landed targets
+
+- 2026-08-26: `pkg/cmd/attestation/verify` now returns terminal write errors from
+  `PrintBulletPoints`; the package-scoped errcheck count dropped from 17 to 16.

@@ -33,6 +33,21 @@ var (
 	bundlePath   = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json")
 )
 
+type failOnSubstringWriter struct {
+	substring string
+}
+
+func (w failOnSubstringWriter) Write(p []byte) (int, error) {
+	if strings.Contains(string(p), w.substring) {
+		return 0, fmt.Errorf("write failed")
+	}
+	return len(p), nil
+}
+
+func (failOnSubstringWriter) Fd() uintptr {
+	return 0
+}
+
 func TestNewVerifyCmd(t *testing.T) {
 	testIO, _, _, _ := iostreams.Test()
 	var testReg httpmock.Registry
@@ -389,6 +404,17 @@ func TestRunVerify(t *testing.T) {
 
 	t.Run("with valid artifact and bundle", func(t *testing.T) {
 		require.NoError(t, runVerify(&publicGoodOpts))
+	})
+
+	t.Run("with error writing attestation details", func(t *testing.T) {
+		testIO, _, _, _ := iostreams.Test()
+		testIO.SetStdoutTTY(true)
+		testIO.ErrOut = failOnSubstringWriter{substring: "Build repo"}
+
+		opts := publicGoodOpts
+		opts.Logger = io.NewHandler(testIO)
+
+		require.ErrorContains(t, runVerify(&opts), "write failed")
 	})
 
 	t.Run("with failing OCI artifact fetch", func(t *testing.T) {
