@@ -337,7 +337,7 @@ func TestManager_UpgradeExtensions(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		exts[i].currentVersion = "old version"
 		exts[i].latestVersion = "new version"
 	}
@@ -376,7 +376,7 @@ func TestManager_UpgradeExtensions_DryRun(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		exts[i].currentVersion = fmt.Sprintf("%d", i)
 		exts[i].latestVersion = fmt.Sprintf("%d", i+1)
 	}

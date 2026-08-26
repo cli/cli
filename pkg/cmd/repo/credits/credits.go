@@ -252,7 +252,7 @@ func creditsRun(opts *CreditsOptions) error {
 func starLine(r *rand.Rand, width int) string {
 	line := ""
 	starChance := 0.1
-	for y := 0; y < width; y++ {
+	for range width {
 		chance := r.Float64()
 		if chance <= starChance {
 			charRoll := r.Float64()

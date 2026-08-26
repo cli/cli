@@ -532,7 +532,7 @@ func getMachineName(ctx context.Context, apiClient apiClient, prompter SurveyPro
 		}
 
 		availableMachines := make([]string, len(machines))
-		for i := 0; i < len(machines); i++ {
+		for i := range machines {
 			availableMachines[i] = machines[i].Name
 		}
 

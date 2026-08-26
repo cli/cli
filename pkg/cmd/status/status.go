@@ -273,7 +273,7 @@ func (s *StatusGetter) LoadNotifications() error {
 	fetched := make(chan StatusItem)
 
 	wg := new(errgroup.Group)
-	for i := 0; i < fetchWorkers; i++ {
+	for range fetchWorkers {
 		wg.Go(func() error {
 			for {
 				select {
@@ -341,7 +341,7 @@ func (s *StatusGetter) LoadNotifications() error {
 	u.SetQuery("participating", "true")
 	u.SetQuery("all", "true")
 	var p safeurl.SafeURL = u
-	for pages := 0; pages < 3; pages++ {
+	for range 3 {
 		var resp []Notification
 		next, err := c.RESTWithNext(s.hostname(), "GET", p.String(), nil, &resp)
 		if err != nil {
