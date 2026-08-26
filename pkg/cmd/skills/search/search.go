@@ -305,11 +305,9 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		pathResult, pathErr = executeSearch(client, host, pathQ, 1, searchPageSize)
-	}()
+	})
 
 	// When no explicit --owner is set and the query looks like it could be a
 	// GitHub username, fire an additional user:<query> search to discover
@@ -317,11 +315,9 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 	// everything else (no scoring boost).
 	if owner == "" && couldBeOwner(queryTerm) {
 		ownerQ := fmt.Sprintf("filename:SKILL.md user:%s", queryTerm)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			ownerResult, ownerErr = executeSearch(client, host, ownerQ, 1, searchPageSize)
-		}()
+		})
 	}
 
 	// When the query has spaces (e.g. "mcp apps"), run an additional content
@@ -329,11 +325,9 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 	// whose names use hyphens as word separators.
 	if hasSpaces {
 		hyphenQ := fmt.Sprintf("filename:SKILL.md %s%s", pathTerm, ownerScope)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			hyphenResult, hyphenErr = executeSearch(client, host, hyphenQ, 1, searchPageSize)
-		}()
+		})
 	}
 
 	// Primary content search runs on the main goroutine.
