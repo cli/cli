@@ -693,10 +693,7 @@ func (c *Client) ProjectItems(o *Owner, number int32, limit int, queryStr string
 	}
 
 	// set first to the min of limit and LimitMax
-	first := LimitMax
-	if limit < first {
-		first = limit
-	}
+	first := min(limit, LimitMax)
 
 	variables := map[string]any{
 		"firstItems":  githubv4.Int(first),
@@ -1085,10 +1082,7 @@ func (c *Client) ProjectFields(o *Owner, number int32, limit int) (*Project, err
 	}
 
 	// set first to the min of limit and LimitMax
-	first := LimitMax
-	if limit < first {
-		first = limit
-	}
+	first := min(limit, LimitMax)
 	variables := map[string]any{
 		"firstItems":  githubv4.Int(LimitMax),
 		"afterItems":  (*githubv4.String)(nil),
@@ -1559,10 +1553,7 @@ func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) (Pr
 	}
 
 	// set first to the min of limit and LimitMax
-	first := LimitMax
-	if limit < first {
-		first = limit
-	}
+	first := min(limit, LimitMax)
 
 	variables := map[string]any{
 		"first":       githubv4.Int(first),

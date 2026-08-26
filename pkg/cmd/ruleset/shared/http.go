@@ -84,13 +84,6 @@ func listRulesets(httpClient *http.Client, query string, variables map[string]an
 	return &res, nil
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func rulesetsQuery(org bool) string {
 	if org {
 		return orgGraphQLHeader + sharedGraphQLBody

@@ -377,10 +377,7 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		}
 	}
 
-	perPage := limit
-	if limit > 100 {
-		perPage = 100
-	}
+	perPage := min(limit, 100)
 	u.SetQuery("per_page", strconv.Itoa(perPage))
 	u.SetQuery("exclude_pull_requests", "true") // significantly reduces payload size
 
