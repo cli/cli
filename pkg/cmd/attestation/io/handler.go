@@ -79,10 +79,10 @@ func (h *Handler) PrintBulletPoints(rows [][]string) (int, error) {
 		}
 	}
 
-	info := ""
+	var info strings.Builder
 	for _, row := range rows {
 		dots := strings.Repeat(".", maxColLen-len(row[0]))
-		info += fmt.Sprintf("%s:%s %s\n", row[0], dots, row[1])
+		info.WriteString(fmt.Sprintf("%s:%s %s\n", row[0], dots, row[1]))
 	}
-	return fmt.Fprintln(h.IO.ErrOut, info)
+	return fmt.Fprintln(h.IO.ErrOut, info.String())
 }

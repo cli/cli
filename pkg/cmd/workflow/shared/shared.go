@@ -225,11 +225,12 @@ func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, r
 	}
 
 	if !io.CanPrompt() {
-		errMsg := "could not resolve to a unique workflow; found:"
+		var errMsg strings.Builder
+		errMsg.WriteString("could not resolve to a unique workflow; found:")
 		for _, workflow := range workflows {
-			errMsg += fmt.Sprintf(" %s", workflow.Base())
+			errMsg.WriteString(fmt.Sprintf(" %s", workflow.Base()))
 		}
-		return nil, errors.New(errMsg)
+		return nil, errors.New(errMsg.String())
 	}
 
 	return selectWorkflow(p, workflows, "Which workflow do you mean?", states)

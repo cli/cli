@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -28,11 +29,11 @@ func newTestGitClient() *git.Client {
 
 // stubGitRemote registers CommandStubber stubs for git remote detection.
 func stubGitRemote(cs *run.CommandStubber, remoteURLs map[string]string) {
-	var remoteLines string
+	var remoteLines strings.Builder
 	for name, url := range remoteURLs {
-		remoteLines += fmt.Sprintf("%[1]s\t%[2]s (fetch)\n%[1]s\t%[2]s (push)\n", name, url)
+		remoteLines.WriteString(fmt.Sprintf("%[1]s\t%[2]s (fetch)\n%[1]s\t%[2]s (push)\n", name, url))
 	}
-	cs.Register(`git( .+)? remote -v`, 0, remoteLines)
+	cs.Register(`git( .+)? remote -v`, 0, remoteLines.String())
 	cs.Register(`git( .+)? config --get-regexp \^remote\\\.`, 1, "")
 	for name, url := range remoteURLs {
 		cs.Register(fmt.Sprintf(`git( .+)? remote get-url -- %s`, regexp.QuoteMeta(name)), 0, url+"\n")

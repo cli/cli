@@ -483,13 +483,13 @@ func shaToColorFunc(sha string) func(string) string {
 }
 
 func computeSeed(seed string) int64 {
-	lol := ""
+	var lol strings.Builder
 
 	for _, r := range seed {
-		lol += fmt.Sprintf("%d", int(r))
+		lol.WriteString(fmt.Sprintf("%d", int(r)))
 	}
 
-	result, err := strconv.ParseInt(lol[0:10], 10, 64)
+	result, err := strconv.ParseInt(lol.String()[0:10], 10, 64)
 	if err != nil {
 		panic(err)
 	}
