@@ -104,7 +104,7 @@ func TestApp_Create(t *testing.T) {
 				machine:         "GIGA",
 				showStatus:      false,
 				idleTimeout:     30 * time.Minute,
-				retentionPeriod: NullableDuration{durationPtr(48 * time.Hour)},
+				retentionPeriod: NullableDuration{new(48 * time.Hour)},
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
