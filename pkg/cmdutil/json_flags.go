@@ -294,7 +294,6 @@ type exportable interface {
 }
 
 var exportableType = reflect.TypeFor[exportable]()
-var sliceOfEmptyInterface []any
 var emptyInterfaceType = reflect.TypeFor[[]any]().Elem()
 
 // Basic function that can be used with structs that need to implement
