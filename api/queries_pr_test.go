@@ -577,7 +577,7 @@ func TestPRRepositorySelectionMatchesStruct(t *testing.T) {
 	selected := strings.Split(inner, ",")
 
 	var declared []string
-	repositoryType := reflect.TypeOf(PRRepository{})
+	repositoryType := reflect.TypeFor[PRRepository]()
 	for i := range repositoryType.NumField() {
 		name, _, _ := strings.Cut(repositoryType.Field(i).Tag.Get("json"), ",")
 		declared = append(declared, name)
