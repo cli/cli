@@ -125,7 +125,7 @@ func copyArgs(config copyConfig) (*copyProjectMutation, map[string]any) {
 			OwnerID:            githubv4.ID(config.opts.ownerID),
 			ProjectID:          githubv4.ID(config.opts.projectID),
 			Title:              githubv4.String(config.opts.title),
-			IncludeDraftIssues: githubv4.NewBoolean(githubv4.Boolean(config.opts.includeDraftIssues)),
+			IncludeDraftIssues: new(githubv4.Boolean(config.opts.includeDraftIssues)),
 		},
 		"firstItems":  githubv4.Int(0),
 		"afterItems":  (*githubv4.String)(nil),

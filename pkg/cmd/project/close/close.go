@@ -114,7 +114,7 @@ func closeArgs(config closeConfig) (*updateProjectMutation, map[string]any) {
 	return &updateProjectMutation{}, map[string]any{
 		"input": githubv4.UpdateProjectV2Input{
 			ProjectID: githubv4.ID(config.opts.projectID),
-			Closed:    githubv4.NewBoolean(githubv4.Boolean(closed)),
+			Closed:    new(githubv4.Boolean(closed)),
 		},
 		"firstItems":  githubv4.Int(0),
 		"afterItems":  (*githubv4.String)(nil),

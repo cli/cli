@@ -30,7 +30,7 @@ func TestNewCmdEdit(t *testing.T) {
 			wantOpts: EditOptions{
 				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				Edits: EditRepositoryInput{
-					Description: sp("hello"),
+					Description: new("hello"),
 				},
 			},
 		},
@@ -49,7 +49,7 @@ func TestNewCmdEdit(t *testing.T) {
 			wantOpts: EditOptions{
 				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				Edits: EditRepositoryInput{
-					Visibility: sp("public"),
+					Visibility: new("public"),
 				},
 			},
 		},
@@ -68,7 +68,7 @@ func TestNewCmdEdit(t *testing.T) {
 			wantOpts: EditOptions{
 				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				Edits: EditRepositoryInput{
-					Visibility: sp("private"),
+					Visibility: new("private"),
 				},
 			},
 		},
@@ -87,7 +87,7 @@ func TestNewCmdEdit(t *testing.T) {
 			wantOpts: EditOptions{
 				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				Edits: EditRepositoryInput{
-					Visibility: sp("internal"),
+					Visibility: new("internal"),
 				},
 			},
 		},
@@ -97,10 +97,10 @@ func TestNewCmdEdit(t *testing.T) {
 			wantOpts: EditOptions{
 				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				Edits: EditRepositoryInput{
-					squashMergeCommitMsg:     sp("pr-title"),
-					EnableSquashMerge:        bp(true),
-					SquashMergeCommitTitle:   sp("PR_TITLE"),
-					SquashMergeCommitMessage: sp("BLANK"),
+					squashMergeCommitMsg:     new("pr-title"),
+					EnableSquashMerge:        new(true),
+					SquashMergeCommitTitle:   new("PR_TITLE"),
+					SquashMergeCommitMessage: new("BLANK"),
 				},
 			},
 		},
@@ -179,8 +179,8 @@ func Test_editRun(t *testing.T) {
 			opts: EditOptions{
 				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				Edits: EditRepositoryInput{
-					Homepage:    sp("newURL"),
-					Description: sp("hello world!"),
+					Homepage:    new("newURL"),
+					Description: new("hello world!"),
 				},
 			},
 			httpStubs: func(t *testing.T, r *httpmock.Registry) {
@@ -217,7 +217,7 @@ func Test_editRun(t *testing.T) {
 			opts: EditOptions{
 				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				Edits: EditRepositoryInput{
-					AllowUpdateBranch: bp(true),
+					AllowUpdateBranch: new(true),
 				},
 			},
 			httpStubs: func(t *testing.T, r *httpmock.Registry) {
@@ -236,13 +236,13 @@ func Test_editRun(t *testing.T) {
 				Edits: EditRepositoryInput{
 					SecurityAndAnalysis: &SecurityAndAnalysisInput{
 						EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
-							Status: sp("enabled"),
+							Status: new("enabled"),
 						},
 						EnableSecretScanning: &SecurityAndAnalysisStatus{
-							Status: sp("enabled"),
+							Status: new("enabled"),
 						},
 						EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
-							Status: sp("disabled"),
+							Status: new("disabled"),
 						},
 					},
 				},
@@ -268,9 +268,9 @@ func Test_editRun(t *testing.T) {
 			opts: EditOptions{
 				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				Edits: EditRepositoryInput{
-					EnableSquashMerge:        bp(true),
-					SquashMergeCommitTitle:   sp("PR_TITLE"),
-					SquashMergeCommitMessage: sp("PR_BODY"),
+					EnableSquashMerge:        new(true),
+					SquashMergeCommitTitle:   new("PR_TITLE"),
+					SquashMergeCommitMessage: new("PR_BODY"),
 				},
 			},
 			httpStubs: func(t *testing.T, r *httpmock.Registry) {
@@ -290,13 +290,13 @@ func Test_editRun(t *testing.T) {
 				Edits: EditRepositoryInput{
 					SecurityAndAnalysis: &SecurityAndAnalysisInput{
 						EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
-							Status: sp("enabled"),
+							Status: new("enabled"),
 						},
 						EnableSecretScanning: &SecurityAndAnalysisStatus{
-							Status: sp("enabled"),
+							Status: new("enabled"),
 						},
 						EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
-							Status: sp("disabled"),
+							Status: new("disabled"),
 						},
 					},
 				},
@@ -853,20 +853,20 @@ func Test_transformSecurityAndAnalysisOpts(t *testing.T) {
 			name: "Enable all security and analysis settings",
 			opts: EditOptions{
 				Edits: EditRepositoryInput{
-					enableAdvancedSecurity:             bp(true),
-					enableSecretScanning:               bp(true),
-					enableSecretScanningPushProtection: bp(true),
+					enableAdvancedSecurity:             new(true),
+					enableSecretScanning:               new(true),
+					enableSecretScanningPushProtection: new(true),
 				},
 			},
 			want: &SecurityAndAnalysisInput{
 				EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
-					Status: sp("enabled"),
+					Status: new("enabled"),
 				},
 				EnableSecretScanning: &SecurityAndAnalysisStatus{
-					Status: sp("enabled"),
+					Status: new("enabled"),
 				},
 				EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
-					Status: sp("enabled"),
+					Status: new("enabled"),
 				},
 			},
 		},
@@ -874,20 +874,20 @@ func Test_transformSecurityAndAnalysisOpts(t *testing.T) {
 			name: "Disable all security and analysis settings",
 			opts: EditOptions{
 				Edits: EditRepositoryInput{
-					enableAdvancedSecurity:             bp(false),
-					enableSecretScanning:               bp(false),
-					enableSecretScanningPushProtection: bp(false),
+					enableAdvancedSecurity:             new(false),
+					enableSecretScanning:               new(false),
+					enableSecretScanningPushProtection: new(false),
 				},
 			},
 			want: &SecurityAndAnalysisInput{
 				EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
-					Status: sp("disabled"),
+					Status: new("disabled"),
 				},
 				EnableSecretScanning: &SecurityAndAnalysisStatus{
-					Status: sp("disabled"),
+					Status: new("disabled"),
 				},
 				EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
-					Status: sp("disabled"),
+					Status: new("disabled"),
 				},
 			},
 		},
@@ -895,12 +895,12 @@ func Test_transformSecurityAndAnalysisOpts(t *testing.T) {
 			name: "Enable only advanced security",
 			opts: EditOptions{
 				Edits: EditRepositoryInput{
-					enableAdvancedSecurity: bp(true),
+					enableAdvancedSecurity: new(true),
 				},
 			},
 			want: &SecurityAndAnalysisInput{
 				EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
-					Status: sp("enabled"),
+					Status: new("enabled"),
 				},
 				EnableSecretScanning:               nil,
 				EnableSecretScanningPushProtection: nil,
@@ -910,13 +910,13 @@ func Test_transformSecurityAndAnalysisOpts(t *testing.T) {
 			name: "Disable only secret scanning",
 			opts: EditOptions{
 				Edits: EditRepositoryInput{
-					enableSecretScanning: bp(false),
+					enableSecretScanning: new(false),
 				},
 			},
 			want: &SecurityAndAnalysisInput{
 				EnableAdvancedSecurity: nil,
 				EnableSecretScanning: &SecurityAndAnalysisStatus{
-					Status: sp("disabled"),
+					Status: new("disabled"),
 				},
 				EnableSecretScanningPushProtection: nil,
 			},
@@ -968,7 +968,7 @@ func Test_transformSquashMergeOpts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			edits := &EditRepositoryInput{
-				squashMergeCommitMsg: sp(tt.input),
+				squashMergeCommitMsg: new(tt.input),
 			}
 			transformSquashMergeOpts(edits)
 			assert.Equal(t, tt.wantTitle, *edits.SquashMergeCommitTitle)
@@ -979,7 +979,7 @@ func Test_transformSquashMergeOpts(t *testing.T) {
 
 func Test_transformSquashMergeOpts_unknownInput(t *testing.T) {
 	edits := &EditRepositoryInput{
-		squashMergeCommitMsg: sp("unknown-value"),
+		squashMergeCommitMsg: new("unknown-value"),
 	}
 	transformSquashMergeOpts(edits)
 	assert.Nil(t, edits.SquashMergeCommitTitle)
@@ -995,10 +995,12 @@ func Test_validateSquashMergeCommitMsg(t *testing.T) {
 	assert.Error(t, validateSquashMergeCommitMsg(""))
 }
 
+//go:fix inline
 func sp(v string) *string {
-	return &v
+	return new(v)
 }
 
+//go:fix inline
 func bp(b bool) *bool {
-	return &b
+	return new(b)
 }

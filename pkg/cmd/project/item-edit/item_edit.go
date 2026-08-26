@@ -345,17 +345,17 @@ func buildEditDraftIssue(config editItemConfig, currentDraftIssue *queries.Draft
 	}
 
 	if config.opts.titleChanged {
-		input.Title = githubv4.NewString(githubv4.String(config.opts.title))
+		input.Title = new(githubv4.String(config.opts.title))
 	} else if currentDraftIssue != nil {
 		// Preserve existing if title is not provided
-		input.Title = githubv4.NewString(githubv4.String(currentDraftIssue.Title))
+		input.Title = new(githubv4.String(currentDraftIssue.Title))
 	}
 
 	if config.opts.bodyChanged {
-		input.Body = githubv4.NewString(githubv4.String(config.opts.body))
+		input.Body = new(githubv4.String(config.opts.body))
 	} else if currentDraftIssue != nil {
 		// Preserve existing if body is not provided
-		input.Body = githubv4.NewString(githubv4.String(currentDraftIssue.Body))
+		input.Body = new(githubv4.String(currentDraftIssue.Body))
 	}
 
 	return &EditProjectDraftIssue{}, map[string]any{
@@ -367,23 +367,23 @@ func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2Fie
 	var value githubv4.ProjectV2FieldValue
 	if config.opts.text != "" {
 		value = githubv4.ProjectV2FieldValue{
-			Text: githubv4.NewString(githubv4.String(config.opts.text)),
+			Text: new(githubv4.String(config.opts.text)),
 		}
 	} else if config.opts.numberChanged {
 		value = githubv4.ProjectV2FieldValue{
-			Number: githubv4.NewFloat(githubv4.Float(config.opts.number)),
+			Number: new(githubv4.Float(config.opts.number)),
 		}
 	} else if config.opts.date != "" {
 		value = githubv4.ProjectV2FieldValue{
-			Date: githubv4.NewDate(githubv4.Date{Time: date}),
+			Date: new(githubv4.Date{Time: date}),
 		}
 	} else if config.opts.singleSelectOptionID != "" {
 		value = githubv4.ProjectV2FieldValue{
-			SingleSelectOptionID: githubv4.NewString(githubv4.String(config.opts.singleSelectOptionID)),
+			SingleSelectOptionID: new(githubv4.String(config.opts.singleSelectOptionID)),
 		}
 	} else if config.opts.iterationID != "" {
 		value = githubv4.ProjectV2FieldValue{
-			IterationID: githubv4.NewString(githubv4.String(config.opts.iterationID)),
+			IterationID: new(githubv4.String(config.opts.iterationID)),
 		}
 	}
 

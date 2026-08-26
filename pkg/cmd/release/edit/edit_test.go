@@ -47,8 +47,8 @@ func Test_NewCmdEdit(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName: "",
-				Name:    stringPtr("Some Title"),
-				Body:    stringPtr("Some Notes"),
+				Name:    new("Some Title"),
+				Body:    new("Some Notes"),
 			},
 		},
 		{
@@ -57,7 +57,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName:            "",
-				DiscussionCategory: stringPtr("some-category"),
+				DiscussionCategory: new("some-category"),
 			},
 		},
 		{
@@ -75,7 +75,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "",
-				Prerelease: boolPtr(true),
+				Prerelease: new(true),
 			},
 		},
 		{
@@ -84,7 +84,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "",
-				Prerelease: boolPtr(false),
+				Prerelease: new(false),
 			},
 		},
 		{
@@ -93,7 +93,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName: "",
-				Draft:   boolPtr(true),
+				Draft:   new(true),
 			},
 		},
 		{
@@ -102,7 +102,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName: "",
-				Draft:   boolPtr(false),
+				Draft:   new(false),
 			},
 		},
 		{
@@ -111,7 +111,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName:  "",
-				IsLatest: boolPtr(true),
+				IsLatest: new(true),
 			},
 		},
 		{
@@ -120,7 +120,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName:  "",
-				IsLatest: boolPtr(false),
+				IsLatest: new(false),
 			},
 		},
 		{
@@ -129,7 +129,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName: "",
-				Body:    stringPtr("MY NOTES"),
+				Body:    new("MY NOTES"),
 			},
 		},
 		{
@@ -139,7 +139,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			stdin: "MY NOTES",
 			want: EditOptions{
 				TagName: "",
-				Body:    stringPtr("MY NOTES"),
+				Body:    new("MY NOTES"),
 			},
 		},
 		{
@@ -252,7 +252,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit the release name",
 			isTTY: true,
 			opts: EditOptions{
-				Name: stringPtr("Hot Release #1"),
+				Name: new("Hot Release #1"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -269,7 +269,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit the discussion category",
 			isTTY: true,
 			opts: EditOptions{
-				DiscussionCategory: stringPtr("some-category"),
+				DiscussionCategory: new("some-category"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -286,7 +286,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit the latest marker",
 			isTTY: false,
 			opts: EditOptions{
-				IsLatest: boolPtr(true),
+				IsLatest: new(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -303,7 +303,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit the release name (empty)",
 			isTTY: true,
 			opts: EditOptions{
-				Name: stringPtr(""),
+				Name: new(""),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -320,7 +320,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit the release notes",
 			isTTY: true,
 			opts: EditOptions{
-				Body: stringPtr("Release Notes:\n- Fix Bug #1\n- Fix Bug #2"),
+				Body: new("Release Notes:\n- Fix Bug #1\n- Fix Bug #2"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -337,7 +337,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit the release notes (empty)",
 			isTTY: true,
 			opts: EditOptions{
-				Body: stringPtr(""),
+				Body: new(""),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -354,7 +354,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit draft (true)",
 			isTTY: true,
 			opts: EditOptions{
-				Draft: boolPtr(true),
+				Draft: new(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -371,7 +371,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit draft (false)",
 			isTTY: true,
 			opts: EditOptions{
-				Draft: boolPtr(false),
+				Draft: new(false),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -388,7 +388,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit prerelease (true)",
 			isTTY: true,
 			opts: EditOptions{
-				Prerelease: boolPtr(true),
+				Prerelease: new(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -405,7 +405,7 @@ func Test_editRun(t *testing.T) {
 			name:  "edit prerelease (false)",
 			isTTY: true,
 			opts: EditOptions{
-				Prerelease: boolPtr(false),
+				Prerelease: new(false),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]any) {
@@ -575,10 +575,12 @@ type errorReader struct{ err error }
 
 func (e errorReader) Read(_ []byte) (int, error) { return 0, e.err }
 
+//go:fix inline
 func boolPtr(b bool) *bool {
-	return &b
+	return new(b)
 }
 
+//go:fix inline
 func stringPtr(s string) *string {
-	return &s
+	return new(s)
 }
