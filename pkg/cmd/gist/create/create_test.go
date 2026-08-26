@@ -177,7 +177,7 @@ func Test_createRun(t *testing.T) {
 		stdin          string
 		wantOut        string
 		wantStderr     string
-		wantParams     map[string]interface{}
+		wantParams     map[string]any
 		wantErr        bool
 		wantBrowse     string
 		responseStatus int
@@ -191,12 +191,12 @@ func Test_createRun(t *testing.T) {
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantStderr: "- Creating gist fixture.txt\n✓ Created public gist fixture.txt\n",
 			wantErr:    false,
-			wantParams: map[string]interface{}{
+			wantParams: map[string]any{
 				"description": "",
 				"updated_at":  "0001-01-01T00:00:00Z",
 				"public":      true,
-				"files": map[string]interface{}{
-					"fixture.txt": map[string]interface{}{
+				"files": map[string]any{
+					"fixture.txt": map[string]any{
 						"content": "{}",
 					},
 				},
@@ -212,12 +212,12 @@ func Test_createRun(t *testing.T) {
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantStderr: "- Creating gist fixture.txt\n✓ Created secret gist fixture.txt\n",
 			wantErr:    false,
-			wantParams: map[string]interface{}{
+			wantParams: map[string]any{
 				"description": "an incredibly interesting gist",
 				"updated_at":  "0001-01-01T00:00:00Z",
 				"public":      false,
-				"files": map[string]interface{}{
-					"fixture.txt": map[string]interface{}{
+				"files": map[string]any{
+					"fixture.txt": map[string]any{
 						"content": "{}",
 					},
 				},
@@ -233,15 +233,15 @@ func Test_createRun(t *testing.T) {
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantStderr: "- Creating gist with multiple files\n✓ Created secret gist fixture.txt\n",
 			wantErr:    false,
-			wantParams: map[string]interface{}{
+			wantParams: map[string]any{
 				"description": "",
 				"updated_at":  "0001-01-01T00:00:00Z",
 				"public":      false,
-				"files": map[string]interface{}{
-					"fixture.txt": map[string]interface{}{
+				"files": map[string]any{
+					"fixture.txt": map[string]any{
 						"content": "{}",
 					},
-					"gistfile1.txt": map[string]interface{}{
+					"gistfile1.txt": map[string]any{
 						"content": "cool stdin content",
 					},
 				},
@@ -257,15 +257,15 @@ func Test_createRun(t *testing.T) {
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantStderr: "- Creating gist with multiple files\n✓ Created secret gist fixture.txt\n",
 			wantErr:    false,
-			wantParams: map[string]interface{}{
+			wantParams: map[string]any{
 				"description": "",
 				"updated_at":  "0001-01-01T00:00:00Z",
 				"public":      false,
-				"files": map[string]interface{}{
-					"fixture.txt": map[string]interface{}{
+				"files": map[string]any{
+					"fixture.txt": map[string]any{
 						"content": "{}",
 					},
-					"gistfile1.txt": map[string]interface{}{
+					"gistfile1.txt": map[string]any{
 						"content": "cool stdin content",
 					},
 				},
@@ -283,12 +283,12 @@ func Test_createRun(t *testing.T) {
 				X Failed to create gist: a gist file cannot be blank
 			`),
 			wantErr: true,
-			wantParams: map[string]interface{}{
+			wantParams: map[string]any{
 				"description": "",
 				"updated_at":  "0001-01-01T00:00:00Z",
 				"public":      false,
-				"files": map[string]interface{}{
-					"empty.txt": map[string]interface{}{"content": " \t\n"},
+				"files": map[string]any{
+					"empty.txt": map[string]any{"content": " \t\n"},
 				},
 			},
 			responseStatus: http.StatusUnprocessableEntity,
@@ -302,12 +302,12 @@ func Test_createRun(t *testing.T) {
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantStderr: "- Creating gist...\n✓ Created secret gist\n",
 			wantErr:    false,
-			wantParams: map[string]interface{}{
+			wantParams: map[string]any{
 				"description": "",
 				"updated_at":  "0001-01-01T00:00:00Z",
 				"public":      false,
-				"files": map[string]interface{}{
-					"gistfile0.txt": map[string]interface{}{
+				"files": map[string]any{
+					"gistfile0.txt": map[string]any{
 						"content": "cool stdin content",
 					},
 				},
@@ -324,12 +324,12 @@ func Test_createRun(t *testing.T) {
 			wantStderr: "- Creating gist fixture.txt\n✓ Created secret gist fixture.txt\n",
 			wantErr:    false,
 			wantBrowse: "https://gist.github.com/aa5a315d61ae9438b18d",
-			wantParams: map[string]interface{}{
+			wantParams: map[string]any{
 				"description": "",
 				"updated_at":  "0001-01-01T00:00:00Z",
 				"public":      false,
-				"files": map[string]interface{}{
-					"fixture.txt": map[string]interface{}{
+				"files": map[string]any{
+					"fixture.txt": map[string]any{
 						"content": "{}",
 					},
 				},
@@ -376,7 +376,7 @@ func Test_createRun(t *testing.T) {
 				t.Errorf("createRun() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			bodyBytes, _ := io.ReadAll(reg.Requests[0].Body)
-			reqBody := make(map[string]interface{})
+			reqBody := make(map[string]any)
 			err := json.Unmarshal(bodyBytes, &reqBody)
 			if err != nil {
 				t.Fatalf("error decoding JSON: %v", err)

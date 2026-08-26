@@ -12,7 +12,7 @@ import (
 )
 
 type printer interface {
-	Printf(fmt string, v ...interface{})
+	Printf(fmt string, v ...any)
 }
 
 // Shell runs an interactive secure shell over an existing

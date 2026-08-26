@@ -63,7 +63,7 @@ func TestPRReopen(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestReopen\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)
@@ -125,7 +125,7 @@ func TestPRReopen_withComment(t *testing.T) {
 		{ "data": { "addComment": { "commentEdge": { "node": {
 			"url": "https://github.com/OWNER/REPO/issues/123#issuecomment-456"
 		} } } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, "THE-ID", inputs["subjectId"])
 				assert.Equal(t, "reopening comment", inputs["body"])
 			}),
@@ -133,7 +133,7 @@ func TestPRReopen_withComment(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestReopen\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)

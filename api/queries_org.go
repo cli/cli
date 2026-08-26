@@ -20,7 +20,7 @@ func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject,
 		} `graphql:"organization(login: $owner)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"endCursor": (*githubv4.String)(nil),
 	}
@@ -56,7 +56,7 @@ func OrganizationTeam(client *Client, hostname string, org string, teamSlug stri
 		} `graphql:"organization(login: $owner)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":    githubv4.String(org),
 		"teamSlug": githubv4.String(teamSlug),
 	}
@@ -87,7 +87,7 @@ func OrganizationTeams(client *Client, repo ghrepo.Interface) ([]OrgTeam, error)
 		} `graphql:"organization(login: $owner)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"endCursor": (*githubv4.String)(nil),
 	}

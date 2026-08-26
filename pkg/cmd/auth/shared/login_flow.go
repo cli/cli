@@ -252,7 +252,7 @@ func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title strin
 
 func GetCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {
 	query := `query UserCurrent{viewer{login}}`
-	reqBody, err := json.Marshal(map[string]interface{}{"query": query})
+	reqBody, err := json.Marshal(map[string]any{"query": query})
 	if err != nil {
 		return "", err
 	}

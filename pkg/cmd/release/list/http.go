@@ -34,7 +34,7 @@ type Release struct {
 	PublishedAt  time.Time
 }
 
-func (r *Release) ExportData(fields []string) map[string]interface{} {
+func (r *Release) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(r, fields)
 }
 
@@ -77,7 +77,7 @@ func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, ex
 		perPage = 100
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"perPage":   githubv4.Int(perPage),
@@ -162,7 +162,7 @@ func fetchReleasesWithoutImmutableReleases(httpClient *http.Client, repo ghrepo.
 		perPage = 100
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"perPage":   githubv4.Int(perPage),

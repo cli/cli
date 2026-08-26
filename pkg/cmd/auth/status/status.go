@@ -53,7 +53,7 @@ var authStatusFields = []string{
 	"hosts",
 }
 
-func (a authStatus) ExportData(fields []string) map[string]interface{} {
+func (a authStatus) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(a, fields)
 }
 

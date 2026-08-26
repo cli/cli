@@ -195,7 +195,7 @@ type InputAnswer struct {
 	providedInputs map[string]string
 }
 
-func (ia *InputAnswer) WriteAnswer(name string, value interface{}) error {
+func (ia *InputAnswer) WriteAnswer(name string, value any) error {
 	if s, ok := value.(string); ok {
 		ia.providedInputs[name] = s
 		return nil
@@ -325,7 +325,7 @@ func runRun(opts *RunOptions) error {
 		return err
 	}
 
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"ref":    ref,
 		"inputs": providedInputs,
 	}

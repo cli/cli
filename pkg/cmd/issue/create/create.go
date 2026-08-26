@@ -445,7 +445,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 		return opts.Browser.Browse(openURL)
 	} else if action == prShared.SubmitAction {
-		params := map[string]interface{}{
+		params := map[string]any{
 			"title": tb.Title,
 			"body":  tb.Body,
 		}

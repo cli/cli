@@ -426,7 +426,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "REPOID", input["repositoryId"])
 							assert.Equal(t, "my title", input["title"])
 							assert.Equal(t, "my body", input["body"])
@@ -587,7 +587,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
-							} } } }`, func(input map[string]interface{}) {
+							} } } }`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "my body", input["body"].(string))
@@ -634,7 +634,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
-							} } } }`, func(input map[string]interface{}) {
+							} } } }`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "my body", input["body"].(string))
@@ -684,7 +684,7 @@ func Test_createRun(t *testing.T) {
 								"id": "PullRequest#1",
 								"URL": "https://github.com/OWNER/REPO/pull/12"
 							} } } }
-							`, func(input map[string]interface{}) {
+							`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "my body", input["body"].(string))
@@ -698,7 +698,7 @@ func Test_createRun(t *testing.T) {
 							{ "data": { "add_000": { "item": {
 								"id": "1"
 							} } } }
-							`, func(mutations string, inputs map[string]interface{}) {
+							`, func(mutations string, inputs map[string]any) {
 						variables, err := json.Marshal(inputs)
 						assert.NoError(t, err)
 						expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"
@@ -746,7 +746,7 @@ func Test_createRun(t *testing.T) {
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
 							} } } }
-							`, func(input map[string]interface{}) {
+							`, func(input map[string]any) {
 						assert.Equal(t, false, input["maintainerCanModify"].(bool))
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
@@ -794,7 +794,7 @@ func Test_createRun(t *testing.T) {
 							{ "node_id": "NODEID",
 							  "name": "REPO",
 							  "owner": {"login": "monalisa"}
-							}`, func(payload map[string]interface{}) {
+							}`, func(payload map[string]any) {
 						assert.Equal(t, true, payload["default_branch_only"])
 					}))
 				reg.Register(
@@ -802,7 +802,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
-							}}}}`, func(input map[string]interface{}) {
+							}}}}`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "master", input["baseRefName"].(string))
 						assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
@@ -864,7 +864,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
-							} } } }`, func(input map[string]interface{}) {
+							} } } }`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "master", input["baseRefName"].(string))
 						assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
@@ -896,7 +896,7 @@ func Test_createRun(t *testing.T) {
 			{ "data": { "createPullRequest": { "pullRequest": {
 				"URL": "https://github.com/OWNER/REPO/pull/12"
 			} } } }
-			`, func(input map[string]interface{}) {
+			`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "master", input["baseRefName"].(string))
 						assert.Equal(t, "my-feat2", input["headRefName"].(string))
@@ -943,7 +943,7 @@ func Test_createRun(t *testing.T) {
 				{ "data": { "createPullRequest": { "pullRequest": {
 					"URL": "https://github.com/OWNER/REPO/pull/12"
 				} } } }
-				`, func(input map[string]interface{}) {
+				`, func(input map[string]any) {
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "- **commit 1**\n- **commit 0**\n\nthis is a bug", input["body"].(string))
 					}))
@@ -1020,7 +1020,7 @@ func Test_createRun(t *testing.T) {
 						"id": "NEWPULLID",
 						"URL": "https://github.com/OWNER/REPO/pull/12"
 					} } } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "TITLE", inputs["title"])
 						assert.Equal(t, "BODY", inputs["body"])
 						if v, ok := inputs["assigneeIds"]; ok {
@@ -1036,22 +1036,22 @@ func Test_createRun(t *testing.T) {
 					{ "data": { "updatePullRequest": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
 						if _, ok := inputs["assigneeIds"]; ok {
 							t.Error("did not expect assigneeIds in updatePullRequest when ApiActorsSupported is true")
 						}
-						assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
-						assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
+						assert.Equal(t, []any{"BUGID", "TODOID"}, inputs["labelIds"])
+						assert.Equal(t, []any{"ROADMAPID"}, inputs["projectIds"])
 						assert.Equal(t, "BIGONEID", inputs["milestoneId"])
 					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["assignableId"])
-						assert.Equal(t, []interface{}{"monalisa"}, inputs["actorLogins"])
+						assert.Equal(t, []any{"monalisa"}, inputs["actorLogins"])
 					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
@@ -1059,10 +1059,10 @@ func Test_createRun(t *testing.T) {
 					{ "data": { "requestReviewsByLogin": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"hubot", "monalisa"}, inputs["userLogins"])
-						assert.Equal(t, []interface{}{"OWNER/core", "OWNER/robots"}, inputs["teamSlugs"])
+						assert.Equal(t, []any{"hubot", "monalisa"}, inputs["userLogins"])
+						assert.Equal(t, []any{"OWNER/core", "OWNER/robots"}, inputs["teamSlugs"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -1175,7 +1175,7 @@ func Test_createRun(t *testing.T) {
 			{ "data": { "createPullRequest": { "pullRequest": {
 				"URL": "https://github.com/OWNER/REPO/pull/12"
 			} } } }
-			`, func(input map[string]interface{}) {
+			`, func(input map[string]any) {
 						assert.Equal(t, true, input["draft"].(bool))
 					}))
 			},
@@ -1228,8 +1228,8 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "requestReviews": {
 							"clientMutationId": ""
 						} } }
-					`, func(inputs map[string]interface{}) {
-						assert.Equal(t, []interface{}{"JILLID"}, inputs["userIds"])
+					`, func(inputs map[string]any) {
+						assert.Equal(t, []any{"JILLID"}, inputs["userIds"])
 					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
@@ -1237,7 +1237,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }
-					`, func(input map[string]interface{}) {
+					`, func(input map[string]any) {
 						assert.Equal(t, "recovered title", input["title"].(string))
 						assert.Equal(t, "recovered body", input["body"].(string))
 					}))
@@ -1367,7 +1367,7 @@ func Test_createRun(t *testing.T) {
 							} } }
 						}
 						`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "first commit of pr", input["title"], "pr title should be first commit message")
 							assert.Equal(t, "first commit description", input["body"], "pr body should be first commit description")
 						},
@@ -1403,7 +1403,7 @@ func Test_createRun(t *testing.T) {
 							} } }
 						}
 						`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "first commit of pr", input["title"], "pr title should be first commit message")
 							assert.Equal(t, "first commit description", input["body"], "pr body should be first commit description")
 						},
@@ -1439,7 +1439,7 @@ func Test_createRun(t *testing.T) {
 							} } }
 						}
 						`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "feature", input["title"], "pr title should be branch name")
 							assert.Equal(t, "- **first commit of pr**\n  first commit with super long description, with super long description, with super long description, with super long description.\n\n- **second commit of pr**\n  second commit description", input["body"], "pr body should be commits msg+body")
 						},
@@ -1460,7 +1460,7 @@ func Test_createRun(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 							} } }
 						}
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "title", inputs["title"])
 						assert.Equal(t, "body", inputs["body"])
 					}))
@@ -1513,7 +1513,7 @@ func Test_createRun(t *testing.T) {
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
 							} } } }
-							`, func(input map[string]interface{}) {
+							`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "my body", input["body"].(string))
@@ -1544,7 +1544,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "REPOID", input["repositoryId"])
 							assert.Equal(t, "my title", input["title"])
 							assert.Equal(t, "my body", input["body"])
@@ -1581,17 +1581,17 @@ func Test_createRun(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12",
 							"id": "NEWPULLID"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 				reg.Register(
 					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "requestReviewsByLogin": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"hubot", "monalisa"}, inputs["userLogins"])
-						assert.Equal(t, []interface{}{"org/core", "org/robots"}, inputs["teamSlugs"])
+						assert.Equal(t, []any{"hubot", "monalisa"}, inputs["userLogins"])
+						assert.Equal(t, []any{"org/core", "org/robots"}, inputs["teamSlugs"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -1617,17 +1617,17 @@ func Test_createRun(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12",
 							"id": "NEWPULLID"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 				reg.Register(
 					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "requestReviewsByLogin": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"hubot"}, inputs["userLogins"])
-						assert.Equal(t, []interface{}{"copilot-pull-request-reviewer[bot]"}, inputs["botLogins"])
+						assert.Equal(t, []any{"hubot"}, inputs["userLogins"])
+						assert.Equal(t, []any{"copilot-pull-request-reviewer[bot]"}, inputs["botLogins"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -1681,7 +1681,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
@@ -1745,7 +1745,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
@@ -1770,7 +1770,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "before ![the shot](https://github.com/user-attachments/assets/ASSET) after", input["body"])
 						}))
 			},
@@ -1811,7 +1811,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://acme.ghe.com/OWNER/REPO/pull/12"
 						} } } }`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "my body\n\n![shot](https://acme.ghe.com/user-attachments/assets/ASSET)", input["body"])
 						}))
 			},
@@ -1864,7 +1864,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "my body\n\n![good](https://github.com/user-attachments/assets/ASSET)", input["body"])
 						}))
 			},
@@ -2298,7 +2298,7 @@ func Test_createRun_GHES(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12",
 							"id": "NEWPULLID"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 					httpmock.StringResponse(`
@@ -2332,10 +2332,10 @@ func Test_createRun_GHES(t *testing.T) {
 					{ "data": { "requestReviews": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["userIds"])
-						assert.Equal(t, []interface{}{"COREID", "ROBOTID"}, inputs["teamIds"])
+						assert.Equal(t, []any{"HUBOTID", "MONAID"}, inputs["userIds"])
+						assert.Equal(t, []any{"COREID", "ROBOTID"}, inputs["teamIds"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -2361,7 +2361,7 @@ func Test_createRun_GHES(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12",
 							"id": "NEWPULLID"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 					httpmock.StringResponse(`
@@ -2388,10 +2388,10 @@ func Test_createRun_GHES(t *testing.T) {
 					{ "data": { "requestReviews": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["userIds"])
-						assert.NotEqual(t, []interface{}{"COREID", "ROBOTID"}, inputs["teamIds"])
+						assert.Equal(t, []any{"HUBOTID", "MONAID"}, inputs["userIds"])
+						assert.NotEqual(t, []any{"COREID", "ROBOTID"}, inputs["teamIds"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -2496,7 +2496,7 @@ func Test_createRun_GHES(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }
 						`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "TITLE", inputs["title"])
 							assert.Equal(t, "BODY", inputs["body"])
 							if v, ok := inputs["assigneeIds"]; ok {
@@ -2512,10 +2512,10 @@ func Test_createRun_GHES(t *testing.T) {
 					{ "data": { "requestReviews": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"COREID"}, inputs["teamIds"])
-						assert.Equal(t, []interface{}{"MONAID"}, inputs["userIds"])
+						assert.Equal(t, []any{"COREID"}, inputs["teamIds"])
+						assert.Equal(t, []any{"MONAID"}, inputs["userIds"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -2640,7 +2640,7 @@ func TestRemoteGuessing(t *testing.T) {
 		httpmock.GraphQLMutation(`
 				{ "data": { "createPullRequest": { "pullRequest": {
 					"URL": "https://github.com/OWNER/REPO/pull/12"
-				} } } }`, func(input map[string]interface{}) {
+				} } } }`, func(input map[string]any) {
 			assert.Equal(t, "REPOID", input["repositoryId"].(string))
 			assert.Equal(t, "master", input["baseRefName"].(string))
 			assert.Equal(t, "OTHEROWNER:feature", input["headRefName"].(string))

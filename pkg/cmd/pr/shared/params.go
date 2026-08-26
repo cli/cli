@@ -61,7 +61,7 @@ func ValidURL(urlStr string) bool {
 	return len(urlStr) < 8192
 }
 
-func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *IssueMetadataState, projectV1Support gh.ProjectsV1Support) error {
+func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]any, tb *IssueMetadataState, projectV1Support gh.ProjectsV1Support) error {
 	if !tb.HasMetadata() {
 		return nil
 	}

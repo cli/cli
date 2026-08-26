@@ -180,7 +180,7 @@ func TestBaseRepoQueriesSelectDatabaseID(t *testing.T) {
 			defer httpReg.Verify(t)
 
 			var query string
-			httpReg.Register(tt.matcher, httpmock.GraphQLQuery(tt.body, func(q string, _ map[string]interface{}) {
+			httpReg.Register(tt.matcher, httpmock.GraphQLQuery(tt.body, func(q string, _ map[string]any) {
 				query = q
 			}))
 

@@ -429,7 +429,7 @@ func (s *StatusGetter) LoadSearchResults() error {
 		searchAssigns += " -repo:" + repo
 		searchReviews += " -repo:" + repo
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"searchAssigns": searchAssigns,
 		"searchReviews": searchReviews,
 	}

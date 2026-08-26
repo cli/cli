@@ -124,7 +124,7 @@ func Test_addPerPage(t *testing.T) {
 	type args struct {
 		p       string
 		perPage int
-		params  map[string]interface{}
+		params  map[string]any
 	}
 	tests := []struct {
 		name string
@@ -145,7 +145,7 @@ func Test_addPerPage(t *testing.T) {
 			args: args{
 				p:       "items",
 				perPage: 13,
-				params: map[string]interface{}{
+				params: map[string]any{
 					"state":    "open",
 					"per_page": 99,
 				},

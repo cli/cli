@@ -81,8 +81,8 @@ type listedSkill struct {
 }
 
 // ExportData implements cmdutil.exportable for --json output.
-func (s listedSkill) ExportData(fields []string) map[string]interface{} {
-	data := map[string]interface{}{}
+func (s listedSkill) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "skillName":
@@ -444,7 +444,7 @@ func parseInstalledSkill(data []byte, name, dir string, agentHostIDs []string, s
 	return s, installMetadata
 }
 
-func hasInstallMetadata(meta map[string]interface{}) bool {
+func hasInstallMetadata(meta map[string]any) bool {
 	for _, key := range []string{"github-repo", "github-ref", "github-tree-sha", "github-path", "github-pinned", "local-path"} {
 		value, ok := meta[key]
 		if !ok {

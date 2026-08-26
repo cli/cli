@@ -42,7 +42,7 @@ func (s OutputStub) Run() error {
 
 type T interface {
 	Helper()
-	Errorf(string, ...interface{})
+	Errorf(string, ...any)
 }
 
 // Deprecated: prefer exact matches for command output

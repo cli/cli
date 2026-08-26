@@ -2565,7 +2565,7 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			} else {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"visibility": tt.visibility,
 					}),
 				)
@@ -2658,7 +2658,7 @@ func TestInstallRun_TelemetryMultipleSkills(t *testing.T) {
 
 	reg.Register(
 		httpmock.REST("GET", "repos/monalisa/octocat-skills"),
-		httpmock.JSONResponse(map[string]interface{}{
+		httpmock.JSONResponse(map[string]any{
 			"visibility": "public",
 		}),
 	)

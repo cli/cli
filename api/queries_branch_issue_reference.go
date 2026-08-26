@@ -36,7 +36,7 @@ func CreateLinkedBranch(client *Client, host string, repoID, issueID, branchID, 
 		name := githubv4.String(branchName)
 		input.Name = &name
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": input,
 	}
 
@@ -66,7 +66,7 @@ func ListLinkedBranches(client *Client, repo ghrepo.Interface, issueNumber int) 
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"number": githubv4.Int(issueNumber),
 		"owner":  githubv4.String(repo.RepoOwner()),
 		"name":   githubv4.String(repo.RepoName()),
@@ -126,7 +126,7 @@ func FindRepoBranchID(client *Client, repo ghrepo.Interface, ref string) (string
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"ref":   githubv4.String(ref),
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),

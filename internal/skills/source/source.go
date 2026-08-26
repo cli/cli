@@ -32,7 +32,7 @@ func ParseRepoURL(raw string) (ghrepo.Interface, error) {
 }
 
 // ParseMetadataRepo extracts repository information from skill metadata.
-func ParseMetadataRepo(meta map[string]interface{}) (ghrepo.Interface, bool, error) {
+func ParseMetadataRepo(meta map[string]any) (ghrepo.Interface, bool, error) {
 	if meta == nil {
 		return nil, false, nil
 	}

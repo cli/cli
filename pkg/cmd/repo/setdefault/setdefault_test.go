@@ -475,7 +475,7 @@ func TestDefaultRun(t *testing.T) {
             "repo_004":{"name":"REPO5","owner":{"login":"OWNER5"}},
             "repo_005":{"name":"REPO6","owner":{"login":"OWNER6"}}
           }}`,
-						func(query string, inputs map[string]interface{}) {
+						func(query string, inputs map[string]any) {
 							assert.Contains(t, query, "repo_000")
 							assert.Contains(t, query, "repo_001")
 							assert.Contains(t, query, "repo_002")

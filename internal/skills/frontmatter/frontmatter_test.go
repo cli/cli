@@ -207,7 +207,7 @@ func TestInjectLocalMetadata(t *testing.T) {
 func TestSerialize(t *testing.T) {
 	tests := []struct {
 		name         string
-		frontmatter  map[string]interface{}
+		frontmatter  map[string]any
 		body         string
 		wantPrefix   string
 		wantSuffix   string
@@ -215,7 +215,7 @@ func TestSerialize(t *testing.T) {
 	}{
 		{
 			name:        "with body",
-			frontmatter: map[string]interface{}{"name": "test"},
+			frontmatter: map[string]any{"name": "test"},
 			body:        "# Body content",
 			wantPrefix:  "---\n",
 			wantContains: []string{
@@ -225,13 +225,13 @@ func TestSerialize(t *testing.T) {
 		},
 		{
 			name:        "empty body",
-			frontmatter: map[string]interface{}{"name": "test"},
+			frontmatter: map[string]any{"name": "test"},
 			body:        "",
 			wantSuffix:  "---\n",
 		},
 		{
 			name:        "body without trailing newline gets one added",
-			frontmatter: map[string]interface{}{"name": "test"},
+			frontmatter: map[string]any{"name": "test"},
 			body:        "# No trailing newline",
 			wantSuffix:  "# No trailing newline\n",
 		},

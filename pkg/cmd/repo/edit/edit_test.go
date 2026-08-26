@@ -186,7 +186,7 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, 2, len(payload))
 						assert.Equal(t, "newURL", payload["homepage"])
 						assert.Equal(t, "hello world!", payload["description"])
@@ -206,9 +206,9 @@ func Test_editRun(t *testing.T) {
 					httpmock.StringResponse(`{"names":["topic2", "topic3", "go"]}`))
 				r.Register(
 					httpmock.REST("PUT", "repos/OWNER/REPO/topics"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, 1, len(payload))
-						assert.Equal(t, []interface{}{"topic2", "go", "topic1"}, payload["names"])
+						assert.Equal(t, []any{"topic2", "go", "topic1"}, payload["names"])
 					}))
 			},
 		},
@@ -223,7 +223,7 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, 1, len(payload))
 						assert.Equal(t, true, payload["allow_update_branch"])
 					}))
@@ -254,12 +254,12 @@ func Test_editRun(t *testing.T) {
 
 				r.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, 1, len(payload))
-						securityAndAnalysis := payload["security_and_analysis"].(map[string]interface{})
-						assert.Equal(t, "enabled", securityAndAnalysis["advanced_security"].(map[string]interface{})["status"])
-						assert.Equal(t, "enabled", securityAndAnalysis["secret_scanning"].(map[string]interface{})["status"])
-						assert.Equal(t, "disabled", securityAndAnalysis["secret_scanning_push_protection"].(map[string]interface{})["status"])
+						securityAndAnalysis := payload["security_and_analysis"].(map[string]any)
+						assert.Equal(t, "enabled", securityAndAnalysis["advanced_security"].(map[string]any)["status"])
+						assert.Equal(t, "enabled", securityAndAnalysis["secret_scanning"].(map[string]any)["status"])
+						assert.Equal(t, "disabled", securityAndAnalysis["secret_scanning_push_protection"].(map[string]any)["status"])
 					}))
 			},
 		},
@@ -276,7 +276,7 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, true, payload["allow_squash_merge"])
 						assert.Equal(t, "PR_TITLE", payload["squash_merge_commit_title"])
 						assert.Equal(t, "PR_BODY", payload["squash_merge_commit_message"])
@@ -400,7 +400,7 @@ func Test_editRun_interactive(t *testing.T) {
 					}`))
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, true, payload["allow_forking"])
 					}))
 			},
@@ -502,7 +502,7 @@ func Test_editRun_interactive(t *testing.T) {
 					}`))
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, "private", payload["visibility"])
 					}))
 			},
@@ -565,7 +565,7 @@ func Test_editRun_interactive(t *testing.T) {
 					}`))
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, "trunk", payload["default_branch"])
 						assert.Equal(t, "https://zombo.com", payload["homepage"])
 						assert.Equal(t, true, payload["has_issues"])
@@ -616,7 +616,7 @@ func Test_editRun_interactive(t *testing.T) {
 					}`))
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, "awesome repo description", payload["description"])
 					}))
 			},
@@ -670,13 +670,13 @@ func Test_editRun_interactive(t *testing.T) {
 					}`))
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, "awesome repo description", payload["description"])
 					}))
 				reg.Register(
 					httpmock.REST("PUT", "repos/OWNER/REPO/topics"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
-						assert.Equal(t, []interface{}{"a", "b", "c", "d"}, payload["names"])
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
+						assert.Equal(t, []any{"a", "b", "c", "d"}, payload["names"])
 					}))
 			},
 		},
@@ -732,7 +732,7 @@ func Test_editRun_interactive(t *testing.T) {
 					}`))
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, true, payload["allow_merge_commit"])
 						assert.Equal(t, false, payload["allow_squash_merge"])
 						assert.Equal(t, true, payload["allow_rebase_merge"])
@@ -796,7 +796,7 @@ func Test_editRun_interactive(t *testing.T) {
 					}`))
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Equal(t, false, payload["allow_merge_commit"])
 						assert.Equal(t, true, payload["allow_squash_merge"])
 						assert.Equal(t, false, payload["allow_rebase_merge"])

@@ -105,7 +105,7 @@ func Test_runAdd(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "user/gpg_keys"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Contains(t, payload, "armored_public_key")
 						assert.NotContains(t, payload, "title")
 					}))
@@ -121,7 +121,7 @@ func Test_runAdd(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "user/gpg_keys"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Contains(t, payload, "armored_public_key")
 						assert.Contains(t, payload, "name")
 					}))

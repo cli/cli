@@ -228,7 +228,7 @@ type Secret struct {
 	NumSelectedRepos int               `json:"num_selected_repos"`
 }
 
-func (s *Secret) ExportData(fields []string) map[string]interface{} {
+func (s *Secret) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(s, fields)
 }
 

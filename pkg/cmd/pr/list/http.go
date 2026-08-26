@@ -70,7 +70,7 @@ func searchPullRequests(httpClient *http.Client, detector fd.Detector, repo ghre
 			}
 		}`
 
-	variables := map[string]interface{}{}
+	variables := map[string]any{}
 
 	filters.Repo = ghrepo.FullName(repo)
 	filters.Entity = "pr"

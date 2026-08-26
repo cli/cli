@@ -414,10 +414,10 @@ func TestIssue_ExportData(t *testing.T) {
 			enc.SetIndent("", "\t")
 			require.NoError(t, enc.Encode(exported))
 
-			var gotData interface{}
+			var gotData any
 			dec = json.NewDecoder(&buf)
 			require.NoError(t, dec.Decode(&gotData))
-			var expectData interface{}
+			var expectData any
 			require.NoError(t, json.Unmarshal([]byte(tt.outputJSON), &expectData))
 
 			assert.Equal(t, expectData, gotData)
@@ -669,10 +669,10 @@ func TestPullRequest_ExportData(t *testing.T) {
 			enc.SetIndent("", "\t")
 			require.NoError(t, enc.Encode(exported))
 
-			var gotData interface{}
+			var gotData any
 			dec = json.NewDecoder(&buf)
 			require.NoError(t, dec.Decode(&gotData))
-			var expectData interface{}
+			var expectData any
 			require.NoError(t, json.Unmarshal([]byte(tt.outputJSON), &expectData))
 
 			assert.Equal(t, expectData, gotData)

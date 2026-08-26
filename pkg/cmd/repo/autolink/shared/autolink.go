@@ -16,6 +16,6 @@ var AutolinkFields = []string{
 	"urlTemplate",
 }
 
-func (a *Autolink) ExportData(fields []string) map[string]interface{} {
+func (a *Autolink) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(a, fields)
 }

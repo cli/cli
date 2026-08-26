@@ -119,8 +119,8 @@ func runCopy(config copyConfig) error {
 	return printResults(config, query.CopyProjectV2.ProjectV2)
 }
 
-func copyArgs(config copyConfig) (*copyProjectMutation, map[string]interface{}) {
-	return &copyProjectMutation{}, map[string]interface{}{
+func copyArgs(config copyConfig) (*copyProjectMutation, map[string]any) {
+	return &copyProjectMutation{}, map[string]any{
 		"input": githubv4.CopyProjectV2Input{
 			OwnerID:            githubv4.ID(config.opts.ownerID),
 			ProjectID:          githubv4.ID(config.opts.projectID),

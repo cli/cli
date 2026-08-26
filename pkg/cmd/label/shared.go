@@ -28,6 +28,6 @@ type label struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
-func (l *label) ExportData(fields []string) map[string]interface{} {
+func (l *label) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(l, fields)
 }

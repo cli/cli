@@ -882,7 +882,7 @@ func mockCommentCreate(t *testing.T, reg *httpmock.Registry, wantBody string) {
 		{ "data": { "addComment": { "commentEdge": { "node": {
 			"url": "https://github.com/OWNER/REPO/pull/123#issuecomment-456"
 		} } } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, wantBody, inputs["body"])
 			}),
 	)
@@ -895,7 +895,7 @@ func mockCommentUpdate(t *testing.T, reg *httpmock.Registry, wantBody string) {
 		{ "data": { "updateIssueComment": { "issueComment": {
 			"url": "https://github.com/OWNER/REPO/pull/123#issuecomment-111"
 		} } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, "id1", inputs["id"])
 				assert.Equal(t, wantBody, inputs["body"])
 			}),
@@ -907,7 +907,7 @@ func mockCommentDelete(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation CommentDelete\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "deleteIssueComment": {} } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, "id1", inputs["id"])
 			},
 		),

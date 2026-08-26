@@ -86,26 +86,26 @@ type ReleaseAsset struct {
 	BrowserDownloadURL string    `json:"browser_download_url"`
 }
 
-func (rel *Release) ExportData(fields []string) map[string]interface{} {
+func (rel *Release) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(rel).Elem()
 	fieldByName := func(v reflect.Value, field string) reflect.Value {
 		return v.FieldByNameFunc(func(s string) bool {
 			return strings.EqualFold(field, s)
 		})
 	}
-	data := map[string]interface{}{}
+	data := map[string]any{}
 
 	for _, f := range fields {
 		switch f {
 		case "author":
-			data[f] = map[string]interface{}{
+			data[f] = map[string]any{
 				"id":    rel.Author.ID,
 				"login": rel.Author.Login,
 			}
 		case "assets":
-			assets := make([]interface{}, 0, len(rel.Assets))
+			assets := make([]any, 0, len(rel.Assets))
 			for _, a := range rel.Assets {
-				assets = append(assets, map[string]interface{}{
+				assets = append(assets, map[string]any{
 					"url":           a.BrowserDownloadURL,
 					"apiUrl":        a.APIURL,
 					"id":            a.ID,
@@ -254,7 +254,7 @@ func fetchDraftRelease(ctx context.Context, httpClient *http.Client, repo ghrepo
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":   githubv4.String(repo.RepoOwner()),
 		"name":    githubv4.String(repo.RepoName()),
 		"tagName": githubv4.String(tagName),
@@ -317,7 +317,7 @@ func StubFetchRelease(t *testing.T, reg *httpmock.Registry, owner, repoName, tag
 		reg.Register(
 			httpmock.GraphQL(`query RepositoryReleaseByTag\b`),
 			httpmock.GraphQLQuery(`{ "data": { "repository": { "release": null }}}`,
-				func(q string, vars map[string]interface{}) {
+				func(q string, vars map[string]any) {
 					assert.Equal(t, owner, vars["owner"])
 					assert.Equal(t, repoName, vars["name"])
 					assert.Equal(t, tagName, vars["tagName"])

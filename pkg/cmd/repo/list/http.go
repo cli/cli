@@ -39,7 +39,7 @@ func listRepos(client *http.Client, hostname string, limit int, owner string, fi
 		perPage = 100
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"perPage": githubv4.Int(perPage),
 	}
 
@@ -143,7 +143,7 @@ func searchRepos(client *http.Client, hostname string, limit int, owner string, 
 		perPage = 100
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"query":   githubv4.String(searchQuery(owner, filter)),
 		"perPage": githubv4.Int(perPage),
 	}

@@ -78,14 +78,14 @@ func TestProjectItemIDByURL(t *testing.T) {
 		gock.New("https://api.github.com").
 			Post("/graphql").
 			Reply(200).
-			JSON(map[string]interface{}{
-				"data": map[string]interface{}{
-					"resource": map[string]interface{}{
+			JSON(map[string]any{
+				"data": map[string]any{
+					"resource": map[string]any{
 						"__typename": "Issue",
-						"projectItems": map[string]interface{}{
-							"nodes": []map[string]interface{}{
-								{"id": "PVTI_other", "project": map[string]interface{}{"id": "PVT_other"}},
-								{"id": "PVTI_match", "project": map[string]interface{}{"id": "PVT_target"}},
+						"projectItems": map[string]any{
+							"nodes": []map[string]any{
+								{"id": "PVTI_other", "project": map[string]any{"id": "PVT_other"}},
+								{"id": "PVTI_match", "project": map[string]any{"id": "PVT_target"}},
 							},
 						},
 					},
@@ -103,13 +103,13 @@ func TestProjectItemIDByURL(t *testing.T) {
 		gock.New("https://api.github.com").
 			Post("/graphql").
 			Reply(200).
-			JSON(map[string]interface{}{
-				"data": map[string]interface{}{
-					"resource": map[string]interface{}{
+			JSON(map[string]any{
+				"data": map[string]any{
+					"resource": map[string]any{
 						"__typename": "Issue",
-						"projectItems": map[string]interface{}{
-							"nodes": []map[string]interface{}{
-								{"id": "PVTI_other", "project": map[string]interface{}{"id": "PVT_other"}},
+						"projectItems": map[string]any{
+							"nodes": []map[string]any{
+								{"id": "PVTI_other", "project": map[string]any{"id": "PVT_other"}},
 							},
 						},
 					},

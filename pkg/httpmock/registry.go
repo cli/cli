@@ -53,7 +53,7 @@ func (r *Registry) Exclude(t *testing.T, m Matcher) {
 }
 
 type Testing interface {
-	Errorf(string, ...interface{})
+	Errorf(string, ...any)
 	Helper()
 }
 

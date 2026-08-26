@@ -318,9 +318,9 @@ var ViewCodespaceFields = []string{
 	"environmentId",
 }
 
-func (c *Codespace) ExportData(fields []string) map[string]interface{} {
+func (c *Codespace) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(c).Elem()
-	data := map[string]interface{}{}
+	data := map[string]any{}
 
 	for _, f := range fields {
 		switch f {
@@ -335,7 +335,7 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 		case "retentionPeriodDays":
 			data[f] = c.RetentionPeriodMinutes / 1440
 		case "gitStatus":
-			data[f] = map[string]interface{}{
+			data[f] = map[string]any{
 				"ref":                   c.GitStatus.Ref,
 				"hasUnpushedChanges":    c.GitStatus.HasUnpushedChanges,
 				"hasUncommittedChanges": c.GitStatus.HasUncommittedChanges,

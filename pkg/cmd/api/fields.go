@@ -13,8 +13,8 @@ const (
 	keySeparator = '='
 )
 
-func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
-	params := make(map[string]interface{})
+func parseFields(opts *ApiOptions) (map[string]any, error) {
+	params := make(map[string]any)
 	parseField := func(f string, isMagic bool) error {
 		var valueIndex int
 		var keystack []string
@@ -43,7 +43,7 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 		}
 
 		key := f
-		var value interface{} = nil
+		var value any = nil
 		if valueIndex == 0 {
 			if keystack[len(keystack)-1] != "" {
 				return fmt.Errorf("field %q requires a value separated by an '=' sign", key)
@@ -86,16 +86,16 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 
 		if isArray {
 			if value == nil {
-				destMap[subkey] = []interface{}{}
+				destMap[subkey] = []any{}
 			} else {
 				if v, exists := destMap[subkey]; exists {
-					if existSlice, ok := v.([]interface{}); ok {
+					if existSlice, ok := v.([]any); ok {
 						destMap[subkey] = append(existSlice, value)
 					} else {
 						return fmt.Errorf("expected array type under %q, got %T", subkey, v)
 					}
 				} else {
-					destMap[subkey] = []interface{}{value}
+					destMap[subkey] = []any{value}
 				}
 			}
 		} else {
@@ -119,25 +119,25 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 	return params, nil
 }
 
-func addParamsMap(m map[string]interface{}, key string) (map[string]interface{}, error) {
+func addParamsMap(m map[string]any, key string) (map[string]any, error) {
 	if v, exists := m[key]; exists {
-		if existMap, ok := v.(map[string]interface{}); ok {
+		if existMap, ok := v.(map[string]any); ok {
 			return existMap, nil
 		} else {
 			return nil, fmt.Errorf("expected map type under %q, got %T", key, v)
 		}
 	}
-	newMap := make(map[string]interface{})
+	newMap := make(map[string]any)
 	m[key] = newMap
 	return newMap, nil
 }
 
-func addParamsSlice(m map[string]interface{}, prevkey, newkey string) (map[string]interface{}, error) {
+func addParamsSlice(m map[string]any, prevkey, newkey string) (map[string]any, error) {
 	if v, exists := m[prevkey]; exists {
-		if existSlice, ok := v.([]interface{}); ok {
+		if existSlice, ok := v.([]any); ok {
 			if len(existSlice) > 0 {
 				lastItem := existSlice[len(existSlice)-1]
-				if lastMap, ok := lastItem.(map[string]interface{}); ok {
+				if lastMap, ok := lastItem.(map[string]any); ok {
 					if _, keyExists := lastMap[newkey]; !keyExists {
 						return lastMap, nil
 					} else if reflect.TypeOf(lastMap[newkey]).Kind() == reflect.Slice {
@@ -145,19 +145,19 @@ func addParamsSlice(m map[string]interface{}, prevkey, newkey string) (map[strin
 					}
 				}
 			}
-			newMap := make(map[string]interface{})
+			newMap := make(map[string]any)
 			m[prevkey] = append(existSlice, newMap)
 			return newMap, nil
 		} else {
 			return nil, fmt.Errorf("expected array type under %q, got %T", prevkey, v)
 		}
 	}
-	newMap := make(map[string]interface{})
-	m[prevkey] = []interface{}{newMap}
+	newMap := make(map[string]any)
+	m[prevkey] = []any{newMap}
 	return newMap, nil
 }
 
-func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {
+func magicFieldValue(v string, opts *ApiOptions) (any, error) {
 	if strings.HasPrefix(v, "@") {
 		b, err := opts.IO.ReadUserFile(v[1:])
 		if err != nil {

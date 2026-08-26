@@ -51,28 +51,28 @@ func stubEnsurePushed(cs *run.CommandStubber, branch string) {
 func stubAllSecureRemote(reg *httpmock.Registry, owner, repo string) {
 	reg.Register(
 		httpmock.REST("GET", "repos/"+owner+"/"+repo+"/topics"),
-		httpmock.JSONResponse(map[string]interface{}{
+		httpmock.JSONResponse(map[string]any{
 			"names": []string{"agent-skills"},
 		}),
 	)
 	reg.Register(
 		httpmock.REST("GET", "repos/"+owner+"/"+repo+"/tags"),
-		httpmock.JSONResponse([]map[string]interface{}{
+		httpmock.JSONResponse([]map[string]any{
 			{"name": "v1.0.0"},
 		}),
 	)
 	reg.Register(
 		httpmock.REST("GET", "repos/"+owner+"/"+repo+"/rulesets"),
-		httpmock.JSONResponse([]map[string]interface{}{
+		httpmock.JSONResponse([]map[string]any{
 			{"id": 1, "name": "tags", "target": "tag", "enforcement": "active"},
 		}),
 	)
 	reg.Register(
 		httpmock.REST("GET", "repos/"+owner+"/"+repo),
-		httpmock.JSONResponse(map[string]interface{}{
-			"security_and_analysis": map[string]interface{}{
-				"secret_scanning":                 map[string]interface{}{"status": "enabled"},
-				"secret_scanning_push_protection": map[string]interface{}{"status": "enabled"},
+		httpmock.JSONResponse(map[string]any{
+			"security_and_analysis": map[string]any{
+				"secret_scanning":                 map[string]any{"status": "enabled"},
+				"secret_scanning_push_protection": map[string]any{"status": "enabled"},
 			},
 		}),
 	)
@@ -399,17 +399,17 @@ func TestPublishRun(t *testing.T) {
 				// immutable releases check
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/immutable-releases"),
-					httpmock.JSONResponse(map[string]interface{}{"enabled": true}),
+					httpmock.JSONResponse(map[string]any{"enabled": true}),
 				)
 				// default branch for branch comparison
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo"),
-					httpmock.JSONResponse(map[string]interface{}{"default_branch": "main"}),
+					httpmock.JSONResponse(map[string]any{"default_branch": "main"}),
 				)
 				// create release
 				reg.Register(
 					httpmock.REST("POST", "repos/monalisa/skills-repo/releases"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"html_url": "https://github.com/monalisa/skills-repo/releases/tag/v1.0.1",
 					}),
 				)
@@ -548,26 +548,26 @@ func TestPublishRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/secure-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"names": []string{"agent-skills"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/secure-repo/tags"),
-					httpmock.JSONResponse([]interface{}{}),
+					httpmock.JSONResponse([]any{}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/secure-repo/rulesets"),
-					httpmock.JSONResponse([]map[string]interface{}{
+					httpmock.JSONResponse([]map[string]any{
 						{"id": 1, "name": "branch-only", "target": "branch", "enforcement": "active"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/secure-repo"),
-					httpmock.JSONResponse(map[string]interface{}{
-						"security_and_analysis": map[string]interface{}{
-							"secret_scanning":                 map[string]interface{}{"status": "disabled"},
-							"secret_scanning_push_protection": map[string]interface{}{"status": "disabled"},
+					httpmock.JSONResponse(map[string]any{
+						"security_and_analysis": map[string]any{
+							"secret_scanning":                 map[string]any{"status": "disabled"},
+							"secret_scanning_push_protection": map[string]any{"status": "disabled"},
 						},
 					}),
 				)
@@ -605,24 +605,24 @@ func TestPublishRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/tag-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"names": []string{"agent-skills"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/tag-repo/tags"),
-					httpmock.JSONResponse([]interface{}{}),
+					httpmock.JSONResponse([]any{}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/tag-repo/rulesets"),
-					httpmock.JSONResponse([]interface{}{}),
+					httpmock.JSONResponse([]any{}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/tag-repo"),
-					httpmock.JSONResponse(map[string]interface{}{
-						"security_and_analysis": map[string]interface{}{
-							"secret_scanning":                 map[string]interface{}{"status": "enabled"},
-							"secret_scanning_push_protection": map[string]interface{}{"status": "enabled"},
+					httpmock.JSONResponse(map[string]any{
+						"security_and_analysis": map[string]any{
+							"secret_scanning":                 map[string]any{"status": "enabled"},
+							"secret_scanning_push_protection": map[string]any{"status": "enabled"},
 						},
 					}),
 				)
@@ -664,26 +664,26 @@ func TestPublishRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/code-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"names": []string{"agent-skills"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/code-repo/tags"),
-					httpmock.JSONResponse([]interface{}{}),
+					httpmock.JSONResponse([]any{}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/code-repo/rulesets"),
-					httpmock.JSONResponse([]map[string]interface{}{
+					httpmock.JSONResponse([]map[string]any{
 						{"id": 1, "name": "tags", "target": "tag", "enforcement": "active"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/code-repo"),
-					httpmock.JSONResponse(map[string]interface{}{
-						"security_and_analysis": map[string]interface{}{
-							"secret_scanning":                 map[string]interface{}{"status": "enabled"},
-							"secret_scanning_push_protection": map[string]interface{}{"status": "enabled"},
+					httpmock.JSONResponse(map[string]any{
+						"security_and_analysis": map[string]any{
+							"secret_scanning":                 map[string]any{"status": "enabled"},
+							"secret_scanning_push_protection": map[string]any{"status": "enabled"},
 						},
 					}),
 				)
@@ -731,26 +731,26 @@ func TestPublishRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/dep-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"names": []string{"agent-skills"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/dep-repo/tags"),
-					httpmock.JSONResponse([]interface{}{}),
+					httpmock.JSONResponse([]any{}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/dep-repo/rulesets"),
-					httpmock.JSONResponse([]map[string]interface{}{
+					httpmock.JSONResponse([]map[string]any{
 						{"id": 1, "name": "tags", "target": "tag", "enforcement": "active"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/dep-repo"),
-					httpmock.JSONResponse(map[string]interface{}{
-						"security_and_analysis": map[string]interface{}{
-							"secret_scanning":                 map[string]interface{}{"status": "enabled"},
-							"secret_scanning_push_protection": map[string]interface{}{"status": "enabled"},
+					httpmock.JSONResponse(map[string]any{
+						"security_and_analysis": map[string]any{
+							"secret_scanning":                 map[string]any{"status": "enabled"},
+							"secret_scanning_push_protection": map[string]any{"status": "enabled"},
 						},
 					}),
 				)
@@ -964,54 +964,54 @@ func TestPublishRun(t *testing.T) {
 				// topic missing
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"names": []string{"golang"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/tags"),
-					httpmock.JSONResponse([]interface{}{}),
+					httpmock.JSONResponse([]any{}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/rulesets"),
-					httpmock.JSONResponse([]map[string]interface{}{
+					httpmock.JSONResponse([]map[string]any{
 						{"id": 1, "name": "tags", "target": "tag", "enforcement": "active"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo"),
-					httpmock.JSONResponse(map[string]interface{}{
-						"security_and_analysis": map[string]interface{}{
-							"secret_scanning":                 map[string]interface{}{"status": "enabled"},
-							"secret_scanning_push_protection": map[string]interface{}{"status": "enabled"},
+					httpmock.JSONResponse(map[string]any{
+						"security_and_analysis": map[string]any{
+							"secret_scanning":                 map[string]any{"status": "enabled"},
+							"secret_scanning_push_protection": map[string]any{"status": "enabled"},
 						},
 					}),
 				)
 				// addAgentSkillsTopic fetches topics again then PUTs
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"names": []string{"golang"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("PUT", "repos/monalisa/skills-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{}),
+					httpmock.JSONResponse(map[string]any{}),
 				)
 				// immutable releases
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/immutable-releases"),
-					httpmock.JSONResponse(map[string]interface{}{"enabled": true}),
+					httpmock.JSONResponse(map[string]any{"enabled": true}),
 				)
 				// default branch
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo"),
-					httpmock.JSONResponse(map[string]interface{}{"default_branch": "main"}),
+					httpmock.JSONResponse(map[string]any{"default_branch": "main"}),
 				)
 				// create release
 				reg.Register(
 					httpmock.REST("POST", "repos/monalisa/skills-repo/releases"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"html_url": "https://github.com/monalisa/skills-repo/releases/tag/v1.0.0",
 					}),
 				)
@@ -1053,45 +1053,45 @@ func TestPublishRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"names": []string{"agent-skills"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/tags"),
-					httpmock.JSONResponse([]map[string]interface{}{
+					httpmock.JSONResponse([]map[string]any{
 						{"name": "v2.3.4"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/rulesets"),
-					httpmock.JSONResponse([]map[string]interface{}{
+					httpmock.JSONResponse([]map[string]any{
 						{"id": 1, "name": "tags", "target": "tag", "enforcement": "active"},
 					}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo"),
-					httpmock.JSONResponse(map[string]interface{}{
-						"security_and_analysis": map[string]interface{}{
-							"secret_scanning":                 map[string]interface{}{"status": "enabled"},
-							"secret_scanning_push_protection": map[string]interface{}{"status": "enabled"},
+					httpmock.JSONResponse(map[string]any{
+						"security_and_analysis": map[string]any{
+							"secret_scanning":                 map[string]any{"status": "enabled"},
+							"secret_scanning_push_protection": map[string]any{"status": "enabled"},
 						},
 					}),
 				)
 				// immutable releases
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/immutable-releases"),
-					httpmock.JSONResponse(map[string]interface{}{"enabled": true}),
+					httpmock.JSONResponse(map[string]any{"enabled": true}),
 				)
 				// default branch
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo"),
-					httpmock.JSONResponse(map[string]interface{}{"default_branch": "main"}),
+					httpmock.JSONResponse(map[string]any{"default_branch": "main"}),
 				)
 				// create release with the suggested v2.3.5 tag
 				reg.Register(
 					httpmock.REST("POST", "repos/monalisa/skills-repo/releases"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"html_url": "https://github.com/monalisa/skills-repo/releases/tag/v2.3.5",
 					}),
 				)
@@ -1225,12 +1225,12 @@ func TestPublishRun(t *testing.T) {
 				// No topic yet, first GET for diagnostic check
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{"names": []string{}}),
+					httpmock.JSONResponse(map[string]any{"names": []string{}}),
 				)
 				// Second GET inside addAgentSkillsTopic
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/topics"),
-					httpmock.JSONResponse(map[string]interface{}{"names": []string{}}),
+					httpmock.JSONResponse(map[string]any{"names": []string{}}),
 				)
 				// Add topic
 				reg.Register(
@@ -1239,31 +1239,31 @@ func TestPublishRun(t *testing.T) {
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/tags"),
-					httpmock.JSONResponse([]map[string]interface{}{}),
+					httpmock.JSONResponse([]map[string]any{}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/rulesets"),
-					httpmock.JSONResponse([]map[string]interface{}{}),
+					httpmock.JSONResponse([]map[string]any{}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"default_branch": "main",
-						"security_and_analysis": map[string]interface{}{
-							"secret_scanning":                 map[string]interface{}{"status": "enabled"},
-							"secret_scanning_push_protection": map[string]interface{}{"status": "enabled"},
+						"security_and_analysis": map[string]any{
+							"secret_scanning":                 map[string]any{"status": "enabled"},
+							"secret_scanning_push_protection": map[string]any{"status": "enabled"},
 						},
 					}),
 				)
 				// Immutable releases already enabled
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/immutable-releases"),
-					httpmock.JSONResponse(map[string]interface{}{"enabled": true}),
+					httpmock.JSONResponse(map[string]any{"enabled": true}),
 				)
 				// Create release
 				reg.Register(
 					httpmock.REST("POST", "repos/monalisa/skills-repo/releases"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"html_url": "https://github.com/monalisa/skills-repo/releases/tag/v1.0.0",
 					}),
 				)
@@ -1317,15 +1317,15 @@ func TestPublishRun(t *testing.T) {
 				stubAllSecureRemote(reg, "monalisa", "skills-repo")
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/immutable-releases"),
-					httpmock.JSONResponse(map[string]interface{}{"enabled": true}),
+					httpmock.JSONResponse(map[string]any{"enabled": true}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo"),
-					httpmock.JSONResponse(map[string]interface{}{"default_branch": "main"}),
+					httpmock.JSONResponse(map[string]any{"default_branch": "main"}),
 				)
 				reg.Register(
 					httpmock.REST("POST", "repos/monalisa/skills-repo/releases"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"html_url": "https://github.com/monalisa/skills-repo/releases/tag/beta-1",
 					}),
 				)
@@ -1377,11 +1377,11 @@ func TestPublishRun(t *testing.T) {
 				stubAllSecureRemote(reg, "monalisa", "skills-repo")
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/immutable-releases"),
-					httpmock.JSONResponse(map[string]interface{}{"enabled": true}),
+					httpmock.JSONResponse(map[string]any{"enabled": true}),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo"),
-					httpmock.JSONResponse(map[string]interface{}{"default_branch": "main"}),
+					httpmock.JSONResponse(map[string]any{"default_branch": "main"}),
 				)
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
@@ -1438,7 +1438,7 @@ func TestPublishRun(t *testing.T) {
 				// Immutable releases NOT enabled
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/immutable-releases"),
-					httpmock.JSONResponse(map[string]interface{}{"enabled": false}),
+					httpmock.JSONResponse(map[string]any{"enabled": false}),
 				)
 				// Enable immutable releases
 				reg.Register(
@@ -1447,11 +1447,11 @@ func TestPublishRun(t *testing.T) {
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo"),
-					httpmock.JSONResponse(map[string]interface{}{"default_branch": "main"}),
+					httpmock.JSONResponse(map[string]any{"default_branch": "main"}),
 				)
 				reg.Register(
 					httpmock.REST("POST", "repos/monalisa/skills-repo/releases"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"html_url": "https://github.com/monalisa/skills-repo/releases/tag/v1.0.1",
 					}),
 				)

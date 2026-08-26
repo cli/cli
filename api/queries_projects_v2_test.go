@@ -26,7 +26,7 @@ func TestUpdateProjectV2Items(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
 					httpmock.GraphQLQuery(`{"data":{"add_000":{"item":{"id":"1"}},"delete_001":{"item":{"id":"2"}}}}`,
-						func(mutations string, inputs map[string]interface{}) {
+						func(mutations string, inputs map[string]any) {
 							expectedMutations := `
                 mutation UpdateProjectV2Items(
                   $input_000: AddProjectV2ItemByIdInput!
@@ -43,10 +43,10 @@ func TestUpdateProjectV2Items(t *testing.T) {
 							if len(inputs) != 4 {
 								t.Fatalf("expected 4 inputs, got %d", len(inputs))
 							}
-							i0 := inputs["input_000"].(map[string]interface{})
-							i1 := inputs["input_001"].(map[string]interface{})
-							i2 := inputs["input_002"].(map[string]interface{})
-							i3 := inputs["input_003"].(map[string]interface{})
+							i0 := inputs["input_000"].(map[string]any)
+							i1 := inputs["input_001"].(map[string]any)
+							i2 := inputs["input_002"].(map[string]any)
+							i3 := inputs["input_003"].(map[string]any)
 							adds := []string{
 								fmt.Sprintf("%v -> %v", i0["contentId"], i0["projectId"]),
 								fmt.Sprintf("%v -> %v", i1["contentId"], i1["projectId"]),
@@ -67,7 +67,7 @@ func TestUpdateProjectV2Items(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
-					httpmock.GraphQLMutation(`{"data":{}, "errors": [{"message": "some gql error"}]}`, func(inputs map[string]interface{}) {}),
+					httpmock.GraphQLMutation(`{"data":{}, "errors": [{"message": "some gql error"}]}`, func(inputs map[string]any) {}),
 				)
 			},
 			expectError: true,
@@ -108,7 +108,7 @@ func TestProjectsV2ItemsForIssue(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query IssueProjectItems\b`),
 					httpmock.GraphQLQuery(`{"data":{"repository":{"issue":{"projectItems":{"nodes": [{"id":"projectItem1"},{"id":"projectItem2"}]}}}}}`,
-						func(query string, inputs map[string]interface{}) {}),
+						func(query string, inputs map[string]any) {}),
 				)
 			},
 			expectItems: ProjectItems{
@@ -124,7 +124,7 @@ func TestProjectsV2ItemsForIssue(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query IssueProjectItems\b`),
 					httpmock.GraphQLQuery(`{"data":{}, "errors": [{"message": "some gql error"}]}`,
-						func(query string, inputs map[string]interface{}) {}),
+						func(query string, inputs map[string]any) {}),
 				)
 			},
 			expectError: true,
@@ -135,7 +135,7 @@ func TestProjectsV2ItemsForIssue(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query IssueProjectItems\b`),
 					httpmock.GraphQLQuery(`{"data":{"repository":{"issue":{"projectItems":{"totalCount":1,"nodes":[null]}}}}}`,
-						func(query string, inputs map[string]interface{}) {}),
+						func(query string, inputs map[string]any) {}),
 				)
 			},
 			expectItems: ProjectItems{},
@@ -176,7 +176,7 @@ func TestProjectsV2ItemsForPullRequest(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestProjectItems\b`),
 					httpmock.GraphQLQuery(`{"data":{"repository":{"pullRequest":{"projectItems":{"nodes": [{"id":"projectItem3"},{"id":"projectItem4"}]}}}}}`,
-						func(query string, inputs map[string]interface{}) {}),
+						func(query string, inputs map[string]any) {}),
 				)
 			},
 			expectItems: ProjectItems{
@@ -192,7 +192,7 @@ func TestProjectsV2ItemsForPullRequest(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestProjectItems\b`),
 					httpmock.GraphQLQuery(`{"data":{}, "errors": [{"message": "some gql error"}]}`,
-						func(query string, inputs map[string]interface{}) {}),
+						func(query string, inputs map[string]any) {}),
 				)
 			},
 			expectError: true,
@@ -203,7 +203,7 @@ func TestProjectsV2ItemsForPullRequest(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestProjectItems\b`),
 					httpmock.GraphQLQuery(`{"data":{"repository":{"pullRequest":{"projectItems":{"totalCount":1,"nodes":[null]}}}}}`,
-						func(query string, inputs map[string]interface{}) {}),
+						func(query string, inputs map[string]any) {}),
 				)
 			},
 			expectItems: ProjectItems{},
@@ -240,7 +240,7 @@ func TestProjectsV2ItemsForPullRequest(t *testing.T) {
                           }
                         }
                       }`,
-						func(query string, inputs map[string]interface{}) {
+						func(query string, inputs map[string]any) {
 							require.Equal(t, float64(1), inputs["number"])
 							require.Equal(t, "OWNER", inputs["owner"])
 							require.Equal(t, "REPO", inputs["name"])
