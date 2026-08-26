@@ -12,8 +12,7 @@ import (
 )
 
 func TestListPorts(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	mockApi := GetMockApi(false)
 	ios, _, _, _ := iostreams.Test()
