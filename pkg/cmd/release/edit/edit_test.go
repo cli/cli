@@ -574,13 +574,3 @@ func Test_editRelease_bodyReadError(t *testing.T) {
 type errorReader struct{ err error }
 
 func (e errorReader) Read(_ []byte) (int, error) { return 0, e.err }
-
-//go:fix inline
-func boolPtr(b bool) *bool {
-	return new(b)
-}
-
-//go:fix inline
-func stringPtr(s string) *string {
-	return new(s)
-}

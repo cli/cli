@@ -994,13 +994,3 @@ func Test_validateSquashMergeCommitMsg(t *testing.T) {
 	assert.Error(t, validateSquashMergeCommitMsg("blah"))
 	assert.Error(t, validateSquashMergeCommitMsg(""))
 }
-
-//go:fix inline
-func sp(v string) *string {
-	return new(v)
-}
-
-//go:fix inline
-func bp(b bool) *bool {
-	return new(b)
-}
