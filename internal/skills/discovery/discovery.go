@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -1108,12 +1109,7 @@ func hasHiddenSegment(p string) bool {
 
 // hasPluginsAncestor reports whether any path component is "plugins".
 func hasPluginsAncestor(p string) bool {
-	for _, seg := range strings.Split(p, "/") {
-		if seg == "plugins" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(p, "/"), "plugins")
 }
 
 // IsSpecCompliant checks if a skill name matches the strict agentskills.io spec.

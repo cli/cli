@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/safepaths"
@@ -222,12 +223,7 @@ func isolateArtifacts(wantNames []string, wantPatterns []string) bool {
 }
 
 func matchAnyName(names []string, name string) bool {
-	for _, n := range names {
-		if name == n {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(names, name)
 }
 
 func matchAnyPattern(patterns []string, name string) bool {

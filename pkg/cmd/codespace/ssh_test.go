@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -108,13 +109,7 @@ func TestGenerateAutomaticSSHKeys(t *testing.T) {
 		}
 		for _, file := range allExistingFiles {
 			filename := file.Name()
-			isWantedFile := false
-			for _, wantedFile := range tt.wantFinalFiles {
-				if filename == wantedFile {
-					isWantedFile = true
-					break
-				}
-			}
+			isWantedFile := slices.Contains(tt.wantFinalFiles, filename)
 
 			if !isWantedFile {
 				t.Errorf("Unexpected file %q exists after generateAutomaticSSHKeys", filename)

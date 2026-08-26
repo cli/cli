@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -207,12 +208,7 @@ func (s *StatusGetter) CachedClient(ttl time.Duration) *http.Client {
 }
 
 func (s *StatusGetter) ShouldExclude(repo string) bool {
-	for _, exclude := range s.Exclude {
-		if repo == exclude {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s.Exclude, repo)
 }
 
 func (s *StatusGetter) CurrentUsername() (string, error) {
