@@ -358,7 +358,7 @@ func (e *verboseExporter) Fields() []string {
 }
 
 func (e *verboseExporter) Write(io *iostreams.IOStreams, data any) error {
-	_, err := io.Out.Write([]byte(fmt.Sprintf("%+v", data)))
+	_, err := io.Out.Write(fmt.Appendf(nil, "%+v", data))
 	if err != nil {
 		return err
 	}
