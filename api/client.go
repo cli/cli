@@ -230,11 +230,11 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 			gotScopes["user:follow"] = struct{}{}
 		} else if s == "codespace" {
 			gotScopes["codespace:secrets"] = struct{}{}
-		} else if strings.HasPrefix(s, "admin:") {
-			gotScopes["read:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
+		} else if after, ok := strings.CutPrefix(s, "admin:"); ok {
+			gotScopes["read:"+after] = struct{}{}
 			gotScopes["write:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
-		} else if strings.HasPrefix(s, "write:") {
-			gotScopes["read:"+strings.TrimPrefix(s, "write:")] = struct{}{}
+		} else if after, ok := strings.CutPrefix(s, "write:"); ok {
+			gotScopes["read:"+after] = struct{}{}
 		}
 	}
 
