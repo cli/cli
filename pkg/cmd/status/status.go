@@ -415,18 +415,19 @@ query AssignedSearch($searchAssigns: String!, $searchReviews: String!, $limit: I
 func (s *StatusGetter) LoadSearchResults() error {
 	c := api.NewClientFromHTTP(s.Client)
 
-	searchAssigns := `assignee:@me state:open archived:false`
+	var searchAssigns strings.Builder
+	searchAssigns.WriteString(`assignee:@me state:open archived:false`)
 	searchReviews := `review-requested:@me state:open archived:false`
 	if s.Org != "" {
-		searchAssigns += " org:" + s.Org
+		searchAssigns.WriteString(" org:" + s.Org)
 		searchReviews += " org:" + s.Org
 	}
 	for _, repo := range s.Exclude {
-		searchAssigns += " -repo:" + repo
+		searchAssigns.WriteString(" -repo:" + repo)
 		searchReviews += " -repo:" + repo
 	}
 	variables := map[string]any{
-		"searchAssigns": searchAssigns,
+		"searchAssigns": searchAssigns.String(),
 		"searchReviews": searchReviews,
 	}
 
