@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
@@ -432,11 +433,8 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 		}
 		for _, prev := range editable.Labels.Default {
 			var found bool
-			for _, selected := range editable.Labels.Add {
-				if prev == selected {
-					found = true
-					break
-				}
+			if slices.Contains(editable.Labels.Add, prev) {
+				found = true
 			}
 			if !found {
 				editable.Labels.Remove = append(editable.Labels.Remove, prev)
@@ -479,12 +477,7 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 
 func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 	contains := func(s []string, str string) bool {
-		for _, v := range s {
-			if v == str {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(s, str)
 	}
 
 	opts := []string{"Title", "Body"}

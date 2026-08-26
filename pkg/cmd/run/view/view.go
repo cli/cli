@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -461,10 +462,8 @@ func shouldFetchJobs(opts *ViewOptions) bool {
 		return true
 	}
 	if opts.Exporter != nil {
-		for _, f := range opts.Exporter.Fields() {
-			if f == "jobs" {
-				return true
-			}
+		if slices.Contains(opts.Exporter.Fields(), "jobs") {
+			return true
 		}
 	}
 	return false

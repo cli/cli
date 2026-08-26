@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -605,10 +606,5 @@ func buildDisplayName(displayName string, prebuildAvailability string) string {
 }
 
 func stringInSlice(a string, slice []string) bool {
-	for _, b := range slice {
-		if b == a {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, a)
 }

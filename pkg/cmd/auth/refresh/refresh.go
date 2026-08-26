@@ -3,6 +3,7 @@ package refresh
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -154,11 +155,8 @@ func refreshRun(opts *RefreshOptions) error {
 		}
 	} else {
 		var found bool
-		for _, c := range candidates {
-			if c == hostname {
-				found = true
-				break
-			}
+		if slices.Contains(candidates, hostname) {
+			found = true
 		}
 
 		if !found {

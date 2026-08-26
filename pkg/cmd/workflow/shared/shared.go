@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -106,12 +107,9 @@ func selectWorkflow(p iprompter, workflows []Workflow, promptMsg string, states 
 	filtered := []Workflow{}
 	candidates := []string{}
 	for _, workflow := range workflows {
-		for _, state := range states {
-			if workflow.State == state {
-				filtered = append(filtered, workflow)
-				candidates = append(candidates, fmt.Sprintf("%s (%s)", workflow.Name, workflow.Base()))
-				break
-			}
+		if slices.Contains(states, workflow.State) {
+			filtered = append(filtered, workflow)
+			candidates = append(candidates, fmt.Sprintf("%s (%s)", workflow.Name, workflow.Base()))
 		}
 	}
 
@@ -186,11 +184,8 @@ func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, name string, 
 		if !strings.EqualFold(workflow.Name, name) {
 			continue
 		}
-		for _, state := range states {
-			if workflow.State == state {
-				filtered = append(filtered, workflow)
-				break
-			}
+		if slices.Contains(states, workflow.State) {
+			filtered = append(filtered, workflow)
 		}
 	}
 

@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -452,12 +453,7 @@ func repoHasTopic(client *api.Client, host, owner, repo string) bool {
 	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
 		return false
 	}
-	for _, t := range resp.Names {
-		if t == "agent-skills" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(resp.Names, "agent-skills")
 }
 
 // fetchTags returns the most recent tags from the repo.
@@ -718,10 +714,8 @@ func addAgentSkillsTopic(client *api.Client, host, owner, repo string) error {
 	}
 
 	// Deduplicate: only add if not already present
-	for _, t := range resp.Names {
-		if t == "agent-skills" {
-			return nil
-		}
+	if slices.Contains(resp.Names, "agent-skills") {
+		return nil
 	}
 
 	topics := append(resp.Names, "agent-skills")

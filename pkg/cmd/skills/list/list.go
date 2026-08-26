@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -286,10 +287,8 @@ func selectedScopes(scope string) []registry.Scope {
 }
 
 func appendAgentHostID(agentHostIDs []string, agentHostID string) []string {
-	for _, existing := range agentHostIDs {
-		if existing == agentHostID {
-			return agentHostIDs
-		}
+	if slices.Contains(agentHostIDs, agentHostID) {
+		return agentHostIDs
 	}
 	return append(agentHostIDs, agentHostID)
 }
@@ -312,12 +311,7 @@ func shouldListPublishedProjectSkills(agentID string, scopes []registry.Scope, g
 	if agentID != "" || gitRoot == "" {
 		return false
 	}
-	for _, scope := range scopes {
-		if scope == registry.ScopeProject {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(scopes, registry.ScopeProject)
 }
 
 func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string, filter scanFilter) ([]listedSkill, error) {
