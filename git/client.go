@@ -305,9 +305,9 @@ func (c *Client) WorktreePrune(ctx context.Context) error {
 func parseWorktrees(output []byte) []Worktree {
 	var worktrees []Worktree
 	output = bytes.ReplaceAll(output, []byte("\r\n"), []byte("\n"))
-	for _, record := range strings.Split(string(output), "\n\n") {
+	for record := range strings.SplitSeq(string(output), "\n\n") {
 		var worktree Worktree
-		for _, line := range strings.Split(record, "\n") {
+		for line := range strings.SplitSeq(record, "\n") {
 			key, value, _ := strings.Cut(line, " ")
 			switch key {
 			case "worktree":

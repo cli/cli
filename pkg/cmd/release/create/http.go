@@ -227,7 +227,7 @@ func tokenHasWorkflowScope(headers http.Header) bool {
 
 	// The API returns scopes separated by a comma and a space, so each element
 	// must be trimmed before comparison.
-	for _, s := range strings.Split(scopes, ",") {
+	for s := range strings.SplitSeq(scopes, ",") {
 		if strings.TrimSpace(s) == "workflow" {
 			return true
 		}
