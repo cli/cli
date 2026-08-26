@@ -21,6 +21,15 @@ cd ${REPO}
 exec gh issue create --title 'Feature Request' --body 'Request Body'
 stdout2env ISSUE_URL
 
+# Targeting an existing, non-empty directory that is not a linked worktree is
+# rejected before any branch is created, so the issue is left without an orphan
+# linked branch on the remote.
+exists ../occupied/keep.txt
+! exec gh issue develop ${ISSUE_URL} --name feature-branch --checkout --worktree ../occupied
+stderr '--worktree path must be empty'
+exec gh issue develop --list ${ISSUE_URL}
+! stdout .
+
 # Develop the issue in a fresh worktree
 exec gh issue develop ${ISSUE_URL} --name feature-branch --checkout --worktree ../wt
 exists ../wt
@@ -50,3 +59,6 @@ stdout '(?m)^feature-branch$'
 # The main working copy remains untouched
 exec git rev-parse --abbrev-ref HEAD
 stdout '(?m)^main$'
+
+-- occupied/keep.txt --
+placeholder

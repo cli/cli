@@ -2,7 +2,9 @@ package shared
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +30,11 @@ func ResolveWorktreeTarget(client *git.Client, path string) (WorktreeTarget, err
 	reuse, err := resolveWorktreeTarget(client, path)
 	if err != nil {
 		return target, err
+	}
+	if !reuse {
+		if err := ensureWorktreePathEmpty(path); err != nil {
+			return target, err
+		}
 	}
 	target.Reuse = reuse
 	return target, nil
@@ -119,4 +126,25 @@ func ensureWorktreePathSafe(path string) error {
 		return fmt.Errorf("--worktree path must be a directory: %s", path)
 	}
 	return nil
+}
+
+func ensureWorktreePathEmpty(path string) error {
+	dir, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+
+	_, err = dir.Readdirnames(1)
+	switch {
+	case errors.Is(err, io.EOF):
+		return nil
+	case err != nil:
+		return err
+	default:
+		return fmt.Errorf("--worktree path must be empty: %s", path)
+	}
 }

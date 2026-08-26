@@ -13,9 +13,12 @@ import (
 
 func TestResolveWorktreeTarget(t *testing.T) {
 	dir := t.TempDir()
+	nonEmptyLinkedWorktree := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(nonEmptyLinkedWorktree, "file"), []byte("x"), 0o644))
 
 	tests := []struct {
 		name      string
+		path      string
 		stubs     func(*run.CommandStubber)
 		wantReuse bool
 		wantErr   string
@@ -38,6 +41,7 @@ func TestResolveWorktreeTarget(t *testing.T) {
 		},
 		{
 			name: "path is a different worktree of this repo",
+			path: nonEmptyLinkedWorktree,
 			stubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+ rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
@@ -85,14 +89,18 @@ func TestResolveWorktreeTarget(t *testing.T) {
 				GhPath:  "/some/path/gh",
 				GitPath: "/some/path/git",
 			}
-			target, err := ResolveWorktreeTarget(client, dir)
+			path := tt.path
+			if path == "" {
+				path = dir
+			}
+			target, err := ResolveWorktreeTarget(client, path)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 				return
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantReuse, target.Reuse)
-			assert.Equal(t, dir, target.Path)
+			assert.Equal(t, path, target.Path)
 		})
 	}
 }
@@ -102,6 +110,10 @@ func TestResolveWorktreeTargetPathSafety(t *testing.T) {
 
 	existingDir := filepath.Join(base, "dir")
 	require.NoError(t, os.Mkdir(existingDir, 0o755))
+
+	nonEmptyDir := filepath.Join(base, "non-empty-dir")
+	require.NoError(t, os.Mkdir(nonEmptyDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(nonEmptyDir, "file"), []byte("x"), 0o644))
 
 	regularFile := filepath.Join(base, "file")
 	require.NoError(t, os.WriteFile(regularFile, []byte("x"), 0o644))
@@ -123,6 +135,11 @@ func TestResolveWorktreeTargetPathSafety(t *testing.T) {
 			path: existingDir,
 		},
 		{
+			name:    "existing non-empty directory is rejected",
+			path:    nonEmptyDir,
+			wantErr: "--worktree path must be empty",
+		},
+		{
 			name:    "leaf symlink is rejected",
 			path:    symlink,
 			wantErr: "--worktree path must not be a symlink",
@@ -138,7 +155,7 @@ func TestResolveWorktreeTargetPathSafety(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cs, teardown := run.Stub()
 			defer teardown(t)
-			if tt.wantErr == "" {
+			if tt.wantErr == "" || tt.path == nonEmptyDir {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 128, "")
 			}
 
