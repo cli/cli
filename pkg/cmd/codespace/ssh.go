@@ -498,8 +498,8 @@ func firstConfiguredKeyPair(
 		return nil, fmt.Errorf("could not load ssh configuration: %w", err)
 	}
 
-	configLines := strings.Split(string(configBytes), "\n")
-	for _, line := range configLines {
+	configLines := strings.SplitSeq(string(configBytes), "\n")
+	for line := range configLines {
 		line = strings.TrimSpace(line)
 
 		if strings.HasPrefix(line, "identityfile ") {

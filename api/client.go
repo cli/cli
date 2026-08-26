@@ -211,7 +211,7 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 	}
 
 	gotScopes := map[string]struct{}{}
-	for _, s := range strings.Split(tokenHasScopes, ",") {
+	for s := range strings.SplitSeq(tokenHasScopes, ",") {
 		s = strings.TrimSpace(s)
 		gotScopes[s] = struct{}{}
 
@@ -238,7 +238,7 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 		}
 	}
 
-	for _, s := range strings.Split(endpointNeedsScopes, ",") {
+	for s := range strings.SplitSeq(endpointNeedsScopes, ",") {
 		s = strings.TrimSpace(s)
 		if _, gotScope := gotScopes[s]; s == "" || gotScope {
 			continue

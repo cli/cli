@@ -628,7 +628,7 @@ func changelogForRange(client *git.Client, refRange string) ([]logEntry, error) 
 	}
 
 	var entries []logEntry
-	for _, cb := range bytes.Split(b, []byte{'\000'}) {
+	for cb := range bytes.SplitSeq(b, []byte{'\000'}) {
 		c := strings.ReplaceAll(string(cb), "\r\n", "\n")
 		c = strings.TrimPrefix(c, "\n")
 		if len(c) == 0 {

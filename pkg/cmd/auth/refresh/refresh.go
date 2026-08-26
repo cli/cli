@@ -175,7 +175,7 @@ func refreshRun(opts *RefreshOptions) error {
 	if !opts.ResetScopes {
 		if oldToken, _ := authCfg.ActiveToken(hostname); oldToken != "" {
 			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken); err == nil {
-				for _, s := range strings.Split(oldScopes, ",") {
+				for s := range strings.SplitSeq(oldScopes, ",") {
 					s = strings.TrimSpace(s)
 					if s != "" {
 						additionalScopes.Add(s)

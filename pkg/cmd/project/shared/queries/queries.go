@@ -1732,7 +1732,7 @@ func requiredScopesFromServerMessage(msg string) []string {
 		return nil
 	}
 	var scopes []string
-	for _, mm := range strings.Split(m[1], ",") {
+	for mm := range strings.SplitSeq(m[1], ",") {
 		scopes = append(scopes, strings.Trim(mm, "' "))
 	}
 	return scopes
