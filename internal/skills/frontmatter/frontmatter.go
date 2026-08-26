@@ -36,13 +36,13 @@ func Parse(content string) (*ParseResult, error) {
 
 	rest := trimmed[len(delimiter):]
 	rest = strings.TrimLeft(rest, "\r\n")
-	endIdx := strings.Index(rest, "\n"+delimiter)
-	if endIdx == -1 {
+	before, after, ok := strings.Cut(rest, "\n"+delimiter)
+	if !ok {
 		return &ParseResult{Body: content}, nil
 	}
 
-	yamlContent := rest[:endIdx]
-	body := rest[endIdx+len("\n"+delimiter):]
+	yamlContent := before
+	body := after
 	body = strings.TrimLeft(body, "\r\n")
 
 	var rawYAML map[string]any
