@@ -417,18 +417,19 @@ func (s *StatusGetter) LoadSearchResults() error {
 
 	var searchAssigns strings.Builder
 	searchAssigns.WriteString(`assignee:@me state:open archived:false`)
-	searchReviews := `review-requested:@me state:open archived:false`
+	var searchReviews strings.Builder
+	searchReviews.WriteString(`review-requested:@me state:open archived:false`)
 	if s.Org != "" {
 		searchAssigns.WriteString(" org:" + s.Org)
-		searchReviews += " org:" + s.Org
+		searchReviews.WriteString(" org:" + s.Org)
 	}
 	for _, repo := range s.Exclude {
 		searchAssigns.WriteString(" -repo:" + repo)
-		searchReviews += " -repo:" + repo
+		searchReviews.WriteString(" -repo:" + repo)
 	}
 	variables := map[string]any{
 		"searchAssigns": searchAssigns.String(),
-		"searchReviews": searchReviews,
+		"searchReviews": searchReviews.String(),
 	}
 
 	var resp struct {
