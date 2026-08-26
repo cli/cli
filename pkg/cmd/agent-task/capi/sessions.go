@@ -39,9 +39,9 @@ type session struct {
 	ResourceType     string    `json:"resource_type"`
 	ResourceID       int64     `json:"resource_id"`
 	ResourceGlobalID string    `json:"resource_global_id"`
-	LastUpdatedAt    time.Time `json:"last_updated_at,omitempty"`
-	CreatedAt        time.Time `json:"created_at,omitempty"`
-	CompletedAt      time.Time `json:"completed_at,omitempty"`
+	LastUpdatedAt    time.Time `json:"last_updated_at"`
+	CreatedAt        time.Time `json:"created_at"`
+	CompletedAt      time.Time `json:"completed_at"`
 	EventURL         string    `json:"event_url"`
 	EventType        string    `json:"event_type"`
 	PremiumRequests  float64   `json:"premium_requests"`
