@@ -202,6 +202,11 @@ Sometimes useful data isn't on the typed commands. Examples:
   `gh pr view <n>` if you only need to read.
 - `gh pr checkout <n> --worktree <path>` checks the PR out into a git worktree
   at `<path>` instead of switching the current branch.
+- `gh issue develop <n> --checkout` creates a linked branch for the issue and
+  checks it out. Add `--worktree <path>` to check that branch out into a git
+  worktree at `<path>` instead of switching the current branch;
+  `--worktree` requires `--checkout`, cannot be blank, and cannot be combined
+  with `--list`.
 - `NO_COLOR`, `CLICOLOR_FORCE`, and `GH_FORCE_TTY` are honored. Set
   `GH_FORCE_TTY=1` if you want TTY-style output (colors, tables, the
   pager, interactivity) inside an agent harness; leave it unset unless needed.
