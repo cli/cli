@@ -98,9 +98,9 @@ func TestSelectScripts(t *testing.T) {
 			wantFiltered: true,
 		},
 		{
-			name:         "filter matches several scripts in the same directory",
-			command:      "repo",
-			scripts:      []string{"repo-clone.txtar", "repo-view.txtar"},
+			name:    "filter matches several scripts in the same directory",
+			command: "repo",
+			scripts: []string{"repo-clone.txtar", "repo-view.txtar"},
 			wantFiles: []string{
 				path.Join("testdata", "repo", "repo-clone.txtar"),
 				path.Join("testdata", "repo", "repo-view.txtar"),
