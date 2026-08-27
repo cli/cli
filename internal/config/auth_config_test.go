@@ -976,3 +976,86 @@ func TestActiveTokenType(t *testing.T) {
 		})
 	}
 }
+
+func TestActiveTokenUsesPinnedAccountFromKeyring(t *testing.T) {
+	// Given two users are logged in securely and the non-active one is pinned
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "pinned-user", "pinned-token", "", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "active-user", "active-token", "", true)
+	require.NoError(t, err)
+	authCfg.SetPinnedAccount("pinned-user")
+
+	// When we get the token
+	token, source := authCfg.ActiveToken("github.com")
+
+	// Then the pinned user's token is fetched from the keyring
+	require.Equal(t, "pinned-token", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestActiveTokenUsesPinnedAccountFromConfig(t *testing.T) {
+	// Given two users are logged in insecurely and the non-active one is pinned
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "pinned-user", "pinned-token", "", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "active-user", "active-token", "", false)
+	require.NoError(t, err)
+	authCfg.SetPinnedAccount("pinned-user")
+
+	// When we get the token
+	token, source := authCfg.ActiveToken("github.com")
+
+	// Then the pinned user's token is fetched from the config
+	require.Equal(t, "pinned-token", token)
+	require.Equal(t, oauthTokenKey, source)
+}
+
+func TestActiveTokenFallsBackWhenPinnedAccountUnauthenticated(t *testing.T) {
+	// Given a logged in user and a pin naming an account with no credentials
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "active-user", "active-token", "", true)
+	require.NoError(t, err)
+	authCfg.SetPinnedAccount("ghost-user")
+
+	// When we get the token
+	token, source := authCfg.ActiveToken("github.com")
+
+	// Then the active user's token is fetched as if no pin were set
+	require.Equal(t, "active-token", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestActiveTokenEnvVarWinsOverPinnedAccount(t *testing.T) {
+	// Given a pinned authenticated account and a token environment variable
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "pinned-user", "pinned-token", "", true)
+	require.NoError(t, err)
+	authCfg.SetPinnedAccount("pinned-user")
+	t.Setenv("GH_TOKEN", "env-token")
+
+	// When we get the token
+	token, source := authCfg.ActiveToken("github.com")
+
+	// Then the environment token wins over the pin
+	require.Equal(t, "env-token", token)
+	require.Equal(t, "GH_TOKEN", source)
+}
+
+func TestStoredActiveTokenIgnoresPinnedAccount(t *testing.T) {
+	// Given two users are logged in securely and the non-active one is pinned
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "pinned-user", "pinned-token", "", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "active-user", "active-token", "", true)
+	require.NoError(t, err)
+	authCfg.SetPinnedAccount("pinned-user")
+
+	// When we get the stored active token
+	token, source := authCfg.storedActiveToken("github.com")
+
+	// Then the active user's token is fetched, not the pinned user's, so
+	// callers like SwitchUser's rollback reason about the stored active user
+	require.Equal(t, "active-token", token)
+	require.Equal(t, "keyring", source)
+}

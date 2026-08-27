@@ -209,3 +209,36 @@ flows, this feature has not yet made it into GHES.
 
 For the moment, if you have multiple accounts on GHES that you wish to log in as, you will need to ensure that you
 are authenticated as the correct user in the browser before running `auth login`.
+
+## Pinning an account to a repository
+
+> This section describes behaviour added after the v2.40.0 release notes above.
+
+`gh` resolves one active account per host, which can be surprising when you work on
+repositories belonging to different accounts: `auth switch` changes the active account
+globally, for every terminal and directory at once.
+
+To pin a repository to a specific account, set the `github.account` git configuration
+key to the username of an account you have logged in with `auth login`:
+
+```
+➜ git config github.account williammartin
+```
+
+When this key resolves for the current directory, `gh` uses the pinned account's stored
+token instead of the active account's. Because the value lives in the repository's git
+configuration, it follows the repository rather than the process: two terminals working
+in two different repositories each resolve their own account, with no global active
+state to race over.
+
+A few details worth knowing:
+
+* `GH_TOKEN` and the other token environment variables still take precedence over the
+  pin, since they are an explicit per-process choice.
+* If the pinned account is not logged in (for example after `auth logout`), `gh` falls
+  back to the active account.
+* The pin affects token resolution only. `auth switch`, `auth logout`, and `auth status`
+  continue to operate on the stored active account.
+* You can pin many repositories at once with git's
+  [conditional includes](https://git-scm.com/docs/git-config#_conditional_includes),
+  for example pinning everything under `~/work/` to your work account.

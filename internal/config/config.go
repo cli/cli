@@ -4,15 +4,18 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
 	o "github.com/cli/cli/v2/pkg/option"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
+	"github.com/cli/safeexec"
 )
 
 // Important: some of the following configuration settings are used outside of `cli/cli`,
@@ -226,10 +229,11 @@ func defaultFor(key string) o.Option[string] {
 // with knowledge on how to access encrypted storage when neccesarry.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig struct {
-	cfg                 *ghConfig.Config
-	defaultHostOverride func() (string, string)
-	hostsOverride       func() []string
-	tokenOverride       func(string) (string, string)
+	cfg                   *ghConfig.Config
+	defaultHostOverride   func() (string, string)
+	hostsOverride         func() []string
+	tokenOverride         func(string) (string, string)
+	pinnedAccountOverride func() string
 }
 
 // ActiveTokenType reports what kind of credential the active token is, so a
@@ -245,9 +249,29 @@ func (c *AuthConfig) ActiveTokenType(hostname string) gh.TokenType {
 }
 
 // ActiveToken will retrieve the active auth token for the given hostname,
-// searching environment variables, plain text config, and
-// lastly encrypted storage.
+// searching environment variables, an account pinned in git configuration,
+// plain text config, and lastly encrypted storage.
 func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
+	if c.tokenOverride != nil {
+		return c.tokenOverride(hostname)
+	}
+	// Tokens sourced from environment variables are an explicit per-process
+	// choice, so they take precedence over an account pinned in git
+	// configuration.
+	if token, source := ghauth.TokenFromEnvOrConfig(hostname); token != "" && envTokenSources[source] {
+		return token, source
+	}
+	if token, source, ok := c.pinnedActiveToken(hostname); ok {
+		return token, source
+	}
+	return c.storedActiveToken(hostname)
+}
+
+// storedActiveToken retrieves the auth token for the stored active user,
+// ignoring any account pinned in git configuration. Callers that reason about
+// the stored active user, such as SwitchUser's rollback, must use this rather
+// than ActiveToken so a pin cannot substitute another account's token.
+func (c *AuthConfig) storedActiveToken(hostname string) (string, string) {
 	if c.tokenOverride != nil {
 		return c.tokenOverride(hostname)
 	}
@@ -270,6 +294,71 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 		}
 	}
 	return token, source
+}
+
+// envTokenSources are the source values TokenFromEnvOrConfig reports when the
+// token came from an environment variable rather than from configuration.
+var envTokenSources = map[string]bool{
+	"GH_TOKEN":                true,
+	"GITHUB_TOKEN":            true,
+	"GH_ENTERPRISE_TOKEN":     true,
+	"GITHUB_ENTERPRISE_TOKEN": true,
+}
+
+// gitAccountKey is the git configuration key used to pin gh to one of the
+// authenticated accounts for the repository containing the working directory.
+// See https://github.com/cli/cli/issues/12459.
+const gitAccountKey = "github.account"
+
+// gitPinnedAccount resolves the gitAccountKey git configuration value for the
+// current working directory. The result is cached for the lifetime of the
+// process because gh does not change its working directory, so the resolved
+// value cannot change between calls.
+var gitPinnedAccount = sync.OnceValue(func() string {
+	gitExe, err := safeexec.LookPath("git")
+	if err != nil {
+		return ""
+	}
+	out, err := exec.Command(gitExe, "config", "--get", gitAccountKey).Output()
+	if err != nil {
+		// The key being unset and git being unusable both mean no pin.
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+})
+
+func (c *AuthConfig) pinnedAccount() string {
+	if c.pinnedAccountOverride != nil {
+		return c.pinnedAccountOverride()
+	}
+	return gitPinnedAccount()
+}
+
+// pinnedActiveToken retrieves the auth token for the account pinned in git
+// configuration, reporting ok as false when no pin is set or the pinned
+// account has no stored credentials for the hostname (for example, after
+// logging that account out), so resolution falls back to the active user.
+func (c *AuthConfig) pinnedActiveToken(hostname string) (token, source string, ok bool) {
+	account := c.pinnedAccount()
+	if account == "" {
+		return "", "", false
+	}
+	if token, err := c.TokenFromKeyringForUser(hostname, account); err == nil {
+		return token, "keyring", true
+	}
+	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, account, oauthTokenKey}); err == nil && token != "" {
+		return token, oauthTokenKey, true
+	}
+	return "", "", false
+}
+
+// SetPinnedAccount will override git configuration resolution and use the
+// given account for all calls that resolve the pinned account. Use for
+// testing purposes only.
+func (c *AuthConfig) SetPinnedAccount(account string) {
+	c.pinnedAccountOverride = func() string {
+		return account
+	}
 }
 
 // HasActiveToken returns true when a token for the hostname is present.
@@ -408,7 +497,7 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 		return fmt.Errorf("failed to get active user: %s", err)
 	}
 
-	previouslyActiveToken, previousSource := c.ActiveToken(hostname)
+	previouslyActiveToken, previousSource := c.storedActiveToken(hostname)
 	if previousSource != "keyring" && previousSource != "oauth_token" {
 		return fmt.Errorf("currently active token for %s is from %s", hostname, previousSource)
 	}
