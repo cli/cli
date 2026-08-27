@@ -76,6 +76,8 @@ safe-outputs:
     apply-suspected-spam:
       description: Apply suspected-spam to the triggering issue
       runs-on: ubuntu-latest
+      # Custom safe-output jobs require at least one input. The step below ignores
+      # this single allowed value and hardcodes the label it applies.
       inputs:
         label:
           description: Label to apply
