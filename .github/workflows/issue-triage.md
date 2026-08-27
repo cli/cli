@@ -57,9 +57,8 @@ safe-outputs:
   github-app:
     client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
     private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
-  # Keep intent metadata optional: plain strings are applied directly, while structured
-  # labels with `suggest: true` are routed for maintainer review.
   add-labels:
+    issue-intent: true
     max: 3
     allowed:
       - bug
@@ -72,8 +71,35 @@ safe-outputs:
       - off-topic
       - no-help-wanted-issue
       - invalid
-      - suspected-spam
       - duplicate
+  jobs:
+    apply-suspected-spam:
+      description: Apply suspected-spam to the triggering issue
+      runs-on: ubuntu-latest
+      inputs:
+        label:
+          description: Label to apply
+          required: true
+          type: choice
+          options: [suspected-spam]
+      permissions:
+        contents: read
+      steps:
+        - name: Create GitHub App token
+          id: app-token
+          uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+          with:
+            client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
+            private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
+            owner: ${{ github.repository_owner }}
+            repositories: ${{ github.event.repository.name }}
+            permission-issues: write
+        - name: Apply suspected-spam
+          env:
+            GH_TOKEN: ${{ steps.app-token.outputs.token }}
+            GH_REPO: ${{ github.repository }}
+            ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          run: gh issue edit "$ISSUE_NUMBER" --repo "$GH_REPO" --add-label suspected-spam
   add-comment:
     max: 1
   noop:
@@ -118,12 +144,10 @@ valid labels. Incorporate your duplicate detection findings.
 
 Judge the issue against the spam criteria included at the top of this prompt.
 
-If, and only if, the issue meets those criteria, call `add_labels` with
-`labels: ["suspected-spam"]`. Emit it as a plain string with no rationale, confidence,
-or `suggest` field. This metadata-free form directly applies the label instead of
-proposing it. Applying the label triggers the shared `close-suspected-spam` job, which
-removes `needs-triage`, posts the standard comment, and closes the issue. Nothing
-happens if the label is merely suggested.
+If, and only if, the issue meets those criteria, call `apply_suspected_spam` with
+`label: suspected-spam`. This directly applies the label instead of proposing it.
+Applying the label triggers the shared `close-suspected-spam` job, which removes
+`needs-triage`, posts the standard comment, and closes the issue.
 
 When you apply `suspected-spam`:
 
