@@ -294,8 +294,8 @@ func fetchReleasePath(ctx context.Context, httpClient *http.Client, host string,
 // treat a missing release as a sentinel rather than an error, and the api client reports the
 // status through an HTTPError rather than through a response the call site can inspect.
 func isNotFound(err error) bool {
-	var httpErr api.HTTPError
-	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
+	httpErr, ok := errors.AsType[api.HTTPError](err)
+	return ok && httpErr.StatusCode == http.StatusNotFound
 }
 
 func StubFetchRelease(t *testing.T, reg *httpmock.Registry, owner, repoName, tagName, responseBody string) {

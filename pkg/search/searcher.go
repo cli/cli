@@ -271,8 +271,7 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 	if err != nil {
 		// Search reports query errors in a shape of its own, so the generic API error is
 		// translated back rather than surfaced directly.
-		var apiErr api.HTTPError
-		if errors.As(err, &apiErr) {
+		if apiErr, ok := errors.AsType[api.HTTPError](err); ok {
 			return apiErr.Headers.Get("Link"), asSearchError(apiErr)
 		}
 		return "", err

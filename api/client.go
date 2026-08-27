@@ -308,8 +308,7 @@ func UnexpectedStatusError(resp *http.Response) error {
 // before HandleHTTPError, which call sites can no longer do when the response never reaches them.
 func handleRequestError(err error, endpointScopes string) error {
 	if endpointScopes != "" {
-		var restErr *ghAPI.HTTPError
-		if errors.As(err, &restErr) && restErr.Headers != nil && restErr.StatusCode >= 400 && restErr.StatusCode < 500 {
+		if restErr, ok := errors.AsType[*ghAPI.HTTPError](err); ok && restErr.Headers != nil && restErr.StatusCode >= 400 && restErr.StatusCode < 500 {
 			oldScopes := restErr.Headers.Get("X-Accepted-Oauth-Scopes")
 			restErr.Headers.Set("X-Accepted-Oauth-Scopes", fmt.Sprintf("%s, %s", oldScopes, endpointScopes))
 		}

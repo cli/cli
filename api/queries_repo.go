@@ -1683,8 +1683,7 @@ func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
 	// decided by the status alone.
 	resp, err := client.Request(repo.RepoHost(), http.MethodHead, path.String(), nil)
 	if err != nil {
-		var httpErr HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		if httpErr, ok := errors.AsType[HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
 			return false, nil
 		}
 		return false, err

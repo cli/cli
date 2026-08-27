@@ -192,8 +192,7 @@ func uploadAsset(ctx context.Context, httpClient *http.Client, uploadURL safeurl
 	if err != nil {
 		// Only transport failures are retryable as network errors. A response that arrived and
 		// carried a failing status is reported as is, so shouldRetry can judge it by status.
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) {
+		if _, ok := errors.AsType[api.HTTPError](err); ok {
 			return nil, err
 		}
 		return nil, errNetwork{err}

@@ -99,8 +99,7 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes), &rn)
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
 			return nil, notImplementedError
 		}
 		return nil, err

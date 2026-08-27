@@ -50,8 +50,7 @@ func (f *apiLogFetcher) GetLog() (io.ReadCloser, error) {
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	resp, err := api.NewClientFromHTTP(f.httpClient).Request(f.repo.RepoHost(), http.MethodGet, logPath.String(), nil)
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("log not found: %v", f.jobID)
 		}
 		return nil, err

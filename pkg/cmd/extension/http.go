@@ -25,8 +25,7 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	resp, err := api.NewClientFromHTTP(httpClient).Request(repo.RepoHost(), http.MethodGet, path.String(), nil)
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
 			return false, nil
 		}
 		return false, err
@@ -180,8 +179,7 @@ func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRe
 	resp, err := api.NewClientFromHTTP(httpClient).Request(baseRepo.RepoHost(), http.MethodGet, path.String(), nil,
 		api.WithHeader("Accept", "application/vnd.github.v3.sha"))
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusUnprocessableEntity {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok && httpErr.StatusCode == http.StatusUnprocessableEntity {
 			return "", commitNotFoundErr
 		}
 		return "", err
