@@ -949,7 +949,6 @@ func preMigrationLogin(c *AuthConfig, hostname, username, token, gitProtocol str
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
 
-<<<<<<< HEAD
 func TestActiveTokenType(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -977,7 +976,7 @@ func TestActiveTokenType(t *testing.T) {
 		})
 	}
 }
-=======
+
 func TestHostForAPIHost(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1069,4 +1068,54 @@ func TestHostForAPIHostIgnoresHostsWithoutAnAPIHost(t *testing.T) {
 	// Then it does not match, rather than matching every host
 	require.False(t, found)
 }
->>>>>>> ec71021f0 (Send a host's token to its configured api_host)
+
+func TestAPIHostForHost(t *testing.T) {
+	tests := []struct {
+		name        string
+		apiHost     string
+		lookup      string
+		wantAPIHost string
+		wantFound   bool
+	}{
+		{
+			name:      "the host has no api_host set",
+			lookup:    "github.com",
+			wantFound: false,
+		},
+		{
+			name:        "the host configures an api_host",
+			apiHost:     "api.example.com",
+			lookup:      "github.com",
+			wantAPIHost: "api.example.com",
+			wantFound:   true,
+		},
+		{
+			name:      "an empty host matches nothing",
+			apiHost:   "api.example.com",
+			lookup:    "",
+			wantFound: false,
+		},
+		{
+			name:      "an unknown host matches nothing",
+			apiHost:   "api.example.com",
+			lookup:    "ghe.io",
+			wantFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authCfg := newTestAuthConfig(t)
+			_, err := authCfg.Login("github.com", "test-user", "test-token", "https", false)
+			require.NoError(t, err)
+			if tt.apiHost != "" {
+				authCfg.cfg.Set([]string{hostsKey, "github.com", apiHostKey}, tt.apiHost)
+			}
+
+			apiHost, found := authCfg.APIHostForHost(tt.lookup)
+
+			require.Equal(t, tt.wantFound, found)
+			require.Equal(t, tt.wantAPIHost, apiHost)
+		})
+	}
+}
