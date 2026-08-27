@@ -355,8 +355,8 @@ func TestHTTPHeaders(t *testing.T) {
 // TestWithoutFollowingRedirects verifies that WithoutFollowingRedirects stops the request at the
 // redirect and surfaces an HTTPError rather than following through. It also proves the redirect is
 // not followed by recording every method the transport sees: without the option the transport would
-// receive a second call (GET, because Go demotes DELETE to GET on a 301 follow); with it, only the
-// original DELETE arrives.
+// receive a second call (GET, because Go demotes non-GET/HEAD to GET on a 301/302/303
+// follow); with it, only the original DELETE arrives.
 //
 // go-gh's RequestWithContext converts any non-2xx response - including 3xx - into an HTTPError.
 // When http.ErrUseLastResponse stops a redirect the client returns the 3xx response with a nil

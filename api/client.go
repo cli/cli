@@ -73,9 +73,9 @@ func WithHeader(name, value string) RequestOption {
 // WithoutFollowingRedirects stops the request from following redirects. When a redirect is
 // encountered, the request fails with an HTTPError carrying the redirect status code and headers
 // rather than following the redirect. This matters for requests where following a redirect
-// silently changes the meaning of the request: Go's default policy converts a DELETE into a GET
-// when it follows a 301, so a caller deleting a renamed resource would receive a success response
-// while having deleted nothing.
+// silently changes the meaning of the request: Go's default policy converts methods other than
+// GET or HEAD (e.g. DELETE) into a GET when it follows a 301/302/303, so a caller deleting a renamed
+// resource would receive a success response while having deleted nothing.
 //
 // This option applies only to the REST request surface (Request and RequestWithContext). It has no
 // effect on GraphQL methods, which do not encounter redirects in practice.
