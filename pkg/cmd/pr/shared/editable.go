@@ -432,11 +432,7 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 			return err
 		}
 		for _, prev := range editable.Labels.Default {
-			var found bool
-			if slices.Contains(editable.Labels.Add, prev) {
-				found = true
-			}
-			if !found {
+			if !slices.Contains(editable.Labels.Add, prev) {
 				editable.Labels.Remove = append(editable.Labels.Remove, prev)
 			}
 		}
@@ -476,10 +472,6 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 }
 
 func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
-	contains := func(s []string, str string) bool {
-		return slices.Contains(s, str)
-	}
-
 	opts := []string{"Title", "Body"}
 	if editable.Reviewers.Selectable {
 		opts = append(opts, "Reviewers")
@@ -494,28 +486,28 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 		return err
 	}
 
-	if contains(results, "Title") {
+	if slices.Contains(results, "Title") {
 		editable.Title.Edited = true
 	}
-	if contains(results, "Body") {
+	if slices.Contains(results, "Body") {
 		editable.Body.Edited = true
 	}
-	if contains(results, "Reviewers") {
+	if slices.Contains(results, "Reviewers") {
 		editable.Reviewers.Edited = true
 	}
-	if contains(results, "Assignees") {
+	if slices.Contains(results, "Assignees") {
 		editable.Assignees.Edited = true
 	}
-	if contains(results, "Labels") {
+	if slices.Contains(results, "Labels") {
 		editable.Labels.Edited = true
 	}
-	if contains(results, "Type") {
+	if slices.Contains(results, "Type") {
 		editable.IssueType.Edited = true
 	}
-	if contains(results, "Projects") {
+	if slices.Contains(results, "Projects") {
 		editable.Projects.Edited = true
 	}
-	if contains(results, "Milestone") {
+	if slices.Contains(results, "Milestone") {
 		editable.Milestone.Edited = true
 	}
 
