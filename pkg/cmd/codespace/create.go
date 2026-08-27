@@ -245,12 +245,12 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		if len(devcontainers) > 0 {
 
 			// if there is only one devcontainer.json file and it is one of the default paths we can auto-select it
-			if len(devcontainers) == 1 && stringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+			if len(devcontainers) == 1 && slices.Contains(DEFAULT_DEVCONTAINER_DEFINITIONS, devcontainers[0].Path) {
 				devContainerPath = devcontainers[0].Path
 			} else {
 				promptOptions := []string{}
 
-				if !stringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+				if !slices.Contains(DEFAULT_DEVCONTAINER_DEFINITIONS, devcontainers[0].Path) {
 					promptOptions = []string{DEVCONTAINER_PROMPT_DEFAULT}
 				}
 
@@ -603,8 +603,4 @@ func buildDisplayName(displayName string, prebuildAvailability string) string {
 	default:
 		return displayName
 	}
-}
-
-func stringInSlice(a string, slice []string) bool {
-	return slices.Contains(slice, a)
 }
