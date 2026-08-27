@@ -76,14 +76,6 @@ safe-outputs:
     apply-suspected-spam:
       description: Apply suspected-spam to the triggering issue
       runs-on: ubuntu-latest
-      # Custom safe-output jobs require at least one input. The step below ignores
-      # this single allowed value and hardcodes the label it applies.
-      inputs:
-        label:
-          description: Label to apply
-          required: true
-          type: choice
-          options: [suspected-spam]
       permissions:
         contents: read
       steps:
@@ -146,10 +138,10 @@ valid labels. Incorporate your duplicate detection findings.
 
 Judge the issue against the spam criteria included at the top of this prompt.
 
-If, and only if, the issue meets those criteria, call `apply_suspected_spam` with
-`label: suspected-spam`. This directly applies the label instead of proposing it.
-Applying the label triggers the shared `close-suspected-spam` job, which removes
-`needs-triage`, posts the standard comment, and closes the issue.
+If, and only if, the issue meets those criteria, call `apply_suspected_spam`. This
+directly applies the label instead of proposing it. Applying the label triggers the
+shared `close-suspected-spam` job, which removes `needs-triage`, posts the standard
+comment, and closes the issue.
 
 When you apply `suspected-spam`:
 
