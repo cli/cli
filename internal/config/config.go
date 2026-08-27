@@ -365,12 +365,14 @@ func (c *AuthConfig) APIHostForHost(host string) (string, bool) {
 // API traffic and not, say, git operations.
 //
 // A misconfiguration where several hosts share one api_host resolves to the
-// first match in Hosts order.
+// first match in lexical Hosts order.
 func (c *AuthConfig) HostForAPIHost(apiHost string) (string, bool) {
 	if apiHost == "" {
 		return "", false
 	}
-	for _, host := range c.Hosts() {
+	hosts := slices.Clone(c.Hosts())
+	slices.Sort(hosts)
+	for _, host := range hosts {
 		configured, err := c.cfg.Get([]string{hostsKey, host, apiHostKey})
 		if err != nil || configured == "" {
 			continue
