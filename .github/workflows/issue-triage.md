@@ -71,8 +71,29 @@ safe-outputs:
       - off-topic
       - no-help-wanted-issue
       - invalid
-      - suspected-spam
       - duplicate
+  jobs:
+    apply-suspected-spam:
+      description: Apply suspected-spam to the triggering issue
+      runs-on: ubuntu-latest
+      permissions:
+        contents: read
+      steps:
+        - name: Create GitHub App token
+          id: app-token
+          uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+          with:
+            client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
+            private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
+            owner: ${{ github.repository_owner }}
+            repositories: ${{ github.event.repository.name }}
+            permission-issues: write
+        - name: Apply suspected-spam
+          env:
+            GH_TOKEN: ${{ steps.app-token.outputs.token }}
+            GH_REPO: ${{ github.repository }}
+            ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          run: gh issue edit "$ISSUE_NUMBER" --repo "$GH_REPO" --add-label suspected-spam
   add-comment:
     max: 1
   noop:
@@ -117,18 +138,17 @@ valid labels. Incorporate your duplicate detection findings.
 
 Judge the issue against the spam criteria included at the top of this prompt.
 
-If, and only if, the issue meets those criteria, emit `suspected-spam` **without**
-`suggest`, so that it is applied directly rather than proposed. Applying the label is
-what triggers the shared `close-suspected-spam` job, which posts the standard comment
-and closes the issue. Nothing happens if the label is merely suggested.
+If, and only if, the issue meets those criteria, call `apply_suspected_spam`. This
+directly applies the label instead of proposing it. Applying the label triggers the
+shared `close-suspected-spam` job, which removes `needs-triage`, posts the standard
+comment, and closes the issue.
 
 When you apply `suspected-spam`:
 
-- Emit it as the only label. Do not pair it with `invalid`, which routes to a different
-  job that closes with no comment at all.
+- Do not call any other label output. In particular, do not pair it with `invalid`,
+  which routes to a different job that closes with no comment at all.
 - Do **not** post a comment. `close-suspected-spam` writes the closure message, and a
   second comment from you would duplicate it.
-- Still attach a rationale and confidence, so the decision is auditable.
 
 Be conservative. A false positive closes a real user's issue, so when the evidence is
 mixed, suggest `more-info-needed` instead and let a human decide.
@@ -137,7 +157,8 @@ mixed, suggest `more-info-needed` instead and let a human decide.
 
 If the issue is not spam, use `add-labels` to suggest the appropriate labels (max 3,
 only from the allowlist above). **Emit these labels as suggestions requiring maintainer
-approval - never apply them directly.** Attach a clear rationale to each suggestion.
+approval - never apply them directly.** Emit each label as an object with `name`,
+`rationale`, `confidence`, and `suggest: true`.
 
 ## Required comment
 
@@ -157,7 +178,7 @@ ${{ github.event.issue.number || inputs.issue_number }}.
 - Apply at most 3 labels from the allowlist. Do not invent labels.
 - `suspected-spam` is the only label you may apply directly. Everything else is a
   suggestion.
-- Do not add or remove `needs-triage` - it is not in your allowlist.
+- Do not add or remove `needs-triage` - the shared triage workflows own that label.
 - Be conservative: when unsure, prefer fewer labels or none.
 - Do not classify into more than one branch at once (e.g., not both bug and enhancement).
 - For duplicates: suggest `duplicate` and link the original issue in your comment.
