@@ -70,8 +70,10 @@ func TestSelectScripts(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workflowDir, 0o755))
 
 	repoScript := path.Join(repoDir, "repo-clone.txtar")
+	repoScript2 := path.Join(repoDir, "repo-view.txtar")
 	workflowScript := path.Join(workflowDir, "workflow-list.txtar")
 	require.NoError(t, os.WriteFile(repoScript, []byte(""), 0o644))
+	require.NoError(t, os.WriteFile(repoScript2, []byte(""), 0o644))
 	require.NoError(t, os.WriteFile(workflowScript, []byte(""), 0o644))
 
 	tests := []struct {
@@ -93,6 +95,16 @@ func TestSelectScripts(t *testing.T) {
 			command:      "repo",
 			scripts:      []string{"repo-clone.txtar"},
 			wantFiles:    []string{path.Join("testdata", "repo", "repo-clone.txtar")},
+			wantFiltered: true,
+		},
+		{
+			name:         "filter matches several scripts in the same directory",
+			command:      "repo",
+			scripts:      []string{"repo-clone.txtar", "repo-view.txtar"},
+			wantFiles: []string{
+				path.Join("testdata", "repo", "repo-clone.txtar"),
+				path.Join("testdata", "repo", "repo-view.txtar"),
+			},
 			wantFiltered: true,
 		},
 		{
