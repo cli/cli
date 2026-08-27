@@ -72,6 +72,44 @@ func TestResolveSingleSelectOptionID(t *testing.T) {
 	})
 }
 
+func TestResolveMultiSelectOptionIDs(t *testing.T) {
+	platforms := multiSelectField("PVTMSF_platforms", "Platforms", []SingleSelectFieldOptions{
+		{ID: "opt_ios", Name: "iOS"},
+		{ID: "opt_android", Name: "Android"},
+		{ID: "opt_web", Name: "Web"},
+	})
+
+	t.Run("resolves multiple option names to ids preserving order", func(t *testing.T) {
+		ids, err := ResolveMultiSelectOptionIDs(platforms, []string{"Web", "iOS"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"opt_web", "opt_ios"}, ids)
+	})
+
+	t.Run("resolves case-insensitively", func(t *testing.T) {
+		ids, err := ResolveMultiSelectOptionIDs(platforms, []string{"android"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"opt_android"}, ids)
+	})
+
+	t.Run("unknown option lists candidate option names", func(t *testing.T) {
+		_, err := ResolveMultiSelectOptionIDs(platforms, []string{"iOS", "Desktop"})
+		require.Error(t, err)
+		var nf *OptionNotFoundError
+		require.True(t, errors.As(err, &nf))
+		assert.Equal(t, "Desktop", nf.Name)
+		assert.Equal(t, []string{"iOS", "Android", "Web"}, nf.Candidates)
+	})
+
+	t.Run("wrong field type is rejected", func(t *testing.T) {
+		_, err := ResolveMultiSelectOptionIDs(textField("PVTF_title", "Title"), []string{"iOS"})
+		require.Error(t, err)
+		var wt *WrongFieldTypeError
+		require.True(t, errors.As(err, &wt))
+		assert.Equal(t, "TEXT", wt.DataType)
+		assert.Equal(t, "MULTI_SELECT", wt.Expected)
+	})
+}
+
 func TestProjectItemIDByURL(t *testing.T) {
 	t.Run("returns the item id for the matching project", func(t *testing.T) {
 		defer gock.Off()

@@ -442,6 +442,13 @@ type FieldValueNodes struct {
 		} `graphql:"reviewers(first: 10)"` // experienced issues with larger limits, 10 seems like enough for now
 		Field ProjectField
 	} `graphql:"... on ProjectV2ItemFieldReviewerValue"`
+	ProjectV2ItemFieldMultiSelectValue struct {
+		Options []struct {
+			ID   string
+			Name string
+		}
+		Field ProjectField
+	} `graphql:"... on ProjectV2ItemFieldMultiSelectValue"`
 }
 
 func (v FieldValueNodes) ID() string {
@@ -468,6 +475,8 @@ func (v FieldValueNodes) ID() string {
 		return v.ProjectV2ItemFieldUserValue.Field.ID()
 	case "ProjectV2ItemFieldReviewerValue":
 		return v.ProjectV2ItemFieldReviewerValue.Field.ID()
+	case "ProjectV2ItemFieldMultiSelectValue":
+		return v.ProjectV2ItemFieldMultiSelectValue.Field.ID()
 	}
 
 	return ""
@@ -973,6 +982,12 @@ type ProjectField struct {
 		DataType string
 		Options  []SingleSelectFieldOptions
 	} `graphql:"... on ProjectV2SingleSelectField"`
+	MultiSelectField struct {
+		ID       string
+		Name     string
+		DataType string
+		Options  []SingleSelectFieldOptions `graphql:"multiSelectOptions"`
+	} `graphql:"... on ProjectV2MultiSelectField"`
 }
 
 // ID is the ID of the project field.
@@ -983,6 +998,8 @@ func (p ProjectField) ID() string {
 		return p.IterationField.ID
 	} else if p.TypeName == "ProjectV2SingleSelectField" {
 		return p.SingleSelectField.ID
+	} else if p.TypeName == "ProjectV2MultiSelectField" {
+		return p.MultiSelectField.ID
 	}
 	return ""
 }
@@ -995,6 +1012,8 @@ func (p ProjectField) Name() string {
 		return p.IterationField.Name
 	} else if p.TypeName == "ProjectV2SingleSelectField" {
 		return p.SingleSelectField.Name
+	} else if p.TypeName == "ProjectV2MultiSelectField" {
+		return p.MultiSelectField.Name
 	}
 	return ""
 }
@@ -1014,6 +1033,8 @@ func (p ProjectField) DataType() string {
 		return p.IterationField.DataType
 	case "ProjectV2SingleSelectField":
 		return p.SingleSelectField.DataType
+	case "ProjectV2MultiSelectField":
+		return p.MultiSelectField.DataType
 	}
 	return ""
 }
@@ -1034,6 +1055,16 @@ func (p ProjectField) Options() []SingleSelectFieldOptions {
 	if p.TypeName == "ProjectV2SingleSelectField" {
 		var options []SingleSelectFieldOptions
 		for _, o := range p.SingleSelectField.Options {
+			options = append(options, SingleSelectFieldOptions{
+				ID:   o.ID,
+				Name: o.Name,
+			})
+		}
+		return options
+	}
+	if p.TypeName == "ProjectV2MultiSelectField" {
+		var options []SingleSelectFieldOptions
+		for _, o := range p.MultiSelectField.Options {
 			options = append(options, SingleSelectFieldOptions{
 				ID:   o.ID,
 				Name: o.Name,
@@ -1798,6 +1829,12 @@ func projectFieldValueData(v FieldValueNodes) interface{} {
 			} else if p.Type == "User" {
 				names = append(names, p.User.Login)
 			}
+		}
+		return names
+	case "ProjectV2ItemFieldMultiSelectValue":
+		names := make([]string, 0)
+		for _, p := range v.ProjectV2ItemFieldMultiSelectValue.Options {
+			names = append(names, p.Name)
 		}
 		return names
 

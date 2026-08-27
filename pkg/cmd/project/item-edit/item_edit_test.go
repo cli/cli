@@ -30,7 +30,7 @@ func TestNewCmdeditItem(t *testing.T) {
 			name:        "invalid-flags",
 			cli:         "--id 123 --text t --date 2023-01-01",
 			wantsErr:    true,
-			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` may be used",
+			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--multi-select-option-ids`, `--iteration-id` or `--value` may be used",
 		},
 		{
 			name:        "field and field-id conflict",
@@ -48,7 +48,7 @@ func TestNewCmdeditItem(t *testing.T) {
 			name:        "value and single-select-option-id conflict",
 			cli:         "--url https://github.com/o/r/issues/1 --field Status --value Todo --single-select-option-id OPTION_ID",
 			wantsErr:    true,
-			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` may be used",
+			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--multi-select-option-ids`, `--iteration-id` or `--value` may be used",
 		},
 		{
 			name:        "value requires field",
@@ -1534,5 +1534,180 @@ func TestRunItemEdit_ByName_WrongFieldType(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), `field "Title" has data type "TITLE"`)
 	assert.Contains(t, err.Error(), "not supported with `--value`")
+	assert.True(t, gock.IsDone())
+}
+
+func TestRunItemEdit_MultiSelect(t *testing.T) {
+	defer gock.Off()
+	// gock.Observe(gock.DumpRequest)
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"multiSelectOptionIds":\["opt_ios","opt_android"\]}}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"updateProjectV2ItemFieldValue": map[string]interface{}{
+					"projectV2Item": map[string]interface{}{
+						"id": "item_id",
+						"content": map[string]interface{}{
+							"__typename": "Issue",
+							"title":      "an issue",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			itemID:               "item_id",
+			projectID:            "project_id",
+			fieldID:              "field_id",
+			multiSelectOptionIDs: []string{"opt_ios", "opt_android"},
+		},
+		client: client,
+	}
+
+	err := runEditItem(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "", stdout.String())
+	assert.True(t, gock.IsDone())
+}
+
+func TestRunItemEdit_ByName_MultiSelect(t *testing.T) {
+	defer gock.Off()
+
+	// resolve owner
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "user ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// resolve project + fields (Platforms is a multi-select field)
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "project ID",
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2MultiSelectField",
+									"id":         "platforms ID",
+									"name":       "Platforms",
+									"dataType":   "MULTI_SELECT",
+									"multiSelectOptions": []map[string]interface{}{
+										{"id": "opt_ios", "name": "iOS"},
+										{"id": "opt_web", "name": "Web"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	// resolve item by URL
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query GetProjectItemByURL.*",
+			"variables": map[string]interface{}{
+				"url":        "https://github.com/monalisa/repo/issues/1",
+				"firstItems": queries.LimitMax,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"resource": map[string]interface{}{
+					"__typename": "Issue",
+					"projectItems": map[string]interface{}{
+						"nodes": []map[string]interface{}{
+							{"id": "item ID", "project": map[string]interface{}{"id": "project ID"}},
+						},
+					},
+				},
+			},
+		})
+
+	// mutation uses the resolved option IDs, preserving order
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"platforms ID","value":{"multiSelectOptionIds":\["opt_ios","opt_web"\]}}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"updateProjectV2ItemFieldValue": map[string]interface{}{
+					"projectV2Item": map[string]interface{}{
+						"id": "item ID",
+						"content": map[string]interface{}{
+							"__typename": "Issue",
+							"title":      "an issue",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			owner:        "monalisa",
+			number32:     1,
+			url:          "https://github.com/monalisa/repo/issues/1",
+			field:        "Platforms",
+			value:        "iOS, Web",
+			valueChanged: true,
+		},
+		client: client,
+	}
+
+	err := runEditItem(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "Edited item \"an issue\"\n", stdout.String())
 	assert.True(t, gock.IsDone())
 }

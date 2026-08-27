@@ -30,6 +30,7 @@ type editItemOpts struct {
 	numberChanged        bool
 	date                 string
 	singleSelectOptionID string
+	multiSelectOptionIDs []string
 	iterationID          string
 	clear                bool
 	// name-based resolution
@@ -71,6 +72,23 @@ type ClearProjectV2FieldValue struct {
 	Clear struct {
 		Item queries.ProjectItem `graphql:"projectV2Item"`
 	} `graphql:"clearProjectV2ItemFieldValue(input:$input)"`
+}
+
+// ProjectV2FieldValue is defined locally because the vendored githubv4 lacks multiSelectOptionIds.
+type ProjectV2FieldValue struct {
+	Text                 *githubv4.String `json:"text,omitempty"`
+	Number               *githubv4.Float  `json:"number,omitempty"`
+	Date                 *githubv4.Date   `json:"date,omitempty"`
+	SingleSelectOptionID *githubv4.String `json:"singleSelectOptionId,omitempty"`
+	IterationID          *githubv4.String `json:"iterationId,omitempty"`
+	MultiSelectOptionIDs *[]string        `json:"multiSelectOptionIds,omitempty"`
+}
+
+type UpdateProjectV2ItemFieldValueInput struct {
+	ProjectID githubv4.ID         `json:"projectId"`
+	ItemID    githubv4.ID         `json:"itemId"`
+	FieldID   githubv4.ID         `json:"fieldId"`
+	Value     ProjectV2FieldValue `json:"value"`
 }
 
 func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) *cobra.Command {
@@ -123,11 +141,12 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` may be used",
+				"only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--multi-select-option-ids`, `--iteration-id` or `--value` may be used",
 				opts.text != "",
 				opts.numberChanged,
 				opts.date != "",
 				opts.singleSelectOptionID != "",
+				len(opts.multiSelectOptionIDs) > 0,
 				opts.iterationID != "",
 				opts.valueChanged,
 			); err != nil {
@@ -151,8 +170,8 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"cannot use `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` in conjunction with `--clear`",
-				opts.text != "" || opts.numberChanged || opts.date != "" || opts.singleSelectOptionID != "" || opts.iterationID != "" || opts.valueChanged,
+				"cannot use `--text`, `--number`, `--date`, `--single-select-option-id`, `--multi-select-option-ids`, `--iteration-id` or `--value` in conjunction with `--clear`",
+				opts.text != "" || opts.numberChanged || opts.date != "" || opts.singleSelectOptionID != "" || len(opts.multiSelectOptionIDs) > 0 || opts.iterationID != "" || opts.valueChanged,
 				opts.clear,
 			); err != nil {
 				return err
@@ -216,6 +235,7 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	editItemCmd.Flags().Float64Var(&opts.number, "number", 0, "Number value for the field")
 	editItemCmd.Flags().StringVar(&opts.date, "date", "", "Date value for the field (YYYY-MM-DD)")
 	editItemCmd.Flags().StringVar(&opts.singleSelectOptionID, "single-select-option-id", "", "ID of the single select option value to set on the field")
+	editItemCmd.Flags().StringSliceVar(&opts.multiSelectOptionIDs, "multi-select-option-ids", nil, "IDs of the multi select option values to set on the field")
 	editItemCmd.Flags().StringVar(&opts.iterationID, "iteration-id", "", "ID of the iteration value to set on the field")
 	editItemCmd.Flags().BoolVar(&opts.clear, "clear", false, "Remove field value")
 
@@ -244,7 +264,7 @@ func runEditItem(config editItemConfig) error {
 	}
 
 	// update item values
-	if config.opts.text != "" || config.opts.numberChanged || config.opts.date != "" || config.opts.singleSelectOptionID != "" || config.opts.iterationID != "" {
+	if config.opts.text != "" || config.opts.numberChanged || config.opts.date != "" || config.opts.singleSelectOptionID != "" || len(config.opts.multiSelectOptionIDs) > 0 || config.opts.iterationID != "" {
 		return updateItemValues(config)
 	}
 
@@ -252,6 +272,19 @@ func runEditItem(config editItemConfig) error {
 		return err
 	}
 	return cmdutil.SilentError
+}
+
+// splitOptionNames splits a comma-separated --value into individual option names
+// for multi-select fields, trimming surrounding spaces and dropping empties.
+func splitOptionNames(value string) []string {
+	parts := strings.Split(value, ",")
+	names := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			names = append(names, p)
+		}
+	}
+	return names
 }
 
 // resolveItemEditNames turns the name-based addressing flags into the node IDs
@@ -305,6 +338,12 @@ func resolveItemEditNames(config editItemConfig) (editItemConfig, error) {
 			return config, err
 		}
 		config.opts.singleSelectOptionID = optionID
+	case "MULTI_SELECT":
+		optionIDs, err := queries.ResolveMultiSelectOptionIDs(field, splitOptionNames(config.opts.value))
+		if err != nil {
+			return config, err
+		}
+		config.opts.multiSelectOptionIDs = optionIDs
 	case "TEXT":
 		config.opts.text = config.opts.value
 	case "NUMBER":
@@ -364,31 +403,36 @@ func buildEditDraftIssue(config editItemConfig, currentDraftIssue *queries.Draft
 }
 
 func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2FieldValue, map[string]interface{}) {
-	var value githubv4.ProjectV2FieldValue
+	var value ProjectV2FieldValue
 	if config.opts.text != "" {
-		value = githubv4.ProjectV2FieldValue{
+		value = ProjectV2FieldValue{
 			Text: githubv4.NewString(githubv4.String(config.opts.text)),
 		}
 	} else if config.opts.numberChanged {
-		value = githubv4.ProjectV2FieldValue{
+		value = ProjectV2FieldValue{
 			Number: githubv4.NewFloat(githubv4.Float(config.opts.number)),
 		}
 	} else if config.opts.date != "" {
-		value = githubv4.ProjectV2FieldValue{
+		value = ProjectV2FieldValue{
 			Date: githubv4.NewDate(githubv4.Date{Time: date}),
 		}
 	} else if config.opts.singleSelectOptionID != "" {
-		value = githubv4.ProjectV2FieldValue{
+		value = ProjectV2FieldValue{
 			SingleSelectOptionID: githubv4.NewString(githubv4.String(config.opts.singleSelectOptionID)),
 		}
 	} else if config.opts.iterationID != "" {
-		value = githubv4.ProjectV2FieldValue{
+		value = ProjectV2FieldValue{
 			IterationID: githubv4.NewString(githubv4.String(config.opts.iterationID)),
+		}
+	} else if len(config.opts.multiSelectOptionIDs) > 0 {
+		ids := config.opts.multiSelectOptionIDs
+		value = ProjectV2FieldValue{
+			MultiSelectOptionIDs: &ids,
 		}
 	}
 
 	return &UpdateProjectV2FieldValue{}, map[string]interface{}{
-		"input": githubv4.UpdateProjectV2ItemFieldValueInput{
+		"input": UpdateProjectV2ItemFieldValueInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
 			ItemID:    githubv4.ID(config.opts.itemID),
 			FieldID:   githubv4.ID(config.opts.fieldID),

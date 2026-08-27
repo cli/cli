@@ -28,6 +28,17 @@ func singleSelectField(id, name string, options []SingleSelectFieldOptions) Proj
 	return f
 }
 
+// multiSelectField builds a ProjectV2MultiSelectField fixture with the given id,
+// name, and options.
+func multiSelectField(id, name string, options []SingleSelectFieldOptions) ProjectField {
+	f := ProjectField{TypeName: "ProjectV2MultiSelectField"}
+	f.MultiSelectField.ID = id
+	f.MultiSelectField.Name = name
+	f.MultiSelectField.DataType = "MULTI_SELECT"
+	f.MultiSelectField.Options = options
+	return f
+}
+
 func TestResolveFieldByName(t *testing.T) {
 	fields := []ProjectField{
 		textField("PVTF_title", "Title"),
