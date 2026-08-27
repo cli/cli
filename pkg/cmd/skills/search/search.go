@@ -368,7 +368,7 @@ func noResults(opts *SearchOptions, msg string) error {
 // potentially a repo fetch (stars), so keeping this small matters for
 // performance. Pre-ranking ensures the best candidates are at the top.
 func truncateForProcessing(skills []skillResult, page, limit int) []skillResult {
-	maxToProcess := max(page*limit*3, limit*3)
+	maxToProcess := page * limit * 3
 	if len(skills) > maxToProcess {
 		return skills[:maxToProcess]
 	}
