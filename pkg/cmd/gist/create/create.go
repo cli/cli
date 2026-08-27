@@ -217,17 +217,12 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 				return nil, fmt.Errorf("binary file contents not supported")
 			}
 		} else {
-			isBinary, err := shared.IsBinaryFile(f)
-			if err != nil {
-				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
-			}
-			if isBinary {
-				return nil, fmt.Errorf("failed to upload %s: binary file not supported", f)
-			}
-
 			content, err = os.ReadFile(f)
 			if err != nil {
 				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
+			}
+			if shared.IsBinaryContents(content) {
+				return nil, fmt.Errorf("failed to upload %s: binary file not supported", f)
 			}
 
 			filename = filepath.Base(f)

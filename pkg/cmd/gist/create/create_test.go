@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_processFiles(t *testing.T) {
@@ -32,6 +33,34 @@ func Test_processFiles(t *testing.T) {
 
 	assert.Equal(t, 1, len(files))
 	assert.Equal(t, "hey cool how is it going", files["gistfile0.txt"].Content)
+}
+
+func Test_processFiles_nonUTF8(t *testing.T) {
+	latin1 := []byte("caf\xe9 r\xe9sum\xe9\n")
+
+	t.Run("rejects latin-1 stdin", func(t *testing.T) {
+		_, err := processFiles(io.NopCloser(bytes.NewReader(latin1)), "", []string{"-"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "binary file contents not supported")
+	})
+
+	t.Run("rejects latin-1 file", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "latin1.txt")
+		require.NoError(t, os.WriteFile(path, latin1, 0o644))
+
+		_, err := processFiles(io.NopCloser(strings.NewReader("")), "", []string{path})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "binary file not supported")
+	})
+
+	t.Run("accepts valid utf-8 file", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "utf8.txt")
+		require.NoError(t, os.WriteFile(path, []byte("café résumé\n"), 0o644))
+
+		files, err := processFiles(io.NopCloser(strings.NewReader("")), "", []string{path})
+		require.NoError(t, err)
+		assert.Equal(t, "café résumé\n", files["utf8.txt"].Content)
+	})
 }
 
 func Test_guessGistName_stdin(t *testing.T) {

@@ -3,6 +3,8 @@ package shared
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_GetGistIDFromURL(t *testing.T) {
@@ -60,23 +63,54 @@ func Test_GetGistIDFromURL(t *testing.T) {
 
 func TestIsBinaryContents(t *testing.T) {
 	tests := []struct {
+		name        string
 		fileContent []byte
 		want        bool
 	}{
 		{
-			want:        false,
+			name:        "ascii text",
 			fileContent: []byte("package main"),
+			want:        false,
 		},
 		{
-			want:        false,
+			name:        "empty",
 			fileContent: []byte(""),
-		},
-		{
 			want:        false,
-			fileContent: []byte(nil),
 		},
 		{
-			want: true,
+			name:        "nil",
+			fileContent: []byte(nil),
+			want:        false,
+		},
+		{
+			name:        "valid utf-8",
+			fileContent: []byte("café 👋 日本語\n"),
+			want:        false,
+		},
+		{
+			// MIME sniffing classifies this as text/plain, but encoding/json
+			// would rewrite each 0xe9 to U+FFFD.
+			name:        "latin-1 text",
+			fileContent: []byte("caf\xe9 r\xe9sum\xe9\n"),
+			want:        true,
+		},
+		{
+			name:        "utf-16 le with bom",
+			fileContent: []byte{0xff, 0xfe, 'h', 0x00, 'i', 0x00},
+			want:        true,
+		},
+		{
+			name:        "jpeg soi",
+			fileContent: []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F'},
+			want:        true,
+		},
+		{
+			name:        "png signature",
+			fileContent: []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a},
+			want:        true,
+		},
+		{
+			name: "legacy jpeg-like fixture",
 			fileContent: []byte{239, 191, 189, 239, 191, 189, 239, 191, 189, 239,
 				191, 189, 239, 191, 189, 16, 74, 70, 73, 70, 239, 191, 189, 1, 1, 1,
 				1, 44, 1, 44, 239, 191, 189, 239, 191, 189, 239, 191, 189, 239, 191,
@@ -85,12 +119,50 @@ func TestIsBinaryContents(t *testing.T) {
 				31, 30, 29, 26, 28, 28, 32, 36, 46, 39, 32, 34, 44, 35, 28, 28, 40,
 				55, 41, 44, 48, 49, 52, 52, 52, 31, 39, 57, 61, 56, 50, 60, 46, 51,
 				52, 50, 239, 191, 189, 239, 191, 189, 239, 191, 189, 67, 1, 9, 9, 9, 12},
+			want: true,
 		},
 	}
 
 	for _, tt := range tests {
-		assert.Equal(t, tt.want, IsBinaryContents(tt.fileContent))
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsBinaryContents(tt.fileContent))
+		})
 	}
+}
+
+func TestIsBinaryFile(t *testing.T) {
+	dir := t.TempDir()
+
+	utf8Path := filepath.Join(dir, "utf8.txt")
+	require.NoError(t, os.WriteFile(utf8Path, []byte("café résumé\n"), 0o644))
+
+	latin1Path := filepath.Join(dir, "latin1.txt")
+	require.NoError(t, os.WriteFile(latin1Path, []byte("caf\xe9 r\xe9sum\xe9\n"), 0o644))
+
+	// MIME detection only inspects the first 3072 bytes. Invalid UTF-8 later
+	// in the file must still be refused.
+	lateInvalid := make([]byte, 4000)
+	for i := range lateInvalid {
+		lateInvalid[i] = 'a'
+	}
+	lateInvalid[3999] = 0xe9
+	latePath := filepath.Join(dir, "late.txt")
+	require.NoError(t, os.WriteFile(latePath, lateInvalid, 0o644))
+
+	got, err := IsBinaryFile(utf8Path)
+	require.NoError(t, err)
+	assert.False(t, got)
+
+	got, err = IsBinaryFile(latin1Path)
+	require.NoError(t, err)
+	assert.True(t, got)
+
+	got, err = IsBinaryFile(latePath)
+	require.NoError(t, err)
+	assert.True(t, got)
+
+	_, err = IsBinaryFile(filepath.Join(dir, "missing.txt"))
+	require.Error(t, err)
 }
 
 func TestPromptGists(t *testing.T) {

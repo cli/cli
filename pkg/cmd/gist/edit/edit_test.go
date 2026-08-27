@@ -37,6 +37,12 @@ func Test_getFilesToAdd(t *testing.T) {
 	}, gf)
 }
 
+func Test_getFilesToAdd_rejectsNonUTF8(t *testing.T) {
+	_, err := getFilesToAdd("latin1.txt", []byte("caf\xe9 r\xe9sum\xe9\n"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "binary file not supported")
+}
+
 func TestNewCmdEdit(t *testing.T) {
 	tests := []struct {
 		name     string

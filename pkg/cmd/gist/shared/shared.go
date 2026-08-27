@@ -6,10 +6,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -198,23 +200,30 @@ pagination:
 	return gists, nil
 }
 
+// IsBinaryFile reports whether the named file cannot be stored in a gist
+// without changing its bytes. See IsBinaryContents.
 func IsBinaryFile(file string) (bool, error) {
-	detectedMime, err := mimetype.DetectFile(file)
+	contents, err := os.ReadFile(file)
 	if err != nil {
 		return false, err
 	}
-
-	isBinary := true
-	for mime := detectedMime; mime != nil; mime = mime.Parent() {
-		if mime.Is("text/plain") {
-			isBinary = false
-			break
-		}
-	}
-	return isBinary, nil
+	return IsBinaryContents(contents), nil
 }
 
+// IsBinaryContents reports whether contents cannot be stored in a gist without
+// changing their bytes.
+//
+// Gist file bodies are sent as JSON strings. encoding/json does not reject
+// invalid UTF-8; it rewrites every offending byte to U+FFFD. MIME sniffing
+// classifies encodings such as ISO-8859-1 and UTF-16 as text/plain, so those
+// files would otherwise be uploaded as replacement characters with a
+// successful exit. Rejecting invalid UTF-8 here matches what a JSON round
+// trip can actually carry.
 func IsBinaryContents(contents []byte) bool {
+	if !utf8.Valid(contents) {
+		return true
+	}
+
 	isBinary := true
 	for mime := mimetype.Detect(contents); mime != nil; mime = mime.Parent() {
 		if mime.Is("text/plain") {
