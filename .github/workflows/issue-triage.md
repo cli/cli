@@ -72,10 +72,51 @@ safe-outputs:
       - no-help-wanted-issue
       - invalid
       - duplicate
-  replace-label:
-    allowed-add: [suspected-spam]
-    allowed-remove: [needs-triage]
-    max: 1
+  jobs:
+    apply-suspected-spam:
+      description: Apply the suspected-spam label directly to the triggering issue
+      runs-on: ubuntu-latest
+      output: Applied suspected-spam to the issue
+      permissions:
+        contents: read
+      inputs:
+        rationale:
+          description: Why the issue meets the spam criteria
+          required: true
+          type: string
+        confidence:
+          description: Confidence in the spam classification
+          required: true
+          type: choice
+          options: [LOW, MEDIUM, HIGH]
+      steps:
+        - name: Create GitHub App token
+          id: app-token
+          uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+          with:
+            client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
+            private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
+            owner: ${{ github.repository_owner }}
+            repositories: ${{ github.event.repository.name }}
+            permission-issues: write
+        - name: Apply suspected-spam
+          env:
+            GH_TOKEN: ${{ steps.app-token.outputs.token }}
+            GH_REPO: ${{ github.repository }}
+            ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          run: |
+            item_count=$(jq '[.items[] | select(.type == "apply_suspected_spam")] | length' "$GH_AW_AGENT_OUTPUT")
+            if [ "$item_count" -ne 1 ]; then
+              echo "::error::Expected exactly one apply_suspected_spam output, got $item_count"
+              exit 1
+            fi
+
+            {
+              echo "### Spam classification"
+              jq -r '.items[] | select(.type == "apply_suspected_spam") | "**Confidence:** \(.confidence)\n\n\(.rationale)"' "$GH_AW_AGENT_OUTPUT"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            gh issue edit "$ISSUE_NUMBER" --repo "$GH_REPO" --add-label suspected-spam
   add-comment:
     max: 1
   noop:
@@ -120,19 +161,21 @@ valid labels. Incorporate your duplicate detection findings.
 
 Judge the issue against the spam criteria included at the top of this prompt.
 
-If, and only if, the issue meets those criteria, call `replace_label` with
-`label_to_remove: needs-triage` and `label_to_add: suspected-spam`. This directly
-applies `suspected-spam` rather than proposing it, and atomically removes
-`needs-triage`. Applying the label is what triggers the shared `close-suspected-spam`
-job, which posts the standard comment and closes the issue. Nothing happens if the
-label is merely suggested, so never use `add_labels` for `suspected-spam`.
+If, and only if, the issue meets those criteria, call `apply_suspected_spam` with a
+clear rationale and confidence. This directly applies `suspected-spam` rather than
+proposing it. Applying the label is what triggers the shared `close-suspected-spam`
+job, which removes `needs-triage`, posts the standard comment, and closes the issue.
+Nothing happens if the label is merely suggested, so never use `add_labels` for
+`suspected-spam`.
 
 When you apply `suspected-spam`:
 
-- Emit it as the only label. Do not pair it with `invalid`, which routes to a different
-  job that closes with no comment at all.
+- Do not call any other label output. In particular, do not pair it with `invalid`,
+  which routes to a different job that closes with no comment at all.
 - Do **not** post a comment. `close-suspected-spam` writes the closure message, and a
   second comment from you would duplicate it.
+- Attach a rationale and confidence to the `apply_suspected_spam` call so the decision
+  is auditable in the workflow run.
 
 Be conservative. A false positive closes a real user's issue, so when the evidence is
 mixed, suggest `more-info-needed` instead and let a human decide.
@@ -161,7 +204,7 @@ ${{ github.event.issue.number || inputs.issue_number }}.
 - Apply at most 3 labels from the allowlist. Do not invent labels.
 - `suspected-spam` is the only label you may apply directly. Everything else is a
   suggestion.
-- For non-spam issues, do not add or remove `needs-triage`.
+- Do not add or remove `needs-triage` - the shared triage workflows own that label.
 - Be conservative: when unsure, prefer fewer labels or none.
 - Do not classify into more than one branch at once (e.g., not both bug and enhancement).
 - For duplicates: suggest `duplicate` and link the original issue in your comment.
