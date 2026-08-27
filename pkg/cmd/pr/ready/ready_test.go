@@ -134,7 +134,7 @@ func TestPRReady(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestReadyForReview\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)
@@ -176,7 +176,7 @@ func TestPRReadyUndo(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation ConvertPullRequestToDraft\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)

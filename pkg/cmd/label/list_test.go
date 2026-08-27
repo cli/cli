@@ -338,11 +338,11 @@ func TestListRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(s string, m map[string]interface{}) {
+					}`, func(s string, m map[string]any) {
 						assert.Equal(t, "OWNER", m["owner"])
 						assert.Equal(t, "REPO", m["repo"])
 						assert.Equal(t, float64(30), m["limit"].(float64))
-						assert.Equal(t, map[string]interface{}{"direction": "ASC", "field": "NAME"}, m["orderBy"])
+						assert.Equal(t, map[string]any{"direction": "ASC", "field": "NAME"}, m["orderBy"])
 					}),
 				)
 			},

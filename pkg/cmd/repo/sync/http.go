@@ -41,7 +41,7 @@ var missingWorkflowScopeErr = errors.New("Upstream commits contain workflow chan
 
 func triggerUpstreamMerge(client *api.Client, repo ghrepo.Interface, branch string) (string, error) {
 	var payload bytes.Buffer
-	if err := json.NewEncoder(&payload).Encode(map[string]interface{}{
+	if err := json.NewEncoder(&payload).Encode(map[string]any{
 		"branch": branch,
 	}); err != nil {
 		return "", err
@@ -77,7 +77,7 @@ func syncFork(client *api.Client, repo ghrepo.Interface, branch, SHA string, for
 	if err != nil {
 		return err
 	}
-	body := map[string]interface{}{
+	body := map[string]any{
 		"sha":   SHA,
 		"force": force,
 	}

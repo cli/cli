@@ -551,12 +551,12 @@ func (m *mergeContext) shouldAddToMergeQueue() bool {
 	return m.mergeQueueRequired && !m.opts.UseAdmin
 }
 
-func (m *mergeContext) warnf(format string, args ...interface{}) error {
+func (m *mergeContext) warnf(format string, args ...any) error {
 	_, err := fmt.Fprintf(m.opts.IO.ErrOut, format, args...)
 	return err
 }
 
-func (m *mergeContext) infof(format string, args ...interface{}) error {
+func (m *mergeContext) infof(format string, args ...any) error {
 	if !m.isTerminal {
 		return nil
 	}

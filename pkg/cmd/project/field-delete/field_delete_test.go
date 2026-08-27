@@ -85,10 +85,10 @@ func TestRunDeleteField(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation DeleteField.*","variables":{"input":{"fieldId":"an ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"deleteProjectV2Field": map[string]interface{}{
-					"projectV2Field": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"deleteProjectV2Field": map[string]any{
+					"projectV2Field": map[string]any{
 						"id": "Field ID",
 					},
 				},
@@ -124,10 +124,10 @@ func TestRunDeleteField_JSON(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation DeleteField.*","variables":{"input":{"fieldId":"an ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"deleteProjectV2Field": map[string]interface{}{
-					"projectV2Field": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"deleteProjectV2Field": map[string]any{
+					"projectV2Field": map[string]any{
 						"__typename": "ProjectV2Field",
 						"id":         "Field ID",
 						"name":       "a name",

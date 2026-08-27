@@ -119,11 +119,11 @@ func TestCloneRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(s string, m map[string]interface{}) {
-						expected := map[string]interface{}{
+					}`, func(s string, m map[string]any) {
+						expected := map[string]any{
 							"owner": "cli",
 							"repo":  "cli",
-							"orderBy": map[string]interface{}{
+							"orderBy": map[string]any{
 								"direction": "ASC",
 								"field":     "CREATED_AT",
 							},
@@ -497,7 +497,7 @@ func TestCloneRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(s string, m map[string]interface{}) {
+					}`, func(s string, m map[string]any) {
 						assert.Equal(t, "cli", m["owner"])
 						assert.Equal(t, "cli", m["repo"])
 						assert.Equal(t, float64(100), m["limit"].(float64))
@@ -524,7 +524,7 @@ func TestCloneRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(s string, m map[string]interface{}) {
+					}`, func(s string, m map[string]any) {
 						assert.Equal(t, "cli", m["owner"])
 						assert.Equal(t, "cli", m["repo"])
 						assert.Equal(t, float64(100), m["limit"].(float64))

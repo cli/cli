@@ -53,7 +53,7 @@ func TestProjectMutationQuery_DoesNotRequireQueryVariable(t *testing.T) {
 		} `graphql:"updateProjectV2(input:$input)"`
 	}{}
 
-	err := client.Mutate("UpdateProjectV2", &mutation, map[string]interface{}{
+	err := client.Mutate("UpdateProjectV2", &mutation, map[string]any{
 		"input": githubv4.UpdateProjectV2Input{
 			ProjectID: githubv4.ID("project ID"),
 		},
@@ -72,9 +72,9 @@ func TestProjectItems_DefaultLimit(t *testing.T) {
 	// list project items
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProjectWithItems.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"firstItems":  LimitMax,
 				"afterItems":  nil,
 				"firstFields": LimitMax,
@@ -84,12 +84,12 @@ func TestProjectItems_DefaultLimit(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"items": map[string]interface{}{
-							"nodes": []map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"items": map[string]any{
+							"nodes": []map[string]any{
 								{
 									"id": "issue ID",
 								},
@@ -125,9 +125,9 @@ func TestProjectItems_LowerLimit(t *testing.T) {
 	// list project items
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProjectWithItems.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"firstItems":  2,
 				"afterItems":  nil,
 				"firstFields": LimitMax,
@@ -137,12 +137,12 @@ func TestProjectItems_LowerLimit(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"items": map[string]interface{}{
-							"nodes": []map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"items": map[string]any{
+							"nodes": []map[string]any{
 								{
 									"id": "issue ID",
 								},
@@ -175,9 +175,9 @@ func TestProjectItems_NoLimit(t *testing.T) {
 	// list project items
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProjectWithItems.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"firstItems":  LimitDefault,
 				"afterItems":  nil,
 				"firstFields": LimitMax,
@@ -187,12 +187,12 @@ func TestProjectItems_NoLimit(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"items": map[string]interface{}{
-							"nodes": []map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"items": map[string]any{
+							"nodes": []map[string]any{
 								{
 									"id": "issue ID",
 								},
@@ -227,7 +227,7 @@ func TestProjectItems_WithQuery(t *testing.T) {
 		owner     *Owner
 		queryName string
 		dataKey   string
-		vars      map[string]interface{}
+		vars      map[string]any
 	}{
 		{
 			name: "user owner",
@@ -238,7 +238,7 @@ func TestProjectItems_WithQuery(t *testing.T) {
 			},
 			queryName: "UserProjectWithItems",
 			dataKey:   "user",
-			vars: map[string]interface{}{
+			vars: map[string]any{
 				"firstItems":  LimitMax,
 				"afterItems":  nil,
 				"firstFields": LimitMax,
@@ -257,7 +257,7 @@ func TestProjectItems_WithQuery(t *testing.T) {
 			},
 			queryName: "OrgProjectWithItems",
 			dataKey:   "organization",
-			vars: map[string]interface{}{
+			vars: map[string]any{
 				"firstItems":  LimitMax,
 				"afterItems":  nil,
 				"firstFields": LimitMax,
@@ -275,7 +275,7 @@ func TestProjectItems_WithQuery(t *testing.T) {
 			},
 			queryName: "ViewerProjectWithItems",
 			dataKey:   "viewer",
-			vars: map[string]interface{}{
+			vars: map[string]any{
 				"firstItems":  LimitMax,
 				"afterItems":  nil,
 				"firstFields": LimitMax,
@@ -293,17 +293,17 @@ func TestProjectItems_WithQuery(t *testing.T) {
 
 			gock.New("https://api.github.com").
 				Post("/graphql").
-				JSON(map[string]interface{}{
+				JSON(map[string]any{
 					"query":     "query " + tt.queryName + ".*",
 					"variables": tt.vars,
 				}).
 				Reply(200).
-				JSON(map[string]interface{}{
-					"data": map[string]interface{}{
-						tt.dataKey: map[string]interface{}{
-							"projectV2": map[string]interface{}{
-								"items": map[string]interface{}{
-									"nodes": []map[string]interface{}{
+				JSON(map[string]any{
+					"data": map[string]any{
+						tt.dataKey: map[string]any{
+							"projectV2": map[string]any{
+								"items": map[string]any{
+									"nodes": []map[string]any{
 										{
 											"id": "issue ID",
 										},
@@ -415,9 +415,9 @@ func TestProjectFields_LowerLimit(t *testing.T) {
 	// list project fields
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  LimitMax,
@@ -427,12 +427,12 @@ func TestProjectFields_LowerLimit(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"fields": map[string]interface{}{
-							"nodes": []map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"fields": map[string]any{
+							"nodes": []map[string]any{
 								{
 									"id": "field ID",
 								},
@@ -465,9 +465,9 @@ func TestProjectFields_DefaultLimit(t *testing.T) {
 	// list project fields
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  LimitMax,
@@ -477,12 +477,12 @@ func TestProjectFields_DefaultLimit(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"fields": map[string]interface{}{
-							"nodes": []map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"fields": map[string]any{
+							"nodes": []map[string]any{
 								{
 									"id": "field ID",
 								},
@@ -518,9 +518,9 @@ func TestProjectFields_NoLimit(t *testing.T) {
 	// list project fields
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  LimitMax,
@@ -530,12 +530,12 @@ func TestProjectFields_NoLimit(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"fields": map[string]interface{}{
-							"nodes": []map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"fields": map[string]any{
+							"nodes": []map[string]any{
 								{
 									"id": "field ID",
 								},
@@ -615,9 +615,9 @@ func TestProjectItems_FieldTitle(t *testing.T) {
 	// list project items
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProjectWithItems.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"firstItems":  LimitMax,
 				"afterItems":  nil,
 				"firstFields": LimitMax,
@@ -627,16 +627,16 @@ func TestProjectItems_FieldTitle(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
-						"items": map[string]interface{}{
-							"nodes": []map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"items": map[string]any{
+							"nodes": []map[string]any{
 								{
 									"id": "draft issue ID",
-									"fieldValues": map[string]interface{}{
-										"nodes": []map[string]interface{}{
+									"fieldValues": map[string]any{
+										"nodes": []map[string]any{
 											{
 												"__typename":  "ProjectV2ItemFieldIterationValue",
 												"title":       "Iteration Title 1",
@@ -644,7 +644,7 @@ func TestProjectItems_FieldTitle(t *testing.T) {
 											},
 											{
 												"__typename": "ProjectV2ItemFieldMilestoneValue",
-												"milestone": map[string]interface{}{
+												"milestone": map[string]any{
 													"title": "Milestone Title 1",
 												},
 											},

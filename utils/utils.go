@@ -28,7 +28,7 @@ func IsDebugEnabled() (bool, string) {
 	}
 }
 
-var TerminalSize = func(w interface{}) (int, int, error) {
+var TerminalSize = func(w any) (int, int, error) {
 	if f, isFile := w.(*os.File); isFile {
 		return term.GetSize(int(f.Fd()))
 	}

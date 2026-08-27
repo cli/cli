@@ -80,7 +80,7 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 
 // getResponse performs the API call and returns the response's link header values.
 // If the "Link" header is missing, the returned slice will be nil.
-func getResponse(client *http.Client, url safeurl.SafeURL, data interface{}) ([]string, error) {
+func getResponse(client *http.Client, url safeurl.SafeURL, data any) ([]string, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return nil, err

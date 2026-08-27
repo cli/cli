@@ -30,8 +30,8 @@ type repoFile struct {
 }
 
 // ExportData implements the cmdutil exportable interface for --json output.
-func (f *repoFile) ExportData(fields []string) map[string]interface{} {
-	data := map[string]interface{}{}
+func (f *repoFile) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
 	for _, field := range fields {
 		switch field {
 		case "name":

@@ -293,12 +293,12 @@ func (a Author) DisplayName() string {
 
 func (author Author) MarshalJSON() ([]byte, error) {
 	if author.ID == "" {
-		return json.Marshal(map[string]interface{}{
+		return json.Marshal(map[string]any{
 			"is_bot": true,
 			"login":  "app/" + author.Login,
 		})
 	}
-	return json.Marshal(map[string]interface{}{
+	return json.Marshal(map[string]any{
 		"is_bot": false,
 		"login":  author.Login,
 		"id":     author.ID,
@@ -323,7 +323,7 @@ func (a CommentAuthor) DisplayName() string {
 }
 
 // IssueCreate creates an issue in a GitHub repository
-func IssueCreate(client *Client, repo *Repository, params map[string]interface{}) (*Issue, error) {
+func IssueCreate(client *Client, repo *Repository, params map[string]any) (*Issue, error) {
 	query := `
 	mutation IssueCreate($input: CreateIssueInput!) {
 		createIssue(input: $input) {
@@ -334,7 +334,7 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 		}
 	}`
 
-	inputParams := map[string]interface{}{
+	inputParams := map[string]any{
 		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
@@ -347,7 +347,7 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 			return nil, fmt.Errorf("invalid IssueCreate mutation parameter %s", key)
 		}
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": inputParams,
 	}
 
@@ -438,7 +438,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptio
 		}
 	}`
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  repo.RepoOwner(),
 		"repo":   repo.RepoName(),
 		"viewer": options.Username,
@@ -524,7 +524,7 @@ func UpdateIssueIssueType(client *Client, hostname string, issueID string, issue
 		typeID = &id
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": UpdateIssueIssueTypeInput{
 			IssueID:     githubv4.ID(issueID),
 			IssueTypeID: typeID,
@@ -550,7 +550,7 @@ func AddSubIssue(client *Client, hostname string, parentID string, subIssueID st
 		} `graphql:"addSubIssue(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": AddSubIssueInput{
 			IssueID:       githubv4.ID(parentID),
 			SubIssueID:    githubv4.ID(subIssueID),
@@ -576,7 +576,7 @@ func RemoveSubIssue(client *Client, hostname string, parentID string, subIssueID
 		} `graphql:"removeSubIssue(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": RemoveSubIssueInput{
 			IssueID:    githubv4.ID(parentID),
 			SubIssueID: githubv4.ID(subIssueID),
@@ -601,7 +601,7 @@ func AddBlockedBy(client *Client, hostname string, issueID string, blockingIssue
 		} `graphql:"addBlockedBy(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": AddBlockedByInput{
 			IssueID:         githubv4.ID(issueID),
 			BlockingIssueID: githubv4.ID(blockingIssueID),
@@ -626,7 +626,7 @@ func RemoveBlockedBy(client *Client, hostname string, issueID string, blockingIs
 		} `graphql:"removeBlockedBy(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": RemoveBlockedByInput{
 			IssueID:         githubv4.ID(issueID),
 			BlockingIssueID: githubv4.ID(blockingIssueID),
@@ -754,7 +754,7 @@ func RepoIssueTypes(client *Client, repo ghrepo.Interface) ([]IssueType, error) 
 			}
 		}
 	}`
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"name":  repo.RepoName(),
 	}
@@ -782,7 +782,7 @@ func IssueNodeID(client *Client, repo ghrepo.Interface, number int) (string, err
 			}
 		}
 	}`
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  repo.RepoOwner(),
 		"name":   repo.RepoName(),
 		"number": number,

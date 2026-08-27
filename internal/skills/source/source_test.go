@@ -14,7 +14,7 @@ func TestBuildRepoURL(t *testing.T) {
 func TestParseMetadataRepo(t *testing.T) {
 	tests := []struct {
 		name      string
-		meta      map[string]interface{}
+		meta      map[string]any
 		wantOwner string
 		wantRepo  string
 		wantHost  string
@@ -23,7 +23,7 @@ func TestParseMetadataRepo(t *testing.T) {
 	}{
 		{
 			name: "parses repo url metadata",
-			meta: map[string]interface{}{
+			meta: map[string]any{
 				"github-repo": "https://github.com/monalisa/octocat-skills",
 			},
 			wantOwner: "monalisa",
@@ -33,7 +33,7 @@ func TestParseMetadataRepo(t *testing.T) {
 		},
 		{
 			name: "invalid repo url",
-			meta: map[string]interface{}{
+			meta: map[string]any{
 				"github-repo": "not a url",
 			},
 			wantFound: true,
@@ -41,7 +41,7 @@ func TestParseMetadataRepo(t *testing.T) {
 		},
 		{
 			name:      "missing repo metadata",
-			meta:      map[string]interface{}{},
+			meta:      map[string]any{},
 			wantFound: false,
 		},
 	}

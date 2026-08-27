@@ -1095,7 +1095,7 @@ func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
 func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support, uploader *attachments.Uploader) error {
 	client := ctx.Client
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"title":               state.Title,
 		"body":                state.Body,
 		"draft":               state.Draft,
@@ -1155,7 +1155,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	return uploadErr
 }
 
-func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *shared.IssueMetadataState) error {
+func renderPullRequestPlain(w io.Writer, params map[string]any, state *shared.IssueMetadataState) error {
 	fmt.Fprint(w, "Would have created a Pull Request with:\n")
 	fmt.Fprintf(w, "title:\t%s\n", params["title"])
 	fmt.Fprintf(w, "draft:\t%t\n", params["draft"])
@@ -1184,7 +1184,7 @@ func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *s
 	return nil
 }
 
-func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}, state *shared.IssueMetadataState) error {
+func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]any, state *shared.IssueMetadataState) error {
 	cs := io.ColorScheme()
 	out := io.Out
 
