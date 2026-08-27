@@ -71,8 +71,11 @@ safe-outputs:
       - off-topic
       - no-help-wanted-issue
       - invalid
-      - suspected-spam
       - duplicate
+  replace-label:
+    allowed-add: [suspected-spam]
+    allowed-remove: [needs-triage]
+    max: 1
   add-comment:
     max: 1
   noop:
@@ -117,10 +120,12 @@ valid labels. Incorporate your duplicate detection findings.
 
 Judge the issue against the spam criteria included at the top of this prompt.
 
-If, and only if, the issue meets those criteria, emit `suspected-spam` **without**
-`suggest`, so that it is applied directly rather than proposed. Applying the label is
-what triggers the shared `close-suspected-spam` job, which posts the standard comment
-and closes the issue. Nothing happens if the label is merely suggested.
+If, and only if, the issue meets those criteria, call `replace_label` with
+`label_to_remove: needs-triage` and `label_to_add: suspected-spam`. This directly
+applies `suspected-spam` rather than proposing it, and atomically removes
+`needs-triage`. Applying the label is what triggers the shared `close-suspected-spam`
+job, which posts the standard comment and closes the issue. Nothing happens if the
+label is merely suggested, so never use `add_labels` for `suspected-spam`.
 
 When you apply `suspected-spam`:
 
@@ -128,7 +133,6 @@ When you apply `suspected-spam`:
   job that closes with no comment at all.
 - Do **not** post a comment. `close-suspected-spam` writes the closure message, and a
   second comment from you would duplicate it.
-- Still attach a rationale and confidence, so the decision is auditable.
 
 Be conservative. A false positive closes a real user's issue, so when the evidence is
 mixed, suggest `more-info-needed` instead and let a human decide.
@@ -157,7 +161,7 @@ ${{ github.event.issue.number || inputs.issue_number }}.
 - Apply at most 3 labels from the allowlist. Do not invent labels.
 - `suspected-spam` is the only label you may apply directly. Everything else is a
   suggestion.
-- Do not add or remove `needs-triage` - it is not in your allowlist.
+- For non-spam issues, do not add or remove `needs-triage`.
 - Be conservative: when unsure, prefer fewer labels or none.
 - Do not classify into more than one branch at once (e.g., not both bug and enhancement).
 - For duplicates: suggest `duplicate` and link the original issue in your comment.
