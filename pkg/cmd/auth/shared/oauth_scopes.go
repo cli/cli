@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type MissingScopesError struct {
@@ -35,7 +36,7 @@ func GetScopes(httpClient *http.Client, hostname, authToken string) (string, err
 	// TODO(api-client-rollout)
 	// This line of code is part of a mechanical roll out of the api client.
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
-	res, err := api.NewClientFromHTTP(httpClient).Request(hostname, http.MethodGet, "", nil,
+	res, err := api.NewClientFromHTTP(httpClient).Request(hostname, http.MethodGet, safeurl.NewImmutableSafeURL("").String(), nil,
 		api.WithHeader("Authorization", "token "+authToken))
 	if err != nil {
 		return "", err
