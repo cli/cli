@@ -153,15 +153,8 @@ func refreshRun(opts *RefreshOptions) error {
 			}
 			hostname = candidates[selected]
 		}
-	} else {
-		var found bool
-		if slices.Contains(candidates, hostname) {
-			found = true
-		}
-
-		if !found {
-			return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
-		}
+	} else if !slices.Contains(candidates, hostname) {
+		return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
 	}
 
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
