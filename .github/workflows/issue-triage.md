@@ -57,8 +57,9 @@ safe-outputs:
   github-app:
     client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
     private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
+  # Keep intent metadata optional: plain strings are applied directly, while structured
+  # labels with `suggest: true` are routed for maintainer review.
   add-labels:
-    issue-intent: true
     max: 3
     allowed:
       - bug
@@ -71,52 +72,8 @@ safe-outputs:
       - off-topic
       - no-help-wanted-issue
       - invalid
+      - suspected-spam
       - duplicate
-  jobs:
-    apply-suspected-spam:
-      description: Apply the suspected-spam label directly to the triggering issue
-      runs-on: ubuntu-latest
-      output: Applied suspected-spam to the issue
-      permissions:
-        contents: read
-      inputs:
-        rationale:
-          description: Why the issue meets the spam criteria
-          required: true
-          type: string
-        confidence:
-          description: Confidence in the spam classification
-          required: true
-          type: choice
-          options: [LOW, MEDIUM, HIGH]
-      steps:
-        - name: Create GitHub App token
-          id: app-token
-          uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-          with:
-            client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
-            private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
-            owner: ${{ github.repository_owner }}
-            repositories: ${{ github.event.repository.name }}
-            permission-issues: write
-        - name: Apply suspected-spam
-          env:
-            GH_TOKEN: ${{ steps.app-token.outputs.token }}
-            GH_REPO: ${{ github.repository }}
-            ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
-          run: |
-            item_count=$(jq '[.items[] | select(.type == "apply_suspected_spam")] | length' "$GH_AW_AGENT_OUTPUT")
-            if [ "$item_count" -ne 1 ]; then
-              echo "::error::Expected exactly one apply_suspected_spam output, got $item_count"
-              exit 1
-            fi
-
-            {
-              echo "### Spam classification"
-              jq -r '.items[] | select(.type == "apply_suspected_spam") | "**Confidence:** \(.confidence)\n\n\(.rationale)"' "$GH_AW_AGENT_OUTPUT"
-            } >> "$GITHUB_STEP_SUMMARY"
-
-            gh issue edit "$ISSUE_NUMBER" --repo "$GH_REPO" --add-label suspected-spam
   add-comment:
     max: 1
   noop:
@@ -161,12 +118,12 @@ valid labels. Incorporate your duplicate detection findings.
 
 Judge the issue against the spam criteria included at the top of this prompt.
 
-If, and only if, the issue meets those criteria, call `apply_suspected_spam` with a
-clear rationale and confidence. This directly applies `suspected-spam` rather than
-proposing it. Applying the label is what triggers the shared `close-suspected-spam`
-job, which removes `needs-triage`, posts the standard comment, and closes the issue.
-Nothing happens if the label is merely suggested, so never use `add_labels` for
-`suspected-spam`.
+If, and only if, the issue meets those criteria, call `add_labels` with
+`labels: ["suspected-spam"]`. Emit it as a plain string with no rationale, confidence,
+or `suggest` field. This metadata-free form directly applies the label instead of
+proposing it. Applying the label triggers the shared `close-suspected-spam` job, which
+removes `needs-triage`, posts the standard comment, and closes the issue. Nothing
+happens if the label is merely suggested.
 
 When you apply `suspected-spam`:
 
@@ -174,8 +131,6 @@ When you apply `suspected-spam`:
   which routes to a different job that closes with no comment at all.
 - Do **not** post a comment. `close-suspected-spam` writes the closure message, and a
   second comment from you would duplicate it.
-- Attach a rationale and confidence to the `apply_suspected_spam` call so the decision
-  is auditable in the workflow run.
 
 Be conservative. A false positive closes a real user's issue, so when the evidence is
 mixed, suggest `more-info-needed` instead and let a human decide.
@@ -184,7 +139,8 @@ mixed, suggest `more-info-needed` instead and let a human decide.
 
 If the issue is not spam, use `add-labels` to suggest the appropriate labels (max 3,
 only from the allowlist above). **Emit these labels as suggestions requiring maintainer
-approval - never apply them directly.** Attach a clear rationale to each suggestion.
+approval - never apply them directly.** Emit each label as an object with `name`,
+`rationale`, `confidence`, and `suggest: true`.
 
 ## Required comment
 
