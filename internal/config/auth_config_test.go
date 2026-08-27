@@ -1024,6 +1024,16 @@ func TestHostForAPIHost(t *testing.T) {
 			wantHost:  "ghe.io",
 			wantFound: true,
 		},
+		{
+			// Best effort: map iteration order is randomized, so this case
+			// only hopes to catch an ordering regression rather than
+			// guaranteeing it on every run.
+			name:      "the first lexical match is returned when several matches found",
+			apiHosts:  map[string]string{"A.github.com": "api.example.com", "a.github.com": "api.example.com"},
+			lookup:    "api.example.com",
+			wantHost:  "A.github.com",
+			wantFound: true,
+		},
 	}
 
 	for _, tt := range tests {
