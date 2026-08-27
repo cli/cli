@@ -305,9 +305,9 @@ func TestDoRequest(t *testing.T) {
 	reg.Register(httpmock.MatchAny, httpmock.StatusStringResponse(201, `{"id": 1}`))
 
 	// Fields such as ContentLength are the reason DoRequest exists, so assert one survives.
-	req, err := http.NewRequest(http.MethodPost, "https://uploads.github.com/assets", strings.NewReader("asset"))
+	req, err := http.NewRequest(http.MethodPost, "https://uploads.github.com/assets", strings.NewReader("longer-than-assigned-content-length"))
 	require.NoError(t, err)
-	req.ContentLength = 5
+	req.ContentLength = 1
 
 	resp, err := client.DoRequest(req)
 	require.NoError(t, err)
@@ -315,7 +315,7 @@ func TestDoRequest(t *testing.T) {
 
 	assert.Equal(t, 201, resp.StatusCode)
 	assert.Equal(t, "uploads.github.com", reg.Requests[0].URL.Hostname())
-	assert.Equal(t, int64(5), reg.Requests[0].ContentLength)
+	assert.Equal(t, int64(1), reg.Requests[0].ContentLength)
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
