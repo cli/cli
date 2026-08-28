@@ -10,7 +10,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const flagName = "attach"
+const (
+	flagName       = "attach"
+	maxAttachments = 50
+)
 
 // errEmptyPath is reported for a --attach that named no file, whether the flag
 // held nothing else or the empty value sat beside a real one.
@@ -41,6 +44,9 @@ func (f *Flag) Changed() bool {
 func (f *Flag) UserAssets() ([]UserAsset, error) {
 	if !f.Changed() {
 		return nil, nil
+	}
+	if len(f.values) > maxAttachments {
+		return nil, fmt.Errorf("`--attach` accepts at most %d values per command", maxAttachments)
 	}
 	return userAssetsFromArgs(f.values)
 }
