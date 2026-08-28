@@ -270,7 +270,7 @@ func branchFunc(f *cmdutil.Factory) func() (string, error) {
 }
 
 func extensionManager(f *cmdutil.Factory) *extension.Manager {
-	em := extension.NewManager(f.IOStreams, f.GitClient)
+	em := extension.NewManager(f.IOStreams, f.GitClient, f.ExecutablePath)
 
 	cfg, err := f.Config()
 	if err != nil {

@@ -7,7 +7,8 @@
 env EXT_NAME=printenv-${RANDOM_STRING}
 env EXT_DIR=gh-${EXT_NAME}
 
-# Setup a local extension that reports the value of GH_EXTENSION
+# Setup a local extension that reports the extension environment and verifies
+# it can invoke the current gh executable without relying on PATH
 mkdir $EXT_DIR
 mv print-env.sh $EXT_DIR/$EXT_DIR
 chmod 777 $EXT_DIR/$EXT_DIR
@@ -20,10 +21,12 @@ defer gh extension remove $EXT_NAME
 # Verify GH_EXTENSION is set when the extension is run as gh <extension>
 exec gh $EXT_NAME
 stdout 'GH_EXTENSION=1'
+stdout 'GH_PATH was set correctly'
 
 # Verify GH_EXTENSION is set when the extension is run via gh extension exec
 exec gh extension exec $EXT_NAME
 stdout 'GH_EXTENSION=1'
+stdout 'GH_PATH was set correctly'
 
 # Verify GH_EXTENSION is absent when the extension is run standalone
 exec ./$EXT_DIR
@@ -35,4 +38,15 @@ stdout 'GH_EXTENSION`: set to `1` by gh when it invokes an extension'
 
 -- print-env.sh --
 #!/usr/bin/env bash
+set -e
+
 echo "GH_EXTENSION=${GH_EXTENSION:-0}"
+
+if [[ "${GH_EXTENSION:-0}" == "1" ]]; then
+  expected_token=$GH_TOKEN
+  mkdir -p empty-path
+  PATH=$PWD/empty-path
+  actual_token=$("$GH_PATH" auth token --hostname "$GH_HOST")
+  [[ "$actual_token" == "$expected_token" ]]
+  echo "GH_PATH was set correctly"
+fi
