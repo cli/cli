@@ -10,7 +10,7 @@ import (
 // individual script names, trimming whitespace and ignoring empty entries.
 func parseScriptFilter(raw string) []string {
 	var scripts []string
-	for _, s := range strings.Split(raw, ",") {
+	for s := range strings.SplitSeq(raw, ",") {
 		if s = strings.TrimSpace(s); s != "" {
 			scripts = append(scripts, s)
 		}

@@ -17,7 +17,7 @@ func TestGetCommits(t *testing.T) {
 
 	reg.Register(
 		httpmock.REST("GET", "repos/OWNER/REPO/commits"),
-		httpmock.JSONResponse([]map[string]interface{}{
+		httpmock.JSONResponse([]map[string]any{
 			{"sha": "abc123def456", "author": map[string]string{"login": "monalisa"}},
 			{"sha": "def456abc123", "author": map[string]string{"login": ""}},
 		}),

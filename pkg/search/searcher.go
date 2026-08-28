@@ -204,7 +204,7 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 // - Items: the actual matching search results, up to 100 max items per page
 //
 // For more information, see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28.
-func (s searcher) search(query Query, result interface{}) (string, error) {
+func (s searcher) search(query Query, result any) (string, error) {
 	u, err := safeurl.JoinPath("search", string(query.Kind))
 	if err != nil {
 		return "", err

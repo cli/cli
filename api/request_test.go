@@ -171,7 +171,7 @@ func TestRequestError(t *testing.T) {
 	defer reg.Verify(t)
 	client := newTestClient(reg)
 
-	reg.Register(httpmock.MatchAny, httpmock.StatusJSONResponse(404, map[string]interface{}{
+	reg.Register(httpmock.MatchAny, httpmock.StatusJSONResponse(404, map[string]any{
 		"message": "Not Found",
 	}))
 
@@ -282,7 +282,7 @@ func TestRequestWithContextPropagatesContext(t *testing.T) {
 	defer reg.Verify(t)
 	client := newTestClient(reg)
 
-	var gotValue interface{}
+	var gotValue any
 	reg.Register(httpmock.MatchAny, func(req *http.Request) (*http.Response, error) {
 		gotValue = req.Context().Value(ctxKey{})
 		return httpmock.StatusStringResponse(200, "{}")(req)
@@ -327,7 +327,7 @@ func TestDoRequestError(t *testing.T) {
 	defer reg.Verify(t)
 	client := newTestClient(reg)
 
-	reg.Register(httpmock.MatchAny, httpmock.StatusJSONResponse(422, map[string]interface{}{
+	reg.Register(httpmock.MatchAny, httpmock.StatusJSONResponse(422, map[string]any{
 		"message": "Validation Failed",
 	}))
 

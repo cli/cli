@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"regexp"
 	"strings"
@@ -104,13 +105,11 @@ func newRequestConfig(opts []RequestOption) requestConfig {
 
 // GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
-func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}, opts ...RequestOption) error {
+func (c Client) GraphQL(hostname string, query string, variables map[string]any, data any, opts ...RequestOption) error {
 	cfg := newRequestConfig(opts)
 	clientOpts := clientOptions(hostname, c.http.Transport)
 	clientOpts.Headers[graphqlFeatures] = features
-	for name, value := range cfg.headers {
-		clientOpts.Headers[name] = value
-	}
+	maps.Copy(clientOpts.Headers, cfg.headers)
 	gqlClient, err := ghAPI.NewGraphQLClient(clientOpts)
 	if err != nil {
 		return err
@@ -222,9 +221,7 @@ func (c Client) Request(hostname string, method string, p string, body io.Reader
 func (c Client) RequestWithContext(ctx context.Context, hostname string, method string, p string, body io.Reader, opts ...RequestOption) (*http.Response, error) {
 	cfg := newRequestConfig(opts)
 	clientOpts := clientOptions(hostname, c.http.Transport)
-	for name, value := range cfg.headers {
-		clientOpts.Headers[name] = value
-	}
+	maps.Copy(clientOpts.Headers, cfg.headers)
 	if cfg.noFollowRedirects {
 		clientOpts.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse

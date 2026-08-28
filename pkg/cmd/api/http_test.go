@@ -329,7 +329,7 @@ func Test_httpRequest(t *testing.T) {
 				apiHost: "api.mygateway.example",
 				method:  "POST",
 				p:       "graphql",
-				params:  map[string]interface{}{},
+				params:  map[string]any{},
 				headers: []string{},
 			},
 			want: expects{

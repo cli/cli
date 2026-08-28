@@ -13,7 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
-func httpRequest(client *http.Client, hostname string, apiHost string, method string, p string, params interface{}, headers []string) (*http.Response, error) {
+func httpRequest(client *http.Client, hostname string, apiHost string, method string, p string, params any, headers []string) (*http.Response, error) {
 	isGraphQL := p == "graphql"
 	var requestURL string
 	if strings.Contains(p, "://") {
