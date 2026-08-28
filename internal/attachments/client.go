@@ -21,12 +21,8 @@ import (
 )
 
 // Uploader attaches files to one upload target.
-//
-// TODO kw: hold an api.Client here and send uploads with DoRequest once #14104
-// lands. The request stays hand-built so it can set Content-Type,
-// Content-Length and GetBody.
 type Uploader struct {
-	httpClient       *http.Client
+	client           *api.Client
 	host             string
 	targetRepository int64
 }
@@ -57,7 +53,7 @@ func NewUploader(httpClient *http.Client, tokenType gh.TokenType, host string, t
 		return nil, err
 	}
 
-	return &Uploader{httpClient: httpClient, host: host, targetRepository: targetRepository}, nil
+	return &Uploader{client: api.NewClientFromHTTP(httpClient), host: host, targetRepository: targetRepository}, nil
 }
 
 // checkHost rejects a host that cannot serve the upload endpoint. IsEnterprise
@@ -151,15 +147,13 @@ func (u *Uploader) postAsset(ctx context.Context, a asset) (string, error) {
 	// Without GetBody a redirect re-reads an exhausted reader.
 	req.GetBody = open
 
-	resp, err := u.httpClient.Do(req)
+	// The request is hand-built and sent with DoRequest rather than Request so
+	// it can set ContentLength and GetBody, which Request cannot express.
+	resp, err := u.client.DoRequest(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return "", api.HandleHTTPError(resp)
-	}
 
 	var asset struct {
 		URL string `json:"url"`
