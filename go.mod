@@ -18,7 +18,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
-	github.com/cli/go-gh/v2 v2.13.1-0.20260827124009-fe4cf1ccc1ff
+	github.com/cli/go-gh/v2 v2.13.1-0.20260828131725-441165930903
 	github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24
 	github.com/cli/oauth v1.2.2
 	github.com/cli/safeexec v1.0.1
