@@ -357,7 +357,7 @@ func TestRequestHeadersAgainstRealTransport(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	httpClient, err := NewHTTPClient(HTTPClientOptions{
 		AppVersion: "v1.2.3",
-		Config:     tinyConfig{ts.URL[7:] + ":oauth_token": "MYTOKEN"},
+		Config:     tinyConfig{serverHostname(t, ts.URL) + ":oauth_token": "MYTOKEN"},
 		Log:        ios.ErrOut,
 	})
 	require.NoError(t, err)

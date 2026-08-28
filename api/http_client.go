@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -156,12 +157,12 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 		if req.Header.Get(authorization) == "" {
 			var redirectHostnameChange bool
 			if req.Response != nil && req.Response.Request != nil {
-				redirectHostnameChange = getHost(req) != getHost(req.Response.Request)
+				redirectHostnameChange = getHostname(req) != getHostname(req.Response.Request)
 			}
 			// Only set header if an initial request or redirect request to the same host as the initial request.
 			// If the host has changed during a redirect do not add the authentication token header.
 			if !redirectHostnameChange {
-				hostname := ghauth.NormalizeHostname(getHost(req))
+				hostname := ghauth.NormalizeHostname(getHostname(req))
 				token, _ := cfg.ActiveToken(hostname)
 				if token == "" {
 					// The request may be aimed at a host's api_host, which gh is
@@ -206,11 +207,15 @@ func (tr funcTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return tr.roundTrip(req)
 }
 
-func getHost(r *http.Request) string {
-	if r.Host != "" {
-		return r.Host
+// getHostname returns the hostname the request is addressed to, preferring an
+// explicit Host override and falling back to the URL host. Any port in the host
+// is stripped, so callers compare on the hostname alone.
+func getHostname(r *http.Request) string {
+	host := r.Host
+	if host == "" {
+		host = r.URL.Host
 	}
-	return r.URL.Host
+	return (&url.URL{Host: host}).Hostname()
 }
 
 type telemetryDisablerTransport struct {
@@ -219,7 +224,7 @@ type telemetryDisablerTransport struct {
 }
 
 func (t telemetryDisablerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if ghauth.IsEnterprise(getHost(req)) {
+	if ghauth.IsEnterprise(getHostname(req)) {
 		t.telemetryDisabler.Disable()
 	}
 	return t.wrappedTransport.RoundTrip(req)

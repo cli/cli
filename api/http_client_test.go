@@ -1,11 +1,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
@@ -265,9 +268,13 @@ func TestNewHTTPClient(t *testing.T) {
 }
 
 func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
-	var request *http.Request
+	// Two servers stand in for two different hosts. A dial map lets the test
+	// address them by hostname, so the auth layer compares real hostnames rather
+	// than the ephemeral ports of localhost servers, which it no longer treats as
+	// part of the host.
+	var serverRequest *http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		request = r
+		serverRequest = r
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
@@ -275,27 +282,52 @@ func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 	var redirectRequest *http.Request
 	redirectServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		redirectRequest = r
-		http.Redirect(w, r, server.URL, http.StatusFound)
+		http.Redirect(w, r, "http://canonical.example/", http.StatusFound)
 	}))
 	defer redirectServer.Close()
 
-	client, err := NewHTTPClient(HTTPClientOptions{
-		Config: tinyConfig{
-			fmt.Sprintf("%s:oauth_token", strings.TrimPrefix(redirectServer.URL, "http://")): "REDIRECT-TOKEN",
-			fmt.Sprintf("%s:oauth_token", strings.TrimPrefix(server.URL, "http://")):         "TOKEN",
+	hostToAddr := map[string]string{
+		"other.example":     redirectServer.Listener.Addr().String(),
+		"canonical.example": server.Listener.Addr().String(),
+	}
+	dialer := &net.Dialer{}
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if host, _, err := net.SplitHostPort(addr); err == nil {
+				if mapped, ok := hostToAddr[host]; ok {
+					addr = mapped
+				}
+			}
+			return dialer.DialContext(ctx, network, addr)
 		},
-	})
-	require.NoError(t, err)
+	}
+	config := tinyConfig{
+		"other.example:oauth_token":     "OTHER-TOKEN",
+		"canonical.example:oauth_token": "CANONICAL-TOKEN",
+	}
+	client := &http.Client{Transport: AddAuthTokenHeader(transport, config)}
 
-	req, err := http.NewRequest("GET", redirectServer.URL, nil)
+	req, err := http.NewRequest("GET", "http://other.example/", nil)
 	require.NoError(t, err)
 
 	res, err := client.Do(req)
 	require.NoError(t, err)
 
-	assert.Equal(t, "token REDIRECT-TOKEN", redirectRequest.Header.Get(authorization))
-	assert.Equal(t, "", request.Header.Get(authorization))
+	// The initial request is authenticated as its own host.
+	assert.Equal(t, "token OTHER-TOKEN", redirectRequest.Header.Get(authorization))
+	// Following the redirect crosses to a different host, so no token is attached,
+	// even though one is configured for that host.
+	assert.Equal(t, "", serverRequest.Header.Get(authorization))
 	assert.Equal(t, 204, res.StatusCode)
+}
+
+// serverHostname returns the hostname of a test server URL, so config can be
+// keyed by host, as production config is, rather than host:port.
+func serverHostname(t *testing.T, rawURL string) string {
+	t.Helper()
+	u, err := url.Parse(rawURL)
+	require.NoError(t, err)
+	return u.Hostname()
 }
 
 func TestHTTPClientSanitizeJSONControlCharactersC0(t *testing.T) {
