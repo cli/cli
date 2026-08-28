@@ -39,6 +39,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 			attached file, such as %[1]s![alt](./login.png)%[1]s, that reference is rewritten to point
 			at the uploaded asset. Any attached file the body does not reference is appended
 			to the end of the comment.
+			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
 			%[1]s--attach './login.png#The login error state'%[1]s. Without it the filename is used.

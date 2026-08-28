@@ -100,6 +100,8 @@ blocked-by/blocking relationships.
 
 - Repeat `--attach` to upload multiple files:
   `gh issue comment 12 --attach ./before.png --attach ./after.png`.
+- Each command invocation accepts at most 50 `--attach` values total across
+  images and videos.
 - Supported files are `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `mp4`,
   `mov`, and `webm`.
 - For an image, append alt text to the path after `#`. Quote the value so the
