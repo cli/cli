@@ -1,8 +1,10 @@
 package attachments
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/shlex"
@@ -137,6 +139,11 @@ func TestFlagUserAssets(t *testing.T) {
 			wantPaths: []string{"./b.png", "./a.png"},
 		},
 		{
+			name:    "too many attachments are rejected before filesystem validation",
+			input:   strings.Repeat("--attach ./missing.txt ", maxAttachments+1),
+			wantErr: "`--attach` accepts at most 50 values per command",
+		},
+		{
 			name:      "a file that does not exist",
 			input:     "--attach ./gone.png",
 			wantErr:   "./gone.png: ",
@@ -262,4 +269,12 @@ func TestFlagUserAssets(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("maximum number of attachments", func(t *testing.T) {
+		names := make([]string, maxAttachments)
+		for i := range names {
+			names[i] = fmt.Sprintf("attachment-%d.png", i)
+		}
+		assert.Len(t, NewTestAssets(t, names...), maxAttachments)
+	})
 }
