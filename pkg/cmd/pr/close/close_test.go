@@ -141,6 +141,33 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 	assert.Equal(t, "! Pull request OWNER/REPO#96 (The title of the PR) is already closed\n", output.Stderr())
 }
 
+func TestPrClose_alreadyClosed_withComment(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
+	pr.State = "CLOSED"
+	pr.Title = "The title of the PR"
+	shared.StubFinderForRunCommandStyleTests(t, "96", pr, baseRepo)
+
+	http.Register(
+		httpmock.GraphQL(`mutation CommentCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "addComment": { "commentEdge": { "node": {
+			"url": "https://github.com/OWNER/REPO/issues/96#issuecomment-456"
+		} } } } }`,
+			func(inputs map[string]any) {
+				assert.Equal(t, "THE-ID", inputs["subjectId"])
+				assert.Equal(t, "closing comment", inputs["body"])
+			}),
+	)
+
+	output, err := runCommand(http, true, "96 --comment 'closing comment'")
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "! Pull request OWNER/REPO#96 (The title of the PR) is already closed\n", output.Stderr())
+}
+
 func TestPrClose_deleteBranch_sameRepo(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)

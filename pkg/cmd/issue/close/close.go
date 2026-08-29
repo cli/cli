@@ -115,6 +115,9 @@ func closeRun(opts *CloseOptions) error {
 	}
 
 	if issue.State == "CLOSED" {
+		if err := addComment(opts, issue, baseRepo); err != nil {
+			return err
+		}
 		fmt.Fprintf(opts.IO.ErrOut, "%s Issue %s#%d (%s) is already closed\n", cs.Yellow("!"), ghrepo.FullName(baseRepo), issue.Number, issue.Title)
 		return nil
 	}
@@ -145,20 +148,8 @@ func closeRun(opts *CloseOptions) error {
 		duplicateIssueID = duplicateIssue.ID
 	}
 
-	if opts.Comment != "" {
-		commentOpts := &prShared.CommentableOptions{
-			Body:       opts.Comment,
-			HttpClient: opts.HttpClient,
-			InputType:  prShared.InputTypeInline,
-			Quiet:      true,
-			RetrieveCommentable: func() (prShared.Commentable, ghrepo.Interface, error) {
-				return issue, baseRepo, nil
-			},
-		}
-		err := prShared.CommentableRun(commentOpts)
-		if err != nil {
-			return err
-		}
+	if err := addComment(opts, issue, baseRepo); err != nil {
+		return err
 	}
 
 	err = apiClose(httpClient, baseRepo, issue, closeReason, duplicateIssueID)
@@ -169,6 +160,22 @@ func closeRun(opts *CloseOptions) error {
 	fmt.Fprintf(opts.IO.ErrOut, "%s Closed issue %s#%d (%s)\n", cs.SuccessIconWithColor(cs.Red), ghrepo.FullName(baseRepo), issue.Number, issue.Title)
 
 	return nil
+}
+
+func addComment(opts *CloseOptions, issue *api.Issue, baseRepo ghrepo.Interface) error {
+	if opts.Comment == "" {
+		return nil
+	}
+	commentOpts := &prShared.CommentableOptions{
+		Body:       opts.Comment,
+		HttpClient: opts.HttpClient,
+		InputType:  prShared.InputTypeInline,
+		Quiet:      true,
+		RetrieveCommentable: func() (prShared.Commentable, ghrepo.Interface, error) {
+			return issue, baseRepo, nil
+		},
+	}
+	return prShared.CommentableRun(commentOpts)
 }
 
 func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue, reason string, duplicateIssueID string) error {
