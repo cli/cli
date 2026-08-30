@@ -21,7 +21,7 @@ import (
 // <owner>:<branch>. The GitHub API is able to interpret this format in order
 // to discover the correct fork repository.
 //
-// In other parts of the code, you may see this refered to as a HeadLabel.
+// In other parts of the code, you may see this referred to as a HeadLabel.
 type QualifiedHeadRef struct {
 	owner      o.Option[string]
 	branchName string
@@ -210,7 +210,7 @@ func TryDetermineDefaultPRHead(gitClient GitConfigClient, remoteToRepo remoteToR
 // remote represents the value of the remote key in a branch's git configuration.
 // This value may be a name or a URL, both of which are strings, but are unfortunately
 // parsed by ReadBranchConfig into separate fields, allowing for illegal states to be
-// created by accident. This is an attempt to indicate that they are mutally exclusive.
+// created by accident. This is an attempt to indicate that they are mutually exclusive.
 type remote interface{ sealedRemote() }
 
 type remoteName struct{ name string }

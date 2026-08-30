@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -298,7 +299,7 @@ func TestGetRawGistFile(t *testing.T) {
 			)
 
 			client := &http.Client{Transport: reg}
-			result, err := GetRawGistFile(client, "https://gist.githubusercontent.com/raw-url")
+			result, err := GetRawGistFile(client, safeurl.NewImmutableSafeURL("https://gist.githubusercontent.com/raw-url"))
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -307,7 +308,7 @@ func TestGetRawGistFile(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.want, result)
+				assert.Equal(t, tt.want, result.Raw())
 			}
 
 			reg.Verify(t)

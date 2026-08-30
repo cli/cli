@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -261,7 +262,7 @@ func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *Pu
 	}
 
 	body := githubv4.String(input.Body)
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.AddPullRequestReviewInput{
 			PullRequestID: pr.ID,
 			Event:         &state,
@@ -284,12 +285,17 @@ func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, 
 		users = []string{}
 	}
 
-	path := fmt.Sprintf(
-		"repos/%s/%s/pulls/%d/requested_reviewers",
-		url.PathEscape(repo.RepoOwner()),
-		url.PathEscape(repo.RepoName()),
-		prNumber,
+	path, err := safeurl.JoinPath(
+		"repos",
+		repo.RepoOwner(),
+		repo.RepoName(),
+		"pulls",
+		strconv.Itoa(prNumber),
+		"requested_reviewers",
 	)
+	if err != nil {
+		return err
+	}
 	body := struct {
 		Reviewers     []string `json:"reviewers"`
 		TeamReviewers []string `json:"team_reviewers"`
@@ -302,7 +308,7 @@ func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, 
 		return err
 	}
 	// The endpoint responds with the updated pull request object; we don't need it here.
-	return client.REST(repo.RepoHost(), "POST", path, buf, nil)
+	return client.REST(repo.RepoHost(), "POST", path.String(), buf, nil)
 }
 
 // RemovePullRequestReviews removes requested reviewers from a pull request using the REST API.
@@ -317,12 +323,17 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 		users = []string{}
 	}
 
-	path := fmt.Sprintf(
-		"repos/%s/%s/pulls/%d/requested_reviewers",
-		url.PathEscape(repo.RepoOwner()),
-		url.PathEscape(repo.RepoName()),
-		prNumber,
+	path, err := safeurl.JoinPath(
+		"repos",
+		repo.RepoOwner(),
+		repo.RepoName(),
+		"pulls",
+		strconv.Itoa(prNumber),
+		"requested_reviewers",
 	)
+	if err != nil {
+		return err
+	}
 	body := struct {
 		Reviewers     []string `json:"reviewers"`
 		TeamReviewers []string `json:"team_reviewers"`
@@ -335,7 +346,7 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 		return err
 	}
 	// The endpoint responds with the updated pull request object; we don't need it here.
-	return client.REST(repo.RepoHost(), "DELETE", path, buf, nil)
+	return client.REST(repo.RepoHost(), "DELETE", path.String(), buf, nil)
 }
 
 // RequestReviewsByLogin sets requested reviewers on a pull request using the GraphQL mutation.
@@ -380,7 +391,7 @@ func RequestReviewsByLogin(client *Client, repo ghrepo.Interface, prID string, u
 	teamSlugValues := toGitHubV4Strings(teamSlugs, "")
 	input.TeamSlugs = &teamSlugValues
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": input,
 	}
 
@@ -451,7 +462,7 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"id":    githubv4.ID(prID),
 		"query": githubv4.String(query),
 		"owner": githubv4.String(repo.RepoOwner()),
@@ -601,7 +612,7 @@ func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"query": githubv4.String(query),
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),

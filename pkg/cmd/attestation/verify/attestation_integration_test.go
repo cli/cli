@@ -27,9 +27,9 @@ func getAttestationsFor(t *testing.T, bundlePath string) []*api.Attestation {
 
 func TestVerifyAttestations(t *testing.T) {
 	sgVerifier, err := verification.NewLiveSigstoreVerifier(verification.SigstoreConfig{
-		HttpClient:     http.DefaultClient,
-		Logger:         io.NewTestHandler(),
-		TUFMetadataDir: o.Some(t.TempDir()),
+		ExternalHttpClient: http.DefaultClient,
+		Logger:             io.NewTestHandler(),
+		TUFMetadataDir:     o.Some(t.TempDir()),
 	})
 	require.NoError(t, err)
 

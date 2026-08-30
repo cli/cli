@@ -99,6 +99,9 @@ var HelpTopics = []helpTopic{
 			When an extension is executed, gh checks for new versions for the executed extension once every 24 hours.
 			If a newer version was found, an upgrade notice is displayed on standard error.
 
+			%[1]sGH_EXTENSION%[1]s: set to %[1]s1%[1]s by gh when it invokes an extension, allowing an extension to
+			tell whether it was run as %[1]sgh <extension>%[1]s or directly as a standalone program.
+
 			%[1]sGH_CONFIG_DIR%[1]s: the directory where gh will store configuration files. If not specified,
 			the default value will be one of the following paths (in order of precedence):
 			  - %[1]s$XDG_CONFIG_HOME/gh%[1]s (if %[1]s$XDG_CONFIG_HOME%[1]s is set),

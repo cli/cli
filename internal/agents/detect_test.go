@@ -138,6 +138,101 @@ func TestDetectWith(t *testing.T) {
 			env:       map[string]string{"AI_AGENT": "bad agent", "GEMINI_CLI": "1"},
 			wantAgent: "gemini-cli",
 		},
+		{
+			name:      "ANTIGRAVITY_AGENT",
+			env:       map[string]string{"ANTIGRAVITY_AGENT": "1"},
+			wantAgent: "antigravity",
+		},
+		{
+			name:      "AUGMENT_AGENT",
+			env:       map[string]string{"AUGMENT_AGENT": "1"},
+			wantAgent: "augment-cli",
+		},
+		{
+			name:      "REPL_ID",
+			env:       map[string]string{"REPL_ID": "abc123"},
+			wantAgent: "replit",
+		},
+		{
+			name:      "GOOSE_PROVIDER",
+			env:       map[string]string{"GOOSE_PROVIDER": "anthropic"},
+			wantAgent: "goose",
+		},
+		{
+			name:      "claude-code takes priority over goose",
+			env:       map[string]string{"GOOSE_PROVIDER": "anthropic", "CLAUDECODE": "1"},
+			wantAgent: "claude-code",
+		},
+		{
+			name:      "kiro takes priority over goose",
+			env:       map[string]string{"GOOSE_PROVIDER": "anthropic", "TERM_PROGRAM": "kiro"},
+			wantAgent: "kiro",
+		},
+		{
+			name:      "CLAUDE_CODE_IS_COWORK detected as cowork",
+			env:       map[string]string{"CLAUDE_CODE_IS_COWORK": "1"},
+			wantAgent: "cowork",
+		},
+		{
+			name:      "cowork takes priority over CLAUDECODE",
+			env:       map[string]string{"CLAUDE_CODE_IS_COWORK": "1", "CLAUDECODE": "1"},
+			wantAgent: "cowork",
+		},
+		{
+			name:      "CLAUDE_CODE",
+			env:       map[string]string{"CLAUDE_CODE": "1"},
+			wantAgent: "claude-code",
+		},
+		{
+			name:      "CURSOR_TRACE_ID detected as cursor",
+			env:       map[string]string{"CURSOR_TRACE_ID": "abc"},
+			wantAgent: "cursor",
+		},
+		{
+			name:      "CURSOR_AGENT detected as cursor-cli",
+			env:       map[string]string{"CURSOR_AGENT": "1"},
+			wantAgent: "cursor-cli",
+		},
+		{
+			name:      "CURSOR_EXTENSION_HOST_ROLE agent-exec detected as cursor-cli",
+			env:       map[string]string{"CURSOR_EXTENSION_HOST_ROLE": "agent-exec"},
+			wantAgent: "cursor-cli",
+		},
+		{
+			name:      "CURSOR_EXTENSION_HOST_ROLE with other value is ignored",
+			env:       map[string]string{"CURSOR_EXTENSION_HOST_ROLE": "worker"},
+			wantAgent: "",
+		},
+		{
+			name:      "CURSOR_TRACE_ID takes priority over CURSOR_AGENT",
+			env:       map[string]string{"CURSOR_TRACE_ID": "abc", "CURSOR_AGENT": "1"},
+			wantAgent: "cursor",
+		},
+		{
+			name:      "TERM_PROGRAM kiro detected as kiro",
+			env:       map[string]string{"TERM_PROGRAM": "kiro"},
+			wantAgent: "kiro",
+		},
+		{
+			name:      "TERM_PROGRAM with kiro as a substring is ignored",
+			env:       map[string]string{"TERM_PROGRAM": "kirostudio"},
+			wantAgent: "",
+		},
+		{
+			name:      "PATH containing .pi/agent detected as pi",
+			env:       map[string]string{"PATH": "/usr/bin:/home/user/.pi/agent/bin"},
+			wantAgent: "pi",
+		},
+		{
+			name:      "PATH with .pi/agent not on a path boundary is ignored",
+			env:       map[string]string{"PATH": "/usr/bin:/home/user/x.pi/agent"},
+			wantAgent: "",
+		},
+		{
+			name:      "PATH with Windows .pi\\agent separators detected as pi",
+			env:       map[string]string{"PATH": `C:\Windows;C:\Users\user\.pi\agent\bin`},
+			wantAgent: "pi",
+		},
 	}
 
 	for _, tt := range tests {

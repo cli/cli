@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestClient(reg *httpmock.Registry) *Client {
@@ -23,7 +24,7 @@ func TestGraphQL(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := newTestClient(http)
 
-	vars := map[string]interface{}{"name": "Mona"}
+	vars := map[string]any{"name": "Mona"}
 	response := struct {
 		Viewer struct {
 			Login string
@@ -136,6 +137,100 @@ func TestRESTError(t *testing.T) {
 	if httpErr.Error() != "HTTP 422: OH NO (https://api.github.com/repos/branch)" {
 		t.Errorf("got %q", httpErr.Error())
 	}
+}
+
+func TestRESTWithNextError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(httpmock.MatchAny, func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			Request:    req,
+			StatusCode: http.StatusNotFound,
+			Body:       io.NopCloser(bytes.NewBufferString(`{"message": "Not Found"}`)),
+			Header: http.Header{
+				"Content-Type":            {"application/json"},
+				"X-Accepted-Oauth-Scopes": {"repo"},
+				"X-Oauth-Scopes":          {"read:user"},
+			},
+		}, nil
+	})
+
+	_, err := client.RESTWithNext("github.com", http.MethodGet, "repos/owner/repo/items", nil, nil)
+
+	var httpErr HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
+	assert.Contains(t, err.Error(), "HTTP 404")
+	assert.Equal(t, `This API operation needs the "repo" scope. To request it, run:  gh auth refresh -h github.com -s repo`, httpErr.ScopesSuggestion())
+}
+
+func TestRESTAndRESTWithNextErrorTypeParity(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	responder := func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			Request:    req,
+			StatusCode: http.StatusNotFound,
+			Body:       io.NopCloser(bytes.NewBufferString(`{"message": "Not Found"}`)),
+			Header:     http.Header{"Content-Type": {"application/json"}},
+		}, nil
+	}
+	reg.Register(httpmock.MatchAny, responder)
+	reg.Register(httpmock.MatchAny, responder)
+
+	restErr := client.REST("github.com", http.MethodGet, "repos/owner/repo/items", nil, nil)
+	_, restWithNextErr := client.RESTWithNext("github.com", http.MethodGet, "repos/owner/repo/items", nil, nil)
+
+	require.Error(t, restErr)
+	require.Error(t, restWithNextErr)
+	assert.IsType(t, restErr, restWithNextErr)
+}
+
+func TestRESTWithNext(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(httpmock.MatchAny, func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			Request:    req,
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBufferString(`{"name": "item"}`)),
+			Header: http.Header{
+				"Content-Type": {"application/json"},
+				"Link":         {`<https://api.github.com/repos/owner/repo/items?page=2>; rel="next", <https://api.github.com/repos/owner/repo/items?page=3>; rel="last"`},
+			},
+		}, nil
+	})
+
+	response := struct {
+		Name string `json:"name"`
+	}{}
+	next, err := client.RESTWithNext("github.com", http.MethodGet, "repos/owner/repo/items", nil, &response)
+
+	require.NoError(t, err)
+	assert.Equal(t, "item", response.Name)
+	assert.Equal(t, "https://api.github.com/repos/owner/repo/items?page=2", next)
+}
+
+func TestRESTWithNextNoContent(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(
+		httpmock.REST(http.MethodDelete, "repos/owner/repo/items/1"),
+		httpmock.StatusStringResponse(http.StatusNoContent, "not JSON"),
+	)
+
+	next, err := client.RESTWithNext("github.com", http.MethodDelete, "repos/owner/repo/items/1", nil, nil)
+
+	require.NoError(t, err)
+	assert.Empty(t, next)
 }
 
 func TestHandleHTTPError_GraphQL502(t *testing.T) {

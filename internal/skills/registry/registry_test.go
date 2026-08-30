@@ -21,6 +21,11 @@ func TestFindByID(t *testing.T) {
 		{name: "codex", id: "codex", wantName: "Codex"},
 		{name: "gemini-cli", id: "gemini-cli", wantName: "Gemini CLI"},
 		{name: "antigravity", id: "antigravity", wantName: "Antigravity"},
+		{name: "antigravity-cli", id: "antigravity-cli", wantName: "Antigravity CLI"},
+		{name: "antigravity2.0", id: "antigravity2.0", wantName: "Antigravity 2.0"},
+		{name: "devin", id: "devin", wantName: "Devin"},
+		{name: "grok", id: "grok", wantName: "Grok"},
+		{name: "windsurf is no longer supported", id: "windsurf", wantErr: "unknown agent"},
 		{name: "unknown agent", id: "nonexistent", wantErr: "unknown agent"},
 	}
 	for _, tt := range tests {
@@ -38,8 +43,11 @@ func TestFindByID(t *testing.T) {
 }
 
 func TestInstallDir(t *testing.T) {
+	t.Setenv(claudeConfigDirEnv, "")
+
 	tests := []struct {
 		name    string
+		setup   func(*testing.T)
 		hostID  string
 		scope   Scope
 		gitRoot string
@@ -70,6 +78,25 @@ func TestInstallDir(t *testing.T) {
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
 			wantDir: filepath.Join("/tmp/monalisa-repo", ".claude", "skills"),
+		},
+		{
+			name:    "claude code user scope",
+			hostID:  "claude-code",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".claude", "skills"),
+		},
+		{
+			name: "claude code user scope, respect env var",
+			setup: func(t *testing.T) {
+				t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join("/home", "monalisa", ".config", "claude"))
+			},
+			hostID:  "claude-code",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home", "monalisa", ".config", "claude", "skills"),
 		},
 		{
 			name:    "cursor project scope",
@@ -104,6 +131,89 @@ func TestInstallDir(t *testing.T) {
 			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
 		},
 		{
+			name:    "antigravity-cli project scope",
+			hostID:  "antigravity-cli",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
+		},
+		{
+			name:    "antigravity-cli user scope",
+			hostID:  "antigravity-cli",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".gemini", "antigravity-cli", "skills"),
+		},
+		{
+			name:    "antigravity2.0 project scope",
+			hostID:  "antigravity2.0",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
+		},
+		{
+			name:    "antigravity2.0 user scope",
+			hostID:  "antigravity2.0",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".gemini", "config", "skills"),
+		},
+		{
+			name:    "devin project scope",
+			hostID:  "devin",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".devin", "skills"),
+		},
+		{
+			name:    "devin user scope",
+			hostID:  "devin",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".devin", "skills"),
+		},
+		{
+			name:    "grok project scope",
+			hostID:  "grok",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".grok", "skills"),
+		},
+		{
+			name:    "grok user scope",
+			hostID:  "grok",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".grok", "skills"),
+		},
+		{
+			// Issue #13494: Universal must use the shared .agents/skills dir
+			// at user scope so compliant clients (Copilot, Pi, OpenCode) pick up
+			// skills per the agentskills.io cross-client convention.
+			name:    "universal project scope",
+			hostID:  "universal",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
+		},
+		{
+			name:    "universal user scope",
+			hostID:  "universal",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".agents", "skills"),
+		},
+		{
 			name:    "project scope without git root",
 			hostID:  "github-copilot",
 			scope:   ScopeProject,
@@ -130,6 +240,10 @@ func TestInstallDir(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup(t)
+			}
+
 			host, err := FindByID(tt.hostID)
 			require.NoError(t, err)
 

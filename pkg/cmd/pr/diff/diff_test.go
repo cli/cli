@@ -123,6 +123,16 @@ func Test_NewCmdDiff(t *testing.T) {
 				BrowserMode: true,
 			},
 		},
+		{
+			name:  "allow escape sequences",
+			args:  "--allow-escape-sequences",
+			isTTY: true,
+			want: DiffOptions{
+				SelectorArg:          "",
+				UseColor:             true,
+				AllowEscapeSequences: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -163,6 +173,7 @@ func Test_NewCmdDiff(t *testing.T) {
 			assert.Equal(t, tt.want.UseColor, opts.UseColor)
 			assert.Equal(t, tt.want.BrowserMode, opts.BrowserMode)
 			assert.Equal(t, tt.want.Exclude, opts.Exclude)
+			assert.Equal(t, tt.want.AllowEscapeSequences, opts.AllowEscapeSequences)
 		})
 	}
 }
@@ -173,9 +184,11 @@ func Test_diffRun(t *testing.T) {
 	tests := []struct {
 		name           string
 		opts           DiffOptions
+		notTTY         bool
 		wantFields     []string
 		wantStdout     string
 		wantStderr     string
+		wantErr        string
 		wantBrowsedURL string
 		httpStubs      func(*httpmock.Registry)
 	}{
@@ -284,6 +297,57 @@ index f2b4805c..3d7bd0f9 100644
 			wantStderr:     "Opening https://github.com/OWNER/REPO/pull/123/files in your browser.\n",
 			wantBrowsedURL: "https://github.com/OWNER/REPO/pull/123/files",
 		},
+		{
+			name: "neutralizes escape sequences by default",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    false,
+			},
+			wantFields: []string{"number"},
+			wantStdout: "diff --git a/f b/f\n+ hello ^[[m world\n",
+			httpStubs: func(reg *httpmock.Registry) {
+				stubDiffRequest(reg, "application/vnd.github.v3.diff", "diff --git a/f b/f\n+ hello \x1b[m world\n")
+			},
+		},
+		{
+			name: "passes escape sequences through with --allow-escape-sequences",
+			opts: DiffOptions{
+				SelectorArg:          "123",
+				UseColor:             false,
+				AllowEscapeSequences: true,
+			},
+			wantFields: []string{"number"},
+			wantStdout: "diff --git a/f b/f\n+ hello \x1b[m world\n",
+			httpStubs: func(reg *httpmock.Registry) {
+				stubDiffRequest(reg, "application/vnd.github.v3.diff", "diff --git a/f b/f\n+ hello \x1b[m world\n")
+			},
+		},
+		{
+			name: "piped diff with escape sequences is refused",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    false,
+			},
+			notTTY:     true,
+			wantFields: []string{"number"},
+			wantErr:    "the diff contains terminal escape sequences; pass --allow-escape-sequences to output it anyway",
+			httpStubs: func(reg *httpmock.Registry) {
+				stubDiffRequest(reg, "application/vnd.github.v3.diff", "diff --git a/f b/f\n+ hello \x1b[m world\n")
+			},
+		},
+		{
+			name: "piped clean diff passes through raw",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    false,
+			},
+			notTTY:     true,
+			wantFields: []string{"number"},
+			wantStdout: "diff --git a/f b/f\n+ hello world\n",
+			httpStubs: func(reg *httpmock.Registry) {
+				stubDiffRequest(reg, "application/vnd.github.v3.diff", "diff --git a/f b/f\n+ hello world\n")
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -300,7 +364,7 @@ index f2b4805c..3d7bd0f9 100644
 			tt.opts.Browser = browser
 
 			ios, _, stdout, stderr := iostreams.Test()
-			ios.SetStdoutTTY(true)
+			ios.SetStdoutTTY(!tt.notTTY)
 			tt.opts.IO = ios
 
 			finder := shared.NewMockFinder("123", pr, ghrepo.New("OWNER", "REPO"))
@@ -308,7 +372,11 @@ index f2b4805c..3d7bd0f9 100644
 			tt.opts.Finder = finder
 
 			err := diffRun(&tt.opts)
-			assert.NoError(t, err)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
@@ -569,7 +637,7 @@ func Test_matchesAny(t *testing.T) {
 
 func Test_sanitizedReader(t *testing.T) {
 	input := strings.NewReader("\t hello \x1B[m world! ăѣ𝔠ծề\r\n")
-	expected := "\t hello \\u{1b}[m world! ăѣ𝔠ծề\r\n"
+	expected := "\t hello ^[[m world! ăѣ𝔠ծề\r\n"
 
 	err := iotest.TestReader(sanitizedReader(input), []byte(expected))
 	if err != nil {

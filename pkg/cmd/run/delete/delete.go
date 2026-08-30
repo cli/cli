@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -138,8 +139,11 @@ func runDelete(opts *DeleteOptions) error {
 }
 
 func deleteWorkflowRun(client *api.Client, repo ghrepo.Interface, runID string) error {
-	path := fmt.Sprintf("repos/%s/actions/runs/%s", ghrepo.FullName(repo), runID)
-	err := client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", runID)
+	if err != nil {
+		return err
+	}
+	err = client.REST(repo.RepoHost(), "DELETE", path.String(), nil, nil)
 	if err != nil {
 		return err
 	}

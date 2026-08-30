@@ -43,6 +43,9 @@ func TestNewCmdVerify_Args(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return nil, nil
 				},
+				ExternalHttpClient: func() (*http.Client, error) {
+					return nil, nil
+				},
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},

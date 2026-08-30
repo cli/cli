@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
@@ -251,15 +252,18 @@ func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title strin
 
 func GetCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {
 	query := `query UserCurrent{viewer{login}}`
-	reqBody, err := json.Marshal(map[string]interface{}{"query": query})
+	reqBody, err := json.Marshal(map[string]any{"query": query})
 	if err != nil {
 		return "", err
 	}
 	result := struct {
 		Data struct{ Viewer struct{ Login string } }
 	}{}
-	apiEndpoint := ghinstance.GraphQLEndpoint(hostname)
-	req, err := http.NewRequest("POST", apiEndpoint, bytes.NewBuffer(reqBody))
+	apiEndpoint, err := safeurl.JoinPathWithHostPrefix(ghinstance.GraphQLEndpoint(hostname))
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequest("POST", apiEndpoint.String(), bytes.NewBuffer(reqBody))
 	if err != nil {
 		return "", err
 	}

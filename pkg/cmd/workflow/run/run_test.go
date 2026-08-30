@@ -168,7 +168,7 @@ func Test_magicFieldValue(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    interface{}
+		want    any
 		wantErr bool
 	}{
 		{
@@ -420,7 +420,7 @@ jobs:
 			}))
 		reg.Register(
 			httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
-			httpmock.StatusJSONResponse(200, map[string]interface{}{
+			httpmock.StatusJSONResponse(200, map[string]any{
 				"workflow_run_id": int64(6789),
 				"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
 				"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
@@ -434,7 +434,7 @@ jobs:
 		wantErr     bool
 		errOut      string
 		wantOut     string
-		wantBody    map[string]interface{}
+		wantBody    map[string]any
 		httpStubs   func(*httpmock.Registry)
 		promptStubs func(*prompter.MockPrompter)
 	}{
@@ -464,8 +464,8 @@ jobs:
 				JSONInput: `{"name":"scully"}`,
 				Detector:  &fd.DisabledDetectorMock{},
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name": "scully",
 				},
 				"ref": "trunk",
@@ -485,8 +485,8 @@ jobs:
 				JSONInput: `{"name":"scully"}`,
 				Detector:  &fd.EnabledDetectorMock{},
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name": "scully",
 				},
 				"ref":                "trunk",
@@ -510,8 +510,8 @@ jobs:
 				JSONInput: `{"name":"scully"}`,
 				Detector:  &fd.DisabledDetectorMock{},
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name": "scully",
 				},
 				"ref": "trunk",
@@ -525,8 +525,8 @@ jobs:
 				JSONInput: `{"name":"scully"}`,
 				Detector:  &fd.EnabledDetectorMock{},
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name": "scully",
 				},
 				"ref":                "trunk",
@@ -545,8 +545,8 @@ jobs:
 				MagicFields: []string{`greeting=hey`},
 				Detector:    &fd.DisabledDetectorMock{},
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name":     "scully",
 					"greeting": "hey",
 				},
@@ -562,8 +562,8 @@ jobs:
 				MagicFields: []string{`greeting=hey`},
 				Detector:    &fd.EnabledDetectorMock{},
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name":     "scully",
 					"greeting": "hey",
 				},
@@ -584,8 +584,8 @@ jobs:
 				Ref:       "good-branch",
 				Detector:  &fd.DisabledDetectorMock{},
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name": "scully",
 				},
 				"ref": "good-branch",
@@ -606,8 +606,8 @@ jobs:
 				Ref:       "good-branch",
 				Detector:  &fd.EnabledDetectorMock{},
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name": "scully",
 				},
 				"ref":                "good-branch",
@@ -642,8 +642,8 @@ jobs:
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
 					httpmock.StatusStringResponse(422, "missing something"))
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"greeting": "hello there",
 				},
 				"ref":                "trunk",
@@ -665,14 +665,14 @@ jobs:
 					httpmock.StatusStringResponse(200, `{"id": 12345}`))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
-					httpmock.StatusJSONResponse(200, map[string]interface{}{
+					httpmock.StatusJSONResponse(200, map[string]any{
 						"workflow_run_id": int64(6789),
 						"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
 						"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
 					}))
 			},
-			wantBody: map[string]interface{}{
-				"inputs":             map[string]interface{}{},
+			wantBody: map[string]any{
+				"inputs":             map[string]any{},
 				"ref":                "trunk",
 				"return_run_details": true,
 			},
@@ -764,7 +764,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/minimal.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fminimal.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedNoInputsYAMLContent,
 					}))
@@ -777,8 +777,8 @@ jobs:
 					return 0, nil
 				})
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{},
+			wantBody: map[string]any{
+				"inputs": map[string]any{},
 				"ref":    "trunk",
 			},
 			wantOut: heredoc.Doc(`
@@ -808,13 +808,13 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/minimal.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fminimal.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedNoInputsYAMLContent,
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/1/dispatches"),
-					httpmock.StatusJSONResponse(200, map[string]interface{}{
+					httpmock.StatusJSONResponse(200, map[string]any{
 						"workflow_run_id": int64(6789),
 						"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
 						"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
@@ -825,8 +825,8 @@ jobs:
 					return 0, nil
 				})
 			},
-			wantBody: map[string]interface{}{
-				"inputs":             map[string]interface{}{},
+			wantBody: map[string]any{
+				"inputs":             map[string]any{},
 				"ref":                "trunk",
 				"return_run_details": true,
 			},
@@ -861,7 +861,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContent,
 					}))
@@ -880,8 +880,8 @@ jobs:
 					return "scully", nil
 				})
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name":     "scully",
 					"greeting": "hi",
 				},
@@ -914,13 +914,13 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContent,
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
-					httpmock.StatusJSONResponse(200, map[string]interface{}{
+					httpmock.StatusJSONResponse(200, map[string]any{
 						"workflow_run_id": int64(6789),
 						"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
 						"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
@@ -937,8 +937,8 @@ jobs:
 					return "scully", nil
 				})
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name":     "scully",
 					"greeting": "hi",
 				},
@@ -976,7 +976,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContentChoiceIp,
 					}))
@@ -996,8 +996,8 @@ jobs:
 				})
 
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name":             "monalisa",
 					"favourite-animal": "dog",
 				},
@@ -1030,13 +1030,13 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContentChoiceIp,
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
-					httpmock.StatusJSONResponse(200, map[string]interface{}{
+					httpmock.StatusJSONResponse(200, map[string]any{
 						"workflow_run_id": int64(6789),
 						"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
 						"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
@@ -1054,8 +1054,8 @@ jobs:
 				})
 
 			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
+			wantBody: map[string]any{
+				"inputs": map[string]any{
 					"name":             "monalisa",
 					"favourite-animal": "dog",
 				},
@@ -1091,7 +1091,7 @@ jobs:
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fworkflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContentMissingChoiceIp,
 					}))
@@ -1151,7 +1151,7 @@ jobs:
 				lastRequest := reg.Requests[len(reg.Requests)-1]
 				if lastRequest.Method == "POST" {
 					bodyBytes, _ := io.ReadAll(lastRequest.Body)
-					reqBody := make(map[string]interface{})
+					reqBody := make(map[string]any)
 					err := json.Unmarshal(bodyBytes, &reqBody)
 					if err != nil {
 						t.Fatalf("error decoding JSON: %v", err)

@@ -34,6 +34,7 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	f.IOStreams = ios
 	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
+	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
 	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
 	f.Remotes = remotesFunc(f)    // Depends on Config, and GitClient
 	f.BaseRepo = BaseRepoFunc(f.Remotes)
@@ -223,6 +224,16 @@ func plainHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAg
 			return nil, err
 		}
 		return client, nil
+	}
+}
+
+func externalHttpClientFunc(ios *iostreams.IOStreams, appVersion string) func() (*http.Client, error) {
+	return func() (*http.Client, error) {
+		return api.NewExternalHTTPClient(api.ExternalHTTPClientOptions{
+			AppVersion:  appVersion,
+			Log:         ios.ErrOut,
+			LogColorize: ios.ColorEnabled(),
+		})
 	}
 }
 

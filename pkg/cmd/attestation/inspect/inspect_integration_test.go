@@ -21,6 +21,9 @@ func TestNewInspectCmd_PrintOutputJSONFormat(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return http.DefaultClient, nil
 		},
+		ExternalHttpClient: func() (*http.Client, error) {
+			return http.DefaultClient, nil
+		},
 	}
 
 	t.Run("Print output in JSON format", func(t *testing.T) {

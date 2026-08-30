@@ -66,7 +66,7 @@ func TestKramdownCompatibleDocs(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	f := &cmdutil.Factory{
 		IOStreams: ios,
-		Config:    func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+		Config:    func() (gh.Config, error) { return config.NewMockConfig(), nil },
 		Browser:   &browser.Stub{},
 		ExtensionManager: &extensions.ExtensionManagerMock{
 			ListFunc: func() []extensions.Extension {

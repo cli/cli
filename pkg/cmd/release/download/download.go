@@ -17,6 +17,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -38,6 +39,8 @@ type DownloadOptions struct {
 	Concurrency int
 
 	ArchiveType string
+
+	AllowEscapeSequences bool
 }
 
 func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobra.Command {
@@ -110,6 +113,9 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
 	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing files of the same name")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip downloading when files of the same name exist")
+	cmd.Flags().BoolVar(&opts.AllowEscapeSequences, "allow-escape-sequences", false, "Allow printing terminal escape sequences when writing an asset to standard output")
+
+	cmdutil.DisableAuthCheck(cmd)
 
 	return cmd
 }
@@ -212,15 +218,31 @@ func downloadRun(opts *DownloadOptions) error {
 		return fmt.Errorf("unable to write more than one asset with `--output`, got %d assets", len(toDownload))
 	}
 
+	// An asset written to standard output is external content. It funnels through
+	// ContentOut so the sink is auditable; the safety decision (refuse binary bound
+	// for a terminal or escape sequences in text, unless --allow-escape-sequences)
+	// is made per copy below. Writing to a file keeps the raw bytes.
+	opts.IO.SetContentSanitization(false)
+
 	dest := destinationWriter{
 		file:         opts.OutputFile,
 		dir:          opts.Destination,
 		skipExisting: opts.SkipExisting,
 		overwrite:    opts.OverwriteExisting,
-		stdout:       opts.IO.Out,
+		stdout:       opts.IO.ContentOut,
+		allowEscapes: opts.AllowEscapeSequences,
+		isTTY:        opts.IO.IsStdoutTTY(),
 	}
 
-	return downloadAssets(&dest, httpClient, toDownload, opts.Concurrency, isArchive, opts.IO)
+	targets := make([]downloadTarget, len(toDownload))
+	for i, a := range toDownload {
+		targets[i] = downloadTarget{
+			url:  safeurl.NewImmutableSafeURL(a.APIURL),
+			name: a.Name,
+		}
+	}
+
+	return downloadAssets(&dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -232,12 +254,17 @@ func matchAny(patterns []string, name string) bool {
 	return false
 }
 
-func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []shared.ReleaseAsset, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
+type downloadTarget struct {
+	url  safeurl.SafeURL
+	name string
+}
+
+func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []downloadTarget, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
 
-	jobs := make(chan shared.ReleaseAsset, len(toDownload))
+	jobs := make(chan downloadTarget, len(toDownload))
 	results := make(chan error, len(toDownload))
 
 	if len(toDownload) < numWorkers {
@@ -247,8 +274,8 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
-				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.Name))
-				results <- downloadAsset(dest, httpClient, a.APIURL, a.Name, isArchive)
+				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.name))
+				results <- downloadAsset(dest, httpClient, a.url, a.name, isArchive)
 			}
 		}()
 	}
@@ -259,7 +286,7 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	close(jobs)
 
 	var downloadError error
-	for i := 0; i < len(toDownload); i++ {
+	for range toDownload {
 		if err := <-results; err != nil && !errors.Is(err, errSkipped) {
 			downloadError = err
 		}
@@ -270,12 +297,12 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	return downloadError
 }
 
-func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL, fileName string, isArchive bool) error {
+func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL safeurl.SafeURL, fileName string, isArchive bool) error {
 	if err := dest.Check(fileName); err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("GET", assetURL, nil)
+	req, err := http.NewRequest("GET", assetURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -345,6 +372,8 @@ type destinationWriter struct {
 	skipExisting bool
 	overwrite    bool
 	stdout       io.Writer
+	allowEscapes bool
+	isTTY        bool
 }
 
 func (w destinationWriter) makePath(name string) string {
@@ -387,7 +416,16 @@ func (w destinationWriter) check(fp string) error {
 func (w destinationWriter) Copy(name string, r io.Reader) (copyErr error) {
 	fp := w.makePath(name)
 	if fp == "-" {
-		_, copyErr = io.Copy(w.stdout, r)
+		if w.allowEscapes {
+			_, copyErr = io.Copy(w.stdout, r)
+			return
+		}
+		copyErr = iostreams.CopyGuardedContent(w.stdout, r, w.isTTY)
+		if binErr, ok := errors.AsType[iostreams.BinaryTerminalError](copyErr); ok {
+			copyErr = fmt.Errorf("%w; use `--output` to save it to a file, or pass --allow-escape-sequences to output it anyway", binErr)
+		} else if errors.Is(copyErr, iostreams.ErrEscapeSequence) {
+			copyErr = errors.New("the asset contains terminal escape sequences; use `--output` to save it to a file, or pass --allow-escape-sequences to output it anyway")
+		}
 		return
 	}
 	if copyErr = w.check(fp); copyErr != nil {

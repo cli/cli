@@ -8,6 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 type MissingScopesError struct {
@@ -33,9 +34,12 @@ type httpClient interface {
 
 // GetScopes performs a GitHub API request and returns the value of the X-Oauth-Scopes header.
 func GetScopes(httpClient httpClient, hostname, authToken string) (string, error) {
-	apiEndpoint := ghinstance.RESTPrefix(hostname)
+	apiEndpoint, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname))
+	if err != nil {
+		return "", err
+	}
 
-	req, err := http.NewRequest("GET", apiEndpoint, nil)
+	req, err := http.NewRequest("GET", apiEndpoint.String(), nil)
 	if err != nil {
 		return "", err
 	}
@@ -86,7 +90,7 @@ func HeaderHasMinimumScopes(scopesHeader string) error {
 		"read:org":  false,
 		"admin:org": false,
 	}
-	for _, s := range strings.Split(scopesHeader, ",") {
+	for s := range strings.SplitSeq(scopesHeader, ",") {
 		search[strings.TrimSpace(s)] = true
 	}
 

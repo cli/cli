@@ -3,25 +3,26 @@ package add
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 func uploadDeployKey(httpClient *http.Client, repo ghrepo.Interface, keyFile io.Reader, title string, isWritable bool) error {
-	path := fmt.Sprintf("repos/%s/%s/keys", repo.RepoOwner(), repo.RepoName())
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "keys")
+	if err != nil {
+		return err
+	}
 
 	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
 		return err
 	}
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"title":     title,
 		"key":       string(keyBytes),
 		"read_only": !isWritable,
@@ -32,25 +33,8 @@ func uploadDeployKey(httpClient *http.Client, repo ghrepo.Interface, keyFile io.
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		return err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-
-	_, err = io.Copy(io.Discard, resp.Body)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	return api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), "POST", path.String(), bytes.NewBuffer(payloadBytes), nil)
 }

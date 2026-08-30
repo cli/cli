@@ -29,6 +29,13 @@ func TestHelperProcess(t *testing.T) {
 		return
 	}
 	if err := func(args []string) error {
+		// Dispatch tests use this marker argument to inspect the environment gh handed to
+		// the extension, rather than echoing the arguments back.
+		if len(args) > 0 && args[len(args)-1] == "print-env" {
+			fmt.Fprintf(os.Stdout, "GH_EXTENSION=%s\n", os.Getenv("GH_EXTENSION"))
+			fmt.Fprintf(os.Stdout, "GH_HELPER_INHERITED=%s\n", os.Getenv("GH_HELPER_INHERITED"))
+			return nil
+		}
 		fmt.Fprintf(os.Stdout, "%v\n", args)
 		return nil
 	}(os.Args[3:]); err != nil {
@@ -38,7 +45,7 @@ func TestHelperProcess(t *testing.T) {
 	os.Exit(0)
 }
 
-func newTestManager(dataDir, updateDir string, client *http.Client, gitClient gitClient, ios *iostreams.IOStreams) *Manager {
+func newTestManager(dataDir, updateDir string, client *http.Client, gitClient gitClient, ios *iostreams.IOStreams, extraEnv ...string) *Manager {
 	return &Manager{
 		dataDir:   func() string { return dataDir },
 		updateDir: func() string { return updateDir },
@@ -51,10 +58,10 @@ func newTestManager(dataDir, updateDir string, client *http.Client, gitClient gi
 				cmd.Stdout = ios.Out
 				cmd.Stderr = ios.ErrOut
 			}
-			cmd.Env = []string{"GH_WANT_HELPER_PROCESS=1"}
+			cmd.Env = append([]string{"GH_WANT_HELPER_PROCESS=1"}, extraEnv...)
 			return cmd
 		},
-		config:    config.NewBlankConfig(),
+		config:    config.NewMockConfig(),
 		io:        ios,
 		client:    client,
 		gitClient: gitClient,
@@ -191,6 +198,75 @@ func TestManager_Dispatch_binary(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_Dispatch_ghExtensionEnv(t *testing.T) {
+	tests := []struct {
+		name     string
+		extraEnv []string
+		wantOut  string
+	}{
+		{
+			name:    "sets GH_EXTENSION",
+			wantOut: "GH_EXTENSION=1\nGH_HELPER_INHERITED=\n",
+		},
+		{
+			name:     "preserves the rest of the environment",
+			extraEnv: []string{"GH_HELPER_INHERITED=yes"},
+			wantOut:  "GH_EXTENSION=1\nGH_HELPER_INHERITED=yes\n",
+		},
+		{
+			name:     "overrides an inherited GH_EXTENSION",
+			extraEnv: []string{"GH_EXTENSION=0", "GH_HELPER_INHERITED=yes"},
+			wantOut:  "GH_EXTENSION=1\nGH_HELPER_INHERITED=yes\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run("script extension: "+tt.name, func(t *testing.T) {
+			dataDir := t.TempDir()
+			updateDir := t.TempDir()
+			extDir := filepath.Join(dataDir, "extensions", "gh-hello")
+			require.NoError(t, stubExtension(filepath.Join(extDir, "gh-hello")))
+
+			gc, gcOne := &mockGitClient{}, &mockGitClient{}
+			gc.On("ForRepo", extDir).Return(gcOne).Once()
+
+			m := newTestManager(dataDir, updateDir, nil, gc, nil, tt.extraEnv...)
+
+			stdout := &bytes.Buffer{}
+			stderr := &bytes.Buffer{}
+			found, err := m.Dispatch([]string{"hello", "print-env"}, nil, stdout, stderr)
+			require.NoError(t, err)
+			require.True(t, found)
+
+			assert.Equal(t, tt.wantOut, stdout.String())
+			assert.Equal(t, "", stderr.String())
+		})
+
+		t.Run("binary extension: "+tt.name, func(t *testing.T) {
+			dataDir := t.TempDir()
+			updateDir := t.TempDir()
+			extDir := filepath.Join(dataDir, "extensions", "gh-hello")
+			require.NoError(t, stubBinaryExtension(extDir, binManifest{
+				Owner: "owner",
+				Name:  "gh-hello",
+				Host:  "github.com",
+				Tag:   "v1.0.0",
+			}))
+
+			m := newTestManager(dataDir, updateDir, nil, nil, nil, tt.extraEnv...)
+
+			stdout := &bytes.Buffer{}
+			stderr := &bytes.Buffer{}
+			found, err := m.Dispatch([]string{"hello", "print-env"}, nil, stdout, stderr)
+			require.NoError(t, err)
+			require.True(t, found)
+
+			assert.Equal(t, tt.wantOut, stdout.String())
+			assert.Equal(t, "", stderr.String())
+		})
+	}
+}
+
 func TestManager_Remove(t *testing.T) {
 	dataDir := t.TempDir()
 	updateDir := t.TempDir()
@@ -261,7 +337,7 @@ func TestManager_UpgradeExtensions(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		exts[i].currentVersion = "old version"
 		exts[i].latestVersion = "new version"
 	}
@@ -300,7 +376,7 @@ func TestManager_UpgradeExtensions_DryRun(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		exts[i].currentVersion = fmt.Sprintf("%d", i)
 		exts[i].latestVersion = fmt.Sprintf("%d", i+1)
 	}
@@ -854,7 +930,7 @@ func TestManager_Install_git(t *testing.T) {
 			}))
 	reg.Register(
 		httpmock.REST("GET", "repos/owner/gh-some-ext/contents/gh-some-ext"),
-		httpmock.StringResponse("script"))
+		httpmock.JSONResponse(map[string]string{"type": "file"}))
 
 	repo := ghrepo.New("owner", fakeExtensionName)
 
@@ -934,7 +1010,7 @@ func TestManager_Install_git_pinned(t *testing.T) {
 		httpmock.StringResponse("abcd1234"))
 	reg.Register(
 		httpmock.REST("GET", "repos/owner/gh-cool-ext/contents/gh-cool-ext"),
-		httpmock.StringResponse("script"))
+		httpmock.JSONResponse(map[string]string{"type": "file"}))
 
 	_ = os.MkdirAll(filepath.Join(m.installDir(), "gh-cool-ext"), 0700)
 	repo := ghrepo.New("owner", "gh-cool-ext")

@@ -260,3 +260,36 @@ func TestTitleSurvey(t *testing.T) {
 		})
 	}
 }
+
+func TestFieldsToEditSurvey_IssueOnlyFields(t *testing.T) {
+	t.Run("without Allowed flag omits Type", func(t *testing.T) {
+		pm := prompter.NewMockPrompter(t)
+		pm.RegisterMultiSelect("What would you like to edit?", []string{},
+			// Type should NOT appear here
+			[]string{"Title", "Body", "Assignees", "Labels", "Projects", "Milestone"},
+			func(_ string, _, _ []string) ([]int, error) {
+				return []int{0}, nil
+			})
+
+		editable := &Editable{}
+		err := FieldsToEditSurvey(pm, editable)
+		require.NoError(t, err)
+		assert.True(t, editable.Title.Edited)
+	})
+
+	t.Run("with Allowed flag includes Type", func(t *testing.T) {
+		pm := prompter.NewMockPrompter(t)
+		pm.RegisterMultiSelect("What would you like to edit?", []string{},
+			// Type should appear between Labels and Projects
+			[]string{"Title", "Body", "Assignees", "Labels", "Type", "Projects", "Milestone"},
+			func(_ string, _, _ []string) ([]int, error) {
+				return []int{4}, nil // select Type
+			})
+
+		editable := &Editable{}
+		editable.IssueType.Selectable = true
+		err := FieldsToEditSurvey(pm, editable)
+		require.NoError(t, err)
+		assert.True(t, editable.IssueType.Edited)
+	})
+}

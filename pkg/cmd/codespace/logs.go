@@ -88,6 +88,16 @@ func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool
 		return fmt.Errorf("remote command: %w", err)
 	}
 
+	// The log file is external content. On a terminal, route it through
+	// ContentOut to neutralize escape sequences (assigning a writer other than an
+	// *os.File also forces the remote output through this process so the sanitizer
+	// runs). When piped, pass the bytes through unchanged: there is no live
+	// terminal to manipulate, and a follow stream cannot be buffered to fail closed.
+	if !a.io.IsStdoutTTY() {
+		a.io.SetContentSanitization(false)
+	}
+	cmd.Stdout = a.io.ContentOut
+
 	tunnelClosed := make(chan error, 1)
 	go func() {
 		opts := portforwarder.ForwardPortOpts{

@@ -10,12 +10,12 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"net/url"
 	"slices"
 	"strconv"
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/shurcooL/githubv4"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -39,9 +39,9 @@ type session struct {
 	ResourceType     string    `json:"resource_type"`
 	ResourceID       int64     `json:"resource_id"`
 	ResourceGlobalID string    `json:"resource_global_id"`
-	LastUpdatedAt    time.Time `json:"last_updated_at,omitempty"`
-	CreatedAt        time.Time `json:"created_at,omitempty"`
-	CompletedAt      time.Time `json:"completed_at,omitempty"`
+	LastUpdatedAt    time.Time `json:"last_updated_at"`
+	CreatedAt        time.Time `json:"created_at"`
+	CompletedAt      time.Time `json:"completed_at"`
 	EventURL         string    `json:"event_url"`
 	EventType        string    `json:"event_type"`
 	PremiumRequests  float64   `json:"premium_requests"`
@@ -119,8 +119,8 @@ var SessionFields = []string{
 }
 
 // ExportData implements the exportable interface for JSON output.
-func (s *Session) ExportData(fields []string) map[string]interface{} {
-	data := make(map[string]interface{}, len(fields))
+func (s *Session) ExportData(fields []string) map[string]any {
+	data := make(map[string]any, len(fields))
 	for _, f := range fields {
 		switch f {
 		case "id":
@@ -217,16 +217,16 @@ func (c *CAPIClient) ListLatestSessionsForViewer(ctx context.Context, limit int)
 		return nil, nil
 	}
 
-	sessionsURL, err := url.JoinPath(c.capiBaseURL, "agents", "sessions")
+	sessionsURL, err := safeurl.JoinPathWithHostPrefix(c.capiBaseURL, "agents", "sessions")
 	if err != nil {
-		return nil, fmt.Errorf("failed to build sessions URL: %w", err)
+		return nil, err
 	}
 	pageSize := defaultSessionsPerPage
 
 	seenResources := make(map[int64]struct{})
 	latestSessions := make([]session, 0, limit)
 	for page := 1; ; page++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sessionsURL, http.NoBody)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sessionsURL.String(), http.NoBody)
 		if err != nil {
 			return nil, err
 		}
@@ -299,9 +299,12 @@ func (c *CAPIClient) GetSession(ctx context.Context, id string) (*Session, error
 		return nil, fmt.Errorf("missing session ID")
 	}
 
-	url := fmt.Sprintf("%s/agents/sessions/%s", c.capiBaseURL, url.PathEscape(id))
+	u, err := safeurl.JoinPathWithHostPrefix(c.capiBaseURL, "agents", "sessions", id)
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -338,9 +341,12 @@ func (c *CAPIClient) GetSessionLogs(ctx context.Context, id string) ([]byte, err
 		return nil, fmt.Errorf("missing session ID")
 	}
 
-	url := fmt.Sprintf("%s/agents/sessions/%s/logs", c.capiBaseURL, url.PathEscape(id))
+	u, err := safeurl.JoinPathWithHostPrefix(c.capiBaseURL, "agents", "sessions", id, "logs")
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -371,9 +377,12 @@ func (c *CAPIClient) ListSessionsByResourceID(ctx context.Context, resourceType 
 		return nil, nil
 	}
 
-	url := fmt.Sprintf("%s/agents/resource/%s/%d", c.capiBaseURL, url.PathEscape(resourceType), resourceID)
+	u, err := safeurl.JoinPathWithHostPrefix(c.capiBaseURL, "agents", "resource", resourceType, strconv.FormatInt(resourceID, 10))
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +528,7 @@ func (c *CAPIClient) GetPullRequestDatabaseID(ctx context.Context, hostname stri
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  githubv4.String(owner),
 		"repo":   githubv4.String(repo),
 		"number": githubv4.Int(number),

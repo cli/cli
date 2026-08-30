@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/cache/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -147,7 +147,7 @@ func deleteRun(opts *DeleteOptions) error {
 			}
 		}
 		for _, cache := range caches.ActionsCaches {
-			toDelete = append(toDelete, strconv.Itoa(cache.Id))
+			toDelete = append(toDelete, strconv.FormatInt(cache.Id, 10))
 		}
 	} else {
 		toDelete = append(toDelete, opts.Identifier)
@@ -201,10 +201,13 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 	return nil
 }
 
-func deleteCacheByID(client *api.Client, repo ghrepo.Interface, id int) error {
+func deleteCacheByID(client *api.Client, repo ghrepo.Interface, id int64) error {
 	// returns HTTP 204 (NO CONTENT) on success
-	path := fmt.Sprintf("repos/%s/actions/caches/%d", ghrepo.FullName(repo), id)
-	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "caches", strconv.FormatInt(id, 10))
+	if err != nil {
+		return err
+	}
+	return client.REST(repo.RepoHost(), "DELETE", path.String(), nil, nil)
 }
 
 // deleteCacheByKey deletes cache entries by given key (and optional ref) and
@@ -214,12 +217,16 @@ func deleteCacheByID(client *api.Client, repo ghrepo.Interface, id int) error {
 // entry. There may be more than one entries with the same key/ref combination,
 // but those entries will have different IDs.
 func deleteCacheByKey(client *api.Client, repo ghrepo.Interface, key, ref string) (int, error) {
-	path := fmt.Sprintf("repos/%s/actions/caches?key=%s", ghrepo.FullName(repo), url.QueryEscape(key))
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "caches")
+	if err != nil {
+		return 0, err
+	}
+	u.SetQuery("key", key)
 	if ref != "" {
-		path += fmt.Sprintf("&ref=%s", url.QueryEscape(ref))
+		u.SetQuery("ref", ref)
 	}
 	var payload shared.CachePayload
-	err := client.REST(repo.RepoHost(), "DELETE", path, nil, &payload)
+	err = client.REST(repo.RepoHost(), "DELETE", u.String(), nil, &payload)
 	if err != nil {
 		return 0, err
 	}
@@ -227,7 +234,7 @@ func deleteCacheByKey(client *api.Client, repo ghrepo.Interface, key, ref string
 	return payload.TotalCount, nil
 }
 
-func parseCacheID(arg string) (int, bool) {
-	id, err := strconv.Atoi(arg)
+func parseCacheID(arg string) (int64, bool) {
+	id, err := strconv.ParseInt(arg, 10, 64)
 	return id, err == nil
 }

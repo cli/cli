@@ -6,8 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -206,12 +208,7 @@ func (s *StatusGetter) CachedClient(ttl time.Duration) *http.Client {
 }
 
 func (s *StatusGetter) ShouldExclude(repo string) bool {
-	for _, exclude := range s.Exclude {
-		if repo == exclude {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s.Exclude, repo)
 }
 
 func (s *StatusGetter) CurrentUsername() (string, error) {
@@ -233,7 +230,7 @@ func (s *StatusGetter) CurrentUsername() (string, error) {
 	return currentUsername, nil
 }
 
-func (s *StatusGetter) ActualMention(commentURL string) (string, error) {
+func (s *StatusGetter) ActualMention(commentURL safeurl.SafeURL) (string, error) {
 	currentUsername, err := s.CurrentUsername()
 	if err != nil {
 		return "", err
@@ -246,7 +243,7 @@ func (s *StatusGetter) ActualMention(commentURL string) (string, error) {
 	resp := struct {
 		Body string
 	}{}
-	if err := c.REST(s.hostname(), "GET", commentURL, nil, &resp); err != nil {
+	if err := c.REST(s.hostname(), "GET", commentURL.String(), nil, &resp); err != nil {
 		return "", err
 	}
 
@@ -264,10 +261,6 @@ func (s *StatusGetter) ActualMention(commentURL string) (string, error) {
 func (s *StatusGetter) LoadNotifications() error {
 	perPage := 100
 	c := api.NewClientFromHTTP(s.Client)
-	query := url.Values{}
-	query.Add("per_page", fmt.Sprintf("%d", perPage))
-	query.Add("participating", "true")
-	query.Add("all", "true")
 
 	fetchWorkers := 10
 	ctx, abortFetching := context.WithCancel(context.Background())
@@ -276,7 +269,7 @@ func (s *StatusGetter) LoadNotifications() error {
 	fetched := make(chan StatusItem)
 
 	wg := new(errgroup.Group)
-	for i := 0; i < fetchWorkers; i++ {
+	for range fetchWorkers {
 		wg.Go(func() error {
 			for {
 				select {
@@ -286,7 +279,7 @@ func (s *StatusGetter) LoadNotifications() error {
 					if !ok {
 						return nil
 					}
-					actual, err := s.ActualMention(n.Subject.LatestCommentURL)
+					actual, err := s.ActualMention(safeurl.NewImmutableSafeURL(n.Subject.LatestCommentURL))
 
 					if err != nil {
 						var httpErr api.HTTPError
@@ -336,10 +329,17 @@ func (s *StatusGetter) LoadNotifications() error {
 	// do that. I'd switch to the GraphQL version, but to my knowledge that does
 	// not work with PATs right now.
 	nIndex := 0
-	p := fmt.Sprintf("notifications?%s", query.Encode())
-	for pages := 0; pages < 3; pages++ {
+	u, err := safeurl.JoinPath("notifications")
+	if err != nil {
+		return err
+	}
+	u.SetQuery("per_page", strconv.Itoa(perPage))
+	u.SetQuery("participating", "true")
+	u.SetQuery("all", "true")
+	var p safeurl.SafeURL = u
+	for range 3 {
 		var resp []Notification
-		next, err := c.RESTWithNext(s.hostname(), "GET", p, nil, &resp)
+		next, err := c.RESTWithNext(s.hostname(), "GET", p.String(), nil, &resp)
 		if err != nil {
 			var httpErr api.HTTPError
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
@@ -365,11 +365,11 @@ func (s *StatusGetter) LoadNotifications() error {
 		if next == "" || len(resp) < perPage {
 			break
 		}
-		p = next
+		p = safeurl.NewImmutableSafeURL(next)
 	}
 
 	close(toFetch)
-	err := wg.Wait()
+	err = wg.Wait()
 	close(fetched)
 	<-doneCh
 	sort.Slice(s.Mentions, func(i, j int) bool {
@@ -415,19 +415,21 @@ query AssignedSearch($searchAssigns: String!, $searchReviews: String!, $limit: I
 func (s *StatusGetter) LoadSearchResults() error {
 	c := api.NewClientFromHTTP(s.Client)
 
-	searchAssigns := `assignee:@me state:open archived:false`
-	searchReviews := `review-requested:@me state:open archived:false`
+	var searchAssigns strings.Builder
+	searchAssigns.WriteString(`assignee:@me state:open archived:false`)
+	var searchReviews strings.Builder
+	searchReviews.WriteString(`review-requested:@me state:open archived:false`)
 	if s.Org != "" {
-		searchAssigns += " org:" + s.Org
-		searchReviews += " org:" + s.Org
+		searchAssigns.WriteString(" org:" + s.Org)
+		searchReviews.WriteString(" org:" + s.Org)
 	}
 	for _, repo := range s.Exclude {
-		searchAssigns += " -repo:" + repo
-		searchReviews += " -repo:" + repo
+		searchAssigns.WriteString(" -repo:" + repo)
+		searchReviews.WriteString(" -repo:" + repo)
 	}
-	variables := map[string]interface{}{
-		"searchAssigns": searchAssigns,
-		"searchReviews": searchReviews,
+	variables := map[string]any{
+		"searchAssigns": searchAssigns.String(),
+		"searchReviews": searchReviews.String(),
 	}
 
 	var resp struct {
@@ -530,8 +532,6 @@ func (s *StatusGetter) LoadSearchResults() error {
 func (s *StatusGetter) LoadEvents() error {
 	perPage := 100
 	c := api.NewClientFromHTTP(s.Client)
-	query := url.Values{}
-	query.Add("per_page", fmt.Sprintf("%d", perPage))
 
 	currentUsername, err := s.CurrentUsername()
 	if err != nil {
@@ -541,9 +541,14 @@ func (s *StatusGetter) LoadEvents() error {
 	var events []Event
 	var resp []Event
 	pages := 0
-	p := fmt.Sprintf("users/%s/received_events?%s", currentUsername, query.Encode())
+	u, err := safeurl.JoinPath("users", currentUsername, "received_events")
+	if err != nil {
+		return err
+	}
+	u.SetQuery("per_page", strconv.Itoa(perPage))
+	var p safeurl.SafeURL = u
 	for pages < 2 {
-		next, err := c.RESTWithNext(s.hostname(), "GET", p, nil, &resp)
+		next, err := c.RESTWithNext(s.hostname(), "GET", p.String(), nil, &resp)
 		if err != nil {
 			var httpErr api.HTTPError
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
@@ -556,7 +561,7 @@ func (s *StatusGetter) LoadEvents() error {
 		}
 
 		pages++
-		p = next
+		p = safeurl.NewImmutableSafeURL(next)
 	}
 
 	s.RepoActivity = []StatusItem{}

@@ -933,7 +933,7 @@ func TestNewCmdExtension(t *testing.T) {
 
 			f := cmdutil.Factory{
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				IOStreams:        ios,
 				ExtensionManager: em,
@@ -1147,47 +1147,47 @@ func Test_checkValidExtensionWithLocalExtension(t *testing.T) {
 	}
 }
 
-func searchResults(numResults int) interface{} {
-	result := map[string]interface{}{
+func searchResults(numResults int) any {
+	result := map[string]any{
 		"incomplete_results": false,
 		"total_count":        4,
-		"items": []interface{}{
-			map[string]interface{}{
+		"items": []any{
+			map[string]any{
 				"name":        "gh-screensaver",
 				"full_name":   "vilmibm/gh-screensaver",
 				"description": "terminal animations",
-				"owner": map[string]interface{}{
+				"owner": map[string]any{
 					"login": "vilmibm",
 				},
 			},
-			map[string]interface{}{
+			map[string]any{
 				"name":        "gh-cool",
 				"full_name":   "cli/gh-cool",
 				"description": "it's just cool ok",
-				"owner": map[string]interface{}{
+				"owner": map[string]any{
 					"login": "cli",
 				},
 			},
-			map[string]interface{}{
+			map[string]any{
 				"name":        "gh-triage",
 				"full_name":   "samcoe/gh-triage",
 				"description": "helps with triage",
-				"owner": map[string]interface{}{
+				"owner": map[string]any{
 					"login": "samcoe",
 				},
 			},
-			map[string]interface{}{
+			map[string]any{
 				"name":        "gh-gei",
 				"full_name":   "github/gh-gei",
 				"description": "something something enterprise",
-				"owner": map[string]interface{}{
+				"owner": map[string]any{
 					"login": "github",
 				},
 			},
 		},
 	}
-	if len(result["items"].([]interface{})) > numResults {
-		fewerItems := result["items"].([]interface{})[0:numResults]
+	if len(result["items"].([]any)) > numResults {
+		fewerItems := result["items"].([]any)[0:numResults]
 		result["items"] = fewerItems
 	}
 	return result

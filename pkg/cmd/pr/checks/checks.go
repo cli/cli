@@ -270,7 +270,7 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 		}
 	}`, api.RequiredStatusCheckRollupGraphQL("$id", "$endCursor", includeEvent))
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"id": pr.ID,
 	}
 

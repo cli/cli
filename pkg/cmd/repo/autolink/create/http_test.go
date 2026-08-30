@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -25,6 +26,7 @@ func TestAutolinkCreator_Create(t *testing.T) {
 		expectedAutolink *shared.Autolink
 		expectErr        bool
 		expectedErrMsg   string
+		expectedStatus   int
 	}{
 		{
 			name: "201 successful creation",
@@ -68,7 +70,8 @@ func TestAutolinkCreator_Create(t *testing.T) {
 				"documentation_url": "https://docs.github.com/rest/repos/autolinks#create-an-autolink-reference-for-a-repository",
 				"status": "422"
 				}`,
-			expectErr: true,
+			expectErr:      true,
+			expectedStatus: http.StatusUnprocessableEntity,
 			expectedErrMsg: heredoc.Doc(`
 				HTTP 422: Validation Failed (https://api.github.com/repos/OWNER/REPO/autolinks)
 				url_template must be an absolute URL`),
@@ -88,6 +91,7 @@ func TestAutolinkCreator_Create(t *testing.T) {
 			}`,
 			expectErr:      true,
 			expectedErrMsg: "HTTP 404: Must have admin rights to Repository. (https://api.github.com/repos/OWNER/REPO/autolinks)",
+			expectedStatus: http.StatusNotFound,
 		},
 		{
 			name: "422 URL template missing <num>",
@@ -96,9 +100,10 @@ func TestAutolinkCreator_Create(t *testing.T) {
 				KeyPrefix:      "TICKET-",
 				URLTemplate:    "https://example.com/TICKET",
 			},
-			stubStatus:   http.StatusUnprocessableEntity,
-			stubRespJSON: `{"message":"Validation Failed","errors":[{"resource":"KeyLink","code":"custom","field":"url_template","message":"url_template is missing a <num> token"}],"documentation_url":"https://docs.github.com/rest/repos/autolinks#create-an-autolink-reference-for-a-repository","status":"422"}`,
-			expectErr:    true,
+			stubStatus:     http.StatusUnprocessableEntity,
+			stubRespJSON:   `{"message":"Validation Failed","errors":[{"resource":"KeyLink","code":"custom","field":"url_template","message":"url_template is missing a <num> token"}],"documentation_url":"https://docs.github.com/rest/repos/autolinks#create-an-autolink-reference-for-a-repository","status":"422"}`,
+			expectErr:      true,
+			expectedStatus: http.StatusUnprocessableEntity,
 			expectedErrMsg: heredoc.Doc(`
 				HTTP 422: Validation Failed (https://api.github.com/repos/OWNER/REPO/autolinks)
 				url_template is missing a <num> token`),
@@ -110,9 +115,10 @@ func TestAutolinkCreator_Create(t *testing.T) {
 				KeyPrefix:      "TICKET-",
 				URLTemplate:    "https://example.com/TICKET?query=<num>",
 			},
-			stubStatus:   http.StatusUnprocessableEntity,
-			stubRespJSON: `{"message":"Validation Failed","errors":[{"resource":"KeyLink","code":"already_exists","field":"key_prefix"}],"documentation_url":"https://docs.github.com/rest/repos/autolinks#create-an-autolink-reference-for-a-repository","status":"422"}`,
-			expectErr:    true,
+			stubStatus:     http.StatusUnprocessableEntity,
+			stubRespJSON:   `{"message":"Validation Failed","errors":[{"resource":"KeyLink","code":"already_exists","field":"key_prefix"}],"documentation_url":"https://docs.github.com/rest/repos/autolinks#create-an-autolink-reference-for-a-repository","status":"422"}`,
+			expectErr:      true,
+			expectedStatus: http.StatusUnprocessableEntity,
 			expectedErrMsg: heredoc.Doc(`
 				HTTP 422: Validation Failed (https://api.github.com/repos/OWNER/REPO/autolinks)
 				KeyLink.key_prefix already exists`),
@@ -127,8 +133,8 @@ func TestAutolinkCreator_Create(t *testing.T) {
 					http.MethodPost,
 					fmt.Sprintf("repos/%s/%s/autolinks", repo.RepoOwner(), repo.RepoName())),
 				httpmock.RESTPayload(tt.stubStatus, tt.stubRespJSON,
-					func(payload map[string]interface{}) {
-						require.Equal(t, map[string]interface{}{
+					func(payload map[string]any) {
+						require.Equal(t, map[string]any{
 							"is_alphanumeric": tt.req.IsAlphanumeric,
 							"key_prefix":      tt.req.KeyPrefix,
 							"url_template":    tt.req.URLTemplate,
@@ -146,6 +152,9 @@ func TestAutolinkCreator_Create(t *testing.T) {
 
 			if tt.expectErr {
 				require.EqualError(t, err, tt.expectedErrMsg)
+				var httpErr api.HTTPError
+				require.ErrorAs(t, err, &httpErr)
+				assert.Equal(t, tt.expectedStatus, httpErr.StatusCode)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedAutolink, autolink)

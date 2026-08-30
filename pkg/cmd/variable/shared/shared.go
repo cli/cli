@@ -2,10 +2,10 @@ package shared
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
@@ -45,7 +45,7 @@ var VariableJSONFields = []string{
 	"selectedReposURL",
 }
 
-func (v *Variable) ExportData(fields []string) map[string]interface{} {
+func (v *Variable) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(v, fields)
 }
 
@@ -66,27 +66,14 @@ func GetVariableEntity(orgName, envName string) (VariableEntity, error) {
 	return Repository, nil
 }
 
-func PopulateMultipleSelectedRepositoryInformation(apiClient *api.Client, host string, variables []Variable) error {
-	for i, variable := range variables {
-		if err := PopulateSelectedRepositoryInformation(apiClient, host, &variable); err != nil {
-			return err
-		}
-		variables[i] = variable
-	}
-	return nil
-}
-
-func PopulateSelectedRepositoryInformation(apiClient *api.Client, host string, variable *Variable) error {
-	if variable.SelectedReposURL == "" {
-		return nil
-	}
-
+// SelectedRepositoryCount returns how many repositories the variable is visible to, fetched from the
+// given entrusted URL. Callers own reading the URL off the variable and writing the result back.
+func SelectedRepositoryCount(apiClient *api.Client, host string, selectedReposURL safeurl.SafeURL) (int, error) {
 	response := struct {
 		TotalCount int `json:"total_count"`
 	}{}
-	if err := apiClient.REST(host, "GET", variable.SelectedReposURL, nil, &response); err != nil {
-		return fmt.Errorf("failed determining selected repositories for %s: %w", variable.Name, err)
+	if err := apiClient.REST(host, "GET", selectedReposURL.String(), nil, &response); err != nil {
+		return 0, err
 	}
-	variable.NumSelectedRepos = response.TotalCount
-	return nil
+	return response.TotalCount, nil
 }

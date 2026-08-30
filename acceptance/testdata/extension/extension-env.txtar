@@ -1,0 +1,38 @@
+# Verify that gh tells an extension when it is being run as an extension
+
+# Skip if Bash is not available given script extension
+[!exec:bash] skip
+
+# Setup environment variables used for testscript
+env EXT_NAME=printenv-${RANDOM_STRING}
+env EXT_DIR=gh-${EXT_NAME}
+
+# Setup a local extension that reports the value of GH_EXTENSION
+mkdir $EXT_DIR
+mv print-env.sh $EXT_DIR/$EXT_DIR
+chmod 777 $EXT_DIR/$EXT_DIR
+
+# Install the local extension, gh extension install only supports the working directory
+cd $EXT_DIR
+exec gh extension install .
+defer gh extension remove $EXT_NAME
+
+# Verify GH_EXTENSION is set when the extension is run as gh <extension>
+exec gh $EXT_NAME
+stdout 'GH_EXTENSION=1'
+
+# Verify GH_EXTENSION is set when the extension is run via gh extension exec
+exec gh extension exec $EXT_NAME
+stdout 'GH_EXTENSION=1'
+
+# Verify GH_EXTENSION is absent when the extension is run standalone
+exec ./$EXT_DIR
+stdout 'GH_EXTENSION=0'
+
+# Verify GH_EXTENSION is documented
+exec gh help environment
+stdout 'GH_EXTENSION`: set to `1` by gh when it invokes an extension'
+
+-- print-env.sh --
+#!/usr/bin/env bash
+echo "GH_EXTENSION=${GH_EXTENSION:-0}"

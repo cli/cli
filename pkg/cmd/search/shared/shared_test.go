@@ -18,7 +18,7 @@ import (
 func TestSearcher(t *testing.T) {
 	f := &cmdutil.Factory{
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{}, nil

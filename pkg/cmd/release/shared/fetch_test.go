@@ -42,7 +42,7 @@ func TestFetchRefSHA(t *testing.T) {
 			tagName:         "v1.2.3",
 			responseStatus:  500,
 			responseMessage: `arbitrary error"`,
-			errorMessage:    "HTTP 500: arbitrary error\" (https://api.github.com/repos/owner/repo/git/ref/tags/v1.2.3)",
+			errorMessage:    "HTTP 500: arbitrary error\" (https://api.github.com/repos/owner/repo/git/ref/tags%2Fv1.2.3)",
 		},
 		{
 			name:           "malformed JSON with 200",
@@ -61,7 +61,7 @@ func TestFetchRefSHA(t *testing.T) {
 			repo, err := ghrepo.FromFullName("owner/repo")
 			require.NoError(t, err)
 
-			path := "repos/owner/repo/git/ref/tags/" + tt.tagName
+			path := "repos/owner/repo/git/ref/tags%2F" + tt.tagName
 			if tt.responseStatus == 404 || tt.responseStatus == 500 {
 				fakeHTTP.Register(
 					httpmock.REST("GET", path),

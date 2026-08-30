@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/registry"
@@ -64,7 +66,7 @@ type tagEntry struct {
 
 // rulesetsResponse is a single ruleset from the rulesets API.
 type rulesetsResponse struct {
-	ID          int    `json:"id"`
+	ID          int64  `json:"id"`
 	Name        string `json:"name"`
 	Target      string `json:"target"`
 	Enforcement string `json:"enforcement"`
@@ -261,7 +263,7 @@ func publishRun(opts *PublishOptions) error {
 
 		// Validate allowed-tools is string, not array
 		if raw, ok := result.RawYAML["allowed-tools"]; ok {
-			if _, isSlice := raw.([]interface{}); isSlice {
+			if _, isSlice := raw.([]any); isSlice {
 				diagnostics = append(diagnostics, publishDiagnostic{
 					skill:    skill.DisplayName(),
 					severity: "error",
@@ -271,7 +273,7 @@ func publishRun(opts *PublishOptions) error {
 		}
 
 		// Check for install metadata that should be stripped
-		if meta, ok := result.RawYAML["metadata"].(map[string]interface{}); ok {
+		if meta, ok := result.RawYAML["metadata"].(map[string]any); ok {
 			githubKeys := findGitHubMetadataKeys(meta)
 			if len(githubKeys) > 0 {
 				if opts.Fix {
@@ -443,17 +445,15 @@ func repoHasTopic(client *api.Client, host, owner, repo string) bool {
 	if client == nil {
 		return false
 	}
-	apiPath := fmt.Sprintf("repos/%s/%s/topics", owner, repo)
-	var resp repoTopicsResponse
-	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "topics")
+	if err != nil {
 		return false
 	}
-	for _, t := range resp.Names {
-		if t == "agent-skills" {
-			return true
-		}
+	var resp repoTopicsResponse
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+		return false
 	}
-	return false
+	return slices.Contains(resp.Names, "agent-skills")
 }
 
 // fetchTags returns the most recent tags from the repo.
@@ -461,9 +461,13 @@ func fetchTags(client *api.Client, host, owner, repo string) []tagEntry {
 	if client == nil {
 		return nil
 	}
-	apiPath := fmt.Sprintf("repos/%s/%s/tags?per_page=10", owner, repo)
+	u, err := safeurl.JoinPath("repos", owner, repo, "tags")
+	if err != nil {
+		return nil
+	}
+	u.SetQuery("per_page", "10")
 	var tags []tagEntry
-	if err := client.REST(host, "GET", apiPath, nil, &tags); err != nil {
+	if err := client.REST(host, "GET", u.String(), nil, &tags); err != nil {
 		return nil
 	}
 	return tags
@@ -597,7 +601,7 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 	}
 
 	// Create release via REST API
-	releaseBody := map[string]interface{}{
+	releaseBody := map[string]any{
 		"tag_name":               tag,
 		"generate_release_notes": true,
 	}
@@ -609,11 +613,14 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 		return fmt.Errorf("failed to serialize release request: %w", err)
 	}
 
-	releasePath := fmt.Sprintf("repos/%s/%s/releases", owner, repo)
+	releasePath, err := safeurl.JoinPath("repos", owner, repo, "releases")
+	if err != nil {
+		return err
+	}
 	var releaseResp struct {
 		HTMLURL string `json:"html_url"`
 	}
-	if err := client.REST(host, "POST", releasePath, bytes.NewReader(releaseJSON), &releaseResp); err != nil {
+	if err := client.REST(host, "POST", releasePath.String(), bytes.NewReader(releaseJSON), &releaseResp); err != nil {
 		return fmt.Errorf("failed to create release: %w", err)
 	}
 
@@ -683,7 +690,11 @@ func detectDefaultBranch(client *api.Client, host, owner, repo string) string {
 	var result struct {
 		DefaultBranch string `json:"default_branch"`
 	}
-	if err := client.REST(host, "GET", fmt.Sprintf("repos/%s/%s", owner, repo), nil, &result); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo)
+	if err != nil {
+		return ""
+	}
+	if err := client.REST(host, "GET", apiPath.String(), nil, &result); err != nil {
 		return ""
 	}
 	return result.DefaultBranch
@@ -691,19 +702,20 @@ func detectDefaultBranch(client *api.Client, host, owner, repo string) string {
 
 // addAgentSkillsTopic adds the "agent-skills" topic to the repo, preserving existing topics.
 func addAgentSkillsTopic(client *api.Client, host, owner, repo string) error {
-	apiPath := fmt.Sprintf("repos/%s/%s/topics", owner, repo)
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "topics")
+	if err != nil {
+		return err
+	}
 
 	// Fetch existing topics
 	var resp repoTopicsResponse
-	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
 		return fmt.Errorf("could not fetch existing topics: %w", err)
 	}
 
 	// Deduplicate: only add if not already present
-	for _, t := range resp.Names {
-		if t == "agent-skills" {
-			return nil
-		}
+	if slices.Contains(resp.Names, "agent-skills") {
+		return nil
 	}
 
 	topics := append(resp.Names, "agent-skills")
@@ -711,7 +723,7 @@ func addAgentSkillsTopic(client *api.Client, host, owner, repo string) error {
 	if err != nil {
 		return fmt.Errorf("could not serialize topics: %w", err)
 	}
-	return client.REST(host, "PUT", apiPath, bytes.NewReader(topicsJSON), nil)
+	return client.REST(host, "PUT", apiPath.String(), bytes.NewReader(topicsJSON), nil)
 }
 
 // checkImmutableReleases checks if immutable releases are enabled for the repo.
@@ -719,11 +731,14 @@ func checkImmutableReleases(client *api.Client, host, owner, repo string) bool {
 	if client == nil {
 		return false
 	}
-	apiPath := fmt.Sprintf("repos/%s/%s/immutable-releases", owner, repo)
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "immutable-releases")
+	if err != nil {
+		return false
+	}
 	var resp struct {
 		Enabled bool `json:"enabled"`
 	}
-	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
 		return false
 	}
 	return resp.Enabled
@@ -731,9 +746,12 @@ func checkImmutableReleases(client *api.Client, host, owner, repo string) bool {
 
 // enableImmutableReleases enables immutable releases for the repo.
 func enableImmutableReleases(client *api.Client, host, owner, repo string) error {
-	apiPath := fmt.Sprintf("repos/%s/%s/immutable-releases", owner, repo)
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "immutable-releases")
+	if err != nil {
+		return err
+	}
 	body := bytes.NewReader([]byte(`{"enabled":true}`))
-	return client.REST(host, "PATCH", apiPath, body, nil)
+	return client.REST(host, "PATCH", apiPath.String(), body, nil)
 }
 
 // checkTagProtection checks whether tag protection rulesets are enabled.
@@ -741,9 +759,12 @@ func checkTagProtection(client *api.Client, host, owner, repo string) []publishD
 	if client == nil {
 		return nil
 	}
-	apiPath := fmt.Sprintf("repos/%s/%s/rulesets", owner, repo)
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "rulesets")
+	if err != nil {
+		return nil
+	}
 	var rulesets []rulesetsResponse
-	if err := client.REST(host, "GET", apiPath, nil, &rulesets); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &rulesets); err != nil {
 		return nil
 	}
 
@@ -764,9 +785,12 @@ func checkSecuritySettings(client *api.Client, host, owner, repo string, skillDi
 	if client == nil {
 		return nil
 	}
-	apiPath := fmt.Sprintf("repos/%s/%s", owner, repo)
+	apiPath, err := safeurl.JoinPath("repos", owner, repo)
+	if err != nil {
+		return nil
+	}
 	var resp repoSecurityResponse
-	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
 		return nil
 	}
 
@@ -794,22 +818,26 @@ func checkSecuritySettings(client *api.Client, host, owner, repo string, skillDi
 	hasCode, hasManifests := detectCodeAndManifests(skillDirs)
 
 	if hasCode {
-		alertsPath := fmt.Sprintf("repos/%s/%s/code-scanning/alerts?per_page=1&state=open", owner, repo)
-		if err := client.REST(host, "GET", alertsPath, nil, new([]interface{})); err != nil {
-			diagnostics = append(diagnostics, publishDiagnostic{
-				severity: "info",
-				message:  "skills include code files but code scanning does not appear to be configured (Settings > Code security > Code scanning)",
-			})
+		if u, err := safeurl.JoinPath("repos", owner, repo, "code-scanning", "alerts"); err == nil {
+			u.SetQuery("per_page", "1")
+			u.SetQuery("state", "open")
+			if err := client.REST(host, "GET", u.String(), nil, new([]any)); err != nil {
+				diagnostics = append(diagnostics, publishDiagnostic{
+					severity: "info",
+					message:  "skills include code files but code scanning does not appear to be configured (Settings > Code security > Code scanning)",
+				})
+			}
 		}
 	}
 
 	if hasManifests {
-		dependabotPath := fmt.Sprintf("repos/%s/%s/vulnerability-alerts", owner, repo)
-		if err := client.REST(host, "GET", dependabotPath, nil, nil); err != nil {
-			diagnostics = append(diagnostics, publishDiagnostic{
-				severity: "info",
-				message:  "skills include dependency manifests but Dependabot alerts do not appear to be enabled (Settings > Code security > Dependabot)",
-			})
+		if dependabotPath, err := safeurl.JoinPath("repos", owner, repo, "vulnerability-alerts"); err == nil {
+			if err := client.REST(host, "GET", dependabotPath.String(), nil, nil); err != nil {
+				diagnostics = append(diagnostics, publishDiagnostic{
+					severity: "info",
+					message:  "skills include dependency manifests but Dependabot alerts do not appear to be enabled (Settings > Code security > Dependabot)",
+				})
+			}
 		}
 	}
 
@@ -972,7 +1000,7 @@ func detectGitHubRemote(gitClient *git.Client, dir string) (*gitHubRemote, error
 func parseGitHubURL(rawURL string) (ghrepo.Interface, error) {
 	u, err := git.ParseURL(rawURL)
 	if err != nil {
-		return nil, nil //nolint:nilerr // unparseable URL means it's not a GitHub remote
+		return nil, nil //nolint:nilerr // unparsable URL means it's not a GitHub remote
 	}
 	r, err := ghrepo.FromURL(u)
 	if err != nil {
@@ -1094,7 +1122,7 @@ func renderDiagnosticsPlain(opts *PublishOptions, diagnostics []publishDiagnosti
 }
 
 // findGitHubMetadataKeys returns metadata keys with the "github-" prefix.
-func findGitHubMetadataKeys(meta map[string]interface{}) []string {
+func findGitHubMetadataKeys(meta map[string]any) []string {
 	var keys []string
 	for k := range meta {
 		if strings.HasPrefix(k, "github-") {
@@ -1112,7 +1140,7 @@ func stripGitHubMetadata(content string) (string, error) {
 		return "", err
 	}
 
-	meta, ok := result.RawYAML["metadata"].(map[string]interface{})
+	meta, ok := result.RawYAML["metadata"].(map[string]any)
 	if !ok {
 		return content, nil
 	}

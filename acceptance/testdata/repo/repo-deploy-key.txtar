@@ -4,6 +4,9 @@ exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private --cl
 # Defer repo cleanup
 defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
 
+# Generate a globally unique deploy key
+generate-ssh-key deployKey.pub myTitle
+
 # cd to the repo and list the deploy keys. There should be no keys
 cd $SCRIPT_NAME-$RANDOM_STRING
 exec gh repo deploy-key list --json=title
@@ -26,6 +29,3 @@ exec gh repo deploy-key delete $DEPLOY_KEY_ID
 # Ensure the deploy key was deleted
 exec gh repo deploy-key list --json=id --jq='.[].id'
 ! stdout $DEPLOY_KEY_ID
-
--- deployKey.pub --
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAZmdeRNskfpvYL5YHB/YJaW8hTEXpnvPMkx5Ri+YwUr myTitle

@@ -13,7 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
-func httpRequest(client *http.Client, hostname string, method string, p string, params interface{}, headers []string) (*http.Response, error) {
+func httpRequest(client *http.Client, hostname string, method string, p string, params any, headers []string) (*http.Response, error) {
 	isGraphQL := p == "graphql"
 	var requestURL string
 	if strings.Contains(p, "://") {
@@ -21,6 +21,8 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 	} else if isGraphQL {
 		requestURL = ghinstance.GraphQLEndpoint(hostname)
 	} else {
+		// Note that the gh api command takes the path verbatim from the user, so we
+		// intentionally do not route it through safeurl and do not escape it here.
 		requestURL = ghinstance.RESTPrefix(hostname) + strings.TrimPrefix(p, "/")
 	}
 
@@ -28,7 +30,7 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 	var bodyIsJSON bool
 
 	switch pp := params.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		if strings.EqualFold(method, "GET") {
 			requestURL = addQuery(requestURL, pp)
 		} else {
@@ -81,9 +83,9 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 	return client.Do(req)
 }
 
-func groupGraphQLVariables(params map[string]interface{}) map[string]interface{} {
-	topLevel := make(map[string]interface{})
-	variables := make(map[string]interface{})
+func groupGraphQLVariables(params map[string]any) map[string]any {
+	topLevel := make(map[string]any)
+	variables := make(map[string]any)
 
 	for key, val := range params {
 		switch key {
@@ -100,7 +102,7 @@ func groupGraphQLVariables(params map[string]interface{}) map[string]interface{}
 	return topLevel
 }
 
-func addQuery(path string, params map[string]interface{}) string {
+func addQuery(path string, params map[string]any) string {
 	if len(params) == 0 {
 		return path
 	}
@@ -117,7 +119,7 @@ func addQuery(path string, params map[string]interface{}) string {
 	return path + sep + query.Encode()
 }
 
-func addQueryParam(query url.Values, key string, value interface{}) error {
+func addQueryParam(query url.Values, key string, value any) error {
 	switch v := value.(type) {
 	case string:
 		query.Add(key, v)
@@ -129,14 +131,14 @@ func addQueryParam(query url.Values, key string, value interface{}) error {
 		query.Add(key, fmt.Sprintf("%d", v))
 	case bool:
 		query.Add(key, fmt.Sprintf("%v", v))
-	case map[string]interface{}:
+	case map[string]any:
 		for subkey, value := range v {
 			// support for nested subkeys can be added here if that is ever necessary
 			if err := addQueryParam(query, subkey, value); err != nil {
 				return err
 			}
 		}
-	case []interface{}:
+	case []any:
 		for _, entry := range v {
 			if err := addQueryParam(query, key+"[]", entry); err != nil {
 				return err

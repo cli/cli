@@ -1,0 +1,144 @@
+# Checkout a PR into a git worktree, then reuse that worktree, rename its branch,
+# force sync it, and add a second worktree once the local branch already exists.
+
+# Set up env vars
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Clone the repo
+exec gh repo clone ${ORG}/${REPO}
+
+# Prepare a branch to PR
+cd ${REPO}
+exec git checkout -b feature-branch
+exec git commit --allow-empty -m 'Empty Commit'
+exec git push -u origin feature-branch
+
+# Create the PR
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+stdout2env PR_URL
+
+# Remove the local branch so checkout has to create it from the remote
+exec git checkout main
+exec git branch -D feature-branch
+stdout 'Deleted branch feature-branch'
+
+# Targeting an existing, non-empty directory that is not a linked worktree is
+# rejected up front with a clear error instead of deferring to git worktree add.
+exists ../occupied/keep.txt
+! exec gh pr checkout ${PR_URL} --worktree ../occupied
+stderr '--worktree path must be empty'
+
+# Checkout the PR into a fresh worktree
+exec gh pr checkout ${PR_URL} --worktree ../wt
+exists ../wt
+
+# The worktree is on the PR branch
+exec git -C ../wt rev-parse --abbrev-ref HEAD
+stdout '(?m)^feature-branch$'
+
+# The main working copy stays on the default branch
+exec git rev-parse --abbrev-ref HEAD
+stdout '(?m)^main$'
+
+# Checking out the same PR into the same worktree again reuses it
+exec gh pr checkout ${PR_URL} --worktree ../wt
+exec git -C ../wt rev-parse --abbrev-ref HEAD
+stdout '(?m)^feature-branch$'
+
+# The main working copy is left untouched
+exec git rev-parse --abbrev-ref HEAD
+stdout '(?m)^main$'
+
+# Checking out into the reused worktree with a new branch name creates that branch
+exec gh pr checkout ${PR_URL} --worktree ../wt --branch renamed-branch
+exec git -C ../wt rev-parse --abbrev-ref HEAD
+stdout '(?m)^renamed-branch$'
+
+# The main working copy is left untouched
+exec git rev-parse --abbrev-ref HEAD
+stdout '(?m)^main$'
+
+# Give the worktree's PR branch a local commit so it diverges from the PR head.
+# A plain reuse would fast-forward-only merge and keep this commit, so --force is
+# required to discard it with a hard reset.
+exec git -C ../wt checkout feature-branch
+exec git -C ../wt commit --allow-empty -m 'Diverging local commit'
+
+# Force checking out the PR into the reused worktree hard resets it to the PR head
+exec gh pr checkout ${PR_URL} --worktree ../wt --force
+exec git -C ../wt rev-parse --abbrev-ref HEAD
+stdout '(?m)^feature-branch$'
+
+# The diverging local commit was discarded by the hard reset
+exec git -C ../wt log -1 --format=%s
+! stdout 'Diverging local commit'
+
+# The worktree branch now matches the PR head
+exec git -C ../wt rev-parse HEAD
+stdout2env WT_HEAD
+exec git rev-parse origin/feature-branch
+stdout ${WT_HEAD}
+
+# The main working copy is left untouched
+exec git rev-parse --abbrev-ref HEAD
+stdout '(?m)^main$'
+
+# With the local branch now present, removing the worktree and checking out into a
+# fresh path adds a new worktree for the existing branch
+exec git worktree remove ../wt
+exec gh pr checkout ${PR_URL} --worktree ../wt2
+exists ../wt2
+exec git -C ../wt2 rev-parse --abbrev-ref HEAD
+stdout '(?m)^feature-branch$'
+
+# The main working copy is left untouched
+exec git rev-parse --abbrev-ref HEAD
+stdout '(?m)^main$'
+
+# Now create a two-sided divergence: advance the remote PR branch with a pushed
+# commit the local branch will not have...
+exec git -C ../wt2 commit --allow-empty -m 'Remote commit'
+exec git -C ../wt2 push origin feature-branch
+
+# ...then rewind the local branch and give it a different, local-only commit, so
+# neither branch is an ancestor of the other
+exec git -C ../wt2 reset --hard HEAD~1
+exec git -C ../wt2 commit --allow-empty -m 'Local commit'
+
+# A non-force checkout cannot fast-forward across the divergence and fails
+! exec gh pr checkout ${PR_URL} --worktree ../wt2
+stderr 'Not possible to fast-forward'
+
+# The local-only commit is still there because the failed sync changed nothing
+exec git -C ../wt2 log -1 --format=%s
+stdout 'Local commit'
+
+# Forcing the checkout hard resets the branch to the advanced PR head
+exec gh pr checkout ${PR_URL} --worktree ../wt2 --force
+exec git -C ../wt2 rev-parse --abbrev-ref HEAD
+stdout '(?m)^feature-branch$'
+exec git -C ../wt2 log -1 --format=%s
+stdout 'Remote commit'
+! stdout 'Local commit'
+
+# The worktree branch now matches the advanced PR head
+exec git -C ../wt2 rev-parse HEAD
+stdout2env WT2_HEAD
+exec git rev-parse origin/feature-branch
+stdout ${WT2_HEAD}
+
+# The main working copy is left untouched
+exec git rev-parse --abbrev-ref HEAD
+stdout '(?m)^main$'
+
+-- occupied/keep.txt --
+placeholder

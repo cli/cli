@@ -249,6 +249,12 @@ func stubCommit(pr *api.PullRequest, oid string) {
 
 // TODO port to new style tests
 func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithBranchFunc(rt, pm, func() (string, error) {
+		return branch, nil
+	}, isTTY, cli)
+}
+
+func runCommandWithBranchFunc(rt http.RoundTripper, pm *prompter.PrompterMock, branch func() (string, error), isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -259,9 +265,7 @@ func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, 
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Branch: func() (string, error) {
-			return branch, nil
-		},
+		Branch: branch,
 		Remotes: func() (context.Remotes, error) {
 			return []*context.Remote{
 				{
@@ -300,6 +304,10 @@ func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, 
 	}, err
 }
 
+func singleWorktree(branch string) string {
+	return fmt.Sprintf("worktree /path/to/repo\nHEAD abc123\nbranch refs/heads/%s\n", branch)
+}
+
 func initFakeHTTP() *httpmock.Registry {
 	return &httpmock.Registry{}
 }
@@ -322,7 +330,7 @@ func TestPrMerge(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -428,7 +436,7 @@ func TestPrMerge_nontty(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -466,7 +474,7 @@ func TestPrMerge_editMessage_nontty(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.Equal(t, "mytitle", input["commitHeadline"].(string))
@@ -505,7 +513,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -544,7 +552,7 @@ func TestPrMerge_withMatchCommitHeadFlag(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, 3, len(input))
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
@@ -585,7 +593,7 @@ func TestPrMerge_withAuthorFlag(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.Equal(t, "octocat@github.com", input["authorEmail"].(string))
@@ -629,13 +637,13 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -644,6 +652,8 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
@@ -701,7 +711,7 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 				✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 				✓ Deleted local branch blueberries and switched to branch main
 			`),
-			wantErr: "failed to delete remote branch blueberries: HTTP 500: blah blah (https://api.github.com/repos/OWNER/REPO/git/refs/heads/blueberries)",
+			wantErr: "failed to delete remote branch blueberries: HTTP 500: blah blah (https://api.github.com/repos/OWNER/REPO/git/refs/heads%2Fblueberries)",
 		},
 	}
 
@@ -726,13 +736,13 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 
 			http.Register(
 				httpmock.GraphQL(`mutation PullRequestMerge\b`),
-				httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+				httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 					assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 					assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 					assert.NotContains(t, input, "commitHeadline")
 				}))
 			http.Register(
-				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 				httpmock.JSONErrorResponse(tt.apiError.StatusCode, tt.apiError))
 
 			cs, cmdTeardown := run.Stub()
@@ -741,6 +751,8 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 			cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 			cs.Register(`git checkout main`, 0, "")
 			cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+			cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
+			cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 			cs.Register(`git branch -D blueberries`, 0, "")
 			cs.Register(`git pull --ff-only`, 0, "")
 
@@ -800,13 +812,13 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -815,6 +827,8 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/fruit`, 0, "")
 	cs.Register(`git checkout fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
@@ -852,7 +866,7 @@ func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -864,6 +878,8 @@ func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
@@ -899,13 +915,13 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -914,6 +930,8 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/fruit`, 1, "")
 	cs.Register(`git checkout -b fruit --track origin/fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
@@ -949,19 +967,21 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("main"))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 
 	output, err := runCommand(http, nil, "main", true, `pr merge --merge --delete-branch blueberries`)
@@ -995,7 +1015,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1035,7 +1055,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1076,7 +1096,7 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1115,7 +1135,7 @@ func TestPrMerge_rebase(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "REBASE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1156,7 +1176,7 @@ func TestPrMerge_squash(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1201,6 +1221,8 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
@@ -1273,6 +1295,8 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D `, 0, "")
 
 	pm := &prompter.PrompterMock{
@@ -1360,7 +1384,7 @@ func TestPRMergeTTY(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1429,13 +1453,13 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 		} } }`))
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -1444,6 +1468,8 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, singleWorktree("blueberries"))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/repo")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
@@ -1507,7 +1533,7 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 		} } }`))
 	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 			assert.Equal(t, "DEFAULT HEADLINE TEXT", input["commitHeadline"].(string))
@@ -1672,7 +1698,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 	defer tr.Verify(t)
 	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 		}))
@@ -1709,7 +1735,7 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 	defer tr.Verify(t)
 	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1747,8 +1773,8 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 	defer tr.Verify(t)
 	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMergeDisable\b`),
-		httpmock.GraphQLQuery(`{}`, func(s string, m map[string]interface{}) {
-			assert.Equal(t, map[string]interface{}{"prID": "THE-ID"}, m)
+		httpmock.GraphQLQuery(`{}`, func(s string, m map[string]any) {
+			assert.Equal(t, map[string]any{"prID": "THE-ID"}, m)
 		}))
 
 	_, cmdTeardown := run.Stub()
@@ -1824,7 +1850,7 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 	)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
@@ -1863,7 +1889,7 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
@@ -1903,7 +1929,7 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
@@ -1951,7 +1977,7 @@ func TestPrAddToMergeQueueAdmin(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -2010,7 +2036,7 @@ func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -2028,6 +2054,344 @@ func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Merged pull request OWNER/REPO#1 (The title of the PR)\n", output.Stderr())
+}
+
+func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
+	type stub struct {
+		pattern  string
+		exitCode int
+		output   string
+	}
+	tests := []struct {
+		name             string
+		worktreeList     string
+		worktreeExitCode int
+		toplevel         string
+		toplevelExitCode int
+		branch           string
+		branchFunc       func() (string, error)
+		extraStubs       []stub
+		wantContains     []string
+		wantNotContains  []string
+	}{
+		{
+			name: "head branch is checked out nowhere from detached worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/detached-wt
+				HEAD def456
+				detached
+			`),
+			toplevel: "/path/to/detached-wt",
+			branchFunc: func() (string, error) {
+				return "", errors.New("current branch is unavailable for detached HEAD")
+			},
+			extraStubs: []stub{
+				{pattern: `git branch -D feature`, exitCode: 0},
+			},
+			wantContains: []string{
+				"Deleted local branch feature",
+				"Deleted remote branch feature",
+			},
+		},
+		{
+			name: "cwd is the head branch's linked worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/feature-wt
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			toplevel: "/path/to/feature-wt",
+			branch:   "feature",
+			wantContains: []string{
+				"skipping local delete",
+				"navigate out of the worktree",
+				"git worktree remove /path/to/feature-wt && git branch -D feature",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{"Deleted local branch"},
+		},
+		{
+			name: "head branch is in a sibling linked worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/feature-wt
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			toplevel: "/path/to/main",
+			branch:   "main",
+			extraStubs: []stub{
+				{pattern: `git worktree remove -- /path/to/feature-wt`, exitCode: 0},
+				{pattern: `git branch -D feature`, exitCode: 0},
+			},
+			wantContains: []string{
+				"Removed worktree /path/to/feature-wt",
+				"Deleted local branch feature",
+				"Deleted remote branch feature",
+			},
+		},
+		{
+			name: "head branch is associated with a prunable worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/missing-feature-wt
+				HEAD def456
+				branch refs/heads/feature
+				prunable gitdir file points to non-existent location
+			`),
+			toplevel: "/path/to/main",
+			branch:   "main",
+			extraStubs: []stub{
+				{pattern: `git worktree prune`, exitCode: 0},
+				{pattern: `git branch -D feature`, exitCode: 0},
+			},
+			wantContains: []string{
+				"Pruned stale worktree metadata for /path/to/missing-feature-wt",
+				"Deleted local branch feature",
+				"Deleted remote branch feature",
+			},
+		},
+		{
+			name: "head branch is checked out in the main worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/feature
+
+				worktree /path/to/other-wt
+				HEAD def456
+				branch refs/heads/other
+			`),
+			toplevel: "/path/to/other-wt",
+			branch:   "other",
+			wantContains: []string{
+				"checked out in the main worktree (/path/to/main); skipping local delete",
+				"git branch -D feature",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{"Deleted local branch"},
+		},
+		{
+			name: "base branch is checked out in another worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/feature
+
+				worktree /path/to/base-wt
+				HEAD def456
+				branch refs/heads/main
+			`),
+			toplevel: "/path/to/main",
+			branch:   "feature",
+			wantContains: []string{
+				"Base branch main is checked out in another worktree (/path/to/base-wt); skipping local delete",
+				"To finish cleanup, switch the worktree at /path/to/base-wt off main, then run in the current path:",
+				"git checkout main && git branch -D feature",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{"Deleted local branch"},
+		},
+		{
+			name: "base branch is associated with a prunable worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/feature
+
+				worktree /path/to/missing-base-wt
+				HEAD def456
+				branch refs/heads/main
+				prunable gitdir file points to non-existent location
+			`),
+			toplevel: "/path/to/main",
+			branch:   "feature",
+			extraStubs: []stub{
+				{pattern: `git worktree prune`, exitCode: 0},
+				{pattern: `git rev-parse --verify refs/heads/main`, exitCode: 0},
+				{pattern: `git checkout main`, exitCode: 0},
+				{pattern: `git .*pull --ff-only origin main`, exitCode: 0},
+				{pattern: `git branch -D feature`, exitCode: 0},
+			},
+			wantContains: []string{
+				"Pruned stale worktree metadata for /path/to/missing-base-wt",
+				"Deleted local branch feature and switched to branch main",
+				"Deleted remote branch feature",
+			},
+		},
+		{
+			name: "sibling worktree is dirty and cannot be removed",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/feature-wt
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			toplevel: "/path/to/main",
+			branch:   "main",
+			extraStubs: []stub{
+				{pattern: `git worktree remove -- /path/to/feature-wt`, exitCode: 128, output: "fatal: '/path/to/feature-wt' contains modified or untracked files, use --force to delete it"},
+			},
+			wantContains: []string{
+				"Could not remove worktree /path/to/feature-wt",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{"Deleted local branch"},
+		},
+		{
+			name:             "worktree discovery fails",
+			worktreeList:     "fatal: worktree discovery failed",
+			worktreeExitCode: 1,
+			branch:           "feature",
+			wantContains: []string{
+				"Could not inspect worktrees; skipping local branch delete",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{"Deleted local branch"},
+		},
+		{
+			name: "current worktree discovery fails",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/feature
+			`),
+			toplevel:         "fatal: cannot determine top-level directory",
+			toplevelExitCode: 1,
+			branch:           "feature",
+			wantContains: []string{
+				"Could not determine the current worktree; skipping local branch delete",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{"Deleted local branch"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
+
+			shared.StubFinderForRunCommandStyleTests(t,
+				"",
+				&api.PullRequest{
+					ID:               "THE-ID",
+					Number:           3,
+					Title:            "The title of the PR",
+					HeadRefName:      "feature",
+					MergeStateStatus: "CLEAN",
+					BaseRefName:      "main",
+				},
+				baseRepo("OWNER", "REPO", "main"),
+			)
+
+			http.Register(
+				httpmock.GraphQL(`mutation PullRequestMerge\b`),
+				httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
+					assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+					assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+				}))
+			http.Register(
+				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Ffeature"),
+				httpmock.StringResponse(`{}`))
+
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+
+			cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
+			cs.Register(`git worktree list --porcelain`, tt.worktreeExitCode, tt.worktreeList)
+			if tt.worktreeExitCode == 0 {
+				cs.Register(`git rev-parse --show-toplevel`, tt.toplevelExitCode, tt.toplevel)
+			}
+			for _, s := range tt.extraStubs {
+				cs.Register(s.pattern, s.exitCode, s.output)
+			}
+
+			branchFunc := tt.branchFunc
+			if branchFunc == nil {
+				branchFunc = func() (string, error) {
+					return tt.branch, nil
+				}
+			}
+			output, err := runCommandWithBranchFunc(http, nil, branchFunc, true, "pr merge --merge -d")
+			require.NoError(t, err)
+
+			assert.Equal(t, "", output.String())
+			for _, want := range tt.wantContains {
+				assert.Contains(t, output.Stderr(), want)
+			}
+			for _, notWant := range tt.wantNotContains {
+				assert.NotContains(t, output.Stderr(), notWant)
+			}
+		})
+	}
+}
+
+func TestPrMerge_deleteBranch_noWorktreeConflict(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "The title of the PR",
+			HeadRefName:      "feature",
+			MergeStateStatus: "CLEAN",
+			BaseRefName:      "main",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+		}))
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Ffeature"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
+	cs.Register(`git worktree list --porcelain`, 0, heredoc.Doc(`
+		worktree /path/to/main
+		HEAD abc123
+		branch refs/heads/feature
+	`))
+	cs.Register(`git rev-parse --show-toplevel`, 0, "/path/to/main")
+	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
+	cs.Register(`git checkout main`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
+	cs.Register(`git branch -D feature`, 0, "")
+
+	output, err := runCommand(http, nil, "feature", true, "pr merge --merge -d")
+	require.NoError(t, err)
+
+	assert.Equal(t, "", output.String())
+	assert.Contains(t, output.Stderr(), "Deleted local branch feature and switched to branch main")
+	assert.Contains(t, output.Stderr(), "Deleted remote branch feature")
 }
 
 type testEditor struct{}

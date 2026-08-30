@@ -1,0 +1,71 @@
+# List directory contents of a repository without cloning.
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a private repo with a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --private --add-readme
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo and add a docs dir plus an executable script
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+cd $SCRIPT_NAME-$RANDOM_STRING
+mkdir docs
+mkdir script
+cp $WORK/guide.md docs/guide.md
+cp $WORK/run.sh script/run.sh
+chmod 755 script/run.sh
+exec git add -A
+exec git commit -m 'Add docs and script'
+exec git push origin main
+
+# Add a v2 branch with an extra file in docs, to exercise --ref
+exec git checkout -b v2
+cp $WORK/extra.md docs/extra.md
+exec git add -A
+exec git commit -m 'Add docs/extra.md on v2'
+exec git push -u origin v2
+exec git checkout main
+
+# List the repository root. Non-TTY output is tab-separated as type, name,
+# octal mode, and byte size. Directories report mode 040000 and size 0; the
+# auto-generated README has a non-deterministic size, so match it as digits.
+exec gh repo read-dir
+stdout '^file\tREADME\.md\t100644\t\d+$'
+stdout '^dir\tdocs\t040000\t0$'
+stdout '^dir\tscript\t040000\t0$'
+
+# List a subdirectory
+exec gh repo read-dir docs
+stdout '^file\tguide\.md\t100644\t19$'
+! stdout 'extra\.md'
+
+# Executable files are reported as a file with octal mode 100755
+exec gh repo read-dir script --json name,type,modeOctal --jq '.entries[] | .name + " " + .type + " " + .modeOctal'
+stdout '^run\.sh file 100755$'
+
+# JSON output lists directory entries
+exec gh repo read-dir --json name,type --jq '.entries[] | select(.type=="dir") | .name'
+stdout '^docs$'
+stdout '^script$'
+
+# A ref can select a different tree
+exec gh repo read-dir docs --ref v2
+stdout 'guide\.md'
+stdout 'extra\.md'
+
+# Error: the path points to a file, not a directory
+! exec gh repo read-dir README.md
+stderr 'is a file, not a directory'
+
+# Error: the path does not exist
+! exec gh repo read-dir does-not-exist
+stderr 'could not find'
+
+-- guide.md --
+This is the guide.
+-- extra.md --
+Extra file on v2.
+-- run.sh --
+#!/bin/bash
+echo "hello"

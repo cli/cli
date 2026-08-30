@@ -1,0 +1,14 @@
+{
+  "name": "Discussion list - Mona's Cafe",
+  "savedAt": "2026-06-06T19:28:53.327Z",
+  "content": "[muted]$[/muted] [b]gh discussion list --repo monalisa/monas-cafe --limit 6[/b]\n\nShowing 6 of 87 open discussions in [b]monalisa/monas-cafe[/b]\n\n[dim][u]ID    [/u]  [u]TITLE                [/u]  [u]CATEGORY     [/u]  [u]LABELS     [/u]  [u]ANSWERED[/u]  [u]UPDATED          [/u][/dim]\n[brgreen]#87[/brgreen]     Sign-in flow desig...  Q&A            [brblue]Enhancement[/brblue]  ✓         [muted]about 2 days ago[/muted]\n[brgreen]#82[/brgreen]     Show and tell: lat...  Show and tell                         [muted]about 4 days ago[/muted]\n[brgreen]#78[/brgreen]     Custom CSS hooks f...  Ideas          [brblue]Enhancement[/brblue]            [muted]about 1 week ago[/muted]\n[brgreen]#71[/brgreen]     Roadmap for Mona's...  Announcements                         [muted]about 2 weeks ago[/muted]\n[brgreen]#64[/brgreen]     Failing on Apple S...  Q&A            [brred]Bug[/brred]          ✓         [muted]about 3 weeks ago[/muted]\n[brgreen]#55[/brgreen]     Welcome new contri...  General                               [muted]about 1 month ago[/muted]\n[muted]And 81 more[/muted]",
+  "options": {
+    "font": "menlo",
+    "fontSize": 14,
+    "width": 800,
+    "chrome": "none",
+    "backdrop": "none",
+    "bodyGradient": false,
+    "autoStyle": true
+  }
+}

@@ -351,7 +351,7 @@ func TestSSOURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config.NewBlankConfig()
+			cfg := config.NewMockConfig()
 			ios, _, _, stderr := iostreams.Test()
 			client, err := HttpClientFunc(func() (gh.Config, error) { return cfg, nil }, ios, "v1.2.3", "", &telemetry.NoOpService{})()
 			require.NoError(t, err)
@@ -421,7 +421,7 @@ func TestNewGitClient(t *testing.T) {
 			f := &cmdutil.Factory{}
 			f.Config = func() (gh.Config, error) {
 				if tt.config == nil {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				} else {
 					return tt.config, nil
 				}
@@ -439,7 +439,7 @@ func TestNewGitClient(t *testing.T) {
 }
 
 func defaultConfig() *ghmock.ConfigMock {
-	cfg := config.NewFromString("")
+	cfg := config.NewMockConfigFromString("")
 	cfg.Set("nonsense.com", "oauth_token", "BLAH")
 	return cfg
 }

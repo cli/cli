@@ -10,7 +10,7 @@ import (
 )
 
 type RulesetGraphQL struct {
-	DatabaseId  int
+	DatabaseId  int64
 	Name        string
 	Target      string
 	Enforcement string
@@ -24,17 +24,17 @@ type RulesetGraphQL struct {
 }
 
 type RulesetREST struct {
-	Id                   int
+	Id                   int64
 	Name                 string
 	Target               string
 	Enforcement          string
 	CurrentUserCanBypass string `json:"current_user_can_bypass"`
 	BypassActors         []struct {
-		ActorId    int    `json:"actor_id"`
+		ActorId    int64  `json:"actor_id"`
 		ActorType  string `json:"actor_type"`
 		BypassMode string `json:"bypass_mode"`
 	} `json:"bypass_actors"`
-	Conditions map[string]map[string]interface{}
+	Conditions map[string]map[string]any
 	SourceType string `json:"source_type"`
 	Source     string
 	Rules      []RulesetRule
@@ -47,10 +47,10 @@ type RulesetREST struct {
 
 type RulesetRule struct {
 	Type              string
-	Parameters        map[string]interface{}
+	Parameters        map[string]any
 	RulesetSourceType string `json:"ruleset_source_type"`
 	RulesetSource     string `json:"ruleset_source"`
-	RulesetId         int    `json:"ruleset_id"`
+	RulesetId         int64  `json:"ruleset_id"`
 }
 
 // Returns the source of the ruleset in the format "owner/name (repo)" or "owner (org)"

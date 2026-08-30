@@ -149,3 +149,26 @@ func FormatSlice(values []string, lineLength uint, indent uint, prependWith stri
 	}
 	return builder.String()
 }
+
+// FormatSize formats a byte count using binary units (B, KB, MB, GB, TB, PB).
+// Values below a kilobyte are shown as whole bytes; larger values are shown with
+// one decimal place of precision.
+func FormatSize(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+
+	units := []string{"KB", "MB", "GB", "TB", "PB"}
+
+	// Stop at the largest known unit so an out-of-range index can never occur,
+	// even for byte counts beyond a petabyte.
+	div, exp := int64(unit), 0
+	for v := n / unit; v >= unit && exp < len(units)-1; v /= unit {
+		div *= unit
+		exp++
+	}
+
+	value := float64(n) / float64(div)
+	return fmt.Sprintf("%.1f %s", value, units[exp])
+}

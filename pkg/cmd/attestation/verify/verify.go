@@ -173,6 +173,11 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				return err
 			}
 
+			externalClient, err := f.ExternalHttpClient()
+			if err != nil {
+				return err
+			}
+
 			opts.OCIClient = oci.NewLiveClient()
 
 			if opts.Hostname == "" {
@@ -183,13 +188,13 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				return err
 			}
 
-			opts.APIClient = api.NewLiveClient(hc, opts.Hostname, opts.Logger)
+			opts.APIClient = api.NewLiveClient(hc, externalClient, opts.Hostname, opts.Logger)
 
 			config := verification.SigstoreConfig{
-				HttpClient:   hc,
-				Logger:       opts.Logger,
-				NoPublicGood: opts.NoPublicGood,
-				TrustedRoot:  opts.TrustedRoot,
+				ExternalHttpClient: externalClient,
+				Logger:             opts.Logger,
+				NoPublicGood:       opts.NoPublicGood,
+				TrustedRoot:        opts.TrustedRoot,
 			}
 
 			// Prepare for tenancy if detected

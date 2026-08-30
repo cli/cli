@@ -340,6 +340,12 @@ var issueOnlyFields = []string{
 	"isPinned",
 	"stateReason",
 	"closedByPullRequestsReferences",
+	"issueType",
+	"parent",
+	"subIssues",
+	"subIssuesSummary",
+	"blockedBy",
+	"blocking",
 }
 
 var IssueFields = append(sharedIssuePRFields, issueOnlyFields...)
@@ -400,6 +406,9 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `projectItems(first:100){nodes{id, project{id,title}, status:fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},totalCount}`)
 		case "milestone":
 			q = append(q, `milestone{number,title,description,dueOn}`)
+		case "repository":
+			// Selects every field PRRepository declares.
+			q = append(q, `repository{id,name,nameWithOwner,databaseId,viewerPermission}`)
 		case "reactionGroups":
 			q = append(q, `reactionGroups{content,users{totalCount}}`)
 		case "mergeCommit":
@@ -436,6 +445,18 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, prClosingIssuesReferences)
 		case "closedByPullRequestsReferences":
 			q = append(q, issueClosedByPullRequestsReferences)
+		case "issueType":
+			q = append(q, `issueType{id,name,description,color}`)
+		case "parent":
+			q = append(q, `parent{id,number,title,url,state,repository{nameWithOwner}}`)
+		case "subIssues":
+			q = append(q, `subIssues(first:100){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}`)
+		case "subIssuesSummary":
+			q = append(q, `subIssuesSummary{total,completed,percentCompleted}`)
+		case "blockedBy":
+			q = append(q, `blockedBy(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}`)
+		case "blocking":
+			q = append(q, `blocking(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}`)
 		default:
 			q = append(q, field)
 		}

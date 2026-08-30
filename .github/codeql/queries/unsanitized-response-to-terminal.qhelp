@@ -1,0 +1,84 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+  <overview>
+    <p>
+      Bytes consumed from an HTTP response body are server-controlled and may
+      contain ANSI escape sequences. When those bytes reach a terminal writer
+      without sanitization, a remote attacker can move the cursor, repaint the
+      screen, fake a shell prompt, write to the clipboard via OSC sequences,
+      or otherwise manipulate the user's terminal session.
+    </p>
+    <p>
+      This query flags HTTP response content, including bytes reintroduced by
+      base64 decoding, that reaches a terminal writer
+      (<code>IOStreams.Out</code>, <code>IOStreams.ErrOut</code>,
+      <code>os.Stdout</code>, or <code>os.Stderr</code>) without first being
+      written to <code>IOStreams.ContentOut</code>, sanitized, or decoded as a
+      structured format (e.g. <code>encoding/json</code>).
+    </p>
+  </overview>
+
+  <recommendation>
+    <p>
+      Choose the writer based on the kind of content you are printing:
+    </p>
+    <ul>
+      <li>
+        <code>IOStreams.Out</code> is for application output the developer
+        authored: tables, prompts, formatted messages, color-coded status. It
+        does not sanitize and never should, because the developer controls
+        every byte that reaches it.
+      </li>
+      <li>
+        <code>IOStreams.ContentOut</code> is for external content the
+        developer did not author: HTTP response bodies, file contents fetched
+        from a remote, anything where a third party chose the bytes. It
+        sanitizes ANSI escape sequences by default.
+      </li>
+    </ul>
+    <p>
+      These patterns satisfy the query:
+    </p>
+    <ol>
+      <li>
+        Label the content at its source as <code>iostreams.Untrusted</code> and
+        print it with <code>String()</code> (or any <code>fmt</code> verb, which
+        calls <code>String()</code>); the value sanitizes itself. Its
+        <code>Raw()</code> method is the explicit opt-out and is still flagged if
+        it reaches a terminal.
+      </li>
+      <li>
+        Write external bytes to <code>IOStreams.ContentOut</code>.
+      </li>
+      <li>
+        Decode the bytes into a structured value first
+        (<code>json.Unmarshal</code>, <code>(*json.Decoder).Decode</code>);
+        the fields you print afterwards are no longer raw external content.
+      </li>
+      <li>
+        For commands where the user has opted into raw output, add a
+        per-command <code>--allow-escape-sequences</code> flag and call
+        <code>opts.IO.SetContentSanitization(false)</code> before writing.
+        The bytes still go through <code>ContentOut</code>, but ContentOut
+        becomes a passthrough for that invocation.
+      </li>
+    </ol>
+  </recommendation>
+
+  <example>
+    <p>
+      In the following BAD example, the response body is written directly to
+      <code>IOStreams.Out</code>. A server can embed ANSI escape sequences in
+      the response and they will be rendered by the user's terminal:
+    </p>
+    <sample src="examples/UnsanitizedResponseToTerminalBad.go" />
+
+    <p>
+      In the following GOOD example, the same body is written to
+      <code>IOStreams.ContentOut</code>, which sanitizes ANSI escape
+      sequences. An <code>--allow-escape-sequences</code> flag is provided for users who
+      explicitly want raw output for trusted content:
+    </p>
+    <sample src="examples/UnsanitizedResponseToTerminalGood.go" />
+  </example>
+</qhelp>

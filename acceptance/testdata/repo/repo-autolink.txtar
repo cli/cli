@@ -1,0 +1,31 @@
+# Create a repository to hold the autolink references
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# List the autolinks. There should be none
+exec gh repo autolink list --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --json=keyPrefix
+! stdout keyPrefix
+
+# Create an alphanumeric autolink
+exec gh repo autolink create --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING TICKET- 'https://example.com/TICKET?query=<num>'
+
+# Ensure the autolink was created
+exec gh repo autolink list --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --json=keyPrefix --jq='.[].keyPrefix'
+stdout 'TICKET-'
+
+# Get the autolink id
+exec gh repo autolink list --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --json=keyPrefix,id --jq='.[] | select(.keyPrefix == "TICKET-") | .id'
+stdout2env AUTOLINK_ID
+
+# View the autolink and ensure the url template round tripped
+exec gh repo autolink view --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING $AUTOLINK_ID --json=urlTemplate --jq='.urlTemplate'
+stdout 'https://example\.com/TICKET\?query=<num>'
+
+# Delete the autolink
+exec gh repo autolink delete --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING $AUTOLINK_ID --yes
+
+# Ensure the autolink was deleted
+exec gh repo autolink list --repo $ORG/$SCRIPT_NAME-$RANDOM_STRING --json=id --jq='.[].id'
+! stdout $AUTOLINK_ID

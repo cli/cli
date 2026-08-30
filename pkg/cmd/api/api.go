@@ -59,6 +59,8 @@ type ApiOptions struct {
 	CacheTTL            time.Duration
 	FilterOutput        string
 	Verbose             bool
+
+	AllowEscapeSequences bool
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
@@ -298,6 +300,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
+	cmd.Flags().BoolVar(&opts.AllowEscapeSequences, "allow-escape-sequences", false, "Allow printing terminal escape sequences")
 	return cmd
 }
 
@@ -314,7 +317,7 @@ func apiRun(opts *ApiOptions) error {
 	}
 	method := opts.RequestMethod
 	requestHeaders := opts.RequestHeaders
-	var requestBody interface{}
+	var requestBody any
 	if len(params) > 0 {
 		requestBody = params
 	}
@@ -331,7 +334,13 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	var bodyWriter io.Writer = opts.IO.Out
+	// Response content funnels through ContentOut. It stays in passthrough here:
+	// JSON is sanitized by the transport and the jq/template/jsoncolor paths emit
+	// our own formatting, so only a raw non-JSON body needs neutralizing, done at
+	// its copy below.
+	opts.IO.SetContentSanitization(false)
+
+	var bodyWriter io.Writer = opts.IO.ContentOut
 	var headersWriter io.Writer = opts.IO.Out
 	if opts.Silent {
 		bodyWriter = io.Discard
@@ -518,7 +527,20 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 				isLastPage:  isLastPage,
 			}
 		}
-		_, err = io.Copy(bodyWriter, responseBody)
+		// A raw non-JSON body is the only response the transport does not sanitize.
+		// It is faithful byte output, so binary bound for a terminal and text
+		// carrying escape sequences are refused; the opt-out flag and discarded
+		// output stream verbatim.
+		if !isJSON && !opts.AllowEscapeSequences && bodyWriter != io.Discard {
+			err = iostreams.CopyGuardedContent(bodyWriter, responseBody, opts.IO.IsStdoutTTY())
+			if binErr, ok := errors.AsType[iostreams.BinaryTerminalError](err); ok {
+				err = fmt.Errorf("%w; redirect or pipe stdout to save it, or pass --allow-escape-sequences to output it anyway", binErr)
+			} else if errors.Is(err, iostreams.ErrEscapeSequence) {
+				err = errors.New("the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway")
+			}
+		} else {
+			_, err = io.Copy(bodyWriter, responseBody)
+		}
 	}
 	if err != nil {
 		return

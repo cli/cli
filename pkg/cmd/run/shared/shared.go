@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
@@ -106,7 +108,7 @@ type Run struct {
 	HeadSha        string `json:"head_sha"`
 	URL            string `json:"html_url"`
 	HeadRepository Repo   `json:"head_repository"`
-	Jobs           []Job  `json:"-"` // populated by GetJobs
+	Jobs           []Job  `json:"-"` // Populated manually (separate from fetching the run)
 }
 
 func (r *Run) StartedTime() time.Time {
@@ -159,14 +161,14 @@ func (r Run) WorkflowName() string {
 	return r.workflowName
 }
 
-func (r *Run) ExportData(fields []string) map[string]interface{} {
+func (r *Run) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(r).Elem()
 	fieldByName := func(v reflect.Value, field string) reflect.Value {
 		return v.FieldByNameFunc(func(s string) bool {
 			return strings.EqualFold(field, s)
 		})
 	}
-	data := map[string]interface{}{}
+	data := map[string]any{}
 
 	for _, f := range fields {
 		switch f {
@@ -177,15 +179,15 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 		case "workflowName":
 			data[f] = r.WorkflowName()
 		case "jobs":
-			jobs := make([]interface{}, 0, len(r.Jobs))
+			jobs := make([]any, 0, len(r.Jobs))
 			for _, j := range r.Jobs {
-				steps := make([]interface{}, 0, len(j.Steps))
+				steps := make([]any, 0, len(j.Steps))
 				for _, s := range j.Steps {
 					var stepCompletedAt time.Time
 					if !s.CompletedAt.IsZero() {
 						stepCompletedAt = s.CompletedAt
 					}
-					steps = append(steps, map[string]interface{}{
+					steps = append(steps, map[string]any{
 						"name":        s.Name,
 						"status":      s.Status,
 						"conclusion":  s.Conclusion,
@@ -198,7 +200,7 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 				if !j.CompletedAt.IsZero() {
 					jobCompletedAt = j.CompletedAt
 				}
-				jobs = append(jobs, map[string]interface{}{
+				jobs = append(jobs, map[string]any{
 					"databaseId":  j.ID,
 					"status":      j.Status,
 					"conclusion":  j.Conclusion,
@@ -280,9 +282,12 @@ var ErrMissingAnnotationsPermissions = errors.New("missing annotations permissio
 func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annotation, error) {
 	var result []*Annotation
 
-	path := fmt.Sprintf("repos/%s/check-runs/%d/annotations", ghrepo.FullName(repo), job.ID)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "check-runs", strconv.FormatInt(job.ID, 10), "annotations")
+	if err != nil {
+		return nil, err
+	}
 
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	err = client.REST(repo.RepoHost(), "GET", path.String(), nil, &result)
 	if err != nil {
 		var httpError api.HTTPError
 		if !errors.As(err, &httpError) {
@@ -361,49 +366,53 @@ func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, opts *FilterOp
 }
 
 func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int) (*RunsPayload, error) {
-	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs")
+	if err != nil {
+		return nil, err
+	}
 	if opts != nil && opts.WorkflowID > 0 {
-		path = fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), opts.WorkflowID)
+		u, err = safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "workflows", strconv.FormatInt(opts.WorkflowID, 10), "runs")
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	perPage := limit
-	if limit > 100 {
-		perPage = 100
-	}
-	path += fmt.Sprintf("?per_page=%d", perPage)
-	path += "&exclude_pull_requests=true" // significantly reduces payload size
+	perPage := min(limit, 100)
+	u.SetQuery("per_page", strconv.Itoa(perPage))
+	u.SetQuery("exclude_pull_requests", "true") // significantly reduces payload size
 
 	if opts != nil {
 		if opts.Branch != "" {
-			path += fmt.Sprintf("&branch=%s", url.QueryEscape(opts.Branch))
+			u.SetQuery("branch", opts.Branch)
 		}
 		if opts.Actor != "" {
-			path += fmt.Sprintf("&actor=%s", url.QueryEscape(opts.Actor))
+			u.SetQuery("actor", opts.Actor)
 		}
 		if opts.Status != "" {
-			path += fmt.Sprintf("&status=%s", url.QueryEscape(opts.Status))
+			u.SetQuery("status", opts.Status)
 		}
 		if opts.Event != "" {
-			path += fmt.Sprintf("&event=%s", url.QueryEscape(opts.Event))
+			u.SetQuery("event", opts.Event)
 		}
 		if opts.Created != "" {
-			path += fmt.Sprintf("&created=%s", url.QueryEscape(opts.Created))
+			u.SetQuery("created", opts.Created)
 		}
 		if opts.Commit != "" {
-			path += fmt.Sprintf("&head_sha=%s", url.QueryEscape(opts.Commit))
+			u.SetQuery("head_sha", opts.Commit)
 		}
 	}
+	var pageURL safeurl.SafeURL = u
 
 	var result *RunsPayload
 
 pagination:
-	for path != "" {
+	for pageURL.String() != "" {
 		var response RunsPayload
-		var err error
-		path, err = client.RESTWithNext(repo.RepoHost(), "GET", path, nil, &response)
+		next, err := client.RESTWithNext(repo.RepoHost(), "GET", pageURL.String(), nil, &response)
 		if err != nil {
 			return nil, err
 		}
+		pageURL = safeurl.NewImmutableSafeURL(next)
 
 		if result == nil {
 			result = &response
@@ -475,38 +484,49 @@ type JobsPayload struct {
 	Jobs       []Job
 }
 
-func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run, attempt uint64) ([]Job, error) {
-	if run.Jobs != nil {
-		return run.Jobs, nil
-	}
-
-	query := url.Values{}
-	query.Set("per_page", "100")
-	jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, query.Encode())
-
+func GetJobs(client *api.Client, repo ghrepo.Interface, runID int64, jobsURL safeurl.SafeURL, attempt uint64) ([]Job, error) {
+	var jobsPath safeurl.SafeURL
 	if attempt > 0 {
-		jobsPath = fmt.Sprintf("repos/%s/actions/runs/%d/attempts/%d/jobs?%s", ghrepo.FullName(repo), run.ID, attempt, query.Encode())
-	}
-
-	for jobsPath != "" {
-		var resp JobsPayload
-		var err error
-		jobsPath, err = client.RESTWithNext(repo.RepoHost(), http.MethodGet, jobsPath, nil, &resp)
+		p, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", strconv.FormatInt(runID, 10), "attempts", strconv.FormatUint(attempt, 10), "jobs")
 		if err != nil {
-			run.Jobs = nil
 			return nil, err
 		}
-
-		run.Jobs = append(run.Jobs, resp.Jobs...)
+		p.SetQuery("per_page", "100")
+		jobsPath = p
+	} else {
+		u, err := url.Parse(jobsURL.String())
+		if err != nil {
+			return nil, err
+		}
+		query := url.Values{}
+		query.Set("per_page", "100")
+		u.RawQuery = query.Encode()
+		// Since u is derived from jobsURL, an already-trusted safeurl.SafeURL, the resulting URL is safe to declare as such.
+		jobsPath = safeurl.NewImmutableSafeURL(u.String())
 	}
-	return run.Jobs, nil
+
+	// A non-nil empty slice is returned so callers can tell that jobs were fetched and there are none (if len is zero).
+	jobs := []Job{}
+	for jobsPath.String() != "" {
+		var resp JobsPayload
+		next, err := client.RESTWithNext(repo.RepoHost(), http.MethodGet, jobsPath.String(), nil, &resp)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, resp.Jobs...)
+		jobsPath = safeurl.NewImmutableSafeURL(next)
+	}
+	return jobs, nil
 }
 
 func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {
-	path := fmt.Sprintf("repos/%s/actions/jobs/%s", ghrepo.FullName(repo), jobID)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "jobs", jobID)
+	if err != nil {
+		return nil, err
+	}
 
 	var result Job
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	err = client.REST(repo.RepoHost(), "GET", path.String(), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -539,13 +559,20 @@ func SelectRun(p Prompter, cs *iostreams.ColorScheme, runs []Run) (string, error
 func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uint64) (*Run, error) {
 	var result Run
 
-	path := fmt.Sprintf("repos/%s/actions/runs/%s?exclude_pull_requests=true", ghrepo.FullName(repo), runID)
-
-	if attempt > 0 {
-		path = fmt.Sprintf("repos/%s/actions/runs/%s/attempts/%d?exclude_pull_requests=true", ghrepo.FullName(repo), runID, attempt)
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", runID)
+	if err != nil {
+		return nil, err
 	}
 
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	if attempt > 0 {
+		u, err = safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", runID, "attempts", strconv.FormatUint(attempt, 10))
+		if err != nil {
+			return nil, err
+		}
+	}
+	u.SetQuery("exclude_pull_requests", "true")
+
+	err = client.REST(repo.RepoHost(), "GET", u.String(), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +631,7 @@ func PullRequestForRun(client *api.Client, repo ghrepo.Interface, run Run) (int,
 		Number int
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":       repo.RepoOwner(),
 		"repo":        repo.RepoName(),
 		"headRefName": run.HeadBranch,

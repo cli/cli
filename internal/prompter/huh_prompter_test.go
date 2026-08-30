@@ -2,6 +2,7 @@ package prompter
 
 import (
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,8 +19,9 @@ import (
 // bubbletea event loop.
 
 type interactionStep struct {
-	bytes []byte
-	delay time.Duration // pause before sending (lets the event loop settle)
+	bytes  []byte
+	delay  time.Duration // pause before sending (lets the event loop settle)
+	waitFn func()        // if non-nil, called instead of time.Sleep(delay)
 }
 
 type interaction struct {
@@ -33,9 +35,15 @@ func newInteraction(steps ...interactionStep) interaction {
 func (ix interaction) run(t *testing.T, w *io.PipeWriter) {
 	t.Helper()
 	for _, s := range ix.steps {
-		time.Sleep(s.delay)
-		_, err := w.Write(s.bytes)
-		require.NoError(t, err)
+		if s.waitFn != nil {
+			s.waitFn()
+		} else {
+			time.Sleep(s.delay)
+		}
+		if s.bytes != nil {
+			_, err := w.Write(s.bytes)
+			require.NoError(t, err)
+		}
 	}
 }
 
@@ -98,9 +106,43 @@ func clearLine() interactionStep {
 	return interactionStep{bytes: []byte{0x01, 0x0b}}
 }
 
-// waitForOptions adds extra delay to let OptionsFunc load before continuing.
+// waitForOptions adds extra delay to let the bubbletea event loop settle
+// after switching modes when no async search is triggered.
 func waitForOptions() interactionStep {
 	return interactionStep{bytes: nil, delay: 50 * time.Millisecond}
+}
+
+// waitForSearch returns an interactionStep that blocks until the field's
+// current async search completes. It wires a one-shot callback into the
+// field's onSearchDone hook and waits for it to fire, avoiding fixed-duration
+// sleeps that are too short on slow architectures such as s390x under QEMU.
+//
+// The wait is bounded by the test's deadline (from -timeout) so a hung search
+// fails the test with a clear message rather than blocking the whole test run.
+func waitForSearch(t *testing.T, field *multiSelectSearchField) interactionStep {
+	t.Helper()
+	done := make(chan struct{})
+	var once sync.Once
+	field.onSearchDone.Store(func() {
+		once.Do(func() { close(done) })
+	})
+
+	var timeout <-chan time.Time
+	if deadline, ok := t.Deadline(); ok {
+		timeout = time.After(time.Until(deadline))
+	} else {
+		timeout = time.After(30 * time.Second)
+	}
+
+	return interactionStep{
+		waitFn: func() {
+			select {
+			case <-done:
+			case <-timeout:
+				t.Fatal("timed out waiting for async search to complete")
+			}
+		},
+	}
 }
 
 // --- Test harness ---
@@ -475,13 +517,16 @@ func TestHuhPrompterMultiSelectWithSearchPersistence(t *testing.T) {
 		f, result := p.buildMultiSelectWithSearchForm(
 			"Select", "Search", nil, nil, staticSearchFunc,
 		)
+		// waitForSearch must be created before runForm so the hook is in place
+		// before the async search fires.
+		searchDone := waitForSearch(t, result)
 		runForm(t, f, newInteraction(
-			tab(), waitForOptions(),
-			toggle(),        // toggle result-a
-			shiftTab(),      // back to search input
-			typeKeys("foo"), // change query
-			tab(), waitForOptions(),
-			enter(), // submit — result-a should persist
+			tab(), waitForOptions(), // switch to select mode (no async search)
+			toggle(),          // toggle result-a
+			shiftTab(),        // back to search input
+			typeKeys("foo"),   // change query
+			tab(), searchDone, // submit query → async search; wait for completion
+			enter(), // submit form — guaranteed search is done
 		))
 		assert.Equal(t, []string{"result-a"}, result.selectedKeys())
 	})

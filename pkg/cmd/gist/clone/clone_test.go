@@ -24,7 +24,7 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 			return httpClient, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		GitClient: &git.Client{
 			GhPath:  "some/path/gh",

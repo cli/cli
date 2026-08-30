@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
@@ -21,6 +22,8 @@ type Editable struct {
 	Labels             EditableSlice
 	Projects           EditableProjects
 	Milestone          EditableString
+	IssueType          EditableString
+	IssueTypeNameToID  map[string]string
 	Metadata           api.RepoMetadataResult
 
 	// TODO ApiActorsSupported
@@ -36,6 +39,10 @@ type EditableString struct {
 	Default string
 	Options []string
 	Edited  bool
+	// Selectable controls whether the interactive survey offers this
+	// field as one of the things the user can choose to edit. Flag-only
+	// fields leave it false.
+	Selectable bool
 }
 
 type EditableSlice struct {
@@ -45,7 +52,10 @@ type EditableSlice struct {
 	Default []string
 	Options []string
 	Edited  bool
-	Allowed bool
+	// Selectable controls whether the interactive survey offers this
+	// field as one of the things the user can choose to edit. Flag-only
+	// fields leave it false.
+	Selectable bool
 }
 
 // EditableAssignees is a special case of EditableSlice.
@@ -75,7 +85,8 @@ func (e Editable) Dirty() bool {
 		e.Assignees.Edited ||
 		e.Labels.Edited ||
 		e.Projects.Edited ||
-		e.Milestone.Edited
+		e.Milestone.Edited ||
+		e.IssueType.Edited
 }
 
 func (e Editable) TitleValue() *string {
@@ -290,6 +301,8 @@ func (e *Editable) Clone() Editable {
 		Labels:             e.Labels.clone(),
 		Projects:           e.Projects.clone(),
 		Milestone:          e.Milestone.clone(),
+		IssueType:          e.IssueType.clone(),
+		IssueTypeNameToID:  e.IssueTypeNameToID,
 		ApiActorsSupported: e.ApiActorsSupported,
 		// Shallow copy since no mutation.
 		Metadata: e.Metadata,
@@ -298,9 +311,10 @@ func (e *Editable) Clone() Editable {
 
 func (es *EditableString) clone() EditableString {
 	return EditableString{
-		Value:   es.Value,
-		Default: es.Default,
-		Edited:  es.Edited,
+		Value:      es.Value,
+		Default:    es.Default,
+		Edited:     es.Edited,
+		Selectable: es.Selectable,
 		// Shallow copies since no mutation.
 		Options: es.Options,
 	}
@@ -308,8 +322,8 @@ func (es *EditableString) clone() EditableString {
 
 func (es *EditableSlice) clone() EditableSlice {
 	cpy := EditableSlice{
-		Edited:  es.Edited,
-		Allowed: es.Allowed,
+		Edited:     es.Edited,
+		Selectable: es.Selectable,
 		// Shallow copies since no mutation.
 		Options: es.Options,
 		// Copy mutable string slices.
@@ -418,14 +432,7 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 			return err
 		}
 		for _, prev := range editable.Labels.Default {
-			var found bool
-			for _, selected := range editable.Labels.Add {
-				if prev == selected {
-					found = true
-					break
-				}
-			}
-			if !found {
+			if !slices.Contains(editable.Labels.Add, prev) {
 				editable.Labels.Remove = append(editable.Labels.Remove, prev)
 			}
 		}
@@ -443,6 +450,16 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 			return err
 		}
 	}
+	if editable.IssueType.Edited {
+		if len(editable.IssueType.Options) > 0 {
+			var selected int
+			selected, err = p.Select("Type", editable.IssueType.Default, editable.IssueType.Options)
+			if err != nil {
+				return err
+			}
+			editable.IssueType.Value = editable.IssueType.Options[selected]
+		}
+	}
 	confirm, err := p.Confirm("Submit?", true)
 	if err != nil {
 		return err
@@ -455,44 +472,42 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 }
 
 func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
-	contains := func(s []string, str string) bool {
-		for _, v := range s {
-			if v == str {
-				return true
-			}
-		}
-		return false
-	}
-
 	opts := []string{"Title", "Body"}
-	if editable.Reviewers.Allowed {
+	if editable.Reviewers.Selectable {
 		opts = append(opts, "Reviewers")
 	}
-	opts = append(opts, "Assignees", "Labels", "Projects", "Milestone")
+	opts = append(opts, "Assignees", "Labels")
+	if editable.IssueType.Selectable {
+		opts = append(opts, "Type")
+	}
+	opts = append(opts, "Projects", "Milestone")
 	results, err := multiSelectSurvey(p, "What would you like to edit?", []string{}, opts)
 	if err != nil {
 		return err
 	}
 
-	if contains(results, "Title") {
+	if slices.Contains(results, "Title") {
 		editable.Title.Edited = true
 	}
-	if contains(results, "Body") {
+	if slices.Contains(results, "Body") {
 		editable.Body.Edited = true
 	}
-	if contains(results, "Reviewers") {
+	if slices.Contains(results, "Reviewers") {
 		editable.Reviewers.Edited = true
 	}
-	if contains(results, "Assignees") {
+	if slices.Contains(results, "Assignees") {
 		editable.Assignees.Edited = true
 	}
-	if contains(results, "Labels") {
+	if slices.Contains(results, "Labels") {
 		editable.Labels.Edited = true
 	}
-	if contains(results, "Projects") {
+	if slices.Contains(results, "Type") {
+		editable.IssueType.Edited = true
+	}
+	if slices.Contains(results, "Projects") {
 		editable.Projects.Edited = true
 	}
-	if contains(results, "Milestone") {
+	if slices.Contains(results, "Milestone") {
 		editable.Milestone.Edited = true
 	}
 
@@ -591,6 +606,21 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable,
 	editable.Labels.Options = labels
 	editable.Projects.Options = projects
 	editable.Milestone.Options = milestones
+
+	// Fetch issue types if editing type
+	if editable.IssueType.Edited {
+		issueTypes, err := api.RepoIssueTypes(client, repo)
+		if err == nil {
+			typeNames := make([]string, len(issueTypes))
+			ids := make(map[string]string, len(issueTypes))
+			for i, t := range issueTypes {
+				typeNames[i] = t.Name
+				ids[t.Name] = t.ID
+			}
+			editable.IssueType.Options = typeNames
+			editable.IssueTypeNameToID = ids
+		}
+	}
 
 	return nil
 }

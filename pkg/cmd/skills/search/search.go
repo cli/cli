@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/registry"
@@ -182,8 +183,8 @@ func (s skillResult) qualifiedName() string {
 }
 
 // ExportData implements cmdutil.exportable for --json output.
-func (s skillResult) ExportData(fields []string) map[string]interface{} {
-	data := map[string]interface{}{}
+func (s skillResult) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "repo":
@@ -304,11 +305,9 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		pathResult, pathErr = executeSearch(client, host, pathQ, 1, searchPageSize)
-	}()
+	})
 
 	// When no explicit --owner is set and the query looks like it could be a
 	// GitHub username, fire an additional user:<query> search to discover
@@ -316,11 +315,9 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 	// everything else (no scoring boost).
 	if owner == "" && couldBeOwner(queryTerm) {
 		ownerQ := fmt.Sprintf("filename:SKILL.md user:%s", queryTerm)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			ownerResult, ownerErr = executeSearch(client, host, ownerQ, 1, searchPageSize)
-		}()
+		})
 	}
 
 	// When the query has spaces (e.g. "mcp apps"), run an additional content
@@ -328,11 +325,9 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 	// whose names use hyphens as word separators.
 	if hasSpaces {
 		hyphenQ := fmt.Sprintf("filename:SKILL.md %s%s", pathTerm, ownerScope)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			hyphenResult, hyphenErr = executeSearch(client, host, hyphenQ, 1, searchPageSize)
-		}()
+		})
 	}
 
 	// Primary content search runs on the main goroutine.
@@ -374,9 +369,6 @@ func noResults(opts *SearchOptions, msg string) error {
 // performance. Pre-ranking ensures the best candidates are at the top.
 func truncateForProcessing(skills []skillResult, page, limit int) []skillResult {
 	maxToProcess := page * limit * 3
-	if maxToProcess < limit*3 {
-		maxToProcess = limit * 3
-	}
 	if len(skills) > maxToProcess {
 		return skills[:maxToProcess]
 	}
@@ -420,10 +412,7 @@ func paginate(skills []skillResult, page, limit int) ([]skillResult, int) {
 	if start >= total {
 		return nil, totalPages
 	}
-	end := start + limit
-	if end > total {
-		end = total
-	}
+	end := min(start+limit, total)
 	return skills[start:end], totalPages
 }
 
@@ -493,10 +482,7 @@ func renderResults(opts *SearchOptions, skills []skillResult, totalPages int) er
 func renderTable(io *iostreams.IOStreams, skills []skillResult) error {
 	isTTY := io.IsStdoutTTY()
 	tw := io.TerminalWidth()
-	descWidth := tw - 70
-	if descWidth < 20 {
-		descWidth = 20
-	}
+	descWidth := max(tw-70, 20)
 
 	table := tableprinter.New(io, tableprinter.WithHeader("REPOSITORY", "SKILL", "DESCRIPTION", "STARS"))
 	for _, s := range skills {
@@ -523,10 +509,7 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 	// Reserve space for the checkbox UI prefix ("[ ] ") and the description
 	// indent ("\n       " = 7 chars), then use the remaining terminal width.
 	tw := opts.IO.TerminalWidth()
-	descWidth := tw - 11
-	if descWidth < 30 {
-		descWidth = 30
-	}
+	descWidth := max(tw-11, 30)
 
 	options := make([]string, len(skills))
 	for i, s := range skills {
@@ -733,10 +716,15 @@ const rateLimitErrorMessage = "GitHub API rate limit exceeded. Please wait a min
 
 // executeSearch performs a single GitHub Code Search API call.
 func executeSearch(client *api.Client, host, query string, page, pageSize int) (*codeSearchResult, error) {
-	apiPath := fmt.Sprintf("search/code?q=%s&per_page=%d&page=%d",
-		url.QueryEscape(query), pageSize, page)
+	apiPath, err := safeurl.JoinPath("search", "code")
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("q", query)
+	apiPath.SetQuery("per_page", strconv.Itoa(pageSize))
+	apiPath.SetQuery("page", strconv.Itoa(page))
 	var result codeSearchResult
-	err := client.REST(host, "GET", apiPath, nil, &result)
+	err = client.REST(host, "GET", apiPath.String(), nil, &result)
 	if err != nil && isRateLimitError(err) {
 		return nil, fmt.Errorf("%s", rateLimitErrorMessage)
 	}
@@ -752,10 +740,7 @@ func fetchPrimaryPages(client *api.Client, host, query string, displayPage, disp
 	// good buffer for typical filter rates while staying well within
 	// the rate-limit budget.
 	needed := displayPage * displayLimit * 3
-	numPages := (needed + searchPageSize - 1) / searchPageSize
-	if numPages < 1 {
-		numPages = 1
-	}
+	numPages := max((needed+searchPageSize-1)/searchPageSize, 1)
 	maxAPIPages := maxResults / searchPageSize
 	if numPages > maxAPIPages {
 		numPages = maxAPIPages
@@ -855,7 +840,7 @@ func fetchDescriptions(client *api.Client, host string, skills []skillResult) ma
 			if err != nil {
 				return
 			}
-			result, err := frontmatter.Parse(content)
+			result, err := frontmatter.Parse(content.Raw())
 			if err != nil {
 				return
 			}
@@ -914,9 +899,12 @@ func fetchRepoStars(client *api.Client, host string, skills []skillResult) map[i
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			apiPath := fmt.Sprintf("repos/%s/%s", owner, repo)
+			apiPath, err := safeurl.JoinPath("repos", owner, repo)
+			if err != nil {
+				return
+			}
 			var info repoInfo
-			if err := client.REST(host, "GET", apiPath, nil, &info); err != nil {
+			if err := client.REST(host, "GET", apiPath.String(), nil, &info); err != nil {
 				return
 			}
 			mu.Lock()

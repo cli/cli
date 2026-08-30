@@ -142,7 +142,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -185,7 +185,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -229,7 +229,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -262,6 +262,43 @@ func TestPreviewRun(t *testing.T) {
 			wantStdout: "My Skill",
 		},
 		{
+			name: "preview by arbitrary nested skill path skips full discovery",
+			tty:  true,
+			opts: &PreviewOptions{
+				repo:      ghrepo.New("owner", "repo"),
+				SkillName: "packages/agent-skills/code-review",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/contents/packages%2Fagent-skills"),
+					httpmock.StringResponse(`[
+						{"name": "code-review", "path": "packages/agent-skills/code-review", "sha": "treeSHA4", "type": "dir"}
+					]`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/trees/treeSHA4"),
+					httpmock.StringResponse(`{
+						"tree": [
+							{"path": "SKILL.md", "type": "blob", "sha": "blob999", "size": 50}
+						]
+					}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/blobs/blob999"),
+					httpmock.StringResponse(`{"sha": "blob999", "content": "`+encodedContent+`", "encoding": "base64"}`),
+				)
+			},
+			wantStdout: "My Skill",
+		},
+		{
 			name: "skill not found",
 			tty:  true,
 			opts: &PreviewOptions{
@@ -274,7 +311,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -303,7 +340,7 @@ func TestPreviewRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -331,11 +368,11 @@ func TestPreviewRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				// ResolveRef with explicit version tries branch first, then tag, then commit
 				reg.Register(
-					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/heads/abc123def456"),
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/heads%2Fabc123def456"),
 					httpmock.StatusStringResponse(404, "not found"),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/tags/abc123def456"),
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/tags%2Fabc123def456"),
 					httpmock.StatusStringResponse(404, "not found"),
 				)
 				reg.Register(
@@ -427,7 +464,7 @@ func TestPreviewRun_Interactive(t *testing.T) {
 		httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 	)
 	reg.Register(
-		httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+		httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 		httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 	)
 	reg.Register(
@@ -502,7 +539,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -591,7 +628,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -740,7 +777,7 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -879,7 +916,7 @@ func TestPreviewRun_InteractiveTelemetryCapturesSelectedSkillName(t *testing.T) 
 		httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 	)
 	reg.Register(
-		httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+		httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 		httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 	)
 	reg.Register(
@@ -909,7 +946,7 @@ func TestPreviewRun_InteractiveTelemetryCapturesSelectedSkillName(t *testing.T) 
 	)
 	reg.Register(
 		httpmock.REST("GET", "repos/owner/repo"),
-		httpmock.JSONResponse(map[string]interface{}{
+		httpmock.JSONResponse(map[string]any{
 			"visibility": "public",
 		}),
 	)
@@ -991,7 +1028,7 @@ func TestPreviewRun_TelemetryVisibility(t *testing.T) {
 				httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 			)
 			reg.Register(
-				httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+				httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 				httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 			)
 			reg.Register(
@@ -1025,7 +1062,7 @@ func TestPreviewRun_TelemetryVisibility(t *testing.T) {
 			} else {
 				reg.Register(
 					httpmock.REST("GET", "repos/owner/repo"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"visibility": tt.visibility,
 					}),
 				)
@@ -1186,7 +1223,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -1234,7 +1271,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(
@@ -1292,7 +1329,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 		)
 		reg.Register(
-			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags%2Fv1.0.0"),
 			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
 		)
 		reg.Register(

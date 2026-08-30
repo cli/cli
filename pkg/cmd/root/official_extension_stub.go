@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -38,25 +39,28 @@ func NewCmdOfficialExtensionStub(io *iostreams.IOStreams, p prompter.Prompter, e
 func officialExtensionStubRun(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension) error {
 	stderr := io.ErrOut
 
-	if !io.CanPrompt() {
-		fmt.Fprint(stderr, heredoc.Docf(`
-			%[1]s is available as an official extension.
-			To install it, run:
-			  gh extension install %[2]s/%[3]s
-		`, fmt.Sprintf("gh %s", ext.Name), ext.Owner, ext.Repo))
-		return nil
-	}
-
-	prompt := heredoc.Docf(`
-		%[1]s is available as an official extension.
-		Would you like to install it now?
-	`, fmt.Sprintf("gh %s", ext.Name))
-	confirmed, err := p.Confirm(prompt, true)
-	if err != nil {
-		return err
-	}
-	if !confirmed {
-		return nil
+	// In CI, skip the prompt so agents and CI runners don't block on Y/n.
+	if !ci.IsCI() {
+		if io.CanPrompt() {
+			prompt := heredoc.Docf(`
+				%[1]s is available as an official extension.
+				Would you like to install it now?
+			`, fmt.Sprintf("gh %s", ext.Name))
+			confirmed, err := p.Confirm(prompt, true)
+			if err != nil {
+				return err
+			}
+			if !confirmed {
+				return nil
+			}
+		} else {
+			fmt.Fprint(stderr, heredoc.Docf(`
+				%[1]s is available as an official extension.
+				To install it, run:
+				  gh extension install %[2]s/%[3]s
+			`, fmt.Sprintf("gh %s", ext.Name), ext.Owner, ext.Repo))
+			return cmdutil.SilentError
+		}
 	}
 
 	repo := ext.Repository()

@@ -53,6 +53,7 @@ func Main() exitCode {
 	buildDate := build.Date
 	buildVersion := build.Version
 	hasDebug, _ := utils.IsDebugEnabled()
+	invokingAgent := agents.Detect()
 
 	cfg, cfgErr := config.NewConfig()
 	if cfgErr != nil {
@@ -62,7 +63,7 @@ func Main() exitCode {
 
 	var ioStreams *iostreams.IOStreams
 	if cfgErr == nil {
-		ioStreams = newIOStreams(cfg)
+		ioStreams = newIOStreams(cfg, invokingAgent)
 	} else {
 		ioStreams = iostreams.System()
 	}
@@ -73,7 +74,7 @@ func Main() exitCode {
 	additionalCommonDimensions := ghtelemetry.Dimensions{
 		"version":             strings.TrimPrefix(buildVersion, "v"),
 		"is_tty":              strconv.FormatBool(ioStreams.IsStdoutTTY()),
-		"agent":               string(agents.Detect()),
+		"agent":               string(invokingAgent),
 		"ci":                  strconv.FormatBool(ci.IsCI()),
 		"github_actions":      strconv.FormatBool(ci.IsGitHubActions()),
 		"accessible_colors":   strconv.FormatBool(ioStreams.AccessibleColorsEnabled()),
@@ -129,7 +130,7 @@ func Main() exitCode {
 	}
 	defer telemetryService.Flush()
 
-	cmdFactory := factory.New(buildVersion, string(agents.Detect()), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
+	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
 
 	if cfgErr == nil {
 		var m migration.MultiAccount
@@ -346,7 +347,7 @@ func isUnderHomebrew(ghBinary string) bool {
 	return strings.HasPrefix(ghBinary, brewBinPrefix)
 }
 
-func newIOStreams(cfg gh.Config) *iostreams.IOStreams {
+func newIOStreams(cfg gh.Config, invokingAgent agents.AgentName) *iostreams.IOStreams {
 	io := iostreams.System()
 
 	if _, ghPromptDisabled := os.LookupEnv("GH_PROMPT_DISABLED"); ghPromptDisabled {
@@ -378,7 +379,9 @@ func newIOStreams(cfg gh.Config) *iostreams.IOStreams {
 		if !slices.Contains(falseyValues, ghSpinnerDisabledValue) {
 			io.SetSpinnerDisabled(true)
 		}
-	} else if spinnerDisabled := cfg.Spinner(""); spinnerDisabled.Value == "disabled" {
+	} else if invokingAgent != "" {
+		io.SetSpinnerDisabled(true)
+	} else if spinner := cfg.Spinner(""); spinner.Value == "disabled" {
 		io.SetSpinnerDisabled(true)
 	}
 

@@ -3,7 +3,6 @@ package extension
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -11,15 +10,22 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	url := fmt.Sprintf("%srepos/%s/%s", ghinstance.RESTPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
-	req, err := http.NewRequest("GET", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
 	if err != nil {
 		return false, err
 	}
 
+	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
+	if err != nil {
+		return false, err
+	}
+
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to its exact-status contract and body-blind response handling.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return false, err
@@ -27,9 +33,9 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
-	case 200:
+	case http.StatusOK:
 		return true, nil
-	case 404:
+	case http.StatusNotFound:
 		return false, nil
 	default:
 		return false, api.HandleHTTPError(resp)
@@ -37,26 +43,22 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 }
 
 func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	path := fmt.Sprintf("repos/%s/%s/contents/%s",
-		repo.RepoOwner(), repo.RepoName(), repo.RepoName())
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "contents", repo.RepoName())
 	if err != nil {
 		return false, err
 	}
 
-	resp, err := httpClient.Do(req)
+	// The response body is not decoded, because a script is considered present for any
+	// successful response regardless of the content type reported.
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodGet, path.String(), nil, nil)
 	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		return false, nil
-	}
-
-	if resp.StatusCode > 299 {
-		err = api.HandleHTTPError(resp)
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 
@@ -74,15 +76,17 @@ type release struct {
 }
 
 // downloadAsset downloads a single asset to the given file path.
-func downloadAsset(httpClient *http.Client, asset releaseAsset, destPath string) (downloadErr error) {
+func downloadAsset(httpClient *http.Client, assetURL safeurl.SafeURL, destPath string) (downloadErr error) {
 	var req *http.Request
-	if req, downloadErr = http.NewRequest("GET", asset.APIURL, nil); downloadErr != nil {
+	if req, downloadErr = http.NewRequest("GET", assetURL.String(), nil); downloadErr != nil {
 		return
 	}
 
 	req.Header.Set("Accept", "application/octet-stream")
 
 	var resp *http.Response
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to its custom Accept header and binary response streaming.
 	if resp, downloadErr = httpClient.Do(req); downloadErr != nil {
 		return
 	}
@@ -113,34 +117,26 @@ var repositoryNotFoundErr = errors.New("repository not found")
 
 // fetchLatestRelease finds the latest published release for a repository.
 func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
-	path := fmt.Sprintf("repos/%s/%s/releases/latest", baseRepo.RepoOwner(), baseRepo.RepoName())
-	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	path, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "latest")
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
+	var data json.RawMessage
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(baseRepo.RepoHost(), http.MethodGet, path.String(), nil, &data)
 	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		return nil, releaseNotFoundErr
-	}
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return nil, releaseNotFoundErr
+		}
 		return nil, err
 	}
 
 	var r release
-	err = json.Unmarshal(b, &r)
-	if err != nil {
+	if err := json.Unmarshal(data, &r); err != nil {
 		return nil, err
 	}
 
@@ -149,35 +145,26 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 
 // fetchReleaseFromTag finds release by tag name for a repository
 func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*release, error) {
-	fullRepoName := fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), baseRepo.RepoName())
-	path := fmt.Sprintf("repos/%s/releases/tags/%s", fullRepoName, tagName)
-	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	path, err := safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
+	var data json.RawMessage
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err = api.NewClientFromHTTP(httpClient).REST(baseRepo.RepoHost(), http.MethodGet, path.String(), nil, &data)
 	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode == 404 {
-		return nil, releaseNotFoundErr
-	}
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return nil, releaseNotFoundErr
+		}
 		return nil, err
 	}
 
 	var r release
-	err = json.Unmarshal(b, &r)
-	if err != nil {
+	if err := json.Unmarshal(data, &r); err != nil {
 		return nil, err
 	}
 
@@ -186,14 +173,18 @@ func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tag
 
 // fetchCommitSHA finds full commit SHA from a target ref in a repo
 func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRef string) (string, error) {
-	path := fmt.Sprintf("repos/%s/%s/commits/%s", baseRepo.RepoOwner(), baseRepo.RepoName(), targetRef)
-	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(baseRepo.RepoHost()), "repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "commits", targetRef)
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return "", err
 	}
 
 	req.Header.Set("Accept", "application/vnd.github.v3.sha")
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to its custom Accept header and bare SHA response body.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err

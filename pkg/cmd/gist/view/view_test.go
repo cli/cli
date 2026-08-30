@@ -148,6 +148,100 @@ func Test_viewRun(t *testing.T) {
 			wantOut: "bwhiizzzbwhuiiizzzz\n",
 		},
 		{
+			name:  "truncated raw file with escape sequences is sanitized on a terminal",
+			isTTY: true,
+			opts: &ViewOptions{
+				Selector:  "1234",
+				ListFiles: false,
+			},
+			mockGist: &shared.Gist{
+				Files: map[string]*shared.GistFile{
+					"escaped.txt": {
+						Type:      "text/plain",
+						Content:   "",
+						Truncated: true,
+						RawURL:    "https://gist.githubusercontent.com/user/1234/raw/escaped.txt",
+					},
+				},
+			},
+			wantOut: "danger^[[31m\n",
+		},
+		{
+			name:  "piped truncated raw file with escape sequences is refused",
+			isTTY: false,
+			opts: &ViewOptions{
+				Selector:  "1234",
+				ListFiles: false,
+			},
+			mockGist: &shared.Gist{
+				Files: map[string]*shared.GistFile{
+					"escaped.txt": {
+						Type:      "text/plain",
+						Content:   "",
+						Truncated: true,
+						RawURL:    "https://gist.githubusercontent.com/user/1234/raw/escaped.txt",
+					},
+				},
+			},
+			wantErr: "gist file contains terminal escape sequences; pass --allow-escape-sequences to view it anyway",
+		},
+		{
+			name:  "piped truncated clean file passes through raw",
+			isTTY: false,
+			opts: &ViewOptions{
+				Selector:  "1234",
+				ListFiles: false,
+			},
+			mockGist: &shared.Gist{
+				Files: map[string]*shared.GistFile{
+					"clean-truncated.txt": {
+						Type:      "text/plain",
+						Content:   "",
+						Truncated: true,
+						RawURL:    "https://gist.githubusercontent.com/user/1234/raw/clean-truncated.txt",
+					},
+				},
+			},
+			wantOut: "clean text\n",
+		},
+		{
+			name:  "piped truncated file with escape sequences passes through with --allow-escape-sequences",
+			isTTY: false,
+			opts: &ViewOptions{
+				Selector:             "1234",
+				ListFiles:            false,
+				AllowEscapeSequences: true,
+			},
+			mockGist: &shared.Gist{
+				Files: map[string]*shared.GistFile{
+					"escaped.txt": {
+						Type:      "text/plain",
+						Content:   "",
+						Truncated: true,
+						RawURL:    "https://gist.githubusercontent.com/user/1234/raw/escaped.txt",
+					},
+				},
+			},
+			wantOut: "danger\x1b[31m\n",
+		},
+		{
+			name:  "piped inline file escapes are already neutralized by the JSON transport",
+			isTTY: false,
+			opts: &ViewOptions{
+				Selector:  "1234",
+				ListFiles: false,
+			},
+			mockGist: &shared.Gist{
+				Files: map[string]*shared.GistFile{
+					"inline-escaped.txt": {
+						Type:    "text/plain",
+						Content: "danger\x1b[31m",
+					},
+				},
+			},
+			wantOut: "danger^[[31m\n",
+		},
+		{
 			name:  "one file, no ID supplied",
 			isTTY: true,
 			opts: &ViewOptions{
@@ -453,6 +547,12 @@ func Test_viewRun(t *testing.T) {
 					} else if filename == "also-truncated.txt" {
 						reg.Register(httpmock.REST("GET", "user/1234/raw/also-truncated.txt"),
 							httpmock.StringResponse("This is the full content of the also-truncated file retrieved from raw URL"))
+					} else if filename == "escaped.txt" {
+						reg.Register(httpmock.REST("GET", "user/1234/raw/escaped.txt"),
+							httpmock.StringResponse("danger\x1b[31m"))
+					} else if filename == "clean-truncated.txt" {
+						reg.Register(httpmock.REST("GET", "user/1234/raw/clean-truncated.txt"),
+							httpmock.StringResponse("clean text"))
 					}
 				}
 			}
@@ -493,7 +593,7 @@ func Test_viewRun(t *testing.T) {
 		}
 
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		ios, _, stdout, _ := iostreams.Test()

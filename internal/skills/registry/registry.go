@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -29,6 +30,8 @@ const (
 	ScopeUser    Scope = "user"
 
 	DefaultAgentID = "github-copilot"
+
+	claudeConfigDirEnv = "CLAUDE_CONFIG_DIR"
 
 	sharedProjectSkillsDir = ".agents/skills"
 )
@@ -74,11 +77,30 @@ var Agents = []AgentHost{
 		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".gemini/skills",
 	},
+
+	// Antigravity documents three surfaces that share the .agents/skills
+	// project dir but each read user-scope skills from a different global
+	// dir. Each UserDir below is the global path from that surface's docs.
 	{
+		// https://antigravity.google/docs/ide/skills
 		ID:         "antigravity",
 		Name:       "Antigravity",
 		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".gemini/antigravity/skills",
+	},
+	{
+		// https://antigravity.google/docs/cli/plugins#agent-skills
+		ID:         "antigravity-cli",
+		Name:       "Antigravity CLI",
+		ProjectDir: sharedProjectSkillsDir,
+		UserDir:    ".gemini/antigravity-cli/skills",
+	},
+	{
+		// https://antigravity.google/docs/skills
+		ID:         "antigravity2.0",
+		Name:       "Antigravity 2.0",
+		ProjectDir: sharedProjectSkillsDir,
+		UserDir:    ".gemini/config/skills",
 	},
 
 	// All other supported agents, alphabetical by ID.
@@ -149,6 +171,12 @@ var Agents = []AgentHost{
 		UserDir:    ".deepagents/agent/skills",
 	},
 	{
+		ID:         "devin",
+		Name:       "Devin",
+		ProjectDir: ".devin/skills",
+		UserDir:    ".devin/skills",
+	},
+	{
 		ID:         "droid",
 		Name:       "Droid",
 		ProjectDir: ".factory/skills",
@@ -165,6 +193,12 @@ var Agents = []AgentHost{
 		Name:       "Goose",
 		ProjectDir: ".goose/skills",
 		UserDir:    ".config/goose/skills",
+	},
+	{
+		ID:         "grok",
+		Name:       "Grok",
+		ProjectDir: ".grok/skills",
+		UserDir:    ".grok/skills",
 	},
 	{
 		ID:         "iflow-cli",
@@ -296,19 +330,13 @@ var Agents = []AgentHost{
 		ID:         "universal",
 		Name:       "Universal",
 		ProjectDir: sharedProjectSkillsDir,
-		UserDir:    ".config/agents/skills",
+		UserDir:    sharedProjectSkillsDir,
 	},
 	{
 		ID:         "warp",
 		Name:       "Warp",
 		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".agents/skills",
-	},
-	{
-		ID:         "windsurf",
-		Name:       "Windsurf",
-		ProjectDir: ".windsurf/skills",
-		UserDir:    ".codeium/windsurf/skills",
 	},
 	{
 		ID:         "zencoder",
@@ -387,6 +415,11 @@ func (h *AgentHost) InstallDir(scope Scope, gitRoot, homeDir string) (string, er
 		}
 		return filepath.Join(gitRoot, h.ProjectDir), nil
 	case ScopeUser:
+		if h.ID == "claude-code" {
+			if configDir := os.Getenv(claudeConfigDirEnv); configDir != "" {
+				return filepath.Join(configDir, "skills"), nil
+			}
+		}
 		if homeDir == "" {
 			return "", fmt.Errorf("could not determine home directory")
 		}

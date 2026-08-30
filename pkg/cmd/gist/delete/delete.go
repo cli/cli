@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -142,8 +143,11 @@ func deleteRun(opts *DeleteOptions) error {
 }
 
 func deleteGist(apiClient *api.Client, hostname string, gistID string) error {
-	path := "gists/" + gistID
-	err := apiClient.REST(hostname, "DELETE", path, nil, nil)
+	path, err := safeurl.JoinPath("gists", gistID)
+	if err != nil {
+		return err
+	}
+	err = apiClient.REST(hostname, "DELETE", path.String(), nil, nil)
 	if err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {

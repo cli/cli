@@ -27,6 +27,20 @@ func TestChooseVerifierWithNilPublicGood(t *testing.T) {
 	require.ErrorContains(t, err, "public good verifier is not available")
 }
 
+func TestChooseVerifierWithNilGitHub(t *testing.T) {
+	verifier := &LiveSigstoreVerifier{
+		Logger:       io.NewTestHandler(),
+		NoPublicGood: false,
+		PublicGood:   nil,
+		GitHub:       nil, // Simulate failed GitHub verifier initialization
+	}
+
+	_, err := verifier.chooseVerifier(GitHubIssuerOrg)
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "GitHub verifier is not available")
+}
+
 // TestChooseVerifierUnrecognizedIssuer tests that an error is returned
 // for unrecognized issuers.
 func TestChooseVerifierUnrecognizedIssuer(t *testing.T) {

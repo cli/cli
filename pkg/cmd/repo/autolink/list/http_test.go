@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -14,16 +15,20 @@ import (
 
 func TestAutolinkLister_List(t *testing.T) {
 	tests := []struct {
-		name   string
-		repo   ghrepo.Interface
-		resp   []shared.Autolink
-		status int
+		name              string
+		repo              ghrepo.Interface
+		resp              any
+		status            int
+		expectedAutolinks []shared.Autolink
+		expectedErrMsg    string
+		expectedStatus    int
 	}{
 		{
-			name:   "no autolinks",
-			repo:   ghrepo.New("OWNER", "REPO"),
-			resp:   []shared.Autolink{},
-			status: http.StatusOK,
+			name:              "no autolinks",
+			repo:              ghrepo.New("OWNER", "REPO"),
+			resp:              []shared.Autolink{},
+			status:            http.StatusOK,
+			expectedAutolinks: []shared.Autolink{},
 		},
 		{
 			name: "two autolinks",
@@ -43,11 +48,39 @@ func TestAutolinkLister_List(t *testing.T) {
 				},
 			},
 			status: http.StatusOK,
+			expectedAutolinks: []shared.Autolink{
+				{
+					ID:             1,
+					IsAlphanumeric: true,
+					KeyPrefix:      "key",
+					URLTemplate:    "https://example.com",
+				},
+				{
+					ID:             2,
+					IsAlphanumeric: false,
+					KeyPrefix:      "key2",
+					URLTemplate:    "https://example2.com",
+				},
+			},
 		},
 		{
-			name:   "http error",
-			repo:   ghrepo.New("OWNER", "REPO"),
-			status: http.StatusNotFound,
+			name: "404 repo not found",
+			repo: ghrepo.New("OWNER", "REPO"),
+			resp: map[string]any{
+				"message": "Not Found",
+			},
+			status:         http.StatusNotFound,
+			expectedErrMsg: "error getting autolinks: HTTP 404: Perhaps you are missing admin rights to the repository? (https://api.github.com/repos/OWNER/REPO/autolinks)",
+		},
+		{
+			name: "500 unexpected error",
+			repo: ghrepo.New("OWNER", "REPO"),
+			resp: map[string]any{
+				"message": "arbitrary error",
+			},
+			status:         http.StatusInternalServerError,
+			expectedErrMsg: "HTTP 500: arbitrary error (https://api.github.com/repos/OWNER/REPO/autolinks)",
+			expectedStatus: http.StatusInternalServerError,
 		},
 	}
 
@@ -64,12 +97,16 @@ func TestAutolinkLister_List(t *testing.T) {
 				HTTPClient: &http.Client{Transport: reg},
 			}
 			autolinks, err := autolinkLister.List(tt.repo)
-			if tt.status == http.StatusNotFound {
-				require.Error(t, err)
-				assert.Equal(t, "error getting autolinks: HTTP 404: Perhaps you are missing admin rights to the repository? (https://api.github.com/repos/OWNER/REPO/autolinks)", err.Error())
+			if tt.expectedErrMsg != "" {
+				require.EqualError(t, err, tt.expectedErrMsg)
+				if tt.expectedStatus != 0 {
+					var httpErr api.HTTPError
+					require.ErrorAs(t, err, &httpErr)
+					assert.Equal(t, tt.expectedStatus, httpErr.StatusCode)
+				}
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.resp, autolinks)
+				assert.Equal(t, tt.expectedAutolinks, autolinks)
 			}
 		})
 	}

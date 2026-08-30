@@ -191,22 +191,22 @@ func TestRunLink_Repo(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
 			"variables": map[string]string{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id":    "an ID",
 					"login": "monalisa",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -217,9 +217,9 @@ func TestRunLink_Repo(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -229,9 +229,9 @@ func TestRunLink_Repo(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"projectV2": map[string]string{
 						"id":    "project-ID",
 						"title": "first-project",
@@ -244,13 +244,13 @@ func TestRunLink_Repo(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "mutation LinkProjectV2ToRepository.*",
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"linkProjectV2ToRepository": map[string]interface{}{},
+		JSON(map[string]any{
+			"data": map[string]any{
+				"linkProjectV2ToRepository": map[string]any{},
 			},
 		})
 
@@ -259,9 +259,9 @@ func TestRunLink_Repo(t *testing.T) {
 		Post("/graphql").
 		BodyString(`.*query RepositoryInfo.*`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"repository": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"repository": map[string]any{
 					"id": "repo-ID",
 				},
 			},
@@ -280,7 +280,7 @@ func TestRunLink_Repo(t *testing.T) {
 			return http.DefaultClient, nil
 		},
 		config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		io: ios,
 	}
@@ -301,22 +301,22 @@ func TestRunLink_Team(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
 			"variables": map[string]string{
 				"login": "monalisa-org",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id":    "an ID",
 					"login": "monalisa-org",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -327,9 +327,9 @@ func TestRunLink_Team(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa-org",
 				"number":      1,
 				"firstItems":  0,
@@ -339,9 +339,9 @@ func TestRunLink_Team(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"projectV2": map[string]string{
 						"id":    "project-ID",
 						"title": "first-project",
@@ -354,13 +354,13 @@ func TestRunLink_Team(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "mutation LinkProjectV2ToTeam.*",
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"linkProjectV2ToTeam": map[string]interface{}{},
+		JSON(map[string]any{
+			"data": map[string]any{
+				"linkProjectV2ToTeam": map[string]any{},
 			},
 		})
 
@@ -369,10 +369,10 @@ func TestRunLink_Team(t *testing.T) {
 		Post("/graphql").
 		BodyString(`.*query OrganizationTeam.*`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
-					"team": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
+					"team": map[string]any{
 						"id": "team-ID",
 					},
 				},
@@ -392,7 +392,7 @@ func TestRunLink_Team(t *testing.T) {
 			return http.DefaultClient, nil
 		},
 		config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		io: ios,
 	}

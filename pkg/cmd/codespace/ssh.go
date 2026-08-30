@@ -498,8 +498,8 @@ func firstConfiguredKeyPair(
 		return nil, fmt.Errorf("could not load ssh configuration: %w", err)
 	}
 
-	configLines := strings.Split(string(configBytes), "\n")
-	for _, line := range configLines {
+	configLines := strings.SplitSeq(string(configBytes), "\n")
+	for line := range configLines {
 		line = strings.TrimSpace(line)
 
 		if strings.HasPrefix(line, "identityfile ") {
@@ -767,7 +767,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 
 	hasRemote := false
 	for _, arg := range args {
-		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
+		if rest, ok := strings.CutPrefix(arg, "remote:"); ok {
 			hasRemote = true
 			// scp treats each filename argument as a shell expression,
 			// subjecting it to expansion of environment variables, braces,

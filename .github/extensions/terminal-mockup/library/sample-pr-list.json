@@ -1,0 +1,14 @@
+{
+  "name": "Sample: gh pr list",
+  "savedAt": "2026-06-06T19:17:45.739Z",
+  "content": "[muted]$[/muted] [b]gh pr list[/b]\n\nShowing 4 of 4 open pull requests in [b]monalisa/my-project[/b]\n\n[brgreen]#142[/brgreen]  [b]Add support for OIDC tokens[/b]                  feature/oidc-tokens         about 1 hour ago\n[brgreen]#138[/brgreen]  [b]Fix race condition in token refresh[/b]          fix/token-race              about 3 hours ago\n[brgreen]#135[/brgreen]  [b]Bump dependencies to latest[/b]                  chore/bump-deps             yesterday\n[brgreen]#129[/brgreen]  [b]Refactor http client error handling[/b]          refactor/http-errors        2 days ago",
+  "options": {
+    "font": "menlo",
+    "fontSize": 14,
+    "width": 800,
+    "chrome": "macos",
+    "backdrop": "grid",
+    "bodyGradient": false,
+    "autoStyle": true
+  }
+}

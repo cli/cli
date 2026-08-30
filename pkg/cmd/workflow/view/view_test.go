@@ -289,7 +289,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(aWorkflow),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/flow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fflow.yml"),
 					httpmock.StringResponse(aWorkflowContent),
 				)
 			},
@@ -308,7 +308,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(aWorkflow),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/flow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fflow.yml"),
 					httpmock.StringResponse(aWorkflowContent),
 				)
 			},
@@ -327,7 +327,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(aWorkflow),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/flow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fflow.yml"),
 					httpmock.StatusStringResponse(404, "not Found"),
 				)
 			},
@@ -348,7 +348,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(aWorkflow),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/flow.yml"),
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github%2Fworkflows%2Fflow.yml"),
 					httpmock.StringResponse(aWorkflowContent),
 				)
 			},

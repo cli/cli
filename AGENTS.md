@@ -2,6 +2,10 @@
 
 This is the GitHub CLI (`gh`), a command-line tool for interacting with GitHub. The module path is `github.com/cli/cli/v2`.
 
+## Security Disclosures
+
+**Never** post security-related content - vulnerabilities, exploits, proofs of concept, or attack details - in any issue, pull request, comment, commit, or discussion. Stop and file a security advisory per [`.github/SECURITY.md`](.github/SECURITY.md).
+
 ## Build, Test, and Lint
 
 ```bash
@@ -70,6 +74,11 @@ Add `--json`, `--jq`, `--template` flags via `cmdutil.AddJSONFlags(cmd, &opts.Ex
 
 ## Testing
 
+Test architecture for commands should generally follow this pattern:
+
+- One table test for the command constructor (`NewCmdFoo`) to verify flag parsing and `Opts` curation.
+- One table test for the run function (`fooRun`) to verify business logic, output, and mocked HTTP/Git interactions.
+
 ### HTTP Mocking
 
 Use `httpmock.Registry` with `defer reg.Verify(t)` to ensure all stubs are called:
@@ -134,6 +143,7 @@ for _, tt := range tests {
 
 - Add godoc comments to all exported functions, types, and constants
 - Avoid unnecessary code comments — only comment when the *why* isn't obvious from the code
+- Comments that imbue sanitized and summarized context from your conversation with a human are very valuable. For example, if you found during development that without the code something downstream would break, that's good context to include.
 - Do not comment just to restate what the code does
 - Never use em dashes (—) in code, comments, or documentation; use regular dashes (-) or rewrite the sentence instead
 
@@ -150,7 +160,7 @@ Use `cmdutil.MutuallyExclusive("message", cond1, cond2)` for mutually exclusive 
 
 ## Feature Detection
 
-Commands using feature detection must include a `// TODO <cleanupIdentifier>` comment directly above the if-statement for linter compliance:
+Commands using feature detection for a temporary gate (one that will eventually be available on all GitHub API servers, i.e. `github.com`, GHEC, and GHES) must include a `// TODO <cleanupIdentifier>` comment directly above the if-statement for linter compliance:
 
 ```go
 // TODO someFeatureCleanup
@@ -161,6 +171,10 @@ if features.SomeCapability {
 }
 ```
 
+Use feature detection only when an API is not GA on all supported GHES versions; skip it for long-established APIs.
+
+A cleanup comment is not needed when the gate is permanent, i.e. the feature is not going to be supported on GHES.
+
 ## API Patterns
 
 ```go
@@ -169,4 +183,18 @@ client.GraphQL(hostname, query, variables, &data)
 client.REST(hostname, "GET", "repos/owner/repo", nil, &data)
 ```
 
-For host resolution, use `cfg.Authentication().DefaultHost()` — not `ghinstance.Default()` which always returns `github.com`.
+For host resolution, use `cfg.Authentication().DefaultHost()`; do not use `ghinstance.Default()` which always returns `github.com`.
+
+Avoid extra round-trips.
+
+## Pull Requests
+
+Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the PR body. Keep its headings and HTML comments, and fill in every section; write "N/A" rather than deleting one.
+
+## Code Review
+
+Review pull requests with the [`code-review` skill](.github/skills/code-review/SKILL.md).
+
+## Tech Debt
+
+Pay down tech debt with the [`tech-debt-burndown` skill](.github/skills/tech-debt-burndown/SKILL.md). It fixes one small, verifiable piece per run and opens a ready-to-review pull request. It is built to run unattended on a schedule, so it never asks questions, and it declines to run when the working tree is dirty or another burndown pull request is already open.

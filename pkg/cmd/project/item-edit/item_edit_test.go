@@ -21,16 +21,70 @@ func TestNewCmdeditItem(t *testing.T) {
 		wantsExporter bool
 	}{
 		{
-			name:        "missing-id",
+			name:        "no item selector flags",
 			cli:         "",
 			wantsErr:    true,
-			wantsErrMsg: "required flag(s) \"id\" not set",
+			wantsErrMsg: "specify the item to edit with `--id` or `--url`",
 		},
 		{
 			name:        "invalid-flags",
 			cli:         "--id 123 --text t --date 2023-01-01",
 			wantsErr:    true,
-			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` may be used",
+			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` may be used",
+		},
+		{
+			name:        "field and field-id conflict",
+			cli:         "--url https://github.com/o/r/issues/1 --field Status --field-id FIELD_ID",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--field` or `--field-id` may be used",
+		},
+		{
+			name:        "url and id conflict",
+			cli:         "--id 123 --url https://github.com/o/r/issues/1",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--url` or `--id` may be used",
+		},
+		{
+			name:        "value and single-select-option-id conflict",
+			cli:         "--url https://github.com/o/r/issues/1 --field Status --value Todo --single-select-option-id OPTION_ID",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id`, `--iteration-id` or `--value` may be used",
+		},
+		{
+			name:        "value requires field",
+			cli:         "1 --url https://github.com/o/r/issues/1 --value Todo",
+			wantsErr:    true,
+			wantsErrMsg: "`--value` requires `--field`",
+		},
+		{
+			name:        "value and field-id conflict",
+			cli:         "1 --owner monalisa --url https://github.com/o/r/issues/1 --field-id FIELD_ID --value Todo",
+			wantsErr:    true,
+			wantsErrMsg: "`--value` cannot be used with `--field-id`; name the field with `--field` to use `--value`",
+		},
+		{
+			name:        "field and id conflict",
+			cli:         "1 --owner monalisa --id ITEM_ID --field Status",
+			wantsErr:    true,
+			wantsErrMsg: "`--field` cannot be used with `--id`; use `--url` to address the item when editing by name",
+		},
+		{
+			name:        "name-based flags require project number",
+			cli:         "--owner monalisa --url https://github.com/o/r/issues/1 --field Status --value Todo",
+			wantsErr:    true,
+			wantsErrMsg: "provide the project number as an argument when using `--url`, `--field`, or `--value`",
+		},
+		{
+			name: "name-based flags",
+			cli:  "1 --owner monalisa --url https://github.com/o/r/issues/1 --field Status --value Todo",
+			wants: editItemOpts{
+				number32:     1,
+				owner:        "monalisa",
+				url:          "https://github.com/o/r/issues/1",
+				field:        "Status",
+				value:        "Todo",
+				valueChanged: true,
+			},
 		},
 		{
 			name: "item-id",
@@ -182,6 +236,12 @@ func TestNewCmdeditItem(t *testing.T) {
 			assert.Equal(t, tt.wants.titleChanged, gotOpts.titleChanged)
 			assert.Equal(t, tt.wants.bodyChanged, gotOpts.bodyChanged)
 			assert.Equal(t, tt.wants.body, gotOpts.body)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
+			assert.Equal(t, tt.wants.number32, gotOpts.number32)
+			assert.Equal(t, tt.wants.url, gotOpts.url)
+			assert.Equal(t, tt.wants.field, gotOpts.field)
+			assert.Equal(t, tt.wants.value, gotOpts.value)
+			assert.Equal(t, tt.wants.valueChanged, gotOpts.valueChanged)
 		})
 	}
 }
@@ -195,10 +255,10 @@ func TestRunItemEdit_Draft(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation EditDraftIssueItem.*","variables":{"input":{"draftIssueId":"DI_item_id","title":"a title","body":"a new body"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2DraftIssue": map[string]interface{}{
-					"draftIssue": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2DraftIssue": map[string]any{
+					"draftIssue": map[string]any{
 						"title": "a title",
 						"body":  "a new body",
 					},
@@ -238,9 +298,9 @@ func TestRunItemEdit_DraftTitleOnly(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"query DraftIssueByID.*","variables":{"id":"DI_item_id"}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"node": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"node": map[string]any{
 					"id":    "DI_item_id",
 					"title": "existing title",
 					"body":  "existing body",
@@ -252,10 +312,10 @@ func TestRunItemEdit_DraftTitleOnly(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation EditDraftIssueItem.*","variables":{"input":{"draftIssueId":"DI_item_id","title":"new title","body":"existing body"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2DraftIssue": map[string]interface{}{
-					"draftIssue": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2DraftIssue": map[string]any{
+					"draftIssue": map[string]any{
 						"title": "new title",
 						"body":  "existing body",
 					},
@@ -294,9 +354,9 @@ func TestRunItemEdit_DraftBodyOnly(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"query DraftIssueByID.*","variables":{"id":"DI_item_id"}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"node": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"node": map[string]any{
 					"id":    "DI_item_id",
 					"title": "existing title",
 					"body":  "existing body",
@@ -308,10 +368,10 @@ func TestRunItemEdit_DraftBodyOnly(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation EditDraftIssueItem.*","variables":{"input":{"draftIssueId":"DI_item_id","title":"existing title","body":"new body"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2DraftIssue": map[string]interface{}{
-					"draftIssue": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2DraftIssue": map[string]any{
+					"draftIssue": map[string]any{
 						"title": "existing title",
 						"body":  "new body",
 					},
@@ -350,8 +410,8 @@ func TestRunItemEdit_DraftFetchError(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"query DraftIssueByID.*","variables":{"id":"DI_item_id"}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"errors": []map[string]interface{}{
+		JSON(map[string]any{
+			"errors": []map[string]any{
 				{
 					"type":    "NOT_FOUND",
 					"message": "Could not resolve to a node with the global id of 'DI_item_id' (node)",
@@ -388,16 +448,16 @@ func TestRunItemEdit_Text(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"text":"item text"}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"body":   "body",
 							"title":  "title",
 							"number": 1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -434,17 +494,17 @@ func TestRunItemEdit_Number(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"number":123.45}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -487,17 +547,17 @@ func TestRunItemEdit_NumberZero(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"number":0}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -540,17 +600,17 @@ func TestRunItemEdit_Date(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"date":"2023-01-01T00:00:00Z"}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -587,17 +647,17 @@ func TestRunItemEdit_SingleSelect(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"singleSelectOptionId":"option_id"}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -634,17 +694,17 @@ func TestRunItemEdit_Iteration(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"iterationId":"option_id"}}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -726,17 +786,17 @@ func TestRunItemEdit_Clear(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation ClearItemFieldValue.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"clearProjectV2ItemFieldValue": map[string]interface{}{
-					"projectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"clearProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
 						"ID": "item_id",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"body":       "body",
 							"title":      "title",
 							"number":     1,
-							"repository": map[string]interface{}{
+							"repository": map[string]any{
 								"nameWithOwner": "my-repo",
 							},
 						},
@@ -775,10 +835,10 @@ func TestRunItemEdit_JSON(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation EditDraftIssueItem.*","variables":{"input":{"draftIssueId":"DI_item_id","title":"a title","body":"a new body"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2DraftIssue": map[string]interface{}{
-					"draftIssue": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2DraftIssue": map[string]any{
+					"draftIssue": map[string]any{
 						"id":    "DI_item_id",
 						"title": "a title",
 						"body":  "a new body",
@@ -809,4 +869,670 @@ func TestRunItemEdit_JSON(t *testing.T) {
 		t,
 		`{"id":"DI_item_id","title":"a title","body":"a new body","type":"DraftIssue"}`,
 		stdout.String())
+}
+
+func TestRunItemEdit_ByName_SingleSelect(t *testing.T) {
+	defer gock.Off()
+
+	// resolve owner
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]any{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"id": "user ID",
+				},
+			},
+			"errors": []any{
+				map[string]any{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// resolve project + fields
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query UserProject.*",
+			"variables": map[string]any{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"id": "project ID",
+						"fields": map[string]any{
+							"nodes": []map[string]any{
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "status ID",
+									"name":       "Status",
+									"dataType":   "SINGLE_SELECT",
+									"options": []map[string]any{
+										{"id": "opt_todo", "name": "Todo"},
+										{"id": "opt_done", "name": "Done"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	// resolve item by URL
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query GetProjectItemByURL.*",
+			"variables": map[string]any{
+				"url":        "https://github.com/monalisa/repo/issues/1",
+				"firstItems": queries.LimitMax,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"resource": map[string]any{
+					"__typename": "Issue",
+					"projectItems": map[string]any{
+						"nodes": []map[string]any{
+							{"id": "item ID", "project": map[string]any{"id": "project ID"}},
+						},
+					},
+				},
+			},
+		})
+
+	// mutation uses the resolved option ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"status ID","value":{"singleSelectOptionId":"opt_done"}}}}`).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
+						"id": "item ID",
+						"content": map[string]any{
+							"__typename": "Issue",
+							"title":      "an issue",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			owner:        "monalisa",
+			number32:     1,
+			url:          "https://github.com/monalisa/repo/issues/1",
+			field:        "Status",
+			value:        "Done",
+			valueChanged: true,
+		},
+		client: client,
+	}
+
+	err := runEditItem(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "Edited item \"an issue\"\n", stdout.String())
+}
+
+// TestRunItemEdit_ByName_ValueDispatch covers how --value is dispatched by the
+// resolved field's data type for the non single-select field types. The error
+// cases exercise the guard branches that reject a value before any write: since
+// those errors are only produced after the owner/project/item lookups succeed,
+// the exact error assertion proves the field-value mutation never fired.
+func TestRunItemEdit_ByName_ValueDispatch(t *testing.T) {
+	tests := []struct {
+		name         string
+		fieldNode    map[string]any
+		value        string
+		mutationBody string // expected mutation body; empty when no write should happen
+		wantErr      string // expected error; empty for happy paths
+	}{
+		{
+			name: "text field",
+			fieldNode: map[string]any{
+				"__typename": "ProjectV2Field",
+				"id":         "text ID",
+				"name":       "Text",
+				"dataType":   "TEXT",
+			},
+			value:        "hello",
+			mutationBody: `{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"text ID","value":{"text":"hello"}}}}`,
+		},
+		{
+			name: "number field",
+			fieldNode: map[string]any{
+				"__typename": "ProjectV2Field",
+				"id":         "number ID",
+				"name":       "Estimate",
+				"dataType":   "NUMBER",
+			},
+			value:        "123.45",
+			mutationBody: `{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"number ID","value":{"number":123.45}}}}`,
+		},
+		{
+			name: "date field",
+			fieldNode: map[string]any{
+				"__typename": "ProjectV2Field",
+				"id":         "date ID",
+				"name":       "Due",
+				"dataType":   "DATE",
+			},
+			value:        "2023-01-01",
+			mutationBody: `{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"date ID","value":{"date":"2023-01-01T00:00:00Z"}}}}`,
+		},
+		{
+			name: "invalid number value",
+			fieldNode: map[string]any{
+				"__typename": "ProjectV2Field",
+				"id":         "number ID",
+				"name":       "Estimate",
+				"dataType":   "NUMBER",
+			},
+			value:   "not-a-number",
+			wantErr: `invalid number value "not-a-number" for field "Estimate"`,
+		},
+		{
+			name: "iteration field rejected",
+			fieldNode: map[string]any{
+				"__typename": "ProjectV2IterationField",
+				"id":         "iteration ID",
+				"name":       "Sprint",
+				"dataType":   "ITERATION",
+			},
+			value:   "Sprint 1",
+			wantErr: "setting an iteration field by name is not supported; use `--iteration-id`",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+
+			// resolve owner
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				JSON(map[string]any{
+					"query": "query UserOrgOwner.*",
+					"variables": map[string]any{
+						"login": "monalisa",
+					},
+				}).
+				Reply(200).
+				JSON(map[string]any{
+					"data": map[string]any{
+						"user": map[string]any{
+							"id": "user ID",
+						},
+					},
+					"errors": []any{
+						map[string]any{
+							"type": "NOT_FOUND",
+							"path": []string{"organization"},
+						},
+					},
+				})
+
+			// resolve project + fields
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				JSON(map[string]any{
+					"query": "query UserProject.*",
+					"variables": map[string]any{
+						"login":       "monalisa",
+						"number":      1,
+						"firstItems":  queries.LimitMax,
+						"afterItems":  nil,
+						"firstFields": queries.LimitMax,
+						"afterFields": nil,
+					},
+				}).
+				Reply(200).
+				JSON(map[string]any{
+					"data": map[string]any{
+						"user": map[string]any{
+							"projectV2": map[string]any{
+								"id": "project ID",
+								"fields": map[string]any{
+									"nodes": []map[string]any{tt.fieldNode},
+								},
+							},
+						},
+					},
+				})
+
+			// resolve item by URL
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				JSON(map[string]any{
+					"query": "query GetProjectItemByURL.*",
+					"variables": map[string]any{
+						"url":        "https://github.com/monalisa/repo/issues/1",
+						"firstItems": queries.LimitMax,
+					},
+				}).
+				Reply(200).
+				JSON(map[string]any{
+					"data": map[string]any{
+						"resource": map[string]any{
+							"__typename": "Issue",
+							"projectItems": map[string]any{
+								"nodes": []map[string]any{
+									{"id": "item ID", "project": map[string]any{"id": "project ID"}},
+								},
+							},
+						},
+					},
+				})
+
+			if tt.mutationBody != "" {
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					BodyString(tt.mutationBody).
+					Reply(200).
+					JSON(map[string]any{
+						"data": map[string]any{
+							"updateProjectV2ItemFieldValue": map[string]any{
+								"projectV2Item": map[string]any{
+									"id": "item ID",
+									"content": map[string]any{
+										"__typename": "Issue",
+										"title":      "an issue",
+									},
+								},
+							},
+						},
+					})
+			}
+
+			client := queries.NewTestClient()
+
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+
+			config := editItemConfig{
+				io: ios,
+				opts: editItemOpts{
+					owner:        "monalisa",
+					number32:     1,
+					url:          "https://github.com/monalisa/repo/issues/1",
+					field:        tt.fieldNode["name"].(string),
+					value:        tt.value,
+					valueChanged: true,
+				},
+				client: client,
+			}
+
+			err := runEditItem(config)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				assert.True(t, gock.IsDone(), "the item should be resolved and no write attempted")
+				return
+			}
+			assert.NoError(t, err)
+			assert.True(t, gock.IsDone())
+			assert.Equal(t, "Edited item \"an issue\"\n", stdout.String())
+		})
+	}
+}
+
+func TestRunItemEdit_ByName_CaseInsensitive(t *testing.T) {
+	defer gock.Off()
+
+	// resolve owner
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]any{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"id": "user ID",
+				},
+			},
+			"errors": []any{
+				map[string]any{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// resolve project + fields
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query UserProject.*",
+			"variables": map[string]any{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"id": "project ID",
+						"fields": map[string]any{
+							"nodes": []map[string]any{
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"id":         "status ID",
+									"name":       "Status",
+									"dataType":   "SINGLE_SELECT",
+									"options": []map[string]any{
+										{"id": "opt_todo", "name": "Todo"},
+										{"id": "opt_inprog", "name": "In Progress"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	// resolve item by URL
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query GetProjectItemByURL.*",
+			"variables": map[string]any{
+				"url":        "https://github.com/monalisa/repo/issues/1",
+				"firstItems": queries.LimitMax,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"resource": map[string]any{
+					"__typename": "Issue",
+					"projectItems": map[string]any{
+						"nodes": []map[string]any{
+							{"id": "item ID", "project": map[string]any{"id": "project ID"}},
+						},
+					},
+				},
+			},
+		})
+
+	// mutation resolves the lowercase field/value inputs to their canonical IDs
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project ID","itemId":"item ID","fieldId":"status ID","value":{"singleSelectOptionId":"opt_inprog"}}}}`).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2ItemFieldValue": map[string]any{
+					"projectV2Item": map[string]any{
+						"id": "item ID",
+						"content": map[string]any{
+							"__typename": "Issue",
+							"title":      "an issue",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			owner:        "monalisa",
+			number32:     1,
+			url:          "https://github.com/monalisa/repo/issues/1",
+			field:        "status",
+			value:        "in progress",
+			valueChanged: true,
+		},
+		client: client,
+	}
+
+	err := runEditItem(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "Edited item \"an issue\"\n", stdout.String())
+	assert.True(t, gock.IsDone())
+}
+
+func TestRunItemEdit_ByName_FieldNotFound(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]any{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"id": "user ID",
+				},
+			},
+			"errors": []any{
+				map[string]any{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query UserProject.*",
+			"variables": map[string]any{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"id": "project ID",
+						"fields": map[string]any{
+							"nodes": []map[string]any{
+								{
+									"__typename": "ProjectV2Field",
+									"id":         "title ID",
+									"name":       "Title",
+									"dataType":   "TITLE",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, _, _ := iostreams.Test()
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			owner:        "monalisa",
+			number32:     1,
+			url:          "https://github.com/monalisa/repo/issues/1",
+			field:        "Status",
+			value:        "Done",
+			valueChanged: true,
+		},
+		client: client,
+	}
+
+	// The field resolves against the project fields, so no item lookup or
+	// mutation should fire; the error must list candidate field names.
+	err := runEditItem(config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `field "Status" not found`)
+	assert.Contains(t, err.Error(), "available fields: Title")
+	assert.True(t, gock.IsDone())
+}
+
+func TestRunItemEdit_ByName_WrongFieldType(t *testing.T) {
+	defer gock.Off()
+
+	// resolve owner
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]any{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"id": "user ID",
+				},
+			},
+			"errors": []any{
+				map[string]any{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// resolve project + fields: the project has a built-in Title field, which
+	// updateProjectV2ItemFieldValue does not support with --value.
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query UserProject.*",
+			"variables": map[string]any{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
+						"id": "project ID",
+						"fields": map[string]any{
+							"nodes": []map[string]any{
+								{
+									"__typename": "ProjectV2Field",
+									"id":         "title ID",
+									"name":       "Title",
+									"dataType":   "TITLE",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	// resolve item by URL: this fires before the value dispatch, but no
+	// mutation should follow.
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]any{
+			"query": "query GetProjectItemByURL.*",
+			"variables": map[string]any{
+				"url":        "https://github.com/monalisa/repo/issues/1",
+				"firstItems": queries.LimitMax,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"resource": map[string]any{
+					"__typename": "Issue",
+					"projectItems": map[string]any{
+						"nodes": []map[string]any{
+							{"id": "item ID", "project": map[string]any{"id": "project ID"}},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, _, _ := iostreams.Test()
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			owner:        "monalisa",
+			number32:     1,
+			url:          "https://github.com/monalisa/repo/issues/1",
+			field:        "Title",
+			value:        "a new title",
+			valueChanged: true,
+		},
+		client: client,
+	}
+
+	// The Title field resolves but its data type is not writable with --value,
+	// so a clean error is returned and no mutation fires.
+	err := runEditItem(config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `field "Title" has data type "TITLE"`)
+	assert.Contains(t, err.Error(), "not supported with `--value`")
+	assert.True(t, gock.IsDone())
 }

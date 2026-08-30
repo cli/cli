@@ -3,14 +3,15 @@ package garden
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*Commit, error) {
@@ -25,8 +26,14 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 
 	commits := []*Commit{}
 
-	pathF := func(page int) string {
-		return fmt.Sprintf("repos/%s/%s/commits?per_page=100&page=%d", repo.RepoOwner(), repo.RepoName(), page)
+	pathF := func(page int) (*safeurl.MutableSafeURL, error) {
+		u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "commits")
+		if err != nil {
+			return nil, err
+		}
+		u.SetQuery("per_page", "100")
+		u.SetQuery("page", strconv.Itoa(page))
+		return u, nil
 	}
 
 	page := 1
@@ -36,7 +43,11 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 			break
 		}
 		result := Result{}
-		links, err := getResponse(client, repo.RepoHost(), pathF(page), &result)
+		path, err := pathF(page)
+		if err != nil {
+			return nil, err
+		}
+		links, err := getResponse(client, path, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -69,9 +80,8 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 
 // getResponse performs the API call and returns the response's link header values.
 // If the "Link" header is missing, the returned slice will be nil.
-func getResponse(client *http.Client, host, path string, data interface{}) ([]string, error) {
-	url := ghinstance.RESTPrefix(host) + path
-	req, err := http.NewRequest("GET", url, nil)
+func getResponse(client *http.Client, url safeurl.SafeURL, data any) ([]string, error) {
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}

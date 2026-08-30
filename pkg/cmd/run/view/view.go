@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -260,11 +262,12 @@ func runView(opts *ViewOptions) error {
 
 	if shouldFetchJobs(opts) {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, run, attempt)
+		jobs, err = shared.GetJobs(client, repo, run.ID, safeurl.NewImmutableSafeURL(run.JobsURL), attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
+		run.Jobs = jobs
 	}
 
 	if opts.Prompt && len(jobs) > 1 {
@@ -298,11 +301,12 @@ func runView(opts *ViewOptions) error {
 
 	if selectedJob == nil && len(jobs) == 0 {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, run, attempt)
+		jobs, err = shared.GetJobs(client, repo, run.ID, safeurl.NewImmutableSafeURL(run.JobsURL), attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get jobs: %w", err)
 		}
+		run.Jobs = jobs
 	} else if selectedJob != nil {
 		jobs = []shared.Job{*selectedJob}
 	}
@@ -458,17 +462,17 @@ func shouldFetchJobs(opts *ViewOptions) bool {
 		return true
 	}
 	if opts.Exporter != nil {
-		for _, f := range opts.Exporter.Fields() {
-			if f == "jobs" {
-				return true
-			}
+		if slices.Contains(opts.Exporter.Fields(), "jobs") {
+			return true
 		}
 	}
 	return false
 }
 
-func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
-	req, err := http.NewRequest("GET", logURL, nil)
+func getLog(httpClient *http.Client, logURL safeurl.SafeURL) (io.ReadCloser, error) {
+	// TODO(api-client-rollout)
+	// This has been deferred from moving to api.Client due to streaming the run log ZIP response body for archive processing instead of decoding JSON.
+	req, err := http.NewRequest("GET", logURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -496,12 +500,16 @@ func getRunLog(cache RunLogCache, httpClient *http.Client, repo ghrepo.Interface
 
 	if !isCached {
 		// Run log does not exist in cache so retrieve and store it
-		logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
-			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID)
+		logURL, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", strconv.FormatInt(run.ID, 10), "logs")
+		if err != nil {
+			return nil, err
+		}
 
 		if attempt > 0 {
-			logURL = fmt.Sprintf("%srepos/%s/actions/runs/%d/attempts/%d/logs",
-				ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID, attempt)
+			logURL, err = safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", strconv.FormatInt(run.ID, 10), "attempts", strconv.FormatUint(attempt, 10), "logs")
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		resp, err := getLog(httpClient, logURL)

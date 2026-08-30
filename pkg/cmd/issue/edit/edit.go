@@ -1,19 +1,23 @@
 package edit
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/attachments"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
-	shared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -35,6 +39,21 @@ type EditOptions struct {
 	IssueNumbers []int
 	Interactive  bool
 
+	RemoveIssueType bool
+
+	Parent          string
+	RemoveParent    bool
+	AddSubIssues    []string
+	RemoveSubIssues []string
+	AddBlockedBy    []string
+	RemoveBlockedBy []string
+	AddBlocking     []string
+	RemoveBlocking  []string
+
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
+	Config     func() (gh.Config, error)
+
 	prShared.Editable
 }
 
@@ -42,6 +61,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := &EditOptions{
 		IO:                 f.IOStreams,
 		HttpClient:         f.HttpClient,
+		Config:             f.Config,
 		DetermineEditor:    func() (string, error) { return cmdutil.DetermineEditor(f.Config) },
 		FieldsToEditSurvey: prShared.FieldsToEditSurvey,
 		EditFieldsSurvey:   prShared.EditFieldsSurvey,
@@ -61,6 +81,21 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			Editing issues' projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 
+			Use %[1]s--attach%[1]s to upload an image or video to a single issue. Without a body
+			flag the issue keeps the body it already has and the attachment is appended to it.
+			If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
+			reference is rewritten to point at the uploaded asset instead.
+			You can attach up to 50 files per command.
+
+			Alt text for an image follows the path after %[1]s#%[1]s, as in
+			%[1]s--attach './login.png#The login error state'%[1]s. Without it the filename is used.
+			A reference already in the body keeps the alt text written there. Video renders
+			as a player and has no alt text, so it cannot be given any.
+
+			If some attachments upload and others fail, the issue is still updated with the
+			ones that succeeded. The command then exits with a non-zero status, but the edited
+			issue URLs are still printed to stdout.
+
 			The %[1]s--add-assignee%[1]s and %[1]s--remove-assignee%[1]s flags both support
 			the following special values:
 			- %[1]s@me%[1]s: assign or unassign yourself
@@ -75,11 +110,19 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --milestone "Version 1"
 			$ gh issue edit 23 --remove-milestone
 			$ gh issue edit 23 --body-file body.txt
+			$ gh issue edit 23 --attach './login.png#The login error state'
+			$ gh issue edit 23 --attach ./before.png --attach ./after.png
 			$ gh issue edit 23 34 --add-label "help wanted"
+			$ gh issue edit 23 --type Bug
+			$ gh issue edit 23 --remove-type
+			$ gh issue edit 23 --parent 100
+			$ gh issue edit 23 --remove-parent
+			$ gh issue edit 100 --add-sub-issue 123,124
+			$ gh issue edit 123 --add-blocked-by 200 --add-blocking 300,301
 		`),
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			issueNumbers, baseRepo, err := shared.ParseIssuesFromArgs(args)
+			issueNumbers, baseRepo, err := issueShared.ParseIssuesFromArgs(args)
 			if err != nil {
 				return err
 			}
@@ -127,6 +170,22 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--type` or `--remove-type`",
+				flags.Changed("type"),
+				opts.RemoveIssueType,
+			); err != nil {
+				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of --parent or --remove-parent",
+				flags.Changed("parent"),
+				opts.RemoveParent,
+			); err != nil {
+				return err
+			}
+
 			if flags.Changed("title") {
 				opts.Editable.Title.Edited = true
 			}
@@ -147,8 +206,22 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				// which results in milestone association removal. For reference,
 				// see the `Editable.MilestoneId` method.
 			}
+			if flags.Changed("type") {
+				opts.Editable.IssueType.Edited = true
+			}
 
-			if !opts.Editable.Dirty() {
+			resolved, err := opts.AttachFlag.UserAssets()
+			if err != nil {
+				return err
+			}
+			opts.Assets = resolved
+
+			// An empty --parent resolves to no work, so it counts as an edit
+			// only here, where passing the flag at all suppresses the survey.
+			hasDeferredFlags := opts.hasDeferredEdits() || flags.Changed("parent")
+
+			// Drop into interactive mode only if the user passed no edit flags at all.
+			if !opts.Editable.Dirty() && !hasDeferredFlags && len(opts.Assets) == 0 {
 				opts.Interactive = true
 			}
 
@@ -158,6 +231,14 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			if opts.Interactive && len(opts.IssueNumbers) > 1 {
 				return cmdutil.FlagErrorf("multiple issues cannot be edited interactively")
+			}
+
+			if len(opts.IssueNumbers) > 1 && len(opts.AddSubIssues) > 0 {
+				return cmdutil.FlagErrorf("`--add-sub-issue` cannot be used when editing multiple issues")
+			}
+
+			if len(opts.IssueNumbers) > 1 && len(opts.Assets) > 0 {
+				return cmdutil.FlagErrorf("`--attach` cannot be used when editing multiple issues")
 			}
 
 			if runF != nil {
@@ -179,8 +260,31 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the issue from projects by `title`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the issue belongs to by `name`")
 	cmd.Flags().BoolVar(&removeMilestone, "remove-milestone", false, "Remove the milestone association from the issue")
+	cmd.Flags().StringVar(&opts.Editable.IssueType.Value, "type", "", "Set the issue type by `name`")
+	cmd.Flags().BoolVar(&opts.RemoveIssueType, "remove-type", false, "Remove the issue type from the issue")
+	cmd.Flags().StringVar(&opts.Parent, "parent", "", "Set the parent issue by `number` or URL")
+	cmd.Flags().BoolVar(&opts.RemoveParent, "remove-parent", false, "Remove the parent issue")
+	cmd.Flags().StringSliceVar(&opts.AddSubIssues, "add-sub-issue", nil, "Add sub-issues by `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.RemoveSubIssues, "remove-sub-issue", nil, "Remove sub-issues by `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.AddBlockedBy, "add-blocked-by", nil, "Add 'blocked by' relationships by issue `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.RemoveBlockedBy, "remove-blocked-by", nil, "Remove 'blocked by' relationships by issue `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.AddBlocking, "add-blocking", nil, "Add 'blocking' relationships by issue `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.RemoveBlocking, "remove-blocking", nil, "Remove 'blocking' relationships by issue `number` or URL")
+	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	return cmd
+}
+
+// hasDeferredEdits reports whether the run asks for an edit that the deferred
+// update path applies, which Editable.Dirty() cannot see. Setting --type is
+// absent because it sets Editable.IssueType.Edited, which Dirty() already
+// covers; only --remove-type arrives here.
+func (opts *EditOptions) hasDeferredEdits() bool {
+	return opts.RemoveIssueType ||
+		opts.Parent != "" || opts.RemoveParent ||
+		len(opts.AddSubIssues) > 0 || len(opts.RemoveSubIssues) > 0 ||
+		len(opts.AddBlockedBy) > 0 || len(opts.RemoveBlockedBy) > 0 ||
+		len(opts.AddBlocking) > 0 || len(opts.RemoveBlocking) > 0
 }
 
 func editRun(opts *EditOptions) error {
@@ -196,6 +300,7 @@ func editRun(opts *EditOptions) error {
 
 	// Prompt the user which fields they'd like to edit.
 	editable := opts.Editable
+	editable.IssueType.Selectable = true
 	if opts.Interactive {
 		err = opts.FieldsToEditSurvey(opts.Prompter, &editable)
 		if err != nil {
@@ -239,11 +344,37 @@ func editRun(opts *EditOptions) error {
 	if editable.Milestone.Edited {
 		lookupFields = append(lookupFields, "milestone")
 	}
+	if editable.IssueType.Edited {
+		lookupFields = append(lookupFields, "issueType")
+	}
+	if opts.Parent != "" || opts.RemoveParent {
+		lookupFields = append(lookupFields, "parent")
+	}
+	if len(opts.Assets) > 0 {
+		lookupFields = append(lookupFields, "repository")
+	}
 
 	// Get all specified issues and make sure they are within the same repo.
-	issues, err := shared.FindIssuesOrPRs(httpClient, baseRepo, opts.IssueNumbers, lookupFields)
+	issues, err := issueShared.FindIssuesOrPRs(httpClient, baseRepo, opts.IssueNumbers, lookupFields)
 	if err != nil {
 		return err
+	}
+
+	// NewCmdEdit rejects --attach for more than one issue, so issues[0] is the
+	// only issue. This is the earliest its repository id and permission exist,
+	// so a run that cannot upload stops before any write.
+	var uploader *attachments.Uploader
+	if len(opts.Assets) > 0 {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+		host := baseRepo.RepoHost()
+		tokenType := cfg.Authentication().ActiveTokenType(host)
+		uploader, err = attachments.NewUploader(httpClient, tokenType, host, issues[0].RepositoryDatabaseID(), issues[0].RepositoryViewerPermission())
+		if err != nil {
+			return err
+		}
 	}
 
 	// Fetch editable shared fields once for all issues.
@@ -260,6 +391,42 @@ func editRun(opts *EditOptions) error {
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
+	}
+
+	// Resolve issue type ID before uploading in non-interactive mode.
+	// Interactive mode resolves after the survey sets the value.
+	var issueTypeID string
+	if !opts.Interactive {
+		issueTypeID, err = lookupIssueTypeID(&editable)
+		if err != nil {
+			return err
+		}
+	}
+
+	var uploadErr error
+	if uploader != nil {
+		// A body the caller supplied replaces the issue's, including an empty
+		// one.
+		body := editable.Body.Value
+		if !editable.Body.Edited {
+			body = issues[0].Body
+		}
+
+		// This sits outside the loop below so each file uploads once, and
+		// Clone carries the merged body into the issue. Nothing that can
+		// prompt or cancel may follow an upload.
+		var uploaded int
+		body, uploaded, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+
+		if uploaded > 0 {
+			editable.Body.Value = body
+			editable.Body.Edited = true
+		} else {
+			// The caller's body was written to carry an attachment that never
+			// arrived, so it does not replace what the issue has. Every other
+			// field the caller asked for still applies.
+			editable.Body.Edited = false
+		}
 	}
 
 	// Update all issues in parallel.
@@ -297,6 +464,9 @@ func editRun(opts *EditOptions) error {
 		if issue.Milestone != nil {
 			editable.Milestone.Default = issue.Milestone.Title
 		}
+		if issue.IssueType != nil {
+			editable.IssueType.Default = issue.IssueType.Name
+		}
 
 		// Allow interactive prompts for one issue; failed earlier if multiple issues specified.
 		if opts.Interactive {
@@ -308,15 +478,28 @@ func editRun(opts *EditOptions) error {
 			if err != nil {
 				return err
 			}
+			issueTypeID, err = lookupIssueTypeID(&editable)
+			if err != nil {
+				return err
+			}
 		}
 
 		g.Add(1)
 		go func(issue *api.Issue) {
 			defer g.Done()
 
-			err := prShared.UpdateIssue(httpClient, baseRepo, issue.ID, issue.IsPullRequest(), editable)
+			if err := prShared.UpdateIssue(httpClient, baseRepo, issue.ID, issue.IsPullRequest(), editable); err != nil {
+				failedIssueChan <- fmt.Sprintf("failed to update %s: %s", issue.URL, err)
+				return
+			}
+
+			mutations, err := deferredUpdateIssueOptions(apiClient, baseRepo, issue, opts, issueTypeID)
 			if err != nil {
 				failedIssueChan <- fmt.Sprintf("failed to update %s: %s", issue.URL, err)
+				return
+			}
+			if err := api.DeferredUpdateIssue(apiClient, mutations); err != nil {
+				failedIssueChan <- fmt.Sprintf("failed to update %s:\n%s", issue.URL, err)
 				return
 			}
 
@@ -338,8 +521,14 @@ func editRun(opts *EditOptions) error {
 	}
 
 	sort.Strings(editedIssueURLs)
-	for _, editedIssueURL := range editedIssueURLs {
-		fmt.Fprintln(opts.IO.Out, editedIssueURL)
+	// Attaching is the only edit this command drops after parsing the flags,
+	// so it is the only way to reach here with nothing written. An upload that
+	// placed a file sets the body edited, so a dirty editable means a write.
+	nothingWritten := len(opts.Assets) > 0 && !editable.Dirty() && !opts.hasDeferredEdits()
+	if !nothingWritten {
+		for _, editedIssueURL := range editedIssueURLs {
+			fmt.Fprintln(opts.IO.Out, editedIssueURL)
+		}
 	}
 
 	// Print a sorted list of failures to stderr.
@@ -354,8 +543,94 @@ func editRun(opts *EditOptions) error {
 	}
 
 	if len(failedIssueErrors) > 0 {
-		return fmt.Errorf("failed to update %s", text.Pluralize(len(failedIssueErrors), "issue"))
+		// A failed upload and a failed write have different remedies, so the
+		// write failure cannot stand in for both.
+		return errors.Join(uploadErr, fmt.Errorf("failed to update %s", text.Pluralize(len(failedIssueErrors), "issue")))
 	}
 
-	return nil
+	return uploadErr
+}
+
+// lookupIssueTypeID resolves the chosen issue type to its node ID using the
+// map populated by FetchOptions.
+func lookupIssueTypeID(editable *prShared.Editable) (string, error) {
+	if !editable.IssueType.Edited || editable.IssueType.Value == "" {
+		return "", nil
+	}
+	id, ok := editable.IssueTypeNameToID[editable.IssueType.Value]
+	if !ok {
+		return "", fmt.Errorf("type %q not found; available types: %s",
+			editable.IssueType.Value,
+			strings.Join(editable.IssueType.Options, ", "))
+	}
+	return id, nil
+}
+
+func deferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, issue *api.Issue, editOpts *EditOptions, issueTypeID string) (api.DeferredUpdateIssueOptions, error) {
+	updateOpts := api.DeferredUpdateIssueOptions{
+		IssueID:               issue.ID,
+		Hostname:              baseRepo.RepoHost(),
+		IssueTypeID:           issueTypeID,
+		RemoveIssueType:       editOpts.RemoveIssueType,
+		ReplaceExistingParent: true,
+	}
+
+	if editOpts.RemoveParent {
+		if issue.Parent != nil {
+			updateOpts.RemoveParentID = issue.Parent.ID
+		}
+	} else if editOpts.Parent != "" {
+		parentID, err := issueShared.ResolveIssueRef(client, baseRepo, editOpts.Parent)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --parent reference %q: %w", editOpts.Parent, err)
+		}
+		updateOpts.ParentID = parentID
+	}
+
+	for _, ref := range editOpts.AddSubIssues {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --add-sub-issue reference %q: %w", ref, err)
+		}
+		updateOpts.AddSubIssueIDs = append(updateOpts.AddSubIssueIDs, id)
+	}
+	for _, ref := range editOpts.RemoveSubIssues {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --remove-sub-issue reference %q: %w", ref, err)
+		}
+		updateOpts.RemoveSubIssueIDs = append(updateOpts.RemoveSubIssueIDs, id)
+	}
+
+	for _, ref := range editOpts.AddBlockedBy {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --add-blocked-by reference %q: %w", ref, err)
+		}
+		updateOpts.AddBlockedByIDs = append(updateOpts.AddBlockedByIDs, id)
+	}
+	for _, ref := range editOpts.RemoveBlockedBy {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --remove-blocked-by reference %q: %w", ref, err)
+		}
+		updateOpts.RemoveBlockedByIDs = append(updateOpts.RemoveBlockedByIDs, id)
+	}
+
+	for _, ref := range editOpts.AddBlocking {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --add-blocking reference %q: %w", ref, err)
+		}
+		updateOpts.AddBlockingIDs = append(updateOpts.AddBlockingIDs, id)
+	}
+	for _, ref := range editOpts.RemoveBlocking {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --remove-blocking reference %q: %w", ref, err)
+		}
+		updateOpts.RemoveBlockingIDs = append(updateOpts.RemoveBlockingIDs, id)
+	}
+
+	return updateOpts, nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -193,42 +194,60 @@ func fmtVisibility(s shared.Variable) string {
 }
 
 func getRepoVariables(client *http.Client, repo ghrepo.Interface) ([]shared.Variable, error) {
-	return getVariables(client, repo.RepoHost(), fmt.Sprintf("repos/%s/actions/variables", ghrepo.FullName(repo)))
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "variables")
+	if err != nil {
+		return nil, err
+	}
+	return getVariables(client, repo.RepoHost(), u)
 }
 
 func getEnvVariables(client *http.Client, repo ghrepo.Interface, envName string) ([]shared.Variable, error) {
-	path := fmt.Sprintf("repos/%s/environments/%s/variables", ghrepo.FullName(repo), envName)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "environments", envName, "variables")
+	if err != nil {
+		return nil, err
+	}
 	return getVariables(client, repo.RepoHost(), path)
 }
 
 func getOrgVariables(client *http.Client, host, orgName string, showSelectedRepoInfo bool) ([]shared.Variable, error) {
-	variables, err := getVariables(client, host, fmt.Sprintf("orgs/%s/actions/variables", orgName))
+	u, err := safeurl.JoinPath("orgs", orgName, "actions", "variables")
+	if err != nil {
+		return nil, err
+	}
+	variables, err := getVariables(client, host, u)
 	if err != nil {
 		return nil, err
 	}
 	apiClient := api.NewClientFromHTTP(client)
 	if showSelectedRepoInfo {
-		err = shared.PopulateMultipleSelectedRepositoryInformation(apiClient, host, variables)
-		if err != nil {
-			return nil, err
+		for i := range variables {
+			if variables[i].SelectedReposURL == "" {
+				continue
+			}
+			count, err := shared.SelectedRepositoryCount(apiClient, host, safeurl.NewImmutableSafeURL(variables[i].SelectedReposURL))
+			if err != nil {
+				return nil, fmt.Errorf("failed determining selected repositories for %s: %w", variables[i].Name, err)
+			}
+			variables[i].NumSelectedRepos = count
 		}
 	}
 	return variables, nil
 }
 
-func getVariables(client *http.Client, host, path string) ([]shared.Variable, error) {
+func getVariables(client *http.Client, host string, u *safeurl.MutableSafeURL) ([]shared.Variable, error) {
 	var results []shared.Variable
 	apiClient := api.NewClientFromHTTP(client)
-	path = fmt.Sprintf("%s?per_page=100", path)
-	for path != "" {
+	u.SetQuery("per_page", "100")
+	var pageURL safeurl.SafeURL = u
+	for pageURL.String() != "" {
 		response := struct {
 			Variables []shared.Variable
 		}{}
-		var err error
-		path, err = apiClient.RESTWithNext(host, "GET", path, nil, &response)
+		next, err := apiClient.RESTWithNext(host, "GET", pageURL.String(), nil, &response)
 		if err != nil {
 			return nil, err
 		}
+		pageURL = safeurl.NewImmutableSafeURL(next)
 		results = append(results, response.Variables...)
 	}
 	return results, nil

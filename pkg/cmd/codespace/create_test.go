@@ -32,6 +32,11 @@ func TestCreateCmdFlagError(t *testing.T) {
 			args:     "--web --idle-timeout 30m",
 			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
 		},
+		{
+			name:     "return error when --repo is not in owner/repo format",
+			args:     "--repo foo",
+			wantsErr: fmt.Errorf(`invalid value for --repo: expected the "OWNER/REPO" format, got "foo"`),
+		},
 	}
 
 	for _, tt := range tests {
@@ -99,7 +104,7 @@ func TestApp_Create(t *testing.T) {
 				machine:         "GIGA",
 				showStatus:      false,
 				idleTimeout:     30 * time.Minute,
-				retentionPeriod: NullableDuration{durationPtr(48 * time.Hour)},
+				retentionPeriod: NullableDuration{new(48 * time.Hour)},
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
@@ -164,7 +169,7 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with nonexistent machine results in error",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int64, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
 								Name:        "GIGA",
@@ -208,7 +213,7 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with devcontainer path results in selecting the correct machine type",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int64, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						if devcontainerPath == "" {
 							return []*api.Machine{
 								{
@@ -270,7 +275,7 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with default branch with default devcontainer if no path provided and no devcontainer files exist in the repo",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+					ListDevContainersFunc: func(ctx context.Context, repoID int64, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{}, nil
 					},
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
@@ -305,7 +310,7 @@ func TestApp_Create(t *testing.T) {
 			name: "returns error when getting devcontainer paths fails",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+					ListDevContainersFunc: func(ctx context.Context, repoID int64, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return nil, fmt.Errorf("some error")
 					},
 				}),
@@ -705,10 +710,10 @@ func TestBuildDisplayName(t *testing.T) {
 }
 
 type MockSurveyPrompter struct {
-	AskFunc func(qs []*survey.Question, response interface{}) error
+	AskFunc func(qs []*survey.Question, response any) error
 }
 
-func (m *MockSurveyPrompter) Ask(qs []*survey.Question, response interface{}) error {
+func (m *MockSurveyPrompter) Ask(qs []*survey.Question, response any) error {
 	return m.AskFunc(qs, response)
 }
 
@@ -793,7 +798,7 @@ func TestHandleAdditionalPermissions(t *testing.T) {
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 						return nil, tt.createCodespaceErr
 					},
-					GetCodespacesPermissionsCheckFunc: func(ctx context.Context, repoID int, branch string, devcontainerPath string) (bool, error) {
+					GetCodespacesPermissionsCheckFunc: func(ctx context.Context, repoID int64, branch string, devcontainerPath string) (bool, error) {
 						if tt.pollForPermissionsErr != nil {
 							return false, tt.pollForPermissionsErr
 						}
@@ -810,7 +815,7 @@ func TestHandleAdditionalPermissions(t *testing.T) {
 
 			params := &api.CreateCodespaceParams{}
 			_, err := a.handleAdditionalPermissions(context.Background(), &MockSurveyPrompter{
-				AskFunc: func(qs []*survey.Question, response interface{}) error {
+				AskFunc: func(qs []*survey.Question, response any) error {
 					*response.(*struct{ Accept string }) = struct{ Accept string }{Accept: tt.accept}
 					return nil
 				},
@@ -844,12 +849,12 @@ func apiCreateDefaults(c *apiClientMock) *apiClientMock {
 		}
 	}
 	if c.ListDevContainersFunc == nil {
-		c.ListDevContainersFunc = func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+		c.ListDevContainersFunc = func(ctx context.Context, repoID int64, branch string, limit int) ([]api.DevContainerEntry, error) {
 			return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
 		}
 	}
 	if c.GetCodespacesMachinesFunc == nil {
-		c.GetCodespacesMachinesFunc = func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
+		c.GetCodespacesMachinesFunc = func(ctx context.Context, repoID int64, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 			return []*api.Machine{
 				{
 					Name:        "GIGA",
@@ -859,8 +864,4 @@ func apiCreateDefaults(c *apiClientMock) *apiClientMock {
 		}
 	}
 	return c
-}
-
-func durationPtr(d time.Duration) *time.Duration {
-	return &d
 }

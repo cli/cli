@@ -1,12 +1,12 @@
 package delete
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 func deleteRepo(client *http.Client, repo ghrepo.Interface) error {
@@ -16,11 +16,12 @@ func deleteRepo(client *http.Client, repo ghrepo.Interface) error {
 		return http.ErrUseLastResponse
 	}
 
-	url := fmt.Sprintf("%srepos/%s",
-		ghinstance.RESTPrefix(repo.RepoHost()),
-		ghrepo.FullName(repo))
+	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return err
+	}
 
-	request, err := http.NewRequest("DELETE", url, nil)
+	request, err := http.NewRequest("DELETE", url.String(), nil)
 	if err != nil {
 		return err
 	}

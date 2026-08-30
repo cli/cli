@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -123,24 +124,27 @@ func removeRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	var path string
+	var path *safeurl.MutableSafeURL
 	var host string
 	switch secretEntity {
 	case shared.Organization:
-		path = fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, secretApp, opts.SecretName)
+		path, err = safeurl.JoinPath("orgs", orgName, string(secretApp), "secrets", opts.SecretName)
 		host, _ = cfg.Authentication().DefaultHost()
 	case shared.Environment:
-		path = fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(baseRepo), envName, opts.SecretName)
+		path, err = safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), "environments", envName, "secrets", opts.SecretName)
 		host = baseRepo.RepoHost()
 	case shared.User:
-		path = fmt.Sprintf("user/codespaces/secrets/%s", opts.SecretName)
+		path, err = safeurl.JoinPath("user", "codespaces", "secrets", opts.SecretName)
 		host, _ = cfg.Authentication().DefaultHost()
 	case shared.Repository:
-		path = fmt.Sprintf("repos/%s/%s/secrets/%s", ghrepo.FullName(baseRepo), secretApp, opts.SecretName)
+		path, err = safeurl.JoinPath("repos", baseRepo.RepoOwner(), baseRepo.RepoName(), string(secretApp), "secrets", opts.SecretName)
 		host = baseRepo.RepoHost()
 	}
+	if err != nil {
+		return err
+	}
 
-	err = client.REST(host, "DELETE", path, nil, nil)
+	err = client.REST(host, "DELETE", path.String(), nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete secret %s: %w", opts.SecretName, err)
 	}

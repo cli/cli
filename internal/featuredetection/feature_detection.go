@@ -5,6 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/hashicorp/go-version"
 	"golang.org/x/sync/errgroup"
 
@@ -48,10 +49,18 @@ type IssueFeatures struct {
 	//   - The replaceActorsForAssignable mutation
 	//   - The requestReviewsByLogin mutation
 	ApiActorsSupported bool
+
+	// TODO IssueRelationshipsCleanup - remove when GHES 3.18 support ends (~October 2026)
+	// IssueRelationshipsSupported indicates the host supports issue
+	// relationships (blocked-by/blocking). Available on github.com and
+	// GHES 3.19+. Issue types and sub-issues are GA on all supported GHES
+	// versions (3.17+) and do not need feature detection.
+	IssueRelationshipsSupported bool
 }
 
 var allIssueFeatures = IssueFeatures{
-	ApiActorsSupported: true,
+	ApiActorsSupported:          true,
+	IssueRelationshipsSupported: true,
 }
 
 type PullRequestFeatures struct {
@@ -100,6 +109,13 @@ type SearchFeatures struct {
 	// API calls.
 	AdvancedIssueSearchAPIOptIn bool
 
+	// SemanticSearch indicates whether the host supports semantic issue search
+	// (search_type=semantic). Dotcom-only; absent on single-tenant GHES.
+	SemanticSearch bool
+	// HybridSearch indicates whether the host supports hybrid issue search
+	// (search_type=hybrid). Dotcom-only; absent on single-tenant GHES.
+	HybridSearch bool
+
 	// TODO advancedSearchFuture
 	// When advanced issue search is supported in Pull Requests tab, or in
 	// global search we can introduce more fields to reflect the support status.
@@ -126,6 +142,22 @@ var advancedIssueSearchSupportedAsOptIn = SearchFeatures{
 var advancedIssueSearchSupportedAsOnlyBackend = SearchFeatures{
 	AdvancedIssueSearchAPI:      true,
 	AdvancedIssueSearchAPIOptIn: false,
+}
+
+// semanticSearchSupported mimics a Dotcom host (github.com or ghe.com data
+// residency) where semantic and hybrid issue search are available.
+var semanticSearchSupported = SearchFeatures{
+	AdvancedIssueSearchAPI: true,
+	SemanticSearch:         true,
+	HybridSearch:           true,
+}
+
+// semanticSearchUnsupported mimics a single-tenant GHES host where advanced
+// issue search is available but semantic and hybrid search are not.
+var semanticSearchUnsupported = SearchFeatures{
+	AdvancedIssueSearchAPI: true,
+	SemanticSearch:         false,
+	HybridSearch:           false,
 }
 
 type ReleaseFeatures struct {
@@ -159,9 +191,35 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 		return allIssueFeatures, nil
 	}
 
-	return IssueFeatures{
-		ApiActorsSupported: false, // TODO ApiActorsSupported — actor-based mutations unavailable on GHES
-	}, nil
+	features := IssueFeatures{
+		ApiActorsSupported: false, // TODO ApiActorsSupported - actor-based mutations unavailable on GHES
+	}
+
+	// Detect issue relationship support (GHES 3.19+) via schema introspection.
+	// Issue types and sub-issues are GA on all supported GHES versions (3.17+)
+	// and do not need detection.
+	var featureDetection struct {
+		Issue struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"Issue: __type(name: \"Issue\")"`
+	}
+
+	gql := api.NewClientFromHTTP(d.httpClient)
+	err := gql.Query(d.host, "Issue_fields", &featureDetection, nil)
+	if err != nil {
+		return IssueFeatures{}, err
+	}
+
+	for _, field := range featureDetection.Issue.Fields {
+		if field.Name == "blockedBy" {
+			features.IssueRelationshipsSupported = true
+			break
+		}
+	}
+
+	return features, nil
 }
 
 func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
@@ -357,7 +415,7 @@ func (d *detector) SearchFeatures() (SearchFeatures, error) {
 	//
 	// Since there's no schema-wise difference between pre-deprecation and
 	// deprecation periods (i.e. `ISSUE_ADVANCED` is available during both),
-	// we cannot figure out the exact time period. The consensus is to to use
+	// we cannot figure out the exact time period. The consensus is to use
 	// the advanced search syntax during both periods.
 
 	var feature SearchFeatures
@@ -412,11 +470,19 @@ func (d *detector) SearchFeatures() (SearchFeatures, error) {
 	}
 
 	for _, enumValue := range searchTypeFeatureDetection.SearchType.EnumValues {
-		if enumValue.Name == "ISSUE_ADVANCED" {
+		switch enumValue.Name {
+		case "ISSUE_ADVANCED":
 			// As long as ISSUE_ADVANCED is present on the schema, we should
 			// explicitly opt-in when making API calls.
 			feature.AdvancedIssueSearchAPIOptIn = true
-			break
+		case "ISSUE_SEMANTIC":
+			// ISSUE_SEMANTIC is gated to Dotcom (github.com and ghe.com data
+			// residency) and absent on single-tenant GHES.
+			feature.SemanticSearch = true
+		case "ISSUE_HYBRID":
+			// ISSUE_HYBRID is gated to Dotcom (github.com and ghe.com data
+			// residency) and absent on single-tenant GHES.
+			feature.HybridSearch = true
 		}
 	}
 
@@ -507,7 +573,11 @@ func resolveEnterpriseVersion(httpClient *http.Client, host string) (*version.Ve
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
-	err := apiClient.REST(host, "GET", "meta", nil, &metaResponse)
+	u, err := safeurl.JoinPath("meta")
+	if err != nil {
+		return nil, err
+	}
+	err = apiClient.REST(host, "GET", u.String(), nil, &metaResponse)
 	if err != nil {
 		return nil, err
 	}

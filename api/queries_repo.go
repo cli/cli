@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/shurcooL/githubv4"
 )
@@ -28,6 +29,7 @@ const (
 // Repository contains information about a GitHub repo
 type Repository struct {
 	ID                       string
+	DatabaseID               int64
 	Name                     string
 	NameWithOwner            string
 	Owner                    RepositoryOwner
@@ -287,7 +289,7 @@ func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*R
 		repository(owner: $owner, name: $name) {%s}
 	}`, RepositoryGraphQL(fields))
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"name":  repo.RepoName(),
 	}
@@ -322,13 +324,14 @@ func IssueRepoInfo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query IssueRepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
 			id
+			databaseId
 			name
 			owner { login }
 			hasIssuesEnabled
 			viewerPermission
 		}
 	}`
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"name":  repo.RepoName(),
 	}
@@ -359,6 +362,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	fragment repo on Repository {
 		id
+		databaseId
 		name
 		owner { login }
 		hasIssuesEnabled
@@ -381,7 +385,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 			squashMergeAllowed
 		}
 	}`
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"name":  repo.RepoName(),
 	}
@@ -446,7 +450,7 @@ func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error)
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),
 	}
@@ -497,6 +501,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 	err := client.GraphQL(hostname, fmt.Sprintf(`
 	fragment repo on Repository {
 		id
+		databaseId
 		name
 		owner { login }
 		viewerPermission
@@ -589,9 +594,12 @@ type repositoryV3 struct {
 
 // ForkRepo forks the repository on GitHub and returns the new repository
 func ForkRepo(client *Client, repo ghrepo.Interface, org, newName string, defaultBranchOnly bool) (*Repository, error) {
-	path := fmt.Sprintf("repos/%s/forks", ghrepo.FullName(repo))
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "forks")
+	if err != nil {
+		return nil, err
+	}
 
-	params := map[string]interface{}{}
+	params := map[string]any{}
 	if org != "" {
 		params["organization"] = org
 	}
@@ -609,7 +617,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org, newName string, defaul
 	}
 
 	result := repositoryV3{}
-	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
+	err = client.REST(repo.RepoHost(), "POST", path.String(), body, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -643,12 +651,13 @@ func RenameRepo(client *Client, repo ghrepo.Interface, newRepoName string) (*Rep
 		return nil, err
 	}
 
-	path := fmt.Sprintf("%srepos/%s",
-		ghinstance.RESTPrefix(repo.RepoHost()),
-		ghrepo.FullName(repo))
+	path, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return nil, err
+	}
 
 	result := repositoryV3{}
-	err := client.REST(repo.RepoHost(), "PATCH", path, body, &result)
+	err = client.REST(repo.RepoHost(), "PATCH", path.String(), body, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -675,7 +684,7 @@ func LastCommit(client *Client, repo ghrepo.Interface) (*Commit, error) {
 			}
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()), "repo": githubv4.String(repo.RepoName()),
 	}
 	if err := client.Query(repo.RepoHost(), "LastCommit", &responseData, variables); err != nil {
@@ -694,7 +703,7 @@ func RepoFindForks(client *Client, repo ghrepo.Interface, limit int) ([]*Reposit
 		}
 	}{}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"repo":  repo.RepoName(),
 		"limit": limit,
@@ -1104,7 +1113,7 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
@@ -1243,7 +1252,7 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]AssignableUse
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
@@ -1302,7 +1311,7 @@ func RepoAssignableActors(client *Client, repo ghrepo.Interface) ([]AssignableAc
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
@@ -1374,7 +1383,7 @@ func SearchRepoAssignableActors(client *Client, repo ghrepo.Interface, query str
 		q = &v
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),
 		"query": q,
@@ -1423,7 +1432,7 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
@@ -1478,7 +1487,7 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 		return nil, fmt.Errorf("invalid state: %s", state)
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"states":    states,
@@ -1608,9 +1617,9 @@ func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, error) {
 	return projectsV2, nil
 }
 
-func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path string, body io.Reader) (*Repository, error) {
+func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path safeurl.SafeURL, body io.Reader) (*Repository, error) {
 	var responsev3 repositoryV3
-	err := apiClient.REST(hostname, method, path, body, &responsev3)
+	err := apiClient.REST(hostname, method, path.String(), body, &responsev3)
 
 	if err != nil {
 		return nil, err
@@ -1666,9 +1675,12 @@ func GetRepoIDs(client *Client, host string, repositories []ghrepo.Interface) ([
 }
 
 func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
-	path := fmt.Sprintf("%srepos/%s/%s", ghinstance.RESTPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
+	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return false, err
+	}
 
-	resp, err := client.HTTP().Head(path)
+	resp, err := client.HTTP().Head(u.String())
 	if err != nil {
 		return false, err
 	}
@@ -1690,7 +1702,11 @@ func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
 func RepoLicenses(httpClient *http.Client, hostname string) ([]License, error) {
 	var licenses []License
 	client := NewClientFromHTTP(httpClient)
-	err := client.REST(hostname, "GET", "licenses", nil, &licenses)
+	path, err := safeurl.JoinPath("licenses")
+	if err != nil {
+		return nil, err
+	}
+	err = client.REST(hostname, "GET", path.String(), nil, &licenses)
 	if err != nil {
 		return nil, err
 	}
@@ -1702,8 +1718,11 @@ func RepoLicenses(httpClient *http.Client, hostname string) ([]License, error) {
 func RepoLicense(httpClient *http.Client, hostname string, licenseName string) (*License, error) {
 	var license License
 	client := NewClientFromHTTP(httpClient)
-	path := fmt.Sprintf("licenses/%s", licenseName)
-	err := client.REST(hostname, "GET", path, nil, &license)
+	path, err := safeurl.JoinPath("licenses", licenseName)
+	if err != nil {
+		return nil, err
+	}
+	err = client.REST(hostname, "GET", path.String(), nil, &license)
 	if err != nil {
 		return nil, err
 	}
@@ -1715,7 +1734,11 @@ func RepoLicense(httpClient *http.Client, hostname string, licenseName string) (
 func RepoGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string, error) {
 	var gitIgnoreTemplates []string
 	client := NewClientFromHTTP(httpClient)
-	err := client.REST(hostname, "GET", "gitignore/templates", nil, &gitIgnoreTemplates)
+	path, err := safeurl.JoinPath("gitignore", "templates")
+	if err != nil {
+		return nil, err
+	}
+	err = client.REST(hostname, "GET", path.String(), nil, &gitIgnoreTemplates)
 	if err != nil {
 		return nil, err
 	}
@@ -1727,8 +1750,11 @@ func RepoGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string,
 func RepoGitIgnoreTemplate(httpClient *http.Client, hostname string, gitIgnoreTemplateName string) (*GitIgnore, error) {
 	var gitIgnoreTemplate GitIgnore
 	client := NewClientFromHTTP(httpClient)
-	path := fmt.Sprintf("gitignore/templates/%s", gitIgnoreTemplateName)
-	err := client.REST(hostname, "GET", path, nil, &gitIgnoreTemplate)
+	path, err := safeurl.JoinPath("gitignore", "templates", gitIgnoreTemplateName)
+	if err != nil {
+		return nil, err
+	}
+	err = client.REST(hostname, "GET", path.String(), nil, &gitIgnoreTemplate)
 	if err != nil {
 		return nil, err
 	}

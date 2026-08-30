@@ -428,6 +428,7 @@ func Test_apiRun(t *testing.T) {
 		options      ApiOptions
 		httpResponse *http.Response
 		err          error
+		errMsg       string
 		stdout       string
 		stderr       string
 		isatty       bool
@@ -656,6 +657,81 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 			isatty: true,
 		},
+		{
+			name: "refuses escape sequences in non-JSON body on a TTY",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString("\x1b[31mred\x1b[m")),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			errMsg: "the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway",
+			stdout: ``,
+			stderr: ``,
+			isatty: true,
+		},
+		{
+			name: "passes escape sequences through with --allow-escape-sequences on a TTY",
+			options: ApiOptions{
+				AllowEscapeSequences: true,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString("\x1b[31mred\x1b[m")),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			err:    nil,
+			stdout: "\x1b[31mred\x1b[m",
+			stderr: ``,
+			isatty: true,
+		},
+		{
+			name: "refuses escape sequences in non-JSON body when piped",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString("\x1b[31mred\x1b[m")),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			errMsg: "the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway",
+			stdout: ``,
+			stderr: ``,
+			isatty: false,
+		},
+		{
+			name: "outputs clean non-JSON text on a TTY",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString("plain readme text\n")),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			err:    nil,
+			stdout: "plain readme text\n",
+			stderr: ``,
+			isatty: true,
+		},
+		{
+			name: "streams binary non-JSON body when piped",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...))),
+				Header:     http.Header{"Content-Type": []string{"application/octet-stream"}},
+			},
+			err:    nil,
+			stdout: string(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...)),
+			stderr: ``,
+			isatty: false,
+		},
+		{
+			name: "refuses binary non-JSON body on a TTY",
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 16)...))),
+				Header:     http.Header{"Content-Type": []string{"application/octet-stream"}},
+			},
+			errMsg: "refusing to output binary content (image/png) to the terminal; redirect or pipe stdout to save it, or pass --allow-escape-sequences to output it anyway",
+			stdout: ``,
+			stderr: ``,
+			isatty: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -664,7 +740,7 @@ func Test_apiRun(t *testing.T) {
 			ios.SetStdoutTTY(tt.isatty)
 
 			tt.options.IO = ios
-			tt.options.Config = func() (gh.Config, error) { return config.NewBlankConfig(), nil }
+			tt.options.Config = func() (gh.Config, error) { return config.NewMockConfig(), nil }
 			tt.options.HttpClient = func() (*http.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 					resp := tt.httpResponse
@@ -675,7 +751,11 @@ func Test_apiRun(t *testing.T) {
 			}
 
 			err := apiRun(&tt.options)
-			if err != tt.err {
+			if tt.errMsg != "" {
+				if err == nil || err.Error() != tt.errMsg {
+					t.Errorf("expected error %q, got %v", tt.errMsg, err)
+				}
+			} else if err != tt.err {
 				t.Errorf("expected error %v, got %v", tt.err, err)
 			}
 
@@ -740,7 +820,7 @@ func Test_apiRun_paginationREST(t *testing.T) {
 			return &http.Client{Transport: tr}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 
 		RequestMethod:       "GET",
@@ -812,7 +892,7 @@ func Test_apiRun_arrayPaginationREST(t *testing.T) {
 			return &http.Client{Transport: tr}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 
 		RequestMethod:       "GET",
@@ -884,7 +964,7 @@ func Test_apiRun_arrayPaginationREST_with_headers(t *testing.T) {
 			return &http.Client{Transport: tr}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 
 		RequestMethod:       "GET",
@@ -953,7 +1033,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 			return &http.Client{Transport: tr}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 
 		RawFields:     []string{"foo=bar"},
@@ -986,7 +1066,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {
-		Variables map[string]interface{}
+		Variables map[string]any
 	}
 
 	bb, err := io.ReadAll(responses[0].Request.Body)
@@ -1052,7 +1132,7 @@ func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
 			return &http.Client{Transport: tr}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 
 		RawFields:     []string{"foo=bar"},
@@ -1089,7 +1169,7 @@ func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {
-		Variables map[string]interface{}
+		Variables map[string]any
 	}
 
 	bb, err := io.ReadAll(responses[0].Request.Body)
@@ -1164,7 +1244,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 			return &http.Client{Transport: tr}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 
 		RequestMethod: "POST",
@@ -1185,7 +1265,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {
-		Variables map[string]interface{}
+		Variables map[string]any
 	}
 
 	bb, err := io.ReadAll(responses[0].Request.Body)
@@ -1211,7 +1291,7 @@ func Test_apiRun_DELETE(t *testing.T) {
 	err := apiRun(&ApiOptions{
 		IO: ios,
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		HttpClient: func() (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
@@ -1240,7 +1320,7 @@ func Test_apiRun_HEAD(t *testing.T) {
 	err := apiRun(&ApiOptions{
 		IO: ios,
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		HttpClient: func() (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
@@ -1325,7 +1405,7 @@ func Test_apiRun_inputFile(t *testing.T) {
 					return &http.Client{Transport: tr}, nil
 				},
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 			}
 
@@ -1360,7 +1440,7 @@ func Test_apiRun_cache(t *testing.T) {
 				AuthenticationFunc: func() gh.AuthConfig {
 					cfg := &config.AuthConfig{}
 					// Required because the http client tries to get the active token and otherwise
-					// this goes down to to go-gh config and panics. Pretty bad solution, it would
+					// this goes down to go-gh config and panics. Pretty bad solution, it would
 					// be better if this were black box.
 					cfg.SetActiveToken("token", "stub")
 					return cfg
@@ -1805,7 +1885,7 @@ func Test_apiRun_acceptHeader(t *testing.T) {
 			tt.options.IO = ios
 
 			tt.options.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 
 			var gotReq *http.Request

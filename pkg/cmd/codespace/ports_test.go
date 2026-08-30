@@ -12,8 +12,7 @@ import (
 )
 
 func TestListPorts(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	mockApi := GetMockApi(false)
 	ios, _, _, _ := iostreams.Test()
@@ -118,7 +117,7 @@ func TestPendingOperationDisallowsForwardPorts(t *testing.T) {
 	app := testingPortsApp()
 	selector := &CodespaceSelector{api: app.apiClient, codespaceName: "disabledCodespace"}
 
-	if err := app.ForwardPorts(context.Background(), selector, nil); err != nil {
+	if err := app.ForwardPorts(context.Background(), selector, nil, false); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
@@ -159,7 +158,7 @@ func GetMockApi(allowOrgPorts bool) *apiClientMock {
 		GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
 			return nil, nil
 		},
-		HTTPClientFunc: func() (*http.Client, error) {
+		ExternalHTTPClientFunc: func() (*http.Client, error) {
 			return connection.NewMockHttpClient()
 		},
 	}

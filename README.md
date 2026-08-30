@@ -10,6 +10,18 @@ GitHub CLI is supported for users on GitHub.com, GitHub Enterprise Cloud, and Gi
 
 For [installation options see below](#installation), for usage instructions [see the manual](https://cli.github.com/manual/).
 
+## Agent skills
+
+An [agent skill](https://agentskills.io) is available for driving `gh` from coding agents. Install or update it with the built-in `gh skill` command:
+
+```shell
+# Install the skill (user scope recommended)
+gh skill install cli/cli gh --scope user
+
+# Update the skill after a `gh` release
+gh skill update gh
+```
+
 ## Contributing
 
 If anything feels off or if you feel that some functionality is missing, please check out the [contributing page](.github/CONTRIBUTING.md). There you will find instructions for sharing your feedback, building the tool locally, and submitting pull requests to the project.
@@ -64,6 +76,8 @@ If a specific version is needed, your GitHub Actions workflow will need to insta
 For information on all pre-installed tools, see [`actions/runner-images`](https://github.com/actions/runner-images)
 
 ### Verification of binaries
+
+Starting with v2.93.0, releases of `gh` are published as immutable releases. For more information, see [Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).
 
 Since version 2.50.0, `gh` has been producing [Build Provenance Attestation](https://github.blog/changelog/2024-06-25-artifact-attestations-is-generally-available/), enabling a cryptographically verifiable paper-trail back to the origin GitHub repository, git revision, and build instructions used. The build provenance attestations are signed and rely on Public Good [Sigstore](https://www.sigstore.dev/) for PKI.
 

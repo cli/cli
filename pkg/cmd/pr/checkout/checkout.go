@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -33,6 +34,7 @@ type CheckoutOptions struct {
 	Force             bool
 	Detach            bool
 	BranchName        string
+	Worktree          string
 }
 
 func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobra.Command {
@@ -56,10 +58,15 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 			$ gh pr checkout 32
 			$ gh pr checkout https://github.com/OWNER/REPO/pull/32
 			$ gh pr checkout feature
+			$ gh pr checkout 32 --branch feature --worktree /path/to/wt-feature
 		`),
 		Args:    cobra.MaximumNArgs(1),
 		Aliases: []string{"co"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("worktree") && opts.Worktree == "" {
+				return cmdutil.FlagErrorf("--worktree cannot be blank")
+			}
+
 			if len(args) > 0 {
 				opts.PRResolver = &specificPRResolver{
 					prFinder: shared.NewFinder(f),
@@ -97,6 +104,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Reset the existing local branch to the latest state of the pull request")
 	cmd.Flags().BoolVarP(&opts.Detach, "detach", "", false, "Checkout PR with a detached HEAD")
 	cmd.Flags().StringVarP(&opts.BranchName, "branch", "b", "", "Local branch name to use (default [the name of the head branch])")
+	cmd.Flags().StringVar(&opts.Worktree, "worktree", "", "Check out the pull request into a worktree at the given `path`")
 
 	return cmd
 }
@@ -105,6 +113,15 @@ func checkoutRun(opts *CheckoutOptions) error {
 	pr, baseRepo, err := opts.PRResolver.Resolve()
 	if err != nil {
 		return err
+	}
+
+	var reuseWorktree bool
+	if opts.Worktree != "" {
+		target, err := shared.ResolveWorktreeTarget(opts.GitClient, opts.Worktree)
+		if err != nil {
+			return err
+		}
+		reuseWorktree = target.Reuse
 	}
 
 	cfg, err := opts.Config()
@@ -137,7 +154,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	var cmdQueue [][]string
 
 	if headRemote != nil {
-		cmdQueue = append(cmdQueue, cmdsForExistingRemote(headRemote, pr, opts)...)
+		cmdQueue = append(cmdQueue, cmdsForExistingRemote(headRemote, pr, opts, reuseWorktree)...)
 	} else {
 		httpClient, err := opts.HttpClient()
 		if err != nil {
@@ -149,12 +166,18 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if err != nil {
 			return err
 		}
-		cmdQueue = append(cmdQueue, cmdsForMissingRemote(pr, baseURLOrName, baseRepo.RepoHost(), defaultBranch, protocol, opts)...)
+		cmdQueue = append(cmdQueue, cmdsForMissingRemote(pr, baseURLOrName, baseRepo.RepoHost(), defaultBranch, protocol, opts, reuseWorktree)...)
 	}
 
 	if opts.RecurseSubmodules {
-		cmdQueue = append(cmdQueue, []string{"submodule", "sync", "--recursive"})
-		cmdQueue = append(cmdQueue, []string{"submodule", "update", "--init", "--recursive"})
+		// Run submodule commands inside the worktree when checking out into
+		// one, so its submodules (not the main worktree's) get initialized.
+		var prefix []string
+		if opts.Worktree != "" {
+			prefix = []string{"-C", opts.Worktree}
+		}
+		cmdQueue = append(cmdQueue, slices.Concat(prefix, []string{"submodule", "sync", "--recursive"}))
+		cmdQueue = append(cmdQueue, slices.Concat(prefix, []string{"submodule", "update", "--init", "--recursive"}))
 	}
 
 	// Note that although we will probably be fetching from the head, in practice, PR checkout can only
@@ -164,10 +187,16 @@ func checkoutRun(opts *CheckoutOptions) error {
 		return err
 	}
 
+	if opts.Worktree != "" && opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.ErrOut, "%s Checked out PR #%d in worktree %s\n", cs.SuccessIcon(), pr.Number, opts.Worktree)
+		fmt.Fprintf(opts.IO.ErrOut, "  To start working: cd %s\n", opts.Worktree)
+	}
+
 	return nil
 }
 
-func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts *CheckoutOptions) [][]string {
+func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts *CheckoutOptions, reuseWorktree bool) [][]string {
 	var cmds [][]string
 	remoteBranch := fmt.Sprintf("%s/%s", remote.Name, pr.HeadRefName)
 
@@ -176,24 +205,35 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 		refSpec += fmt.Sprintf(":refs/remotes/%s", remoteBranch)
 	}
 
-	cmds = append(cmds, []string{"fetch", remote.Name, refSpec, "--no-tags"})
-
 	localBranch := pr.HeadRefName
 	if opts.BranchName != "" {
 		localBranch = opts.BranchName
 	}
 
+	remoteBranchRef := fmt.Sprintf("refs/remotes/%s", remoteBranch)
+	fetchCmd := []string{"fetch", remote.Name, refSpec, "--no-tags"}
+
+	if opts.Detach {
+		return append(cmds, detachCmds(fetchCmd, opts.Worktree, reuseWorktree)...)
+	}
+
+	cmds = append(cmds, fetchCmd)
+
 	switch {
-	case opts.Detach:
-		cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
-	case localBranchExists(opts.GitClient, localBranch):
-		cmds = append(cmds, []string{"checkout", localBranch})
-		if opts.Force {
-			cmds = append(cmds, []string{"reset", "--hard", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
-		} else {
-			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+	case opts.Worktree != "":
+		worktreeCmds, branchExists := shared.WorktreeCheckoutCommands(
+			opts.GitClient,
+			shared.WorktreeTarget{Path: opts.Worktree, Reuse: reuseWorktree},
+			localBranch,
+			remoteBranch,
+		)
+		cmds = append(cmds, worktreeCmds...)
+		if branchExists {
+			cmds = append(cmds, syncBranchCmds(opts.Worktree, remoteBranchRef, opts.Force)...)
 		}
+	case opts.GitClient.HasLocalBranch(context.Background(), localBranch):
+		cmds = append(cmds, []string{"checkout", localBranch})
+		cmds = append(cmds, syncBranchCmds("", remoteBranchRef, opts.Force)...)
 	default:
 		cmds = append(cmds, []string{"checkout", "-b", localBranch, "--track", remoteBranch})
 	}
@@ -201,14 +241,13 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 	return cmds
 }
 
-func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultBranch, protocol string, opts *CheckoutOptions) [][]string {
+func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultBranch, protocol string, opts *CheckoutOptions, reuseWorktree bool) [][]string {
 	var cmds [][]string
 	ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
 
 	if opts.Detach {
-		cmds = append(cmds, []string{"fetch", baseURLOrName, ref, "--no-tags"})
-		cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
-		return cmds
+		fetchCmd := []string{"fetch", baseURLOrName, ref, "--no-tags"}
+		return detachCmds(fetchCmd, opts.Worktree, reuseWorktree)
 	}
 
 	localBranch := pr.HeadRefName
@@ -220,15 +259,29 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	}
 
 	currentBranch, _ := opts.Branch()
-	if localBranch == currentBranch {
+	if opts.Worktree != "" {
+		if reuseWorktree {
+			// FETCH_HEAD is per-worktree, and git refuses to update a branch via
+			// refspec while it is checked out, so fetch to FETCH_HEAD inside the worktree.
+			cmds = append(cmds, []string{"-C", opts.Worktree, "fetch", baseURLOrName, ref, "--no-tags"})
+			if opts.GitClient.HasLocalBranch(context.Background(), localBranch) {
+				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", localBranch})
+				cmds = append(cmds, syncBranchCmds(opts.Worktree, "FETCH_HEAD", opts.Force)...)
+			} else {
+				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-b", localBranch, "FETCH_HEAD"})
+			}
+		} else {
+			fetchCmd := []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--no-tags"}
+			if opts.Force {
+				fetchCmd = append(fetchCmd, "--force")
+			}
+			cmds = append(cmds, fetchCmd)
+			cmds = append(cmds, []string{"worktree", "add", "--", opts.Worktree, localBranch})
+		}
+	} else if localBranch == currentBranch {
 		// PR head matches currently checked out branch
 		cmds = append(cmds, []string{"fetch", baseURLOrName, ref, "--no-tags"})
-		if opts.Force {
-			cmds = append(cmds, []string{"reset", "--hard", "FETCH_HEAD"})
-		} else {
-			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"merge", "--ff-only", "FETCH_HEAD"})
-		}
+		cmds = append(cmds, syncBranchCmds("", "FETCH_HEAD", opts.Force)...)
 	} else {
 		// TODO: check if non-fast-forward and suggest to use `--force`
 		fetchCmd := []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--no-tags"}
@@ -263,20 +316,58 @@ func missingMergeConfigForBranch(client *git.Client, b string) bool {
 	return err != nil || mc == ""
 }
 
-func localBranchExists(client *git.Client, b string) bool {
-	_, err := client.ShowRefs(context.Background(), []string{"refs/heads/" + b})
-	return err == nil
+// detachCmds returns the commands for a detached checkout. When reusing an
+// existing linked worktree, FETCH_HEAD must be written inside it (it is
+// per-worktree), so the fetch runs with -C <path>.
+func detachCmds(fetchCmd []string, worktree string, reuseWorktree bool) [][]string {
+	if worktree == "" {
+		return [][]string{
+			fetchCmd,
+			{"checkout", "--detach", "FETCH_HEAD"},
+		}
+	}
+
+	if reuseWorktree {
+		return [][]string{
+			append([]string{"-C", worktree}, fetchCmd...),
+			{"-C", worktree, "checkout", "--detach", "FETCH_HEAD"},
+		}
+	}
+	return [][]string{
+		fetchCmd,
+		{"worktree", "add", "--detach", "--", worktree, "FETCH_HEAD"},
+	}
+}
+
+// syncBranchCmds syncs a branch to ref: a hard reset when force is set,
+// otherwise a fast-forward-only merge. A non-empty path runs the commands there.
+func syncBranchCmds(path, ref string, force bool) [][]string {
+	var prefix []string
+	if path != "" {
+		prefix = []string{"-C", path}
+	}
+	if force {
+		return [][]string{append(prefix, "reset", "--hard", ref)}
+	}
+	// TODO: check if non-fast-forward and suggest to use `--force`
+	return [][]string{append(prefix, "merge", "--ff-only", ref)}
 }
 
 func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cmdQueue [][]string) error {
 	for _, args := range cmdQueue {
+		// Determine the git sub-command, skipping any -C <path> prefix.
+		subCmd := args[0]
+		if len(args) >= 3 && args[0] == "-C" {
+			subCmd = args[2]
+		}
+
 		var err error
 		var cmd *git.Command
-		switch args[0] {
+		switch subCmd {
 		case "submodule":
-			cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
+			cmd, err = authenticatedCommand(client, credentialPattern, args)
 		case "fetch":
-			cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args...)
+			cmd, err = authenticatedCommand(client, git.AllMatchingCredentialsPattern, args)
 		default:
 			cmd, err = client.Command(context.Background(), args...)
 		}
@@ -288,6 +379,22 @@ func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cm
 		}
 	}
 	return nil
+}
+
+// authenticatedCommand builds an authenticated git command, transparently
+// handling a leading -C <path> prefix. AuthenticatedCommand prepends
+// credential-helper flags before all args, so a -C prefix would be displaced;
+// instead we strip it and apply it as cmd.Dir.
+func authenticatedCommand(client *git.Client, credentialPattern git.CredentialPattern, args []string) (*git.Command, error) {
+	if args[0] == "-C" {
+		cmd, err := client.AuthenticatedCommand(context.Background(), credentialPattern, args[2:]...)
+		if err != nil {
+			return nil, err
+		}
+		cmd.Dir = args[1]
+		return cmd, nil
+	}
+	return client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
 }
 
 type PRResolver interface {

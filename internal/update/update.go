@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/ci"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/hashicorp/go-version"
 	"github.com/mattn/go-isatty"
@@ -112,7 +113,15 @@ func CheckForUpdate(ctx context.Context, client *http.Client, stateFilePath, rep
 }
 
 func getLatestReleaseInfo(ctx context.Context, client *http.Client, repo string) (*ReleaseInfo, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo), nil)
+	owner, name, err := safeurl.RepoPartsFromNWO(repo)
+	if err != nil {
+		return nil, err
+	}
+	u, err := safeurl.JoinPathWithHostPrefix("https://api.github.com", "repos", owner, name, "releases", "latest")
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}

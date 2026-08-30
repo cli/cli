@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -24,6 +25,7 @@ func TestAutolinkViewer_View(t *testing.T) {
 		expectedAutolink *shared.Autolink
 		expectErr        bool
 		expectedErrMsg   string
+		expectedStatus   int
 	}{
 		{
 			name:       "200 successful alphanumeric view",
@@ -71,6 +73,15 @@ func TestAutolinkViewer_View(t *testing.T) {
 			expectErr:      true,
 			expectedErrMsg: "HTTP 404: Perhaps you are missing admin rights to the repository? (https://api.github.com/repos/OWNER/REPO/autolinks/123)",
 		},
+		{
+			name:           "500 unexpected error",
+			id:             "123",
+			stubStatus:     http.StatusInternalServerError,
+			stubRespJSON:   `{"message":"arbitrary error"}`,
+			expectErr:      true,
+			expectedErrMsg: "HTTP 500 (https://api.github.com/repos/OWNER/REPO/autolinks/123)",
+			expectedStatus: http.StatusInternalServerError,
+		},
 	}
 
 	for _, tt := range tests {
@@ -93,6 +104,11 @@ func TestAutolinkViewer_View(t *testing.T) {
 
 			if tt.expectErr {
 				require.EqualError(t, err, tt.expectedErrMsg)
+				if tt.expectedStatus != 0 {
+					var httpErr api.HTTPError
+					require.ErrorAs(t, err, &httpErr)
+					assert.Equal(t, tt.expectedStatus, httpErr.StatusCode)
+				}
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedAutolink, autolink)

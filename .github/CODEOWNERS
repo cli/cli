@@ -5,7 +5,6 @@ internal/codespaces/ @cli/codespaces @cli/code-reviewers
 
 # Limit Package Security team ownership to the attestation command package and related integration tests
 pkg/cmd/attestation/ @cli/package-security @cli/code-reviewers
-pkg/cmd/release/attestation/ @cli/package-security @cli/code-reviewers
 pkg/cmd/release/verify/ @cli/package-security @cli/code-reviewers
 pkg/cmd/release/verify-asset/ @cli/package-security @cli/code-reviewers
 pkg/cmd/release/shared/ @cli/package-security @cli/code-reviewers

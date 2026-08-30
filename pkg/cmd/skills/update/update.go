@@ -79,8 +79,8 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			Checks installed skills for available updates by comparing the local
 			tree SHA (from %[1]sSKILL.md%[1]s frontmatter) against the remote repository.
 
-			Scans all known agent host directories (Copilot, Claude, Cursor, Codex,
-			Gemini, Antigravity) in both project and user scope automatically.
+			Scans all known agent host directories (including Copilot, Claude, Cursor,
+			Gemini, Antigravity, Grok, and others) in both project and user scope automatically.
 
 			Without arguments, checks all installed skills. With skill names,
 			checks only those specific skills.
@@ -91,6 +91,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 
 			Skills without GitHub metadata (e.g. installed manually or by another
 			tool) are prompted for their source repository in interactive mode.
+			With %[1]s--all%[1]s or in non-interactive mode, they are skipped with a notice.
 			The update re-downloads the skill with metadata injected, so future
 			updates work automatically.
 
@@ -221,7 +222,7 @@ func updateRun(opts *UpdateOptions) error {
 		if s.owner != "" && s.repo != "" {
 			continue
 		}
-		if !canPrompt {
+		if !canPrompt || opts.All {
 			noMeta = append(noMeta, s.name)
 			continue
 		}
@@ -337,7 +338,7 @@ func updateRun(opts *UpdateOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s %s is pinned to %s (skipped)\n", cs.Muted("⊘"), s.name, s.pinned)
 	}
 	for _, name := range noMeta {
-		fmt.Fprintf(opts.IO.ErrOut, "%s %s has no GitHub metadata. Reinstall to enable updates\n", cs.WarningIcon(), name)
+		fmt.Fprintf(opts.IO.ErrOut, "%s %s has no GitHub metadata. Run `gh skill update %s` interactively to add metadata, or reinstall to enable updates\n", cs.WarningIcon(), name, name)
 	}
 
 	if len(updates) == 0 {
@@ -384,53 +385,10 @@ func updateRun(opts *UpdateOptions) error {
 
 	var failed bool
 	for _, u := range updates {
-		installOpts := &installer.Options{
-			Host:      u.local.repoHost,
-			Owner:     u.local.owner,
-			Repo:      u.local.repo,
-			Ref:       u.resolved.Ref,
-			SHA:       u.resolved.SHA,
-			Skills:    []discovery.Skill{u.skill},
-			AgentHost: u.local.host,
-			Scope:     u.local.scope,
-			GitRoot:   gitRoot,
-			HomeDir:   homeDir,
-			Client:    apiClient,
-		}
-		// When updating skills from a custom --dir, host is nil.
-		// Use the skill's install root as the target. For namespaced
-		// skills (name contains "/"), the dir is two levels below the
-		// root instead of one.
-		if u.local.host == nil {
-			base := filepath.Dir(u.local.dir)
-			if strings.Contains(u.local.name, "/") {
-				base = filepath.Dir(base)
-			}
-			installOpts.Dir = base
-		}
-		_, installErr := installer.Install(installOpts)
-		if installErr != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Failed to update %s: %v\n", cs.FailureIcon(), u.local.name, installErr)
+		if err := updateSkillInPlace(opts, u, apiClient, gitRoot, homeDir); err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Failed to update %s: %v\n", cs.FailureIcon(), u.local.name, err)
 			failed = true
 			continue
-		}
-
-		// When the install location has changed (e.g. migrating from a
-		// namespaced layout to flat), remove the old directory so that the
-		// stale copy does not shadow the freshly installed one.
-		newDir := filepath.Join(installOpts.Dir, u.skill.Name)
-		if installOpts.Dir == "" && u.local.host != nil {
-			if d, err := u.local.host.InstallDir(u.local.scope, gitRoot, homeDir); err == nil {
-				newDir = filepath.Join(d, u.skill.Name)
-			}
-		}
-		if newDir != "" && u.local.dir != "" && filepath.Clean(newDir) != filepath.Clean(u.local.dir) {
-			_ = os.RemoveAll(u.local.dir)
-			// Remove the parent if it is now empty (leftover namespace directory).
-			parent := filepath.Dir(u.local.dir)
-			if entries, readErr := os.ReadDir(parent); readErr == nil && len(entries) == 0 {
-				_ = os.Remove(parent)
-			}
 		}
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.Out, "%s Updated %s\n", cs.SuccessIcon(), u.local.name)
@@ -444,6 +402,121 @@ func updateRun(opts *UpdateOptions) error {
 	}
 
 	return nil
+}
+
+// updateSkillInPlace installs the resolved update into a staging directory
+// alongside the existing skill directory and, on success, atomically swaps
+// the staged contents into place via same-filesystem renames. This
+// guarantees:
+//
+//   - The skill directory's own inode is preserved, so symlinks, mounts, and
+//     external references that point at it stay valid.
+//   - Stale files from the previous version are removed.
+//   - A failure at any point (install, read, rename) leaves the existing
+//     skill completely untouched: existing files are first moved aside into
+//     a backup directory and restored if any subsequent step fails.
+func updateSkillInPlace(opts *UpdateOptions, u pendingUpdate, apiClient *api.Client, gitRoot, homeDir string) error {
+	if u.local.dir == "" {
+		return fmt.Errorf("cannot update %s: no install location recorded", u.local.name)
+	}
+
+	parent := filepath.Dir(u.local.dir)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return fmt.Errorf("could not ensure parent directory %s: %w", parent, err)
+	}
+
+	// Stage as a sibling of the existing skill directory so the swap stays
+	// on the same filesystem and every rename is atomic.
+	staging, err := os.MkdirTemp(parent, "."+u.skill.Name+".gh-skill-update-")
+	if err != nil {
+		return fmt.Errorf("could not create staging directory: %w", err)
+	}
+	defer os.RemoveAll(staging)
+
+	installOpts := &installer.Options{
+		Host:    u.local.repoHost,
+		Owner:   u.local.owner,
+		Repo:    u.local.repo,
+		Ref:     u.resolved.Ref,
+		SHA:     u.resolved.SHA,
+		Skills:  []discovery.Skill{u.skill},
+		Dir:     staging,
+		GitRoot: gitRoot,
+		HomeDir: homeDir,
+		Client:  apiClient,
+	}
+	if _, err := installer.Install(installOpts); err != nil {
+		return err
+	}
+
+	stagedSkillDir := filepath.Join(staging, u.skill.Name)
+	if _, err := os.Stat(stagedSkillDir); err != nil {
+		return fmt.Errorf("installer did not produce %s: %w", stagedSkillDir, err)
+	}
+
+	if err := os.MkdirAll(u.local.dir, 0o755); err != nil {
+		return fmt.Errorf("could not ensure skill directory %s: %w", u.local.dir, err)
+	}
+
+	return swapDirectoryContents(u.local.dir, stagedSkillDir)
+}
+
+// swapDirectoryContents replaces the entries inside dest with the entries
+// inside src, preserving dest's inode. It first moves every existing entry
+// into a sibling backup directory, then moves the staged entries into dest.
+// If any step fails, the original contents are restored from the backup.
+//
+// src and dest must live on the same filesystem so renames are atomic.
+func swapDirectoryContents(dest, src string) error {
+	backup, err := os.MkdirTemp(filepath.Dir(dest), "."+filepath.Base(dest)+".gh-skill-backup-")
+	if err != nil {
+		return fmt.Errorf("could not create backup directory: %w", err)
+	}
+
+	existing, err := os.ReadDir(dest)
+	if err != nil {
+		_ = os.RemoveAll(backup)
+		return fmt.Errorf("could not read skill directory %s: %w", dest, err)
+	}
+	var movedOut []string
+	for _, entry := range existing {
+		if err := os.Rename(filepath.Join(dest, entry.Name()), filepath.Join(backup, entry.Name())); err != nil {
+			restoreBackup(dest, backup, movedOut, nil)
+			return fmt.Errorf("could not move %s aside: %w", entry.Name(), err)
+		}
+		movedOut = append(movedOut, entry.Name())
+	}
+
+	staged, err := os.ReadDir(src)
+	if err != nil {
+		restoreBackup(dest, backup, movedOut, nil)
+		return fmt.Errorf("could not read staged skill directory %s: %w", src, err)
+	}
+	var movedIn []string
+	for _, entry := range staged {
+		from := filepath.Join(src, entry.Name())
+		to := filepath.Join(dest, entry.Name())
+		if err := os.Rename(from, to); err != nil {
+			restoreBackup(dest, backup, movedOut, movedIn)
+			return fmt.Errorf("could not move %s into place: %w", entry.Name(), err)
+		}
+		movedIn = append(movedIn, entry.Name())
+	}
+
+	_ = os.RemoveAll(backup)
+	return nil
+}
+
+// restoreBackup undoes a partial swap by removing any freshly installed
+// entries and moving the original entries back from backup into dest.
+func restoreBackup(dest, backup string, movedOut, movedIn []string) {
+	for _, name := range movedIn {
+		_ = os.RemoveAll(filepath.Join(dest, name))
+	}
+	for _, name := range movedOut {
+		_ = os.Rename(filepath.Join(backup, name), filepath.Join(dest, name))
+	}
+	_ = os.RemoveAll(backup)
 }
 
 // scanAllAgents walks every registered agent's skill directory (project + user scope) and

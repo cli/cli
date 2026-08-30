@@ -1,0 +1,54 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+cd $SCRIPT_NAME-$RANDOM_STRING
+
+# Create the two helper issues that the main issue will block / be blocked by
+exec gh issue create --title 'blocker' --body ''
+stdout2env BLOCKER_URL
+
+exec gh issue create --title 'blocked' --body ''
+stdout2env BLOCKED_URL
+
+# Create the main issue with both relationships set on create
+exec gh issue create --title 'main' --body '' --blocked-by $BLOCKER_URL --blocking $BLOCKED_URL
+stdout2env MAIN_URL
+
+# Confirm both relationships landed
+exec gh issue view $MAIN_URL --json blockedBy --jq '.blockedBy.nodes[].url'
+stdout $BLOCKER_URL
+
+exec gh issue view $MAIN_URL --json blocking --jq '.blocking.nodes[].url'
+stdout $BLOCKED_URL
+
+# Add a second blocker / blocked via edit
+exec gh issue create --title 'blocker 2' --body ''
+stdout2env BLOCKER_2_URL
+
+exec gh issue create --title 'blocked 2' --body ''
+stdout2env BLOCKED_2_URL
+
+exec gh issue edit $MAIN_URL --add-blocked-by $BLOCKER_2_URL --add-blocking $BLOCKED_2_URL
+
+exec gh issue view $MAIN_URL --json blockedBy --jq '.blockedBy.totalCount'
+stdout '^2$'
+
+exec gh issue view $MAIN_URL --json blocking --jq '.blocking.totalCount'
+stdout '^2$'
+
+# Remove the original blocker / blocked
+exec gh issue edit $MAIN_URL --remove-blocked-by $BLOCKER_URL --remove-blocking $BLOCKED_URL
+
+exec gh issue view $MAIN_URL --json blockedBy --jq '.blockedBy.nodes[].title'
+stdout '^blocker 2$'
+! stdout '^blocker$'
+
+exec gh issue view $MAIN_URL --json blocking --jq '.blocking.nodes[].title'
+stdout '^blocked 2$'
+! stdout '^blocked$'

@@ -39,7 +39,7 @@ func connectionReady(codespace *api.Codespace) bool {
 type apiClient interface {
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	StartCodespace(ctx context.Context, name string) error
-	HTTPClient() (*http.Client, error)
+	ExternalHTTPClient() (*http.Client, error)
 }
 
 type progressIndicator interface {
@@ -66,12 +66,12 @@ func GetCodespaceConnection(ctx context.Context, progress progressIndicator, api
 	progress.StartProgressIndicatorWithLabel("Connecting to codespace")
 	defer progress.StopProgressIndicator()
 
-	httpClient, err := apiClient.HTTPClient()
+	externalHttpClient, err := apiClient.ExternalHTTPClient()
 	if err != nil {
 		return nil, fmt.Errorf("error getting http client: %w", err)
 	}
 
-	return connection.NewCodespaceConnection(ctx, codespace, httpClient)
+	return connection.NewCodespaceConnection(ctx, codespace, externalHttpClient)
 }
 
 // waitUntilCodespaceConnectionReady waits for a Codespace to be running and is able to be connected to.

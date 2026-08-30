@@ -11,13 +11,13 @@ on:
 jobs:
   no-response:
     if: github.event_name == 'issue_comment' || github.event.schedule == '5 * * * *'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-no-response-close.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-no-response-close.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write
 
   stale:
     if: github.event.schedule == '0 3 * * *'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-stale-issues.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-stale-issues.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     with:
       days_before_stale: 30
       days_before_close: -1
@@ -29,6 +29,6 @@ jobs:
 
   pitch-surface:
     if: github.event.schedule == '0 14 1 * *' || github.event_name == 'workflow_dispatch'
-    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/pitch-surface-top-issues.yml@main
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/pitch-surface-top-issues.yml@df758d511475056e61d6d3a123621a854f10c646 # v0.0.1
     permissions:
       issues: write

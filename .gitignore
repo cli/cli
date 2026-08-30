@@ -39,8 +39,13 @@
 *~
 
 vendor/
+!.github/codeql/tests/**/vendor/
 gh
 
 # Test coverage artifacts
 coverage.out
 lcov.info
+
+# CodeQL scratch database (regenerated locally)
+codeql-db/
+*.sarif

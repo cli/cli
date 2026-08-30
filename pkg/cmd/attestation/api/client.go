@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 	ioconfig "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/klauspost/compress/snappy"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -52,8 +54,8 @@ func (p *FetchParams) Validate() error {
 
 // githubApiClient makes REST calls to the GitHub API
 type githubApiClient interface {
-	REST(hostname, method, p string, body io.Reader, data interface{}) error
-	RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error)
+	REST(hostname, method, p string, body io.Reader, data any) error
+	RESTWithNext(hostname, method, p string, body io.Reader, data any) (string, error)
 }
 
 // httpClient makes HTTP calls to all non-GitHub API endpoints
@@ -67,18 +69,18 @@ type Client interface {
 }
 
 type LiveClient struct {
-	githubAPI  githubApiClient
-	httpClient httpClient
-	host       string
-	logger     *ioconfig.Handler
+	githubAPI          githubApiClient
+	externalHttpClient httpClient
+	host               string
+	logger             *ioconfig.Handler
 }
 
-func NewLiveClient(hc *http.Client, host string, l *ioconfig.Handler) *LiveClient {
+func NewLiveClient(hc *http.Client, externalClient *http.Client, host string, l *ioconfig.Handler) *LiveClient {
 	return &LiveClient{
-		githubAPI:  api.NewClientFromHTTP(hc),
-		host:       strings.TrimSuffix(host, "/"),
-		httpClient: hc,
-		logger:     l,
+		githubAPI:          api.NewClientFromHTTP(hc),
+		host:               strings.TrimSuffix(host, "/"),
+		externalHttpClient: externalClient,
+		logger:             l,
 	}
 }
 
@@ -99,35 +101,43 @@ func (c *LiveClient) GetByDigest(params FetchParams) ([]*Attestation, error) {
 	return bundles, nil
 }
 
-func (c *LiveClient) buildRequestURL(params FetchParams) (string, error) {
+func (c *LiveClient) buildRequestURL(params FetchParams) (safeurl.SafeURL, error) {
 	if err := params.Validate(); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var url string
+	var u *safeurl.MutableSafeURL
 	if params.Repo != "" {
 		// check if Repo is set first because if Repo has been set, Owner will be set using the value of Repo.
 		// If Repo is not set, the field will remain empty. It will not be populated using the value of Owner.
-		url = fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, params.Repo, params.Digest)
+		owner, name, err := safeurl.RepoPartsFromNWO(params.Repo)
+		if err != nil {
+			return nil, err
+		}
+		u, err = safeurl.JoinPath("repos", owner, name, "attestations", params.Digest)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		url = fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, params.Owner, params.Digest)
+		var err error
+		u, err = safeurl.JoinPath("orgs", params.Owner, "attestations", params.Digest)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	perPage := params.Limit
-	if perPage > maxLimitForFetch {
-		perPage = maxLimitForFetch
-	}
+	perPage := min(params.Limit, maxLimitForFetch)
 
 	// ref: https://github.com/cli/go-gh/blob/d32c104a9a25c9de3d7c7b07a43ae0091441c858/example_gh_test.go#L96
-	url = fmt.Sprintf("%s?per_page=%d", url, perPage)
+	u.SetQuery("per_page", strconv.Itoa(perPage))
 	if params.PredicateType != "" {
-		url = fmt.Sprintf("%s&predicate_type=%s", url, params.PredicateType)
+		u.SetQuery("predicate_type", params.PredicateType)
 	}
-	return url, nil
+	return u, nil
 }
 
 func (c *LiveClient) getAttestations(params FetchParams) ([]*Attestation, error) {
-	url, err := c.buildRequestURL(params)
+	u, err := c.buildRequestURL(params)
 	if err != nil {
 		return nil, err
 	}
@@ -136,10 +146,12 @@ func (c *LiveClient) getAttestations(params FetchParams) ([]*Attestation, error)
 	var resp AttestationsResponse
 	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
 
+	var pageURL safeurl.SafeURL = u
+
 	// if no attestation or less than limit, then keep fetching
-	for url != "" && len(attestations) < params.Limit {
+	for pageURL.String() != "" && len(attestations) < params.Limit {
 		err := backoff.Retry(func() error {
-			newURL, restErr := c.githubAPI.RESTWithNext(c.host, http.MethodGet, url, nil, &resp)
+			newURL, restErr := c.githubAPI.RESTWithNext(c.host, http.MethodGet, pageURL.String(), nil, &resp)
 			if restErr != nil {
 				if shouldRetry(restErr) {
 					return restErr
@@ -147,7 +159,7 @@ func (c *LiveClient) getAttestations(params FetchParams) ([]*Attestation, error)
 				return backoff.Permanent(restErr)
 			}
 
-			url = newURL
+			pageURL = safeurl.NewImmutableSafeURL(newURL)
 
 			// filter by the initiator type
 			if params.Initiator != "" {
@@ -200,7 +212,7 @@ func (c *LiveClient) fetchBundleFromAttestations(attestations []*Attestation) ([
 			}
 
 			// otherwise fetch the bundle with the provided URL
-			b, err := c.getBundle(a.BundleURL)
+			b, err := c.getBundle(safeurl.NewImmutableSafeURL(a.BundleURL))
 			if err != nil {
 				return fmt.Errorf("failed to fetch bundle with URL: %w", err)
 			}
@@ -219,19 +231,19 @@ func (c *LiveClient) fetchBundleFromAttestations(attestations []*Attestation) ([
 	return fetched, nil
 }
 
-func (c *LiveClient) getBundle(url string) (*bundle.Bundle, error) {
+func (c *LiveClient) getBundle(url safeurl.SafeURL) (*bundle.Bundle, error) {
 	c.logger.VerbosePrintf("Fetching attestation bundle with bundle URL\n\n")
 
 	var sgBundle *bundle.Bundle
 	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
 	err := backoff.Retry(func() error {
-		resp, err := c.httpClient.Get(url)
+		resp, err := c.externalHttpClient.Get(url.String())
 		if err != nil {
 			return fmt.Errorf("request to fetch bundle from URL failed: %w", err)
 		}
 
 		if resp.StatusCode >= 500 && resp.StatusCode <= 599 {
-			return fmt.Errorf("attestation bundle with URL %s returned status code %d", url, resp.StatusCode)
+			return fmt.Errorf("attestation bundle with URL %s returned status code %d", url.String(), resp.StatusCode)
 		}
 
 		defer resp.Body.Close()
@@ -278,15 +290,19 @@ func shouldRetry(err error) bool {
 // GetTrustDomain returns the current trust domain. If the default is used
 // the empty string is returned
 func (c *LiveClient) GetTrustDomain() (string, error) {
-	return c.getTrustDomain(MetaPath)
+	u, err := safeurl.JoinPath(MetaPath)
+	if err != nil {
+		return "", err
+	}
+	return c.getTrustDomain(u)
 }
 
-func (c *LiveClient) getTrustDomain(url string) (string, error) {
+func (c *LiveClient) getTrustDomain(u safeurl.SafeURL) (string, error) {
 	var resp MetaResponse
 
 	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
 	err := backoff.Retry(func() error {
-		restErr := c.githubAPI.REST(c.host, http.MethodGet, url, nil, &resp)
+		restErr := c.githubAPI.REST(c.host, http.MethodGet, u.String(), nil, &resp)
 		if restErr != nil {
 			if shouldRetry(restErr) {
 				return restErr

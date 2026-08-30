@@ -876,9 +876,9 @@ func Test_createRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("POST", "user/repos"),
 					httpmock.RESTPayload(200, "{\"name\":\"ElliotAlderson\", \"owner\":{\"login\": \"OWNER\"}, \"html_url\":\"https://github.com/OWNER/ElliotAlderson\"}",
-						func(payload map[string]interface{}) {
+						func(payload map[string]any) {
 							payload["name"] = "ElliotAlderson"
-							payload["owner"] = map[string]interface{}{"login": "OWNER"}
+							payload["owner"] = map[string]any{"login": "OWNER"}
 							payload["auto_init"] = true
 							payload["private"] = true
 						},
@@ -918,7 +918,7 @@ func Test_createRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(s string, m map[string]interface{}) {
+					}`, func(s string, m map[string]any) {
 						assert.Equal(t, "OWNER", m["owner"])
 						assert.Equal(t, "mytemplate", m["name"])
 					}),
@@ -940,7 +940,7 @@ func Test_createRun(t *testing.T) {
 								}
 							}
 						}
-					}`, func(m map[string]interface{}) {
+					}`, func(m map[string]any) {
 						assert.Equal(t, "REPOID", m["repositoryId"])
 					}))
 			},
@@ -1051,7 +1051,7 @@ func Test_createRun(t *testing.T) {
 
 		if tt.opts.Config == nil {
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 		}
 

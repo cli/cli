@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 )
 
@@ -82,13 +84,13 @@ func setVariable(client *api.Client, host string, opts setOptions) setResult {
 	return result
 }
 
-func postVariable(client *api.Client, host, path string, payload interface{}) error {
+func postVariable(client *api.Client, host string, path safeurl.SafeURL, payload any) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)
 	}
 	requestBody := bytes.NewReader(payloadBytes)
-	return client.REST(host, "POST", path, requestBody, nil)
+	return client.REST(host, "POST", path.String(), requestBody, nil)
 }
 
 func postOrgVariable(client *api.Client, host, orgName, visibility, variableName, value string, repositoryIDs []int64) error {
@@ -98,7 +100,10 @@ func postOrgVariable(client *api.Client, host, orgName, visibility, variableName
 		Visibility:   visibility,
 		Repositories: repositoryIDs,
 	}
-	path := fmt.Sprintf(`orgs/%s/actions/variables`, orgName)
+	path, err := safeurl.JoinPath("orgs", orgName, "actions", "variables")
+	if err != nil {
+		return err
+	}
 	return postVariable(client, host, path, payload)
 }
 
@@ -107,7 +112,10 @@ func postEnvVariable(client *api.Client, host string, repoID int64, envName, var
 		Name:  variableName,
 		Value: value,
 	}
-	path := fmt.Sprintf(`repositories/%d/environments/%s/variables`, repoID, envName)
+	path, err := safeurl.JoinPath("repositories", strconv.FormatInt(repoID, 10), "environments", envName, "variables")
+	if err != nil {
+		return err
+	}
 	return postVariable(client, host, path, payload)
 }
 
@@ -116,17 +124,20 @@ func postRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, v
 		Name:  variableName,
 		Value: value,
 	}
-	path := fmt.Sprintf(`repos/%s/actions/variables`, ghrepo.FullName(repo))
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "variables")
+	if err != nil {
+		return err
+	}
 	return postVariable(client, repo.RepoHost(), path, payload)
 }
 
-func patchVariable(client *api.Client, host, path string, payload interface{}) error {
+func patchVariable(client *api.Client, host string, path safeurl.SafeURL, payload any) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)
 	}
 	requestBody := bytes.NewReader(payloadBytes)
-	return client.REST(host, "PATCH", path, requestBody, nil)
+	return client.REST(host, "PATCH", path.String(), requestBody, nil)
 }
 
 func patchOrgVariable(client *api.Client, host, orgName, visibility, variableName, value string, repositoryIDs []int64) error {
@@ -135,7 +146,10 @@ func patchOrgVariable(client *api.Client, host, orgName, visibility, variableNam
 		Visibility:   visibility,
 		Repositories: repositoryIDs,
 	}
-	path := fmt.Sprintf(`orgs/%s/actions/variables/%s`, orgName, variableName)
+	path, err := safeurl.JoinPath("orgs", orgName, "actions", "variables", variableName)
+	if err != nil {
+		return err
+	}
 	return patchVariable(client, host, path, payload)
 }
 
@@ -143,7 +157,10 @@ func patchEnvVariable(client *api.Client, host string, repoID int64, envName, va
 	payload := setPayload{
 		Value: value,
 	}
-	path := fmt.Sprintf(`repositories/%d/environments/%s/variables/%s`, repoID, envName, variableName)
+	path, err := safeurl.JoinPath("repositories", strconv.FormatInt(repoID, 10), "environments", envName, "variables", variableName)
+	if err != nil {
+		return err
+	}
 	return patchVariable(client, host, path, payload)
 }
 
@@ -151,6 +168,9 @@ func patchRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, 
 	payload := setPayload{
 		Value: value,
 	}
-	path := fmt.Sprintf(`repos/%s/actions/variables/%s`, ghrepo.FullName(repo), variableName)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "variables", variableName)
+	if err != nil {
+		return err
+	}
 	return patchVariable(client, repo.RepoHost(), path, payload)
 }

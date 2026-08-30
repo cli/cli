@@ -6,13 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
@@ -50,7 +51,7 @@ func (w *Workflow) Base() string {
 	return path.Base(w.Path)
 }
 
-func (w *Workflow) ExportData(fields []string) map[string]interface{} {
+func (w *Workflow) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(w, fields)
 }
 
@@ -69,9 +70,14 @@ func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workf
 		}
 		var result WorkflowsPayload
 
-		path := fmt.Sprintf("repos/%s/actions/workflows?per_page=%d&page=%d", ghrepo.FullName(repo), perPage, page)
+		u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "workflows")
+		if err != nil {
+			return nil, err
+		}
+		u.SetQuery("per_page", strconv.Itoa(perPage))
+		u.SetQuery("page", strconv.Itoa(page))
 
-		err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+		err = client.REST(repo.RepoHost(), "GET", u.String(), nil, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -101,12 +107,9 @@ func selectWorkflow(p iprompter, workflows []Workflow, promptMsg string, states 
 	filtered := []Workflow{}
 	candidates := []string{}
 	for _, workflow := range workflows {
-		for _, state := range states {
-			if workflow.State == state {
-				filtered = append(filtered, workflow)
-				candidates = append(candidates, fmt.Sprintf("%s (%s)", workflow.Name, workflow.Base()))
-				break
-			}
+		if slices.Contains(states, workflow.State) {
+			filtered = append(filtered, workflow)
+			candidates = append(candidates, fmt.Sprintf("%s (%s)", workflow.Name, workflow.Base()))
 		}
 	}
 
@@ -159,8 +162,11 @@ func isWorkflowFile(f string) bool {
 func getWorkflowByID(client *api.Client, repo ghrepo.Interface, ID string) (*Workflow, error) {
 	var workflow Workflow
 
-	path := fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), url.PathEscape(ID))
-	if err := client.REST(repo.RepoHost(), "GET", path, nil, &workflow); err != nil {
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "workflows", ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := client.REST(repo.RepoHost(), "GET", path.String(), nil, &workflow); err != nil {
 		return nil, err
 	}
 
@@ -178,11 +184,8 @@ func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, name string, 
 		if !strings.EqualFold(workflow.Name, name) {
 			continue
 		}
-		for _, state := range states {
-			if workflow.State == state {
-				filtered = append(filtered, workflow)
-				break
-			}
+		if slices.Contains(states, workflow.State) {
+			filtered = append(filtered, workflow)
 		}
 	}
 
@@ -222,21 +225,24 @@ func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, r
 	}
 
 	if !io.CanPrompt() {
-		errMsg := "could not resolve to a unique workflow; found:"
+		var errMsg strings.Builder
+		errMsg.WriteString("could not resolve to a unique workflow; found:")
 		for _, workflow := range workflows {
-			errMsg += fmt.Sprintf(" %s", workflow.Base())
+			errMsg.WriteString(fmt.Sprintf(" %s", workflow.Base()))
 		}
-		return nil, errors.New(errMsg)
+		return nil, errors.New(errMsg.String())
 	}
 
 	return selectWorkflow(p, workflows, "Which workflow do you mean?", states)
 }
 
 func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Workflow, ref string) ([]byte, error) {
-	path := fmt.Sprintf("repos/%s/contents/%s", ghrepo.FullName(repo), workflow.Path)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "contents", workflow.Path)
+	if err != nil {
+		return nil, err
+	}
 	if ref != "" {
-		q := fmt.Sprintf("?ref=%s", url.QueryEscape(ref))
-		path = path + q
+		path.SetQuery("ref", ref)
 	}
 
 	type Result struct {
@@ -244,7 +250,7 @@ func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Work
 	}
 
 	var result Result
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	err = client.REST(repo.RepoHost(), "GET", path.String(), nil, &result)
 	if err != nil {
 		return nil, err
 	}

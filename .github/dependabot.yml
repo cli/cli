@@ -7,12 +7,18 @@ updates:
   cooldown:
     default-days: 3
   ignore:
-    - dependency-name: "*"
-      update-types:
-        - version-update:semver-major
+  - dependency-name: "*"
+    update-types:
+    - version-update:semver-major
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:
       interval: "daily"
   cooldown:
     default-days: 3
+  groups:
+    codeql-actions:
+      patterns:
+        - "github/codeql-action/*"
+  ignore:
+  - dependency-name: "github/gh-aw-actions/*" # Managed by gh aw compile. Version-locked to the gh-aw compiler; do not bump.

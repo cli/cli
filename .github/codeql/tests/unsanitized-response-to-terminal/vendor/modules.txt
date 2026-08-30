@@ -1,0 +1,6 @@
+# github.com/cli/go-gh/v2 v2.13.0
+## explicit; go 1.21
+github.com/cli/go-gh/v2/pkg/asciisanitizer
+# golang.org/x/text v0.37.0
+## explicit; go 1.21
+golang.org/x/text/transform

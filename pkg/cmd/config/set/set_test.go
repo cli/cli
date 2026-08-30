@@ -51,7 +51,7 @@ func TestNewCmdConfigSet(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 			}
 
@@ -97,7 +97,7 @@ func Test_setRun(t *testing.T) {
 		{
 			name: "set key value",
 			input: &SetOptions{
-				Config: config.NewBlankConfig(),
+				Config: config.NewMockConfig(),
 				Key:    "editor",
 				Value:  "vim",
 			},
@@ -106,7 +106,7 @@ func Test_setRun(t *testing.T) {
 		{
 			name: "set key value scoped by host",
 			input: &SetOptions{
-				Config:   config.NewBlankConfig(),
+				Config:   config.NewMockConfig(),
 				Hostname: "github.com",
 				Key:      "editor",
 				Value:    "vim",
@@ -116,7 +116,7 @@ func Test_setRun(t *testing.T) {
 		{
 			name: "set unknown key",
 			input: &SetOptions{
-				Config: config.NewBlankConfig(),
+				Config: config.NewMockConfig(),
 				Key:    "unknownKey",
 				Value:  "someValue",
 			},
@@ -126,7 +126,7 @@ func Test_setRun(t *testing.T) {
 		{
 			name: "set invalid value",
 			input: &SetOptions{
-				Config: config.NewBlankConfig(),
+				Config: config.NewMockConfig(),
 				Key:    "git_protocol",
 				Value:  "invalid",
 			},

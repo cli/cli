@@ -309,7 +309,7 @@ func TestImportRun(t *testing.T) {
 			tt.opts.IO = ios
 
 			readConfigs := config.StubWriteConfig(t)
-			cfg := config.NewFromString(tt.initConfig)
+			cfg := config.NewMockConfigFromString(tt.initConfig)
 			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
 			}

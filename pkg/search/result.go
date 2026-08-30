@@ -114,7 +114,7 @@ type RepositoriesResult struct {
 type IssuesResult struct {
 	IncompleteResults bool    `json:"incomplete_results"`
 	Items             []Issue `json:"items"`
-	// Number of isssues matching the query on the server. Ignoring limit.
+	// Number of issues matching the query on the server. Ignoring limit.
 	Total int `json:"total_count"`
 }
 
@@ -264,13 +264,13 @@ func (u User) IsBot() bool {
 	return u.ID == ""
 }
 
-func (u User) ExportData() map[string]interface{} {
+func (u User) ExportData() map[string]any {
 	isBot := u.IsBot()
 	login := u.Login
 	if isBot {
 		login = "app/" + login
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"id":     u.ID,
 		"login":  login,
 		"type":   u.Type,
@@ -279,13 +279,13 @@ func (u User) ExportData() map[string]interface{} {
 	}
 }
 
-func (code Code) ExportData(fields []string) map[string]interface{} {
+func (code Code) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(code)
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "textMatches":
-			matches := make([]interface{}, 0, len(code.TextMatches))
+			matches := make([]any, 0, len(code.TextMatches))
 			for _, match := range code.TextMatches {
 				matches = append(matches, match.ExportData(textMatchFields))
 			}
@@ -298,40 +298,40 @@ func (code Code) ExportData(fields []string) map[string]interface{} {
 	return data
 }
 
-func (textMatch TextMatch) ExportData(fields []string) map[string]interface{} {
+func (textMatch TextMatch) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(textMatch, fields)
 }
 
-func (commit Commit) ExportData(fields []string) map[string]interface{} {
+func (commit Commit) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(commit)
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "author":
 			data[f] = commit.Author.ExportData()
 		case "commit":
 			info := commit.Info
-			data[f] = map[string]interface{}{
-				"author": map[string]interface{}{
+			data[f] = map[string]any{
+				"author": map[string]any{
 					"date":  info.Author.Date,
 					"email": info.Author.Email,
 					"name":  info.Author.Name,
 				},
-				"committer": map[string]interface{}{
+				"committer": map[string]any{
 					"date":  info.Committer.Date,
 					"email": info.Committer.Email,
 					"name":  info.Committer.Name,
 				},
 				"comment_count": info.CommentCount,
 				"message":       info.Message,
-				"tree":          map[string]interface{}{"sha": info.Tree.Sha},
+				"tree":          map[string]any{"sha": info.Tree.Sha},
 			}
 		case "committer":
 			data[f] = commit.Committer.ExportData()
 		case "parents":
-			parents := make([]interface{}, 0, len(commit.Parents))
+			parents := make([]any, 0, len(commit.Parents))
 			for _, parent := range commit.Parents {
-				parents = append(parents, map[string]interface{}{
+				parents = append(parents, map[string]any{
 					"sha": parent.Sha,
 					"url": parent.URL,
 				})
@@ -339,7 +339,7 @@ func (commit Commit) ExportData(fields []string) map[string]interface{} {
 			data[f] = parents
 		case "repository":
 			repo := commit.Repo
-			data[f] = map[string]interface{}{
+			data[f] = map[string]any{
 				"description": repo.Description,
 				"fullName":    repo.FullName,
 				"name":        repo.Name,
@@ -357,13 +357,13 @@ func (commit Commit) ExportData(fields []string) map[string]interface{} {
 	return data
 }
 
-func (repo Repository) ExportData(fields []string) map[string]interface{} {
+func (repo Repository) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(repo)
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "license":
-			data[f] = map[string]interface{}{
+			data[f] = map[string]any{
 				"key":  repo.License.Key,
 				"name": repo.License.Name,
 				"url":  repo.License.URL,
@@ -379,7 +379,7 @@ func (repo Repository) ExportData(fields []string) map[string]interface{} {
 }
 
 func (repo Repository) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
+	return json.Marshal(map[string]any{
 		"id":            repo.ID,
 		"nameWithOwner": repo.FullName,
 		"url":           repo.URL,
@@ -402,13 +402,13 @@ func (issue Issue) IsPullRequest() bool {
 	return issue.PullRequest.URL != ""
 }
 
-func (issue Issue) ExportData(fields []string) map[string]interface{} {
+func (issue Issue) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(issue)
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "assignees":
-			assignees := make([]interface{}, 0, len(issue.Assignees))
+			assignees := make([]any, 0, len(issue.Assignees))
 			for _, assignee := range issue.Assignees {
 				assignees = append(assignees, assignee.ExportData())
 			}
@@ -418,9 +418,9 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 		case "isPullRequest":
 			data[f] = issue.IsPullRequest()
 		case "labels":
-			labels := make([]interface{}, 0, len(issue.Labels))
+			labels := make([]any, 0, len(issue.Labels))
 			for _, label := range issue.Labels {
-				labels = append(labels, map[string]interface{}{
+				labels = append(labels, map[string]any{
 					"color":       label.Color,
 					"description": label.Description,
 					"id":          label.ID,
@@ -432,7 +432,7 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 			comp := strings.Split(issue.RepositoryURL, "/")
 			name := comp[len(comp)-1]
 			nameWithOwner := strings.Join(comp[len(comp)-2:], "/")
-			data[f] = map[string]interface{}{
+			data[f] = map[string]any{
 				"name":          name,
 				"nameWithOwner": nameWithOwner,
 			}

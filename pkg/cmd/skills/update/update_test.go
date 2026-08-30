@@ -345,7 +345,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "commit1", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/commit1"),
@@ -355,7 +355,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -371,7 +371,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -401,7 +401,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -434,7 +434,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -464,7 +464,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdinTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -473,6 +473,42 @@ func TestUpdateRun(t *testing.T) {
 				}
 			},
 			wantStderr: "no GitHub metadata",
+		},
+		{
+			name: "all skips no-metadata skill without prompting",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "manual-skill")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: manual-skill
+					---
+					No metadata
+				`)), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(true)
+				ios.SetStdinTTY(true)
+				ios.SetStderrTTY(true)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					Prompter: &prompter.PrompterMock{
+						InputFunc: func(prompt string, defaultValue string) (string, error) {
+							return "", fmt.Errorf("unexpected prompt")
+						},
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					Dir:       dir,
+					All:       true,
+				}
+			},
+			wantStderr: "Run `gh skill update manual-skill` interactively",
 		},
 		{
 			name: "all up to date",
@@ -496,7 +532,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "commitsha123", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -508,7 +544,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -540,7 +576,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v2.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/hubot/octocat-skills/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/hubot/octocat-skills/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit456", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -553,7 +589,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -588,7 +624,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(`{"tag_name": "v2.0.0"}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/hubot/octocat-skills/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/hubot/octocat-skills/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit456", "type": "commit"}}`),
 				)
 				reg.Register(
@@ -601,7 +637,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdinTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -636,7 +672,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -653,7 +689,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -673,7 +709,7 @@ func TestUpdateRun(t *testing.T) {
 			wantStdout: "Updated code-review",
 		},
 		{
-			name: "namespaced skill with --dir resolves install base correctly",
+			name: "namespaced skill with --dir updates in-place",
 			setup: func(t *testing.T, dir string) {
 				t.Helper()
 				homeDir := t.TempDir()
@@ -691,13 +727,15 @@ func TestUpdateRun(t *testing.T) {
 					---
 					Old namespaced content
 				`)), 0o644))
+				// Plant a stale file that should be cleaned during update.
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "STALE.txt"), []byte("leftover"), 0o644))
 			},
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -714,7 +752,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -726,14 +764,20 @@ func TestUpdateRun(t *testing.T) {
 			},
 			verify: func(t *testing.T, dir string) {
 				t.Helper()
-				// After update, skill should be installed flat (not namespaced).
-				content, err := os.ReadFile(filepath.Join(dir, "code-review", "SKILL.md"))
+				// Skill must stay in its original namespaced directory.
+				content, err := os.ReadFile(filepath.Join(dir, "monalisa", "code-review", "SKILL.md"))
 				require.NoError(t, err)
 				assert.Contains(t, string(content), "github-repo: https://github.com/monalisa/octocat-skills")
 				assert.NotContains(t, string(content), "Old namespaced content")
-				// Old namespaced directory should be cleaned up.
+				// Skill must NOT have been relocated to a flat path.
+				_, err = os.Stat(filepath.Join(dir, "code-review", "SKILL.md"))
+				assert.True(t, os.IsNotExist(err), "skill should not be relocated to flat path")
+				// Namespace directory must still exist.
 				_, err = os.Stat(filepath.Join(dir, "monalisa", "code-review"))
-				assert.True(t, os.IsNotExist(err), "old namespaced directory should be removed")
+				assert.False(t, os.IsNotExist(err), "namespaced directory must not be deleted")
+				// Stale file should have been cleaned during update.
+				_, err = os.Stat(filepath.Join(dir, "monalisa", "code-review", "STALE.txt"))
+				assert.True(t, os.IsNotExist(err), "stale file should be removed during update")
 			},
 			wantStdout: "Updated monalisa/code-review",
 		},
@@ -762,7 +806,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -778,7 +822,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -821,7 +865,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -840,7 +884,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -883,7 +927,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v3.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
@@ -895,7 +939,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -931,7 +975,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -967,7 +1011,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0.0"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "commit123", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/commit123"),
@@ -986,7 +1030,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -1037,7 +1081,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/octocat/hubot-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v2.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/octocat/hubot-skills/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/octocat/hubot-skills/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/hubot-skills/git/trees/newcommit789"),
@@ -1054,7 +1098,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStdoutTTY(false)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -1095,7 +1139,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -1130,7 +1174,7 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/octocat/hubot-skills/releases/latest"),
 					httpmock.StringResponse(`{"tag_name": "v2.0.0"}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/octocat/hubot-skills/git/ref/tags/v2.0.0"),
+					httpmock.REST("GET", "repos/octocat/hubot-skills/git/ref/tags%2Fv2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/octocat/hubot-skills/git/trees/newcommit789"),
@@ -1141,7 +1185,7 @@ func TestUpdateRun(t *testing.T) {
 				ios.SetStderrTTY(true)
 				return &UpdateOptions{
 					IO:     ios,
-					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
 						return &http.Client{Transport: reg}, nil
 					},
@@ -1183,9 +1227,9 @@ func TestUpdateRun(t *testing.T) {
 
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
-				return
+			} else {
+				require.NoError(t, err)
 			}
-			require.NoError(t, err)
 			if tt.wantStderr != "" {
 				assert.Contains(t, stderr.String(), tt.wantStderr)
 			}
@@ -1197,4 +1241,83 @@ func TestUpdateRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+// If the staged contents cannot be installed after the existing entries
+// have already been moved aside, the original skill directory must be
+// restored byte-for-byte and its inode must be preserved.
+func TestSwapDirectoryContents_RollsBackOnFailure(t *testing.T) {
+	parent := t.TempDir()
+	dest := filepath.Join(parent, "code-review")
+	require.NoError(t, os.MkdirAll(dest, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dest, "SKILL.md"), []byte("original"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dest, "extra.txt"), []byte("keep me"), 0o644))
+	subdir := filepath.Join(dest, "examples")
+	require.NoError(t, os.MkdirAll(subdir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(subdir, "demo.txt"), []byte("demo"), 0o644))
+
+	destBefore, err := os.Stat(dest)
+	require.NoError(t, err)
+
+	// Point src at a path that does not exist so the staged ReadDir fails
+	// after the existing entries have already been moved aside. This is the
+	// only deterministic, portable way to exercise the rollback branch from
+	// outside the swap.
+	src := filepath.Join(parent, "does-not-exist")
+
+	err = swapDirectoryContents(dest, src)
+	require.Error(t, err, "swap should fail when staged dir cannot be read")
+
+	destAfter, err := os.Stat(dest)
+	require.NoError(t, err)
+	assert.True(t, os.SameFile(destBefore, destAfter), "dest directory identity must be preserved across rollback")
+
+	content, readErr := os.ReadFile(filepath.Join(dest, "SKILL.md"))
+	require.NoError(t, readErr)
+	assert.Equal(t, "original", string(content), "original SKILL.md must be restored")
+	extra, readErr := os.ReadFile(filepath.Join(dest, "extra.txt"))
+	require.NoError(t, readErr)
+	assert.Equal(t, "keep me", string(extra), "original extra.txt must be restored")
+	demo, readErr := os.ReadFile(filepath.Join(subdir, "demo.txt"))
+	require.NoError(t, readErr)
+	assert.Equal(t, "demo", string(demo), "original nested subdir must be restored intact")
+
+	entries, err := os.ReadDir(parent)
+	require.NoError(t, err)
+	var leftovers []string
+	for _, e := range entries {
+		if e.Name() != "code-review" {
+			leftovers = append(leftovers, e.Name())
+		}
+	}
+	assert.Empty(t, leftovers, "no staging or backup directories should remain after rollback")
+}
+
+// The skill directory's own inode must survive an update so symlinks,
+// bind mounts, and other external references pointing at it remain
+// valid. Per-entry rename swaps satisfy this; replacing the directory
+// itself would not.
+func TestSwapDirectoryContents_PreservesDestInode(t *testing.T) {
+	parent := t.TempDir()
+	dest := filepath.Join(parent, "code-review")
+	require.NoError(t, os.MkdirAll(dest, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dest, "old.txt"), []byte("old"), 0o644))
+
+	src := filepath.Join(parent, "staged")
+	require.NoError(t, os.MkdirAll(src, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(src, "new.txt"), []byte("new"), 0o644))
+
+	destBefore, err := os.Stat(dest)
+	require.NoError(t, err)
+
+	require.NoError(t, swapDirectoryContents(dest, src))
+
+	destAfter, err := os.Stat(dest)
+	require.NoError(t, err)
+	assert.True(t, os.SameFile(destBefore, destAfter), "dest directory identity must be preserved")
+
+	assert.NoFileExists(t, filepath.Join(dest, "old.txt"), "stale files must be removed")
+	content, err := os.ReadFile(filepath.Join(dest, "new.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "new", string(content), "staged content must be installed")
 }

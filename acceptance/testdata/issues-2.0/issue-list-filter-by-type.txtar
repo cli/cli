@@ -1,0 +1,21 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+cd $SCRIPT_NAME-$RANDOM_STRING
+
+# Create one Bug-typed issue and one untyped issue
+exec gh issue create --title 'typed-bug' --body '' --type 'Bug'
+exec gh issue create --title 'untyped' --body ''
+
+sleep 3
+
+# Filtering by type returns only the typed issue
+exec gh issue list --type 'Bug'
+stdout 'typed-bug'
+! stdout 'untyped'

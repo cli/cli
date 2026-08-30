@@ -115,7 +115,7 @@ func TestPrClose(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)
@@ -152,12 +152,12 @@ func TestPrClose_deleteBranch_sameRepo(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -186,7 +186,7 @@ func TestPrClose_deleteBranch_crossRepo(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)
@@ -218,12 +218,12 @@ func TestPrClose_deleteBranch_sameBranch(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/trunk"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Ftrunk"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -253,12 +253,12 @@ func TestPrClose_deleteBranch_notInGitRepo(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)
 	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/trunk"),
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Ftrunk"),
 		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := run.Stub()
@@ -290,7 +290,7 @@ func TestPrClose_withComment(t *testing.T) {
 		{ "data": { "addComment": { "commentEdge": { "node": {
 			"url": "https://github.com/OWNER/REPO/issues/123#issuecomment-456"
 		} } } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, "THE-ID", inputs["subjectId"])
 				assert.Equal(t, "closing comment", inputs["body"])
 			}),
@@ -298,7 +298,7 @@ func TestPrClose_withComment(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
 			}),
 	)

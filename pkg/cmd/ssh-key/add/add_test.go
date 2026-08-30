@@ -2,13 +2,16 @@ package add
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_runAdd(t *testing.T) {
@@ -30,7 +33,7 @@ func Test_runAdd(t *testing.T) {
 					httpmock.StringResponse("[]"))
 				reg.Register(
 					httpmock.REST("POST", "user/keys"),
-					httpmock.RESTPayload(200, ``, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Contains(t, payload, "key")
 						assert.Empty(t, payload["title"])
 					}))
@@ -49,7 +52,7 @@ func Test_runAdd(t *testing.T) {
 					httpmock.StringResponse("[]"))
 				reg.Register(
 					httpmock.REST("POST", "user/ssh_signing_keys"),
-					httpmock.RESTPayload(200, ``, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Contains(t, payload, "key")
 						assert.Empty(t, payload["title"])
 					}))
@@ -133,7 +136,7 @@ func Test_runAdd(t *testing.T) {
 			tt.httpStubs(reg)
 		}
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
@@ -148,4 +151,30 @@ func Test_runAdd(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
+}
+
+func TestSSHKeyUploadHTTPError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("GET", "user/keys"),
+		httpmock.StringResponse("[]"),
+	)
+	reg.Register(
+		httpmock.REST("POST", "user/keys"),
+		httpmock.StatusStringResponse(http.StatusUnprocessableEntity, `{"message":"Validation Failed"}`),
+	)
+
+	uploaded, err := SSHKeyUpload(
+		&http.Client{Transport: reg},
+		"github.com",
+		strings.NewReader("ssh-ed25519 asdf"),
+		"",
+	)
+
+	assert.False(t, uploaded)
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusUnprocessableEntity, httpErr.StatusCode)
+	assert.Contains(t, err.Error(), "HTTP 422")
 }

@@ -79,14 +79,19 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *co
 				return err
 			}
 
+			externalClient, err := f.ExternalHttpClient()
+			if err != nil {
+				return err
+			}
+
 			io := f.IOStreams
-			attClient := api.NewLiveClient(httpClient, baseRepo.RepoHost(), att_io.NewHandler(io))
+			attClient := api.NewLiveClient(httpClient, externalClient, baseRepo.RepoHost(), att_io.NewHandler(io))
 
 			attVerifier := &shared.AttestationVerifier{
-				AttClient:   attClient,
-				HttpClient:  httpClient,
-				IO:          io,
-				TrustedRoot: opts.TrustedRoot,
+				AttClient:          attClient,
+				ExternalHttpClient: externalClient,
+				IO:                 io,
+				TrustedRoot:        opts.TrustedRoot,
 			}
 
 			config := &VerifyConfig{

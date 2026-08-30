@@ -2,15 +2,92 @@ package add
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func Test_gpgKeyUploadScopesMissing(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("POST", "user/gpg_keys"),
+		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+	)
+
+	err := gpgKeyUpload(&http.Client{Transport: reg}, "github.com", strings.NewReader("-----BEGIN PGP PUBLIC KEY BLOCK-----"), "")
+
+	require.Same(t, errScopesMissing, err)
+}
+
+func Test_gpgKeyUploadDuplicateKeyBeforeWrongFormat(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("POST", "user/gpg_keys"),
+		httpmock.WithHeader(httpmock.StatusStringResponse(http.StatusUnprocessableEntity, `{
+			"message": "Validation Failed",
+			"errors": [{
+				"resource": "GpgKey",
+				"code": "custom",
+				"field": "key_id",
+				"message": "key_id already exists"
+			}]
+		}`), "Content-Type", "application/json"),
+	)
+
+	err := gpgKeyUpload(&http.Client{Transport: reg}, "github.com", strings.NewReader("binary-key"), "")
+
+	require.Same(t, errDuplicateKey, err)
+}
+
+func Test_gpgKeyUploadWrongFormat(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("POST", "user/gpg_keys"),
+		httpmock.StatusStringResponse(http.StatusUnprocessableEntity, `{
+			"message": "Validation Failed",
+			"errors": [{
+				"resource": "GpgKey",
+				"code": "custom",
+				"message": "We got an error doing that."
+			}]
+		}`),
+	)
+
+	err := gpgKeyUpload(&http.Client{Transport: reg}, "github.com", strings.NewReader("binary-key"), "")
+
+	require.Same(t, errWrongFormat, err)
+}
+
+func Test_gpgKeyUploadHTTPError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("POST", "user/gpg_keys"),
+		httpmock.WithHeader(
+			httpmock.StatusStringResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`),
+			"Content-Type", "application/json",
+		),
+	)
+
+	err := gpgKeyUpload(&http.Client{Transport: reg}, "github.com", strings.NewReader("-----BEGIN PGP PUBLIC KEY BLOCK-----"), "")
+
+	var httpErr api.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
+	assert.Contains(t, err.Error(), "HTTP 500")
+	assert.EqualError(t, err, "HTTP 500: Internal Server Error (https://api.github.com/user/gpg_keys)")
+}
 
 func Test_runAdd(t *testing.T) {
 	tests := []struct {
@@ -28,7 +105,7 @@ func Test_runAdd(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "user/gpg_keys"),
-					httpmock.RESTPayload(200, ``, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Contains(t, payload, "armored_public_key")
 						assert.NotContains(t, payload, "title")
 					}))
@@ -44,7 +121,7 @@ func Test_runAdd(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "user/gpg_keys"),
-					httpmock.RESTPayload(200, ``, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Contains(t, payload, "armored_public_key")
 						assert.Contains(t, payload, "name")
 					}))
@@ -127,7 +204,7 @@ func Test_runAdd(t *testing.T) {
 			tt.httpStubs(reg)
 		}
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		t.Run(tt.name, func(t *testing.T) {

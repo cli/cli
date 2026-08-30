@@ -83,14 +83,19 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*VerifyAssetConfig) error) 
 				return err
 			}
 
+			externalClient, err := f.ExternalHttpClient()
+			if err != nil {
+				return err
+			}
+
 			io := f.IOStreams
-			attClient := api.NewLiveClient(httpClient, baseRepo.RepoHost(), att_io.NewHandler(io))
+			attClient := api.NewLiveClient(httpClient, externalClient, baseRepo.RepoHost(), att_io.NewHandler(io))
 
 			attVerifier := &shared.AttestationVerifier{
-				AttClient:   attClient,
-				HttpClient:  httpClient,
-				IO:          io,
-				TrustedRoot: opts.TrustedRoot,
+				AttClient:          attClient,
+				ExternalHttpClient: externalClient,
+				IO:                 io,
+				TrustedRoot:        opts.TrustedRoot,
 			}
 
 			config := &VerifyAssetConfig{

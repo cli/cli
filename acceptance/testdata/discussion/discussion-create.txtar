@@ -1,0 +1,47 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+cd $SCRIPT_NAME-$RANDOM_STRING
+
+# Explicitly disable discussions
+exec gh api repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING -X PATCH -F has_discussions=false
+
+# Creating a discussion should fail when discussions are disabled
+! exec gh discussion create --title 'Fail' --body 'Body' --category 'General'
+stderr 'has discussions disabled'
+
+# Enable discussions
+exec gh api repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING -X PATCH -F has_discussions=true
+
+# Create with title + body + category
+exec gh discussion create --title 'Basic Discussion' --body 'Basic body' --category 'General'
+stdout2env BASIC_URL
+exec gh discussion view $BASIC_URL
+stdout 'title:\tBasic Discussion'
+stdout 'Basic body'
+
+# Create with title + body from file + category
+exec gh discussion create --title 'File Body Discussion' --body-file $WORK/body.txt --category 'General'
+stdout2env FILE_URL
+exec gh discussion view $FILE_URL
+stdout 'title:\tFile Body Discussion'
+stdout 'Body from file content'
+
+# Create with title + body + category + 2 labels
+exec gh discussion create --title 'Labeled Discussion' --body 'Labeled body' --category 'General' --label bug,enhancement
+stdout2env LABELED_URL
+exec gh discussion view $LABELED_URL
+stdout 'title:\tLabeled Discussion'
+stdout 'labels:\tbug, enhancement'
+
+# Create with title + body + category + invalid label (label resolution fails before creation)
+! exec gh discussion create --title 'Invalid Label Discussion' --body 'Body' --category 'General' --label nonexistent-label-xyz
+stderr 'labels not found'
+
+-- body.txt --
+Body from file content

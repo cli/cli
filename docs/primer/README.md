@@ -4,7 +4,7 @@ These guidelines are a collection of principles, foundations and usage guideline
 
 ## [Components](components)
 
-Design guidance on how we format content in in the Terminal through text formatting, color and font weights.
+Design guidance on how we format content in the Terminal through text formatting, color and font weights.
 
 ## [Foundations](foundations)
 

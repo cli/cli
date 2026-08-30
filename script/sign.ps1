@@ -1,5 +1,10 @@
 #!/usr/bin/env pwsh
 
+if ($null -eq $Env:DO_SIGN_ARTIFACTS -or $Env:DO_SIGN_ARTIFACTS -eq "false") {
+	Write-Host "Skipping Windows code signing; DO_SIGN_ARTIFACTS not set or false"
+	exit
+}
+
 if ($null -eq $Env:DLIB_PATH) {
 	Write-Host "Skipping Windows code signing; DLIB_PATH not set"
 	exit

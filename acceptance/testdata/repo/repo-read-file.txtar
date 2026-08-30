@@ -1,0 +1,88 @@
+# Read files from a repository without cloning, in several modes.
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a private repo with a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --private --add-readme
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo and add a text file under a subdirectory
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+cd $SCRIPT_NAME-$RANDOM_STRING
+mkdir docs
+cp $WORK/guide.md docs/guide.md
+exec git add -A
+exec git commit -m 'Add docs/guide.md'
+exec git push origin main
+
+# Add a v2 branch where the same file has different content, to exercise --ref
+exec git checkout -b v2
+cp $WORK/guide-v2.md docs/guide.md
+exec git add -A
+exec git commit -m 'Update docs/guide.md on v2'
+exec git push -u origin v2
+exec git checkout main
+
+# Create a small binary file (PNG signature) via the Contents API
+exec gh api -X PUT repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING/contents/assets/logo.png -f message='Add binary' -f content=iVBORw0KGgo=
+
+# Create a text file containing ANSI terminal escape sequences via the Contents API
+exec gh api -X PUT repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING/contents/ansi.txt -f message='Add ansi' -f content=G1szMW1oZWxsbxtbMG0K
+
+# Read a file from the default branch: raw content goes to stdout
+exec gh repo read-file docs/guide.md
+cmp stdout $WORK/guide.md
+
+# Read the same file at a specific ref
+exec gh repo read-file docs/guide.md --ref v2
+cmp stdout $WORK/guide-v2.md
+
+# Save a file to disk, and confirm --clobber is required to overwrite
+exec gh repo read-file docs/guide.md --output out.txt
+cmp out.txt $WORK/guide.md
+! exec gh repo read-file docs/guide.md --output out.txt
+stderr 'already exists'
+exec gh repo read-file docs/guide.md --output out.txt --clobber
+cmp out.txt $WORK/guide.md
+
+# Save into a directory: a trailing separator writes under the remote basename
+exec gh repo read-file docs/guide.md --output download-dir/
+cmp download-dir/guide.md $WORK/guide.md
+
+# Save to an explicit path inside a directory, creating it as needed
+exec gh repo read-file docs/guide.md --output download-dir/out.txt
+cmp download-dir/out.txt $WORK/guide.md
+
+# JSON output exposes file metadata
+exec gh repo read-file docs/guide.md --json name,path,size,type --jq '.name'
+stdout '^guide\.md$'
+
+# Read a binary file: the raw bytes written to stdout match the saved copy,
+# and the base64 content is exposed via --json
+exec gh repo read-file assets/logo.png --output downloaded.png
+exists downloaded.png
+exec gh repo read-file assets/logo.png
+cmp stdout downloaded.png
+exec gh repo read-file assets/logo.png --json size,type,content --jq '.content'
+stdout '^iVBORw0KGgo=$'
+
+# A file with terminal escape sequences is refused by default, but readable
+# with --allow-escape-sequences
+! exec gh repo read-file ansi.txt
+stderr 'terminal escape sequences'
+exec gh repo read-file ansi.txt --allow-escape-sequences
+stdout 'hello'
+
+# Error: the path is a directory
+! exec gh repo read-file docs
+stderr 'is a directory'
+
+# Error: the path does not exist
+! exec gh repo read-file does/not/exist.md
+stderr 'Not Found'
+
+-- guide.md --
+Hello from the default branch!
+-- guide-v2.md --
+Hello from the v2 branch!

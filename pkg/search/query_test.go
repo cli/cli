@@ -308,6 +308,16 @@ func TestQualifiersMap(t *testing.T) {
 				"user":   {"user"},
 			},
 		},
+		{
+			name: "concatenates fields that share a qualifier key",
+			qualifiers: Qualifiers{
+				Type:      "issue",
+				IssueType: "Bug",
+			},
+			out: map[string][]string{
+				"type": {"issue", "Bug"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
