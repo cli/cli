@@ -25,6 +25,9 @@ type RevertOptions struct {
 	BodySet bool
 	Title   string
 	IsDraft bool
+
+	Branch string
+	Base   string
 }
 
 func NewCmdRevert(f *cmdutil.Factory, runF func(*RevertOptions) error) *cobra.Command {
@@ -79,6 +82,8 @@ func NewCmdRevert(f *cmdutil.Factory, runF func(*RevertOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Title for the revert pull request")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body for the revert pull request")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
+	cmd.Flags().StringVar(&opts.Branch, "branch", "", "Name of the branch to create for the revert pull request")
+	cmd.Flags().StringVarP(&opts.Base, "base", "B", "", "Base branch for the revert pull request")
 	return cmd
 }
 
@@ -126,7 +131,29 @@ func revertRun(opts *RevertOptions) error {
 	}
 
 	if revertPR != nil {
+		// Print the URL before the follow-up steps so the reference to the
+		// revert pull request is always available, even if one of them fails.
 		fmt.Fprintln(opts.IO.Out, revertPR.URL)
+
+		// Rename the branch that GitHub created for the revert, if requested.
+		if opts.Branch != "" {
+			if revertPR.HeadRefName == "" {
+				fmt.Fprintf(opts.IO.ErrOut, "%s could not rename branch: revert PR has no head branch name\n", cs.WarningIcon())
+			} else if _, err := api.RenameBranch(apiClient, baseRepo, revertPR.HeadRefName, opts.Branch); err != nil {
+				fmt.Fprintf(opts.IO.ErrOut, "%s Failed to rename branch %s to %s: %s\n", cs.FailureIcon(), revertPR.HeadRefName, opts.Branch, err)
+				return fmt.Errorf("branch rename failed: %w", err)
+			}
+		}
+
+		// Change the base branch of the revert pull request, if requested.
+		if opts.Base != "" {
+			if revertPR.ID == "" {
+				fmt.Fprintf(opts.IO.ErrOut, "%s could not change base branch: revert PR has no ID\n", cs.WarningIcon())
+			} else if err := api.UpdatePullRequestBase(apiClient, baseRepo, revertPR.ID, opts.Base); err != nil {
+				fmt.Fprintf(opts.IO.ErrOut, "%s Failed to change base branch to %s: %s\n", cs.FailureIcon(), opts.Base, err)
+				return fmt.Errorf("base branch update failed: %w", err)
+			}
+		}
 	}
 	return nil
 }

@@ -216,6 +216,265 @@ func TestPRRevert_withDraft(t *testing.T) {
 	assert.Equal(t, "", output.Stderr())
 }
 
+func TestPRRevert_withBranch(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
+		ID:     "SOME-ID",
+		Number: 123,
+		State:  "MERGED",
+		Title:  "The title of the PR",
+	}, ghrepo.New("OWNER", "REPO"))
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestRevert\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "revertPullRequest": { "pullRequest": {
+				"ID": "SOME-ID"
+			}, "revertPullRequest": {
+               "ID": "NEW-ID",
+               "Number": 456,
+               "URL": "https://github.com/OWNER/REPO/pull/456",
+               "HeadRefName": "revert-456-main"
+            } } } }
+			`,
+			func(inputs map[string]any) {
+				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
+			}),
+	)
+
+	// The branch GitHub created for the revert is renamed to the requested name.
+	http.Register(
+		httpmock.REST("POST", "repos/OWNER/REPO/branches/revert-456-main/rename"),
+		httpmock.RESTPayload(201, `{ "name": "custom-branch" }`,
+			func(payload map[string]any) {
+				assert.Equal(t, payload["new_name"], "custom-branch")
+			}),
+	)
+
+	output, err := runCommand(http, true, "123 --branch custom-branch")
+	// Revert PR created and its branch renamed.
+	assert.NoError(t, err)
+	// Only URL printed.
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/456\n", output.String())
+	assert.Equal(t, "", output.Stderr())
+}
+
+func TestPRRevert_withBase(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
+		ID:     "SOME-ID",
+		Number: 123,
+		State:  "MERGED",
+		Title:  "The title of the PR",
+	}, ghrepo.New("OWNER", "REPO"))
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestRevert\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "revertPullRequest": { "pullRequest": {
+				"ID": "SOME-ID"
+			}, "revertPullRequest": {
+               "ID": "NEW-ID",
+               "Number": 456,
+               "URL": "https://github.com/OWNER/REPO/pull/456",
+               "HeadRefName": "revert-456-main"
+            } } } }
+			`,
+			func(inputs map[string]any) {
+				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
+			}),
+	)
+
+	// The base branch of the newly created revert PR is updated.
+	http.Register(
+		httpmock.GraphQL(`mutation UpdatePullRequestBase\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "updatePullRequest": { "clientMutationId": "" } } }
+			`,
+			func(inputs map[string]any) {
+				assert.Equal(t, inputs["pullRequestId"], "NEW-ID")
+				assert.Equal(t, inputs["baseRefName"], "main")
+			}),
+	)
+
+	output, err := runCommand(http, true, "123 --base main")
+	// Revert PR created and re-based.
+	assert.NoError(t, err)
+	// Only URL printed.
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/456\n", output.String())
+	assert.Equal(t, "", output.Stderr())
+}
+
+func TestPRRevert_withBranchAndBase(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
+		ID:     "SOME-ID",
+		Number: 123,
+		State:  "MERGED",
+		Title:  "The title of the PR",
+	}, ghrepo.New("OWNER", "REPO"))
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestRevert\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "revertPullRequest": { "pullRequest": {
+				"ID": "SOME-ID"
+			}, "revertPullRequest": {
+               "ID": "NEW-ID",
+               "Number": 456,
+               "URL": "https://github.com/OWNER/REPO/pull/456",
+               "HeadRefName": "revert-456-main"
+            } } } }
+			`,
+			func(inputs map[string]any) {
+				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
+			}),
+	)
+
+	http.Register(
+		httpmock.REST("POST", "repos/OWNER/REPO/branches/revert-456-main/rename"),
+		httpmock.RESTPayload(201, `{ "name": "custom-branch" }`,
+			func(payload map[string]any) {
+				assert.Equal(t, payload["new_name"], "custom-branch")
+			}),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation UpdatePullRequestBase\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "updatePullRequest": { "clientMutationId": "" } } }
+			`,
+			func(inputs map[string]any) {
+				assert.Equal(t, inputs["pullRequestId"], "NEW-ID")
+				assert.Equal(t, inputs["baseRefName"], "trunk")
+			}),
+	)
+
+	output, err := runCommand(http, true, "123 --branch custom-branch --base trunk")
+	// Revert PR created, branch renamed and re-based.
+	assert.NoError(t, err)
+	// Only URL printed.
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/456\n", output.String())
+	assert.Equal(t, "", output.Stderr())
+}
+
+func TestPRRevert_withBranch_noHeadRefName(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
+		ID:     "SOME-ID",
+		Number: 123,
+		State:  "MERGED",
+		Title:  "The title of the PR",
+	}, ghrepo.New("OWNER", "REPO"))
+
+	// The API response carries no head branch name, so there is nothing to rename.
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestRevert\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "revertPullRequest": { "pullRequest": {
+				"ID": "SOME-ID"
+			}, "revertPullRequest": {
+               "ID": "NEW-ID",
+               "Number": 456,
+               "URL": "https://github.com/OWNER/REPO/pull/456"
+            } } } }
+			`,
+			func(inputs map[string]any) {
+				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
+			}),
+	)
+
+	output, err := runCommand(http, true, "123 --branch custom-branch")
+	// The rename is skipped with a warning instead of failing.
+	assert.NoError(t, err)
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/456\n", output.String())
+	assert.Equal(t, "! could not rename branch: revert PR has no head branch name\n", output.Stderr())
+}
+
+func TestPRRevert_withBase_noPullRequestID(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
+		ID:     "SOME-ID",
+		Number: 123,
+		State:  "MERGED",
+		Title:  "The title of the PR",
+	}, ghrepo.New("OWNER", "REPO"))
+
+	// The API response carries no revert PR ID, so the base can't be updated.
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestRevert\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "revertPullRequest": { "pullRequest": {
+				"ID": "SOME-ID"
+			}, "revertPullRequest": {
+               "Number": 456,
+               "URL": "https://github.com/OWNER/REPO/pull/456",
+               "HeadRefName": "revert-456-main"
+            } } } }
+			`,
+			func(inputs map[string]any) {
+				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
+			}),
+	)
+
+	output, err := runCommand(http, true, "123 --base trunk")
+	// The base update is skipped with a warning instead of failing.
+	assert.NoError(t, err)
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/456\n", output.String())
+	assert.Equal(t, "! could not change base branch: revert PR has no ID\n", output.Stderr())
+}
+
+func TestPRRevert_branchRenameFailurePrintsURL(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
+		ID:     "SOME-ID",
+		Number: 123,
+		State:  "MERGED",
+		Title:  "The title of the PR",
+	}, ghrepo.New("OWNER", "REPO"))
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestRevert\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "revertPullRequest": { "pullRequest": {
+				"ID": "SOME-ID"
+			}, "revertPullRequest": {
+               "ID": "NEW-ID",
+               "Number": 456,
+               "URL": "https://github.com/OWNER/REPO/pull/456",
+               "HeadRefName": "revert-456-main"
+            } } } }
+			`,
+			func(inputs map[string]any) {
+				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
+			}),
+	)
+
+	http.Register(
+		httpmock.REST("POST", "repos/OWNER/REPO/branches/revert-456-main/rename"),
+		httpmock.StatusStringResponse(422, `{ "message": "Validation failed" }`),
+	)
+
+	output, err := runCommand(http, true, "123 --branch custom-branch")
+	// Rename failure is fatal, but the revert PR URL has already been printed.
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "branch rename failed:")
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/456\n", output.String())
+	assert.Contains(t, output.Stderr(), "X Failed to rename branch revert-456-main to custom-branch:")
+}
+
 func TestPRRevert_APIFailure(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
