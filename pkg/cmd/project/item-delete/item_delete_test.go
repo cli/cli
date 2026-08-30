@@ -107,21 +107,21 @@ func TestRunDelete_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -132,9 +132,9 @@ func TestRunDelete_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -144,10 +144,10 @@ func TestRunDelete_User(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -159,9 +159,9 @@ func TestRunDelete_User(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation DeleteProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"deleteProjectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"deleteProjectV2Item": map[string]any{
 					"deletedItemId": "item ID",
 				},
 			},
@@ -196,21 +196,21 @@ func TestRunDelete_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -221,9 +221,9 @@ func TestRunDelete_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query OrgProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "github",
 				"number":      1,
 				"firstItems":  0,
@@ -233,10 +233,10 @@ func TestRunDelete_Org(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -248,9 +248,9 @@ func TestRunDelete_Org(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation DeleteProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"deleteProjectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"deleteProjectV2Item": map[string]any{
 					"deletedItemId": "item ID",
 				},
 			},
@@ -285,13 +285,13 @@ func TestRunDelete_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"id": "an ID",
 				},
 			},
@@ -301,9 +301,9 @@ func TestRunDelete_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"number":      1,
 				"firstItems":  0,
 				"afterItems":  nil,
@@ -312,10 +312,10 @@ func TestRunDelete_Me(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -327,9 +327,9 @@ func TestRunDelete_Me(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation DeleteProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"deleteProjectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"deleteProjectV2Item": map[string]any{
 					"deletedItemId": "item ID",
 				},
 			},
@@ -364,21 +364,21 @@ func TestRunDelete_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -389,9 +389,9 @@ func TestRunDelete_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -401,10 +401,10 @@ func TestRunDelete_JSON(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -416,9 +416,9 @@ func TestRunDelete_JSON(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation DeleteProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"deleteProjectV2Item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"deleteProjectV2Item": map[string]any{
 					"deletedItemId": "item ID",
 				},
 			},

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -229,6 +230,18 @@ type AuthConfig struct {
 	defaultHostOverride func() (string, string)
 	hostsOverride       func() []string
 	tokenOverride       func(string) (string, string)
+}
+
+// ActiveTokenType reports what kind of credential the active token is, so a
+// caller that only needs to know that can avoid handling the token.
+func (c *AuthConfig) ActiveTokenType(hostname string) gh.TokenType {
+	token, _ := c.ActiveToken(hostname)
+	for _, tokenType := range gh.TokenTypes {
+		if strings.HasPrefix(token, string(tokenType)) {
+			return tokenType
+		}
+	}
+	return gh.TokenTypeUnknown
 }
 
 // ActiveToken will retrieve the active auth token for the given hostname,

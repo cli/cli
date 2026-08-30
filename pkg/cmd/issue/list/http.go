@@ -44,7 +44,7 @@ func listIssues(client *api.Client, repo ghrepo.Interface, filters prShared.Filt
 	}
 	`
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  repo.RepoOwner(),
 		"repo":   repo.RepoName(),
 		"states": states,
@@ -162,7 +162,7 @@ func searchIssues(client *api.Client, detector fd.Detector, repo ghrepo.Interfac
 
 	perPage := min(limit, 100)
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"repo":  repo.RepoName(),
 		"limit": perPage,
@@ -216,11 +216,4 @@ loop:
 	}
 
 	return &ic, nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

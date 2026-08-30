@@ -29,6 +29,7 @@ const (
 // Repository contains information about a GitHub repo
 type Repository struct {
 	ID                       string
+	DatabaseID               int64
 	Name                     string
 	NameWithOwner            string
 	Owner                    RepositoryOwner
@@ -288,7 +289,7 @@ func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*R
 		repository(owner: $owner, name: $name) {%s}
 	}`, RepositoryGraphQL(fields))
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"name":  repo.RepoName(),
 	}
@@ -323,13 +324,14 @@ func IssueRepoInfo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query IssueRepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
 			id
+			databaseId
 			name
 			owner { login }
 			hasIssuesEnabled
 			viewerPermission
 		}
 	}`
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"name":  repo.RepoName(),
 	}
@@ -360,6 +362,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	fragment repo on Repository {
 		id
+		databaseId
 		name
 		owner { login }
 		hasIssuesEnabled
@@ -382,7 +385,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 			squashMergeAllowed
 		}
 	}`
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"name":  repo.RepoName(),
 	}
@@ -447,7 +450,7 @@ func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error)
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),
 	}
@@ -498,6 +501,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 	err := client.GraphQL(hostname, fmt.Sprintf(`
 	fragment repo on Repository {
 		id
+		databaseId
 		name
 		owner { login }
 		viewerPermission
@@ -595,7 +599,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org, newName string, defaul
 		return nil, err
 	}
 
-	params := map[string]interface{}{}
+	params := map[string]any{}
 	if org != "" {
 		params["organization"] = org
 	}
@@ -680,7 +684,7 @@ func LastCommit(client *Client, repo ghrepo.Interface) (*Commit, error) {
 			}
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()), "repo": githubv4.String(repo.RepoName()),
 	}
 	if err := client.Query(repo.RepoHost(), "LastCommit", &responseData, variables); err != nil {
@@ -699,7 +703,7 @@ func RepoFindForks(client *Client, repo ghrepo.Interface, limit int) ([]*Reposit
 		}
 	}{}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": repo.RepoOwner(),
 		"repo":  repo.RepoName(),
 		"limit": limit,
@@ -1118,7 +1122,7 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
@@ -1257,7 +1261,7 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]AssignableUse
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
@@ -1316,7 +1320,7 @@ func RepoAssignableActors(client *Client, repo ghrepo.Interface) ([]AssignableAc
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
@@ -1388,7 +1392,7 @@ func SearchRepoAssignableActors(client *Client, repo ghrepo.Interface, query str
 		q = &v
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),
 		"query": q,
@@ -1437,7 +1441,7 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
@@ -1492,7 +1496,7 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 		return nil, fmt.Errorf("invalid state: %s", state)
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"states":    states,

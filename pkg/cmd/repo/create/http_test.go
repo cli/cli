@@ -46,8 +46,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":             "winter-foods",
 								"description":      "roasted chestnuts",
 								"homepageUrl":      "http://example.com",
@@ -87,8 +87,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":             "winter-foods",
 								"description":      "roasted chestnuts",
 								"homepageUrl":      "http://example.com",
@@ -130,8 +130,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":             "crisps",
 								"visibility":       "INTERNAL",
 								"ownerId":          "ORGID",
@@ -173,8 +173,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":             "crisps",
 								"visibility":       "INTERNAL",
 								"ownerId":          "ORGID",
@@ -218,8 +218,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":               "gen-project",
 								"description":        "my generated project",
 								"visibility":         "PRIVATE",
@@ -263,8 +263,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":               "gen-project",
 								"description":        "my generated project",
 								"visibility":         "PRIVATE",
@@ -286,8 +286,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"repositoryId":     "REPOID",
 								"hasIssuesEnabled": true,
 								"hasWikiEnabled":   false,
@@ -328,8 +328,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":               "gen-project",
 								"description":        "my generated project",
 								"visibility":         "PRIVATE",
@@ -351,8 +351,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"repositoryId":     "REPOID",
 								"hasIssuesEnabled": false,
 								"hasWikiEnabled":   true,
@@ -393,8 +393,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":               "gen-project",
 								"description":        "my generated project",
 								"visibility":         "PRIVATE",
@@ -416,8 +416,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"repositoryId":     "REPOID",
 								"hasIssuesEnabled": false,
 								"hasWikiEnabled":   false,
@@ -459,8 +459,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":               "gen-project",
 								"description":        "my generated project",
 								"visibility":         "PRIVATE",
@@ -482,8 +482,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"repositoryId":     "REPOID",
 								"hasIssuesEnabled": true,
 								"hasWikiEnabled":   true,
@@ -526,8 +526,8 @@ func Test_repoCreate(t *testing.T) {
 								}
 							}
 						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
+						func(inputs map[string]any) {
+							assert.Equal(t, map[string]any{
 								"name":               "gen-project",
 								"description":        "my generated project",
 								"visibility":         "INTERNAL",
@@ -554,8 +554,8 @@ func Test_repoCreate(t *testing.T) {
 			stubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.REST("POST", "user/repos"),
-					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]any) {
+						assert.Equal(t, map[string]any{
 							"name":               "crisps",
 							"private":            true,
 							"gitignore_template": "Go",
@@ -577,8 +577,8 @@ func Test_repoCreate(t *testing.T) {
 			stubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.REST("POST", "user/repos"),
-					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]any) {
+						assert.Equal(t, map[string]any{
 							"name":       "crisps",
 							"private":    false,
 							"has_issues": false,
@@ -603,8 +603,8 @@ func Test_repoCreate(t *testing.T) {
 			stubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.REST("POST", "api/v3/user/repos"),
-					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]any) {
+						assert.Equal(t, map[string]any{
 							"name":               "crisps",
 							"private":            true,
 							"gitignore_template": "Go",
@@ -634,8 +634,8 @@ func Test_repoCreate(t *testing.T) {
 					httpmock.StringResponse(`{ "node_id": "ORGID", "type": "Organization" }`))
 				r.Register(
 					httpmock.REST("POST", "orgs/snacks-inc/repos"),
-					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]any) {
+						assert.Equal(t, map[string]any{
 							"name":               "crisps",
 							"private":            false,
 							"visibility":         "internal",
@@ -667,8 +667,8 @@ func Test_repoCreate(t *testing.T) {
 					httpmock.StringResponse(`{ "node_id": "TEAMID", "id": 1234, "organization": {"node_id": "ORGID"} }`))
 				r.Register(
 					httpmock.REST("POST", "orgs/snacks-inc/repos"),
-					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]any) {
+						assert.Equal(t, map[string]any{
 							"name":               "crisps",
 							"private":            false,
 							"visibility":         "internal",

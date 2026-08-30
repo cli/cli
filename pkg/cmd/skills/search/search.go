@@ -183,8 +183,8 @@ func (s skillResult) qualifiedName() string {
 }
 
 // ExportData implements cmdutil.exportable for --json output.
-func (s skillResult) ExportData(fields []string) map[string]interface{} {
-	data := map[string]interface{}{}
+func (s skillResult) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "repo":
@@ -305,11 +305,9 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		pathResult, pathErr = executeSearch(client, host, pathQ, 1, searchPageSize)
-	}()
+	})
 
 	// When no explicit --owner is set and the query looks like it could be a
 	// GitHub username, fire an additional user:<query> search to discover
@@ -317,11 +315,9 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 	// everything else (no scoring boost).
 	if owner == "" && couldBeOwner(queryTerm) {
 		ownerQ := fmt.Sprintf("filename:SKILL.md user:%s", queryTerm)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			ownerResult, ownerErr = executeSearch(client, host, ownerQ, 1, searchPageSize)
-		}()
+		})
 	}
 
 	// When the query has spaces (e.g. "mcp apps"), run an additional content
@@ -329,11 +325,9 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 	// whose names use hyphens as word separators.
 	if hasSpaces {
 		hyphenQ := fmt.Sprintf("filename:SKILL.md %s%s", pathTerm, ownerScope)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			hyphenResult, hyphenErr = executeSearch(client, host, hyphenQ, 1, searchPageSize)
-		}()
+		})
 	}
 
 	// Primary content search runs on the main goroutine.
@@ -375,9 +369,6 @@ func noResults(opts *SearchOptions, msg string) error {
 // performance. Pre-ranking ensures the best candidates are at the top.
 func truncateForProcessing(skills []skillResult, page, limit int) []skillResult {
 	maxToProcess := page * limit * 3
-	if maxToProcess < limit*3 {
-		maxToProcess = limit * 3
-	}
 	if len(skills) > maxToProcess {
 		return skills[:maxToProcess]
 	}
@@ -421,10 +412,7 @@ func paginate(skills []skillResult, page, limit int) ([]skillResult, int) {
 	if start >= total {
 		return nil, totalPages
 	}
-	end := start + limit
-	if end > total {
-		end = total
-	}
+	end := min(start+limit, total)
 	return skills[start:end], totalPages
 }
 
@@ -494,10 +482,7 @@ func renderResults(opts *SearchOptions, skills []skillResult, totalPages int) er
 func renderTable(io *iostreams.IOStreams, skills []skillResult) error {
 	isTTY := io.IsStdoutTTY()
 	tw := io.TerminalWidth()
-	descWidth := tw - 70
-	if descWidth < 20 {
-		descWidth = 20
-	}
+	descWidth := max(tw-70, 20)
 
 	table := tableprinter.New(io, tableprinter.WithHeader("REPOSITORY", "SKILL", "DESCRIPTION", "STARS"))
 	for _, s := range skills {
@@ -524,10 +509,7 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 	// Reserve space for the checkbox UI prefix ("[ ] ") and the description
 	// indent ("\n       " = 7 chars), then use the remaining terminal width.
 	tw := opts.IO.TerminalWidth()
-	descWidth := tw - 11
-	if descWidth < 30 {
-		descWidth = 30
-	}
+	descWidth := max(tw-11, 30)
 
 	options := make([]string, len(skills))
 	for i, s := range skills {
@@ -758,10 +740,7 @@ func fetchPrimaryPages(client *api.Client, host, query string, displayPage, disp
 	// good buffer for typical filter rates while staying well within
 	// the rate-limit budget.
 	needed := displayPage * displayLimit * 3
-	numPages := (needed + searchPageSize - 1) / searchPageSize
-	if numPages < 1 {
-		numPages = 1
-	}
+	numPages := max((needed+searchPageSize-1)/searchPageSize, 1)
 	maxAPIPages := maxResults / searchPageSize
 	if numPages > maxAPIPages {
 		numPages = maxAPIPages

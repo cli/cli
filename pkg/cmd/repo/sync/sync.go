@@ -203,8 +203,8 @@ func syncRemoteRepo(opts *SyncOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
 		branchName := opts.Branch
-		if idx := strings.Index(baseBranchLabel, ":"); idx >= 0 {
-			branchName = baseBranchLabel[idx+1:]
+		if _, after, ok := strings.Cut(baseBranchLabel, ":"); ok {
+			branchName = after
 		}
 		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s:%s\" branch from \"%s\"\n",
 			cs.SuccessIcon(),
@@ -259,6 +259,16 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	} else {
 		if hasLocalBranch {
 			if err := git.UpdateBranch(branch, "FETCH_HEAD"); err != nil {
+				worktrees, worktreeErr := git.Worktrees()
+				if worktreeErr != nil {
+					return fmt.Errorf("cannot update branch %q: %w; also cannot retrieve worktrees: %w", branch, err, worktreeErr)
+				}
+				if worktree := gitpkg.WorktreeForBranch(worktrees, branch); worktree != nil {
+					if worktree.Prunable {
+						return fmt.Errorf("can't sync %q because stale worktree metadata still associates it with %s\ntip: run `git worktree prune` and retry", branch, worktree.Path)
+					}
+					return fmt.Errorf("can't sync %q because it's checked out in another worktree at %s\ntip: run `gh repo sync` from that worktree instead", branch, worktree.Path)
+				}
 				return err
 			}
 		} else {

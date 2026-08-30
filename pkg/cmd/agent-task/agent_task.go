@@ -90,6 +90,9 @@ func requireOAuthToken(f *cmdutil.Factory) error {
 	// minted through our device flow.
 	tokenSourceIsDeviceFlow := source == "oauth_token" || source == "keyring"
 	// Tokens with "gho_" prefix are OAuth tokens.
+	//
+	// TODO: this matches a token prefix itself. It could ask
+	// gh.AuthConfig.ActiveTokenType instead.
 	tokenIsOAuth := strings.HasPrefix(token, "gho_")
 
 	// Reject if the token is not from a device flow source or is not an OAuth token

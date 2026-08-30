@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -207,12 +208,7 @@ func (s *StatusGetter) CachedClient(ttl time.Duration) *http.Client {
 }
 
 func (s *StatusGetter) ShouldExclude(repo string) bool {
-	for _, exclude := range s.Exclude {
-		if repo == exclude {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s.Exclude, repo)
 }
 
 func (s *StatusGetter) CurrentUsername() (string, error) {
@@ -273,7 +269,7 @@ func (s *StatusGetter) LoadNotifications() error {
 	fetched := make(chan StatusItem)
 
 	wg := new(errgroup.Group)
-	for i := 0; i < fetchWorkers; i++ {
+	for range fetchWorkers {
 		wg.Go(func() error {
 			for {
 				select {
@@ -341,7 +337,7 @@ func (s *StatusGetter) LoadNotifications() error {
 	u.SetQuery("participating", "true")
 	u.SetQuery("all", "true")
 	var p safeurl.SafeURL = u
-	for pages := 0; pages < 3; pages++ {
+	for range 3 {
 		var resp []Notification
 		next, err := c.RESTWithNext(s.hostname(), "GET", p.String(), nil, &resp)
 		if err != nil {
@@ -419,19 +415,21 @@ query AssignedSearch($searchAssigns: String!, $searchReviews: String!, $limit: I
 func (s *StatusGetter) LoadSearchResults() error {
 	c := api.NewClientFromHTTP(s.Client)
 
-	searchAssigns := `assignee:@me state:open archived:false`
-	searchReviews := `review-requested:@me state:open archived:false`
+	var searchAssigns strings.Builder
+	searchAssigns.WriteString(`assignee:@me state:open archived:false`)
+	var searchReviews strings.Builder
+	searchReviews.WriteString(`review-requested:@me state:open archived:false`)
 	if s.Org != "" {
-		searchAssigns += " org:" + s.Org
-		searchReviews += " org:" + s.Org
+		searchAssigns.WriteString(" org:" + s.Org)
+		searchReviews.WriteString(" org:" + s.Org)
 	}
 	for _, repo := range s.Exclude {
-		searchAssigns += " -repo:" + repo
-		searchReviews += " -repo:" + repo
+		searchAssigns.WriteString(" -repo:" + repo)
+		searchReviews.WriteString(" -repo:" + repo)
 	}
-	variables := map[string]interface{}{
-		"searchAssigns": searchAssigns,
-		"searchReviews": searchReviews,
+	variables := map[string]any{
+		"searchAssigns": searchAssigns.String(),
+		"searchReviews": searchReviews.String(),
 	}
 
 	var resp struct {

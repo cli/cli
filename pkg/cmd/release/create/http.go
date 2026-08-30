@@ -49,7 +49,7 @@ func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName str
 			} `graphql:"ref(qualifiedName: $tagName)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":   githubv4.String(repo.RepoOwner()),
 		"name":    githubv4.String(repo.RepoName()),
 		"tagName": githubv4.String(qualifiedTagName),
@@ -74,7 +74,7 @@ func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, 
 }
 
 func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagName, target, previousTagName string) (*releaseNotes, error) {
-	params := map[string]interface{}{
+	params := map[string]any{
 		"tag_name": tagName,
 	}
 	if target != "" {
@@ -138,7 +138,7 @@ func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagN
 	}
 }
 
-func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*shared.Release, error) {
+func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]any) (*shared.Release, error) {
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -181,7 +181,7 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 }
 
 func publishRelease(httpClient *http.Client, host string, releaseURL safeurl.SafeURL, discussionCategory string, isLatest *bool) (*shared.Release, error) {
-	params := map[string]interface{}{"draft": false}
+	params := map[string]any{"draft": false}
 	if discussionCategory != "" {
 		params["discussion_category_name"] = discussionCategory
 	}
@@ -227,7 +227,7 @@ func tokenHasWorkflowScope(headers http.Header) bool {
 
 	// The API returns scopes separated by a comma and a space, so each element
 	// must be trimmed before comparison.
-	for _, s := range strings.Split(scopes, ",") {
+	for s := range strings.SplitSeq(scopes, ",") {
 		if strings.TrimSpace(s) == "workflow" {
 			return true
 		}

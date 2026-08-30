@@ -30,8 +30,8 @@ func Test_listOrgs(t *testing.T) {
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "octocat"}}}`))
 				reg.Register(
 					httpmock.GraphQL(`query OrganizationList\b`),
-					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
-						want := map[string]interface{}{
+					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]any) {
+						want := map[string]any{
 							"user":  "octocat",
 							"limit": float64(30),
 						}
@@ -52,8 +52,8 @@ func Test_listOrgs(t *testing.T) {
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "octocat"}}}`))
 				r.Register(
 					httpmock.GraphQL(`query OrganizationList\b`),
-					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
-						want := map[string]interface{}{
+					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]any) {
+						want := map[string]any{
 							"user":  "octocat",
 							"limit": float64(1),
 						}

@@ -330,7 +330,7 @@ func TestPrMerge(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -436,7 +436,7 @@ func TestPrMerge_nontty(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -474,7 +474,7 @@ func TestPrMerge_editMessage_nontty(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.Equal(t, "mytitle", input["commitHeadline"].(string))
@@ -513,7 +513,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -552,7 +552,7 @@ func TestPrMerge_withMatchCommitHeadFlag(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, 3, len(input))
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
@@ -593,7 +593,7 @@ func TestPrMerge_withAuthorFlag(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.Equal(t, "octocat@github.com", input["authorEmail"].(string))
@@ -637,7 +637,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -736,7 +736,7 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 
 			http.Register(
 				httpmock.GraphQL(`mutation PullRequestMerge\b`),
-				httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+				httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 					assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 					assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 					assert.NotContains(t, input, "commitHeadline")
@@ -812,7 +812,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -866,7 +866,7 @@ func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -915,7 +915,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -967,7 +967,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1015,7 +1015,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1055,7 +1055,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1096,7 +1096,7 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1135,7 +1135,7 @@ func TestPrMerge_rebase(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "REBASE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1176,7 +1176,7 @@ func TestPrMerge_squash(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1384,7 +1384,7 @@ func TestPRMergeTTY(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1453,7 +1453,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 		} } }`))
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1533,7 +1533,7 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 		} } }`))
 	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 			assert.Equal(t, "DEFAULT HEADLINE TEXT", input["commitHeadline"].(string))
@@ -1698,7 +1698,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 	defer tr.Verify(t)
 	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 		}))
@@ -1735,7 +1735,7 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 	defer tr.Verify(t)
 	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -1773,8 +1773,8 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 	defer tr.Verify(t)
 	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMergeDisable\b`),
-		httpmock.GraphQLQuery(`{}`, func(s string, m map[string]interface{}) {
-			assert.Equal(t, map[string]interface{}{"prID": "THE-ID"}, m)
+		httpmock.GraphQLQuery(`{}`, func(s string, m map[string]any) {
+			assert.Equal(t, map[string]any{"prID": "THE-ID"}, m)
 		}))
 
 	_, cmdTeardown := run.Stub()
@@ -1850,7 +1850,7 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 	)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
@@ -1889,7 +1889,7 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
@@ -1929,7 +1929,7 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
@@ -1977,7 +1977,7 @@ func TestPrAddToMergeQueueAdmin(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -2036,7 +2036,7 @@ func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
@@ -2142,6 +2142,30 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 			},
 		},
 		{
+			name: "head branch is associated with a prunable worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/missing-feature-wt
+				HEAD def456
+				branch refs/heads/feature
+				prunable gitdir file points to non-existent location
+			`),
+			toplevel: "/path/to/main",
+			branch:   "main",
+			extraStubs: []stub{
+				{pattern: `git worktree prune`, exitCode: 0},
+				{pattern: `git branch -D feature`, exitCode: 0},
+			},
+			wantContains: []string{
+				"Pruned stale worktree metadata for /path/to/missing-feature-wt",
+				"Deleted local branch feature",
+				"Deleted remote branch feature",
+			},
+		},
+		{
 			name: "head branch is checked out in the main worktree",
 			worktreeList: heredoc.Doc(`
 				worktree /path/to/main
@@ -2181,6 +2205,33 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 				"Deleted remote branch feature",
 			},
 			wantNotContains: []string{"Deleted local branch"},
+		},
+		{
+			name: "base branch is associated with a prunable worktree",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/feature
+
+				worktree /path/to/missing-base-wt
+				HEAD def456
+				branch refs/heads/main
+				prunable gitdir file points to non-existent location
+			`),
+			toplevel: "/path/to/main",
+			branch:   "feature",
+			extraStubs: []stub{
+				{pattern: `git worktree prune`, exitCode: 0},
+				{pattern: `git rev-parse --verify refs/heads/main`, exitCode: 0},
+				{pattern: `git checkout main`, exitCode: 0},
+				{pattern: `git .*pull --ff-only origin main`, exitCode: 0},
+				{pattern: `git branch -D feature`, exitCode: 0},
+			},
+			wantContains: []string{
+				"Pruned stale worktree metadata for /path/to/missing-base-wt",
+				"Deleted local branch feature and switched to branch main",
+				"Deleted remote branch feature",
+			},
 		},
 		{
 			name: "sibling worktree is dirty and cannot be removed",
@@ -2253,7 +2304,7 @@ func TestPrMerge_deleteBranch_worktrees(t *testing.T) {
 
 			http.Register(
 				httpmock.GraphQL(`mutation PullRequestMerge\b`),
-				httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+				httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 					assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 					assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 				}))
@@ -2312,7 +2363,7 @@ func TestPrMerge_deleteBranch_noWorktreeConflict(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}))

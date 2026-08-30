@@ -158,6 +158,31 @@ func TestRESTPrefix(t *testing.T) {
 	}
 }
 
+func TestUserAssetUploadPrefix(t *testing.T) {
+	tests := []struct {
+		host string
+		want string
+	}{
+		{
+			host: "github.com",
+			want: "https://uploads.github.com/",
+		},
+		{
+			host: "tenant.ghe.com",
+			want: "https://uploads.tenant.ghe.com/",
+		},
+		{
+			host: "github.localhost",
+			want: "http://uploads.github.localhost/",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			assert.Equal(t, tt.want, UserAssetUploadPrefix(tt.host))
+		})
+	}
+}
+
 func TestCategorizeHost(t *testing.T) {
 	tests := []struct {
 		name string

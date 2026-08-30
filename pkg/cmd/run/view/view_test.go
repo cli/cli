@@ -2553,7 +2553,7 @@ func TestViewRun(t *testing.T) {
 				RunID: "3",
 				Exporter: shared.MakeTestExporter(
 					[]string{"jobs"},
-					func(io *iostreams.IOStreams, data interface{}) error {
+					func(io *iostreams.IOStreams, data any) error {
 						run, ok := data.(*shared.Run)
 						if !ok {
 							return fmt.Errorf("expected data type *shared.Run")

@@ -53,7 +53,7 @@ var authStatusFields = []string{
 	"hosts",
 }
 
-func (a authStatus) ExportData(fields []string) map[string]interface{} {
+func (a authStatus) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(a, fields)
 }
 
@@ -332,6 +332,9 @@ func statusRun(opts *StatusOptions) error {
 // knownTokenPrefixes contains GitHub's token format prefixes.
 // See [GitHub token formats].
 //
+// TODO: gh.TokenTypes now carries these same prefixes, so this list duplicates
+// it. Use that instead.
+//
 // [GitHub token formats]: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github#githubs-token-formats
 var knownTokenPrefixes = []string{"github_pat_", "ghp_", "gho_", "ghu_", "ghs_", "ghr_"}
 
@@ -355,6 +358,8 @@ func displayScopes(scopes string) string {
 	return strings.Join(list, ", ")
 }
 
+// TODO: this matches a token prefix itself. It could ask
+// gh.AuthConfig.ActiveTokenType instead.
 func expectScopes(token string) bool {
 	return strings.HasPrefix(token, "ghp_") || strings.HasPrefix(token, "gho_")
 }

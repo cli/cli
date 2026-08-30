@@ -97,21 +97,21 @@ func TestRunMarkTemplate_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -122,9 +122,9 @@ func TestRunMarkTemplate_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query OrgProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "github",
 				"number":      1,
 				"firstItems":  0,
@@ -134,10 +134,10 @@ func TestRunMarkTemplate_Org(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -149,10 +149,10 @@ func TestRunMarkTemplate_Org(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation MarkProjectTemplate.*","variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"markProjectV2AsTemplate": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"markProjectV2AsTemplate": map[string]any{
+					"projectV2": map[string]any{
 						"id":     "project ID",
 						"number": 1,
 					},
@@ -189,21 +189,21 @@ func TestRunUnmarkTemplate_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -214,9 +214,9 @@ func TestRunUnmarkTemplate_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query OrgProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "github",
 				"number":      1,
 				"firstItems":  0,
@@ -226,10 +226,10 @@ func TestRunUnmarkTemplate_Org(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -241,10 +241,10 @@ func TestRunUnmarkTemplate_Org(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UnmarkProjectTemplate.*","variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"unmarkProjectV2AsTemplate": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"unmarkProjectV2AsTemplate": map[string]any{
+					"projectV2": map[string]any{
 						"id":     "project ID",
 						"number": 1,
 					},
@@ -282,21 +282,21 @@ func TestRunMarkTemplate_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -307,9 +307,9 @@ func TestRunMarkTemplate_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query OrgProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "github",
 				"number":      1,
 				"firstItems":  0,
@@ -319,10 +319,10 @@ func TestRunMarkTemplate_JSON(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -334,13 +334,13 @@ func TestRunMarkTemplate_JSON(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation MarkProjectTemplate.*","variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"markProjectV2AsTemplate": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"markProjectV2AsTemplate": map[string]any{
+					"projectV2": map[string]any{
 						"id":     "project ID",
 						"number": 1,
-						"owner": map[string]interface{}{
+						"owner": map[string]any{
 							"__typename": "Organization",
 							"login":      "github",
 						},

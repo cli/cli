@@ -39,9 +39,9 @@ type session struct {
 	ResourceType     string    `json:"resource_type"`
 	ResourceID       int64     `json:"resource_id"`
 	ResourceGlobalID string    `json:"resource_global_id"`
-	LastUpdatedAt    time.Time `json:"last_updated_at,omitempty"`
-	CreatedAt        time.Time `json:"created_at,omitempty"`
-	CompletedAt      time.Time `json:"completed_at,omitempty"`
+	LastUpdatedAt    time.Time `json:"last_updated_at"`
+	CreatedAt        time.Time `json:"created_at"`
+	CompletedAt      time.Time `json:"completed_at"`
 	EventURL         string    `json:"event_url"`
 	EventType        string    `json:"event_type"`
 	PremiumRequests  float64   `json:"premium_requests"`
@@ -119,8 +119,8 @@ var SessionFields = []string{
 }
 
 // ExportData implements the exportable interface for JSON output.
-func (s *Session) ExportData(fields []string) map[string]interface{} {
-	data := make(map[string]interface{}, len(fields))
+func (s *Session) ExportData(fields []string) map[string]any {
+	data := make(map[string]any, len(fields))
 	for _, f := range fields {
 		switch f {
 		case "id":
@@ -528,7 +528,7 @@ func (c *CAPIClient) GetPullRequestDatabaseID(ctx context.Context, hostname stri
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  githubv4.String(owner),
 		"repo":   githubv4.String(repo),
 		"number": githubv4.Int(number),

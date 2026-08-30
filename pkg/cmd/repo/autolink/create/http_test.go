@@ -133,8 +133,8 @@ func TestAutolinkCreator_Create(t *testing.T) {
 					http.MethodPost,
 					fmt.Sprintf("repos/%s/%s/autolinks", repo.RepoOwner(), repo.RepoName())),
 				httpmock.RESTPayload(tt.stubStatus, tt.stubRespJSON,
-					func(payload map[string]interface{}) {
-						require.Equal(t, map[string]interface{}{
+					func(payload map[string]any) {
+						require.Equal(t, map[string]any{
 							"is_alphanumeric": tt.req.IsAlphanumeric,
 							"key_prefix":      tt.req.KeyPrefix,
 							"url_template":    tt.req.URLTemplate,

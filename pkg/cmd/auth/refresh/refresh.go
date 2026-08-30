@@ -3,6 +3,7 @@ package refresh
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -152,18 +153,8 @@ func refreshRun(opts *RefreshOptions) error {
 			}
 			hostname = candidates[selected]
 		}
-	} else {
-		var found bool
-		for _, c := range candidates {
-			if c == hostname {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
-		}
+	} else if !slices.Contains(candidates, hostname) {
+		return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
 	}
 
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
@@ -177,7 +168,7 @@ func refreshRun(opts *RefreshOptions) error {
 	if !opts.ResetScopes {
 		if oldToken, _ := authCfg.ActiveToken(hostname); oldToken != "" {
 			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken); err == nil {
-				for _, s := range strings.Split(oldScopes, ",") {
+				for s := range strings.SplitSeq(oldScopes, ",") {
 					s = strings.TrimSpace(s)
 					if s != "" {
 						additionalScopes.Add(s)

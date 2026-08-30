@@ -946,7 +946,7 @@ func TestPreviewRun_InteractiveTelemetryCapturesSelectedSkillName(t *testing.T) 
 	)
 	reg.Register(
 		httpmock.REST("GET", "repos/owner/repo"),
-		httpmock.JSONResponse(map[string]interface{}{
+		httpmock.JSONResponse(map[string]any{
 			"visibility": "public",
 		}),
 	)
@@ -1062,7 +1062,7 @@ func TestPreviewRun_TelemetryVisibility(t *testing.T) {
 			} else {
 				reg.Register(
 					httpmock.REST("GET", "repos/owner/repo"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"visibility": tt.visibility,
 					}),
 				)

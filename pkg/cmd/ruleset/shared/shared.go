@@ -34,7 +34,7 @@ type RulesetREST struct {
 		ActorType  string `json:"actor_type"`
 		BypassMode string `json:"bypass_mode"`
 	} `json:"bypass_actors"`
-	Conditions map[string]map[string]interface{}
+	Conditions map[string]map[string]any
 	SourceType string `json:"source_type"`
 	Source     string
 	Rules      []RulesetRule
@@ -47,7 +47,7 @@ type RulesetREST struct {
 
 type RulesetRule struct {
 	Type              string
-	Parameters        map[string]interface{}
+	Parameters        map[string]any
 	RulesetSourceType string `json:"ruleset_source_type"`
 	RulesetSource     string `json:"ruleset_source"`
 	RulesetId         int64  `json:"ruleset_id"`

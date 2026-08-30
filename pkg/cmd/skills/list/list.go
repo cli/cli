@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -81,8 +82,8 @@ type listedSkill struct {
 }
 
 // ExportData implements cmdutil.exportable for --json output.
-func (s listedSkill) ExportData(fields []string) map[string]interface{} {
-	data := map[string]interface{}{}
+func (s listedSkill) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "skillName":
@@ -286,10 +287,8 @@ func selectedScopes(scope string) []registry.Scope {
 }
 
 func appendAgentHostID(agentHostIDs []string, agentHostID string) []string {
-	for _, existing := range agentHostIDs {
-		if existing == agentHostID {
-			return agentHostIDs
-		}
+	if slices.Contains(agentHostIDs, agentHostID) {
+		return agentHostIDs
 	}
 	return append(agentHostIDs, agentHostID)
 }
@@ -312,12 +311,7 @@ func shouldListPublishedProjectSkills(agentID string, scopes []registry.Scope, g
 	if agentID != "" || gitRoot == "" {
 		return false
 	}
-	for _, scope := range scopes {
-		if scope == registry.ScopeProject {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(scopes, registry.ScopeProject)
 }
 
 func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string, filter scanFilter) ([]listedSkill, error) {
@@ -444,7 +438,7 @@ func parseInstalledSkill(data []byte, name, dir string, agentHostIDs []string, s
 	return s, installMetadata
 }
 
-func hasInstallMetadata(meta map[string]interface{}) bool {
+func hasInstallMetadata(meta map[string]any) bool {
 	for _, key := range []string{"github-repo", "github-ref", "github-tree-sha", "github-path", "github-pinned", "local-path"} {
 		value, ok := meta[key]
 		if !ok {

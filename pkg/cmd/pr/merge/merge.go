@@ -414,7 +414,15 @@ func (m *mergeContext) deleteLocalBranch() error {
 	}
 
 	switchedToBranch := ""
-	headWorktree := worktreeForBranch(worktrees, m.pr.HeadRefName)
+	headWorktree := git.WorktreeForBranch(worktrees, m.pr.HeadRefName)
+	if headWorktree != nil && headWorktree.Prunable {
+		if err := m.opts.GitClient.WorktreePrune(ctx); err != nil {
+			_ = m.warnf("%s Could not prune stale worktree metadata for %s; skipping local branch delete: %s\n", m.cs.WarningIcon(), headWorktree.Path, err)
+			return nil
+		}
+		_ = m.infof("%s Pruned stale worktree metadata for %s\n", m.cs.SuccessIconWithColor(m.cs.Red), headWorktree.Path)
+		headWorktree = nil
+	}
 	if headWorktree != nil {
 		mainWorktree := &worktrees[0]
 
@@ -430,7 +438,16 @@ func (m *mergeContext) deleteLocalBranch() error {
 
 		// The head is checked out in the current main worktree.
 		case headWorktree.Path == currentWorkdir:
-			if baseWorktree := worktreeForBranch(worktrees, m.pr.BaseRefName); baseWorktree != nil && baseWorktree.Path != currentWorkdir {
+			baseWorktree := git.WorktreeForBranch(worktrees, m.pr.BaseRefName)
+			if baseWorktree != nil && baseWorktree.Prunable {
+				if err := m.opts.GitClient.WorktreePrune(ctx); err != nil {
+					_ = m.warnf("%s Could not prune stale worktree metadata for %s; skipping local branch delete: %s\n", m.cs.WarningIcon(), baseWorktree.Path, err)
+					return nil
+				}
+				_ = m.infof("%s Pruned stale worktree metadata for %s\n", m.cs.SuccessIconWithColor(m.cs.Red), baseWorktree.Path)
+				baseWorktree = nil
+			}
+			if baseWorktree != nil && baseWorktree.Path != currentWorkdir {
 				_ = m.warnf("%s Base branch %s is checked out in another worktree (%s); skipping local delete\n",
 					m.cs.WarningIcon(), m.cs.Cyan(m.pr.BaseRefName), baseWorktree.Path)
 				_ = m.warnf("  To finish cleanup, switch the worktree at %s off %s, then run in the current path:\n",
@@ -534,24 +551,12 @@ func (m *mergeContext) shouldAddToMergeQueue() bool {
 	return m.mergeQueueRequired && !m.opts.UseAdmin
 }
 
-// worktreeForBranch returns the worktree that has the given branch checked out,
-// or nil if the branch is not checked out in any worktree.
-func worktreeForBranch(worktrees []git.Worktree, branch string) *git.Worktree {
-	branchRef := "refs/heads/" + branch
-	for i := range worktrees {
-		if worktrees[i].Ref == branchRef {
-			return &worktrees[i]
-		}
-	}
-	return nil
-}
-
-func (m *mergeContext) warnf(format string, args ...interface{}) error {
+func (m *mergeContext) warnf(format string, args ...any) error {
 	_, err := fmt.Fprintf(m.opts.IO.ErrOut, format, args...)
 	return err
 }
 
-func (m *mergeContext) infof(format string, args ...interface{}) error {
+func (m *mergeContext) infof(format string, args ...any) error {
 	if !m.isTerminal {
 		return nil
 	}
