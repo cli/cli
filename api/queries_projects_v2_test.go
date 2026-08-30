@@ -293,6 +293,31 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 		expectOut bool
 	}{
 		{
+			name:      "legacy read scope error",
+			errMsg:    "field requires one of the following scopes: ['read:project']",
+			expectOut: true,
+		},
+		{
+			name:      "wrapped legacy read scope error",
+			errMsg:    "wrapped: field requires one of the following scopes: ['read:project']",
+			expectOut: true,
+		},
+		{
+			name:      "different scope error",
+			errMsg:    "field requires one of the following scopes: ['read:discussion']",
+			expectOut: false,
+		},
+		{
+			name:      "empty scope clause",
+			errMsg:    "field requires one of the following scopes: []",
+			expectOut: false,
+		},
+		{
+			name:      "malformed scope clause",
+			errMsg:    "field requires one of the following scopes: ['read:project'",
+			expectOut: false,
+		},
+		{
 			name:      "repository projectsV2 field error",
 			errMsg:    "Field 'projectsV2' doesn't exist on type 'Repository'",
 			expectOut: true,
@@ -342,7 +367,7 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 	}
 }
 
-func TestProjectsV2IgnorableError_missingProjectScopeAlternative(t *testing.T) {
+func TestProjectsV2IgnorableError_structuredMissingProjectScopeAlternative(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
 	client := newTestClient(reg)
