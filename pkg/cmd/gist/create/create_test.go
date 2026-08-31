@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_processFiles(t *testing.T) {
@@ -32,6 +33,14 @@ func Test_processFiles(t *testing.T) {
 
 	assert.Equal(t, 1, len(files))
 	assert.Equal(t, "hey cool how is it going", files["gistfile0.txt"].Content)
+}
+
+func Test_processFilesRejectsInvalidUTF8(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "latin1.txt")
+	require.NoError(t, os.WriteFile(filename, []byte{0x63, 0x61, 0x66, 0xe9}, 0o600))
+
+	_, err := processFiles(io.NopCloser(strings.NewReader("")), "", []string{filename})
+	require.EqualError(t, err, "failed to upload "+filename+": binary file not supported")
 }
 
 func Test_guessGistName_stdin(t *testing.T) {

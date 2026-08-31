@@ -229,6 +229,9 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 			if err != nil {
 				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
+			if shared.IsBinaryContents(content) {
+				return nil, fmt.Errorf("failed to upload %s: binary file not supported", f)
+			}
 
 			filename = filepath.Base(f)
 		}

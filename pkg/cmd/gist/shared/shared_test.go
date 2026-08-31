@@ -76,6 +76,10 @@ func TestIsBinaryContents(t *testing.T) {
 			fileContent: []byte(nil),
 		},
 		{
+			want:        true,
+			fileContent: []byte{0x63, 0x61, 0x66, 0xe9},
+		},
+		{
 			want: true,
 			fileContent: []byte{239, 191, 189, 239, 191, 189, 239, 191, 189, 239,
 				191, 189, 239, 191, 189, 16, 74, 70, 73, 70, 239, 191, 189, 1, 1, 1,

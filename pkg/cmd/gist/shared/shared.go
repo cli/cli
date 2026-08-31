@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -212,6 +213,10 @@ func IsBinaryFile(file string) (bool, error) {
 }
 
 func IsBinaryContents(contents []byte) bool {
+	if !utf8.Valid(contents) {
+		return true
+	}
+
 	isBinary := true
 	for mime := mimetype.Detect(contents); mime != nil; mime = mime.Parent() {
 		if mime.Is("text/plain") {
