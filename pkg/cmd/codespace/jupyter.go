@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/codespaces/rpc"
+	"github.com/microsoft/dev-tunnels/go/tunnels"
 	"github.com/spf13/cobra"
 )
 
@@ -71,10 +72,10 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 	}
 
 	// Forward the port so that it is reachable over the tunnel's web forwarding origin.
-	// Visibility is deliberately left unset, which Dev Tunnels treats as private, so a
-	// port created here is reachable only by the codespace owner. A port that already
-	// exists keeps its current access control, as createTunnelPort ignores the resulting
-	// conflict.
+	// Visibility is deliberately left unset, which Dev Tunnels treats as private for a
+	// newly created port. A port that already exists keeps its current access control,
+	// because createTunnelPort ignores the resulting conflict, so the visibility of the
+	// port is verified below rather than assumed.
 	opts := portforwarder.ForwardPortOpts{
 		Port: serverPort,
 	}
@@ -114,6 +115,10 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 // name-and-port pattern used by portInfo.BrowseURL, because the tunnel service generates
 // it for the host that is actually serving the port. That keeps the URL correct when the
 // forwarding domain is not the default one, such as on GitHub Enterprise Server.
+//
+// The port must be private. Forwarding does not change the access control of a port
+// that already exists, so a port left public by an earlier forward, or by the codespace
+// itself, would otherwise expose the JupyterLab auth token on a publicly reachable URL.
 func jupyterWebForwardingURL(ctx context.Context, fwd portforwarder.PortForwarder, serverPort int, serverURL string) (string, error) {
 	ports, err := fwd.ListPorts(ctx)
 	if err != nil {
@@ -124,6 +129,13 @@ func jupyterWebForwardingURL(ctx context.Context, fwd portforwarder.PortForwarde
 	for _, port := range ports {
 		if int(port.PortNumber) != serverPort {
 			continue
+		}
+		var entries []tunnels.TunnelAccessControlEntry
+		if port.AccessControl != nil {
+			entries = port.AccessControl.Entries
+		}
+		if visibility := portforwarder.AccessControlEntriesToVisibility(entries); visibility != portforwarder.PrivatePortVisibility {
+			return "", fmt.Errorf("JupyterLab port %d is %s rather than private, so it was not opened. Set the port to private and try again", serverPort, visibility)
 		}
 		if len(port.PortForwardingURIs) > 0 {
 			forwardingURI = port.PortForwardingURIs[0]

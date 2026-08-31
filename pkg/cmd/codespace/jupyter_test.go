@@ -30,6 +30,34 @@ func TestJupyterWebForwardingURL(t *testing.T) {
 		}
 	}
 
+	// portWithVisibility builds a forwarded port carrying the access control entries
+	// that Dev Tunnels uses for the given visibility.
+	portWithVisibility := func(visibility string) []*tunnels.TunnelPort {
+		var entry tunnels.TunnelAccessControlEntry
+		switch visibility {
+		case portforwarder.PublicPortVisibility:
+			entry = tunnels.TunnelAccessControlEntry{
+				Type:     tunnels.TunnelAccessControlEntryTypeAnonymous,
+				Subjects: []string{},
+				Scopes:   []string{string(tunnels.TunnelAccessScopeConnect)},
+			}
+		case portforwarder.OrgPortVisibility:
+			entry = tunnels.TunnelAccessControlEntry{
+				Type:     tunnels.TunnelAccessControlEntryTypeOrganizations,
+				Scopes:   []string{string(tunnels.TunnelAccessScopeConnect)},
+				Provider: string(tunnels.TunnelAuthenticationSchemeGitHub),
+			}
+		default:
+			t.Fatalf("unsupported visibility %q", visibility)
+		}
+
+		return []*tunnels.TunnelPort{{
+			PortNumber:         8888,
+			PortForwardingURIs: []string{forwardingURI},
+			AccessControl:      &tunnels.TunnelAccessControl{Entries: []tunnels.TunnelAccessControlEntry{entry}},
+		}}
+	}
+
 	tests := []struct {
 		name       string
 		ports      []*tunnels.TunnelPort
@@ -101,6 +129,36 @@ func TestJupyterWebForwardingURL(t *testing.T) {
 			serverPort: 8888,
 			serverURL:  "http://[::1",
 			wantErr:    "failed to parse JupyterLab server URL",
+		},
+		{
+			name:       "public port is refused",
+			ports:      portWithVisibility(portforwarder.PublicPortVisibility),
+			serverPort: 8888,
+			serverURL:  "http://localhost:8888/lab?token=abc",
+			wantErr:    "JupyterLab port 8888 is public rather than private",
+		},
+		{
+			name:       "org visible port is refused",
+			ports:      portWithVisibility(portforwarder.OrgPortVisibility),
+			serverPort: 8888,
+			serverURL:  "http://localhost:8888/lab?token=abc",
+			wantErr:    "JupyterLab port 8888 is org rather than private",
+		},
+		{
+			name: "denied anonymous entry is still private",
+			ports: []*tunnels.TunnelPort{{
+				PortNumber:         8888,
+				PortForwardingURIs: []string{forwardingURI},
+				AccessControl: &tunnels.TunnelAccessControl{
+					Entries: []tunnels.TunnelAccessControlEntry{{
+						Type:   tunnels.TunnelAccessControlEntryTypeAnonymous,
+						IsDeny: true,
+					}},
+				},
+			}},
+			serverPort: 8888,
+			serverURL:  "http://localhost:8888/lab?token=abc",
+			want:       "https://ideal-space-fishstick-abc123-8888.app.github.dev/lab?token=abc",
 		},
 	}
 
