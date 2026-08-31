@@ -3,8 +3,7 @@ package codespace
 import (
 	"context"
 	"fmt"
-	"net"
-	"strings"
+	"net/url"
 
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
@@ -71,35 +70,88 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 		return err
 	}
 
-	// Pass 0 to pick a random port
-	listen, _, err := codespaces.ListenTCP(0, false)
+	// Forward the port so that it is reachable over the tunnel's web forwarding origin.
+	// Visibility is deliberately left unset, which Dev Tunnels treats as private, so a
+	// port created here is reachable only by the codespace owner. A port that already
+	// exists keeps its current access control, as createTunnelPort ignores the resulting
+	// conflict.
+	opts := portforwarder.ForwardPortOpts{
+		Port: serverPort,
+	}
+	if err := fwd.ForwardPort(ctx, opts); err != nil {
+		return fmt.Errorf("failed to forward JupyterLab port: %w", err)
+	}
+
+	targetURL, err := jupyterWebForwardingURL(ctx, fwd, serverPort, serverUrl)
 	if err != nil {
 		return err
 	}
-	defer listen.Close()
-	destPort := listen.Addr().(*net.TCPAddr).Port
 
-	tunnelClosed := make(chan error, 1)
-	go func() {
-		opts := portforwarder.ForwardPortOpts{
-			Port: serverPort,
-		}
-		tunnelClosed <- fwd.ForwardPortToListener(ctx, opts, listen)
-	}()
-
-	// Server URL contains an authentication token that must be preserved
-	targetUrl := strings.Replace(serverUrl, fmt.Sprintf("%d", serverPort), fmt.Sprintf("%d", destPort), 1)
-	err = a.browser.Browse(targetUrl)
+	err = a.browser.Browse(targetURL)
 	if err != nil {
 		return fmt.Errorf("failed to open JupyterLab in browser: %w", err)
 	}
 
-	fmt.Fprintln(a.io.Out, targetUrl)
+	fmt.Fprintln(a.io.Out, targetURL)
 
-	select {
-	case err := <-tunnelClosed:
-		return fmt.Errorf("tunnel closed: %w", err)
-	case <-ctx.Done():
-		return nil // success
+	// The browser reaches JupyterLab over the tunnel's web forwarding origin rather than
+	// through this process, so there is no local listener left to wait on. Block until the
+	// user interrupts, which keeps the port forwarded for the lifetime of the command.
+	<-ctx.Done()
+
+	return nil
+}
+
+// jupyterWebForwardingURL builds the URL to open for the forwarded JupyterLab port.
+//
+// The origin is taken from the tunnel's own web forwarding URI, never from the
+// codespace. Only the path and query of the codespace-reported server URL are reused,
+// because those carry the JupyterLab auth token. The codespace is untrusted here: it
+// supplies both the port and the server URL, so previously it could choose the origin
+// that its own content was rendered on in the user's browser.
+//
+// The origin comes from the port's own PortForwardingURIs rather than from the
+// name-and-port pattern used by portInfo.BrowseURL, because the tunnel service generates
+// it for the host that is actually serving the port. That keeps the URL correct when the
+// forwarding domain is not the default one, such as on GitHub Enterprise Server.
+func jupyterWebForwardingURL(ctx context.Context, fwd portforwarder.PortForwarder, serverPort int, serverURL string) (string, error) {
+	ports, err := fwd.ListPorts(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list forwarded ports: %w", err)
 	}
+
+	var forwardingURI string
+	for _, port := range ports {
+		if int(port.PortNumber) != serverPort {
+			continue
+		}
+		if len(port.PortForwardingURIs) > 0 {
+			forwardingURI = port.PortForwardingURIs[0]
+		}
+		break
+	}
+
+	if forwardingURI == "" {
+		return "", fmt.Errorf("no web forwarding URL available for JupyterLab port %d", serverPort)
+	}
+
+	base, err := url.Parse(forwardingURI)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse web forwarding URL: %w", err)
+	}
+
+	reported, err := url.Parse(serverURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse JupyterLab server URL: %w", err)
+	}
+
+	// Resolving a reference keeps the forwarding URI's scheme and host while taking the
+	// path, query and fragment from the reported URL.
+	target := base.ResolveReference(&url.URL{
+		Path:     reported.Path,
+		RawQuery: reported.RawQuery,
+		Fragment: reported.Fragment,
+	})
+
+	return target.String(), nil
 }
