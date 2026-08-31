@@ -3,6 +3,7 @@ package codespace
 import (
 	"context"
 	"errors"
+	"net/url"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
@@ -145,6 +146,33 @@ func TestJupyterWebForwardingURL(t *testing.T) {
 			wantErr:    "JupyterLab port 8888 is org rather than private",
 		},
 		{
+			name: "inherited anonymous entry is refused",
+			ports: []*tunnels.TunnelPort{{
+				PortNumber:         8888,
+				PortForwardingURIs: []string{forwardingURI},
+				AccessControl: &tunnels.TunnelAccessControl{
+					Entries: []tunnels.TunnelAccessControlEntry{{
+						Type:        tunnels.TunnelAccessControlEntryTypeAnonymous,
+						Scopes:      []string{string(tunnels.TunnelAccessScopeConnect)},
+						IsInherited: true,
+					}},
+				},
+			}},
+			serverPort: 8888,
+			serverURL:  "http://localhost:8888/lab?token=abc",
+			wantErr:    "JupyterLab port 8888 is public rather than private",
+		},
+		{
+			name: "port without access control is private",
+			ports: []*tunnels.TunnelPort{{
+				PortNumber:         8888,
+				PortForwardingURIs: []string{forwardingURI},
+			}},
+			serverPort: 8888,
+			serverURL:  "http://localhost:8888/lab?token=abc",
+			want:       "https://ideal-space-fishstick-abc123-8888.app.github.dev/lab?token=abc",
+		},
+		{
 			name: "denied anonymous entry is still private",
 			ports: []*tunnels.TunnelPort{{
 				PortNumber:         8888,
@@ -176,6 +204,45 @@ func TestJupyterWebForwardingURL(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestJupyterWebForwardingURLOriginIsAlwaysTheTunnel locks the security invariant of
+// this command: the codespace supplies the server URL, so no value it can choose may
+// influence the origin the browser ends up on. Only the path, query and fragment are
+// reused. These inputs are the ones an attacker would reach for, so they are asserted
+// on scheme and host rather than on an exact string, which keeps the check meaningful
+// if path canonicalization ever changes.
+func TestJupyterWebForwardingURLOriginIsAlwaysTheTunnel(t *testing.T) {
+	const forwardingURI = "https://ideal-space-fishstick-abc123-8888.app.github.dev/"
+	const wantHost = "ideal-space-fishstick-abc123-8888.app.github.dev"
+
+	hostileURLs := []string{
+		"http://localhost:8888//evil.example/lab?token=abc",
+		"http://localhost:8888/%2F%2Fevil.example/lab?token=abc",
+		"http://user:pw@evil.example:8888/lab?token=abc",
+		"//evil.example/lab?token=abc",
+		"javascript:alert(document.domain)",
+		"file:///etc/passwd",
+		"http://localhost:8888/../../evil?token=abc",
+		"",
+	}
+
+	for _, serverURL := range hostileURLs {
+		t.Run(serverURL, func(t *testing.T) {
+			fwd := stubPortForwarder{ports: []*tunnels.TunnelPort{
+				{PortNumber: 8888, PortForwardingURIs: []string{forwardingURI}},
+			}}
+
+			got, err := jupyterWebForwardingURL(context.Background(), fwd, 8888, serverURL)
+			require.NoError(t, err)
+
+			parsed, err := url.Parse(got)
+			require.NoError(t, err)
+			require.Equal(t, "https", parsed.Scheme)
+			require.Equal(t, wantHost, parsed.Host)
+			require.Nil(t, parsed.User)
 		})
 	}
 }
