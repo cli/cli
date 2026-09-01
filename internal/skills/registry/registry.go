@@ -69,7 +69,7 @@ var Agents = []AgentHost{
 		ID:         "codex",
 		Name:       "Codex",
 		ProjectDir: sharedProjectSkillsDir,
-		UserDir:    ".codex/skills",
+		UserDir:    sharedProjectSkillsDir,
 	},
 	{
 		ID:         "gemini-cli",
