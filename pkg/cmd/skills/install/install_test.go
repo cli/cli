@@ -302,6 +302,11 @@ func hiddenDirSkillTreeJSON(name, treeSHA, blobSHA string) string {
 }
 
 func TestInstallRun(t *testing.T) {
+	var projectRoot string
+	var outsideRoot string
+	var clobberProjectRoot string
+	var clobberTarget string
+
 	tests := []struct {
 		name       string
 		isTTY      bool
@@ -523,6 +528,83 @@ func TestInstallRun(t *testing.T) {
 					Dir:          targetDir,
 					Force:        true,
 				}
+			},
+			wantStdout: "Installed git-commit",
+		},
+		{
+			name:  "project install rejects ancestor symlink",
+			isTTY: false,
+			setup: func(t *testing.T) {
+				t.Helper()
+				projectRoot = t.TempDir()
+				outsideRoot = t.TempDir()
+				require.NoError(t, os.Symlink(outsideRoot, filepath.Join(projectRoot, ".agents")))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: projectRoot},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "git-commit",
+					Agent:        "github-copilot",
+					Scope:        "project",
+					ScopeChanged: true,
+				}
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoFileExists(t, filepath.Join(outsideRoot, "skills", "git-commit", "SKILL.md"))
+			},
+			wantErr: "symbolic link",
+		},
+		{
+			name:  "project force install replaces final symlink",
+			isTTY: false,
+			setup: func(t *testing.T) {
+				t.Helper()
+				clobberProjectRoot = t.TempDir()
+				skillDir := filepath.Join(clobberProjectRoot, ".agents", "skills", "git-commit")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				clobberTarget = filepath.Join(skillDir, "target.md")
+				require.NoError(t, os.WriteFile(clobberTarget, []byte("old"), 0o644))
+				require.NoError(t, os.Symlink(filepath.Base(clobberTarget), filepath.Join(skillDir, "SKILL.md")))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: clobberProjectRoot},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "git-commit",
+					Agent:        "github-copilot",
+					Scope:        "project",
+					ScopeChanged: true,
+					Force:        true,
+				}
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				skillFile := filepath.Join(clobberProjectRoot, ".agents", "skills", "git-commit", "SKILL.md")
+				info, err := os.Lstat(skillFile)
+				require.NoError(t, err)
+				assert.Zero(t, info.Mode()&os.ModeSymlink)
+				content, err := os.ReadFile(clobberTarget)
+				require.NoError(t, err)
+				assert.Equal(t, "old", string(content))
 			},
 			wantStdout: "Installed git-commit",
 		},
@@ -1621,6 +1703,12 @@ func TestInstallRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+				if tt.verify != nil {
+					tt.verify(t)
+				}
+				if tt.assert != nil {
+					tt.assert(t)
+				}
 				return
 			}
 

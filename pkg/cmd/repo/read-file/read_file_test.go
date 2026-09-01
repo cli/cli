@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -565,16 +566,26 @@ func Test_readFileRun(t *testing.T) {
 }
 
 func Test_writeToOutput(t *testing.T) {
+	var clobberTarget string
+	var danglingTarget string
+	var ancestorTarget string
+	var outputDirTarget string
+	var regularMode os.FileMode
+
 	tests := []struct {
-		name      string
-		file      *repoFile
-		output    string
-		clobber   bool
-		lstat     func(path string) (*lstatResult, error)
-		wantDest  string
-		wantWrite string
-		wantDir   string
-		wantErr   string
+		name            string
+		file            *repoFile
+		output          string
+		clobber         bool
+		lstat           func(path string) (*lstatResult, error)
+		setup           func(t *testing.T)
+		useRealFS       bool
+		verify          func(t *testing.T)
+		wantDest        string
+		wantWrite       string
+		wantDir         string
+		wantErr         string
+		wantErrContains string
 	}{
 		{
 			name:      "writes to a new file path",
@@ -641,41 +652,230 @@ func Test_writeToOutput(t *testing.T) {
 			},
 			wantErr: "something went wrong",
 		},
+		{
+			name:      "clobber rejects output symlink",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "README.md",
+			clobber:   true,
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				clobberTarget = filepath.Join(t.TempDir(), "target.md")
+				require.NoError(t, os.WriteFile(clobberTarget, []byte("old"), 0o644))
+				require.NoError(t, os.Symlink(clobberTarget, "README.md"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Lstat("README.md")
+				require.NoError(t, err)
+				assert.NotZero(t, info.Mode()&os.ModeSymlink)
+				content, err := os.ReadFile(clobberTarget)
+				require.NoError(t, err)
+				assert.Equal(t, "old", string(content))
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "no clobber rejects dangling final symlink",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "README.md",
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				danglingTarget = filepath.Join(t.TempDir(), "missing.md")
+				require.NoError(t, os.Symlink(danglingTarget, "README.md"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoFileExists(t, danglingTarget)
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "trailing separator rejects output symlink",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "linked/",
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				outputDirTarget = t.TempDir()
+				require.NoError(t, os.Symlink(outputDirTarget, "linked"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoFileExists(t, filepath.Join(outputDirTarget, "README.md"))
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "trailing separator clobber rejects output symlink",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "linked/",
+			clobber:   true,
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				outputDirTarget = t.TempDir()
+				require.NoError(t, os.Symlink(outputDirTarget, "linked"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Lstat("linked")
+				require.NoError(t, err)
+				assert.NotZero(t, info.Mode()&os.ModeSymlink)
+				assert.NoFileExists(t, filepath.Join(outputDirTarget, "README.md"))
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "directory output clobber rejects derived symlink",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "out/",
+			clobber:   true,
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				require.NoError(t, os.Mkdir("out", 0o755))
+				clobberTarget = filepath.Join(t.TempDir(), "target.md")
+				require.NoError(t, os.WriteFile(clobberTarget, []byte("old"), 0o644))
+				require.NoError(t, os.Symlink(clobberTarget, filepath.Join("out", "README.md")))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Lstat(filepath.Join("out", "README.md"))
+				require.NoError(t, err)
+				assert.NotZero(t, info.Mode()&os.ModeSymlink)
+				content, err := os.ReadFile(clobberTarget)
+				require.NoError(t, err)
+				assert.Equal(t, "old", string(content))
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "clobber preserves regular file mode",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "README.md",
+			clobber:   true,
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				require.NoError(t, os.WriteFile("README.md", []byte("old"), 0o600))
+				info, err := os.Stat("README.md")
+				require.NoError(t, err)
+				regularMode = info.Mode().Perm()
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Stat("README.md")
+				require.NoError(t, err)
+				assert.Equal(t, regularMode, info.Mode().Perm())
+				content, err := os.ReadFile("README.md")
+				require.NoError(t, err)
+				assert.Equal(t, "hi", string(content))
+			},
+			wantDest: "README.md",
+		},
+		{
+			name:      "allows ancestor symlink in explicit output parent",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    filepath.Join("out", "nested", "README.md"),
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				ancestorTarget = t.TempDir()
+				require.NoError(t, os.Symlink(ancestorTarget, "out"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				content, err := os.ReadFile(filepath.Join(ancestorTarget, "nested", "README.md"))
+				require.NoError(t, err)
+				assert.Equal(t, "hi", string(content))
+			},
+			wantDest: filepath.Join("out", "nested", "README.md"),
+		},
+		{
+			name:      "directory target rejects remote name escape",
+			file:      &repoFile{Name: "../README.md", Content: []byte("hi")},
+			output:    "out/",
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				require.NoError(t, os.Mkdir("out", 0o755))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoFileExists(t, "README.md")
+			},
+			wantErrContains: "not a local child path",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if tt.setup != nil {
+				tt.setup(t)
+			}
+
 			var gotDir string
 			var gotWritePath string
 			var gotWriteContent []byte
 
-			origLstat, origMkdir, origWrite := lstatF, mkdirAllF, writeFileF
+			origLstat, origWrite := lstatF, writeOutputFile
 			defer func() {
-				lstatF, mkdirAllF, writeFileF = origLstat, origMkdir, origWrite
+				lstatF, writeOutputFile = origLstat, origWrite
 			}()
 
 			lstatF = tt.lstat
-			mkdirAllF = func(path string, _ fs.FileMode) error {
-				gotDir = path
-				return nil
-			}
-			writeFileF = func(path string, data []byte, _ fs.FileMode) error {
-				gotWritePath = path
-				gotWriteContent = data
-				return nil
+			if !tt.useRealFS {
+				writeOutputFile = func(dir, name string, data []byte, _ fs.FileMode, _ bool) error {
+					gotDir = dir
+					if dir == "" {
+						gotDir = filepath.Dir(name)
+						gotWritePath = name
+					} else {
+						gotDir = filepath.Clean(dir)
+						gotWritePath = filepath.Join(dir, name)
+					}
+					gotWriteContent = data
+					return nil
+				}
 			}
 
 			dest, err := writeToOutput(tt.file, tt.output, tt.clobber)
+			if tt.wantErrContains != "" {
+				require.ErrorContains(t, err, tt.wantErrContains)
+				if tt.verify != nil {
+					tt.verify(t)
+				}
+				return
+			}
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
+				if tt.verify != nil {
+					tt.verify(t)
+				}
 				return
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantDest, dest)
-			assert.Equal(t, tt.wantDest, gotWritePath)
-			assert.Equal(t, tt.wantWrite, string(gotWriteContent))
-			if tt.wantDir != "" {
-				assert.Equal(t, tt.wantDir, gotDir)
+			if !tt.useRealFS {
+				assert.Equal(t, tt.wantDest, gotWritePath)
+				assert.Equal(t, tt.wantWrite, string(gotWriteContent))
+				if tt.wantDir != "" {
+					assert.Equal(t, tt.wantDir, gotDir)
+				}
+			}
+			if tt.verify != nil {
+				tt.verify(t)
 			}
 		})
 	}

@@ -1,7 +1,9 @@
 package update
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/installer"
@@ -386,9 +389,14 @@ func updateRun(opts *UpdateOptions) error {
 	var failed bool
 	for _, u := range updates {
 		if err := updateSkillInPlace(opts, u, apiClient, gitRoot, homeDir); err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Failed to update %s: %v\n", cs.FailureIcon(), u.local.name, err)
-			failed = true
-			continue
+			var committedWarning *committedUpdateWarning
+			if errors.As(err, &committedWarning) {
+				fmt.Fprintf(opts.IO.ErrOut, "%s Updated %s with warning: %v\n", cs.WarningIcon(), u.local.name, committedWarning)
+			} else {
+				fmt.Fprintf(opts.IO.ErrOut, "%s Failed to update %s: %v\n", cs.FailureIcon(), u.local.name, err)
+				failed = true
+				continue
+			}
 		}
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.Out, "%s Updated %s\n", cs.SuccessIcon(), u.local.name)
@@ -418,6 +426,12 @@ func updateRun(opts *UpdateOptions) error {
 func updateSkillInPlace(opts *UpdateOptions, u pendingUpdate, apiClient *api.Client, gitRoot, homeDir string) error {
 	if u.local.dir == "" {
 		return fmt.Errorf("cannot update %s: no install location recorded", u.local.name)
+	}
+	// Project paths are derived beneath the Git root and stay pinned through
+	// publication. User-scope and explicit --dir updates retain the existing
+	// same-user application-directory implementation below.
+	if u.local.scope == registry.ScopeProject {
+		return updateProjectSkillInPlace(u, apiClient, gitRoot, homeDir)
 	}
 
 	parent := filepath.Dir(u.local.dir)
@@ -459,6 +473,319 @@ func updateSkillInPlace(opts *UpdateOptions, u pendingUpdate, apiClient *api.Cli
 	}
 
 	return swapDirectoryContents(u.local.dir, stagedSkillDir)
+}
+
+func updateProjectSkillInPlace(u pendingUpdate, apiClient *api.Client, gitRoot, homeDir string) (retErr error) {
+	projectRoot, skillRoot, err := openProjectSkillRoot(gitRoot, u.local.dir)
+	if err != nil {
+		return fmt.Errorf("could not safely access project skill directory %s: %w", u.local.dir, err)
+	}
+	defer projectRoot.Close()
+	defer skillRoot.Close()
+
+	stagingName, stagingRoot, err := skillRoot.TempDir(".gh-skill-update-")
+	if err != nil {
+		return fmt.Errorf("could not create staging directory: %w", err)
+	}
+	committed := false
+	defer func() {
+		var cleanupErrors []error
+		if err := stagingRoot.Close(); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("could not close staging directory %s: %w", stagingName, err))
+		}
+		if err := removeRootStaging(skillRoot, stagingName); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("retained staging directory %s: %w", stagingName, err))
+		}
+		retErr = addCommittedCleanupWarning(retErr, committed, errors.Join(cleanupErrors...))
+	}()
+
+	installOpts := &installer.Options{
+		Host:       u.local.repoHost,
+		Owner:      u.local.owner,
+		Repo:       u.local.repo,
+		Ref:        u.resolved.Ref,
+		SHA:        u.resolved.SHA,
+		Skills:     []discovery.Skill{u.skill},
+		Dir:        filepath.Join(u.local.dir, stagingName),
+		GitRoot:    gitRoot,
+		HomeDir:    homeDir,
+		Client:     apiClient,
+		TargetRoot: stagingRoot,
+		DirectRoot: true,
+	}
+	if _, err := installer.Install(installOpts); err != nil {
+		return err
+	}
+	if _, err := stagingRoot.Lstat("SKILL.md"); err != nil {
+		return fmt.Errorf("installer did not produce SKILL.md: %w", err)
+	}
+	swapErr := swapRootDirectoryContents(skillRoot, stagingRoot, stagingName)
+	if swapErr != nil {
+		var committedWarning *committedUpdateWarning
+		if !errors.As(swapErr, &committedWarning) {
+			return swapErr
+		}
+	}
+	committed = true
+	return swapErr
+}
+
+func openProjectSkillRoot(gitRoot, skillDir string) (*safepaths.Root, *safepaths.Root, error) {
+	if gitRoot == "" {
+		return nil, nil, fmt.Errorf("could not determine project root directory")
+	}
+	return safepaths.OpenRootWithin(gitRoot, skillDir, 0o755)
+}
+
+type rootBackupEntry struct {
+	original string
+	backup   string
+}
+
+type rootPublishEntry struct {
+	final  string
+	hidden string
+}
+
+type committedUpdateWarning struct {
+	err error
+}
+
+func (e *committedUpdateWarning) Error() string {
+	return fmt.Sprintf("new content is active, but post-commit cleanup was incomplete: %v", e.err)
+}
+
+func (e *committedUpdateWarning) Unwrap() error {
+	return e.err
+}
+
+var renameRootEntry = func(root *safepaths.Root, oldName, newName string) error {
+	return root.Rename(oldName, newName)
+}
+
+var removeRootBackup = func(root *safepaths.Root, name string) error {
+	return root.RemoveAll(name)
+}
+
+var removeRootStaging = func(root *safepaths.Root, name string) error {
+	return root.RemoveAll(name)
+}
+
+var removeRootHidden = func(root *safepaths.Root, name string) error {
+	return root.RemoveAll(name)
+}
+
+var copyRootFile = func(dst io.Writer, src io.Reader) (int64, error) {
+	return io.Copy(dst, src)
+}
+
+func swapRootDirectoryContents(root, stagingRoot *safepaths.Root, stagingName string) error {
+	staged, err := stagingRoot.ReadDir(".")
+	if err != nil {
+		return fmt.Errorf("could not read staged skill directory: %w", err)
+	}
+
+	var publishEntries []rootPublishEntry
+	for i, entry := range staged {
+		hiddenName := fmt.Sprintf("%s.publish-%d", stagingName, i)
+		if _, err := root.Lstat(hiddenName); err == nil {
+			cleanupErr := cleanupRootEntries(root, publishEntryNames(publishEntries))
+			return errors.Join(
+				fmt.Errorf("publish path already exists: %s", hiddenName),
+				hiddenCleanupFailure(cleanupErr),
+			)
+		} else if !os.IsNotExist(err) {
+			cleanupErr := cleanupRootEntries(root, publishEntryNames(publishEntries))
+			return errors.Join(
+				fmt.Errorf("could not inspect publish path %s: %w", hiddenName, err),
+				hiddenCleanupFailure(cleanupErr),
+			)
+		}
+		publishEntries = append(publishEntries, rootPublishEntry{final: entry.Name(), hidden: hiddenName})
+		if err := copyRootEntry(stagingRoot, root, entry.Name(), hiddenName); err != nil {
+			cleanupErr := cleanupRootEntries(root, publishEntryNames(publishEntries))
+			return errors.Join(
+				fmt.Errorf("could not prepare %s: %w", entry.Name(), err),
+				hiddenCleanupFailure(cleanupErr),
+			)
+		}
+	}
+
+	existing, err := root.ReadDir(".")
+	if err != nil {
+		cleanupErr := cleanupRootEntries(root, publishEntryNames(publishEntries))
+		return errors.Join(
+			fmt.Errorf("could not read skill directory: %w", err),
+			hiddenCleanupFailure(cleanupErr),
+		)
+	}
+	publishNames := make(map[string]bool, len(publishEntries))
+	for _, entry := range publishEntries {
+		publishNames[entry.hidden] = true
+	}
+	var backups []rootBackupEntry
+	for i, entry := range existing {
+		if entry.Name() == stagingName || publishNames[entry.Name()] {
+			continue
+		}
+		backupName := fmt.Sprintf("%s.backup-%d", stagingName, i)
+		if _, err := root.Lstat(backupName); err == nil {
+			cleanupErr := cleanupRootEntries(root, publishEntryNames(publishEntries))
+			rollbackErr := restoreRootBackup(root, backups, nil)
+			return errors.Join(
+				fmt.Errorf("backup path already exists: %s", backupName),
+				rollbackFailure(rollbackErr),
+				hiddenCleanupFailure(cleanupErr),
+			)
+		} else if !os.IsNotExist(err) {
+			cleanupErr := cleanupRootEntries(root, publishEntryNames(publishEntries))
+			rollbackErr := restoreRootBackup(root, backups, nil)
+			return errors.Join(
+				fmt.Errorf("could not inspect backup path %s: %w", backupName, err),
+				rollbackFailure(rollbackErr),
+				hiddenCleanupFailure(cleanupErr),
+			)
+		}
+		if err := renameRootEntry(root, entry.Name(), backupName); err != nil {
+			rollbackErr := restoreRootBackup(root, backups, nil)
+			cleanupErr := cleanupRootEntries(root, publishEntryNames(publishEntries))
+			return errors.Join(
+				fmt.Errorf("could not move %s aside: %w", entry.Name(), err),
+				rollbackFailure(rollbackErr),
+				hiddenCleanupFailure(cleanupErr),
+			)
+		}
+		backups = append(backups, rootBackupEntry{original: entry.Name(), backup: backupName})
+	}
+
+	var movedIn []string
+	for _, entry := range publishEntries {
+		if err := renameRootEntry(root, entry.hidden, entry.final); err != nil {
+			rollbackErr := restoreRootBackup(root, backups, movedIn)
+			cleanupErr := cleanupRootEntries(root, publishEntryNames(publishEntries))
+			return errors.Join(
+				fmt.Errorf("could not publish %s: %w", entry.final, err),
+				rollbackFailure(rollbackErr),
+				hiddenCleanupFailure(cleanupErr),
+			)
+		}
+		movedIn = append(movedIn, entry.final)
+	}
+
+	var cleanupErrors []error
+	for _, entry := range backups {
+		if err := removeRootBackup(root, entry.backup); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("retained backup %s: %w", entry.backup, err))
+		}
+	}
+	if err := errors.Join(cleanupErrors...); err != nil {
+		return &committedUpdateWarning{err: err}
+	}
+	return nil
+}
+
+func copyRootEntry(src, dest *safepaths.Root, srcName, destName string) error {
+	info, err := src.Lstat(srcName)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		if err := dest.MkdirAll(destName, 0o755); err != nil {
+			return err
+		}
+		entries, err := src.ReadDir(srcName)
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			if err := copyRootEntry(
+				src,
+				dest,
+				filepath.Join(srcName, entry.Name()),
+				filepath.Join(destName, entry.Name()),
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	input, err := src.Open(srcName)
+	if err != nil {
+		return err
+	}
+	defer input.Close()
+	output, err := dest.Create(destName, info.Mode().Perm(), false)
+	if err != nil {
+		return err
+	}
+	if _, err := copyRootFile(output, input); err != nil {
+		_ = output.Close()
+		return err
+	}
+	return output.Close()
+}
+
+func restoreRootBackup(root *safepaths.Root, backups []rootBackupEntry, movedIn []string) error {
+	var restoreErrors []error
+	for _, name := range movedIn {
+		if err := root.RemoveAll(name); err != nil {
+			restoreErrors = append(restoreErrors, fmt.Errorf("could not remove new entry %s: %w", name, err))
+		}
+	}
+	for _, entry := range backups {
+		if err := renameRootEntry(root, entry.backup, entry.original); err != nil {
+			restoreErrors = append(restoreErrors, fmt.Errorf("could not restore %s from %s: %w", entry.original, entry.backup, err))
+		}
+	}
+	return errors.Join(restoreErrors...)
+}
+
+func publishEntryNames(entries []rootPublishEntry) []string {
+	names := make([]string, len(entries))
+	for i, entry := range entries {
+		names[i] = entry.hidden
+	}
+	return names
+}
+
+func cleanupRootEntries(root *safepaths.Root, names []string) error {
+	var cleanupErrors []error
+	for _, name := range names {
+		if err := removeRootHidden(root, name); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("could not remove hidden entry %s: %w", name, err))
+		}
+	}
+	return errors.Join(cleanupErrors...)
+}
+
+func rollbackFailure(err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("rollback failed; recoverable backups were retained: %w", err)
+}
+
+func hiddenCleanupFailure(err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("hidden prepared entries were retained: %w", err)
+}
+
+func addCommittedCleanupWarning(result error, committed bool, cleanupErr error) error {
+	if cleanupErr == nil {
+		return result
+	}
+	if !committed {
+		return errors.Join(result, cleanupErr)
+	}
+
+	var warning *committedUpdateWarning
+	if errors.As(result, &warning) {
+		return &committedUpdateWarning{err: errors.Join(warning.err, cleanupErr)}
+	}
+	return &committedUpdateWarning{err: cleanupErr}
 }
 
 // swapDirectoryContents replaces the entries inside dest with the entries

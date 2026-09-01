@@ -183,11 +183,15 @@ func TestInstallLocal(t *testing.T) {
 }
 
 func TestInstallSkill(t *testing.T) {
+	var preservedSkillMode os.FileMode
+
 	tests := []struct {
-		name   string
-		skill  discovery.Skill
-		stubs  func(*httpmock.Registry)
-		verify func(t *testing.T, destDir string)
+		name    string
+		skill   discovery.Skill
+		setup   func(t *testing.T, destDir string)
+		stubs   func(*httpmock.Registry)
+		verify  func(t *testing.T, destDir string)
+		replace bool
 	}{
 		{
 			name:  "installs files from remote",
@@ -284,10 +288,54 @@ func TestInstallSkill(t *testing.T) {
 				assert.True(t, os.IsNotExist(err), "traversal path should not be written")
 			},
 		},
+		{
+			name:  "forced replacement preserves regular file mode",
+			skill: discovery.Skill{Name: "code-review", Path: "skills/code-review", TreeSHA: "tree-mode"},
+			setup: func(t *testing.T, destDir string) {
+				t.Helper()
+				skillDir := filepath.Join(destDir, "code-review")
+				require.NoError(t, os.Mkdir(skillDir, 0o755))
+				skillFile := filepath.Join(skillDir, "SKILL.md")
+				require.NoError(t, os.WriteFile(skillFile, []byte("old"), 0o600))
+				info, err := os.Stat(skillFile)
+				require.NoError(t, err)
+				preservedSkillMode = info.Mode().Perm()
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree-mode"),
+					httpmock.JSONResponse(map[string]any{
+						"sha": "tree-mode", "truncated": false,
+						"tree": []map[string]any{
+							{"path": "SKILL.md", "type": "blob", "sha": "mode-sha", "size": 10},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/mode-sha"),
+					httpmock.JSONResponse(map[string]any{
+						"sha": "mode-sha", "encoding": "base64",
+						"content": base64.StdEncoding.EncodeToString([]byte("# Updated")),
+					}))
+			},
+			verify: func(t *testing.T, destDir string) {
+				t.Helper()
+				skillFile := filepath.Join(destDir, "code-review", "SKILL.md")
+				info, err := os.Stat(skillFile)
+				require.NoError(t, err)
+				assert.Equal(t, preservedSkillMode, info.Mode().Perm())
+				content, err := os.ReadFile(skillFile)
+				require.NoError(t, err)
+				assert.Contains(t, string(content), "# Updated")
+			},
+			replace: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			destDir := t.TempDir()
+			if tt.setup != nil {
+				tt.setup(t, destDir)
+			}
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
@@ -299,6 +347,9 @@ func TestInstallSkill(t *testing.T) {
 				Ref:    "v1.0",
 				SHA:    "commit123",
 				Client: client,
+			}
+			if tt.replace {
+				opts.ReplaceExisting = map[string]bool{tt.skill.Name: true}
 			}
 
 			err := installSkill(opts, tt.skill, destDir)

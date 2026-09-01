@@ -2,9 +2,11 @@ package update
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -12,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/skills/registry"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -311,15 +314,21 @@ func TestScanAllAgentsDeduplicatesSharedProjectDirs(t *testing.T) {
 }
 
 func TestUpdateRun(t *testing.T) {
+	var projectSymlinkTarget string
+	var projectSwapRoot string
+	var projectSwapMovedRoot string
+	var projectSwapOutside string
+
 	tests := []struct {
-		name       string
-		setup      func(t *testing.T, dir string)
-		stubs      func(reg *httpmock.Registry)
-		opts       func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions
-		verify     func(t *testing.T, dir string)
-		wantErr    string
-		wantStderr string
-		wantStdout string
+		name          string
+		setup         func(t *testing.T, dir string)
+		stubs         func(reg *httpmock.Registry)
+		opts          func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions
+		verify        func(t *testing.T, dir string)
+		wantErr       string
+		wantStderr    string
+		wantStderrAll []string
+		wantStdout    string
 	}{
 		{
 			name: "scans all agents when no --dir is set",
@@ -707,6 +716,305 @@ func TestUpdateRun(t *testing.T) {
 				assert.NotContains(t, string(content), "Old content")
 			},
 			wantStdout: "Updated code-review",
+		},
+		{
+			name: "project update rejects ancestor symlink",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				t.Setenv("HOME", t.TempDir())
+				t.Setenv("USERPROFILE", os.Getenv("HOME"))
+				projectSymlinkTarget = t.TempDir()
+				skillDir := filepath.Join(projectSymlinkTarget, "skills", "code-review")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: code-review
+					metadata:
+					  github-repo: https://github.com/monalisa/octocat-skills
+					  github-tree-sha: oldsha000
+					  github-path: skills/code-review
+					---
+					Old content
+				`)), 0o644))
+				require.NoError(t, os.Symlink(projectSymlinkTarget, filepath.Join(dir, ".agents")))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
+					httpmock.StringResponse(`{"sha": "newcommit789", "tree": [{"path": "skills/code-review/SKILL.md", "type": "blob", "sha": "newblob1"}, {"path": "skills/code-review", "type": "tree", "sha": "newsha999"}, {"path": "skills", "type": "tree", "sha": "treeshaZ"}], "truncated": false}`))
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(false)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					All:       true,
+					Force:     true,
+				}
+			},
+			verify: func(t *testing.T, _ string) {
+				t.Helper()
+				content, err := os.ReadFile(filepath.Join(projectSymlinkTarget, "skills", "code-review", "SKILL.md"))
+				require.NoError(t, err)
+				assert.Contains(t, string(content), "Old content")
+			},
+			wantErr:    "SilentError",
+			wantStderr: "symbolic link",
+		},
+		{
+			name: "project update stays rooted when ancestor changes",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				t.Setenv("HOME", t.TempDir())
+				t.Setenv("USERPROFILE", os.Getenv("HOME"))
+				projectSwapRoot = dir
+				projectSwapMovedRoot = filepath.Join(dir, ".agents-moved")
+				projectSwapOutside = t.TempDir()
+
+				skillDir := filepath.Join(dir, ".agents", "skills", "code-review")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: code-review
+					metadata:
+					  github-repo: https://github.com/monalisa/octocat-skills
+					  github-tree-sha: oldsha000
+					  github-path: skills/code-review
+					---
+					Old content
+				`)), 0o644))
+
+				outsideSkillDir := filepath.Join(projectSwapOutside, "skills", "code-review")
+				require.NoError(t, os.MkdirAll(outsideSkillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(outsideSkillDir, "SKILL.md"), []byte("outside content"), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
+					httpmock.StringResponse(`{"sha": "newcommit789", "tree": [{"path": "skills/code-review/SKILL.md", "type": "blob", "sha": "newblob1"}, {"path": "skills/code-review", "type": "tree", "sha": "newsha999"}, {"path": "skills", "type": "tree", "sha": "treeshaZ"}], "truncated": false}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newsha999"),
+					httpmock.StringResponse(`{"sha": "newsha999", "tree": [{"path": "SKILL.md", "type": "blob", "sha": "newblob1", "size": 20}], "truncated": false}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/newblob1"),
+					func(req *http.Request) (*http.Response, error) {
+						require.NoError(t, os.Rename(filepath.Join(projectSwapRoot, ".agents"), projectSwapMovedRoot))
+						require.NoError(t, os.Symlink(projectSwapOutside, filepath.Join(projectSwapRoot, ".agents")))
+						return httpmock.StringResponse(fmt.Sprintf(`{"sha": "newblob1", "encoding": "base64", "content": "%s"}`,
+							"IyBDb2RlIFJldmlldyBVcGRhdGVk"))(req)
+					})
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(false)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					All:       true,
+					Force:     true,
+				}
+			},
+			verify: func(t *testing.T, _ string) {
+				t.Helper()
+				outside, err := os.ReadFile(filepath.Join(projectSwapOutside, "skills", "code-review", "SKILL.md"))
+				require.NoError(t, err)
+				assert.Equal(t, "outside content", string(outside))
+
+				updatedDir := filepath.Join(projectSwapMovedRoot, "skills", "code-review")
+				updated, err := os.ReadFile(filepath.Join(updatedDir, "SKILL.md"))
+				require.NoError(t, err)
+				assert.NotContains(t, string(updated), "Old content")
+				entries, err := os.ReadDir(updatedDir)
+				require.NoError(t, err)
+				require.Len(t, entries, 1)
+			},
+			wantStdout: "Updated code-review",
+		},
+		{
+			name: "project update publishes nested staged subtree",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				t.Setenv("HOME", t.TempDir())
+				t.Setenv("USERPROFILE", os.Getenv("HOME"))
+				skillDir := filepath.Join(dir, ".agents", "skills", "code-review")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: code-review
+					metadata:
+					  github-repo: https://github.com/monalisa/octocat-skills
+					  github-tree-sha: oldsha000
+					  github-path: skills/code-review
+					---
+					Old content
+				`)), 0o644))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "stale.txt"), []byte("stale"), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
+					httpmock.StringResponse(`{"sha": "newcommit789", "tree": [{"path": "skills/code-review/SKILL.md", "type": "blob", "sha": "newblob1"}, {"path": "skills/code-review/templates/config.txt", "type": "blob", "sha": "newblob2"}, {"path": "skills/code-review", "type": "tree", "sha": "newsha999"}, {"path": "skills", "type": "tree", "sha": "treeshaZ"}], "truncated": false}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newsha999"),
+					httpmock.StringResponse(`{"sha": "newsha999", "tree": [{"path": "SKILL.md", "type": "blob", "sha": "newblob1", "size": 20}, {"path": "templates/config.txt", "type": "blob", "sha": "newblob2", "size": 6}], "truncated": false}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/newblob1"),
+					httpmock.StringResponse(fmt.Sprintf(`{"sha": "newblob1", "encoding": "base64", "content": "%s"}`,
+						"IyBDb2RlIFJldmlldyBVcGRhdGVk")))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/newblob2"),
+					httpmock.StringResponse(fmt.Sprintf(`{"sha": "newblob2", "encoding": "base64", "content": "%s"}`,
+						"bmVzdGVk")))
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(false)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					All:       true,
+					Force:     true,
+				}
+			},
+			verify: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, ".agents", "skills", "code-review")
+				updated, err := os.ReadFile(filepath.Join(skillDir, "SKILL.md"))
+				require.NoError(t, err)
+				assert.NotContains(t, string(updated), "Old content")
+				nested, err := os.ReadFile(filepath.Join(skillDir, "templates", "config.txt"))
+				require.NoError(t, err)
+				assert.Equal(t, "nested", string(nested))
+				assert.NoFileExists(t, filepath.Join(skillDir, "stale.txt"))
+				entries, err := os.ReadDir(skillDir)
+				require.NoError(t, err)
+				require.Len(t, entries, 2)
+			},
+			wantStdout: "Updated code-review",
+		},
+		{
+			name: "project update warns after committed cleanup failures",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				t.Setenv("HOME", t.TempDir())
+				t.Setenv("USERPROFILE", os.Getenv("HOME"))
+				skillDir := filepath.Join(dir, ".agents", "skills", "code-review")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: code-review
+					metadata:
+					  github-repo: https://github.com/monalisa/octocat-skills
+					  github-tree-sha: oldsha000
+					  github-path: skills/code-review
+					---
+					Old content
+				`)), 0o644))
+
+				originalRemove := removeRootBackup
+				originalStagingRemove := removeRootStaging
+				t.Cleanup(func() {
+					removeRootBackup = originalRemove
+					removeRootStaging = originalStagingRemove
+				})
+				removeRootBackup = func(_ *safepaths.Root, _ string) error {
+					return fmt.Errorf("backup cleanup blocked")
+				}
+				removeRootStaging = func(_ *safepaths.Root, _ string) error {
+					return fmt.Errorf("staging cleanup blocked")
+				}
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv3.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "newcommit789", "type": "commit"}}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
+					httpmock.StringResponse(`{"sha": "newcommit789", "tree": [{"path": "skills/code-review/SKILL.md", "type": "blob", "sha": "newblob1"}, {"path": "skills/code-review", "type": "tree", "sha": "newsha999"}, {"path": "skills", "type": "tree", "sha": "treeshaZ"}], "truncated": false}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newsha999"),
+					httpmock.StringResponse(`{"sha": "newsha999", "tree": [{"path": "SKILL.md", "type": "blob", "sha": "newblob1", "size": 20}], "truncated": false}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/newblob1"),
+					httpmock.StringResponse(fmt.Sprintf(`{"sha": "newblob1", "encoding": "base64", "content": "%s"}`,
+						"IyBDb2RlIFJldmlldyBVcGRhdGVk")))
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(false)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					All:       true,
+					Force:     true,
+				}
+			},
+			verify: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, ".agents", "skills", "code-review")
+				updated, err := os.ReadFile(filepath.Join(skillDir, "SKILL.md"))
+				require.NoError(t, err)
+				assert.NotContains(t, string(updated), "Old content")
+
+				entries, err := os.ReadDir(skillDir)
+				require.NoError(t, err)
+				var backupPath string
+				var stagingPath string
+				for _, entry := range entries {
+					if strings.Contains(entry.Name(), ".backup-") {
+						backupPath = filepath.Join(skillDir, entry.Name())
+					}
+					if strings.HasPrefix(entry.Name(), ".gh-skill-update-") &&
+						!strings.Contains(entry.Name(), ".backup-") &&
+						!strings.Contains(entry.Name(), ".publish-") {
+						stagingPath = filepath.Join(skillDir, entry.Name())
+					}
+				}
+				require.NotEmpty(t, backupPath)
+				backup, err := os.ReadFile(backupPath)
+				require.NoError(t, err)
+				assert.Contains(t, string(backup), "Old content")
+				require.DirExists(t, stagingPath)
+				staged, err := os.ReadFile(filepath.Join(stagingPath, "SKILL.md"))
+				require.NoError(t, err)
+				assert.NotContains(t, string(staged), "Old content")
+			},
+			wantStdout:    "Updated code-review",
+			wantStderrAll: []string{"retained backup", "retained staging directory"},
 		},
 		{
 			name: "namespaced skill with --dir updates in-place",
@@ -1233,6 +1541,9 @@ func TestUpdateRun(t *testing.T) {
 			if tt.wantStderr != "" {
 				assert.Contains(t, stderr.String(), tt.wantStderr)
 			}
+			for _, want := range tt.wantStderrAll {
+				assert.Contains(t, stderr.String(), want)
+			}
 			if tt.wantStdout != "" {
 				assert.Contains(t, stdout.String(), tt.wantStdout)
 			}
@@ -1320,4 +1631,200 @@ func TestSwapDirectoryContents_PreservesDestInode(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(dest, "new.txt"))
 	require.NoError(t, err)
 	assert.Equal(t, "new", string(content), "staged content must be installed")
+}
+
+func TestSwapRootDirectoryContents_RetainsBackupOnRollbackFailure(t *testing.T) {
+	rootDir := t.TempDir()
+	root, err := safepaths.OpenRoot(rootDir)
+	require.NoError(t, err)
+	defer root.Close()
+	require.NoError(t, root.WriteFile("SKILL.md", []byte("original"), 0o644, false))
+
+	stagingName, stagingRoot, err := root.TempDir(".stage-")
+	require.NoError(t, err)
+	defer stagingRoot.Close()
+	require.NoError(t, stagingRoot.WriteFile("SKILL.md", []byte("replacement"), 0o644, false))
+
+	originalRename := renameRootEntry
+	defer func() { renameRootEntry = originalRename }()
+	renameRootEntry = func(root *safepaths.Root, oldName, newName string) error {
+		if strings.HasPrefix(oldName, stagingName+".publish-") {
+			return fmt.Errorf("publish blocked")
+		}
+		if strings.HasPrefix(oldName, stagingName+".backup-") {
+			return fmt.Errorf("restore blocked")
+		}
+		return root.Rename(oldName, newName)
+	}
+
+	err = swapRootDirectoryContents(root, stagingRoot, stagingName)
+	require.ErrorContains(t, err, "publish blocked")
+	require.ErrorContains(t, err, "rollback failed; recoverable backups were retained")
+	require.ErrorContains(t, err, "restore blocked")
+	assert.NoFileExists(t, filepath.Join(rootDir, "SKILL.md"))
+
+	entries, err := root.ReadDir(".")
+	require.NoError(t, err)
+	var backupName string
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), stagingName+".backup-") {
+			backupName = entry.Name()
+			break
+		}
+	}
+	require.NotEmpty(t, backupName)
+	content, err := os.ReadFile(filepath.Join(rootDir, backupName))
+	require.NoError(t, err)
+	assert.Equal(t, "original", string(content))
+}
+
+func TestSwapRootDirectoryContents_DoesNotExposePartialFiles(t *testing.T) {
+	rootDir := t.TempDir()
+	root, err := safepaths.OpenRoot(rootDir)
+	require.NoError(t, err)
+	defer root.Close()
+	require.NoError(t, root.WriteFile("SKILL.md", []byte("original"), 0o644, false))
+
+	stagingName, stagingRoot, err := root.TempDir(".stage-")
+	require.NoError(t, err)
+	defer stagingRoot.Close()
+	require.NoError(t, stagingRoot.WriteFile("SKILL.md", []byte("replacement"), 0o644, false))
+
+	originalCopy := copyRootFile
+	defer func() { copyRootFile = originalCopy }()
+	copyRootFile = func(dst io.Writer, src io.Reader) (int64, error) {
+		buffer := make([]byte, 3)
+		n, readErr := src.Read(buffer)
+		require.NoError(t, readErr)
+		written, writeErr := dst.Write(buffer[:n])
+		require.NoError(t, writeErr)
+
+		visible, err := os.ReadFile(filepath.Join(rootDir, "SKILL.md"))
+		require.NoError(t, err)
+		assert.Equal(t, "original", string(visible))
+		return int64(written), fmt.Errorf("copy interrupted")
+	}
+
+	err = swapRootDirectoryContents(root, stagingRoot, stagingName)
+	require.ErrorContains(t, err, "copy interrupted")
+	visible, err := os.ReadFile(filepath.Join(rootDir, "SKILL.md"))
+	require.NoError(t, err)
+	assert.Equal(t, "original", string(visible))
+
+	entries, err := root.ReadDir(".")
+	require.NoError(t, err)
+	for _, entry := range entries {
+		assert.NotContains(t, entry.Name(), ".publish-")
+	}
+}
+
+func TestSwapRootDirectoryContents_CleansPreparedEntriesOnSecondNameFailure(t *testing.T) {
+	rootDir := t.TempDir()
+	root, err := safepaths.OpenRoot(rootDir)
+	require.NoError(t, err)
+	defer root.Close()
+
+	stagingName, stagingRoot, err := root.TempDir(".stage-")
+	require.NoError(t, err)
+	defer stagingRoot.Close()
+	require.NoError(t, stagingRoot.WriteFile("first.txt", []byte("first"), 0o644, false))
+	require.NoError(t, stagingRoot.WriteFile("second.txt", []byte("second"), 0o644, false))
+	collision := stagingName + ".publish-1"
+	require.NoError(t, root.WriteFile(collision, []byte("existing"), 0o644, false))
+
+	originalRemove := removeRootHidden
+	defer func() { removeRootHidden = originalRemove }()
+	removeRootHidden = func(_ *safepaths.Root, name string) error {
+		if name == stagingName+".publish-0" {
+			return fmt.Errorf("cleanup blocked for %s", name)
+		}
+		return originalRemove(root, name)
+	}
+
+	err = swapRootDirectoryContents(root, stagingRoot, stagingName)
+	require.ErrorContains(t, err, "publish path already exists")
+	require.ErrorContains(t, err, "hidden prepared entries were retained")
+	require.ErrorContains(t, err, stagingName+".publish-0")
+	assert.FileExists(t, filepath.Join(rootDir, stagingName+".publish-0"))
+	content, err := os.ReadFile(filepath.Join(rootDir, collision))
+	require.NoError(t, err)
+	assert.Equal(t, "existing", string(content))
+	assert.NoFileExists(t, filepath.Join(rootDir, "first.txt"))
+	assert.NoFileExists(t, filepath.Join(rootDir, "second.txt"))
+}
+
+func TestSwapRootDirectoryContents_RestoresAfterDestructiveFailure(t *testing.T) {
+	tests := []struct {
+		name      string
+		configure func(stagingName string)
+	}{
+		{
+			name: "backup move fails after first original",
+			configure: func(stagingName string) {
+				originalRename := renameRootEntry
+				renameRootEntry = func(root *safepaths.Root, oldName, newName string) error {
+					if oldName == "b.txt" && strings.HasPrefix(newName, stagingName+".backup-") {
+						return fmt.Errorf("backup move failed")
+					}
+					return originalRename(root, oldName, newName)
+				}
+			},
+		},
+		{
+			name: "publication fails after first new entry",
+			configure: func(stagingName string) {
+				originalRename := renameRootEntry
+				published := 0
+				renameRootEntry = func(root *safepaths.Root, oldName, newName string) error {
+					if strings.HasPrefix(oldName, stagingName+".publish-") {
+						published++
+						if published == 2 {
+							return fmt.Errorf("publication failed")
+						}
+					}
+					return originalRename(root, oldName, newName)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+			root, err := safepaths.OpenRoot(rootDir)
+			require.NoError(t, err)
+			defer root.Close()
+			require.NoError(t, root.WriteFile("a.txt", []byte("original-a"), 0o644, false))
+			require.NoError(t, root.WriteFile("b.txt", []byte("original-b"), 0o644, false))
+
+			stagingName, stagingRoot, err := root.TempDir(".stage-")
+			require.NoError(t, err)
+			defer stagingRoot.Close()
+			require.NoError(t, stagingRoot.WriteFile("a.txt", []byte("new-a"), 0o644, false))
+			require.NoError(t, stagingRoot.WriteFile("b.txt", []byte("new-b"), 0o644, false))
+			require.NoError(t, stagingRoot.WriteFile("c.txt", []byte("new-c"), 0o644, false))
+
+			originalRename := renameRootEntry
+			defer func() { renameRootEntry = originalRename }()
+			tt.configure(stagingName)
+
+			err = swapRootDirectoryContents(root, stagingRoot, stagingName)
+			require.Error(t, err)
+			a, err := os.ReadFile(filepath.Join(rootDir, "a.txt"))
+			require.NoError(t, err)
+			assert.Equal(t, "original-a", string(a))
+			b, err := os.ReadFile(filepath.Join(rootDir, "b.txt"))
+			require.NoError(t, err)
+			assert.Equal(t, "original-b", string(b))
+			assert.NoFileExists(t, filepath.Join(rootDir, "c.txt"))
+
+			entries, err := root.ReadDir(".")
+			require.NoError(t, err)
+			for _, entry := range entries {
+				assert.NotContains(t, entry.Name(), ".backup-")
+				assert.NotContains(t, entry.Name(), ".publish-")
+			}
+			require.Len(t, entries, 3)
+		})
+	}
 }

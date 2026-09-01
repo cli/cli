@@ -24,11 +24,11 @@ func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
 	return shared.ListArtifacts(p.client, p.repo, runID)
 }
 
-func (p *apiPlatform) Download(url safeurl.SafeURL, dir safepaths.Absolute) error {
-	return downloadArtifact(p.client, url, dir)
+func (p *apiPlatform) Download(url safeurl.SafeURL, openDestination func() (*safepaths.Root, error)) error {
+	return downloadArtifact(p.client, url, openDestination)
 }
 
-func downloadArtifact(httpClient *http.Client, url safeurl.SafeURL, destDir safepaths.Absolute) error {
+func downloadArtifact(httpClient *http.Client, url safeurl.SafeURL, openDestination func() (*safepaths.Root, error)) (downloadErr error) {
 	// TODO(api-client-rollout)
 	// This has been deferred from moving to api.Client due to streaming the artifact ZIP response body to disk instead of decoding JSON.
 	req, err := http.NewRequest("GET", url.String(), nil)
@@ -66,6 +66,15 @@ func downloadArtifact(httpClient *http.Client, url safeurl.SafeURL, destDir safe
 	if err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
+	destDir, err := openDestination()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := destDir.Close(); downloadErr == nil && err != nil {
+			downloadErr = err
+		}
+	}()
 	if err := ghzip.ExtractZip(zipfile, destDir); err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}

@@ -271,6 +271,76 @@ func TestExtractTarGz(t *testing.T) {
 		err := extractTarGz(bytes.NewReader([]byte("not valid gzip")), destDir)
 		require.Error(t, err, "expected error for invalid gzip, got nil")
 	})
+
+	t.Run("rejects invalid nonregular entry before extraction", func(t *testing.T) {
+		var archive bytes.Buffer
+		gzipWriter := gzip.NewWriter(&archive)
+		tarWriter := tar.NewWriter(gzipWriter)
+		require.NoError(t, tarWriter.WriteHeader(&tar.Header{
+			Name:     "../outside",
+			Typeflag: tar.TypeDir,
+			Mode:     0o755,
+		}))
+		content := []byte("content")
+		require.NoError(t, tarWriter.WriteHeader(&tar.Header{
+			Name: "copilot",
+			Mode: 0o755,
+			Size: int64(len(content)),
+		}))
+		_, err := tarWriter.Write(content)
+		require.NoError(t, err)
+		require.NoError(t, tarWriter.Close())
+		require.NoError(t, gzipWriter.Close())
+
+		destDir := t.TempDir()
+		err = extractTarGz(bytes.NewReader(archive.Bytes()), destDir)
+		require.ErrorContains(t, err, "not a local child path")
+		assert.NoFileExists(t, filepath.Join(destDir, "copilot"))
+	})
+
+	t.Run("rejects ancestor symlink", func(t *testing.T) {
+		content := []byte("nested content")
+		archive := createTarGzBuffer(t, map[string][]byte{
+			"subdir/file.txt": content,
+		})
+		destDir := t.TempDir()
+		outside := t.TempDir()
+		require.NoError(t, os.Symlink(outside, filepath.Join(destDir, "subdir")))
+
+		err := extractTarGz(bytes.NewReader(archive), destDir)
+		require.ErrorContains(t, err, "symbolic link")
+		assert.NoFileExists(t, filepath.Join(outside, "file.txt"))
+	})
+
+	t.Run("replaces dangling final symlink", func(t *testing.T) {
+		archive := createTarGzBuffer(t, map[string][]byte{
+			"copilot": []byte("content"),
+		})
+		destDir := t.TempDir()
+		missing := filepath.Join(destDir, "missing")
+		require.NoError(t, os.Symlink("missing", filepath.Join(destDir, "copilot")))
+
+		err := extractTarGz(bytes.NewReader(archive), destDir)
+		require.NoError(t, err)
+		assert.NoFileExists(t, missing)
+		info, err := os.Lstat(filepath.Join(destDir, "copilot"))
+		require.NoError(t, err)
+		assert.Zero(t, info.Mode()&os.ModeSymlink)
+	})
+
+	t.Run("replaces leftover file on retry", func(t *testing.T) {
+		archive := createTarGzBuffer(t, map[string][]byte{
+			"copilot": []byte("complete"),
+		})
+		destDir := t.TempDir()
+		target := filepath.Join(destDir, "copilot")
+		require.NoError(t, os.WriteFile(target, []byte("partial"), 0o644))
+
+		require.NoError(t, extractTarGz(bytes.NewReader(archive), destDir))
+		content, err := os.ReadFile(target)
+		require.NoError(t, err)
+		assert.Equal(t, "complete", string(content))
+	})
 }
 
 func TestExtractZip(t *testing.T) {
@@ -332,6 +402,46 @@ func TestExtractZip(t *testing.T) {
 
 		err := extractZip(zipPath, destDir)
 		require.Error(t, err, "expected error for path traversal, got nil")
+	})
+
+	t.Run("validates all entries before extraction", func(t *testing.T) {
+		zipDir := t.TempDir()
+		zipPath := filepath.Join(zipDir, "archive.zip")
+
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		valid, err := zw.Create("copilot.exe")
+		require.NoError(t, err)
+		_, err = valid.Write([]byte("content"))
+		require.NoError(t, err)
+		invalid, err := zw.Create("../outside.txt")
+		require.NoError(t, err)
+		_, err = invalid.Write([]byte("content"))
+		require.NoError(t, err)
+		require.NoError(t, zw.Close())
+		require.NoError(t, os.WriteFile(zipPath, buf.Bytes(), 0o755))
+
+		destDir := t.TempDir()
+		err = extractZip(zipPath, destDir)
+		require.ErrorContains(t, err, "not a local child path")
+		assert.NoFileExists(t, filepath.Join(destDir, "copilot.exe"))
+	})
+
+	t.Run("rejects ancestor symlink", func(t *testing.T) {
+		zipDir := t.TempDir()
+		zipPath := filepath.Join(zipDir, "archive.zip")
+		archive := createZipBuffer(t, map[string][]byte{
+			"subdir/file.txt": []byte("content"),
+		})
+		require.NoError(t, os.WriteFile(zipPath, archive, 0o755))
+
+		destDir := t.TempDir()
+		outside := t.TempDir()
+		require.NoError(t, os.Symlink(outside, filepath.Join(destDir, "subdir")))
+
+		err := extractZip(zipPath, destDir)
+		require.ErrorContains(t, err, "symbolic link")
+		assert.NoFileExists(t, filepath.Join(outside, "file.txt"))
 	})
 }
 

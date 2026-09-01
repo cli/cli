@@ -399,16 +399,18 @@ func installRun(opts *InstallOptions) error {
 		}
 
 		result, err := installer.Install(&installer.Options{
-			Host:       hostname,
-			Owner:      opts.repo.RepoOwner(),
-			Repo:       opts.repo.RepoName(),
-			Ref:        resolved.Ref,
-			SHA:        resolved.SHA,
-			PinnedRef:  opts.Pin,
-			Skills:     plan.skills,
-			Dir:        plan.dir,
-			Client:     apiClient,
-			OnProgress: installProgress(opts.IO, len(plan.skills)),
+			Host:            hostname,
+			Owner:           opts.repo.RepoOwner(),
+			Repo:            opts.repo.RepoName(),
+			Ref:             resolved.Ref,
+			SHA:             resolved.SHA,
+			PinnedRef:       opts.Pin,
+			Skills:          plan.skills,
+			Dir:             plan.dir,
+			RootDir:         plan.root,
+			Client:          apiClient,
+			ReplaceExisting: plan.replaceExisting,
+			OnProgress:      installProgress(opts.IO, len(plan.skills)),
 		})
 
 		if result != nil {
@@ -556,9 +558,11 @@ func runLocalInstall(opts *InstallOptions) error {
 		}
 
 		result, err := installer.InstallLocal(&installer.LocalOptions{
-			SourceDir: absSource,
-			Skills:    plan.skills,
-			Dir:       plan.dir,
+			SourceDir:       absSource,
+			Skills:          plan.skills,
+			Dir:             plan.dir,
+			RootDir:         plan.root,
+			ReplaceExisting: plan.replaceExisting,
 		})
 		if err != nil {
 			return err
@@ -684,9 +688,11 @@ type skillSelector struct {
 }
 
 type installPlan struct {
-	dir    string
-	hosts  []*registry.AgentHost
-	skills []discovery.Skill
+	dir             string
+	root            string
+	hosts           []*registry.AgentHost
+	skills          []discovery.Skill
+	replaceExisting map[string]bool
 }
 
 // errSkillsListed is a sentinel returned by selectSkillsWithSelector when
@@ -996,7 +1002,11 @@ func buildInstallPlans(opts *InstallOptions, selectedSkills []discovery.Skill, s
 
 		plan, ok := byDir[targetDir]
 		if !ok {
-			plan = &installPlan{dir: targetDir}
+			rootDir := targetDir
+			if opts.Dir == "" && scope == registry.ScopeProject {
+				rootDir = gitRoot
+			}
+			plan = &installPlan{dir: targetDir, root: rootDir}
 			byDir[targetDir] = plan
 			orderedDirs = append(orderedDirs, targetDir)
 		}
@@ -1006,7 +1016,7 @@ func buildInstallPlans(opts *InstallOptions, selectedSkills []discovery.Skill, s
 	plans := make([]installPlan, 0, len(orderedDirs))
 	for _, dir := range orderedDirs {
 		plan := byDir[dir]
-		installSkills, err := checkOverwrite(opts, selectedSkills, plan.dir, canPrompt)
+		installSkills, replaceExisting, err := checkOverwrite(opts, selectedSkills, plan.dir, canPrompt)
 		if err != nil {
 			return nil, err
 		}
@@ -1015,6 +1025,7 @@ func buildInstallPlans(opts *InstallOptions, selectedSkills []discovery.Skill, s
 			continue
 		}
 		plan.skills = installSkills
+		plan.replaceExisting = replaceExisting
 		plans = append(plans, *plan)
 	}
 
@@ -1036,7 +1047,7 @@ func formatPlanHosts(hosts []*registry.AgentHost) string {
 	return strings.Join(names, ", ")
 }
 
-func checkOverwrite(opts *InstallOptions, skills []discovery.Skill, targetDir string, canPrompt bool) ([]discovery.Skill, error) {
+func checkOverwrite(opts *InstallOptions, skills []discovery.Skill, targetDir string, canPrompt bool) ([]discovery.Skill, map[string]bool, error) {
 	var existing, fresh []discovery.Skill
 	for _, s := range skills {
 		dir := filepath.Join(targetDir, s.Name)
@@ -1048,11 +1059,15 @@ func checkOverwrite(opts *InstallOptions, skills []discovery.Skill, targetDir st
 	}
 
 	if len(existing) == 0 {
-		return skills, nil
+		return skills, nil, nil
 	}
 
 	if opts.Force {
-		return skills, nil
+		replaceExisting := make(map[string]bool, len(existing))
+		for _, skill := range existing {
+			replaceExisting[skill.Name] = true
+		}
+		return skills, replaceExisting, nil
 	}
 
 	if !canPrompt {
@@ -1060,24 +1075,26 @@ func checkOverwrite(opts *InstallOptions, skills []discovery.Skill, targetDir st
 		for i, s := range existing {
 			names[i] = s.DisplayName()
 		}
-		return nil, fmt.Errorf("skills already installed: %s (use --force to overwrite)", strings.Join(names, ", "))
+		return nil, nil, fmt.Errorf("skills already installed: %s (use --force to overwrite)", strings.Join(names, ", "))
 	}
 
 	var confirmed []discovery.Skill
+	replaceExisting := make(map[string]bool)
 	for _, s := range existing {
 		prompt := existingSkillPrompt(targetDir, s)
 		ok, err := opts.Prompter.Confirm(prompt, false)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if ok {
 			confirmed = append(confirmed, s)
+			replaceExisting[s.Name] = true
 		} else {
 			fmt.Fprintf(opts.IO.ErrOut, "Skipping %s\n", s.DisplayName())
 		}
 	}
 
-	return append(fresh, confirmed...), nil
+	return append(fresh, confirmed...), replaceExisting, nil
 }
 
 func existingSkillPrompt(targetDir string, incoming discovery.Skill) string {
