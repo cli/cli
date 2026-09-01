@@ -186,6 +186,24 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
+func Test_interactiveRepoNameAndOwner_repromptsForBlankName(t *testing.T) {
+	pm := prompter.NewMockPrompter(t)
+	pm.RegisterInput("Repository name", func(string, string) (string, error) {
+		return " ", nil
+	})
+	pm.RegisterInput("Repository name", func(string, string) (string, error) {
+		return "OWNER/REPO", nil
+	})
+	ios, _, _, stderr := iostreams.Test()
+
+	name, owner, err := interactiveRepoNameAndOwner(nil, "github.com", pm, ios, "")
+
+	require.NoError(t, err)
+	assert.Equal(t, "REPO", name)
+	assert.Equal(t, "OWNER", owner)
+	assert.Equal(t, "X Repository name cannot be blank\n", stderr.String())
+}
+
 func Test_createRun(t *testing.T) {
 	tests := []struct {
 		name        string

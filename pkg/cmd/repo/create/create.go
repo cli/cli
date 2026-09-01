@@ -307,7 +307,7 @@ func createFromScratch(opts *CreateOptions) error {
 	host, _ := cfg.Authentication().DefaultHost()
 
 	if opts.Interactive {
-		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, "")
+		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, opts.IO, "")
 		if err != nil {
 			return err
 		}
@@ -448,7 +448,7 @@ func createFromTemplate(opts *CreateOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, "")
+	opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, opts.IO, "")
 	if err != nil {
 		return err
 	}
@@ -592,7 +592,7 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	if opts.Interactive {
-		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, filepath.Base(absPath))
+		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, opts.IO, filepath.Base(absPath))
 		if err != nil {
 			return err
 		}
@@ -893,8 +893,8 @@ func interactiveLicense(client *http.Client, hostname string, prompter iprompter
 }
 
 // name, description, and visibility
-func interactiveRepoInfo(client *http.Client, hostname string, prompter iprompter, defaultName string) (string, string, string, error) {
-	name, owner, err := interactiveRepoNameAndOwner(client, hostname, prompter, defaultName)
+func interactiveRepoInfo(client *http.Client, hostname string, prompter iprompter, io *iostreams.IOStreams, defaultName string) (string, string, string, error) {
+	name, owner, err := interactiveRepoNameAndOwner(client, hostname, prompter, io, defaultName)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -925,10 +925,17 @@ func getRepoVisibilityOptions(owner string) []string {
 	return visibilityOptions
 }
 
-func interactiveRepoNameAndOwner(client *http.Client, hostname string, prompter iprompter, defaultName string) (string, string, error) {
-	name, err := prompter.Input("Repository name", defaultName)
-	if err != nil {
-		return "", "", err
+func interactiveRepoNameAndOwner(client *http.Client, hostname string, prompter iprompter, io *iostreams.IOStreams, defaultName string) (string, string, error) {
+	var name string
+	for strings.TrimSpace(name) == "" {
+		var err error
+		name, err = prompter.Input("Repository name", defaultName)
+		if err != nil {
+			return "", "", err
+		}
+		if strings.TrimSpace(name) == "" {
+			fmt.Fprintf(io.ErrOut, "%s Repository name cannot be blank\n", io.ColorScheme().FailureIcon())
+		}
 	}
 
 	name, owner, err := splitNameAndOwner(name)
