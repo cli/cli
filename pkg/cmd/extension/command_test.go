@@ -898,6 +898,35 @@ func TestNewCmdExtension(t *testing.T) {
 			isTTY:      true,
 			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
+		{
+			name: "force install with pin when present",
+			args: []string{"install", "owner/gh-hello", "--force", "--pin", "v1.0.0"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{
+						&Extension{path: "owner/gh-hello", owner: "owner"},
+					}
+				}
+				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					listCalls := em.ListCalls()
+					assert.Equal(t, 1, len(listCalls))
+					installCalls := em.InstallCalls()
+					assert.Equal(t, 1, len(installCalls))
+					assert.Equal(t, "gh-hello", installCalls[0].InterfaceMoqParam.RepoName())
+					assert.Equal(t, "v1.0.0", installCalls[0].S)
+					upgradeCalls := em.UpgradeCalls()
+					assert.Empty(t, upgradeCalls)
+				}
+			},
+			isTTY: true,
+			wantStdout: heredoc.Doc(`
+				✓ Installed extension owner/gh-hello
+				✓ Pinned extension at v1.0.0
+			`),
+		},
 	}
 
 	for _, tt := range tests {
