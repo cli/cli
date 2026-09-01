@@ -13,7 +13,9 @@ import (
 	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
@@ -613,6 +615,88 @@ func Test_authRecoveryCommand(t *testing.T) {
 			got := authRecoveryCommand(cfg, httpErr)
 			if got != tt.want {
 				t.Errorf("authRecoveryCommand() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRecordCommandTelemetry(t *testing.T) {
+	tests := []struct {
+		name      string
+		cmd       *cobra.Command
+		wantEvent *ghtelemetry.Event
+	}{
+		{
+			name: "records command_invocation for normal command",
+			cmd: func() *cobra.Command {
+				root := &cobra.Command{Use: "gh"}
+				child := &cobra.Command{Use: "pr"}
+				leaf := &cobra.Command{Use: "list"}
+				leaf.Flags().String("repo", "", "")
+				root.AddCommand(child)
+				child.AddCommand(leaf)
+				return leaf
+			}(),
+			wantEvent: &ghtelemetry.Event{
+				Type: "command_invocation",
+				Dimensions: ghtelemetry.Dimensions{
+					"command":           "gh pr list",
+					"flags":             "",
+					"guessed_host_type": "uncategorized",
+				},
+			},
+		},
+		{
+			name: "records visited flags",
+			cmd: func() *cobra.Command {
+				root := &cobra.Command{Use: "gh"}
+				leaf := &cobra.Command{Use: "list"}
+				leaf.Flags().String("repo", "cli/cli", "")
+				leaf.Flags().Bool("web", true, "")
+				// Mark flags as visited by setting them
+				_ = leaf.Flags().Set("repo", "cli/cli")
+				_ = leaf.Flags().Set("web", "true")
+				root.AddCommand(leaf)
+				return leaf
+			}(),
+			wantEvent: &ghtelemetry.Event{
+				Type: "command_invocation",
+				Dimensions: ghtelemetry.Dimensions{
+					"command":           "gh list",
+					"flags":             "repo,web",
+					"guessed_host_type": "github.com",
+				},
+			},
+		},
+		{
+			name: "records missing_command when cmd is nil",
+			cmd:  nil,
+			wantEvent: &ghtelemetry.Event{
+				Type: "missing_command",
+			},
+		},
+		{
+			name: "skips telemetry-disabled commands",
+			cmd: func() *cobra.Command {
+				cmd := &cobra.Command{Use: "my-alias"}
+				cmdutil.DisableTelemetry(cmd)
+				return cmd
+			}(),
+			wantEvent: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &telemetry.CommandRecorderSpy{}
+			recordCommandTelemetry(svc, tt.cmd, nil, nil)
+			if tt.wantEvent == nil {
+				assert.Empty(t, svc.Events)
+			} else {
+				assert.Len(t, svc.Events, 1)
+				assert.Equal(t, tt.wantEvent.Type, svc.Events[0].Type)
+				if tt.wantEvent.Dimensions != nil {
+					assert.Equal(t, tt.wantEvent.Dimensions, svc.Events[0].Dimensions)
+				}
 			}
 		})
 	}

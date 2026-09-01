@@ -107,6 +107,10 @@ func HostPrefix(hostname string) string {
 }
 
 func CategorizeHost(host string) string {
+	if host == "" {
+		return "uncategorized"
+	}
+
 	if host == defaultHostname {
 		return "github.com"
 	}

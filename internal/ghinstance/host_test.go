@@ -229,6 +229,11 @@ func TestCategorizeHost(t *testing.T) {
 			host: "garage.github.com",
 			want: "uncategorized",
 		},
+		{
+			name: "empty host returns uncategorized",
+			host: "",
+			want: "uncategorized",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

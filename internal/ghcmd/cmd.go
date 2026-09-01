@@ -24,6 +24,8 @@ import (
 	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
@@ -37,6 +39,7 @@ import (
 	"github.com/cli/safeexec"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type exitCode int
@@ -192,7 +195,12 @@ func Main() exitCode {
 
 	rootCmd.SetArgs(expandedArgs)
 
-	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
+	var executedCmd *cobra.Command
+	defer func() {
+		recordCommandTelemetry(telemetryService, executedCmd, cmdFactory.BaseRepo, cmdFactory.Config)
+	}()
+
+	if executedCmd, err = rootCmd.ExecuteContextC(ctx); err != nil {
 		var pagerPipeError *iostreams.ErrClosedPagerPipe
 		var noResultsError cmdutil.NoResultsError
 		var extError *root.ExternalCommandExitError
@@ -223,7 +231,7 @@ func Main() exitCode {
 			return exitCode(extError.ExitCode())
 		}
 
-		printError(stderr, err, cmd, hasDebug)
+		printError(stderr, err, executedCmd, hasDebug)
 
 		if strings.Contains(err.Error(), "Incorrect function") {
 			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
@@ -491,5 +499,46 @@ func mightBeGHESUser(cfg gh.Config) bool {
 	// If any targeted host is Enterprise, then the user is likely a GHES user.
 	return slices.ContainsFunc(cfg.Authentication().Hosts(), func(host string) bool {
 		return ghauth.IsEnterprise(host)
+	})
+}
+
+// recordCommandTelemetry records a command_invocation telemetry event for the
+// given command, or a missing_command event when cmd is nil. Commands marked
+// as telemetry-disabled (e.g. aliases, auth, completion) are silently skipped.
+//
+// Note: user-defined aliases have telemetry disabled because alias names may
+// contain sensitive information. When a gh alias re-dispatches to a core
+// command via root.Execute(), the expanded command does not get a separate
+// telemetry event - this is an accepted trade-off for simplicity.
+func recordCommandTelemetry(
+	service ghtelemetry.Service,
+	cmd *cobra.Command,
+	baseRepo func() (ghrepo.Interface, error),
+	config func() (gh.Config, error),
+) {
+	if cmd == nil {
+		service.Record(ghtelemetry.Event{
+			Type: "missing_command",
+		})
+		return
+	}
+
+	if cmdutil.IsTelemetryDisabled(cmd) {
+		return
+	}
+
+	var flags []string
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		flags = append(flags, f.Name)
+	})
+	slices.Sort(flags)
+
+	service.Record(ghtelemetry.Event{
+		Type: "command_invocation",
+		Dimensions: ghtelemetry.Dimensions{
+			"command":           cmd.CommandPath(),
+			"flags":             strings.Join(flags, ","),
+			"guessed_host_type": ghinstance.CategorizeHost(telemetry.GuessTargetHost(cmd, baseRepo, config)),
+		},
 	})
 }
