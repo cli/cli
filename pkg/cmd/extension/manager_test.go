@@ -20,6 +20,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -1020,6 +1021,68 @@ func TestManager_Install_git_pinned(t *testing.T) {
 	assert.Equal(t, "", stdout.String())
 	gc.AssertExpectations(t)
 	gcOne.AssertExpectations(t)
+}
+
+func TestManager_Install_git_pinned_replaces_existing_installation(t *testing.T) {
+	dataDir := t.TempDir()
+	updateDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	ios, _, stdout, stderr := iostreams.Test()
+
+	extensionDir := filepath.Join(dataDir, "extensions", "gh-cool-ext")
+	stagingDir := extensionDir + ".new"
+	gc, gcNew := &mockGitClient{}, &mockGitClient{}
+	gc.On("ForRepo", stagingDir).Return(gcNew).Once()
+	gc.On("Clone", "https://github.com/owner/gh-cool-ext.git", []string{stagingDir}).
+		Run(func(mock.Arguments) { require.NoError(t, os.MkdirAll(stagingDir, 0700)) }).
+		Return("", nil).Once()
+	gcNew.On("CheckoutBranch", "abcd1234").Return(nil).Once()
+
+	m := newTestManager(dataDir, updateDir, &client, gc, ios)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-cool-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "not-a-binary",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-cool-ext/commits/some-ref"),
+		httpmock.StringResponse("abcd1234"))
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-cool-ext/contents/gh-cool-ext"),
+		httpmock.JSONResponse(map[string]string{"type": "file"}))
+
+	// Simulate an already-installed extension by writing a non-empty
+	// existing installation directory before installing.
+	require.NoError(t, os.MkdirAll(extensionDir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "gh-cool-ext"), []byte("old"), 0600))
+
+	repo := ghrepo.New("owner", "gh-cool-ext")
+	err := m.Install(repo, "some-ref")
+	assert.NoError(t, err)
+	assert.Equal(t, "", stderr.String())
+	assert.Equal(t, "", stdout.String())
+	gc.AssertExpectations(t)
+	gcNew.AssertExpectations(t)
+
+	// The staging and backup directories should be cleaned up, and the
+	// installation directory should exist (having been swapped into place).
+	_, err = os.Stat(stagingDir)
+	assert.True(t, os.IsNotExist(err))
+	_, err = os.Stat(extensionDir + ".old")
+	assert.True(t, os.IsNotExist(err))
+	_, err = os.Stat(extensionDir)
+	assert.NoError(t, err)
 }
 
 func TestManager_Install_binary_pinned(t *testing.T) {

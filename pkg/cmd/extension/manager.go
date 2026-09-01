@@ -429,6 +429,17 @@ func (m *Manager) installGit(repo ghrepo.Interface, target string) error {
 		return err
 	}
 
+	// If an extension is already installed (non-empty) at targetDir (e.g. a
+	// forced, pinned re-install), clone into a temporary staging directory
+	// and swap it into place once the clone (and checkout, if pinned)
+	// succeed. This avoids clobbering, or leaving the user without, a
+	// working installation if the clone or checkout fails. Git refuses to
+	// clone into a non-empty directory, so an empty (or non-existent)
+	// targetDir can be cloned into directly.
+	if entries, err := os.ReadDir(targetDir); err == nil && len(entries) > 0 {
+		return m.installGitReplace(cloneURL, targetDir, commitSHA)
+	}
+
 	_, err := m.gitClient.Clone(cloneURL, []string{targetDir})
 	if err != nil {
 		return err
@@ -437,13 +448,56 @@ func (m *Manager) installGit(repo ghrepo.Interface, target string) error {
 		return nil
 	}
 
-	scopedClient := m.gitClient.ForRepo(targetDir)
-	err = scopedClient.CheckoutBranch(commitSHA)
-	if err != nil {
+	return checkoutGitPin(m.gitClient, targetDir, commitSHA)
+}
+
+// installGitReplace clones cloneURL into a staging directory alongside
+// targetDir, checks it out to commitSHA if provided, and then swaps it in
+// place of the existing installation at targetDir. If any step prior to the
+// swap fails, the existing installation at targetDir is left untouched.
+func (m *Manager) installGitReplace(cloneURL, targetDir, commitSHA string) error {
+	stagingDir := targetDir + ".new"
+	if err := os.RemoveAll(stagingDir); err != nil {
+		return fmt.Errorf("failed to clean up staging directory: %w", err)
+	}
+	defer os.RemoveAll(stagingDir)
+
+	if _, err := m.gitClient.Clone(cloneURL, []string{stagingDir}); err != nil {
 		return err
 	}
 
-	pinPath := filepath.Join(targetDir, fmt.Sprintf(".pin-%s", commitSHA))
+	if commitSHA != "" {
+		if err := checkoutGitPin(m.gitClient, stagingDir, commitSHA); err != nil {
+			return err
+		}
+	}
+
+	backupDir := targetDir + ".old"
+	if err := os.RemoveAll(backupDir); err != nil {
+		return fmt.Errorf("failed to clean up backup directory: %w", err)
+	}
+
+	// Move the existing installation out of the way, then move the newly
+	// cloned extension into place. If the second rename fails, restore the
+	// existing installation so it is never left missing.
+	if err := os.Rename(targetDir, backupDir); err != nil {
+		return fmt.Errorf("failed to back up existing installation: %w", err)
+	}
+	if err := os.Rename(stagingDir, targetDir); err != nil {
+		_ = os.Rename(backupDir, targetDir)
+		return fmt.Errorf("failed to install new version: %w", err)
+	}
+
+	return os.RemoveAll(backupDir)
+}
+
+func checkoutGitPin(gitClient gitClient, dir, commitSHA string) error {
+	scopedClient := gitClient.ForRepo(dir)
+	if err := scopedClient.CheckoutBranch(commitSHA); err != nil {
+		return err
+	}
+
+	pinPath := filepath.Join(dir, fmt.Sprintf(".pin-%s", commitSHA))
 	f, err := os.OpenFile(pinPath, os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to create pin file in directory: %w", err)

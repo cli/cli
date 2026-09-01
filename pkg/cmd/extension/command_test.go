@@ -899,6 +899,26 @@ func TestNewCmdExtension(t *testing.T) {
 			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
 		{
+			name:    "force install with pin when present and local",
+			args:    []string{"install", "owner/gh-hello", "--force", "--pin", "v1.0.0"},
+			wantErr: true,
+			errMsg:  "local extensions cannot be pinned",
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{
+						&Extension{path: "owner/gh-hello", owner: "owner", kind: LocalKind},
+					}
+				}
+				return func(t *testing.T) {
+					installCalls := em.InstallCalls()
+					assert.Empty(t, installCalls)
+					upgradeCalls := em.UpgradeCalls()
+					assert.Empty(t, upgradeCalls)
+				}
+			},
+			isTTY: true,
+		},
+		{
 			name: "force install with pin when present",
 			args: []string{"install", "owner/gh-hello", "--force", "--pin", "v1.0.0"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {

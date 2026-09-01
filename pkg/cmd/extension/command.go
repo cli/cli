@@ -382,6 +382,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 							if pinFlag == "" {
 								return upgradeFunc(ext.Name(), forceFlag)
 							}
+							if ext.IsLocal() {
+								return fmt.Errorf("local extensions cannot be pinned")
+							}
+							// Otherwise, fall through to the pinned install below, which
+							// will replace the existing installation.
 						} else if errors.Is(err, alreadyInstalledError) {
 							fmt.Fprintf(io.ErrOut, "%s Extension %s is already installed\n", cs.WarningIcon(), ghrepo.FullName(repo))
 							return nil
