@@ -482,7 +482,7 @@ func Test_refreshRun(t *testing.T) {
 				return token("xyz456"), username("test-user"), nil
 			}
 
-			cfg, _ := config.NewIsolatedTestConfig(t)
+			cfg, _ := config.NewIsolatedTestConfig(t, "")
 			for _, hostname := range tt.cfgHosts {
 				_, err := cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
 				require.NoError(t, err)

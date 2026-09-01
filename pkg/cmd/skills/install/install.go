@@ -726,10 +726,7 @@ func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, ca
 		sel.fetchDescriptions()
 	}
 
-	labelWidth := opts.IO.TerminalWidth() - multiSelectLabelMargin
-	if labelWidth < 1 {
-		labelWidth = 1
-	}
+	labelWidth := max(opts.IO.TerminalWidth()-multiSelectLabelMargin, 1)
 
 	selected, err := opts.Prompter.MultiSelectWithSearch(
 		"Select skill(s) to install:",
@@ -780,10 +777,7 @@ func listAvailableSkills(opts *InstallOptions, skills []discovery.Skill, sel ski
 	}
 
 	tw := opts.IO.TerminalWidth()
-	descWidth := tw - 40
-	if descWidth < 20 {
-		descWidth = 20
-	}
+	descWidth := max(tw-40, 20)
 	isTTY := opts.IO.IsStdoutTTY()
 
 	table := tableprinter.New(opts.IO, tableprinter.WithHeader("SKILL", "DESCRIPTION"))

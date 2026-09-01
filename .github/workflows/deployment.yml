@@ -16,7 +16,7 @@ on:
       tag_name:
         required: true
         type: string
-        description: "The tag name for the release (e.g. v2.100.0)."
+        description: "The tag name for the release (e.g. v2.100.0, or v2.100.0-rc.1 for a pre-release)."
       environment:
         default: production
         type: environment
@@ -42,8 +42,9 @@ jobs:
         env:
           TAG_NAME: ${{ inputs.tag_name }}
         run: |
-          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag name format. Must be in the form v1.2.3"
+          # Build metadata (v1.2.3+001) is rejected: later steps detect a pre-release by its hyphen.
+          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Invalid tag name format. Must be in the form v1.2.3 or v1.2.3-rc.1"
             exit 1
           fi
   linux:
@@ -245,7 +246,7 @@ jobs:
         run: git tag "$TAG_NAME"
       - name: Authenticate to Azure for code signing
         if: inputs.environment == 'production'
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
         with:
           client-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
           tenant-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
@@ -375,12 +376,19 @@ jobs:
           GPG_KEY: ${{ secrets.GPG_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           GPG_KEYGRIP: ${{ secrets.GPG_KEYGRIP }}
+          GPG_PUBKEY_2026: ${{ secrets.GPG_PUBKEY_2026 }}
+          GPG_KEY_2026: ${{ secrets.GPG_KEY_2026 }}
+          GPG_PASSPHRASE_2026: ${{ secrets.GPG_PASSPHRASE_2026 }}
+          GPG_KEYGRIP_2026: ${{ secrets.GPG_KEYGRIP_2026 }}
         run: |
           base64 -d <<<"$GPG_PUBKEY" | gpg --import --no-tty --batch --yes
           base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
+          base64 -d <<<"$GPG_PUBKEY_2026" | gpg --import --no-tty --batch --yes
+          base64 -d <<<"$GPG_KEY_2026" | gpg --import --no-tty --batch --yes
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
           gpg-connect-agent RELOADAGENT /bye
           base64 -d <<<"$GPG_PASSPHRASE" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP"
+          base64 -d <<<"$GPG_PASSPHRASE_2026" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP_2026"
       - name: Sign RPMs
         if: inputs.environment == 'production'
         run: |
@@ -388,7 +396,7 @@ jobs:
           rpmsign --addsign dist/*.rpm
       - name: Attest release artifacts
         if: inputs.environment == 'production' && !inputs.dry_run
-        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: "dist/gh_*"
           create-storage-record: false # (default: true)
@@ -400,7 +408,7 @@ jobs:
           ./script/createrepo.sh
           cp -r dist/repodata site/packages/rpm/
           pushd site/packages/rpm
-          gpg --yes --detach-sign --armor repodata/repomd.xml
+          gpg --yes --detach-sign --armor --default-key 2C6106201985B60E6C7AC87323F3D4EA75716059 repodata/repomd.xml
           popd
       - name: Run reprepro
         if: ${{ inputs.environment == 'production' }}

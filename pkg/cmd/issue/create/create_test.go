@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
@@ -34,14 +36,22 @@ func TestNewCmdCreate(t *testing.T) {
 	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
+	tmpImage := filepath.Join(t.TempDir(), "shot.png")
+	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
+
 	tests := []struct {
-		name      string
-		tty       bool
-		stdin     string
-		cli       string
-		config    string
-		wantsErr  bool
-		wantsOpts CreateOptions
+		name        string
+		tty         bool
+		stdin       string
+		cli         string
+		config      string
+		wantsErr    bool
+		wantsErrMsg string
+		// wantErrIsNotExist covers an error whose text the operating system
+		// words differently, so the assertion cannot be on the message.
+		wantErrIsNotExist bool
+		wantsOpts         CreateOptions
+		wantAssetPaths    []string
 	}{
 		{
 			name:     "empty non-tty",
@@ -253,6 +263,32 @@ func TestNewCmdCreate(t *testing.T) {
 				Blocking: []string{"300"},
 			},
 		},
+		{
+			name:     "attach flag",
+			tty:      false,
+			cli:      fmt.Sprintf(`-t mytitle -b mybody --attach '%s'`, tmpImage),
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title: "mytitle",
+				Body:  "mybody",
+			},
+			wantAssetPaths: []string{tmpImage},
+		},
+		{
+			name:        "attach conflict is reported before a missing file",
+			tty:         false,
+			cli:         `-t mytitle -b mybody --web --attach ./nope.png`,
+			wantsErr:    true,
+			wantsErrMsg: "`--attach` is not supported when using `--web`",
+		},
+		{
+			name:              "attach flag naming a file that does not exist",
+			tty:               false,
+			cli:               `-t mytitle -b mybody --attach ./nope.png`,
+			wantsErr:          true,
+			wantsErrMsg:       "./nope.png: ",
+			wantErrIsNotExist: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -268,9 +304,9 @@ func TestNewCmdCreate(t *testing.T) {
 				IOStreams: ios,
 				Config: func() (gh.Config, error) {
 					if tt.config != "" {
-						return config.NewFromString(tt.config), nil
+						return config.NewMockConfigFromString(tt.config), nil
 					}
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 			}
 
@@ -287,11 +323,18 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetErr(io.Discard)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
+				if tt.wantsErrMsg != "" {
+					if tt.wantErrIsNotExist {
+						require.ErrorIs(t, err, fs.ErrNotExist)
+						require.ErrorContains(t, err, tt.wantsErrMsg)
+					} else {
+						require.EqualError(t, err, tt.wantsErrMsg)
+					}
+				}
 				return
-			} else {
-				require.NoError(t, err)
 			}
+			require.NoError(t, err)
 
 			assert.Equal(t, "", stdout.String())
 			assert.Equal(t, "", stderr.String())
@@ -306,6 +349,12 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.Parent, opts.Parent)
 			assert.Equal(t, tt.wantsOpts.BlockedBy, opts.BlockedBy)
 			assert.Equal(t, tt.wantsOpts.Blocking, opts.Blocking)
+
+			var assetPaths []string
+			for _, a := range opts.Assets {
+				assetPaths = append(assetPaths, a.Path())
+			}
+			assert.Equal(t, tt.wantAssetPaths, assetPaths)
 		})
 	}
 }
@@ -314,8 +363,11 @@ func Test_createRun(t *testing.T) {
 	tests := []struct {
 		name        string
 		opts        CreateOptions
+		attach      []string
+		host        string
+		config      string
 		httpStubs   func(*testing.T, *httpmock.Registry)
-		promptStubs func(*prompter.PrompterMock)
+		promptStubs func(*testing.T, *prompter.PrompterMock)
 		wantsStdout string
 		wantsStderr string
 		wantsBrowse string
@@ -482,7 +534,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createIssue": { "issue": {
 							"URL": "https://github.com/OWNER/REPO/issues/12"
 						} } } }
-					`, func(inputs map[string]interface{}) {
+					`, func(inputs map[string]any) {
 						assert.Equal(t, "title", inputs["title"])
 						assert.Equal(t, "body", inputs["body"])
 					}))
@@ -492,6 +544,41 @@ func Test_createRun(t *testing.T) {
 				EditorMode:       true,
 				TitledEditSurvey: func(string, string) (string, string, error) { return "title", "body", nil },
 			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "editor attachment reference is rewritten",
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "shot.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://github.com/OWNER/REPO/issues/12"
+						} } } }
+					`, func(inputs map[string]any) {
+						assert.Equal(t, "title", inputs["title"])
+						assert.Equal(t, "from editor ![shot](https://github.com/user-attachments/assets/AAA)", inputs["body"])
+					}))
+			},
+			opts: CreateOptions{
+				Detector:   &fd.EnabledDetectorMock{},
+				EditorMode: true,
+				TitledEditSurvey: func(string, string) (string, string, error) {
+					return "title", "from editor ![shot](./shot.png)", nil
+				},
+			},
+			attach:      []string{"shot.png"},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
 		},
@@ -520,7 +607,7 @@ func Test_createRun(t *testing.T) {
 		{ "data": { "createIssue": { "issue": {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 						assert.Equal(t, "bug: ", inputs["title"])
 						assert.Equal(t, "Does not work :((", inputs["body"])
 					}))
@@ -542,7 +629,7 @@ func Test_createRun(t *testing.T) {
 				Title:       "test `gh issue create` actor assignees",
 				Body:        "Actor assignees allow users and bots to be assigned to issues",
 			},
-			promptStubs: func(pm *prompter.PrompterMock) {
+			promptStubs: func(_ *testing.T, pm *prompter.PrompterMock) {
 				firstConfirmSubmission := true
 				pm.InputFunc = func(message, defaultValue string) (string, error) {
 					switch message {
@@ -596,7 +683,7 @@ func Test_createRun(t *testing.T) {
 							"id": "ISSUEID",
 							"URL": "https://github.com/OWNER/REPO/issues/12"
 						} } } }
-					`, func(inputs map[string]interface{}) {
+					`, func(inputs map[string]any) {
 						if v, ok := inputs["assigneeIds"]; ok {
 							t.Errorf("did not expect assigneeIds: %v", v)
 						}
@@ -605,9 +692,9 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-					`, func(inputs map[string]interface{}) {
+					`, func(inputs map[string]any) {
 						assert.Equal(t, "ISSUEID", inputs["assignableId"])
-						assert.Equal(t, []interface{}{"copilot-swe-agent[bot]", "MonaLisa"}, inputs["actorLogins"])
+						assert.Equal(t, []any{"copilot-swe-agent[bot]", "MonaLisa"}, inputs["actorLogins"])
 					}))
 			},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
@@ -621,7 +708,7 @@ func Test_createRun(t *testing.T) {
 				Title:       "test `gh issue create` user assignees",
 				Body:        "User assignees allow only users to be assigned to issues",
 			},
-			promptStubs: func(pm *prompter.PrompterMock) {
+			promptStubs: func(_ *testing.T, pm *prompter.PrompterMock) {
 				firstConfirmSubmission := true
 				pm.InputFunc = func(message, defaultValue string) (string, error) {
 					switch message {
@@ -679,8 +766,8 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createIssue": { "issue": {
 							"URL": "https://github.com/OWNER/REPO/issues/12"
 						} } } }
-					`, func(inputs map[string]interface{}) {
-						assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["assigneeIds"])
+					`, func(inputs map[string]any) {
+						assert.Equal(t, []any{"HUBOTID", "MONAID"}, inputs["assigneeIds"])
 					}))
 			},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
@@ -721,7 +808,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "updateIssueIssueType": { "issue": { "id": "ISSUE_ID_123" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "ISSUE_ID_123", inputs["issueId"])
 							assert.Equal(t, "IT_1", inputs["issueTypeId"])
 						}))
@@ -737,7 +824,7 @@ func Test_createRun(t *testing.T) {
 				Title:       "feature request",
 				Body:        "would be nice to have",
 			},
-			promptStubs: func(pm *prompter.PrompterMock) {
+			promptStubs: func(_ *testing.T, pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
 					switch message {
 					case "Issue type":
@@ -779,7 +866,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "updateIssueIssueType": { "issue": { "id": "ISSUE_ID_123" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "ISSUE_ID_123", inputs["issueId"])
 							assert.Equal(t, "IT_2", inputs["issueTypeId"])
 						}))
@@ -797,7 +884,7 @@ func Test_createRun(t *testing.T) {
 				Title:       "feature request",
 				Body:        "would be nice to have",
 			},
-			promptStubs: func(pm *prompter.PrompterMock) {
+			promptStubs: func(_ *testing.T, pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
 					switch message {
 					case "What's next?":
@@ -841,7 +928,7 @@ func Test_createRun(t *testing.T) {
 				Title:       "feature request",
 				Body:        "would be nice to have",
 			},
-			promptStubs: func(pm *prompter.PrompterMock) {
+			promptStubs: func(_ *testing.T, pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
 					switch message {
 					case "Issue type":
@@ -1047,7 +1134,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation AddSubIssue\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "addSubIssue": { "issue": { "id": "PARENT_ID_100" } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "PARENT_ID_100", inputs["issueId"])
 							assert.Equal(t, "ISSUE_ID_123", inputs["subIssueId"])
 							assert.Equal(t, false, inputs["replaceParent"])
@@ -1098,28 +1185,377 @@ func Test_createRun(t *testing.T) {
 				// also don't depend on parallel ordering.
 				// --blocked-by N: this issue is blocked by N
 				r.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]any) bool {
 						return input["issueId"] == "ISSUE_ID_123" && input["blockingIssueId"] == "BLOCKER_ID_200"
 					}),
 					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "ISSUE_ID_123" } } } }`))
 				r.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]any) bool {
 						return input["issueId"] == "ISSUE_ID_123" && input["blockingIssueId"] == "BLOCKER_ID_201"
 					}),
 					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "ISSUE_ID_123" } } } }`))
 				// --blocking N: N is blocked by this issue (args swapped)
 				r.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]any) bool {
 						return input["issueId"] == "BLOCKED_ID_300" && input["blockingIssueId"] == "ISSUE_ID_123"
 					}),
 					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "BLOCKED_ID_300" } } } }`))
 				r.Register(
-					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation AddBlockedBy\b`, func(input map[string]any) bool {
 						return input["issueId"] == "BLOCKED_ID_301" && input["blockingIssueId"] == "ISSUE_ID_123"
 					}),
 					httpmock.StringResponse(`{ "data": { "addBlockedBy": { "issue": { "id": "BLOCKED_ID_301" } } } }`))
 			},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "attaching writes the body the upload produced",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				Body:     "a body",
+			},
+			attach: []string{"shot.png"},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "shot.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://github.com/OWNER/REPO/issues/12"
+						} } } }`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "a body\n\n![shot](https://github.com/user-attachments/assets/AAA)", inputs["body"])
+						}))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "attaching sends the repository id the lookup returned",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				Body:     "a body",
+			},
+			attach: []string{"shot.png"},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 4321,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 4321, "shot.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://github.com/OWNER/REPO/issues/12"
+						} } } }`))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "attaching without write access stops before any prompt or write",
+			opts: CreateOptions{
+				Detector:    &fd.EnabledDetectorMock{},
+				Interactive: true,
+				Title:       "mytitle",
+				Body:        "a body",
+			},
+			attach: []string{"shot.png"},
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "READ"
+						} } }`))
+			},
+			wantsErr: "attaching files requires write access to the repository",
+		},
+		{
+			name: "attaching without a repository id stops before it writes",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				Body:     "a body",
+			},
+			attach: []string{"shot.png"},
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+			},
+			wantsErr: "could not determine which repository to attach files to",
+		},
+		{
+			name: "the only upload failing creates no issue",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				Body:     "a body",
+			},
+			attach: []string{"shot.png"},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "shot.png", 404, `{ "message": "Not Found" }`)
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
+			},
+			wantsErr: "could not upload ./shot.png: attaching files requires write access to the repository",
+		},
+		{
+			name: "an upload that fails alongside one that succeeds still creates the issue",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				Body:     "a body",
+			},
+			attach: []string{"first.png", "second.png"},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "first.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				attachments.StubUpload(r, 1234, "second.png", 404, `{ "message": "Not Found" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://github.com/OWNER/REPO/issues/12"
+						} } } }`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "a body\n\n![first](https://github.com/user-attachments/assets/AAA)", inputs["body"])
+						}))
+			},
+			wantsErr: "could not upload ./second.png: attaching files requires write access to the repository",
+		},
+		{
+			name: "a create that fails after an upload failed reports both",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				Body:     "a body",
+			},
+			attach: []string{"first.png", "second.png"},
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "first.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				attachments.StubUpload(r, 1234, "second.png", 404, `{ "message": "Not Found" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`{ "errors": [{ "message": "the create failed" }] }`))
+			},
+			wantsErr: "could not upload ./second.png: attaching files requires write access to the repository\nGraphQL: the create failed",
+		},
+		{
+			name: "a body the attachment cannot be written into creates no issue",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				// A video cannot embed as a reference-style image.
+				Body: "![clip][1]\n\n[1]: ./clip.mp4",
+			},
+			attach: []string{"clip.mp4"},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				r.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
+			},
+			wantsErr: "cannot embed a video as a reference-style image: ./clip.mp4",
+		},
+		{
+			name: "the token comes from the host the base repository resolved to",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				Body:     "a body",
+			},
+			attach: []string{"shot.png"},
+			host:   "acme.ghe.com",
+			// The default host holds a token class that cannot upload, so
+			// making both usable disarms half the row.
+			config: heredoc.Doc(`
+				hosts:
+				  github.com:
+				    user: monalisa
+				    oauth_token: ghs_anactionstoken
+				  acme.ghe.com:
+				    user: monalisa
+				    oauth_token: gho_atenanttoken
+			`),
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUploadToHost(t, r, "uploads.acme.ghe.com", 1234, "shot.png", 200, `{ "url": "https://acme.ghe.com/user-attachments/assets/AAA" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://acme.ghe.com/OWNER/REPO/issues/12"
+						} } } }`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "a body\n\n![shot](https://acme.ghe.com/user-attachments/assets/AAA)", inputs["body"])
+						}))
+			},
+			wantsStdout: "https://acme.ghe.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "attaching leaves the browser preview off the menu",
+			opts: CreateOptions{
+				Detector:    &fd.EnabledDetectorMock{},
+				Interactive: true,
+				Title:       "mytitle",
+				Body:        "a body",
+			},
+			attach: []string{"shot.png"},
+			promptStubs: func(t *testing.T, pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What's next?":
+						assert.NotContains(t, options, "Continue in browser")
+						return prompter.IndexFor(options, "Submit")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "shot.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://github.com/OWNER/REPO/issues/12"
+						} } } }`))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "attaching leaves the browser preview off the menu shown after the metadata survey",
+			opts: CreateOptions{
+				Detector:    &fd.EnabledDetectorMock{},
+				Interactive: true,
+				Title:       "mytitle",
+				Body:        "a body",
+			},
+			attach: []string{"shot.png"},
+			promptStubs: func(t *testing.T, pm *prompter.PrompterMock) {
+				firstConfirmSubmission := true
+				pm.MultiSelectFunc = func(message string, defaults []string, options []string) ([]int, error) {
+					switch message {
+					// HasMetadata stays false, the only state where the second
+					// menu could offer a preview.
+					case "What would you like to add?":
+						return nil, nil
+					default:
+						return nil, fmt.Errorf("unexpected multi-select prompt: %s", message)
+					}
+				}
+				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What's next?":
+						if firstConfirmSubmission {
+							firstConfirmSubmission = false
+							return prompter.IndexFor(options, "Add metadata")
+						}
+						assert.NotContains(t, options, "Continue in browser")
+						return prompter.IndexFor(options, "Submit")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "shot.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://github.com/OWNER/REPO/issues/12"
+						} } } }`))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
 		},
 	}
@@ -1138,8 +1574,12 @@ func Test_createRun(t *testing.T) {
 			opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: httpReg}, nil
 			}
+			host := tt.host
+			if host == "" {
+				host = "github.com"
+			}
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.New("OWNER", "REPO"), nil
+				return ghrepo.NewWithHost("OWNER", "REPO", host), nil
 			}
 			browser := &browser.Stub{}
 			opts.Browser = browser
@@ -1147,7 +1587,20 @@ func Test_createRun(t *testing.T) {
 			prompterMock := &prompter.PrompterMock{}
 			opts.Prompter = prompterMock
 			if tt.promptStubs != nil {
-				tt.promptStubs(prompterMock)
+				tt.promptStubs(t, prompterMock)
+			}
+
+			// NewTestAssets moves into a temporary directory, so it runs before
+			// anything else reads a relative path.
+			if len(tt.attach) > 0 {
+				opts.Assets = attachments.NewTestAssets(t, tt.attach...)
+			}
+			opts.Config = func() (gh.Config, error) {
+				cfg := tt.config
+				if cfg == "" {
+					cfg = fmt.Sprintf("hosts:\n  %s:\n    user: monalisa\n    oauth_token: gho_atokenthatcanupload\n", host)
+				}
+				return config.NewMockConfigFromString(cfg), nil
 			}
 
 			err := createRun(opts)
@@ -1166,7 +1619,6 @@ func Test_createRun(t *testing.T) {
 }
 
 /*** LEGACY TESTS ***/
-
 func runCommand(rt http.RoundTripper, isTTY bool, cli string, pm *prompter.PrompterMock) (*test.CmdOut, error) {
 	return runCommandWithRootDirOverridden(rt, isTTY, cli, "", pm)
 }
@@ -1184,7 +1636,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
@@ -1235,7 +1687,7 @@ func TestIssueCreate(t *testing.T) {
 				{ "data": { "createIssue": { "issue": {
 					"URL": "https://github.com/OWNER/REPO/issues/12"
 				} } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["repositoryId"], "REPOID")
 				assert.Equal(t, inputs["title"], "hello")
 				assert.Equal(t, inputs["body"], "cash rules everything around me")
@@ -1279,10 +1731,10 @@ func TestIssueCreate_recover(t *testing.T) {
 		{ "data": { "createIssue": { "issue": {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "recovered title", inputs["title"])
 			assert.Equal(t, "recovered body", inputs["body"])
-			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
+			assert.Equal(t, []any{"BUGID", "TODOID"}, inputs["labelIds"])
 		}))
 
 	pm := &prompter.PrompterMock{}
@@ -1362,7 +1814,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 			{ "data": { "createIssue": { "issue": {
 				"URL": "https://github.com/OWNER/REPO/issues/12"
 			} } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["repositoryId"], "REPOID")
 				assert.Equal(t, inputs["title"], "hello")
 				assert.Equal(t, inputs["body"], "I have a suggestion for an enhancement")
@@ -1524,14 +1976,14 @@ func TestIssueCreate_metadata(t *testing.T) {
 			"id": "NEWISSUEID",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "TITLE", inputs["title"])
 			assert.Equal(t, "BODY", inputs["body"])
 			if v, ok := inputs["assigneeIds"]; ok {
 				t.Errorf("did not expect assigneeIds: %v", v)
 			}
-			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
-			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
+			assert.Equal(t, []any{"BUGID", "TODOID"}, inputs["labelIds"])
+			assert.Equal(t, []any{"ROADMAPID"}, inputs["projectIds"])
 			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
 			assert.NotContains(t, inputs, "userIds")
 			assert.NotContains(t, inputs, "teamIds")
@@ -1541,9 +1993,9 @@ func TestIssueCreate_metadata(t *testing.T) {
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "NEWISSUEID", inputs["assignableId"])
-			assert.Equal(t, []interface{}{"monalisa"}, inputs["actorLogins"])
+			assert.Equal(t, []any{"monalisa"}, inputs["actorLogins"])
 		}))
 
 	output, err := runCommand(http, true, `-t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`, nil)
@@ -1600,7 +2052,7 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 			"id": "NEWISSUEID",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "hello", inputs["title"])
 			assert.Equal(t, "cash rules everything around me", inputs["body"])
 			if v, ok := inputs["assigneeIds"]; ok {
@@ -1611,9 +2063,9 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "NEWISSUEID", inputs["assignableId"])
-			assert.Equal(t, []interface{}{"MonaLisa", "someoneelse"}, inputs["actorLogins"])
+			assert.Equal(t, []any{"MonaLisa", "someoneelse"}, inputs["actorLogins"])
 		}))
 
 	output, err := runCommand(http, true, `-a @me -a someoneelse -t hello -b "cash rules everything around me"`, nil)
@@ -1643,7 +2095,7 @@ func TestIssueCreate_AtCopilotAssignee(t *testing.T) {
 			"id": "NEWISSUEID",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "hello", inputs["title"])
 			assert.Equal(t, "cash rules everything around me", inputs["body"])
 			if v, ok := inputs["assigneeIds"]; ok {
@@ -1654,9 +2106,9 @@ func TestIssueCreate_AtCopilotAssignee(t *testing.T) {
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "NEWISSUEID", inputs["assignableId"])
-			assert.Equal(t, []interface{}{"copilot-swe-agent[bot]"}, inputs["actorLogins"])
+			assert.Equal(t, []any{"copilot-swe-agent[bot]"}, inputs["actorLogins"])
 		}))
 
 	output, err := runCommand(http, true, `-a @copilot -t hello -b "cash rules everything around me"`, nil)
@@ -1726,7 +2178,7 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 			"id": "Issue#1",
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`, func(inputs map[string]interface{}) {
+	`, func(inputs map[string]any) {
 			assert.Equal(t, "TITLE", inputs["title"])
 			assert.Equal(t, "BODY", inputs["body"])
 			assert.Nil(t, inputs["projectIds"])
@@ -1738,7 +2190,7 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 			{ "data": { "add_000": { "item": {
 				"id": "1"
 			} } } }
-	`, func(mutations string, inputs map[string]interface{}) {
+	`, func(mutations string, inputs map[string]any) {
 			variables, err := json.Marshal(inputs)
 			assert.NoError(t, err)
 			expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"

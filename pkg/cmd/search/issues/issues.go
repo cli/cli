@@ -15,6 +15,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 	var noAssignee, noLabel, noMilestone, noProject bool
 	var order, sort string
 	var appAuthor string
+	var searchType string
 	opts := &shared.IssuesOptions{
 		Browser: f.Browser,
 		Entity:  shared.Issues,
@@ -40,6 +41,12 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			On supported GitHub hosts, advanced issue search syntax can be used in the
 			%[1]s--search%[1]s query. For more information about advanced issue search, see:
 			<https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/filtering-and-searching-issues-and-pull-requests#building-advanced-filters-for-issues>
+
+			Use %[1]s--search-type%[1]s to select semantic or hybrid (keyword + semantic)
+			ranking instead of the default lexical search. Semantic and hybrid search are
+			scoped to issues, are relevance-ranked (so %[1]s--sort%[1]s and %[1]s--order%[1]s
+			cannot be used), return a single page of results, and are not available on
+			GitHub Enterprise Server.
 
 			For more information on handling search queries containing a hyphen, run %[1]sgh search --help%[1]s.
 		`, "`"),
@@ -67,6 +74,12 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 
 			# Search issues only from un-archived repositories (default is all repositories)
 			$ gh search issues --owner github --archived=false
+
+			# Search issues using semantic (natural-language) ranking
+			$ gh search issues "feature broken on web" --search-type semantic
+
+			# Search issues using hybrid (keyword + semantic) ranking
+			$ gh search issues "feature broken" --search-type hybrid
 		`),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
@@ -78,12 +91,26 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			if c.Flags().Changed("author") && c.Flags().Changed("app") {
 				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
 			}
+			semanticSearch := searchType == "semantic" || searchType == "hybrid"
+			if semanticSearch && opts.WebMode {
+				return cmdutil.FlagErrorf("`--web` is not supported with %s search", searchType)
+			}
+			if semanticSearch && includePrs {
+				return cmdutil.FlagErrorf("%s search is scoped to issues and cannot be combined with `--include-prs`", searchType)
+			}
+			if semanticSearch && (c.Flags().Changed("sort") || c.Flags().Changed("order")) {
+				return cmdutil.FlagErrorf("`--sort` and `--order` are not supported with %s search", searchType)
+			}
 			if c.Flags().Changed("app") {
 				opts.Query.Qualifiers.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
 			if includePrs {
 				opts.Entity = shared.Both
 				opts.Query.Qualifiers.Type = ""
+			}
+			if searchType != "lexical" {
+				// We don't submit `lexical` as search type as it's the default API behaviour.
+				opts.Query.IssueSearchType = searchType
 			}
 			if c.Flags().Changed("order") {
 				opts.Query.Order = order
@@ -144,6 +171,8 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			"reactions-thinking_face",
 			"updated",
 		}, "Sort fetched results")
+
+	cmdutil.StringEnumFlag(cmd, &searchType, "search-type", "", "lexical", []string{"lexical", "semantic", "hybrid"}, "Type of issue search to perform")
 
 	// Query qualifier flags
 	cmd.Flags().BoolVar(&includePrs, "include-prs", false, "Include pull requests in results")

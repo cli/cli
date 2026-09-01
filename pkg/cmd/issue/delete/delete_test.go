@@ -38,7 +38,7 @@ func runCommand(rt http.RoundTripper, pm *prompter.MockPrompter, isTTY bool, cli
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
@@ -79,7 +79,7 @@ func TestIssueDelete(t *testing.T) {
 	httpRegistry.Register(
 		httpmock.GraphQL(`mutation IssueDelete\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["issueId"], "THE-ID")
 			}),
 	)
@@ -114,7 +114,7 @@ func TestIssueDelete_confirm(t *testing.T) {
 	httpRegistry.Register(
 		httpmock.GraphQL(`mutation IssueDelete\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["issueId"], "THE-ID")
 			}),
 	)

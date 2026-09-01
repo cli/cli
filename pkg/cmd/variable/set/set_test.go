@@ -211,7 +211,7 @@ func Test_setRun_repo(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
-				Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+				Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
@@ -284,7 +284,7 @@ func Test_setRun_env(t *testing.T) {
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
 				},
-				Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+				Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
@@ -396,7 +396,7 @@ func Test_setRun_org(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			tt.opts.IO = ios
 			tt.opts.VariableName = "cool_variable"

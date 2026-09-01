@@ -1,5 +1,5 @@
 ---
-name: cli-code-reviewer
+name: code-review
 description: Reviews GitHub CLI (gh) pull requests against codebase conventions
 ---
 

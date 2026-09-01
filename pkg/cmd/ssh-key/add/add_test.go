@@ -33,7 +33,7 @@ func Test_runAdd(t *testing.T) {
 					httpmock.StringResponse("[]"))
 				reg.Register(
 					httpmock.REST("POST", "user/keys"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Contains(t, payload, "key")
 						assert.Empty(t, payload["title"])
 					}))
@@ -52,7 +52,7 @@ func Test_runAdd(t *testing.T) {
 					httpmock.StringResponse("[]"))
 				reg.Register(
 					httpmock.REST("POST", "user/ssh_signing_keys"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						assert.Contains(t, payload, "key")
 						assert.Empty(t, payload["title"])
 					}))
@@ -136,7 +136,7 @@ func Test_runAdd(t *testing.T) {
 			tt.httpStubs(reg)
 		}
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		t.Run(tt.name, func(t *testing.T) {

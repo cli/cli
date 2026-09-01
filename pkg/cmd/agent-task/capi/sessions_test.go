@@ -116,8 +116,8 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
-						assert.Equal(t, []interface{}{"PR_kwDNA-jNB9A", "U_kgAB"}, vars["ids"])
+					), func(q string, vars map[string]any) {
+						assert.Equal(t, []any{"PR_kwDNA-jNB9A", "U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -211,8 +211,8 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
-						assert.Equal(t, []interface{}{"U_kgAB"}, vars["ids"])
+					), func(q string, vars map[string]any) {
+						assert.Equal(t, []any{"U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -355,8 +355,8 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
-						assert.Equal(t, []interface{}{"PR_kwDNA-jNB9A", "PR_kwDNA-jNB9E", "U_kgAB"}, vars["ids"])
+					), func(q string, vars map[string]any) {
+						assert.Equal(t, []any{"PR_kwDNA-jNB9A", "PR_kwDNA-jNB9E", "U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -585,9 +585,9 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
+					), func(q string, vars map[string]any) {
 						// Expected encoded node IDs for resource IDs 3000,3001,3002 and user octocat
-						assert.Equal(t, []interface{}{"PR_kwDNA-jNC7g", "PR_kwDNA-jNC7k", "PR_kwDNA-jNC7o", "U_kgAB"}, vars["ids"])
+						assert.Equal(t, []any{"PR_kwDNA-jNC7g", "PR_kwDNA-jNC7k", "PR_kwDNA-jNC7o", "U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -807,9 +807,9 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
+					), func(q string, vars map[string]any) {
 						// Expected encoded node IDs for resource IDs 3000 and user octocat
-						assert.Equal(t, []interface{}{"PR_kwDNA-jNC7g", "U_kgAB"}, vars["ids"])
+						assert.Equal(t, []any{"PR_kwDNA-jNC7g", "U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -943,9 +943,9 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
+					), func(q string, vars map[string]any) {
 						// Expected encoded node IDs for resource IDs 3000 and user octocat
-						assert.Equal(t, []interface{}{"PR_kwDNA-jNC7g", "U_kgAB"}, vars["ids"])
+						assert.Equal(t, []any{"PR_kwDNA-jNC7g", "U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -1052,9 +1052,9 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
+					), func(q string, vars map[string]any) {
 						// Expected encoded node IDs for resource IDs 3000 and user octocat
-						assert.Equal(t, []interface{}{"PR_kwDNA-jNC7g", "U_kgAB"}, vars["ids"])
+						assert.Equal(t, []any{"PR_kwDNA-jNC7g", "U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -1295,8 +1295,8 @@ func TestListSessionsByResourceID(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
-						assert.Equal(t, []interface{}{"PR_kwDNA-jNB9A", "U_kgAB"}, vars["ids"])
+					), func(q string, vars map[string]any) {
+						assert.Equal(t, []any{"PR_kwDNA-jNB9A", "U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -1418,8 +1418,8 @@ func TestListSessionsByResourceID(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
-						assert.Equal(t, []interface{}{"PR_kwDNA-jNB9A", "U_kgAB"}, vars["ids"])
+					), func(q string, vars map[string]any) {
+						assert.Equal(t, []any{"PR_kwDNA-jNB9A", "U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -1670,8 +1670,8 @@ func TestGetSession(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
-						assert.Equal(t, []interface{}{"PR_kwDNA-jNB9A", "U_kgAB"}, vars["ids"])
+					), func(q string, vars map[string]any) {
+						assert.Equal(t, []any{"PR_kwDNA-jNB9A", "U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -1751,8 +1751,8 @@ func TestGetSession(t *testing.T) {
 							}
 						}`,
 						sampleDateString,
-					), func(q string, vars map[string]interface{}) {
-						assert.Equal(t, []interface{}{"U_kgAB"}, vars["ids"])
+					), func(q string, vars map[string]any) {
+						assert.Equal(t, []any{"U_kgAB"}, vars["ids"])
 					}),
 				)
 			},
@@ -1873,7 +1873,7 @@ func TestGetPullRequestDatabaseID(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.WithHost(httpmock.GraphQL(`query GetPullRequestFullDatabaseID\b`), "api.github.com"),
-					httpmock.GraphQLQuery(`{"data": {"repository": {"pullRequest": {"fullDatabaseId": "999", "url": "some-url"}}}}`, func(s string, m map[string]interface{}) {
+					httpmock.GraphQLQuery(`{"data": {"repository": {"pullRequest": {"fullDatabaseId": "999", "url": "some-url"}}}}`, func(s string, m map[string]any) {
 						assert.Equal(t, "OWNER", m["owner"])
 						assert.Equal(t, "REPO", m["repo"])
 						assert.Equal(t, float64(42), m["number"])

@@ -22,7 +22,7 @@ func uploadDeployKey(httpClient *http.Client, repo ghrepo.Interface, keyFile io.
 		return err
 	}
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"title":     title,
 		"key":       string(keyBytes),
 		"read_only": !isWritable,

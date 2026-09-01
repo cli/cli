@@ -109,10 +109,10 @@ func runCreateItem(config createItemConfig) error {
 	return printResults(config, query.CreateProjectDraftItem.ProjectV2Item)
 }
 
-func createDraftIssueArgs(config createItemConfig) (*createProjectDraftItemMutation, map[string]interface{}) {
-	return &createProjectDraftItemMutation{}, map[string]interface{}{
+func createDraftIssueArgs(config createItemConfig) (*createProjectDraftItemMutation, map[string]any) {
+	return &createProjectDraftItemMutation{}, map[string]any{
 		"input": githubv4.AddProjectV2DraftIssueInput{
-			Body:      githubv4.NewString(githubv4.String(config.opts.body)),
+			Body:      new(githubv4.String(config.opts.body)),
 			ProjectID: githubv4.ID(config.opts.projectID),
 			Title:     githubv4.String(config.opts.title),
 		},

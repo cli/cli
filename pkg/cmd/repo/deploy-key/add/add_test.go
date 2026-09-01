@@ -36,7 +36,7 @@ func Test_addRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/keys"),
-					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]any) {
 						if title := payload["title"].(string); title != "my sacred key" {
 							t.Errorf("POST title %q, want %q", title, "my sacred key")
 						}

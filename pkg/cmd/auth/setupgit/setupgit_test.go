@@ -169,7 +169,7 @@ func Test_setupGitRun(t *testing.T) {
 			ios.SetStdoutTTY(true)
 			tt.opts.IO = ios
 
-			cfg, _ := config.NewIsolatedTestConfig(t)
+			cfg, _ := config.NewIsolatedTestConfig(t, "")
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}

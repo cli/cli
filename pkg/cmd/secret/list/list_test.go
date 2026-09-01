@@ -628,7 +628,7 @@ func Test_listRun(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			tt.opts.Now = func() time.Time {
 				t, _ := time.Parse(time.RFC822, "15 Mar 23 00:00 UTC")
@@ -821,7 +821,7 @@ func Test_listRun_populatesNumSelectedReposIfRequired(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			opts.Now = func() time.Time {
 				t, _ := time.Parse(time.RFC822, "4 Apr 24 00:00 UTC")

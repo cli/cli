@@ -61,7 +61,7 @@ func TestNewCmdStatus(t *testing.T) {
 		f := &cmdutil.Factory{
 			IOStreams: ios,
 			Config: func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			},
 		}
 		t.Run(tt.name, func(t *testing.T) {

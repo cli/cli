@@ -27,7 +27,7 @@ func runCommand(rt http.RoundTripper, cli string) (*test.CmdOut, error) {
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
@@ -181,7 +181,7 @@ func Test_transferRunSuccessfulIssueTransfer(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation IssueTransfer\b`),
-		httpmock.GraphQLMutation(`{"data":{"transferIssue":{"issue":{"url":"https://github.com/OWNER1/REPO1/issues/1"}}}}`, func(input map[string]interface{}) {
+		httpmock.GraphQLMutation(`{"data":{"transferIssue":{"issue":{"url":"https://github.com/OWNER1/REPO1/issues/1"}}}}`, func(input map[string]any) {
 			assert.Equal(t, input["issueId"], "THE-ID")
 			assert.Equal(t, input["repositoryId"], "dest-id")
 		}))

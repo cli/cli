@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -119,13 +117,11 @@ func checkoutRun(opts *CheckoutOptions) error {
 
 	var reuseWorktree bool
 	if opts.Worktree != "" {
-		if err := ensureWorktreePathSafe(opts.Worktree); err != nil {
-			return err
-		}
-		reuseWorktree, err = resolveWorktreeTarget(opts.GitClient, opts.Worktree)
+		target, err := shared.ResolveWorktreeTarget(opts.GitClient, opts.Worktree)
 		if err != nil {
 			return err
 		}
+		reuseWorktree = target.Reuse
 	}
 
 	cfg, err := opts.Config()
@@ -225,20 +221,17 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 
 	switch {
 	case opts.Worktree != "":
-		if reuseWorktree {
-			if localBranchExists(opts.GitClient, localBranch) {
-				cmds = append(cmds, worktreeCheckoutCmds(opts.Worktree, localBranch, remoteBranchRef, opts.Force)...)
-			} else {
-				// New --branch name while reusing a worktree: create it tracking the remote.
-				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", "-b", localBranch, "--track", remoteBranch})
-			}
-		} else if localBranchExists(opts.GitClient, localBranch) {
-			cmds = append(cmds, []string{"worktree", "add", "--", opts.Worktree, localBranch})
+		worktreeCmds, branchExists := shared.WorktreeCheckoutCommands(
+			opts.GitClient,
+			shared.WorktreeTarget{Path: opts.Worktree, Reuse: reuseWorktree},
+			localBranch,
+			remoteBranch,
+		)
+		cmds = append(cmds, worktreeCmds...)
+		if branchExists {
 			cmds = append(cmds, syncBranchCmds(opts.Worktree, remoteBranchRef, opts.Force)...)
-		} else {
-			cmds = append(cmds, []string{"worktree", "add", "--track", "-b", localBranch, "--", opts.Worktree, remoteBranch})
 		}
-	case localBranchExists(opts.GitClient, localBranch):
+	case opts.GitClient.HasLocalBranch(context.Background(), localBranch):
 		cmds = append(cmds, []string{"checkout", localBranch})
 		cmds = append(cmds, syncBranchCmds("", remoteBranchRef, opts.Force)...)
 	default:
@@ -271,7 +264,7 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 			// FETCH_HEAD is per-worktree, and git refuses to update a branch via
 			// refspec while it is checked out, so fetch to FETCH_HEAD inside the worktree.
 			cmds = append(cmds, []string{"-C", opts.Worktree, "fetch", baseURLOrName, ref, "--no-tags"})
-			if localBranchExists(opts.GitClient, localBranch) {
+			if opts.GitClient.HasLocalBranch(context.Background(), localBranch) {
 				cmds = append(cmds, []string{"-C", opts.Worktree, "checkout", localBranch})
 				cmds = append(cmds, syncBranchCmds(opts.Worktree, "FETCH_HEAD", opts.Force)...)
 			} else {
@@ -323,71 +316,6 @@ func missingMergeConfigForBranch(client *git.Client, b string) bool {
 	return err != nil || mc == ""
 }
 
-func localBranchExists(client *git.Client, b string) bool {
-	_, err := client.ShowRefs(context.Background(), []string{"refs/heads/" + b})
-	return err == nil
-}
-
-// resolveWorktreeTarget asks git where path lives, letting git resolve symlinks,
-// "..", case, and trailing slashes for us instead of comparing paths ourselves.
-// It returns whether an existing linked worktree there should be reused, and
-// errors when the path cannot host a new worktree: a path inside a different
-// repository, a subdirectory of another worktree, or the worktree we are already
-// running in. Detection is best-effort: if git cannot resolve the current or
-// target worktree (e.g. the path does not exist yet), reuse is false so git
-// worktree add handles the path.
-func resolveWorktreeTarget(client *git.Client, path string) (reuseWorktree bool, err error) {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return false, err
-	}
-
-	// git emits one line per flag, so we expect exactly two lines here.
-	current, ok := revParseFacts(client, "", "--show-toplevel", "--git-common-dir")
-	if !ok || len(current) != 2 {
-		return false, nil
-	}
-	currentToplevel, currentCommonDir := current[0], current[1]
-
-	// A non-existent or non-git target fails here: it is a fresh path for a new worktree.
-	target, ok := revParseFacts(client, abs, "--show-toplevel", "--show-prefix", "--git-common-dir")
-	if !ok || len(target) != 3 {
-		return false, nil
-	}
-	targetToplevel, targetPrefix, targetCommonDir := target[0], target[1], target[2]
-
-	switch {
-	case targetCommonDir != currentCommonDir:
-		return false, fmt.Errorf("--worktree path is inside a different repository")
-	case targetToplevel == currentToplevel:
-		return false, fmt.Errorf("--worktree path points to the repository you're already in; omit --worktree to check out here")
-	case targetPrefix != "":
-		return false, fmt.Errorf("--worktree path is inside an existing worktree")
-	}
-	// The path is the root of another linked worktree of this repo; reuse it.
-	return true, nil
-}
-
-// revParseFacts runs `git rev-parse --path-format=absolute <flags...>` and
-// returns one absolute path per flag, in flag order (an empty --show-prefix
-// yields an empty string), with ok=false if git fails. When dir is non-empty
-// the query is scoped there with -C.
-func revParseFacts(client *git.Client, dir string, flags ...string) (fields []string, ok bool) {
-	args := append([]string{"rev-parse", "--path-format=absolute"}, flags...)
-	if dir != "" {
-		args = append([]string{"-C", dir}, args...)
-	}
-	cmd, err := client.Command(context.Background(), args...)
-	if err != nil {
-		return nil, false
-	}
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, false
-	}
-	return strings.Split(strings.TrimRight(string(out), "\n"), "\n"), true
-}
-
 // detachCmds returns the commands for a detached checkout. When reusing an
 // existing linked worktree, FETCH_HEAD must be written inside it (it is
 // per-worktree), so the fetch runs with -C <path>.
@@ -423,33 +351,6 @@ func syncBranchCmds(path, ref string, force bool) [][]string {
 	}
 	// TODO: check if non-fast-forward and suggest to use `--force`
 	return [][]string{append(prefix, "merge", "--ff-only", ref)}
-}
-
-func worktreeCheckoutCmds(path, branch, ref string, force bool) [][]string {
-	cmds := [][]string{{"-C", path, "checkout", branch}}
-	cmds = append(cmds, syncBranchCmds(path, ref, force)...)
-	return cmds
-}
-
-// ensureWorktreePathSafe validates a --worktree target before we write to it:
-// it must be a non-existent path (git will create it) or an existing directory,
-// and never a symlink at its final component. A symlinked ancestor (e.g. macOS
-// /tmp -> /private/tmp) is fine; os.Lstat checks only the leaf so it is not
-// followed. Rejecting a leaf symlink guards against writing PR content through a
-// planted link.
-func ensureWorktreePathSafe(path string) error {
-	fi, err := os.Lstat(path)
-	switch {
-	case os.IsNotExist(err):
-		return nil
-	case err != nil:
-		return err
-	case fi.Mode()&os.ModeSymlink != 0:
-		return fmt.Errorf("--worktree path must not be a symlink: %s", path)
-	case !fi.IsDir():
-		return fmt.Errorf("--worktree path must be a directory: %s", path)
-	}
-	return nil
 }
 
 func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cmdQueue [][]string) error {

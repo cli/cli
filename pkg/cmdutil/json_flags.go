@@ -197,7 +197,7 @@ func checkFormatFlags(cmd *cobra.Command) (*jsonExporter, error) {
 
 type Exporter interface {
 	Fields() []string
-	Write(io *iostreams.IOStreams, data interface{}) error
+	Write(io *iostreams.IOStreams, data any) error
 }
 
 type jsonExporter struct {
@@ -222,7 +222,7 @@ func (e *jsonExporter) SetFields(fields []string) {
 // Write serializes data into JSON output written to w. If the object passed as data implements exportable,
 // or if data is a map or slice of exportable object, ExportData() will be called on each object to obtain
 // raw data for serialization.
-func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
+func (e *jsonExporter) Write(ios *iostreams.IOStreams, data any) error {
 	buf := bytes.Buffer{}
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
@@ -256,14 +256,14 @@ func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 	return err
 }
 
-func (e *jsonExporter) exportData(v reflect.Value) interface{} {
+func (e *jsonExporter) exportData(v reflect.Value) any {
 	switch v.Kind() {
 	case reflect.Pointer, reflect.Interface:
 		if !v.IsNil() {
 			return e.exportData(v.Elem())
 		}
 	case reflect.Slice:
-		a := make([]interface{}, v.Len())
+		a := make([]any, v.Len())
 		for i := 0; i < v.Len(); i++ {
 			a[i] = e.exportData(v.Index(i))
 		}
@@ -290,12 +290,11 @@ func (e *jsonExporter) exportData(v reflect.Value) interface{} {
 }
 
 type exportable interface {
-	ExportData([]string) map[string]interface{}
+	ExportData([]string) map[string]any
 }
 
-var exportableType = reflect.TypeOf((*exportable)(nil)).Elem()
-var sliceOfEmptyInterface []interface{}
-var emptyInterfaceType = reflect.TypeOf(sliceOfEmptyInterface).Elem()
+var exportableType = reflect.TypeFor[exportable]()
+var emptyInterfaceType = reflect.TypeFor[[]any]().Elem()
 
 // Basic function that can be used with structs that need to implement
 // the exportable interface. It has numerous limitations so verify
@@ -304,7 +303,7 @@ var emptyInterfaceType = reflect.TypeOf(sliceOfEmptyInterface).Elem()
 // Perhaps this should be moved up into exportData for the case when
 // a struct does not implement the exportable interface, but for now it will
 // need to be explicitly used.
-func StructExportData(s interface{}, fields []string) map[string]interface{} {
+func StructExportData(s any, fields []string) map[string]any {
 	v := reflect.ValueOf(s)
 	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
@@ -313,7 +312,7 @@ func StructExportData(s interface{}, fields []string) map[string]interface{} {
 		// If s is not a struct or pointer to a struct return nil.
 		return nil
 	}
-	data := make(map[string]interface{}, len(fields))
+	data := make(map[string]any, len(fields))
 	for _, f := range fields {
 		sf := fieldByName(v, f)
 		if sf.IsValid() && sf.CanInterface() {

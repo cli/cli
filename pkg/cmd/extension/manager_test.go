@@ -61,7 +61,7 @@ func newTestManager(dataDir, updateDir string, client *http.Client, gitClient gi
 			cmd.Env = append([]string{"GH_WANT_HELPER_PROCESS=1"}, extraEnv...)
 			return cmd
 		},
-		config:    config.NewBlankConfig(),
+		config:    config.NewMockConfig(),
 		io:        ios,
 		client:    client,
 		gitClient: gitClient,
@@ -337,7 +337,7 @@ func TestManager_UpgradeExtensions(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		exts[i].currentVersion = "old version"
 		exts[i].latestVersion = "new version"
 	}
@@ -376,7 +376,7 @@ func TestManager_UpgradeExtensions_DryRun(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		exts[i].currentVersion = fmt.Sprintf("%d", i)
 		exts[i].latestVersion = fmt.Sprintf("%d", i+1)
 	}

@@ -13,12 +13,23 @@ import (
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
-func NewBlankConfig() *ghmock.ConfigMock {
-	return NewFromString(defaultConfigStr)
+// NewMockConfig returns a mock config populated with gh's default config file.
+// See NewMockConfigFromString for when to prefer a mock over NewIsolatedTestConfig.
+func NewMockConfig() *ghmock.ConfigMock {
+	return NewMockConfigFromString(defaultConfigStr)
 }
 
-func NewFromString(cfgStr string) *ghmock.ConfigMock {
-	c := ghConfig.ReadFromString(cfgStr)
+// NewMockConfigFromString returns a mock config populated from cfgString, for tests
+// that need to stub config behaviour by assigning to the mock's function fields.
+//
+// The mock answers host, token, and default host lookups from cfgString alone, so it
+// ignores both the config files on disk and the environment. It never writes anything.
+//
+// Prefer NewIsolatedTestConfig when the code under test exercises the real config
+// implementation, writes config, or reads the auth environment variables directly,
+// since none of those go through the mock.
+func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
+	c := ghConfig.ReadFromString(cfgString)
 	cfg := cfg{c}
 	mock := &ghmock.ConfigMock{}
 	mock.GetOrDefaultFunc = func(host, key string) o.Option[gh.ConfigEntry] {
@@ -97,15 +108,39 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	return mock
 }
 
-// NewIsolatedTestConfig sets up a Mock keyring, creates a blank config
-// overwrites the ghConfig.Read function that returns a singleton config
-// in the real implementation, sets the GH_CONFIG_DIR env var so that
-// any call to Write goes to a different location on disk, and then returns
-// the blank config and a function that reads any data written to disk.
-func NewIsolatedTestConfig(t *testing.T) (*cfg, func(io.Writer, io.Writer)) {
+// NewIsolatedTestConfig returns the real config implementation, built from cfgString
+// and isolated from the machine running the tests. Pass "" for a config with no
+// content. It also returns a function that reads back anything written to disk.
+//
+// Use it when the code under test exercises real config behaviour: writing config,
+// logging in and out, or reading the auth environment variables directly. Prefer
+// NewMockConfigFromString when the test only needs to stub config lookups.
+//
+// Isolation covers all three places config comes from. It mocks the keyring, replaces
+// the ghConfig.Read singleton so each test gets its own config, points GH_CONFIG_DIR at
+// a temp dir so writes stay off the real config, and clears the environment variables
+// that go-gh consults for authentication and host resolution.
+//
+// Callers that want one of the auth env vars set should set it after calling this,
+// otherwise the value is cleared along with the ambient environment.
+func NewIsolatedTestConfig(t *testing.T, cfgString string) (*cfg, func(io.Writer, io.Writer)) {
 	keyring.MockInit()
 
-	c := ghConfig.ReadFromString("")
+	// go-gh reads these ahead of any stored config, so isolating the config file is
+	// not enough on its own. A developer with GH_TOKEN exported, or any CI image that
+	// provides one, would otherwise see an authenticated config here and fail tests
+	// that assert on the logged out state.
+	for _, key := range []string{
+		"GH_TOKEN",
+		"GITHUB_TOKEN",
+		"GH_ENTERPRISE_TOKEN",
+		"GITHUB_ENTERPRISE_TOKEN",
+		"GH_HOST",
+	} {
+		t.Setenv(key, "")
+	}
+
+	c := ghConfig.ReadFromString(cfgString)
 	cfg := cfg{c}
 
 	// The real implementation of config.Read uses a sync.Once

@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
@@ -54,6 +56,9 @@ type CreateOptions struct {
 	Parent      string
 	BlockedBy   []string
 	Blocking    []string
+
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -75,6 +80,20 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Create an issue on GitHub.
 
+			Use %[1]s--attach%[1]s to upload an image or video. The attachment is appended to the
+			body. If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
+			reference is rewritten to point at the uploaded asset instead.
+			You can attach up to 50 files per command.
+
+			Alt text for an image follows the path after %[1]s#%[1]s, as in
+			%[1]s--attach './login.png#The login error state'%[1]s. Without it the filename is used.
+			A reference already in the body keeps the alt text written there. Video renders
+			as a player and has no alt text, so it cannot be given any.
+
+			If some attachments upload and others fail, the issue is still created with the
+			ones that succeeded. The command then exits with a non-zero status, but the new
+			issue's URL is still printed to stdout.
+
 			Adding an issue to projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 
@@ -84,6 +103,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh issue create --title "I found a bug" --body "Nothing works"
+			$ gh issue create --attach './login.png#The login error state'
+			$ gh issue create --attach ./before.png --attach ./after.png
 			$ gh issue create --label "bug,help wanted"
 			$ gh issue create --label bug --label "help wanted"
 			$ gh issue create --assignee monalisa,hubot
@@ -134,6 +155,19 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"`--attach` is not supported when using `--web`",
+				opts.AttachFlag.Changed(),
+				opts.WebMode,
+			); err != nil {
+				return err
+			}
+
+			opts.Assets, err = opts.AttachFlag.UserAssets()
+			if err != nil {
+				return err
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -156,6 +190,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVar(&opts.Parent, "parent", "", "Add the new issue as a sub-issue of the specified parent `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.BlockedBy, "blocked-by", nil, "Mark the new issue as blocked by these issue `numbers` or URLs")
 	cmd.Flags().StringSliceVar(&opts.Blocking, "blocking", nil, "Mark the new issue as blocking these issue `numbers` or URLs")
+	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	return cmd
 }
@@ -258,6 +293,23 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
+	// Built before the first survey, so a run that cannot upload stops early.
+	var uploader *attachments.Uploader
+	if len(opts.Assets) > 0 {
+		var cfg gh.Config
+		cfg, err = opts.Config()
+		if err != nil {
+			return
+		}
+		host := baseRepo.RepoHost()
+		tokenType := cfg.Authentication().ActiveTokenType(host)
+
+		uploader, err = attachments.NewUploader(httpClient, tokenType, host, repo.DatabaseID, repo.ViewerPermission)
+		if err != nil {
+			return
+		}
+	}
+
 	action := prShared.SubmitAction
 	templateNameForSubmit := ""
 	var openURL string
@@ -329,7 +381,8 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		allowPreview := !tb.HasMetadata() && prShared.ValidURL(openURL)
+		// Preview opens the browser, which cannot carry an upload.
+		allowPreview := !tb.HasMetadata() && prShared.ValidURL(openURL) && len(opts.Assets) == 0
 		action, err = prShared.ConfirmIssueSubmission(opts.Prompter, allowPreview, repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
@@ -352,7 +405,7 @@ func createRun(opts *CreateOptions) (err error) {
 				return
 			}
 
-			action, err = prShared.ConfirmIssueSubmission(opts.Prompter, !tb.HasMetadata(), false)
+			action, err = prShared.ConfirmIssueSubmission(opts.Prompter, !tb.HasMetadata() && len(opts.Assets) == 0, false)
 			if err != nil {
 				return
 			}
@@ -397,14 +450,15 @@ func createRun(opts *CreateOptions) (err error) {
 	} else if action == prShared.SubmitAction {
 		// Resolve the deferred fields before creating anything. These lookups
 		// can fail on user error (an unknown --type, a bad issue reference) and
-		// such a failure must not leave a created issue behind.
+		// such a failure must not leave a created issue behind, nor consume an
+		// attachment upload.
 		var updateOpts api.DeferredUpdateIssueOptions
 		updateOpts, err = resolveDeferredUpdateIssueOptions(apiClient, baseRepo, opts)
 		if err != nil {
 			return
 		}
 
-		params := map[string]interface{}{
+		params := map[string]any{
 			"title": tb.Title,
 			"body":  tb.Body,
 		}
@@ -415,6 +469,21 @@ func createRun(opts *CreateOptions) (err error) {
 		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb, projectsV1Support)
 		if err != nil {
 			return
+		}
+
+		// With nothing uploaded the body would promise an attachment that does
+		// not exist, so no issue is created. Once anything has uploaded the
+		// issue is created and the failures are reported.
+		if uploader != nil {
+			body, uploaded, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.Assets)
+			if uploadErr != nil && uploaded == 0 {
+				err = uploadErr
+				return
+			}
+			params["body"] = body
+			if uploadErr != nil {
+				defer func() { err = errors.Join(uploadErr, err) }()
+			}
 		}
 
 		var newIssue *api.Issue

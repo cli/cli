@@ -191,7 +191,7 @@ func Test_deleteRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 		ios, _, stdout, _ := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)

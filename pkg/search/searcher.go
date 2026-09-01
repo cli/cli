@@ -162,6 +162,10 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 func (s searcher) Issues(query Query) (IssuesResult, error) {
 	result := IssuesResult{}
 
+	// Semantic and hybrid searches use a separate, smaller rate-limit bucket and
+	// are relevance-ranked, so bound fetching to a single page.
+	singlePage := query.IssueSearchType == "semantic" || query.IssueSearchType == "hybrid"
+
 	numItemsToRetrieve := query.Limit
 	query.Limit = min(numItemsToRetrieve, maxPerPage)
 	query.Page = 1
@@ -177,6 +181,10 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
 		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
+
+		if singlePage {
+			break
+		}
 
 		query.Page = nextPage(link)
 		if query.Page == 0 {
@@ -197,7 +205,7 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 // - Items: the actual matching search results, up to 100 max items per page
 //
 // For more information, see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28.
-func (s searcher) search(query Query, result interface{}) (string, error) {
+func (s searcher) search(query Query, result any) (string, error) {
 	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(s.host), "search", string(query.Kind))
 	if err != nil {
 		return "", err
@@ -225,6 +233,19 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 				// Advanced syntax should be explicitly enabled
 				u.SetQuery("advanced_search", "true")
 			}
+		}
+
+		switch query.IssueSearchType {
+		case "semantic":
+			if !features.SemanticSearch {
+				return "", fmt.Errorf("semantic search is not supported on this host: %s", s.host)
+			}
+			u.SetQuery("search_type", query.IssueSearchType)
+		case "hybrid":
+			if !features.HybridSearch {
+				return "", fmt.Errorf("hybrid search is not supported on this host: %s", s.host)
+			}
+			u.SetQuery("search_type", query.IssueSearchType)
 		}
 	} else {
 		u.SetQuery("q", query.StandardSearchString())
@@ -339,11 +360,4 @@ func nextPage(link string) (page int) {
 		}
 	}
 	return 0
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

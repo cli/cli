@@ -24,7 +24,7 @@ func preloadIssueComments(client *http.Client, repo ghrepo.Interface, issue *api
 		return nil
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"id":        githubv4.ID(issue.ID),
 		"endCursor": githubv4.String(issue.Comments.PageInfo.EndCursor),
 	}
@@ -66,7 +66,7 @@ func preloadClosedByPullRequestsReferences(client *http.Client, repo ghrepo.Inte
 		} `graphql:"node(id: $id)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"id":        githubv4.ID(issue.ID),
 		"endCursor": githubv4.String(issue.ClosedByPullRequestsReferences.PageInfo.EndCursor),
 	}

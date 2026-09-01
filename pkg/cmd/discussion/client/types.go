@@ -31,8 +31,8 @@ type Discussion struct {
 // ExportData returns a map of the requested fields for JSON output.
 // Because domain types carry no JSON struct tags, each field is mapped
 // explicitly rather than using reflection.
-func (d Discussion) ExportData(fields []string) map[string]interface{} {
-	data := map[string]interface{}{}
+func (d Discussion) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
 	for _, f := range fields {
 		switch f {
 		case "id":
@@ -60,7 +60,7 @@ func (d Discussion) ExportData(fields []string) map[string]interface{} {
 		case "category":
 			data[f] = d.Category.Export()
 		case "labels":
-			labels := make([]interface{}, len(d.Labels))
+			labels := make([]any, len(d.Labels))
 			for i, l := range d.Labels {
 				labels[i] = l.Export()
 			}
@@ -80,11 +80,11 @@ func (d Discussion) ExportData(fields []string) map[string]interface{} {
 				data[f] = d.AnswerChosenBy.Export()
 			}
 		case "comments":
-			comments := make([]interface{}, len(d.Comments.Comments))
+			comments := make([]any, len(d.Comments.Comments))
 			for i, c := range d.Comments.Comments {
 				comments[i] = c.Export()
 			}
-			m := map[string]interface{}{
+			m := map[string]any{
 				"totalCount": d.Comments.TotalCount,
 				"nodes":      comments,
 			}
@@ -96,7 +96,7 @@ func (d Discussion) ExportData(fields []string) map[string]interface{} {
 			}
 			data[f] = m
 		case "reactionGroups":
-			reactions := make([]interface{}, len(d.ReactionGroups))
+			reactions := make([]any, len(d.ReactionGroups))
 			for i, rg := range d.ReactionGroups {
 				reactions[i] = rg.Export()
 			}
@@ -126,8 +126,8 @@ type DiscussionActor struct {
 }
 
 // Export returns the author as a map for JSON output.
-func (a DiscussionActor) Export() map[string]interface{} {
-	return map[string]interface{}{
+func (a DiscussionActor) Export() map[string]any {
+	return map[string]any{
 		"id":    a.ID,
 		"login": a.Login,
 		"name":  a.Name,
@@ -144,8 +144,8 @@ type DiscussionCategory struct {
 }
 
 // Export returns the category as a map for JSON output.
-func (c DiscussionCategory) Export() map[string]interface{} {
-	return map[string]interface{}{
+func (c DiscussionCategory) Export() map[string]any {
+	return map[string]any{
 		"id":           c.ID,
 		"name":         c.Name,
 		"slug":         c.Slug,
@@ -162,8 +162,8 @@ type DiscussionLabel struct {
 }
 
 // Export returns the label as a map for JSON output.
-func (l DiscussionLabel) Export() map[string]interface{} {
-	return map[string]interface{}{
+func (l DiscussionLabel) Export() map[string]any {
+	return map[string]any{
 		"id":    l.ID,
 		"name":  l.Name,
 		"color": l.Color,
@@ -185,16 +185,16 @@ type DiscussionComment struct {
 }
 
 // Export returns the comment as a map for JSON output.
-func (c DiscussionComment) Export() map[string]interface{} {
-	replies := make([]interface{}, len(c.Replies.Comments))
+func (c DiscussionComment) Export() map[string]any {
+	replies := make([]any, len(c.Replies.Comments))
 	for i, r := range c.Replies.Comments {
 		replies[i] = r.ExportReply()
 	}
-	reactions := make([]interface{}, len(c.ReactionGroups))
+	reactions := make([]any, len(c.ReactionGroups))
 	for i, rg := range c.ReactionGroups {
 		reactions[i] = rg.Export()
 	}
-	repliesMap := map[string]interface{}{
+	repliesMap := map[string]any{
 		"totalCount": c.Replies.TotalCount,
 		"nodes":      replies,
 	}
@@ -204,7 +204,7 @@ func (c DiscussionComment) Export() map[string]interface{} {
 	if c.Replies.NextCursor != "" {
 		repliesMap["next"] = c.Replies.NextCursor
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"id":             c.ID,
 		"url":            c.URL,
 		"author":         c.Author.Export(),
@@ -218,12 +218,12 @@ func (c DiscussionComment) Export() map[string]interface{} {
 }
 
 // ExportReply returns a reply as a map for JSON output, without nested replies.
-func (c DiscussionComment) ExportReply() map[string]interface{} {
-	reactions := make([]interface{}, len(c.ReactionGroups))
+func (c DiscussionComment) ExportReply() map[string]any {
+	reactions := make([]any, len(c.ReactionGroups))
 	for i, rg := range c.ReactionGroups {
 		reactions[i] = rg.Export()
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"id":             c.ID,
 		"url":            c.URL,
 		"author":         c.Author.Export(),
@@ -262,8 +262,8 @@ type ReactionGroup struct {
 }
 
 // Export returns the reaction group as a map for JSON output.
-func (rg ReactionGroup) Export() map[string]interface{} {
-	return map[string]interface{}{
+func (rg ReactionGroup) Export() map[string]any {
+	return map[string]any{
 		"content":    rg.Content,
 		"totalCount": rg.TotalCount,
 	}
@@ -298,12 +298,12 @@ type DiscussionListResult struct {
 
 // ExportData returns a map suitable for JSON output, including pagination
 // fields only when they are non-empty.
-func (r DiscussionListResult) ExportData(fields []string) map[string]interface{} {
-	discussions := make([]interface{}, len(r.Discussions))
+func (r DiscussionListResult) ExportData(fields []string) map[string]any {
+	discussions := make([]any, len(r.Discussions))
 	for i, d := range r.Discussions {
 		discussions[i] = d.ExportData(fields)
 	}
-	m := map[string]interface{}{
+	m := map[string]any{
 		"totalCount":  r.TotalCount,
 		"discussions": discussions,
 	}

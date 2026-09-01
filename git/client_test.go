@@ -110,6 +110,7 @@ func TestClientAuthenticatedCommand(t *testing.T) {
 }
 
 func TestClientRemotes(t *testing.T) {
+	IsolateConfig(t)
 	tempDir := t.TempDir()
 	initRepo(t, tempDir)
 	gitDir := filepath.Join(tempDir, ".git")
@@ -149,6 +150,7 @@ func TestClientRemotes(t *testing.T) {
 }
 
 func TestClientRemotes_no_resolved_remote(t *testing.T) {
+	IsolateConfig(t)
 	tempDir := t.TempDir()
 	initRepo(t, tempDir)
 	gitDir := filepath.Join(tempDir, ".git")
@@ -708,6 +710,7 @@ func createCommitsCommandContext(t *testing.T, testData stubbedCommitsCommandDat
 }
 
 func TestClientLastCommit(t *testing.T) {
+	IsolateConfig(t)
 	client := Client{
 		RepoDir: "./fixtures/simple.git",
 	}
@@ -718,6 +721,7 @@ func TestClientLastCommit(t *testing.T) {
 }
 
 func TestClientCommitBody(t *testing.T) {
+	IsolateConfig(t)
 	client := Client{
 		RepoDir: "./fixtures/simple.git",
 	}
@@ -2283,4 +2287,134 @@ func TestClientIsIgnored(t *testing.T) {
 func TestShortSHA(t *testing.T) {
 	assert.Equal(t, "abc123de", ShortSHA("abc123def456789"))
 	assert.Equal(t, "short", ShortSHA("short"))
+}
+
+func TestParseWorktrees(t *testing.T) {
+	tests := []struct {
+		name string
+		out  string
+		want []Worktree
+	}{
+		{
+			name: "empty output",
+			out:  "",
+			want: nil,
+		},
+		{
+			name: "single worktree",
+			out: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+			`),
+			want: []Worktree{
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
+			},
+		},
+		{
+			name: "multiple worktrees",
+			out: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/feature-wt
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			want: []Worktree{
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
+				{Path: "/path/to/feature-wt", Ref: "refs/heads/feature"},
+			},
+		},
+		{
+			name: "detached HEAD has no branch",
+			out: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/detached
+				HEAD def456
+				detached
+			`),
+			want: []Worktree{
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
+				{Path: "/path/to/detached", Ref: ""},
+			},
+		},
+		{
+			name: "no trailing blank line",
+			out:  "worktree /path/to/main\nHEAD abc123\nbranch refs/heads/main",
+			want: []Worktree{
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
+			},
+		},
+		{
+			name: "bare main worktree has no branch",
+			out: heredoc.Doc(`
+				worktree /path/to/bare
+				bare
+
+				worktree /path/to/feature-wt
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			want: []Worktree{
+				{Path: "/path/to/bare", Ref: ""},
+				{Path: "/path/to/feature-wt", Ref: "refs/heads/feature"},
+			},
+		},
+		{
+			name: "prunable worktree with spaces and windows line endings",
+			out:  "worktree /path/to/main\r\nHEAD abc123\r\nbranch refs/heads/main\r\n\r\nworktree /path/to/feature work\r\nHEAD def456\r\nbranch refs/heads/feature/one\r\nprunable gitdir file points to non-existent location\r\n",
+			want: []Worktree{
+				{Path: "/path/to/main", Ref: "refs/heads/main"},
+				{Path: "/path/to/feature work", Ref: "refs/heads/feature/one", Prunable: true},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseWorktrees([]byte(tt.out))
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestWorktreeForBranch(t *testing.T) {
+	worktrees := []Worktree{
+		{Path: "/path/to/main", Ref: "refs/heads/main"},
+		{Path: "/path/to/feature", Ref: "refs/heads/feature/one"},
+	}
+
+	assert.Equal(t, &worktrees[1], WorktreeForBranch(worktrees, "feature/one"))
+	assert.Nil(t, WorktreeForBranch(worktrees, "feature"))
+	assert.Nil(t, WorktreeForBranch(worktrees, "missing"))
+}
+
+func TestClientWorktreeRemove(t *testing.T) {
+	cmd, cmdCtx := createCommandContext(t, 0, "", "")
+	client := Client{
+		GitPath:        "path/to/git",
+		commandContext: cmdCtx,
+	}
+
+	err := client.WorktreeRemove(context.Background(), "-feature")
+
+	require.NoError(t, err)
+	assert.Equal(t, "path/to/git worktree remove -- -feature", strings.Join(cmd.Args[3:], " "))
+}
+
+func TestClientWorktreePrune(t *testing.T) {
+	cmd, cmdCtx := createCommandContext(t, 0, "", "")
+	client := Client{
+		GitPath:        "path/to/git",
+		commandContext: cmdCtx,
+	}
+
+	err := client.WorktreePrune(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, "path/to/git worktree prune", strings.Join(cmd.Args[3:], " "))
 }

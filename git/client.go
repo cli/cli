@@ -263,6 +263,68 @@ func (c *Client) ShowRefs(ctx context.Context, refs []string) ([]Ref, error) {
 	return verified, err
 }
 
+// Worktrees lists the repository's worktrees by parsing the output of
+// `git worktree list --porcelain`.
+func (c *Client) Worktrees(ctx context.Context) ([]Worktree, error) {
+	cmd, err := c.Command(ctx, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	return parseWorktrees(out), nil
+}
+
+// WorktreeRemove removes the worktree at the given path via
+// `git worktree remove <path>`.
+func (c *Client) WorktreeRemove(ctx context.Context, path string) error {
+	cmd, err := c.Command(ctx, "worktree", "remove", "--", path)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	return err
+}
+
+// WorktreePrune removes administrative files for worktrees that no longer
+// exist on disk.
+func (c *Client) WorktreePrune(ctx context.Context) error {
+	cmd, err := c.Command(ctx, "worktree", "prune")
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	return err
+}
+
+// parseWorktrees parses the output of `git worktree list --porcelain` into a
+// slice of Worktree. Each record begins with a "worktree <path>" line followed
+// by attribute lines.
+func parseWorktrees(output []byte) []Worktree {
+	var worktrees []Worktree
+	output = bytes.ReplaceAll(output, []byte("\r\n"), []byte("\n"))
+	for record := range strings.SplitSeq(string(output), "\n\n") {
+		var worktree Worktree
+		for line := range strings.SplitSeq(record, "\n") {
+			key, value, _ := strings.Cut(line, " ")
+			switch key {
+			case "worktree":
+				worktree.Path = value
+			case "branch":
+				worktree.Ref = value
+			case "prunable":
+				worktree.Prunable = true
+			}
+		}
+		if worktree.Path != "" {
+			worktrees = append(worktrees, worktree)
+		}
+	}
+	return worktrees
+}
+
 func (c *Client) Config(ctx context.Context, name string) (string, error) {
 	args := []string{"config", name}
 	cmd, err := c.Command(ctx, args...)

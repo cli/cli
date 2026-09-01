@@ -152,6 +152,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
+			if err := cmdutil.MutuallyExclusive("specify only one of --comments or --json",
+				opts.Comments, opts.Exporter != nil); err != nil {
+				return err
+			}
+
 			if err := cmdutil.MutuallyExclusive("specify only one of --comments or --web",
 				opts.Comments, opts.WebMode); err != nil {
 				return err

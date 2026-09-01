@@ -745,7 +745,7 @@ func TestRepoFork(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 
-			cfg, _ := config.NewIsolatedTestConfig(t)
+			cfg, _ := config.NewIsolatedTestConfig(t, "")
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
