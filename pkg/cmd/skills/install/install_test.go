@@ -1589,6 +1589,37 @@ func TestInstallRun(t *testing.T) {
 			},
 			wantStdout: "Installed git-commit",
 		},
+		{
+			name: "respect pi coding agent dir env var for user scope",
+			setup: func(t *testing.T) {
+				t.Setenv("PI_CODING_AGENT_DIR", t.TempDir())
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "git-commit",
+					Agent:        "pi",
+					Scope:        "user",
+					ScopeChanged: true,
+					Telemetry:    &telemetry.NoOpService{},
+				}
+			},
+			assert: func(t *testing.T) {
+				assert.FileExists(t, filepath.Join(os.Getenv("PI_CODING_AGENT_DIR"), "skills", "git-commit", "SKILL.md"))
+				assert.NoFileExists(t, filepath.Join(os.Getenv("HOME"), ".pi", "agent", "skills", "git-commit", "SKILL.md"))
+			},
+			wantStdout: "Installed git-commit",
+		},
 	}
 
 	for _, tt := range tests {
