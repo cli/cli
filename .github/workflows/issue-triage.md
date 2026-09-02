@@ -134,6 +134,14 @@ potential duplicates of this issue. Note your findings for the next step.
 Follow the `issue-classifier` skill instructions. Use the `label-taxonomy` reference for
 valid labels. Incorporate your duplicate detection findings.
 
+Assess the report independently. Treat the reporter's diagnosis, causal claims, and
+expected behavior as hypotheses rather than established facts. Separate direct
+observations from interpretations, check assumptions against available logs, command
+output, reproduction details, documentation, and source, and consider plausible
+alternative explanations before choosing a classification. An expected-vs-actual
+statement alone does not establish a product bug. Do not repeat the reporter's framing
+as your conclusion unless the evidence supports it.
+
 ## Step 5: Check for spam
 
 Judge the issue against the spam criteria included at the top of this prompt.
