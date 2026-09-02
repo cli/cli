@@ -277,8 +277,6 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 		return nil, err
 	}
 
-	// The Content-Type this site used to set explicitly is the one the client already sends,
-	// so it is no longer stated here.
 	// TODO(api-client-rollout)
 	// This line of code is part of a mechanical roll out of the api client.
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
