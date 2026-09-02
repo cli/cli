@@ -153,7 +153,18 @@ When you apply `suspected-spam`:
 Be conservative. A false positive closes a real user's issue, so when the evidence is
 mixed, suggest `more-info-needed` instead and let a human decide.
 
-## Step 6: Suggest the remaining labels via safe outputs
+## Step 6: Investigate the likely cause
+
+For a non-spam bug report, perform a first-pass technical investigation before writing
+the comment. Trace the relevant behavior through the current `cli/cli` source and inspect
+recent changes when useful. Form a concise hypothesis that explains how the reported
+symptom could arise, grounded in issue evidence and specific code.
+
+Include this hypothesis in the comment so the first responder has a concrete starting
+point. If available evidence cannot support a useful hypothesis, say what remains unknown
+and name the specific diagnostic evidence needed next; do not invent a cause.
+
+## Step 7: Suggest the remaining labels via safe outputs
 
 If the issue is not spam, use `add-labels` to suggest the appropriate labels (max 3,
 only from the allowlist above). **Emit these labels as suggestions requiring maintainer
