@@ -295,26 +295,58 @@ func editRun(opts *EditOptions) error {
 		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
 	}
 
-	findOptions := shared.FindOptions{
-		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "author", "url", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone"},
-		Detector: opts.Detector,
-	}
-
-	if len(opts.Assets) > 0 {
-		findOptions.Fields = append(findOptions.Fields, "repository")
-	}
-
 	issueFeatures, err := opts.Detector.IssueFeatures()
 	if err != nil {
 		return err
 	}
 
-	// TODO ApiActorsSupported
-	if issueFeatures.ApiActorsSupported {
-		findOptions.Fields = append(findOptions.Fields, "assignedActors")
-	} else {
-		findOptions.Fields = append(findOptions.Fields, "assignees")
+	editable := opts.Editable
+	editable.Reviewers.Selectable = true
+
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"id", "url"},
+		Detector: opts.Detector,
+	}
+	if opts.Interactive {
+		findOptions.Fields = append(findOptions.Fields, "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone")
+		// TODO ApiActorsSupported
+		if issueFeatures.ApiActorsSupported {
+			findOptions.Fields = append(findOptions.Fields, "assignedActors")
+		} else {
+			findOptions.Fields = append(findOptions.Fields, "assignees")
+		}
+	} else if editable.Title.Edited {
+		findOptions.Fields = append(findOptions.Fields, "title")
+	}
+	if !opts.Interactive && (editable.Body.Edited || len(opts.Assets) > 0) {
+		findOptions.Fields = append(findOptions.Fields, "body")
+	}
+	if !opts.Interactive && editable.Base.Edited {
+		findOptions.Fields = append(findOptions.Fields, "baseRefName")
+	}
+	if !opts.Interactive && editable.Reviewers.Edited {
+		findOptions.Fields = append(findOptions.Fields, "reviewRequests")
+	}
+	if !opts.Interactive && editable.Assignees.Edited {
+		// TODO ApiActorsSupported
+		if issueFeatures.ApiActorsSupported {
+			findOptions.Fields = append(findOptions.Fields, "assignedActors")
+		} else {
+			findOptions.Fields = append(findOptions.Fields, "assignees")
+		}
+	}
+	if !opts.Interactive && editable.Labels.Edited {
+		findOptions.Fields = append(findOptions.Fields, "labels")
+	}
+	if !opts.Interactive && editable.Projects.Edited {
+		findOptions.Fields = append(findOptions.Fields, "projectCards", "projectItems")
+	}
+	if !opts.Interactive && editable.Milestone.Edited {
+		findOptions.Fields = append(findOptions.Fields, "milestone")
+	}
+	if len(opts.Assets) > 0 {
+		findOptions.Fields = append(findOptions.Fields, "repository")
 	}
 
 	pr, repo, err := opts.Finder.Find(findOptions)
@@ -339,8 +371,6 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
-	editable := opts.Editable
-	editable.Reviewers.Selectable = true
 	editable.Title.Default = pr.Title
 	editable.Body.Default = pr.Body
 	editable.Base.Default = pr.BaseRefName

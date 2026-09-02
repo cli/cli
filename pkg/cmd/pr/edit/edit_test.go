@@ -1603,7 +1603,7 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
 		{
-			name: "the lookup does not ask for the repository id without an attachment",
+			name: "title-only lookup avoids unrelated fields",
 			input: &EditOptions{
 				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
@@ -1623,7 +1623,8 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockPullRequestUpdate(reg)
 			},
-			wantNoLookupFields: []string{"repository"},
+			wantLookupFields:   []string{"id", "url", "title"},
+			wantNoLookupFields: []string{"author", "body", "baseRefName", "reviewRequests", "assignedActors", "assignees", "labels", "projectCards", "projectItems", "milestone", "repository"},
 			stdout:             "https://github.com/OWNER/REPO/pull/123\n",
 		},
 	}
@@ -1985,6 +1986,11 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			Finder: shared.NewFinder(f),
 
 			SelectorArg: "https://github.com/cli/cli/pull/123",
+			Editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
 		})
 
 		// Verify that our request contained projectCards
@@ -2016,6 +2022,11 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			Finder: shared.NewFinder(f),
 
 			SelectorArg: "https://github.com/cli/cli/pull/123",
+			Editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
 		})
 
 		// Verify that our request did not contain projectCards
