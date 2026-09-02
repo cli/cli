@@ -157,9 +157,11 @@ testData:
       </TITLE>
 
       <BODY>
-      > Calling the gh executable from another tool is the supported integration path.
+      > Thanks for asking!
       >
-      > _Originally posted by @maintainer in https://github.com/cli/cli/discussions/3881_
+      > `gh` is not intended for use as a library -- it wouldn't work too well and it will break as releases come out. Calling out to `gh` when needed is the way to go.
+
+      _Originally posted by @vilmibm in https://github.com/cli/cli/discussions/3881#discussioncomment-907075_
 
       I followed that guidance and found a bug in the released executable. With gh
       2.80.0, `gh repo clone owner/repo -- --branch release` checks out the default
