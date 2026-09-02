@@ -135,6 +135,44 @@ testData:
 
       _Originally posted by @babakks in [#11241](https://github.com/cli/cli/issues/11241#issuecomment-3049268353)_
       </BODY>
+  - name: 'spam, #14284 verbatim repost of discussion #3881'
+    expected: FAIL
+    input: |
+      <TITLE>
+      I want to make a tool for a project to ease things like building it, fetching dependencies, and making releases, and a few other things, my goal is so that our CI that is very complex will be simplified and basically be few calls to this tool instead of the many things we have going on. This is a multi-repository project and I would like to use gh as a way to give me ease access to some GitHub functionality.
+      </TITLE>
+
+      <BODY>
+      I want to make a tool for a project to ease things like building it, fetching dependencies, and making releases, and a few other things, my goal is so that our CI that is very complex will be simplified and basically be few calls to this tool instead of the many things we have going on. This is a multi-repository project and I would like to use gh as a way to give me ease access to some GitHub functionality.
+
+      Should I code my tool in GO leveraging gh as a library? Is this a possibility? Or should I avoid this and instead do my tool in any language and simply call gh when needed?
+
+      _Originally posted by @ericoporto in https://github.com/cli/cli/discussions/3881_
+      </BODY>
+  - name: legitimate, quoted discussion with an original actionable bug report
+    expected: PASS
+    input: |
+      <TITLE>
+      gh repo clone ignores the selected branch after cloning
+      </TITLE>
+
+      <BODY>
+      > Calling the gh executable from another tool is the supported integration path.
+      >
+      > _Originally posted by @maintainer in https://github.com/cli/cli/discussions/3881_
+
+      I followed that guidance and found a bug in the released executable. With gh
+      2.80.0, `gh repo clone owner/repo -- --branch release` checks out the default
+      branch instead of `release`.
+
+      Steps to reproduce:
+      1. Run `gh repo clone owner/repo -- --branch release`.
+      2. Run `git branch --show-current` in the clone.
+
+      I expected `release`, but the command prints the repository's default branch.
+      Please make `gh repo clone` preserve the branch selected through the forwarded
+      clone arguments.
+      </BODY>
   - name: spam, legible nonsense
     expected: FAIL
     input: |
