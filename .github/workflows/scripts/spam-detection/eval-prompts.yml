@@ -135,45 +135,47 @@ testData:
 
       _Originally posted by @babakks in [#11241](https://github.com/cli/cli/issues/11241#issuecomment-3049268353)_
       </BODY>
-  - name: 'spam, #14284 verbatim repost of discussion #3881'
-    expected: FAIL
-    input: |
-      <TITLE>
-      I want to make a tool for a project to ease things like building it, fetching dependencies, and making releases, and a few other things, my goal is so that our CI that is very complex will be simplified and basically be few calls to this tool instead of the many things we have going on. This is a multi-repository project and I would like to use gh as a way to give me ease access to some GitHub functionality.
-      </TITLE>
-
-      <BODY>
-      I want to make a tool for a project to ease things like building it, fetching dependencies, and making releases, and a few other things, my goal is so that our CI that is very complex will be simplified and basically be few calls to this tool instead of the many things we have going on. This is a multi-repository project and I would like to use gh as a way to give me ease access to some GitHub functionality.
-
-      Should I code my tool in GO leveraging gh as a library? Is this a possibility? Or should I avoid this and instead do my tool in any language and simply call gh when needed?
-
-      _Originally posted by @ericoporto in https://github.com/cli/cli/discussions/3881_
-      </BODY>
-  - name: legitimate, quoted discussion with an original actionable bug report
+  - name: legitimate, original label archiving enhancement
     expected: PASS
     input: |
       <TITLE>
-      gh repo clone ignores the selected branch after cloning
+      Support for Archiving Labels
       </TITLE>
 
       <BODY>
-      > Thanks for asking!
-      >
-      > `gh` is not intended for use as a library -- it wouldn't work too well and it will break as releases come out. Calling out to `gh` when needed is the way to go.
+      ### Describe the feature or problem you’d like to solve
 
-      _Originally posted by @vilmibm in https://github.com/cli/cli/discussions/3881#discussioncomment-907075_
+      [GitHub has added support for archiving/unarchiving labels](https://github.blog/changelog/2026-08-27-label-archiving-is-generally-available/#archive-labels), so it would be great to have support in the CLI.
 
-      I followed that guidance and found a bug in the released executable. With gh
-      2.80.0, `gh repo clone owner/repo -- --branch release` checks out the default
-      branch instead of `release`.
+      There's at least support in the REST API for [updating the archived state of labels](https://docs.github.com/en/rest/issues/labels?apiVersion=2026-03-10#update-a-label), although there's no documented way to see the archived state for a given label.
 
-      Steps to reproduce:
-      1. Run `gh repo clone owner/repo -- --branch release`.
-      2. Run `git branch --show-current` in the clone.
+      ### Proposed solution
 
-      I expected `release`, but the command prints the repository's default branch.
-      Please make `gh repo clone` preserve the branch selected through the forwarded
-      clone arguments.
+      Add commands to manage archiving/unarchiving labels, such as separate commands which mirror `gh repo {archive,unarchive}`.
+      * `gh label archive`
+      * `gh label unarchve`
+      </BODY>
+  - name: spam, attributed verbatim repost of label archiving enhancement
+    expected: FAIL
+    input: |
+      <TITLE>
+      Support for Archiving Labels
+      </TITLE>
+
+      <BODY>
+      ### Describe the feature or problem you’d like to solve
+
+      [GitHub has added support for archiving/unarchiving labels](https://github.blog/changelog/2026-08-27-label-archiving-is-generally-available/#archive-labels), so it would be great to have support in the CLI.
+
+      There's at least support in the REST API for [updating the archived state of labels](https://docs.github.com/en/rest/issues/labels?apiVersion=2026-03-10#update-a-label), although there's no documented way to see the archived state for a given label.
+
+      ### Proposed solution
+
+      Add commands to manage archiving/unarchiving labels, such as separate commands which mirror `gh repo {archive,unarchive}`.
+      * `gh label archive`
+      * `gh label unarchve`
+
+      _Originally posted by @dsanders11 in https://github.com/cli/cli/issues/14308_
       </BODY>
   - name: spam, legible nonsense
     expected: FAIL
