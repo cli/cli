@@ -185,16 +185,6 @@ as your conclusion unless the evidence supports it.
 
 Judge the issue against the spam criteria included at the top of this prompt.
 
-If the issue contains an `Originally posted by` attribution, treat the attribution as
-evidence that the attributed content came from its linked GitHub source. Inspect that
-source when the available read-only tools support its type, but do not require successful
-source retrieval before making the spam decision. Treat the issue as spam when attributed
-content makes up its substantive content and adds no original context. Do not perform
-proactive phrase searches when no attribution is present. Do not treat attributed
-excerpts as spam when the author adds their own problem statement or actionable request
-explaining why the quotation is relevant. When the attribution's scope or the originality
-of the added context is unclear, do not apply `suspected-spam`.
-
 If, and only if, the issue meets those criteria, call `apply_suspected_spam`. This
 directly applies the label instead of proposing it. Applying the label triggers the
 shared `close-suspected-spam` job, which removes `needs-triage`, posts the standard
