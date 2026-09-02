@@ -310,6 +310,7 @@ func editRun(opts *EditOptions) error {
 			opts.Interactive,
 			len(opts.Assets) > 0,
 			issueFeatures.ApiActorsSupported,
+			opts.Detector.ProjectsV1() == gh.ProjectsV1Supported,
 		),
 		Detector: opts.Detector,
 	}
@@ -446,11 +447,15 @@ func editRun(opts *EditOptions) error {
 	return uploadErr
 }
 
-func pullRequestLookupFields(editable shared.Editable, interactive, hasAssets, apiActorsSupported bool) []string {
+func pullRequestLookupFields(editable shared.Editable, interactive, hasAssets, apiActorsSupported, projectsV1Supported bool) []string {
 	fields := []string{"id", "url"}
 
 	if interactive {
-		fields = append(fields, "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone")
+		fields = append(fields, "author", "title", "body", "baseRefName", "reviewRequests", "labels")
+		if projectsV1Supported {
+			fields = append(fields, "projectCards")
+		}
+		fields = append(fields, "projectItems", "milestone")
 		// TODO ApiActorsSupported
 		if apiActorsSupported {
 			fields = append(fields, "assignedActors")
@@ -458,14 +463,8 @@ func pullRequestLookupFields(editable shared.Editable, interactive, hasAssets, a
 			fields = append(fields, "assignees")
 		}
 	} else {
-		if editable.Title.Edited {
-			fields = append(fields, "title")
-		}
-		if editable.Body.Edited || hasAssets {
+		if hasAssets && !editable.Body.Edited {
 			fields = append(fields, "body")
-		}
-		if editable.Base.Edited {
-			fields = append(fields, "baseRefName")
 		}
 		if editable.Reviewers.Edited {
 			fields = append(fields, "reviewRequests")
@@ -478,14 +477,13 @@ func pullRequestLookupFields(editable shared.Editable, interactive, hasAssets, a
 				fields = append(fields, "assignees")
 			}
 		}
-		if editable.Labels.Edited {
-			fields = append(fields, "labels")
-		}
 		if editable.Projects.Edited {
-			fields = append(fields, "projectCards", "projectItems")
-		}
-		if editable.Milestone.Edited {
-			fields = append(fields, "milestone")
+			if projectsV1Supported {
+				fields = append(fields, "projectCards")
+			}
+			if len(editable.Projects.Remove) > 0 {
+				fields = append(fields, "projectItems")
+			}
 		}
 	}
 

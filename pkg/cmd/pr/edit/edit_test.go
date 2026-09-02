@@ -1623,8 +1623,8 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockPullRequestUpdate(reg)
 			},
-			wantLookupFields:   []string{"id", "url", "title"},
-			wantNoLookupFields: []string{"author", "body", "baseRefName", "reviewRequests", "assignedActors", "assignees", "labels", "projectCards", "projectItems", "milestone", "repository"},
+			wantLookupFields:   []string{"id", "url"},
+			wantNoLookupFields: []string{"author", "title", "body", "baseRefName", "reviewRequests", "assignedActors", "assignees", "labels", "projectCards", "projectItems", "milestone", "repository"},
 			stdout:             "https://github.com/OWNER/REPO/pull/123\n",
 		},
 	}
@@ -1699,33 +1699,34 @@ func Test_editRun(t *testing.T) {
 
 func Test_pullRequestLookupFields(t *testing.T) {
 	tests := []struct {
-		name               string
-		editable           shared.Editable
-		interactive        bool
-		hasAssets          bool
-		apiActorsSupported bool
-		want               []string
+		name                string
+		editable            shared.Editable
+		interactive         bool
+		hasAssets           bool
+		apiActorsSupported  bool
+		projectsV1Supported bool
+		want                []string
 	}{
 		{
 			name: "title",
 			editable: shared.Editable{
 				Title: shared.EditableString{Edited: true},
 			},
-			want: []string{"id", "url", "title"},
+			want: []string{"id", "url"},
 		},
 		{
 			name: "body",
 			editable: shared.Editable{
 				Body: shared.EditableString{Edited: true},
 			},
-			want: []string{"id", "url", "body"},
+			want: []string{"id", "url"},
 		},
 		{
 			name: "base",
 			editable: shared.Editable{
 				Base: shared.EditableString{Edited: true},
 			},
-			want: []string{"id", "url", "baseRefName"},
+			want: []string{"id", "url"},
 		},
 		{
 			name: "reviewers",
@@ -1760,23 +1761,52 @@ func Test_pullRequestLookupFields(t *testing.T) {
 			editable: shared.Editable{
 				Labels: shared.EditableSlice{Edited: true},
 			},
-			want: []string{"id", "url", "labels"},
+			want: []string{"id", "url"},
 		},
 		{
-			name: "projects",
+			name: "projects v1 add",
 			editable: shared.Editable{
 				Projects: shared.EditableProjects{
-					EditableSlice: shared.EditableSlice{Edited: true},
+					EditableSlice: shared.EditableSlice{Add: []string{"Roadmap"}, Edited: true},
 				},
 			},
-			want: []string{"id", "url", "projectCards", "projectItems"},
+			projectsV1Supported: true,
+			want:                []string{"id", "url", "projectCards"},
+		},
+		{
+			name: "projects v2 add",
+			editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Add: []string{"Roadmap"}, Edited: true},
+				},
+			},
+			want: []string{"id", "url"},
+		},
+		{
+			name: "projects v2 remove",
+			editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Remove: []string{"Roadmap"}, Edited: true},
+				},
+			},
+			want: []string{"id", "url", "projectItems"},
+		},
+		{
+			name: "projects v1 remove",
+			editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Remove: []string{"Roadmap"}, Edited: true},
+				},
+			},
+			projectsV1Supported: true,
+			want:                []string{"id", "url", "projectCards", "projectItems"},
 		},
 		{
 			name: "milestone",
 			editable: shared.Editable{
 				Milestone: shared.EditableString{Edited: true},
 			},
-			want: []string{"id", "url", "milestone"},
+			want: []string{"id", "url"},
 		},
 		{
 			name:      "attachment",
@@ -1784,22 +1814,31 @@ func Test_pullRequestLookupFields(t *testing.T) {
 			want:      []string{"id", "url", "body", "repository"},
 		},
 		{
-			name:               "interactive with actors",
-			interactive:        true,
-			apiActorsSupported: true,
-			want:               []string{"id", "url", "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone", "assignedActors"},
+			name: "attachment with replacement body",
+			editable: shared.Editable{
+				Body: shared.EditableString{Edited: true},
+			},
+			hasAssets: true,
+			want:      []string{"id", "url", "repository"},
+		},
+		{
+			name:                "interactive with actors",
+			interactive:         true,
+			apiActorsSupported:  true,
+			projectsV1Supported: true,
+			want:                []string{"id", "url", "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone", "assignedActors"},
 		},
 		{
 			name:        "interactive without actors and with attachment",
 			interactive: true,
 			hasAssets:   true,
-			want:        []string{"id", "url", "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone", "assignees", "repository"},
+			want:        []string{"id", "url", "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectItems", "milestone", "assignees", "repository"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := pullRequestLookupFields(tt.editable, tt.interactive, tt.hasAssets, tt.apiActorsSupported)
+			got := pullRequestLookupFields(tt.editable, tt.interactive, tt.hasAssets, tt.apiActorsSupported, tt.projectsV1Supported)
 			assert.Equal(t, tt.want, got)
 		})
 	}
