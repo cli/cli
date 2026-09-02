@@ -154,31 +154,37 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
-		if req.Header.Get(authorization) == "" {
-			var redirectHostnameChange bool
-			if req.Response != nil && req.Response.Request != nil {
-				redirectHostnameChange = getHostname(req) != getHostname(req.Response.Request)
-			}
-			// Only set header if an initial request or redirect request to the same host as the initial request.
-			// If the host has changed during a redirect do not add the authentication token header.
-			if !redirectHostnameChange {
-				hostname := ghauth.NormalizeHostname(getHostname(req))
-				token, _ := cfg.ActiveToken(hostname)
-				if token == "" {
-					// The request may be aimed at a host's api_host, which gh is
-					// not logged in to and so has no token of its own. Fall back
-					// to the token of the host it stands in for. This only ever
-					// adds a token where there would have been none, so hosts we
-					// already authenticate keep resolving exactly as before.
-					if canonicalHost, ok := cfg.HostForAPIHost(hostname); ok {
-						token, _ = cfg.ActiveToken(canonicalHost)
-					}
-				}
-				if token != "" {
-					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
-				}
+		if req.Header.Get(authorization) != "" {
+			return rt.RoundTrip(req)
+		}
+
+		var redirectHostnameChange bool
+		if req.Response != nil && req.Response.Request != nil {
+			redirectHostnameChange = getHostname(req) != getHostname(req.Response.Request)
+		}
+
+		// Only set header if an initial request or redirect request to the same host as the initial request.
+		// If the host has changed during a redirect do not add the authentication token header.
+		if redirectHostnameChange {
+			return rt.RoundTrip(req)
+		}
+
+		hostnameInRequest := ghauth.NormalizeHostname(getHostname(req))
+		token, _ := cfg.ActiveToken(hostnameInRequest)
+		if token == "" {
+			// The request may be aimed at a host's api_host, which gh is
+			// not logged in to and so has no token of its own. Fall back
+			// to the token of the host it stands in for. This only ever
+			// adds a token where there would have been none, so hosts we
+			// already authenticate keep resolving exactly as before.
+			if canonicalHost, ok := cfg.HostForAPIHost(hostnameInRequest); ok {
+				token, _ = cfg.ActiveToken(canonicalHost)
 			}
 		}
+		if token != "" {
+			req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+		}
+
 		return rt.RoundTrip(req)
 	}}
 }
