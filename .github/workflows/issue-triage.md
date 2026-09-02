@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  discussions: read
   issues: read
   copilot-requests: write
 
@@ -47,7 +48,7 @@ engine: copilot
 
 tools:
   github:
-    toolsets: [repos, issues]
+    toolsets: [repos, issues, discussions]
     allowed-repos: ["desktop/gh-cli-and-desktop-shared-workflows", "cli/cli"]
     min-integrity: none
 
@@ -183,6 +184,13 @@ as your conclusion unless the evidence supports it.
 ## Step 5: Check for spam
 
 Judge the issue against the spam criteria included at the top of this prompt.
+
+Check whether the issue's substantive title or body was copied verbatim from another
+`cli/cli` issue, discussion, or comment. Search for a distinctive exact phrase from the
+content, and inspect any linked source or `Originally posted by` attribution. Treat a
+verbatim repost with no original context as spam. Do not treat quoted excerpts as spam
+when the author adds their own problem statement or actionable request explaining why
+the quotation is relevant.
 
 If, and only if, the issue meets those criteria, call `apply_suspected_spam`. This
 directly applies the label instead of proposing it. Applying the label triggers the
