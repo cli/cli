@@ -53,6 +53,9 @@ func NewUploader(httpClient *http.Client, tokenType gh.TokenType, host string, t
 		return nil, err
 	}
 
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	return &Uploader{client: api.NewClientFromHTTP(httpClient), host: host, targetRepository: targetRepository}, nil
 }
 
