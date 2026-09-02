@@ -170,6 +170,10 @@ explaining which label(s) you are suggesting (if any) and why, in plain language
 duplicate, name the likely original. If you are suggesting no label, say so and state what
 information would help a first responder finish triage.
 
+When referring to source code, link every file, symbol, or line claim to an immutable
+GitHub permalink pinned to a full commit SHA and exact line range. Do not use branch
+links, bare file paths, or unlinked code references.
+
 When calling `add-comment`, explicitly set `item_number` to
 ${{ github.event.issue.number || inputs.issue_number }}.
 
