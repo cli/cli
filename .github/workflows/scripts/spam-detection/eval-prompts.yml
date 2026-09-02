@@ -135,6 +135,24 @@ testData:
 
       _Originally posted by @babakks in [#11241](https://github.com/cli/cli/issues/11241#issuecomment-3049268353)_
       </BODY>
+  - name: spam, cross-author discussion repost without original context
+    expected: FAIL
+    input: |
+      <AUTHOR>
+      OscaeGTX
+      </AUTHOR>
+
+      <TITLE>
+      I want to make a tool for a project to ease things like building it, fetching dependencies, and making releases
+      </TITLE>
+
+      <BODY>
+      I want to make a tool for a project to ease things like building it, fetching dependencies, and making releases, and a few other things. My goal is for our complex CI to be simplified into a few calls to this tool. This is a multi-repository project and I would like to use gh for easy access to some GitHub functionality.
+
+      Should I code my tool in Go leveraging gh as a library? Is this possible? Or should I write my tool in any language and simply call gh when needed?
+
+      _Originally posted by @ericoporto in https://github.com/cli/cli/discussions/3881_
+      </BODY>
   - name: spam, legible nonsense
     expected: FAIL
     input: |
