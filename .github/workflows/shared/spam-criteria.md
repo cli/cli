@@ -65,12 +65,14 @@ document, or clarify GitHub CLI belong elsewhere and should be treated as spam.
   off-topic discussions).
 - Content that seems to be taken from, or quoting, another discussion or issue
   which does not establish a sensible context, problem statement, or feedback.
-- An issue containing an `Originally posted by` attribution whose substantive content
-  is copied verbatim from the linked issue, comment, discussion, or other GitHub source
-  and presented without original context. Inspect the linked source to verify the match;
-  do not proactively search for unattributed copies. Attributed excerpts are legitimate
-  when the author adds their own problem statement or actionable request explaining why
-  the quotation is relevant.
+- An issue containing an `Originally posted by` attribution where the attributed
+  material makes up its substantive content and is presented without original context.
+  The attribution establishes that the material came from its linked GitHub source.
+  Inspect the source when an available read-only tool supports its type, but do not
+  require successful retrieval. Do not proactively search for unattributed copies.
+  Attributed excerpts are legitimate when the author adds their own problem statement or
+  actionable request explaining why the quotation is relevant. If the attribution's
+  scope or the originality of that context is unclear, do not classify the issue as spam.
 
 ## Issue templates
 
