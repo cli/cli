@@ -230,6 +230,9 @@ type telemetryDisablerTransport struct {
 }
 
 func (t telemetryDisablerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// If the request is aimed at an enterprise host, disable telemetry.
+	// Currently, requests that are sent to configured api_hosts will be treated as enterprise hosts,
+	// even though they may be GHEC with Data Residency.
 	if ghauth.IsEnterprise(getHostname(req)) {
 		t.telemetryDisabler.Disable()
 	}
