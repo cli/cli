@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  discussions: read
   issues: read
   copilot-requests: write
 
@@ -47,7 +48,7 @@ engine: copilot
 
 tools:
   github:
-    toolsets: [repos, issues]
+    toolsets: [repos, issues, discussions]
     allowed-repos: ["desktop/gh-cli-and-desktop-shared-workflows", "cli/cli"]
     min-integrity: none
 
@@ -72,6 +73,40 @@ safe-outputs:
       - no-help-wanted-issue
       - invalid
       - duplicate
+      - gh-agent-task
+      - gh-alias
+      - gh-api
+      - gh-attestation
+      - gh-auth
+      - gh-browse
+      - gh-cache
+      - gh-codespace
+      - gh-completion
+      - gh-config
+      - gh-copilot
+      - gh-discussion
+      - gh-extension
+      - gh-gist
+      - gh-gpg-key
+      - gh-help
+      - gh-issue
+      - gh-label
+      - gh-licenses
+      - gh-org
+      - gh-pr
+      - gh-project
+      - gh-reference
+      - gh-release
+      - gh-repo
+      - gh-ruleset
+      - gh-run
+      - gh-search
+      - gh-secret
+      - gh-skill
+      - gh-ssh-key
+      - gh-status
+      - gh-variable
+      - gh-workflow
   jobs:
     apply-suspected-spam:
       description: Apply suspected-spam to the triggering issue
@@ -113,7 +148,10 @@ repository (main branch) using the GitHub file tools:
 2. `skills/issue-classifier/SKILL.md`
 3. `skills/issue-classifier/references/label-taxonomy.md`
 
-These are your primary triage instructions. Follow them exactly.
+These are your primary triage instructions. Follow them exactly for issue
+classification. For command labels, the local `gh-*` entries in the `add-labels`
+allowlist above are complete and authoritative; use them even when the shared taxonomy
+does not list them.
 
 ## Step 2: Read the issue
 
@@ -132,7 +170,16 @@ potential duplicates of this issue. Note your findings for the next step.
 ## Step 4: Classify the issue
 
 Follow the `issue-classifier` skill instructions. Use the `label-taxonomy` reference for
-valid labels. Incorporate your duplicate detection findings.
+issue type, priority, and status labels, and the local allowlist for command labels.
+Incorporate your duplicate detection findings.
+
+Assess the report independently. Treat the reporter's diagnosis, causal claims, and
+expected behavior as hypotheses rather than established facts. Separate direct
+observations from interpretations, check assumptions against available logs, command
+output, reproduction details, documentation, and source, and consider plausible
+alternative explanations before choosing a classification. An expected-vs-actual
+statement alone does not establish a product bug. Do not repeat the reporter's framing
+as your conclusion unless the evidence supports it.
 
 ## Step 5: Check for spam
 
@@ -153,12 +200,29 @@ When you apply `suspected-spam`:
 Be conservative. A false positive closes a real user's issue, so when the evidence is
 mixed, suggest `more-info-needed` instead and let a human decide.
 
-## Step 6: Suggest the remaining labels via safe outputs
+## Step 6: Investigate the likely cause
+
+For a non-spam bug report, perform a first-pass technical investigation before writing
+the comment. Trace the relevant behavior through the current `cli/cli` source and inspect
+recent changes when useful. Form a concise hypothesis that explains how the reported
+symptom could arise, grounded in issue evidence and specific code.
+
+Include this hypothesis in the comment so the first responder has a concrete starting
+point. If available evidence cannot support a useful hypothesis, say what remains unknown
+and name the specific diagnostic evidence needed next; do not invent a cause.
+
+## Step 7: Suggest the remaining labels via safe outputs
 
 If the issue is not spam, use `add-labels` to suggest the appropriate labels (max 3,
 only from the allowlist above). **Emit these labels as suggestions requiring maintainer
 approval - never apply them directly.** Emit each label as an object with `name`,
 `rationale`, `confidence`, and `suggest: true`.
+
+When an issue concerns a specific `gh` command or command family, include the most
+specific matching `gh-*` command label as one of the suggestions. Suggest at most one
+command label, choosing the primary affected command when several are mentioned. The
+command label counts toward the existing three-label maximum; do not omit it merely to
+leave an unused slot.
 
 ## Required comment
 
@@ -169,6 +233,10 @@ After deciding, post **one** comment on issue
 explaining which label(s) you are suggesting (if any) and why, in plain language. For a
 duplicate, name the likely original. If you are suggesting no label, say so and state what
 information would help a first responder finish triage.
+
+When referring to source code, link every file, symbol, or line claim to an immutable
+GitHub permalink pinned to a full commit SHA and exact line range. Do not use branch
+links, bare file paths, or unlinked code references.
 
 When calling `add-comment`, explicitly set `item_number` to
 ${{ github.event.issue.number || inputs.issue_number }}.
