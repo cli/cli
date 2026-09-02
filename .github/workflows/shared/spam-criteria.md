@@ -67,9 +67,11 @@ document, or clarify GitHub CLI belong elsewhere and should be treated as spam.
   which does not establish a sensible context, problem statement, or feedback.
 - An issue whose substantive title or body is copied verbatim from another issue,
   discussion, or comment and presented as a new issue without original context. Verify
-  the match from a linked source, an `Originally posted by` attribution, or an exact
-  phrase search. Quoted excerpts are legitimate when the author adds their own problem
-  statement or actionable request explaining why the quotation is relevant.
+  issue and issue-comment matches with an exact phrase search. Verify discussion matches
+  only from a direct source link or `Originally posted by` attribution because unlinked
+  discussions cannot be searched with the available tools. Quoted excerpts are
+  legitimate when the author adds their own problem statement or actionable request
+  explaining why the quotation is relevant.
 
 ## Issue templates
 
