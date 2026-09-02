@@ -1697,6 +1697,114 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
+func Test_pullRequestLookupFields(t *testing.T) {
+	tests := []struct {
+		name               string
+		editable           shared.Editable
+		interactive        bool
+		hasAssets          bool
+		apiActorsSupported bool
+		want               []string
+	}{
+		{
+			name: "title",
+			editable: shared.Editable{
+				Title: shared.EditableString{Edited: true},
+			},
+			want: []string{"id", "url", "title"},
+		},
+		{
+			name: "body",
+			editable: shared.Editable{
+				Body: shared.EditableString{Edited: true},
+			},
+			want: []string{"id", "url", "body"},
+		},
+		{
+			name: "base",
+			editable: shared.Editable{
+				Base: shared.EditableString{Edited: true},
+			},
+			want: []string{"id", "url", "baseRefName"},
+		},
+		{
+			name: "reviewers",
+			editable: shared.Editable{
+				Reviewers: shared.EditableReviewers{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
+			want: []string{"id", "url", "reviewRequests"},
+		},
+		{
+			name: "assignees with actors",
+			editable: shared.Editable{
+				Assignees: shared.EditableAssignees{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
+			apiActorsSupported: true,
+			want:               []string{"id", "url", "assignedActors"},
+		},
+		{
+			name: "assignees without actors",
+			editable: shared.Editable{
+				Assignees: shared.EditableAssignees{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
+			want: []string{"id", "url", "assignees"},
+		},
+		{
+			name: "labels",
+			editable: shared.Editable{
+				Labels: shared.EditableSlice{Edited: true},
+			},
+			want: []string{"id", "url", "labels"},
+		},
+		{
+			name: "projects",
+			editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
+			want: []string{"id", "url", "projectCards", "projectItems"},
+		},
+		{
+			name: "milestone",
+			editable: shared.Editable{
+				Milestone: shared.EditableString{Edited: true},
+			},
+			want: []string{"id", "url", "milestone"},
+		},
+		{
+			name:      "attachment",
+			hasAssets: true,
+			want:      []string{"id", "url", "body", "repository"},
+		},
+		{
+			name:               "interactive with actors",
+			interactive:        true,
+			apiActorsSupported: true,
+			want:               []string{"id", "url", "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone", "assignedActors"},
+		},
+		{
+			name:        "interactive without actors and with attachment",
+			interactive: true,
+			hasAssets:   true,
+			want:        []string{"id", "url", "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone", "assignees", "repository"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := pullRequestLookupFields(tt.editable, tt.interactive, tt.hasAssets, tt.apiActorsSupported)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // fieldCapturingFinder records the fields a run asks the pull request lookup
 // for, then delegates to the finder it wraps.
 type fieldCapturingFinder struct {

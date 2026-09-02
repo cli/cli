@@ -305,48 +305,13 @@ func editRun(opts *EditOptions) error {
 
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "url"},
+		Fields: pullRequestLookupFields(
+			editable,
+			opts.Interactive,
+			len(opts.Assets) > 0,
+			issueFeatures.ApiActorsSupported,
+		),
 		Detector: opts.Detector,
-	}
-	if opts.Interactive {
-		findOptions.Fields = append(findOptions.Fields, "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone")
-		// TODO ApiActorsSupported
-		if issueFeatures.ApiActorsSupported {
-			findOptions.Fields = append(findOptions.Fields, "assignedActors")
-		} else {
-			findOptions.Fields = append(findOptions.Fields, "assignees")
-		}
-	} else if editable.Title.Edited {
-		findOptions.Fields = append(findOptions.Fields, "title")
-	}
-	if !opts.Interactive && (editable.Body.Edited || len(opts.Assets) > 0) {
-		findOptions.Fields = append(findOptions.Fields, "body")
-	}
-	if !opts.Interactive && editable.Base.Edited {
-		findOptions.Fields = append(findOptions.Fields, "baseRefName")
-	}
-	if !opts.Interactive && editable.Reviewers.Edited {
-		findOptions.Fields = append(findOptions.Fields, "reviewRequests")
-	}
-	if !opts.Interactive && editable.Assignees.Edited {
-		// TODO ApiActorsSupported
-		if issueFeatures.ApiActorsSupported {
-			findOptions.Fields = append(findOptions.Fields, "assignedActors")
-		} else {
-			findOptions.Fields = append(findOptions.Fields, "assignees")
-		}
-	}
-	if !opts.Interactive && editable.Labels.Edited {
-		findOptions.Fields = append(findOptions.Fields, "labels")
-	}
-	if !opts.Interactive && editable.Projects.Edited {
-		findOptions.Fields = append(findOptions.Fields, "projectCards", "projectItems")
-	}
-	if !opts.Interactive && editable.Milestone.Edited {
-		findOptions.Fields = append(findOptions.Fields, "milestone")
-	}
-	if len(opts.Assets) > 0 {
-		findOptions.Fields = append(findOptions.Fields, "repository")
 	}
 
 	pr, repo, err := opts.Finder.Find(findOptions)
@@ -479,6 +444,56 @@ func editRun(opts *EditOptions) error {
 	fmt.Fprintln(opts.IO.Out, pr.URL)
 
 	return uploadErr
+}
+
+func pullRequestLookupFields(editable shared.Editable, interactive, hasAssets, apiActorsSupported bool) []string {
+	fields := []string{"id", "url"}
+
+	if interactive {
+		fields = append(fields, "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone")
+		// TODO ApiActorsSupported
+		if apiActorsSupported {
+			fields = append(fields, "assignedActors")
+		} else {
+			fields = append(fields, "assignees")
+		}
+	} else {
+		if editable.Title.Edited {
+			fields = append(fields, "title")
+		}
+		if editable.Body.Edited || hasAssets {
+			fields = append(fields, "body")
+		}
+		if editable.Base.Edited {
+			fields = append(fields, "baseRefName")
+		}
+		if editable.Reviewers.Edited {
+			fields = append(fields, "reviewRequests")
+		}
+		if editable.Assignees.Edited {
+			// TODO ApiActorsSupported
+			if apiActorsSupported {
+				fields = append(fields, "assignedActors")
+			} else {
+				fields = append(fields, "assignees")
+			}
+		}
+		if editable.Labels.Edited {
+			fields = append(fields, "labels")
+		}
+		if editable.Projects.Edited {
+			fields = append(fields, "projectCards", "projectItems")
+		}
+		if editable.Milestone.Edited {
+			fields = append(fields, "milestone")
+		}
+	}
+
+	if hasAssets {
+		fields = append(fields, "repository")
+	}
+
+	return fields
 }
 
 // reviewerSearchFunc is intended to be an arg for MultiSelectWithSearch
