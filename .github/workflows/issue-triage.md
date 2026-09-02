@@ -147,7 +147,10 @@ repository (main branch) using the GitHub file tools:
 2. `skills/issue-classifier/SKILL.md`
 3. `skills/issue-classifier/references/label-taxonomy.md`
 
-These are your primary triage instructions. Follow them exactly.
+These are your primary triage instructions. Follow them exactly for issue
+classification. For command labels, the local `gh-*` entries in the `add-labels`
+allowlist above are complete and authoritative; use them even when the shared taxonomy
+does not list them.
 
 ## Step 2: Read the issue
 
@@ -166,7 +169,8 @@ potential duplicates of this issue. Note your findings for the next step.
 ## Step 4: Classify the issue
 
 Follow the `issue-classifier` skill instructions. Use the `label-taxonomy` reference for
-valid labels. Incorporate your duplicate detection findings.
+issue type, priority, and status labels, and the local allowlist for command labels.
+Incorporate your duplicate detection findings.
 
 Assess the report independently. Treat the reporter's diagnosis, causal claims, and
 expected behavior as hypotheses rather than established facts. Separate direct
