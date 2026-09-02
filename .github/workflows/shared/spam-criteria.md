@@ -71,10 +71,11 @@ document, or clarify GitHub CLI belong elsewhere and should be treated as spam.
   repost. Retrieve the linked GitHub source and compare its content with the issue. Apply
   this criterion only when retrieval succeeds and confirms the substantive content was
   copied verbatim. If the source type is unsupported, retrieval fails, the content
-  differs, or the comparison is inconclusive, do not classify the issue as spam. Do not
-  proactively search for unattributed copies. Attributed excerpts are legitimate when
-  the author adds their own problem statement or actionable request explaining why the
-  quotation is relevant.
+  differs, or the comparison is inconclusive, this provenance criterion does not apply;
+  continue evaluating every other spam indicator independently. Do not proactively
+  search for unattributed copies. Attributed excerpts are legitimate under this
+  provenance criterion when the author adds their own problem statement or actionable
+  request explaining why the quotation is relevant.
 
 ## Issue templates
 
