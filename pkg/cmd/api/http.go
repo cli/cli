@@ -20,6 +20,8 @@ func httpRequest(client *http.Client, hostname string, apiHost string, method st
 		// Absolute URLs are used as-is; api_host is never applied to them.
 		requestURL = p
 	} else if isGraphQL {
+		// First we determine the GQL endpoint for the canonical host, which depends on what type of host it is
+		// e.g github.com will be at https://api.github.com/graphql and GHES myghes.com will be at https://myghes.com/api/graphql.
 		requestURL = ghinstance.GraphQLEndpoint(hostname)
 		if apiHost != "" {
 			requestURL = swapURLHost(requestURL, apiHost)
