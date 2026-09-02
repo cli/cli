@@ -135,6 +135,37 @@ testData:
 
       _Originally posted by @babakks in [#11241](https://github.com/cli/cli/issues/11241#issuecomment-3049268353)_
       </BODY>
+  - name: 'spam, #14284 library-integration design advice'
+    expected: FAIL
+    input: |
+      <TITLE>
+      Should I code my tool in Go leveraging gh as a library?
+      </TITLE>
+
+      <BODY>
+      I want to make a tool for my multi-repository project to simplify building,
+      fetching dependencies, and making releases. I would like to use gh for easy
+      access to GitHub functionality.
+
+      Should I code my tool in Go leveraging gh as a library, or should I write it
+      in any language and call gh when needed?
+      </BODY>
+  - name: legitimate, request for a supported public Go library API
+    expected: PASS
+    input: |
+      <TITLE>
+      Expose a supported public Go API for GitHub CLI functionality
+      </TITLE>
+
+      <BODY>
+      Please add and document a stable public Go API that other applications can use
+      for GitHub CLI authentication and repository operations. Invoking the gh
+      executable for every operation adds process overhead and makes typed error
+      handling difficult.
+
+      This would require maintainers to define compatibility guarantees and publish
+      supported packages separately from GitHub CLI's internal packages.
+      </BODY>
   - name: spam, legible nonsense
     expected: FAIL
     input: |
