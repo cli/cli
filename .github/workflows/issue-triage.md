@@ -72,6 +72,40 @@ safe-outputs:
       - no-help-wanted-issue
       - invalid
       - duplicate
+      - gh-agent-task
+      - gh-alias
+      - gh-api
+      - gh-attestation
+      - gh-auth
+      - gh-browse
+      - gh-cache
+      - gh-codespace
+      - gh-completion
+      - gh-config
+      - gh-copilot
+      - gh-discussion
+      - gh-extension
+      - gh-gist
+      - gh-gpg-key
+      - gh-help
+      - gh-issue
+      - gh-label
+      - gh-licenses
+      - gh-org
+      - gh-pr
+      - gh-project
+      - gh-reference
+      - gh-release
+      - gh-repo
+      - gh-ruleset
+      - gh-run
+      - gh-search
+      - gh-secret
+      - gh-skill
+      - gh-ssh-key
+      - gh-status
+      - gh-variable
+      - gh-workflow
   jobs:
     apply-suspected-spam:
       description: Apply suspected-spam to the triggering issue
@@ -183,6 +217,12 @@ If the issue is not spam, use `add-labels` to suggest the appropriate labels (ma
 only from the allowlist above). **Emit these labels as suggestions requiring maintainer
 approval - never apply them directly.** Emit each label as an object with `name`,
 `rationale`, `confidence`, and `suggest: true`.
+
+When an issue concerns a specific `gh` command or command family, include the most
+specific matching `gh-*` command label as one of the suggestions. Suggest at most one
+command label, choosing the primary affected command when several are mentioned. The
+command label counts toward the existing three-label maximum; do not omit it merely to
+leave an unused slot.
 
 ## Required comment
 
