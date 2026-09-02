@@ -66,6 +66,9 @@ func NewCmdAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *cobra.C
 		},
 		GroupID:            "alias",
 		DisableFlagParsing: true,
+		Annotations: map[string]string{
+			aliasExpansionAnnotation: aliasValue,
+		},
 	}
 	cmdutil.DisableAuthCheck(cmd)
 	// Aliases are user-defined names and must not be reported as telemetry

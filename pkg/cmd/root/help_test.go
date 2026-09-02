@@ -1,6 +1,7 @@
 package root
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -122,4 +123,75 @@ func assertPipesAreInCodeBlocks(t *testing.T, cmd *cobra.Command) {
 	}
 
 	checkNode(doc)
+}
+
+func TestWriteHelp_aliasResolution(t *testing.T) {
+	newRoot := func() (*cobra.Command, *iostreams.IOStreams) {
+		ios, _, _, _ := iostreams.Test()
+		rootCmd := &cobra.Command{Use: "gh"}
+		prCmd := &cobra.Command{Use: "pr", Short: "Manage pull requests"}
+		listCmd := &cobra.Command{Use: "list", Short: "List pull requests", Run: func(*cobra.Command, []string) {}}
+		listCmd.Flags().Int("limit", 30, "Maximum number of items to fetch")
+		prCmd.AddCommand(listCmd)
+		rootCmd.AddCommand(prCmd)
+		return rootCmd, ios
+	}
+
+	t.Run("configured alias renders the target command help", func(t *testing.T) {
+		rootCmd, ios := newRoot()
+		aliasCmd := NewCmdAlias(ios, "prs", "pr list")
+		rootCmd.AddCommand(aliasCmd)
+
+		var buf bytes.Buffer
+		WriteHelp(&buf, ios.ColorScheme(), aliasCmd)
+
+		out := buf.String()
+		require.Contains(t, out, "gh pr list")
+		require.Contains(t, out, "--limit")
+		require.NotContains(t, out, `Alias for "pr list"`)
+	})
+
+	t.Run("alias expansion carrying flags still resolves to the target", func(t *testing.T) {
+		rootCmd, ios := newRoot()
+		aliasCmd := NewCmdAlias(ios, "prs", "pr list --limit 5")
+		rootCmd.AddCommand(aliasCmd)
+
+		var buf bytes.Buffer
+		WriteHelp(&buf, ios.ColorScheme(), aliasCmd)
+
+		require.Contains(t, buf.String(), "gh pr list")
+	})
+
+	t.Run("shell alias has no target and renders its own help", func(t *testing.T) {
+		rootCmd, ios := newRoot()
+		aliasCmd := NewCmdShellAlias(ios, "sh", "!echo hi")
+		rootCmd.AddCommand(aliasCmd)
+
+		var buf bytes.Buffer
+		WriteHelp(&buf, ios.ColorScheme(), aliasCmd)
+
+		require.Contains(t, buf.String(), "gh sh")
+	})
+
+	t.Run("alias expanding to an unknown command falls back to the alias", func(t *testing.T) {
+		rootCmd, ios := newRoot()
+		aliasCmd := NewCmdAlias(ios, "zz", "nope missing")
+		rootCmd.AddCommand(aliasCmd)
+
+		var buf bytes.Buffer
+		WriteHelp(&buf, ios.ColorScheme(), aliasCmd)
+
+		require.Contains(t, buf.String(), "gh zz")
+	})
+
+	t.Run("non-alias command is unaffected", func(t *testing.T) {
+		rootCmd, ios := newRoot()
+		target, _, err := rootCmd.Find([]string{"pr", "list"})
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+		WriteHelp(&buf, ios.ColorScheme(), target)
+
+		require.Contains(t, buf.String(), "gh pr list")
+	})
 }
