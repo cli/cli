@@ -145,8 +145,8 @@ github.com/charmbracelet/x/xpty v0.1.3/go.mod h1:poPYpWuLDBFCKmKLDnhBp51ATa0ooD8
 github.com/cli/browser v1.0.0/go.mod h1:IEWkHYbLjkhtjwwWlwTHW2lGxeS5gezEQBMLTwDHf5Q=
 github.com/cli/browser v1.3.0 h1:LejqCrpWr+1pRqmEPDGnTZOjsMe7sehifLynZJuqJpo=
 github.com/cli/browser v1.3.0/go.mod h1:HH8s+fOAxjhQoBUAsKuPCbqUuxZDhQ2/aD+SzsEfBTk=
-github.com/cli/go-gh/v2 v2.13.1-0.20260828131725-441165930903 h1:R5sOzspafj+29HvJ69hW2n/lxdreY8obIMt+6ocEo9c=
-github.com/cli/go-gh/v2 v2.13.1-0.20260828131725-441165930903/go.mod h1:rabojrPy/l48e2MDmQP+7FDjJalu5fL0wDDfcorZxJg=
+github.com/cli/go-gh/v2 v2.15.0 h1:LF5lDLs6yLaUgUlvki/D9syUGYnYaJXjzYXpazTqYdw=
+github.com/cli/go-gh/v2 v2.15.0/go.mod h1:OaJTFtHJapQq670h/3L0vqm4NwZGoJmSAVctWiY+3pQ=
 github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24 h1:QDrhR4JA2n3ij9YQN0u5ZeuvRIIvsUGmf5yPlTS0w8E=
 github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24/go.mod h1:rr9GNING0onuVw8MnracQHn7PcchnFlP882Y0II2KZk=
 github.com/cli/oauth v1.2.2 h1:/qG/wok8jzu66tx7q+duGOIp4DT5P/ACXrdc33UoNUQ=
@@ -325,8 +325,8 @@ github.com/hashicorp/hcl v1.0.1-vault-7 h1:ag5OxFVy3QYTFTJODRzTKVZ6xvdfLLCA1cy/Y
 github.com/hashicorp/hcl v1.0.1-vault-7/go.mod h1:XYhtn6ijBSAj6n4YqAaf7RBPS4I06AItNorpy+MoQNM=
 github.com/hashicorp/vault/api v1.22.0 h1:+HYFquE35/B74fHoIeXlZIP2YADVboaPjaSicHEZiH0=
 github.com/hashicorp/vault/api v1.22.0/go.mod h1:IUZA2cDvr4Ok3+NtK2Oq/r+lJeXkeCrHRmqdyWfpmGM=
-github.com/henvic/httpretty v0.1.4 h1:Jo7uwIRWVFxkqOnErcoYfH90o3ddQyVrSANeS4cxYmU=
-github.com/henvic/httpretty v0.1.4/go.mod h1:Dn60sQTZfbt2dYsdUSNsCljyF4AfdqnuJFDLJA1I4AM=
+github.com/henvic/httpretty v0.2.0 h1:U4pKgF9SV4uRrE/7PF85TVnCJxXA91zKFpYU0iFwFOw=
+github.com/henvic/httpretty v0.2.0/go.mod h1:4LSlqxtJoYd+gt1lsqh9omUUziIVwoVsxdW15hZHTcI=
 github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
 github.com/hinshun/vt10x v0.0.0-20220119200601-820417d04eec h1:qv2VnGeEQHchGaZ/u7lxST/RaJw+cv273q79D81Xbog=
@@ -497,8 +497,8 @@ github.com/theupdateframework/go-tuf v0.7.0 h1:CqbQFrWo1ae3/I0UCblSbczevCCbS31Qv
 github.com/theupdateframework/go-tuf v0.7.0/go.mod h1:uEB7WSY+7ZIugK6R1hiBMBjQftaFzn7ZCDJcp1tCUug=
 github.com/theupdateframework/go-tuf/v2 v2.4.2 h1:w7976/W8uTwlsegP5nRymlpjPgrwSh+AXUf85is6nJk=
 github.com/theupdateframework/go-tuf/v2 v2.4.2/go.mod h1:JqBrIUnNLAaNq/8GmBcEMFWfAFBbqp/MkJEJseXKbks=
-github.com/thlib/go-timezone-local v0.0.7 h1:fX8zd3aJydqLlTs/TrROrIIdztzsdFV23OzOQx31jII=
-github.com/thlib/go-timezone-local v0.0.7/go.mod h1:/Tnicc6m/lsJE0irFMA0LfIwTBo4QP7A8IfyIv4zZKI=
+github.com/thlib/go-timezone-local v0.0.8 h1:wPh1JtBHBqAKmYjHD4j6GbQMGGbOOOnB6YRMQUTzYAY=
+github.com/thlib/go-timezone-local v0.0.8/go.mod h1:/Tnicc6m/lsJE0irFMA0LfIwTBo4QP7A8IfyIv4zZKI=
 github.com/tink-crypto/tink-go-awskms/v3 v3.0.0 h1:XSohRhCkXAVI0iaCnWB/GS05TEmpnKurQmzaY1jzt3Y=
 github.com/tink-crypto/tink-go-awskms/v3 v3.0.0/go.mod h1:+7MXsShLzVbSQ6dI0Pe4JuZM52jD1jQ1itAygd/MDsA=
 github.com/tink-crypto/tink-go-gcpkms/v2 v2.3.0 h1:3s6YMgMOBZRU8qG6ybpKSF2Sau+y3sMvxR911M59SwA=

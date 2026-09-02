@@ -18,7 +18,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
-	github.com/cli/go-gh/v2 v2.13.1-0.20260828131725-441165930903
+	github.com/cli/go-gh/v2 v2.15.0
 	github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24
 	github.com/cli/oauth v1.2.2
 	github.com/cli/safeexec v1.0.1
@@ -134,7 +134,7 @@ require (
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 // indirect
-	github.com/henvic/httpretty v0.1.4 // indirect
+	github.com/henvic/httpretty v0.2.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/in-toto/in-toto-golang v0.11.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -168,7 +168,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
-	github.com/thlib/go-timezone-local v0.0.7 // indirect
+	github.com/thlib/go-timezone-local v0.0.8 // indirect
 	github.com/transparency-dev/formats v0.1.1 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
