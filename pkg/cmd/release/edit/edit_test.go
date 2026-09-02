@@ -504,45 +504,6 @@ func Test_editRelease_httpError(t *testing.T) {
 	assert.Nil(t, release)
 }
 
-func Test_editRelease_decodeError(t *testing.T) {
-	reg := &httpmock.Registry{}
-	defer reg.Verify(t)
-	reg.Register(
-		func(req *http.Request) bool {
-			return req.Method == http.MethodPatch &&
-				req.URL.EscapedPath() == "/repos/OWNER/REPO/releases/12345" &&
-				req.URL.Host == "api.github.com"
-		},
-		httpmock.StatusStringResponse(200, `{`),
-	)
-
-	httpClient := &http.Client{Transport: reg}
-	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]any{"tag_name": "v1.2.3"})
-
-	require.Error(t, err)
-	assert.NotNil(t, release) // decode was attempted - non-nil pointer even on decode error
-}
-
-func Test_editRelease_204(t *testing.T) {
-	reg := &httpmock.Registry{}
-	defer reg.Verify(t)
-	reg.Register(
-		func(req *http.Request) bool {
-			return req.Method == http.MethodPatch &&
-				req.URL.EscapedPath() == "/repos/OWNER/REPO/releases/12345" &&
-				req.URL.Host == "api.github.com"
-		},
-		httpmock.StatusStringResponse(204, ""),
-	)
-
-	httpClient := &http.Client{Transport: reg}
-	release, err := editRelease(httpClient, ghrepo.New("OWNER", "REPO"), 12345, map[string]any{"tag_name": "v1.2.3"})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unexpected end of JSON input")
-	assert.NotNil(t, release)
-}
-
 func Test_editRelease_bodyReadError(t *testing.T) {
 	readErr := errors.New("read: connection reset by peer")
 	reg := &httpmock.Registry{}

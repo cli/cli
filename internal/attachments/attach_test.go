@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,7 @@ func writeFiles(t *testing.T, names ...string) {
 
 func testUploader(reg *httpmock.Registry) *Uploader {
 	return &Uploader{
-		httpClient:       &http.Client{Transport: reg},
+		client:           api.NewClientFromHTTP(&http.Client{Transport: reg}),
 		host:             "github.com",
 		targetRepository: 1234,
 	}

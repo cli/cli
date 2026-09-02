@@ -418,6 +418,8 @@ func apiRun(opts *ApiOptions) error {
 		host = opts.Hostname
 	}
 
+	apiHost, _ := cfg.Authentication().APIHostForHost(host)
+
 	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
 	err = tmpl.Parse(opts.Template)
 	if err != nil {
@@ -427,7 +429,7 @@ func apiRun(opts *ApiOptions) error {
 	isFirstPage := true
 	hasNextPage := true
 	for hasNextPage {
-		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
+		resp, err := httpRequest(httpClient, host, apiHost, method, requestPath, requestBody, requestHeaders)
 		if err != nil {
 			return err
 		}

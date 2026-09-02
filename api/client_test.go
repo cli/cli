@@ -330,7 +330,7 @@ func TestHTTPHeaders(t *testing.T) {
 	ios, _, _, stderr := iostreams.Test()
 	httpClient, err := NewHTTPClient(HTTPClientOptions{
 		AppVersion: "v1.2.3",
-		Config:     tinyConfig{ts.URL[7:] + ":oauth_token": "MYTOKEN"},
+		Config:     tinyConfig{serverHostname(t, ts.URL) + ":oauth_token": "MYTOKEN"},
 		Log:        ios.ErrOut,
 	})
 	assert.NoError(t, err)
@@ -350,4 +350,118 @@ func TestHTTPHeaders(t *testing.T) {
 		assert.Equal(t, value, gotReq.Header.Get(name), name)
 	}
 	assert.Equal(t, "", stderr.String())
+}
+
+// TestWithoutFollowingRedirects verifies that WithoutFollowingRedirects stops the request at the
+// redirect and surfaces an HTTPError rather than following through. It also proves the redirect is
+// not followed by recording every method the transport sees: without the option the transport would
+// receive a second call (GET, because Go demotes non-GET/HEAD to GET on a 301/302/303
+// follow); with it, only the original DELETE arrives.
+//
+// go-gh's RequestWithContext converts any non-2xx response - including 3xx - into an HTTPError.
+// When http.ErrUseLastResponse stops a redirect the client returns the 3xx response with a nil
+// error, so the 3xx reaches RequestWithContext's success check and becomes an HTTPError. This is
+// the correct behaviour for repo delete: the caller learns the operation failed rather than
+// receiving a misleading success.
+func TestWithoutFollowingRedirects(t *testing.T) {
+	newCountingTransport := func(methods *[]string) http.RoundTripper {
+		return roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			*methods = append(*methods, req.Method)
+			resp := &http.Response{
+				StatusCode: http.StatusMovedPermanently,
+				Header:     http.Header{"Location": []string{"https://api.github.com/repos/OWNER/RENAMED"}},
+				Body:       io.NopCloser(bytes.NewBufferString("")),
+				Request:    req,
+			}
+			return resp, nil
+		})
+	}
+
+	t.Run("without option: redirect is followed, DELETE becomes GET", func(t *testing.T) {
+		var methods []string
+		transport := newCountingTransport(&methods)
+		// Second request (the followed redirect) must also be handled by the transport.
+		redirectTransport := redirectFollowingTransport{
+			inner:   transport,
+			methods: &methods,
+		}
+		client := NewClientFromHTTP(&http.Client{Transport: redirectTransport})
+
+		_, _ = client.Request("github.com", http.MethodDelete, "repos/OWNER/REPO", nil)
+
+		// The transport sees DELETE then GET because Go's default policy demotes DELETE to GET.
+		require.GreaterOrEqual(t, len(methods), 2)
+		assert.Equal(t, http.MethodDelete, methods[0])
+		assert.Equal(t, http.MethodGet, methods[1])
+	})
+
+	t.Run("with option: redirect is not followed, HTTPError carries redirect status", func(t *testing.T) {
+		var methods []string
+		client := NewClientFromHTTP(&http.Client{Transport: newCountingTransport(&methods)})
+
+		_, err := client.Request("github.com", http.MethodDelete, "repos/OWNER/REPO", nil, WithoutFollowingRedirects())
+		require.Error(t, err)
+
+		var httpErr HTTPError
+		require.ErrorAs(t, err, &httpErr)
+		assert.Equal(t, http.StatusMovedPermanently, httpErr.StatusCode)
+
+		// Transport is only asked for the original DELETE; the redirect is never followed.
+		assert.Equal(t, []string{http.MethodDelete}, methods)
+	})
+}
+
+// roundTripFunc lets a plain function satisfy http.RoundTripper.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+// redirectFollowingTransport serves the second (redirect-follow) request with a 204 so that the
+// test for the no-option case can complete without a transport error.
+type redirectFollowingTransport struct {
+	inner   http.RoundTripper
+	methods *[]string
+}
+
+func (t redirectFollowingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(*t.methods) == 0 {
+		return t.inner.RoundTrip(req)
+	}
+	*t.methods = append(*t.methods, req.Method)
+	return &http.Response{
+		StatusCode: http.StatusNoContent,
+		Header:     http.Header{},
+		Body:       io.NopCloser(bytes.NewBufferString("")),
+		Request:    req,
+	}, nil
+}
+
+func TestUnexpectedStatusError(t *testing.T) {
+	tests := []struct {
+		name        string
+		resp        *http.Response
+		wantMessage string
+	}{
+		{
+			name: "populated request",
+			resp: func() *http.Response {
+				req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/OWNER/REPO", nil)
+				require.NoError(t, err)
+				return &http.Response{StatusCode: http.StatusCreated, Request: req}
+			}(),
+			wantMessage: "unexpected HTTP 201 for GET https://api.github.com/repos/OWNER/REPO",
+		},
+		{
+			name:        "nil request",
+			resp:        &http.Response{StatusCode: http.StatusNoContent},
+			wantMessage: "unexpected HTTP 204",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := UnexpectedStatusError(tt.resp)
+			require.Error(t, err)
+			assert.Equal(t, tt.wantMessage, err.Error())
+		})
+	}
 }

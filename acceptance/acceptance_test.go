@@ -73,7 +73,7 @@ func TestAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "api"))
 }
 
 func TestAuth(t *testing.T) {
@@ -82,7 +82,16 @@ func TestAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "auth"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "auth"))
+}
+
+func TestGists(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "gist"))
 }
 
 func TestGPGKeys(t *testing.T) {
@@ -91,7 +100,7 @@ func TestGPGKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "gpg-key"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "gpg-key"))
 }
 
 func TestExtensions(t *testing.T) {
@@ -100,7 +109,7 @@ func TestExtensions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "extension"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "extension"))
 }
 
 func TestIssues(t *testing.T) {
@@ -109,7 +118,7 @@ func TestIssues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "issue"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "issue"))
 }
 
 func TestDiscussions(t *testing.T) {
@@ -118,7 +127,7 @@ func TestDiscussions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "discussion"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "discussion"))
 }
 
 func TestIssues2_0(t *testing.T) {
@@ -127,7 +136,7 @@ func TestIssues2_0(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "issues-2.0"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "issues-2.0"))
 }
 
 func TestLabels(t *testing.T) {
@@ -136,7 +145,7 @@ func TestLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "label"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "label"))
 }
 
 func TestOrg(t *testing.T) {
@@ -145,7 +154,7 @@ func TestOrg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "org"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "org"))
 }
 
 func TestProject(t *testing.T) {
@@ -154,7 +163,7 @@ func TestProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "project"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "project"))
 }
 
 func TestPullRequests(t *testing.T) {
@@ -163,7 +172,7 @@ func TestPullRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "pr"))
 }
 
 func TestReleases(t *testing.T) {
@@ -172,7 +181,7 @@ func TestReleases(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "release"))
 }
 
 func TestRepo(t *testing.T) {
@@ -181,7 +190,7 @@ func TestRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "repo"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "repo"))
 }
 
 func TestRulesets(t *testing.T) {
@@ -190,7 +199,7 @@ func TestRulesets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "ruleset"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "ruleset"))
 }
 
 func TestSearches(t *testing.T) {
@@ -199,7 +208,7 @@ func TestSearches(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "search"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "search"))
 }
 
 func TestSecrets(t *testing.T) {
@@ -208,7 +217,7 @@ func TestSecrets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "secret"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "secret"))
 }
 
 func TestSSHKeys(t *testing.T) {
@@ -217,7 +226,7 @@ func TestSSHKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "ssh-key"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "ssh-key"))
 }
 
 func TestVariables(t *testing.T) {
@@ -226,7 +235,7 @@ func TestVariables(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "variable"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "variable"))
 }
 
 func TestWorkflows(t *testing.T) {
@@ -235,7 +244,7 @@ func TestWorkflows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "workflow"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "workflow"))
 }
 
 func TestTelemetry(t *testing.T) {
@@ -244,18 +253,21 @@ func TestTelemetry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "telemetry"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "telemetry"))
 }
 
-func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
-	var files []string
-	if tsEnv.script != "" {
-		files = []string{path.Join("testdata", command, tsEnv.script)}
-	}
+func testScriptParamsFor(t *testing.T, tsEnv testScriptEnv, command string) testscript.Params {
+	t.Helper()
+	files, filtered := selectScripts(command, tsEnv.scripts)
 
 	var dir string
-	if len(files) == 0 {
+	if !filtered {
+		// No filter was set - run everything in the directory.
 		dir = path.Join("testdata", command)
+	} else if len(files) == 0 {
+		// A filter was set but none of the selected scripts belong to this
+		// command directory, so skip rather than running the whole directory.
+		t.Skipf("testdata/%s: no selected script belongs to this command directory", command)
 	}
 
 	return testscript.Params{
@@ -287,11 +299,41 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 
 		ts.Setenv("GH_HOST", tsEnv.host)
 		ts.Setenv("ORG", tsEnv.org)
-		ts.Setenv("GH_TOKEN", tsEnv.token)
+
+		if tsEnv.apiHost == "" {
+			ts.Setenv("GH_TOKEN", tsEnv.token)
+		} else {
+			// api_host is only readable from hosts.yml, and a GH_TOKEN in the
+			// environment resolves auth without ever consulting that file, so
+			// the token has to move into the same place as the override.
+			hostsFile := filepath.Join(ts.Cd, "hosts.yml")
+			hostsContent := fmt.Sprintf(""+
+				"%[1]s:\n"+
+				"    user: %[2]s\n"+
+				"    oauth_token: %[3]s\n"+
+				"    git_protocol: https\n"+
+				"    api_host: %[4]s\n"+
+				"    users:\n"+
+				"        %[2]s:\n"+
+				"            oauth_token: %[3]s\n",
+				tsEnv.host, tsEnv.user, tsEnv.token, tsEnv.apiHost)
+			if err := os.WriteFile(hostsFile, []byte(hostsContent), 0o600); err != nil {
+				return fmt.Errorf("writing sandbox hosts.yml: %w", err)
+			}
+		}
 
 		ts.Setenv("RANDOM_STRING", randomString(10))
 
 		ts.Setenv("GH_TELEMETRY", "false")
+
+		// testscript constructs a fresh environment from a fixed allowlist and
+		// does not propagate SSL_CERT_FILE. When the operator has set it - for
+		// instance because all API traffic routes through a gateway whose CA is
+		// not in the system bundle - honour that intent explicitly, or every
+		// request inside the sandbox will fail certificate verification.
+		if certFile := os.Getenv("SSL_CERT_FILE"); certFile != "" {
+			ts.Setenv("SSL_CERT_FILE", certFile)
+		}
 
 		// The sandbox overrides HOME, so git cannot find the user's global
 		// config. Write a minimal identity so commits inside the sandbox
@@ -560,8 +602,16 @@ type testScriptEnv struct {
 	host  string
 	org   string
 	token string
+	user  string
 
-	script string
+	// scripts optionally narrows a run to named scripts within the command
+	// directory being run. Empty means run every script in the directory.
+	scripts []string
+
+	// apiHost, when set, routes API traffic through that hostname by writing a
+	// hosts.yml instead of authenticating from GH_TOKEN. Used by the gateway
+	// harness in script/api-host-gateway.
+	apiHost string
 
 	skipDefer       bool
 	preserveWorkDir bool
@@ -599,9 +649,14 @@ func (e *testScriptEnv) fromEnv() error {
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
 
-	e.script = os.Getenv("GH_ACCEPTANCE_SCRIPT")
+	e.scripts = parseScriptFilter(os.Getenv("GH_ACCEPTANCE_SCRIPT"))
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
 	e.skipDefer = os.Getenv("GH_ACCEPTANCE_SKIP_DEFER") == "true"
+	e.apiHost = os.Getenv("GH_ACCEPTANCE_API_HOST")
+	e.user = os.Getenv("GH_ACCEPTANCE_USER")
+	if e.apiHost != "" && e.user == "" {
+		return fmt.Errorf("GH_ACCEPTANCE_USER is required when GH_ACCEPTANCE_API_HOST is set")
+	}
 
 	return nil
 }
@@ -611,5 +666,5 @@ func TestSkills(t *testing.T) {
 	if err := tsEnv.fromEnv(); err != nil {
 		t.Fatal(err)
 	}
-	testscript.Run(t, testScriptParamsFor(tsEnv, "skills"))
+	testscript.Run(t, testScriptParamsFor(t, tsEnv, "skills"))
 }

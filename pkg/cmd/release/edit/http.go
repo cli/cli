@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -22,38 +20,20 @@ func editRelease(httpClient *http.Client, repo ghrepo.Interface, releaseID int64
 		return nil, err
 	}
 
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", strconv.FormatInt(releaseID, 10))
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("PATCH", url.String(), bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	// TODO(api-client-rollout)
-	// This has been deferred from moving to api.Client because its return shape depends on the response status code, which api.Client.REST does not expose on success.
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", strconv.FormatInt(releaseID, 10))
 	if err != nil {
 		return nil, err
 	}
 
 	var newRelease shared.Release
-	err = json.Unmarshal(b, &newRelease)
-	return &newRelease, err
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	if err := api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodPatch, path.String(), bytes.NewBuffer(bodyBytes), &newRelease); err != nil {
+		return nil, err
+	}
+
+	return &newRelease, nil
 }
 
 func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {

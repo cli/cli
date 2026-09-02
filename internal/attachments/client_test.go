@@ -56,6 +56,10 @@ func (c staticTokenConfig) ActiveToken(host string) (string, string) {
 	return c[host], "oauth_token"
 }
 
+func (c staticTokenConfig) HostForAPIHost(apiHost string) (string, bool) {
+	return "", false
+}
+
 func TestUpload(t *testing.T) {
 	a := testAsset(t, "shot.png", "image/png", "the bytes")
 

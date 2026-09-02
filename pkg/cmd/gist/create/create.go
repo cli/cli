@@ -17,7 +17,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
@@ -273,26 +272,20 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 		return nil, err
 	}
 
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname), "gists")
+	path, err := safeurl.JoinPath("gists")
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, u.String(), requestBody)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
-	resp, err := client.Do(req)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(client).Request(hostname, http.MethodPost, path.String(), requestBody,
+		api.WithEndpointScopes("gist"))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		api.EndpointNeedsScopes(resp, "gist")
-		return nil, api.HandleHTTPError(resp)
-	}
 
 	result := &shared.Gist{}
 	dec := json.NewDecoder(resp.Body)

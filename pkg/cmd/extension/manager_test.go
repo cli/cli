@@ -540,7 +540,7 @@ func TestManager_MigrateToBinaryExtension(t *testing.T) {
 				Assets: []releaseAsset{
 					{
 						Name:   "gh-remote-windows-amd64.exe",
-						APIURL: "/release/cool",
+						APIURL: "https://example.com/release/cool",
 					},
 				},
 			}))
@@ -552,7 +552,7 @@ func TestManager_MigrateToBinaryExtension(t *testing.T) {
 				Assets: []releaseAsset{
 					{
 						Name:   "gh-remote-windows-amd64.exe",
-						APIURL: "/release/cool",
+						APIURL: "https://example.com/release/cool",
 					},
 				},
 			}))

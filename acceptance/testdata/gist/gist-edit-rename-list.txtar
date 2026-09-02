@@ -1,0 +1,60 @@
+# Gists are owned by the authenticated user rather than an org, so unlike most
+# other acceptance scripts there is no repository to create or clean up.
+#
+# Only --add is exercised here. Editing a file's content, and editing the
+# description on its own, both fall through to an interactive editor, so they
+# cannot be driven from a script. --remove is left out deliberately, because it
+# issues the same update request as --add and so covers no further ground.
+#
+# Every update to an existing gist is followed by a sleep. A read that comes
+# straight after an update serves the previous state around twice in ten
+# attempts, and it settles within about a second and a half. The sleeps matter
+# most before the next gh command rather than before an assertion: rename reads
+# the gist to build its update, so a stale read there renames nothing at all and
+# still exits 0, leaving the gist permanently wrong rather than briefly behind.
+# Creating a gist reads back consistently, so it needs no sleep.
+
+# Setup useful env vars
+env GIST_DESC=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Create a gist from a file, capturing its URL
+exec gh gist create first.txt --desc ${GIST_DESC}
+stdout2env GIST_URL
+
+# Defer gist cleanup
+defer gh gist delete --yes ${GIST_URL}
+
+# Add a second file to the gist
+exec gh gist edit ${GIST_URL} --add second.txt
+sleep 5
+
+# Check both files are now in the gist
+exec gh gist view ${GIST_URL} --files
+stdout 'first.txt'
+stdout 'second.txt'
+
+# Rename the second file. Checking that the new name is present is enough to
+# prove the rename happened, and asserting the absence of the old name would
+# only add another chance to read the gist before the write has settled.
+exec gh gist rename ${GIST_URL} second.txt renamed.txt
+sleep 5
+
+# Check the rename took effect
+exec gh gist view ${GIST_URL} --files
+stdout 'first.txt'
+stdout 'renamed.txt'
+
+# Check the renamed file kept its content
+exec gh gist view ${GIST_URL} --filename renamed.txt --raw
+stdout 'the second file'
+
+# Find the gist by description, which lists secret gists by default
+exec gh gist list --filter ${GIST_DESC}
+stdout ${GIST_DESC}
+stdout '2 files'
+stdout 'secret'
+
+-- first.txt --
+the first file
+-- second.txt --
+the second file

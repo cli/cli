@@ -299,7 +299,7 @@ func TestGetRawGistFile(t *testing.T) {
 			)
 
 			client := &http.Client{Transport: reg}
-			result, err := GetRawGistFile(client, safeurl.NewImmutableSafeURL("https://gist.githubusercontent.com/raw-url"))
+			result, err := GetRawGistFile(client, "github.com", safeurl.NewImmutableSafeURL("https://gist.githubusercontent.com/raw-url"))
 
 			if tt.wantErr {
 				assert.Error(t, err)

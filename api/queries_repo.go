@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -651,13 +650,13 @@ func RenameRepo(client *Client, repo ghrepo.Interface, newRepoName string) (*Rep
 		return nil, err
 	}
 
-	path, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
 	if err != nil {
 		return nil, err
 	}
 
 	result := repositoryV3{}
-	err = client.REST(repo.RepoHost(), "PATCH", path.String(), body, &result)
+	err = client.REST(repo.RepoHost(), http.MethodPatch, path.String(), body, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1675,26 +1674,30 @@ func GetRepoIDs(client *Client, host string, repositories []ghrepo.Interface) ([
 }
 
 func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName())
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName())
 	if err != nil {
 		return false, err
 	}
 
-	resp, err := client.HTTP().Head(u.String())
+	// A HEAD request has no body to decode, so Request is used rather than REST. Existence is
+	// decided by the status alone.
+	resp, err := client.Request(repo.RepoHost(), http.MethodHead, path.String(), nil)
 	if err != nil {
+		if httpErr, ok := errors.AsType[HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 
 	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case 200:
-		return true, nil
-	case 404:
-		return false, nil
-	default:
-		return false, ghAPI.HandleHTTPError(resp)
+	// Only 200 means the repository exists. Any other success status is unexpected here and is
+	// reported as an error rather than being taken as existence.
+	if resp.StatusCode != http.StatusOK {
+		return false, UnexpectedStatusError(resp)
 	}
+
+	return true, nil
 }
 
 // RepoLicenses fetches available repository licenses.
