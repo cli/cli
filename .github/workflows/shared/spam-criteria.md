@@ -67,12 +67,14 @@ document, or clarify GitHub CLI belong elsewhere and should be treated as spam.
   which does not establish a sensible context, problem statement, or feedback.
 - An issue containing an `Originally posted by` attribution where the attributed
   material makes up its substantive content and is presented without original context.
-  The attribution establishes that the material came from its linked GitHub source.
-  Inspect the source when an available read-only tool supports its type, but do not
-  require successful retrieval. Do not proactively search for unattributed copies.
-  Attributed excerpts are legitimate when the author adds their own problem statement or
-  actionable request explaining why the quotation is relevant. If the attribution's
-  scope or the originality of that context is unclear, do not classify the issue as spam.
+  The attribution triggers a provenance check but does not by itself prove a verbatim
+  repost. Retrieve the linked GitHub source and compare its content with the issue. Apply
+  this criterion only when retrieval succeeds and confirms the substantive content was
+  copied verbatim. If the source type is unsupported, retrieval fails, the content
+  differs, or the comparison is inconclusive, do not classify the issue as spam. Do not
+  proactively search for unattributed copies. Attributed excerpts are legitimate when
+  the author adds their own problem statement or actionable request explaining why the
+  quotation is relevant.
 
 ## Issue templates
 
