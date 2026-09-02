@@ -185,14 +185,13 @@ as your conclusion unless the evidence supports it.
 
 Judge the issue against the spam criteria included at the top of this prompt.
 
-Check whether the issue's substantive title or body was copied verbatim from another
-`cli/cli` issue, discussion, or comment. Search issues and issue comments for a
-distinctive exact phrase from the content. Inspect a discussion only when the issue
-provides its direct URL through a source link or `Originally posted by` attribution;
-the available tools cannot search unlinked discussion content. Treat a verified verbatim
-repost with no original context as spam. Do not treat quoted excerpts as spam when the
-author adds their own problem statement or actionable request explaining why the
-quotation is relevant.
+If the issue contains an `Originally posted by` attribution, inspect its linked source
+with the available GitHub tools, whether it is an issue, comment, discussion, or another
+GitHub resource. Treat the issue as spam when its substantive content is copied verbatim
+from that source without original context. Do not perform proactive phrase searches when
+no attribution is present. Do not treat attributed excerpts as spam when the author adds
+their own problem statement or actionable request explaining why the quotation is
+relevant.
 
 If, and only if, the issue meets those criteria, call `apply_suspected_spam`. This
 directly applies the label instead of proposing it. Applying the label triggers the

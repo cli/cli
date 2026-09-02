@@ -65,13 +65,12 @@ document, or clarify GitHub CLI belong elsewhere and should be treated as spam.
   off-topic discussions).
 - Content that seems to be taken from, or quoting, another discussion or issue
   which does not establish a sensible context, problem statement, or feedback.
-- An issue whose substantive title or body is copied verbatim from another issue,
-  discussion, or comment and presented as a new issue without original context. Verify
-  issue and issue-comment matches with an exact phrase search. Verify discussion matches
-  only from a direct source link or `Originally posted by` attribution because unlinked
-  discussions cannot be searched with the available tools. Quoted excerpts are
-  legitimate when the author adds their own problem statement or actionable request
-  explaining why the quotation is relevant.
+- An issue containing an `Originally posted by` attribution whose substantive content
+  is copied verbatim from the linked issue, comment, discussion, or other GitHub source
+  and presented without original context. Inspect the linked source to verify the match;
+  do not proactively search for unattributed copies. Attributed excerpts are legitimate
+  when the author adds their own problem statement or actionable request explaining why
+  the quotation is relevant.
 
 ## Issue templates
 
