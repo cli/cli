@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
@@ -195,7 +196,7 @@ type CreateContext struct {
 	GitClient          *git.Client
 }
 
-func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:               f.IOStreams,
 		HttpClient:       f.HttpClient,
@@ -274,6 +275,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.AttachFlag.RecordTelemetry(cmd.CommandPath(), telemetry)
+
 			opts.Finder = shared.NewFinder(f)
 
 			opts.TitleProvided = cmd.Flags().Changed("title")
