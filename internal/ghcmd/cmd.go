@@ -335,6 +335,8 @@ func checkForUpdate(ctx context.Context, f *cmdutil.Factory, currentVersion stri
 	if err != nil {
 		return nil, err
 	}
+	// Update checks use the invocation's GitHub client, so their server request IDs
+	// are intentionally correlated with the invocation that triggered the check.
 	stateFilePath := filepath.Join(config.StateDir(), "state.yml")
 	return update.CheckForUpdate(ctx, httpClient, stateFilePath, updaterEnabled, currentVersion)
 }

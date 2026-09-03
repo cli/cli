@@ -19,6 +19,11 @@ type EventRecorder interface {
 	Disabler
 }
 
+// RequestIDRecorder records GitHub server request IDs for invocation correlation.
+type RequestIDRecorder interface {
+	RecordRequestID(requestID string)
+}
+
 type CommandRecorder interface {
 	EventRecorder
 	SetSampleRate(rate int)
@@ -26,6 +31,7 @@ type CommandRecorder interface {
 
 type Service interface {
 	CommandRecorder
+	RequestIDRecorder
 	Flush()
 }
 

@@ -22,14 +22,17 @@ type config interface {
 type HTTPClientOptions struct {
 	AppVersion         string
 	InvokingAgent      string
+	CacheDir           string
 	CacheTTL           time.Duration
 	Config             config
 	EnableCache        bool
 	Log                io.Writer
 	LogColorize        bool
 	LogVerboseHTTP     bool
+	RequestIDRecorder  ghtelemetry.RequestIDRecorder
 	SkipDefaultHeaders bool
 	TelemetryDisabler  ghtelemetry.Disabler
+	Transport          http.RoundTripper
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
@@ -40,6 +43,19 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		AuthToken:          "none",
 		LogIgnoreEnv:       true,
 		SkipDefaultHeaders: opts.SkipDefaultHeaders,
+	}
+	if opts.Transport != nil {
+		clientOpts.Transport = opts.Transport
+	}
+	if opts.RequestIDRecorder != nil {
+		transport := clientOpts.Transport
+		if transport == nil {
+			transport = http.DefaultTransport
+		}
+		clientOpts.Transport = requestIDTransport{
+			wrappedTransport: transport,
+			recorder:         opts.RequestIDRecorder,
+		}
 	}
 
 	debugEnabled, debugValue := utils.IsDebugEnabled()
@@ -66,6 +82,7 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 
 	if opts.EnableCache {
 		clientOpts.EnableCache = opts.EnableCache
+		clientOpts.CacheDir = opts.CacheDir
 		clientOpts.CacheTTL = opts.CacheTTL
 	}
 
@@ -227,6 +244,19 @@ func getHostname(r *http.Request) string {
 type telemetryDisablerTransport struct {
 	wrappedTransport  http.RoundTripper
 	telemetryDisabler ghtelemetry.Disabler
+}
+
+type requestIDTransport struct {
+	wrappedTransport http.RoundTripper
+	recorder         ghtelemetry.RequestIDRecorder
+}
+
+func (t requestIDTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	res, err := t.wrappedTransport.RoundTrip(req)
+	if err == nil && res != nil {
+		t.recorder.RecordRequestID(res.Header.Get("X-GitHub-Request-Id"))
+	}
+	return res, err
 }
 
 func (t telemetryDisablerTransport) RoundTrip(req *http.Request) (*http.Response, error) {

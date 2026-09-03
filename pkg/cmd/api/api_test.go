@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/template"
@@ -420,6 +421,22 @@ func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
 	cmd.SetArgs([]string{`C:\users\repos`})
 	_, err := cmd.ExecuteC()
 	assert.EqualError(t, err, `invalid API endpoint: "C:\users\repos". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`)
+}
+
+func TestNewCmdApiUsesFactoryRequestIDRecorder(t *testing.T) {
+	recorder := &telemetry.NoOpService{}
+	f := &cmdutil.Factory{
+		RequestIDRecorder: recorder,
+	}
+
+	cmd := NewCmdApi(f, func(opts *ApiOptions) error {
+		assert.Same(t, recorder, opts.RequestIDRecorder)
+		return nil
+	})
+	cmd.SetArgs([]string{"user"})
+
+	_, err := cmd.ExecuteC()
+	require.NoError(t, err)
 }
 
 func Test_apiRun(t *testing.T) {

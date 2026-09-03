@@ -2,7 +2,9 @@ package telemetry
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -613,6 +615,75 @@ func TestServiceSampling(t *testing.T) {
 	})
 }
 
+func TestServiceRecordRequestID(t *testing.T) {
+	t.Cleanup(stubDeviceID("test-device"))
+
+	var captured SendTelemetryPayload
+	svc := newService(func(p SendTelemetryPayload) { captured = p }, nil)
+	svc.RecordRequestID(" REQUEST-1 ")
+	svc.RecordRequestID("")
+	svc.Record(ghtelemetry.Event{
+		Type:       "command_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "gh pr list"},
+	})
+	svc.Flush()
+
+	require.Len(t, captured.Events, 2)
+	requestEvent := captured.Events[0]
+	commandEvent := captured.Events[1]
+	assert.Equal(t, "api_request", requestEvent.Type)
+	assert.Equal(t, "REQUEST-1", requestEvent.Dimensions["request_id"])
+	assert.NotEmpty(t, requestEvent.Dimensions["invocation_id"])
+	assert.Equal(t, "command_invocation", commandEvent.Type)
+	assert.Equal(t, requestEvent.Dimensions["invocation_id"], commandEvent.Dimensions["invocation_id"])
+	assert.NotContains(t, commandEvent.Dimensions, "request_id")
+}
+
+func TestServiceBoundsRequestIDEvents(t *testing.T) {
+	t.Cleanup(stubDeviceID("test-device"))
+
+	var captured SendTelemetryPayload
+	svc := newService(func(p SendTelemetryPayload) { captured = p }, ghtelemetry.Dimensions{
+		"version":             "2.99.0",
+		"is_tty":              "true",
+		"agent":               "copilot_cli",
+		"ci":                  "false",
+		"github_actions":      "false",
+		"accessible_colors":   "false",
+		"accessible_prompter": "false",
+		"color_labels":        "false",
+		"spinner_disabled":    "false",
+		"sample_rate":         "1",
+	})
+	for i := 0; i < maxRequestIDEvents+5; i++ {
+		svc.RecordRequestID(fmt.Sprintf("REQUEST-%d", i))
+	}
+	svc.Record(ghtelemetry.Event{Type: "command_invocation"})
+	svc.Flush()
+
+	require.Len(t, captured.Events, maxRequestIDEvents+2)
+	assert.Equal(t, "command_invocation", captured.Events[maxRequestIDEvents].Type)
+	summary := captured.Events[maxRequestIDEvents+1]
+	assert.Equal(t, "api_request_summary", summary.Type)
+	assert.Equal(t, int64(maxRequestIDEvents+5), summary.Measures["request_count"])
+	assert.Equal(t, int64(maxRequestIDEvents), summary.Measures["recorded_request_count"])
+
+	payloadBytes, err := json.Marshal(captured)
+	require.NoError(t, err)
+	assert.Less(t, len(payloadBytes), maxPayloadSize)
+}
+
+func TestServiceDoesNotRecordRequestIDAfterDisable(t *testing.T) {
+	t.Cleanup(stubDeviceID("test-device"))
+
+	svc := newService(func(SendTelemetryPayload) {}, nil)
+	svc.Disable()
+	svc.RecordRequestID("REQUEST-1")
+
+	assert.Empty(t, svc.events)
+	assert.Zero(t, svc.requestIDCount)
+}
+
 func TestWithAdditionalCommonDimensions(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
@@ -700,6 +771,7 @@ func TestNoOpService(t *testing.T) {
 	svc := &NoOpService{}
 	// All methods should be safe to call without panicking
 	svc.Record(ghtelemetry.Event{Type: "test"})
+	svc.RecordRequestID("REQUEST-1")
 	svc.Disable()
 	svc.SetSampleRate(50)
 	svc.Flush()

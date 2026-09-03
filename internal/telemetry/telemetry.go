@@ -28,6 +28,10 @@ import (
 
 const deviceIDFileName = "device-id"
 
+// Request events repeat common dimensions in the wire payload. Keep the cap
+// conservative so they cannot crowd command telemetry out of the 16 KB payload.
+const maxRequestIDEvents = 10
+
 // stateDirFunc returns the state directory path. Can be replaced in tests.
 var stateDirFunc = config.StateDir
 
@@ -262,7 +266,8 @@ type service struct {
 
 	events []recordedEvent
 
-	disabled bool
+	requestIDCount int
+	disabled       bool
 }
 
 func (s *service) Disable() {
@@ -277,6 +282,35 @@ func (s *service) Record(event ghtelemetry.Event) {
 	defer s.mu.Unlock()
 
 	s.events = append(s.events, recordedEvent{event: event, recordedAt: time.Now()})
+}
+
+func (s *service) RecordRequestID(requestID string) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.disabled {
+		return
+	}
+
+	s.requestIDCount++
+	if s.requestIDCount > maxRequestIDEvents {
+		return
+	}
+
+	s.events = append(s.events, recordedEvent{
+		event: ghtelemetry.Event{
+			Type: "api_request",
+			Dimensions: ghtelemetry.Dimensions{
+				"request_id": requestID,
+			},
+		},
+		recordedAt: time.Now(),
+	})
 }
 
 func (s *service) SetSampleRate(rate int) {
@@ -308,6 +342,19 @@ func (s *service) Flush() {
 	events := s.events
 	if s.disabled {
 		events = nil
+	}
+
+	if len(events) > 0 && s.requestIDCount > maxRequestIDEvents {
+		events = append(events, recordedEvent{
+			event: ghtelemetry.Event{
+				Type: "api_request_summary",
+				Measures: ghtelemetry.Measures{
+					"request_count":          int64(s.requestIDCount),
+					"recorded_request_count": maxRequestIDEvents,
+				},
+			},
+			recordedAt: time.Now(),
+		})
 	}
 
 	payload := SendTelemetryPayload{
@@ -417,6 +464,8 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 type NoOpService struct{}
 
 func (s *NoOpService) Record(event ghtelemetry.Event) {}
+
+func (s *NoOpService) RecordRequestID(requestID string) {}
 
 func (s *NoOpService) Disable() {}
 
