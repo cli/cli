@@ -20,19 +20,16 @@ type config interface {
 }
 
 type HTTPClientOptions struct {
-	AppVersion         string
-	InvokingAgent      string
-	CacheDir           string
-	CacheTTL           time.Duration
-	Config             config
-	EnableCache        bool
-	Log                io.Writer
-	LogColorize        bool
-	LogVerboseHTTP     bool
-	APIRequestRecorder ghtelemetry.APIRequestRecorder
-	SkipDefaultHeaders bool
-	TelemetryDisabler  ghtelemetry.Disabler
-	Transport          http.RoundTripper
+	AppVersion          string
+	InvokingAgent       string
+	CacheTTL            time.Duration
+	Config              config
+	EnableCache         bool
+	Log                 io.Writer
+	LogColorize         bool
+	LogVerboseHTTP      bool
+	APIRequestTelemetry ghtelemetry.APIRequestTelemetry
+	SkipDefaultHeaders  bool
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
@@ -44,18 +41,9 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		LogIgnoreEnv:       true,
 		SkipDefaultHeaders: opts.SkipDefaultHeaders,
 	}
-	if opts.Transport != nil {
-		clientOpts.Transport = opts.Transport
-	}
-	if opts.APIRequestRecorder != nil {
-		transport := clientOpts.Transport
-		if transport == nil {
-			transport = http.DefaultTransport
-		}
-		clientOpts.Transport = requestIDTransport{
-			wrappedTransport: transport,
-			recorder:         opts.APIRequestRecorder,
-		}
+	clientOpts.Transport = requestIDTransport{
+		wrappedTransport: http.DefaultTransport,
+		recorder:         opts.APIRequestTelemetry,
 	}
 
 	debugEnabled, debugValue := utils.IsDebugEnabled()
@@ -82,7 +70,6 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 
 	if opts.EnableCache {
 		clientOpts.EnableCache = opts.EnableCache
-		clientOpts.CacheDir = opts.CacheDir
 		clientOpts.CacheTTL = opts.CacheTTL
 	}
 
@@ -95,11 +82,9 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
 	}
 
-	if opts.TelemetryDisabler != nil {
-		client.Transport = telemetryDisablerTransport{
-			wrappedTransport:  client.Transport,
-			telemetryDisabler: opts.TelemetryDisabler,
-		}
+	client.Transport = telemetryDisablerTransport{
+		wrappedTransport:  client.Transport,
+		telemetryDisabler: opts.APIRequestTelemetry,
 	}
 
 	return client, nil

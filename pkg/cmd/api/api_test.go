@@ -427,13 +427,11 @@ func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
 func TestNewCmdApiUsesFactoryTelemetryRecorder(t *testing.T) {
 	recorder := &telemetry.NoOpService{}
 	f := &cmdutil.Factory{
-		APIRequestRecorder: recorder,
-		TelemetryDisabler:  recorder,
+		APIRequestTelemetry: recorder,
 	}
 
 	cmd := NewCmdApi(f, func(opts *ApiOptions) error {
-		assert.Same(t, recorder, opts.APIRequestRecorder)
-		assert.Same(t, recorder, opts.TelemetryDisabler)
+		assert.Same(t, recorder, opts.APIRequestTelemetry)
 		return nil
 	})
 	cmd.SetArgs([]string{"user"})
@@ -455,12 +453,11 @@ func TestAPIRunDisablesTelemetryForEnterpriseRequest(t *testing.T) {
 	})
 	ios, _, _, _ := iostreams.Test()
 	opts := ApiOptions{
-		Config:             func() (gh.Config, error) { return config.NewMockConfig(), nil },
-		HttpClient:         rootapi.NewHTTPClient,
-		IO:                 ios,
-		RequestPath:        server.URL,
-		APIRequestRecorder: recorder,
-		TelemetryDisabler:  recorder,
+		Config:              func() (gh.Config, error) { return config.NewMockConfig(), nil },
+		HttpClient:          rootapi.NewHTTPClient,
+		IO:                  ios,
+		RequestPath:         server.URL,
+		APIRequestTelemetry: recorder,
 	}
 
 	err := apiRun(&opts)
@@ -1482,8 +1479,9 @@ func Test_apiRun_cache(t *testing.T) {
 
 	ios, _, stdout, stderr := iostreams.Test()
 	options := ApiOptions{
-		IO:         ios,
-		HttpClient: rootapi.NewHTTPClient,
+		IO:                  ios,
+		HttpClient:          rootapi.NewHTTPClient,
+		APIRequestTelemetry: &telemetry.NoOpService{},
 		Config: func() (gh.Config, error) {
 			return &ghmock.ConfigMock{
 				AuthenticationFunc: func() gh.AuthConfig {
@@ -1527,10 +1525,11 @@ func Test_apiRun_invokingAgent(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	options := ApiOptions{
-		IO:            ios,
-		AppVersion:    "1.2.3",
-		InvokingAgent: "copilot-cli",
-		HttpClient:    rootapi.NewHTTPClient,
+		IO:                  ios,
+		AppVersion:          "1.2.3",
+		InvokingAgent:       "copilot-cli",
+		HttpClient:          rootapi.NewHTTPClient,
+		APIRequestTelemetry: &telemetry.NoOpService{},
 		Config: func() (gh.Config, error) {
 			return &ghmock.ConfigMock{
 				AuthenticationFunc: func() gh.AuthConfig {

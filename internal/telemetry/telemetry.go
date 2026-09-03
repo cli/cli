@@ -356,8 +356,8 @@ func (s *service) Flush() {
 					"request_ids": strings.Join(s.requestIDs, ","),
 				},
 				Measures: ghtelemetry.Measures{
-					"request_count":          int64(s.apiRequestCount),
-					"recorded_request_count": int64(len(s.requestIDs)),
+					"observed_request_count":   int64(s.apiRequestCount),
+					"omitted_request_id_count": int64(s.apiRequestCount - len(s.requestIDs)),
 				},
 			},
 			recordedAt: time.Now(),

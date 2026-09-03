@@ -633,8 +633,8 @@ func TestServiceRecordAPIRequest(t *testing.T) {
 	requestEvent := captured.Events[1]
 	assert.Equal(t, "api_requests", requestEvent.Type)
 	assert.Equal(t, "REQUEST-1", requestEvent.Dimensions["request_ids"])
-	assert.Equal(t, int64(1), requestEvent.Measures["request_count"])
-	assert.Equal(t, int64(1), requestEvent.Measures["recorded_request_count"])
+	assert.Equal(t, int64(1), requestEvent.Measures["observed_request_count"])
+	assert.Zero(t, requestEvent.Measures["omitted_request_id_count"])
 	assert.NotEmpty(t, requestEvent.Dimensions["invocation_id"])
 	assert.Equal(t, "command_invocation", commandEvent.Type)
 	assert.Equal(t, requestEvent.Dimensions["invocation_id"], commandEvent.Dimensions["invocation_id"])
@@ -670,8 +670,8 @@ func TestServiceBoundsAPIRequests(t *testing.T) {
 	assert.Equal(t, "command_invocation", captured.Events[0].Type)
 	requests := captured.Events[1]
 	assert.Equal(t, "api_requests", requests.Type)
-	assert.Equal(t, int64(requestCount), requests.Measures["request_count"])
-	assert.Less(t, requests.Measures["recorded_request_count"], int64(requestCount))
+	assert.Equal(t, int64(requestCount), requests.Measures["observed_request_count"])
+	assert.Positive(t, requests.Measures["omitted_request_id_count"])
 	assert.LessOrEqual(t, len(requests.Dimensions["request_ids"]), maxRequestIDsEncodedSize)
 
 	payloadBytes, err := json.Marshal(captured)

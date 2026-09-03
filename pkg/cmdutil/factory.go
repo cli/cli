@@ -19,13 +19,12 @@ type Factory struct {
 	ExecutablePath string
 	InvokingAgent  string
 
-	Browser            browser.Browser
-	ExtensionManager   extensions.ExtensionManager
-	GitClient          *git.Client
-	IOStreams          *iostreams.IOStreams
-	Prompter           prompter.Prompter
-	APIRequestRecorder ghtelemetry.APIRequestRecorder
-	TelemetryDisabler  ghtelemetry.Disabler
+	Browser             browser.Browser
+	ExtensionManager    extensions.ExtensionManager
+	GitClient           *git.Client
+	IOStreams           *iostreams.IOStreams
+	Prompter            prompter.Prompter
+	APIRequestTelemetry ghtelemetry.APIRequestTelemetry
 
 	BaseRepo func() (ghrepo.Interface, error)
 	Branch   func() (string, error)

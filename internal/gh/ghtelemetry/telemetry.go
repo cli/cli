@@ -29,6 +29,13 @@ type APIRequestRecorder interface {
 	RecordAPIRequest(request APIRequest)
 }
 
+// APIRequestTelemetry records GitHub API requests and disables telemetry when
+// requests cross a host boundary where telemetry is not allowed.
+type APIRequestTelemetry interface {
+	APIRequestRecorder
+	Disabler
+}
+
 type CommandRecorder interface {
 	EventRecorder
 	SetSampleRate(rate int)
@@ -36,7 +43,7 @@ type CommandRecorder interface {
 
 type Service interface {
 	CommandRecorder
-	APIRequestRecorder
+	APIRequestTelemetry
 	Flush()
 }
 

@@ -242,12 +242,13 @@ func TestNewHTTPClient(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, stderr := iostreams.Test()
 			client, err := NewHTTPClient(HTTPClientOptions{
-				AppVersion:         tt.args.appVersion,
-				InvokingAgent:      tt.args.invokingAgent,
-				Config:             tt.args.config,
-				Log:                ios.ErrOut,
-				LogVerboseHTTP:     tt.args.logVerboseHTTP,
-				SkipDefaultHeaders: tt.args.skipDefaultHeaders,
+				AppVersion:          tt.args.appVersion,
+				InvokingAgent:       tt.args.invokingAgent,
+				Config:              tt.args.config,
+				Log:                 ios.ErrOut,
+				LogVerboseHTTP:      tt.args.logVerboseHTTP,
+				SkipDefaultHeaders:  tt.args.skipDefaultHeaders,
+				APIRequestTelemetry: &telemetry.NoOpService{},
 			})
 			require.NoError(t, err)
 
@@ -351,7 +352,7 @@ func TestHTTPClientSanitizeJSONControlCharactersC0(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client, err := NewHTTPClient(HTTPClientOptions{})
+	client, err := NewHTTPClient(HTTPClientOptions{APIRequestTelemetry: &telemetry.NoOpService{}})
 	require.NoError(t, err)
 	req, err := http.NewRequest("GET", ts.URL, nil)
 	require.NoError(t, err)
@@ -387,7 +388,7 @@ func TestHTTPClientSanitizeControlCharactersC1(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client, err := NewHTTPClient(HTTPClientOptions{})
+	client, err := NewHTTPClient(HTTPClientOptions{APIRequestTelemetry: &telemetry.NoOpService{}})
 	require.NoError(t, err)
 	req, err := http.NewRequest("GET", ts.URL, nil)
 	require.NoError(t, err)
@@ -405,7 +406,7 @@ func TestHTTPClientSanitizeControlCharactersC1(t *testing.T) {
 	assert.Equal(t, "monalisa¡", issue.Author.Login)
 }
 
-func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
+func TestNewHTTPClientDisablesTelemetry(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -435,9 +436,9 @@ func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			disabler := &fakeTelemetryDisabler{}
+			telemetry := &fakeAPIRequestRecorder{}
 			client, err := NewHTTPClient(HTTPClientOptions{
-				TelemetryDisabler: disabler,
+				APIRequestTelemetry: telemetry,
 			})
 			require.NoError(t, err)
 
@@ -448,62 +449,39 @@ func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
 			res, err := client.Do(req)
 			require.NoError(t, err)
 			assert.Equal(t, 204, res.StatusCode)
-			assert.Equal(t, tt.wantDisabled, disabler.disabled, "Disable() called")
+			assert.Equal(t, tt.wantDisabled, telemetry.disabled, "Disable() called")
 		})
 	}
 }
 
-func TestNewHTTPClientWithoutTelemetryDisabler(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer ts.Close()
-
-	client, err := NewHTTPClient(HTTPClientOptions{})
-	require.NoError(t, err)
-
-	req, err := http.NewRequest("GET", ts.URL, nil)
-	require.NoError(t, err)
-	req.Host = "ghes.example.com"
-
-	res, err := client.Do(req)
-	require.NoError(t, err)
-	assert.Equal(t, 204, res.StatusCode)
-}
-
 func TestNewHTTPClientRecordsRequestIDs(t *testing.T) {
 	recorder := &fakeAPIRequestRecorder{}
-	responses := []*http.Response{
-		{
-			StatusCode: http.StatusFound,
-			Header: http.Header{
-				"Location":            []string{"https://api.github.com/final"},
-				"X-Github-Request-Id": []string{"REQUEST-1"},
-			},
-			Body: io.NopCloser(strings.NewReader("")),
-		},
-		{
-			StatusCode: http.StatusNoContent,
-			Header: http.Header{
-				"X-Github-Request-Id": []string{"REQUEST-2"},
-			},
-			Body: io.NopCloser(strings.NewReader("")),
-		},
-	}
-	transport := &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-		res := responses[0]
-		responses = responses[1:]
-		res.Request = req
-		return res, nil
-	}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/start":
+			w.Header().Set("X-GitHub-Request-Id", "REQUEST-1")
+			http.Redirect(w, r, "/final", http.StatusFound)
+		case "/final":
+			w.Header().Set("X-GitHub-Request-Id", "REQUEST-2")
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
 	client, err := NewHTTPClient(HTTPClientOptions{
-		APIRequestRecorder: recorder,
-		Transport:          transport,
+		APIRequestTelemetry: recorder,
 	})
 	require.NoError(t, err)
+	client.CheckRedirect = func(req *http.Request, _ []*http.Request) error {
+		req.Host = "github.com"
+		return nil
+	}
 
-	req, err := http.NewRequest("GET", "https://api.github.com/start", nil)
+	req, err := http.NewRequest("GET", server.URL+"/start", nil)
 	require.NoError(t, err)
+	req.Host = "github.com"
 	res, err := client.Do(req)
 	require.NoError(t, err)
 	res.Body.Close()
@@ -517,21 +495,20 @@ func TestNewHTTPClientRecordsRequestIDs(t *testing.T) {
 
 func TestNewHTTPClientDoesNotRecordMissingRequestID(t *testing.T) {
 	recorder := &fakeAPIRequestRecorder{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-GitHub-Request-Id", "  ")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
 	client, err := NewHTTPClient(HTTPClientOptions{
-		APIRequestRecorder: recorder,
-		Transport: &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusNoContent,
-				Header:     http.Header{"X-Github-Request-Id": []string{"  "}},
-				Body:       io.NopCloser(strings.NewReader("")),
-				Request:    req,
-			}, nil
-		}},
+		APIRequestTelemetry: recorder,
 	})
 	require.NoError(t, err)
 
-	req, err := http.NewRequest("GET", "https://api.github.com/", nil)
+	req, err := http.NewRequest("GET", server.URL, nil)
 	require.NoError(t, err)
+	req.Host = "github.com"
 	res, err := client.Do(req)
 	require.NoError(t, err)
 	res.Body.Close()
@@ -540,28 +517,28 @@ func TestNewHTTPClientDoesNotRecordMissingRequestID(t *testing.T) {
 }
 
 func TestNewHTTPClientDoesNotReplayCachedRequestIDs(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
 	recorder := &fakeAPIRequestRecorder{}
 	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("X-GitHub-Request-Id", fmt.Sprintf("REQUEST-%d", requestCount))
+		fmt.Fprint(w, "{}")
+	}))
+	defer server.Close()
+
 	client, err := NewHTTPClient(HTTPClientOptions{
-		CacheDir:           t.TempDir(),
-		CacheTTL:           time.Hour,
-		EnableCache:        true,
-		APIRequestRecorder: recorder,
-		Transport: &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			requestCount++
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"X-Github-Request-Id": []string{fmt.Sprintf("REQUEST-%d", requestCount)}},
-				Body:       io.NopCloser(strings.NewReader("{}")),
-				Request:    req,
-			}, nil
-		}},
+		CacheTTL:            time.Hour,
+		EnableCache:         true,
+		APIRequestTelemetry: recorder,
 	})
 	require.NoError(t, err)
 
 	for range 2 {
-		req, err := http.NewRequest("GET", "https://api.github.com/repos/cli/cli", nil)
+		req, err := http.NewRequest("GET", server.URL+"/repos/cli/cli", nil)
 		require.NoError(t, err)
+		req.Host = "github.com"
 		res, err := client.Do(req)
 		require.NoError(t, err)
 		_, err = io.ReadAll(res.Body)
@@ -578,22 +555,20 @@ func TestNewHTTPClientDropsTelemetryForEnterpriseRequests(t *testing.T) {
 	recorder := telemetry.NewService(func(p telemetry.SendTelemetryPayload) {
 		payload = p
 	})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-GitHub-Request-Id", "ENTERPRISE-REQUEST")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
 	client, err := NewHTTPClient(HTTPClientOptions{
-		APIRequestRecorder: recorder,
-		TelemetryDisabler:  recorder,
-		Transport: &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusNoContent,
-				Header:     http.Header{"X-Github-Request-Id": []string{"ENTERPRISE-REQUEST"}},
-				Body:       io.NopCloser(strings.NewReader("")),
-				Request:    req,
-			}, nil
-		}},
+		APIRequestTelemetry: recorder,
 	})
 	require.NoError(t, err)
 
-	req, err := http.NewRequest("GET", "https://ghes.example.com/api/v3/user", nil)
+	req, err := http.NewRequest("GET", server.URL+"/api/v3/user", nil)
 	require.NoError(t, err)
+	req.Host = "ghes.example.com"
 	res, err := client.Do(req)
 	require.NoError(t, err)
 	res.Body.Close()
@@ -649,14 +624,6 @@ func TestNewExternalHTTPClient(t *testing.T) {
 			assert.Empty(t, gotReq.Header.Values("time-zone"))
 		})
 	}
-}
-
-type fakeTelemetryDisabler struct {
-	disabled bool
-}
-
-func (f *fakeTelemetryDisabler) Disable() {
-	f.disabled = true
 }
 
 type fakeAPIRequestRecorder struct {

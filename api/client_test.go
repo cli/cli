@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -329,9 +330,10 @@ func TestHTTPHeaders(t *testing.T) {
 
 	ios, _, _, stderr := iostreams.Test()
 	httpClient, err := NewHTTPClient(HTTPClientOptions{
-		AppVersion: "v1.2.3",
-		Config:     tinyConfig{serverHostname(t, ts.URL) + ":oauth_token": "MYTOKEN"},
-		Log:        ios.ErrOut,
+		AppVersion:          "v1.2.3",
+		Config:              tinyConfig{serverHostname(t, ts.URL) + ":oauth_token": "MYTOKEN"},
+		Log:                 ios.ErrOut,
+		APIRequestTelemetry: &telemetry.NoOpService{},
 	})
 	assert.NoError(t, err)
 	client := NewClientFromHTTP(httpClient)
