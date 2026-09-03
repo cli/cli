@@ -114,6 +114,26 @@ func Test_setRun(t *testing.T) {
 			expectedValue: "vim",
 		},
 		{
+			name: "set api_host scoped by host",
+			input: &SetOptions{
+				Config:   config.NewMockConfig(),
+				Hostname: "github.example.com",
+				Key:      "api_host",
+				Value:    "api-gateway.example.com",
+			},
+			expectedValue: "api-gateway.example.com",
+		},
+		{
+			name: "set api_host without hostname",
+			input: &SetOptions{
+				Config: config.NewMockConfig(),
+				Key:    "api_host",
+				Value:  "api-gateway.example.com",
+			},
+			wantsErr: true,
+			errMsg:   "--host required when setting api_host",
+		},
+		{
 			name: "set unknown key",
 			input: &SetOptions{
 				Config: config.NewMockConfig(),
@@ -196,4 +216,13 @@ func Test_ValidateKey(t *testing.T) {
 
 	err = ValidateKey("browser")
 	assert.NoError(t, err)
+
+	err = ValidateKey("api_host")
+	assert.NoError(t, err)
+}
+
+func Test_isPerHostOnly(t *testing.T) {
+	assert.True(t, isPerHostOnly("api_host"))
+	assert.False(t, isPerHostOnly("editor"))
+	assert.False(t, isPerHostOnly("unknown"))
 }
