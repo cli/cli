@@ -2,7 +2,7 @@ module github.com/cli/cli/v2
 
 go 1.26.0
 
-toolchain go1.26.7
+toolchain go1.26.8
 
 require (
 	charm.land/bubbles/v2 v2.2.1
