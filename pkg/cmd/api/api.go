@@ -18,6 +18,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
@@ -34,13 +35,14 @@ const (
 )
 
 type ApiOptions struct {
-	AppVersion    string
-	InvokingAgent string
-	BaseRepo      func() (ghrepo.Interface, error)
-	Branch        func() (string, error)
-	Config        func() (gh.Config, error)
-	HttpClient    func() (*http.Client, error)
-	IO            *iostreams.IOStreams
+	AppVersion        string
+	InvokingAgent     string
+	BaseRepo          func() (ghrepo.Interface, error)
+	Branch            func() (string, error)
+	Config            func() (gh.Config, error)
+	HttpClient        func(api.HTTPClientOptions) (*http.Client, error)
+	IO                *iostreams.IOStreams
+	TelemetryDisabler ghtelemetry.Disabler
 
 	Hostname            string
 	RequestMethod       string
@@ -65,12 +67,14 @@ type ApiOptions struct {
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
-		AppVersion:    f.AppVersion,
-		InvokingAgent: f.InvokingAgent,
-		BaseRepo:      f.BaseRepo,
-		Branch:        f.Branch,
-		Config:        f.Config,
-		IO:            f.IOStreams,
+		AppVersion:        f.AppVersion,
+		InvokingAgent:     f.InvokingAgent,
+		BaseRepo:          f.BaseRepo,
+		Branch:            f.Branch,
+		Config:            f.Config,
+		HttpClient:        api.NewHTTPClient,
+		IO:                f.IOStreams,
+		TelemetryDisabler: f.TelemetryDisabler,
 	}
 
 	cmd := &cobra.Command{
@@ -389,25 +393,23 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	if opts.HttpClient == nil {
-		opts.HttpClient = func() (*http.Client, error) {
-			log := opts.IO.ErrOut
-			if opts.Verbose {
-				log = opts.IO.Out
-			}
-			opts := api.HTTPClientOptions{
-				AppVersion:     opts.AppVersion,
-				InvokingAgent:  opts.InvokingAgent,
-				CacheTTL:       opts.CacheTTL,
-				Config:         cfg.Authentication(),
-				EnableCache:    opts.CacheTTL > 0,
-				Log:            log,
-				LogColorize:    opts.IO.ColorEnabled(),
-				LogVerboseHTTP: opts.Verbose,
-			}
-			return api.NewHTTPClient(opts)
-		}
+		opts.HttpClient = api.NewHTTPClient
 	}
-	httpClient, err := opts.HttpClient()
+	log := opts.IO.ErrOut
+	if opts.Verbose {
+		log = opts.IO.Out
+	}
+	httpClient, err := opts.HttpClient(api.HTTPClientOptions{
+		AppVersion:        opts.AppVersion,
+		InvokingAgent:     opts.InvokingAgent,
+		CacheTTL:          opts.CacheTTL,
+		Config:            cfg.Authentication(),
+		EnableCache:       opts.CacheTTL > 0,
+		Log:               log,
+		LogColorize:       opts.IO.ColorEnabled(),
+		LogVerboseHTTP:    opts.Verbose,
+		TelemetryDisabler: opts.TelemetryDisabler,
+	})
 	if err != nil {
 		return err
 	}
