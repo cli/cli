@@ -24,7 +24,7 @@ var ssoHeader string
 var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
 
 type telemetryRecorder interface {
-	ghtelemetry.RequestIDRecorder
+	ghtelemetry.APIRequestRecorder
 	ghtelemetry.Disabler
 }
 
@@ -37,7 +37,7 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	}
 
 	f.IOStreams = ios
-	f.RequestIDRecorder = telemetryRecorder
+	f.APIRequestRecorder = telemetryRecorder
 	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryRecorder)
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryRecorder)
 	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
@@ -198,13 +198,13 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			Config:            cfg.Authentication(),
-			Log:               ios.ErrOut,
-			LogColorize:       ios.ColorEnabled(),
-			AppVersion:        appVersion,
-			InvokingAgent:     invokingAgent,
-			RequestIDRecorder: telemetryRecorder,
-			TelemetryDisabler: telemetryRecorder,
+			Config:             cfg.Authentication(),
+			Log:                ios.ErrOut,
+			LogColorize:        ios.ColorEnabled(),
+			AppVersion:         appVersion,
+			InvokingAgent:      invokingAgent,
+			APIRequestRecorder: telemetryRecorder,
+			TelemetryDisabler:  telemetryRecorder,
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {
@@ -224,7 +224,7 @@ func plainHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAg
 			InvokingAgent: invokingAgent,
 			// This is required to prevent automatic setting of auth and other headers.
 			SkipDefaultHeaders: true,
-			RequestIDRecorder:  telemetryRecorder,
+			APIRequestRecorder: telemetryRecorder,
 			TelemetryDisabler:  telemetryRecorder,
 		}
 		client, err := api.NewHTTPClient(opts)

@@ -28,9 +28,9 @@ import (
 
 const deviceIDFileName = "device-id"
 
-// Request events repeat common dimensions in the wire payload. Keep the cap
-// conservative so they cannot crowd command telemetry out of the 16 KB payload.
-const maxRequestIDEvents = 10
+// Leave room in the 16 KB payload for common dimensions, command telemetry,
+// and other invocation events.
+const maxRequestIDsEncodedSize = 8 * 1024
 
 // stateDirFunc returns the state directory path. Can be replaced in tests.
 var stateDirFunc = config.StateDir
@@ -266,8 +266,10 @@ type service struct {
 
 	events []recordedEvent
 
-	requestIDCount int
-	disabled       bool
+	requestIDs            []string
+	requestIDsEncodedSize int
+	apiRequestCount       int
+	disabled              bool
 }
 
 func (s *service) Disable() {
@@ -284,8 +286,8 @@ func (s *service) Record(event ghtelemetry.Event) {
 	s.events = append(s.events, recordedEvent{event: event, recordedAt: time.Now()})
 }
 
-func (s *service) RecordRequestID(requestID string) {
-	requestID = strings.TrimSpace(requestID)
+func (s *service) RecordAPIRequest(request ghtelemetry.APIRequest) {
+	requestID := strings.TrimSpace(request.RequestID)
 	if requestID == "" {
 		return
 	}
@@ -297,20 +299,22 @@ func (s *service) RecordRequestID(requestID string) {
 		return
 	}
 
-	s.requestIDCount++
-	if s.requestIDCount > maxRequestIDEvents {
+	s.apiRequestCount++
+
+	encodedRequestID, err := json.Marshal(requestID)
+	if err != nil {
+		return
+	}
+	size := len(encodedRequestID) - 2
+	if len(s.requestIDs) > 0 {
+		size++
+	}
+	if s.requestIDsEncodedSize+size > maxRequestIDsEncodedSize {
 		return
 	}
 
-	s.events = append(s.events, recordedEvent{
-		event: ghtelemetry.Event{
-			Type: "api_request",
-			Dimensions: ghtelemetry.Dimensions{
-				"request_id": requestID,
-			},
-		},
-		recordedAt: time.Now(),
-	})
+	s.requestIDs = append(s.requestIDs, requestID)
+	s.requestIDsEncodedSize += size
 }
 
 func (s *service) SetSampleRate(rate int) {
@@ -344,13 +348,16 @@ func (s *service) Flush() {
 		events = nil
 	}
 
-	if len(events) > 0 && s.requestIDCount > maxRequestIDEvents {
+	if len(s.requestIDs) > 0 && !s.disabled {
 		events = append(events, recordedEvent{
 			event: ghtelemetry.Event{
-				Type: "api_request_summary",
+				Type: "api_requests",
+				Dimensions: ghtelemetry.Dimensions{
+					"request_ids": strings.Join(s.requestIDs, ","),
+				},
 				Measures: ghtelemetry.Measures{
-					"request_count":          int64(s.requestIDCount),
-					"recorded_request_count": maxRequestIDEvents,
+					"request_count":          int64(s.apiRequestCount),
+					"recorded_request_count": int64(len(s.requestIDs)),
 				},
 			},
 			recordedAt: time.Now(),
@@ -465,7 +472,7 @@ type NoOpService struct{}
 
 func (s *NoOpService) Record(event ghtelemetry.Event) {}
 
-func (s *NoOpService) RecordRequestID(requestID string) {}
+func (s *NoOpService) RecordAPIRequest(request ghtelemetry.APIRequest) {}
 
 func (s *NoOpService) Disable() {}
 

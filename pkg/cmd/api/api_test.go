@@ -423,14 +423,14 @@ func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
 	assert.EqualError(t, err, `invalid API endpoint: "C:\users\repos". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`)
 }
 
-func TestNewCmdApiUsesFactoryRequestIDRecorder(t *testing.T) {
+func TestNewCmdApiUsesFactoryAPIRequestRecorder(t *testing.T) {
 	recorder := &telemetry.NoOpService{}
 	f := &cmdutil.Factory{
-		RequestIDRecorder: recorder,
+		APIRequestRecorder: recorder,
 	}
 
 	cmd := NewCmdApi(f, func(opts *ApiOptions) error {
-		assert.Same(t, recorder, opts.RequestIDRecorder)
+		assert.Same(t, recorder, opts.APIRequestRecorder)
 		return nil
 	})
 	cmd.SetArgs([]string{"user"})

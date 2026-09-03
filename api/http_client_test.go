@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -471,7 +472,7 @@ func TestNewHTTPClientWithoutTelemetryDisabler(t *testing.T) {
 }
 
 func TestNewHTTPClientRecordsRequestIDs(t *testing.T) {
-	recorder := &fakeRequestIDRecorder{}
+	recorder := &fakeAPIRequestRecorder{}
 	responses := []*http.Response{
 		{
 			StatusCode: http.StatusFound,
@@ -496,8 +497,8 @@ func TestNewHTTPClientRecordsRequestIDs(t *testing.T) {
 		return res, nil
 	}}
 	client, err := NewHTTPClient(HTTPClientOptions{
-		RequestIDRecorder: recorder,
-		Transport:         transport,
+		APIRequestRecorder: recorder,
+		Transport:          transport,
 	})
 	require.NoError(t, err)
 
@@ -508,13 +509,16 @@ func TestNewHTTPClientRecordsRequestIDs(t *testing.T) {
 	res.Body.Close()
 
 	assert.Equal(t, http.StatusNoContent, res.StatusCode)
-	assert.Equal(t, []string{"REQUEST-1", "REQUEST-2"}, recorder.requestIDs)
+	assert.Equal(t, []ghtelemetry.APIRequest{
+		{RequestID: "REQUEST-1"},
+		{RequestID: "REQUEST-2"},
+	}, recorder.requests)
 }
 
 func TestNewHTTPClientDoesNotRecordMissingRequestID(t *testing.T) {
-	recorder := &fakeRequestIDRecorder{}
+	recorder := &fakeAPIRequestRecorder{}
 	client, err := NewHTTPClient(HTTPClientOptions{
-		RequestIDRecorder: recorder,
+		APIRequestRecorder: recorder,
 		Transport: &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusNoContent,
@@ -532,17 +536,17 @@ func TestNewHTTPClientDoesNotRecordMissingRequestID(t *testing.T) {
 	require.NoError(t, err)
 	res.Body.Close()
 
-	assert.Empty(t, recorder.requestIDs)
+	assert.Empty(t, recorder.requests)
 }
 
 func TestNewHTTPClientDoesNotReplayCachedRequestIDs(t *testing.T) {
-	recorder := &fakeRequestIDRecorder{}
+	recorder := &fakeAPIRequestRecorder{}
 	requestCount := 0
 	client, err := NewHTTPClient(HTTPClientOptions{
-		CacheDir:          t.TempDir(),
-		CacheTTL:          time.Hour,
-		EnableCache:       true,
-		RequestIDRecorder: recorder,
+		CacheDir:           t.TempDir(),
+		CacheTTL:           time.Hour,
+		EnableCache:        true,
+		APIRequestRecorder: recorder,
 		Transport: &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			requestCount++
 			return &http.Response{
@@ -566,7 +570,7 @@ func TestNewHTTPClientDoesNotReplayCachedRequestIDs(t *testing.T) {
 	}
 
 	assert.Equal(t, 1, requestCount)
-	assert.Equal(t, []string{"REQUEST-1"}, recorder.requestIDs)
+	assert.Equal(t, []ghtelemetry.APIRequest{{RequestID: "REQUEST-1"}}, recorder.requests)
 }
 
 func TestNewHTTPClientDropsTelemetryForEnterpriseRequests(t *testing.T) {
@@ -575,8 +579,8 @@ func TestNewHTTPClientDropsTelemetryForEnterpriseRequests(t *testing.T) {
 		payload = p
 	})
 	client, err := NewHTTPClient(HTTPClientOptions{
-		RequestIDRecorder: recorder,
-		TelemetryDisabler: recorder,
+		APIRequestRecorder: recorder,
+		TelemetryDisabler:  recorder,
 		Transport: &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusNoContent,
@@ -655,19 +659,16 @@ func (f *fakeTelemetryDisabler) Disable() {
 	f.disabled = true
 }
 
-type fakeRequestIDRecorder struct {
-	requestIDs []string
-	disabled   bool
+type fakeAPIRequestRecorder struct {
+	requests []ghtelemetry.APIRequest
+	disabled bool
 }
 
-func (f *fakeRequestIDRecorder) RecordRequestID(requestID string) {
-	requestID = strings.TrimSpace(requestID)
-	if requestID != "" {
-		f.requestIDs = append(f.requestIDs, requestID)
-	}
+func (f *fakeAPIRequestRecorder) RecordAPIRequest(request ghtelemetry.APIRequest) {
+	f.requests = append(f.requests, request)
 }
 
-func (f *fakeRequestIDRecorder) Disable() {
+func (f *fakeAPIRequestRecorder) Disable() {
 	f.disabled = true
 }
 

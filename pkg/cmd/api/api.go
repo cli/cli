@@ -35,14 +35,14 @@ const (
 )
 
 type ApiOptions struct {
-	AppVersion        string
-	InvokingAgent     string
-	BaseRepo          func() (ghrepo.Interface, error)
-	Branch            func() (string, error)
-	Config            func() (gh.Config, error)
-	HttpClient        func() (*http.Client, error)
-	IO                *iostreams.IOStreams
-	RequestIDRecorder ghtelemetry.RequestIDRecorder
+	AppVersion         string
+	InvokingAgent      string
+	BaseRepo           func() (ghrepo.Interface, error)
+	Branch             func() (string, error)
+	Config             func() (gh.Config, error)
+	HttpClient         func() (*http.Client, error)
+	IO                 *iostreams.IOStreams
+	APIRequestRecorder ghtelemetry.APIRequestRecorder
 
 	Hostname            string
 	RequestMethod       string
@@ -67,13 +67,13 @@ type ApiOptions struct {
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
-		AppVersion:        f.AppVersion,
-		InvokingAgent:     f.InvokingAgent,
-		BaseRepo:          f.BaseRepo,
-		Branch:            f.Branch,
-		Config:            f.Config,
-		IO:                f.IOStreams,
-		RequestIDRecorder: f.RequestIDRecorder,
+		AppVersion:         f.AppVersion,
+		InvokingAgent:      f.InvokingAgent,
+		BaseRepo:           f.BaseRepo,
+		Branch:             f.Branch,
+		Config:             f.Config,
+		IO:                 f.IOStreams,
+		APIRequestRecorder: f.APIRequestRecorder,
 	}
 
 	cmd := &cobra.Command{
@@ -398,15 +398,15 @@ func apiRun(opts *ApiOptions) error {
 				log = opts.IO.Out
 			}
 			opts := api.HTTPClientOptions{
-				AppVersion:        opts.AppVersion,
-				InvokingAgent:     opts.InvokingAgent,
-				CacheTTL:          opts.CacheTTL,
-				Config:            cfg.Authentication(),
-				EnableCache:       opts.CacheTTL > 0,
-				Log:               log,
-				LogColorize:       opts.IO.ColorEnabled(),
-				LogVerboseHTTP:    opts.Verbose,
-				RequestIDRecorder: opts.RequestIDRecorder,
+				AppVersion:         opts.AppVersion,
+				InvokingAgent:      opts.InvokingAgent,
+				CacheTTL:           opts.CacheTTL,
+				Config:             cfg.Authentication(),
+				EnableCache:        opts.CacheTTL > 0,
+				Log:                log,
+				LogColorize:        opts.IO.ColorEnabled(),
+				LogVerboseHTTP:     opts.Verbose,
+				APIRequestRecorder: opts.APIRequestRecorder,
 			}
 			return api.NewHTTPClient(opts)
 		}

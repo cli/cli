@@ -615,13 +615,13 @@ func TestServiceSampling(t *testing.T) {
 	})
 }
 
-func TestServiceRecordRequestID(t *testing.T) {
+func TestServiceRecordAPIRequest(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	var captured SendTelemetryPayload
 	svc := newService(func(p SendTelemetryPayload) { captured = p }, nil)
-	svc.RecordRequestID(" REQUEST-1 ")
-	svc.RecordRequestID("")
+	svc.RecordAPIRequest(ghtelemetry.APIRequest{RequestID: " REQUEST-1 "})
+	svc.RecordAPIRequest(ghtelemetry.APIRequest{})
 	svc.Record(ghtelemetry.Event{
 		Type:       "command_invocation",
 		Dimensions: ghtelemetry.Dimensions{"command": "gh pr list"},
@@ -629,17 +629,19 @@ func TestServiceRecordRequestID(t *testing.T) {
 	svc.Flush()
 
 	require.Len(t, captured.Events, 2)
-	requestEvent := captured.Events[0]
-	commandEvent := captured.Events[1]
-	assert.Equal(t, "api_request", requestEvent.Type)
-	assert.Equal(t, "REQUEST-1", requestEvent.Dimensions["request_id"])
+	commandEvent := captured.Events[0]
+	requestEvent := captured.Events[1]
+	assert.Equal(t, "api_requests", requestEvent.Type)
+	assert.Equal(t, "REQUEST-1", requestEvent.Dimensions["request_ids"])
+	assert.Equal(t, int64(1), requestEvent.Measures["request_count"])
+	assert.Equal(t, int64(1), requestEvent.Measures["recorded_request_count"])
 	assert.NotEmpty(t, requestEvent.Dimensions["invocation_id"])
 	assert.Equal(t, "command_invocation", commandEvent.Type)
 	assert.Equal(t, requestEvent.Dimensions["invocation_id"], commandEvent.Dimensions["invocation_id"])
-	assert.NotContains(t, commandEvent.Dimensions, "request_id")
+	assert.NotContains(t, commandEvent.Dimensions, "request_ids")
 }
 
-func TestServiceBoundsRequestIDEvents(t *testing.T) {
+func TestServiceBoundsAPIRequests(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	var captured SendTelemetryPayload
@@ -655,33 +657,38 @@ func TestServiceBoundsRequestIDEvents(t *testing.T) {
 		"spinner_disabled":    "false",
 		"sample_rate":         "1",
 	})
-	for i := 0; i < maxRequestIDEvents+5; i++ {
-		svc.RecordRequestID(fmt.Sprintf("REQUEST-%d", i))
+	const requestCount = 300
+	for i := 0; i < requestCount; i++ {
+		svc.RecordAPIRequest(ghtelemetry.APIRequest{
+			RequestID: fmt.Sprintf("REQUEST-%04d:%s", i, strings.Repeat("A", 24)),
+		})
 	}
 	svc.Record(ghtelemetry.Event{Type: "command_invocation"})
 	svc.Flush()
 
-	require.Len(t, captured.Events, maxRequestIDEvents+2)
-	assert.Equal(t, "command_invocation", captured.Events[maxRequestIDEvents].Type)
-	summary := captured.Events[maxRequestIDEvents+1]
-	assert.Equal(t, "api_request_summary", summary.Type)
-	assert.Equal(t, int64(maxRequestIDEvents+5), summary.Measures["request_count"])
-	assert.Equal(t, int64(maxRequestIDEvents), summary.Measures["recorded_request_count"])
+	require.Len(t, captured.Events, 2)
+	assert.Equal(t, "command_invocation", captured.Events[0].Type)
+	requests := captured.Events[1]
+	assert.Equal(t, "api_requests", requests.Type)
+	assert.Equal(t, int64(requestCount), requests.Measures["request_count"])
+	assert.Less(t, requests.Measures["recorded_request_count"], int64(requestCount))
+	assert.LessOrEqual(t, len(requests.Dimensions["request_ids"]), maxRequestIDsEncodedSize)
 
 	payloadBytes, err := json.Marshal(captured)
 	require.NoError(t, err)
 	assert.Less(t, len(payloadBytes), maxPayloadSize)
 }
 
-func TestServiceDoesNotRecordRequestIDAfterDisable(t *testing.T) {
+func TestServiceDoesNotRecordAPIRequestAfterDisable(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	svc := newService(func(SendTelemetryPayload) {}, nil)
 	svc.Disable()
-	svc.RecordRequestID("REQUEST-1")
+	svc.RecordAPIRequest(ghtelemetry.APIRequest{RequestID: "REQUEST-1"})
 
 	assert.Empty(t, svc.events)
-	assert.Zero(t, svc.requestIDCount)
+	assert.Zero(t, svc.apiRequestCount)
+	assert.Empty(t, svc.requestIDs)
 }
 
 func TestWithAdditionalCommonDimensions(t *testing.T) {
@@ -771,7 +778,7 @@ func TestNoOpService(t *testing.T) {
 	svc := &NoOpService{}
 	// All methods should be safe to call without panicking
 	svc.Record(ghtelemetry.Event{Type: "test"})
-	svc.RecordRequestID("REQUEST-1")
+	svc.RecordAPIRequest(ghtelemetry.APIRequest{RequestID: "REQUEST-1"})
 	svc.Disable()
 	svc.SetSampleRate(50)
 	svc.Flush()

@@ -19,9 +19,14 @@ type EventRecorder interface {
 	Disabler
 }
 
-// RequestIDRecorder records GitHub server request IDs for invocation correlation.
-type RequestIDRecorder interface {
-	RecordRequestID(requestID string)
+// APIRequest contains telemetry-safe metadata about a GitHub API request.
+type APIRequest struct {
+	RequestID string
+}
+
+// APIRequestRecorder records GitHub API requests for invocation correlation.
+type APIRequestRecorder interface {
+	RecordAPIRequest(request APIRequest)
 }
 
 type CommandRecorder interface {
@@ -31,7 +36,7 @@ type CommandRecorder interface {
 
 type Service interface {
 	CommandRecorder
-	RequestIDRecorder
+	APIRequestRecorder
 	Flush()
 }
 

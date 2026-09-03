@@ -29,7 +29,7 @@ type HTTPClientOptions struct {
 	Log                io.Writer
 	LogColorize        bool
 	LogVerboseHTTP     bool
-	RequestIDRecorder  ghtelemetry.RequestIDRecorder
+	APIRequestRecorder ghtelemetry.APIRequestRecorder
 	SkipDefaultHeaders bool
 	TelemetryDisabler  ghtelemetry.Disabler
 	Transport          http.RoundTripper
@@ -47,14 +47,14 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	if opts.Transport != nil {
 		clientOpts.Transport = opts.Transport
 	}
-	if opts.RequestIDRecorder != nil {
+	if opts.APIRequestRecorder != nil {
 		transport := clientOpts.Transport
 		if transport == nil {
 			transport = http.DefaultTransport
 		}
 		clientOpts.Transport = requestIDTransport{
 			wrappedTransport: transport,
-			recorder:         opts.RequestIDRecorder,
+			recorder:         opts.APIRequestRecorder,
 		}
 	}
 
@@ -248,13 +248,15 @@ type telemetryDisablerTransport struct {
 
 type requestIDTransport struct {
 	wrappedTransport http.RoundTripper
-	recorder         ghtelemetry.RequestIDRecorder
+	recorder         ghtelemetry.APIRequestRecorder
 }
 
 func (t requestIDTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	res, err := t.wrappedTransport.RoundTrip(req)
 	if err == nil && res != nil {
-		t.recorder.RecordRequestID(res.Header.Get("X-GitHub-Request-Id"))
+		if requestID := strings.TrimSpace(res.Header.Get("X-GitHub-Request-Id")); requestID != "" {
+			t.recorder.RecordAPIRequest(ghtelemetry.APIRequest{RequestID: requestID})
+		}
 	}
 	return res, err
 }
