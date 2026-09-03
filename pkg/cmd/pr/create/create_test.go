@@ -21,9 +21,11 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -335,7 +337,8 @@ func TestNewCmdCreate(t *testing.T) {
 			}
 
 			var opts *CreateOptions
-			cmd := NewCmdCreate(f, func(o *CreateOptions) error {
+			recorder := &telemetry.CommandRecorderSpy{}
+			cmd := NewCmdCreate(f, recorder, func(o *CreateOptions) error {
 				opts = o
 				return nil
 			})
@@ -346,6 +349,18 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
 			_, err = cmd.ExecuteC()
+			if cmd.Flags().Changed("attach") {
+				values, flagErr := cmd.Flags().GetStringArray("attach")
+				require.NoError(t, flagErr)
+				require.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
+				require.Len(t, recorder.Events, 1)
+				assert.Equal(t, "attachment_invocation", recorder.Events[0].Type)
+				assert.Equal(t, cmd.CommandPath(), recorder.Events[0].Dimensions["command"])
+				assert.Equal(t, int64(len(values)), recorder.Events[0].Measures["attach_count"])
+			} else {
+				assert.Empty(t, recorder.Events)
+				assert.Zero(t, recorder.LastSampleRate)
+			}
 			if tt.wantsErr {
 				if tt.wantsErrMsg != "" {
 					if tt.wantErrIsNotExist {

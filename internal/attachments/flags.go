@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -37,6 +38,24 @@ func AddFlag(cmd *cobra.Command) *Flag {
 // Changed reports whether the attachment flag was passed.
 func (f *Flag) Changed() bool {
 	return f.flag.Changed
+}
+
+// RecordTelemetry records how many attachment flags were provided.
+func (f *Flag) RecordTelemetry(command string, recorder ghtelemetry.CommandRecorder) {
+	if recorder == nil || !f.Changed() {
+		return
+	}
+
+	recorder.SetSampleRate(ghtelemetry.SAMPLE_ALL)
+	recorder.Record(ghtelemetry.Event{
+		Type: "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{
+			"command": command,
+		},
+		Measures: ghtelemetry.Measures{
+			"attach_count": int64(len(f.values)),
+		},
+	})
 }
 
 // UserAssets validates the files named by the attachment flag, keeping them in

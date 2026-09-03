@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -84,6 +86,58 @@ func TestAddFlag(t *testing.T) {
 			assert.Empty(t, attachFlag.flag.Shorthand)
 			assert.Equal(t, "Attach an image or video `file`, in '<file>#<image alt text>' format", attachFlag.flag.Usage)
 			assert.Same(t, attachFlag.flag, cmd.Flags().Lookup(flagName))
+		})
+	}
+}
+
+func TestFlagRecordTelemetry(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantEvent bool
+		wantCount int64
+	}{
+		{
+			name:  "flag not passed",
+			input: "",
+		},
+		{
+			name:      "one attachment",
+			input:     "--attach ./first.png",
+			wantEvent: true,
+			wantCount: 1,
+		},
+		{
+			name:      "several attachments before validation",
+			input:     "--attach ./first.png --attach ./second.png --attach ./third.png",
+			wantEvent: true,
+			wantCount: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, attachFlag := attachCmd(t, tt.input)
+			recorder := &telemetry.CommandRecorderSpy{}
+
+			attachFlag.RecordTelemetry("gh issue comment", recorder)
+
+			if !tt.wantEvent {
+				assert.Empty(t, recorder.Events)
+				assert.Zero(t, recorder.LastSampleRate)
+				return
+			}
+
+			require.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
+			require.Equal(t, []ghtelemetry.Event{{
+				Type: "attachment_invocation",
+				Dimensions: ghtelemetry.Dimensions{
+					"command": "gh issue comment",
+				},
+				Measures: ghtelemetry.Measures{
+					"attach_count": tt.wantCount,
+				},
+			}}, recorder.Events)
 		})
 	}
 }
