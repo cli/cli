@@ -25,6 +25,7 @@ type Factory struct {
 	IOStreams          *iostreams.IOStreams
 	Prompter           prompter.Prompter
 	APIRequestRecorder ghtelemetry.APIRequestRecorder
+	TelemetryDisabler  ghtelemetry.Disabler
 
 	BaseRepo func() (ghrepo.Interface, error)
 	Branch   func() (string, error)

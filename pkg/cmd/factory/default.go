@@ -38,6 +38,7 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 
 	f.IOStreams = ios
 	f.APIRequestRecorder = telemetryRecorder
+	f.TelemetryDisabler = telemetryRecorder
 	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryRecorder)
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryRecorder)
 	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)

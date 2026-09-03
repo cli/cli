@@ -40,9 +40,10 @@ type ApiOptions struct {
 	BaseRepo           func() (ghrepo.Interface, error)
 	Branch             func() (string, error)
 	Config             func() (gh.Config, error)
-	HttpClient         func() (*http.Client, error)
+	HttpClient         func(api.HTTPClientOptions) (*http.Client, error)
 	IO                 *iostreams.IOStreams
 	APIRequestRecorder ghtelemetry.APIRequestRecorder
+	TelemetryDisabler  ghtelemetry.Disabler
 
 	Hostname            string
 	RequestMethod       string
@@ -72,8 +73,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		BaseRepo:           f.BaseRepo,
 		Branch:             f.Branch,
 		Config:             f.Config,
+		HttpClient:         api.NewHTTPClient,
 		IO:                 f.IOStreams,
 		APIRequestRecorder: f.APIRequestRecorder,
+		TelemetryDisabler:  f.TelemetryDisabler,
 	}
 
 	cmd := &cobra.Command{
@@ -391,27 +394,22 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	if opts.HttpClient == nil {
-		opts.HttpClient = func() (*http.Client, error) {
-			log := opts.IO.ErrOut
-			if opts.Verbose {
-				log = opts.IO.Out
-			}
-			opts := api.HTTPClientOptions{
-				AppVersion:         opts.AppVersion,
-				InvokingAgent:      opts.InvokingAgent,
-				CacheTTL:           opts.CacheTTL,
-				Config:             cfg.Authentication(),
-				EnableCache:        opts.CacheTTL > 0,
-				Log:                log,
-				LogColorize:        opts.IO.ColorEnabled(),
-				LogVerboseHTTP:     opts.Verbose,
-				APIRequestRecorder: opts.APIRequestRecorder,
-			}
-			return api.NewHTTPClient(opts)
-		}
+	log := opts.IO.ErrOut
+	if opts.Verbose {
+		log = opts.IO.Out
 	}
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HttpClient(api.HTTPClientOptions{
+		AppVersion:         opts.AppVersion,
+		InvokingAgent:      opts.InvokingAgent,
+		CacheTTL:           opts.CacheTTL,
+		Config:             cfg.Authentication(),
+		EnableCache:        opts.CacheTTL > 0,
+		Log:                log,
+		LogColorize:        opts.IO.ColorEnabled(),
+		LogVerboseHTTP:     opts.Verbose,
+		APIRequestRecorder: opts.APIRequestRecorder,
+		TelemetryDisabler:  opts.TelemetryDisabler,
+	})
 	if err != nil {
 		return err
 	}

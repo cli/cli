@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	rootapi "github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
@@ -423,20 +424,50 @@ func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
 	assert.EqualError(t, err, `invalid API endpoint: "C:\users\repos". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`)
 }
 
-func TestNewCmdApiUsesFactoryAPIRequestRecorder(t *testing.T) {
+func TestNewCmdApiUsesFactoryTelemetryRecorder(t *testing.T) {
 	recorder := &telemetry.NoOpService{}
 	f := &cmdutil.Factory{
 		APIRequestRecorder: recorder,
+		TelemetryDisabler:  recorder,
 	}
 
 	cmd := NewCmdApi(f, func(opts *ApiOptions) error {
 		assert.Same(t, recorder, opts.APIRequestRecorder)
+		assert.Same(t, recorder, opts.TelemetryDisabler)
 		return nil
 	})
 	cmd.SetArgs([]string{"user"})
 
 	_, err := cmd.ExecuteC()
 	require.NoError(t, err)
+}
+
+func TestAPIRunDisablesTelemetryForEnterpriseRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-GitHub-Request-Id", "ENTERPRISE-REQUEST")
+		fmt.Fprint(w, "{}")
+	}))
+	defer server.Close()
+
+	var payload telemetry.SendTelemetryPayload
+	recorder := telemetry.NewService(func(p telemetry.SendTelemetryPayload) {
+		payload = p
+	})
+	ios, _, _, _ := iostreams.Test()
+	opts := ApiOptions{
+		Config:             func() (gh.Config, error) { return config.NewMockConfig(), nil },
+		HttpClient:         rootapi.NewHTTPClient,
+		IO:                 ios,
+		RequestPath:        server.URL,
+		APIRequestRecorder: recorder,
+		TelemetryDisabler:  recorder,
+	}
+
+	err := apiRun(&opts)
+	require.NoError(t, err)
+	recorder.Flush()
+
+	assert.Empty(t, payload.Events)
 }
 
 func Test_apiRun(t *testing.T) {
@@ -758,7 +789,7 @@ func Test_apiRun(t *testing.T) {
 
 			tt.options.IO = ios
 			tt.options.Config = func() (gh.Config, error) { return config.NewMockConfig(), nil }
-			tt.options.HttpClient = func() (*http.Client, error) {
+			tt.options.HttpClient = func(rootapi.HTTPClientOptions) (*http.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 					resp := tt.httpResponse
 					resp.Request = req
@@ -827,7 +858,7 @@ func Test_apiRun_paginationREST(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
@@ -899,7 +930,7 @@ func Test_apiRun_arrayPaginationREST(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
@@ -971,7 +1002,7 @@ func Test_apiRun_arrayPaginationREST_with_headers(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
@@ -1040,7 +1071,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
@@ -1139,7 +1170,7 @@ func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
@@ -1251,7 +1282,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
@@ -1310,7 +1341,7 @@ func Test_apiRun_DELETE(t *testing.T) {
 		Config: func() (gh.Config, error) {
 			return config.NewMockConfig(), nil
 		},
-		HttpClient: func() (*http.Client, error) {
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				gotRequest = req
 				return &http.Response{StatusCode: 204, Request: req}, nil
@@ -1339,7 +1370,7 @@ func Test_apiRun_HEAD(t *testing.T) {
 		Config: func() (gh.Config, error) {
 			return config.NewMockConfig(), nil
 		},
-		HttpClient: func() (*http.Client, error) {
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: 422,
@@ -1410,7 +1441,7 @@ func Test_apiRun_inputFile(t *testing.T) {
 				RawFields:        []string{"a=b", "c=d"},
 
 				IO: ios,
-				HttpClient: func() (*http.Client, error) {
+				HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
 					var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 						var err error
 						if bodyBytes, err = io.ReadAll(req.Body); err != nil {
@@ -1451,7 +1482,8 @@ func Test_apiRun_cache(t *testing.T) {
 
 	ios, _, stdout, stderr := iostreams.Test()
 	options := ApiOptions{
-		IO: ios,
+		IO:         ios,
+		HttpClient: rootapi.NewHTTPClient,
 		Config: func() (gh.Config, error) {
 			return &ghmock.ConfigMock{
 				AuthenticationFunc: func() gh.AuthConfig {
@@ -1498,6 +1530,7 @@ func Test_apiRun_invokingAgent(t *testing.T) {
 		IO:            ios,
 		AppVersion:    "1.2.3",
 		InvokingAgent: "copilot-cli",
+		HttpClient:    rootapi.NewHTTPClient,
 		Config: func() (gh.Config, error) {
 			return &ghmock.ConfigMock{
 				AuthenticationFunc: func() gh.AuthConfig {
@@ -1906,7 +1939,7 @@ func Test_apiRun_acceptHeader(t *testing.T) {
 			}
 
 			var gotReq *http.Request
-			tt.options.HttpClient = func() (*http.Client, error) {
+			tt.options.HttpClient = func(rootapi.HTTPClientOptions) (*http.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 					gotReq = req
 					resp := &http.Response{
