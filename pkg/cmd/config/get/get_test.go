@@ -130,3 +130,16 @@ func Test_getRun(t *testing.T) {
 		})
 	}
 }
+
+func Test_getRunRequiresHostForPerHostOption(t *testing.T) {
+	opts := &GetOptions{
+		Config: config.NewMockConfig(),
+		Key:    "api_host",
+	}
+
+	err := getRun(opts)
+
+	var flagError *cmdutil.FlagError
+	require.ErrorAs(t, err, &flagError)
+	require.EqualError(t, err, "--host required when getting api_host")
+}

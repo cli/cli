@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -53,6 +54,10 @@ func NewCmdConfigGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Co
 }
 
 func getRun(opts *GetOptions) error {
+	if config.IsPerHostOnly(opts.Key) && opts.Hostname == "" {
+		return cmdutil.FlagErrorf("--host required when getting %s", opts.Key)
+	}
+
 	// search keyring storage when fetching the `oauth_token` value
 	if opts.Hostname != "" && opts.Key == "oauth_token" {
 		token, _ := opts.Config.Authentication().ActiveToken(opts.Hostname)

@@ -646,10 +646,21 @@ type ConfigOption struct {
 	Description   string
 	DefaultValue  string
 	AllowedValues []string
+	PerHostOnly   bool
 	CurrentValue  func(c gh.Config, hostname string) string
 }
 
 var Options = []ConfigOption{
+	{
+		Key:          apiHostKey,
+		Description:  "experimental: the hostname (without scheme or port) to use when making API requests for a GitHub host. Note: this is not a security boundary and requests to the canonical host will remain authenticated",
+		DefaultValue: "",
+		PerHostOnly:  true,
+		CurrentValue: func(c gh.Config, hostname string) string {
+			apiHost, _ := c.Authentication().APIHostForHost(hostname)
+			return apiHost
+		},
+	},
 	{
 		Key:           gitProtocolKey,
 		Description:   "the protocol to use for git clone and push operations",
@@ -754,6 +765,17 @@ var Options = []ConfigOption{
 			return c.Telemetry().Value
 		},
 	},
+}
+
+// IsPerHostOnly reports whether key can only be configured for a specific host.
+func IsPerHostOnly(key string) bool {
+	for _, option := range Options {
+		if key == option.Key {
+			return option.PerHostOnly
+		}
+	}
+
+	return false
 }
 
 func HomeDirPath(subdir string) (string, error) {

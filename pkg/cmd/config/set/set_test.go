@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdConfigSet(t *testing.T) {
@@ -114,6 +115,26 @@ func Test_setRun(t *testing.T) {
 			expectedValue: "vim",
 		},
 		{
+			name: "set api_host scoped by host",
+			input: &SetOptions{
+				Config:   config.NewMockConfig(),
+				Hostname: "github.example.com",
+				Key:      "api_host",
+				Value:    "api-gateway.example.com",
+			},
+			expectedValue: "api-gateway.example.com",
+		},
+		{
+			name: "set api_host without hostname",
+			input: &SetOptions{
+				Config: config.NewMockConfig(),
+				Key:    "api_host",
+				Value:  "api-gateway.example.com",
+			},
+			wantsErr: true,
+			errMsg:   "--host required when setting api_host",
+		},
+		{
 			name: "set unknown key",
 			input: &SetOptions{
 				Config: config.NewMockConfig(),
@@ -196,4 +217,7 @@ func Test_ValidateKey(t *testing.T) {
 
 	err = ValidateKey("browser")
 	assert.NoError(t, err)
+
+	err = ValidateKey("api_host")
+	require.NoError(t, err)
 }

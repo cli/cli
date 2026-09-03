@@ -64,6 +64,12 @@ func TestGetOrDefaultApplicationDefaults(t *testing.T) {
 	}
 }
 
+func TestIsPerHostOnly(t *testing.T) {
+	require.True(t, IsPerHostOnly(apiHostKey))
+	require.False(t, IsPerHostOnly(editorKey))
+	require.False(t, IsPerHostOnly("unknown"))
+}
+
 func TestGetOrDefaultNonExistentKey(t *testing.T) {
 	// Given we have no top level configuration
 	cfg := newTestConfig()
