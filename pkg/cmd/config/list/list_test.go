@@ -82,6 +82,7 @@ func Test_listRun(t *testing.T) {
 			name: "list",
 			config: func() gh.Config {
 				cfg := config.NewMockConfig()
+				cfg.Set("HOST", "api_host", "api-gateway.example.com")
 				cfg.Set("HOST", "git_protocol", "ssh")
 				cfg.Set("HOST", "editor", "/usr/bin/vim")
 				cfg.Set("HOST", "prompt", "disabled")
@@ -93,6 +94,7 @@ func Test_listRun(t *testing.T) {
 			}(),
 			input: &ListOptions{Hostname: "HOST"},
 			stdout: heredoc.Doc(`
+				api_host=api-gateway.example.com
 				git_protocol=ssh
 				editor=/usr/bin/vim
 				prompt=disabled
