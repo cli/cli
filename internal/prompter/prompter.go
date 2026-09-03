@@ -2,6 +2,7 @@ package prompter
 
 import (
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 
@@ -71,13 +72,61 @@ func New(editorCmd string, io *iostreams.IOStreams) Prompter {
 		}
 	}
 
+	probe := newSurveyProbeIO(asFile(io.In), asFile(io.Out))
 	return &surveyPrompter{
-		prompter:  ghPrompter.New(io.In, io.Out, io.ErrOut),
-		stdin:     io.In,
+		prompter:  ghPrompter.New(wrapFileReader(io.In, probe), wrapFileWriter(io.Out, probe), io.ErrOut),
 		stdout:    io.Out,
 		stderr:    io.ErrOut,
 		editorCmd: editorCmd,
 	}
+}
+
+// asFile narrows an arbitrary stream to *os.File, tolerating nil and
+// non-file implementations (tests).
+func asFile(f any) *os.File {
+	if f == nil {
+		return nil
+	}
+	if file, ok := f.(*os.File); ok {
+		return file
+	}
+	return nil
+}
+
+// wrapFileReader keeps the original FileReader for ghPrompter bookkeeping
+// (Fd is required) while making its Read surface the probe-bounded view. If
+// either stream is not a real file, the wrapper degrades to a no-op and the
+// original stream is passed through untouched.
+type probeFileReader struct {
+	inner ghPrompter.FileReader
+	read  func([]byte) (int, error)
+}
+
+func (r *probeFileReader) Read(p []byte) (int, error) { return r.read(p) }
+func (r *probeFileReader) Fd() uintptr                { return r.inner.Fd() }
+
+func wrapFileReader(in ghPrompter.FileReader, probe *surveyProbeIO) ghPrompter.FileReader {
+	if probe == nil || probe.In() == nil {
+		return in
+	}
+	bounded := probe.In()
+	return &probeFileReader{inner: in, read: bounded.Read}
+}
+
+type probeFileWriter struct {
+	inner ghPrompter.FileWriter
+	write func([]byte) (int, error)
+}
+
+func (w *probeFileWriter) Write(p []byte) (int, error) { return w.write(p) }
+func (w *probeFileWriter) Fd() uintptr                 { return w.inner.Fd() }
+
+func wrapFileWriter(out ghPrompter.FileWriter, probe *surveyProbeIO) ghPrompter.FileWriter {
+	if probe == nil || probe.Out() == nil {
+		return out
+	}
+	watched := probe.Out()
+	return &probeFileWriter{inner: out, write: watched.Write}
 }
 
 type accessiblePrompter struct {
