@@ -113,7 +113,12 @@ go mod edit -go="$GO_DIRECTIVE_VERSION" -toolchain="go$TOOLCHAIN_VERSION" "$GO_M
 echo "  • set go directive → $GO_DIRECTIVE_VERSION"
 echo "  • set toolchain    → go$TOOLCHAIN_VERSION"
 
-if ! git diff --quiet -- "$GO_MOD"; then
+# Reconcile the module, apply source migrations, and verify the result before
+# creating a pull request.
+echo "  • running go mod tidy..."
+pushd "$MODULE_DIR" > /dev/null
+go mod tidy
+if ! git -C "$REPO_ROOT" diff --quiet -- "$GO_MOD"; then
   lint_version_lines=$(grep -Ec '^[[:space:]]+version: v[0-9]+\.[0-9]+\.[0-9]+$' "$LINT_WORKFLOW" || true)
   if [[ $lint_version_lines -ne 1 ]]; then
     echo "Error: expected exactly one pinned golangci-lint version in '$LINT_WORKFLOW'" >&2
@@ -125,12 +130,6 @@ if ! git diff --quiet -- "$GO_MOD"; then
 else
   echo "  • Go version unchanged; keeping the existing golangci-lint pin"
 fi
-
-# Reconcile the module, apply source migrations, and verify the result before
-# creating a pull request.
-echo "  • running go mod tidy..."
-pushd "$MODULE_DIR" > /dev/null
-go mod tidy
 echo "  • running go fix..."
 go fix ./...
 status=0
