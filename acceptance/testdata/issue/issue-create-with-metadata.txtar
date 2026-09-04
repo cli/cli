@@ -1,3 +1,4 @@
+# requires-user-capability: true
 
 # Create a repository with a file so it has a default branch
 fixture-repo shared REPO

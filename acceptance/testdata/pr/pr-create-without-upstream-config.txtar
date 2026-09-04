@@ -1,3 +1,4 @@
+# requires-user-capability: false
 
 # This test is the same as pr-create-basic, except that the git push doesn't include the -u argument
 # This causes a git config read to fail during gh pr create, but it should not be fatal

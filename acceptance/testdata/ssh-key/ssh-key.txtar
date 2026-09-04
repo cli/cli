@@ -1,3 +1,4 @@
+# requires-user-capability: true
 
 skip 'it modifies the user''s personal GitHub account SSH keys'
 
