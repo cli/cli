@@ -1,12 +1,23 @@
 # Acceptance Test Instructions
 
-Acceptance tests exercise `gh` against live GitHub resources. Keep them isolated
-and safe to rerun.
+Acceptance tests exercise `gh` against live GitHub resources. Keep them isolated,
+safe to rerun, and compatible with both user tokens and GitHub App installation
+tokens.
 
 ## Adding or Changing Tests
 
 - Put each script in `testdata/<group>/`. Groups are discovered automatically;
   do not register them in the Go harness.
+- Every `.txtar` script must start with exactly one capability declaration:
+
+  ```txtar
+  # requires-user-capability: false
+  ```
+
+- Set the declaration to `true` only when the script requires a user principal,
+  such as account SSH/GPG keys, personal-account forks, or user membership APIs.
+  Repository and organization operations supported by an installation token
+  should use `false`.
 - Every script must contain exactly one repository fixture declaration:
 
   ```txtar
@@ -36,6 +47,8 @@ and safe to rerun.
   environment variable, and deletes all managed repositories after the suite.
 - Give unmanaged resources and resources inside shared repositories unique
   names using `$SCRIPT_NAME` and `$RANDOM_STRING`.
+- Do not print tokens or run acceptance tests with verbose logging unless needed;
+  redaction is defense in depth and is not guaranteed to cover every secret.
 
 ## Running Tests
 
@@ -56,6 +69,6 @@ Run the metadata and group-selection checks without live credentials:
 ```sh
 go test ./acceptance
 go test -tags=acceptance \
-  -run '^(TestSelectAcceptanceTestGroups|TestAcceptanceScriptsDeclareFixtureRepository|TestValidateFixtureRepositoryDeclaration|TestFixtureRepositoryManager)$' \
+  -run '^(TestSelectAcceptanceTestGroups|TestTokenHasUserCapability|TestAcceptanceScriptsDeclareUserCapabilityRequirement|TestAcceptanceScriptsDeclareFixtureRepository|TestRequiresUserCapabilityForScriptErrors|TestValidateFixtureRepositoryDeclaration|TestFixtureRepositoryManager)$' \
   ./acceptance
 ```

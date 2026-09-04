@@ -1,3 +1,4 @@
+# requires-user-capability: false
 
 # Create a repository to hold the autolink references
 fixture-repo shared REPO
