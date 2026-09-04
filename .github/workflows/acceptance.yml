@@ -1,0 +1,66 @@
+name: Acceptance Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or commit to test
+        required: true
+        default: trunk
+        type: string
+      os:
+        description: Operating system to test
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+      command:
+        description: Command tests to run, or all
+        required: true
+        default: all
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    environment: gh-acceptance-testing
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os == 'all' && '["ubuntu-latest","windows-latest","macos-latest"]' || format('["{0}"]', inputs.os)) }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Check out tested revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Generate acceptance test token
+        id: acceptance-token
+        # actions/create-github-app-token v3.2.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # zizmor: ignore[github-app] - The disposable test organization intentionally exercises all App permissions.
+        with:
+          client-id: ${{ secrets.GH_ACCEPTANCE_TESTING_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GH_ACCEPTANCE_TESTING_APP_PRIVATE_KEY }}
+          owner: gh-acceptance-testing # zizmor: ignore[github-app] - Tests create repositories dynamically, so the token needs installation-wide access.
+
+      - name: Run acceptance tests
+        env:
+          GH_ACCEPTANCE_HOST: github.com
+          GH_ACCEPTANCE_ORG: gh-acceptance-testing
+          GH_ACCEPTANCE_TOKEN: ${{ steps.acceptance-token.outputs.token }}
+          GH_ACCEPTANCE_GROUP: ${{ inputs.command }}
+        run: go test -tags=acceptance ./acceptance

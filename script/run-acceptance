@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly repository="cli/cli"
+readonly workflow="acceptance.yml"
+readonly workflow_ref="trunk"
+readonly operating_systems="all ubuntu-latest windows-latest macos-latest"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly repo_root
+readonly testdata_dir="$repo_root/acceptance/testdata"
+
+usage() {
+  cat <<EOF
+Usage: script/run-acceptance [REF] [COMMAND] [OS]
+
+Dispatch acceptance tests for a branch or commit. REF defaults to the current
+branch. COMMAND and OS default to "all".
+
+List available command groups:
+  script/run-acceptance groups
+EOF
+}
+
+contains() {
+  local expected="$1"
+  shift
+
+  local candidate
+  for candidate in "$@"; do
+    if [[ "$candidate" == "$expected" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+test_groups() {
+  echo "all"
+
+  local directory
+  for directory in "$testdata_dir"/*; do
+    if [[ -d "$directory" ]]; then
+      basename "$directory"
+    fi
+  done
+}
+
+if [[ "${1:-}" == "groups" ]]; then
+  test_groups
+  exit
+fi
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit
+fi
+
+ref="${1:-}"
+command="${2:-all}"
+operating_system="${3:-all}"
+
+command_values=()
+while IFS= read -r group; do
+  command_values+=("$group")
+done < <(test_groups)
+if ! contains "$command" "${command_values[@]}"; then
+  echo "invalid command: $command" >&2
+  exit 1
+fi
+
+read -r -a operating_system_values <<<"$operating_systems"
+if ! contains "$operating_system" "${operating_system_values[@]}"; then
+  echo "invalid operating system: $operating_system" >&2
+  exit 1
+fi
+
+if [[ -z "$ref" ]]; then
+  ref="$(git branch --show-current)"
+  if [[ -z "$ref" ]]; then
+    echo "ref is required when HEAD is detached" >&2
+    exit 1
+  fi
+fi
+
+gh workflow run "$workflow" \
+  --repo "$repository" \
+  --ref "$workflow_ref" \
+  --raw-field "ref=$ref" \
+  --raw-field "command=$command" \
+  --raw-field "os=$operating_system"
+
+printf 'Dispatched acceptance tests for %s\n' "$ref"
