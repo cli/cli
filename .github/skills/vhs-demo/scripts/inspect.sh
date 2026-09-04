@@ -63,7 +63,7 @@ printf '%s\n' "$probe" | grep -Eq '^format_name=gif$' || {
 
 mkdir -p "$inspection_dir/sampled"
 ffmpeg -v error -y -i "$gif" -frames:v 1 "$inspection_dir/first.png"
-ffmpeg -v error -y -sseof -0.1 -i "$gif" -frames:v 1 "$inspection_dir/final.png"
+ffmpeg -v error -y -i "$gif" -update 1 "$inspection_dir/final.png"
 ffmpeg -v error -y -i "$gif" -vf fps=1 \
 	"$inspection_dir/sampled/frame-%04d.png"
 

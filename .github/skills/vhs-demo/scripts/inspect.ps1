@@ -7,6 +7,40 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Resolve-PhysicalPath {
+    param(
+        [Parameter(Mandatory)]
+        [string]$LiteralPath
+    )
+
+    $fullPath = [IO.Path]::GetFullPath($LiteralPath)
+    $root = [IO.Path]::GetPathRoot($fullPath)
+    $currentPath = $root
+
+    foreach ($component in $fullPath.Substring($root.Length) -split "[\\/]") {
+        if ([string]::IsNullOrEmpty($component)) {
+            continue
+        }
+
+        $item = Get-Item -LiteralPath (
+            Join-Path $currentPath $component
+        ) -ErrorAction Stop
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            $resolveLinkTarget = $item.PSObject.Methods["ResolveLinkTarget"]
+            if ($null -eq $resolveLinkTarget) {
+                throw "Cannot safely resolve linked path with this PowerShell version: $LiteralPath"
+            }
+            $item = $item.ResolveLinkTarget($true)
+            if ($null -eq $item) {
+                throw "Failed to resolve linked path: $LiteralPath"
+            }
+        }
+        $currentPath = $item.FullName
+    }
+
+    return $currentPath
+}
+
 $gifItem = Get-Item -LiteralPath $Gif -ErrorAction Stop
 if ($gifItem.Length -eq 0) {
     throw "GIF is empty: $Gif"
@@ -15,7 +49,9 @@ if (($gifItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
     throw "GIF must not be a symbolic link or reparse point: $Gif"
 }
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..")).Path
+$repoRoot = Resolve-PhysicalPath (
+    Join-Path $PSScriptRoot "..\..\..\.."
+)
 if (Test-Path -LiteralPath $InspectionDirectory) {
     throw "Inspection directory already exists: $InspectionDirectory"
 }
@@ -24,10 +60,9 @@ $inspectionParentInput = Split-Path -Parent $InspectionDirectory
 if ([string]::IsNullOrEmpty($inspectionParentInput)) {
     $inspectionParentInput = "."
 }
-$inspectionParent = (
-    Resolve-Path -LiteralPath $inspectionParentInput -ErrorAction Stop
-).Path
+$inspectionParent = Resolve-PhysicalPath $inspectionParentInput
 $inspectionPath = Join-Path $inspectionParent $inspectionLeaf
+$gifPath = Resolve-PhysicalPath $gifItem.FullName
 $comparison = if (
     [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
 ) {
@@ -40,7 +75,7 @@ $repoPrefix = $repoRoot.TrimEnd(
     [IO.Path]::AltDirectorySeparatorChar
 ) + [IO.Path]::DirectorySeparatorChar
 
-foreach ($candidate in @($gifItem.FullName, $inspectionPath)) {
+foreach ($candidate in @($gifPath, $inspectionPath)) {
     if ($candidate.Equals($repoRoot, $comparison) -or
         $candidate.StartsWith($repoPrefix, $comparison)) {
         throw "Generated media must be outside the repository: $candidate"
@@ -71,7 +106,7 @@ New-Item -ItemType Directory -Force -Path $sampled | Out-Null
     (Join-Path $inspectionPath "first.png")
 if ($LASTEXITCODE -ne 0) { throw "Failed to extract first frame" }
 
-& ffmpeg -v error -y -sseof -0.1 -i $gifItem.FullName -frames:v 1 `
+& ffmpeg -v error -y -i $gifItem.FullName -update 1 `
     (Join-Path $inspectionPath "final.png")
 if ($LASTEXITCODE -ne 0) { throw "Failed to extract final frame" }
 
