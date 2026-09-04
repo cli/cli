@@ -207,6 +207,13 @@ the comment. Trace the relevant behavior through the current `cli/cli` source an
 recent changes when useful. Form a concise hypothesis that explains how the reported
 symptom could arise, grounded in issue evidence and specific code.
 
+When source evidence will appear in the comment, obtain the exact commit SHA from a
+GitHub tool response. Never invent, infer, abbreviate, or manually alter a SHA. Before
+constructing each permalink, fetch the cited file at that exact SHA and verify that the
+referenced code and line range exist in that revision. If you cannot obtain and verify
+the SHA and cited lines with the available tools, do not include that source-code claim
+or permalink.
+
 Include this hypothesis in the comment so the first responder has a concrete starting
 point. If available evidence cannot support a useful hypothesis, say what remains unknown
 and name the specific diagnostic evidence needed next; do not invent a cause.
@@ -235,8 +242,10 @@ duplicate, name the likely original. If you are suggesting no label, say so and 
 information would help a first responder finish triage.
 
 When referring to source code, link every file, symbol, or line claim to an immutable
-GitHub permalink pinned to a full commit SHA and exact line range. Do not use branch
-links, bare file paths, or unlinked code references.
+GitHub permalink pinned to a verified full commit SHA and exact line range. Use only a
+SHA returned by a GitHub tool and verify the cited file and lines at that SHA before
+posting the link. Do not invent or guess a SHA, and do not use branch links, bare file
+paths, or unlinked code references.
 
 When calling `add-comment`, explicitly set `item_number` to
 ${{ github.event.issue.number || inputs.issue_number }}.
