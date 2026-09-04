@@ -38,6 +38,8 @@ done
 REPO="cli/cli"
 MODULE_DIR=$(dirname "$GO_MOD")
 GO_SUM="$MODULE_DIR/go.sum"
+REPO_ROOT=$(git rev-parse --show-toplevel)
+LINT_WORKFLOW="$REPO_ROOT/.github/workflows/lint.yml"
 
 # ---- Discover latest stable Go release --------------------------------------
 echo "Fetching latest stable Go version..."
@@ -48,6 +50,15 @@ GO_DIRECTIVE_VERSION="$(cut -d. -f1-2 <<< "$TOOLCHAIN_VERSION").0"
 
 echo "  → go directive : $GO_DIRECTIVE_VERSION"
 echo "  → toolchain    : go$TOOLCHAIN_VERSION"
+
+# Keep regular CI reproducibly pinned to the linter release used to validate
+# this bump.
+LINTER_VERSION=$(golangci-lint version --short)
+if [[ ! "$LINTER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: unexpected golangci-lint version '$LINTER_VERSION'" >&2
+  exit 1
+fi
+echo "  → golangci-lint: v$LINTER_VERSION"
 
 # ---- Read current go.mod state using go mod edit ----------------------------
 GO_MOD_JSON=$(go mod edit -json "$GO_MOD")
@@ -80,6 +91,15 @@ BRANCH_CREATED=1
 go mod edit -go="$GO_DIRECTIVE_VERSION" -toolchain="go$TOOLCHAIN_VERSION" "$GO_MOD"
 echo "  • set go directive → $GO_DIRECTIVE_VERSION"
 echo "  • set toolchain    → go$TOOLCHAIN_VERSION"
+
+lint_version_lines=$(grep -Ec '^[[:space:]]+version: v[0-9]+\.[0-9]+\.[0-9]+$' "$LINT_WORKFLOW" || true)
+if [[ $lint_version_lines -ne 1 ]]; then
+  echo "Error: expected exactly one pinned golangci-lint version in '$LINT_WORKFLOW'" >&2
+  exit 1
+fi
+sed -i.bak -E "s/^([[:space:]]+version: )v[0-9]+\.[0-9]+\.[0-9]+$/\1v$LINTER_VERSION/" "$LINT_WORKFLOW"
+rm -f "$LINT_WORKFLOW.bak"
+echo "  • set golangci-lint → v$LINTER_VERSION"
 
 # Reconcile the module, apply source migrations, and verify the result before
 # creating a pull request.
@@ -151,6 +171,7 @@ This PR updates Go to the latest stable release.
 
 * **go directive:** \`$FINAL_GO\`
 $TC_LINE
+* **golangci-lint:** \`v$LINTER_VERSION\`
 EOF
 )
 
