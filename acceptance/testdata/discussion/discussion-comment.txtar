@@ -5,9 +5,6 @@ fixture-repo shared REPO
 # Target the fixture repository
 env GH_REPO=$ORG/$REPO
 
-# Enable discussions
-exec gh api repos/$ORG/$REPO -X PATCH -F has_discussions=true
-
 # Create a discussion to comment on
 exec gh discussion create --title 'Comment Test' --body 'Discussion for comment tests' --category 'General'
 stdout2env DISCUSSION_URL
