@@ -81,20 +81,30 @@ go mod edit -go="$GO_DIRECTIVE_VERSION" -toolchain="go$TOOLCHAIN_VERSION" "$GO_M
 echo "  • set go directive → $GO_DIRECTIVE_VERSION"
 echo "  • set toolchain    → go$TOOLCHAIN_VERSION"
 
-# Let go mod tidy reconcile dependencies and normalize directives.
+# Reconcile the module, apply source migrations, and verify the result before
+# creating a pull request.
 echo "  • running go mod tidy..."
 pushd "$MODULE_DIR" > /dev/null
 go mod tidy
+echo "  • running go fix..."
+go fix ./...
+status=0
+echo "  • running tests..."
+go test ./... || status=$?
+echo "  • running golangci-lint..."
+golangci-lint run ./... || status=$?
+if [[ $status -ne 0 ]]; then
+  exit "$status"
+fi
 popd > /dev/null
 
 # ---- Check if anything actually changed -------------------------------------
-if git diff --quiet -- "$GO_MOD" "$GO_SUM" 2>/dev/null; then
+if git diff --quiet; then
   echo "Already on latest Go version -- no changes needed."
   exit 0
 fi
 
-git add "$GO_MOD"
-[[ -f "$GO_SUM" ]] && git add "$GO_SUM"
+git add -u
 
 # ---- Commit -----------------------------------------------------------------
 COMMIT_MSG="Bump Go to $TOOLCHAIN_VERSION"
