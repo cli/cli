@@ -9,7 +9,8 @@ Acceptance tests exercise `gh` against live GitHub resources. Minimize repositor
 creation and cloning without allowing concurrent scripts to interfere.
 
 Read `acceptance/README.md` and nearby scripts before editing. Test groups are
-discovered from `acceptance/testdata/<group>/`; do not register them manually.
+discovered from `acceptance/testdata/<group>/`; do not register them in the Go
+harness, workflow, or dispatch helper.
 
 ## Declare token capability
 

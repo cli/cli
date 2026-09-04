@@ -26,11 +26,60 @@ It's recommended to create and use a Legacy PAT for this; Fine-Grained PATs do n
 
 The test harness infers whether a token authenticates a user from GitHub's documented token prefixes. OAuth (`gho_`), classic PAT (`ghp_`), fine-grained PAT (`github_pat_`), and GitHub App user (`ghu_`) tokens provide user capabilities. GitHub App installation (`ghs_`) tokens do not, so scripts marked `requires-user-capability: true` are skipped.
 
+Users with write access can manually run the acceptance test workflow for a specified branch or commit. A run can target Linux, Windows, macOS, or all three, and can run either the complete suite or the tests for one command. The tests use a GitHub App installed for all repositories in the `gh-acceptance-testing` organization. The workflow uses the `gh-acceptance-testing` environment, where the App credentials are stored as the `GH_ACCEPTANCE_TESTING_APP_CLIENT_ID` and `GH_ACCEPTANCE_TESTING_APP_PRIVATE_KEY` secrets. Tests that require user authentication, including account key management and forks owned by a personal account, are excluded from this workflow based on each script's `requires-user-capability` declaration.
+
 Managed fixture repositories reduce repository creation by sharing state where
-tests can safely coexist.
+tests can safely coexist. Avoid overlapping full-suite workflow runs because
+every job uses the same GitHub App installation rate-limit buckets.
+
+After the workflow exists on the default branch, use
+`script/run-acceptance [REF] [COMMAND] [OS]` to dispatch it for a branch or
+commit. The ref defaults to the current branch, while the command and operating
+system default to `all`. List the available command groups with:
+
+```sh
+script/run-acceptance groups
+```
 
 Acceptance test groups are discovered from the directories under `testdata`, so
-adding a group does not require updating the test harness.
+adding a group does not require updating the workflow or dispatch helper.
+
+#### How the Acceptance Test GitHub App Was Created
+
+The GitHub App is owned by `gh-acceptance-testing` and restricted to installation on that
+account. The organization is dedicated to acceptance testing, so the App was intentionally
+granted broad installation permissions to let the suite exercise repository and
+organization administration without repeatedly changing the App registration.
+
+1. In the `gh-acceptance-testing` organization settings, **Developer settings**,
+   **GitHub Apps**, then **New GitHub App** were selected. See
+   [Registering a GitHub App](https://docs.github.com/apps/creating-github-apps/registering-a-github-app/registering-a-github-app).
+2. The App was given a globally unique name and `https://github.com/cli/cli` as its
+   homepage. No callback or redirect URI was configured, **Expire user authorization
+   tokens**, **Request user authorization (OAuth) during installation**, and
+   **Enable Device Flow** were disabled. No post-installation **Setup URL** was
+   configured and **Redirect on update** was disabled. Webhooks were also disabled,
+   and **Only on this account** was selected under
+   **Where can this GitHub App be installed?**
+3. Every **Repository permission** and **Organization permission** was set to the highest
+   available access. **Account permissions** were not requested because an installation
+   token does not authenticate a user, and the harness skips tests that require user
+   capabilities.
+4. After the App was created, its **Client ID** was recorded and **Generate a private
+   key** was selected. The complete downloaded PEM file became the private-key secret;
+   GitHub stores only the public half of the generated key. See
+   [Managing private keys for GitHub Apps](https://docs.github.com/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps).
+5. From the App settings, **Install App** was selected, followed by
+   `gh-acceptance-testing` and **All repositories**. See
+   [Installing your own GitHub App](https://docs.github.com/apps/using-github-apps/installing-your-own-github-app).
+6. A `gh-acceptance-testing` environment was created in the `cli/cli` repository without
+   required reviewers. It contains these environment secrets:
+   - `GH_ACCEPTANCE_TESTING_APP_CLIENT_ID`: the App's Client ID.
+   - `GH_ACCEPTANCE_TESTING_APP_PRIVATE_KEY`: the complete contents of the downloaded PEM file.
+
+Each operating-system job mints its own installation token. The token is scoped to the
+`gh-acceptance-testing` installation, covers all repositories in that installation, and
+expires after one hour.
 
 ---
 
