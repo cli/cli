@@ -3,7 +3,7 @@
 # bump-go.sh -- Update go.mod `go` directive and toolchain to latest stable Go release.
 #
 # Usage:
-#   ./bump-go.sh [--apply|-a] <path/to/go.mod>
+#   ./bump-go.sh [--apply|-a] [--version <version>] <path/to/go.mod>
 #
 # By default the script runs in *dry-run* mode: it creates a local branch,
 # commits the version bump, shows the exact patch, **checks for an existing PR**
@@ -15,17 +15,23 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 [--apply|-a] <path/to/go.mod>" >&2
+  echo "Usage: $0 [--apply|-a] [--version <version>] <path/to/go.mod>" >&2
   exit 1
 }
 
 # ---- Argument parsing -------------------------------------------------------
 APPLY=0
 GO_MOD=""
+TARGET_GO_VERSION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply|-a) APPLY=1 ;;
+    --version)
+      shift
+      [[ $# -gt 0 ]] || usage
+      TARGET_GO_VERSION="${1#go}"
+      ;;
     -h|--help)  usage ;;
     *)          [[ -z "$GO_MOD" ]] && GO_MOD="$1" || usage ;;
   esac
@@ -47,10 +53,19 @@ GO_SUM="$MODULE_DIR/go.sum"
 LINT_WORKFLOW="$REPO_ROOT/.github/workflows/lint.yml"
 
 # ---- Discover latest stable Go release --------------------------------------
-echo "Fetching latest stable Go version..."
-LATEST_JSON=$(curl -fsSL https://go.dev/dl/?mode=json | jq -c '[.[] | select(.stable==true)][0]')
-FULL_VERSION=$(jq -r '.version' <<< "$LATEST_JSON")        # e.g. go1.23.4
-TOOLCHAIN_VERSION="${FULL_VERSION#go}"                     # e.g. 1.23.4
+if [[ -n "$TARGET_GO_VERSION" ]]; then
+  TOOLCHAIN_VERSION="$TARGET_GO_VERSION"
+  echo "Using selected Go version..."
+else
+  echo "Fetching latest stable Go version..."
+  LATEST_JSON=$(curl -fsSL https://go.dev/dl/?mode=json | jq -c '[.[] | select(.stable==true)][0]')
+  FULL_VERSION=$(jq -r '.version' <<< "$LATEST_JSON")      # e.g. go1.23.4
+  TOOLCHAIN_VERSION="${FULL_VERSION#go}"                   # e.g. 1.23.4
+fi
+if [[ ! "$TOOLCHAIN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: unexpected Go version '$TOOLCHAIN_VERSION'" >&2
+  exit 1
+fi
 GO_DIRECTIVE_VERSION="$(cut -d. -f1-2 <<< "$TOOLCHAIN_VERSION").0"
 
 echo "  → go directive : $GO_DIRECTIVE_VERSION"
@@ -79,8 +94,9 @@ BRANCH_CREATED=0
 
 cleanup() {
   if [[ $BRANCH_CREATED -eq 1 ]]; then
-    git checkout - >/dev/null 2>&1 || true
-    git branch -D "$BRANCH" >/dev/null 2>&1 || true
+    git -C "$REPO_ROOT" restore --source=HEAD --staged --worktree -- :/ >/dev/null 2>&1 || true
+    git -C "$REPO_ROOT" checkout - >/dev/null 2>&1 || true
+    git -C "$REPO_ROOT" branch -D "$BRANCH" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
