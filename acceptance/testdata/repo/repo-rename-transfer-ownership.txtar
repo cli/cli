@@ -1,9 +1,6 @@
 
 # Create a repository with a file so it has a default branch
-fixture-repo none
-env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
-exec gh repo create $ORG/$REPO --add-readme --private
-defer gh repo delete $ORG/$REPO --yes
+fixture-repo shared REPO
 
 # Attempt to rename the repo with a slash in the name
 ! exec gh repo rename $ORG/new-name --repo=$ORG/$REPO --yes
