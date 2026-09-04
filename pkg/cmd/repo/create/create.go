@@ -26,7 +26,6 @@ import (
 )
 
 type errWithExitCode interface {
-	error
 	ExitCode() int
 }
 

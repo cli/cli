@@ -46,7 +46,6 @@ var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 var commitLogRE = regexp.MustCompile(`(?m)^[0-9a-fA-F]{7,40}\x00.*?\x00[\S\s]*?\x00$`)
 
 type errWithExitCode interface {
-	error
 	ExitCode() int
 }
 
