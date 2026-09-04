@@ -57,13 +57,15 @@ func newLiveFixtureRepositoryClientWithTransport(tsEnv testScriptEnv, transport 
 
 func (c *liveFixtureRepositoryClient) create(name string) error {
 	body, err := json.Marshal(struct {
-		Name     string `json:"name"`
-		Private  bool   `json:"private"`
-		AutoInit bool   `json:"auto_init"`
+		Name           string `json:"name"`
+		Private        bool   `json:"private"`
+		AutoInit       bool   `json:"auto_init"`
+		HasDiscussions bool   `json:"has_discussions"`
 	}{
-		Name:     name,
-		Private:  true,
-		AutoInit: true,
+		Name:           name,
+		Private:        true,
+		AutoInit:       true,
+		HasDiscussions: true,
 	})
 	if err != nil {
 		return err
@@ -180,8 +182,14 @@ func TestFixtureRepositoryManager(t *testing.T) {
 
 func TestLiveFixtureRepositoryClientUsesAPIHost(t *testing.T) {
 	var request *http.Request
+	var requestBody []byte
 	transport := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		var err error
 		request = req
+		requestBody, err = io.ReadAll(req.Body)
+		if err != nil {
+			return nil, err
+		}
 		return &http.Response{
 			StatusCode: http.StatusCreated,
 			Status:     "201 Created",
@@ -203,6 +211,7 @@ func TestLiveFixtureRepositoryClientUsesAPIHost(t *testing.T) {
 	assert.Equal(t, "gateway.example.com", request.URL.Host)
 	assert.Equal(t, "/orgs/example/repos", request.URL.Path)
 	assert.Equal(t, "token ghs_token", request.Header.Get("Authorization"))
+	assert.JSONEq(t, `{"name":"fixture","private":true,"auto_init":true,"has_discussions":true}`, string(requestBody))
 }
 
 func TestDeferredRepositoryCleanup(t *testing.T) {
