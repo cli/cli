@@ -175,7 +175,10 @@ func cloneRun(opts *CloneOptions) error {
 	if err != nil {
 		return err
 	}
-	canonicalCloneURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
+	canonicalCloneURL, err := remoteURL(canonicalRepo, protocol)
+	if err != nil {
+		return err
+	}
 
 	// If repo HasWikiEnabled and wantsWiki is true then create a new clone URL
 	if wantsWiki {
@@ -203,7 +206,10 @@ func cloneRun(opts *CloneOptions) error {
 			}
 		} else {
 			protocol := cfg.GitProtocol(canonicalRepo.Parent.RepoHost()).Value
-			upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
+			upstreamURL, err := remoteURL(canonicalRepo.Parent, protocol)
+			if err != nil {
+				return err
+			}
 
 			upstreamName := opts.UpstreamName
 			if opts.UpstreamName == "@owner" {
@@ -234,6 +240,16 @@ func cloneRun(opts *CloneOptions) error {
 		}
 	}
 	return nil
+}
+
+func remoteURL(repo *api.Repository, protocol string) (string, error) {
+	if protocol != "ssh" {
+		return ghrepo.FormatRemoteURL(repo, protocol), nil
+	}
+	if repo.SSHURL == "" {
+		return "", fmt.Errorf("invalid API response: repository %s is missing sshUrl", ghrepo.FullName(repo))
+	}
+	return repo.SSHURL, nil
 }
 
 // simplifyURL strips given URL of extra parts like extra path segments (i.e.,
