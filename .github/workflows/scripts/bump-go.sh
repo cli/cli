@@ -35,10 +35,15 @@ done
 [[ -z "$GO_MOD" ]] && usage
 [[ -f "$GO_MOD" ]] || { echo "Error: '$GO_MOD' not found" >&2; exit 1; }
 
+REPO_ROOT=$(git rev-parse --show-toplevel)
+if ! git -C "$REPO_ROOT" diff --quiet || ! git -C "$REPO_ROOT" diff --cached --quiet; then
+  echo "Error: tracked changes must be committed or stashed before running this script" >&2
+  exit 1
+fi
+
 REPO="cli/cli"
 MODULE_DIR=$(dirname "$GO_MOD")
 GO_SUM="$MODULE_DIR/go.sum"
-REPO_ROOT=$(git rev-parse --show-toplevel)
 LINT_WORKFLOW="$REPO_ROOT/.github/workflows/lint.yml"
 
 # ---- Discover latest stable Go release --------------------------------------
@@ -92,14 +97,18 @@ go mod edit -go="$GO_DIRECTIVE_VERSION" -toolchain="go$TOOLCHAIN_VERSION" "$GO_M
 echo "  • set go directive → $GO_DIRECTIVE_VERSION"
 echo "  • set toolchain    → go$TOOLCHAIN_VERSION"
 
-lint_version_lines=$(grep -Ec '^[[:space:]]+version: v[0-9]+\.[0-9]+\.[0-9]+$' "$LINT_WORKFLOW" || true)
-if [[ $lint_version_lines -ne 1 ]]; then
-  echo "Error: expected exactly one pinned golangci-lint version in '$LINT_WORKFLOW'" >&2
-  exit 1
+if ! git diff --quiet -- "$GO_MOD"; then
+  lint_version_lines=$(grep -Ec '^[[:space:]]+version: v[0-9]+\.[0-9]+\.[0-9]+$' "$LINT_WORKFLOW" || true)
+  if [[ $lint_version_lines -ne 1 ]]; then
+    echo "Error: expected exactly one pinned golangci-lint version in '$LINT_WORKFLOW'" >&2
+    exit 1
+  fi
+  sed -i.bak -E "s/^([[:space:]]+version: )v[0-9]+\.[0-9]+\.[0-9]+$/\1v$LINTER_VERSION/" "$LINT_WORKFLOW"
+  rm -f "$LINT_WORKFLOW.bak"
+  echo "  • set golangci-lint → v$LINTER_VERSION"
+else
+  echo "  • Go version unchanged; keeping the existing golangci-lint pin"
 fi
-sed -i.bak -E "s/^([[:space:]]+version: )v[0-9]+\.[0-9]+\.[0-9]+$/\1v$LINTER_VERSION/" "$LINT_WORKFLOW"
-rm -f "$LINT_WORKFLOW.bak"
-echo "  • set golangci-lint → v$LINTER_VERSION"
 
 # Reconcile the module, apply source migrations, and verify the result before
 # creating a pull request.
