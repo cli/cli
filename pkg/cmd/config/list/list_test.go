@@ -90,6 +90,7 @@ func Test_listRun(t *testing.T) {
 				cfg.Set("HOST", "pager", "less")
 				cfg.Set("HOST", "http_unix_socket", "")
 				cfg.Set("HOST", "browser", "brave")
+				cfg.Set("", "clipboard", "enabled")
 				return cfg
 			}(),
 			input: &ListOptions{Hostname: "HOST"},
@@ -102,6 +103,7 @@ func Test_listRun(t *testing.T) {
 				pager=less
 				http_unix_socket=
 				browser=brave
+				clipboard=enabled
 				color_labels=disabled
 				accessible_colors=disabled
 				accessible_prompter=disabled

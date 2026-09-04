@@ -137,7 +137,7 @@ func Test_NewCmdLogin(t *testing.T) {
 				Hostname:    "github.com",
 				Web:         true,
 				Interactive: true,
-				Clipboard:   true,
+				Clipboard:   new(true),
 			},
 		},
 		{
@@ -146,7 +146,16 @@ func Test_NewCmdLogin(t *testing.T) {
 			wants: LoginOptions{
 				Hostname:  "github.com",
 				Web:       true,
-				Clipboard: true,
+				Clipboard: new(true),
+			},
+		},
+		{
+			name: "nontty web and clipboard disabled",
+			cli:  "--web --clipboard=false",
+			wants: LoginOptions{
+				Hostname:  "github.com",
+				Web:       true,
+				Clipboard: new(false),
 			},
 		},
 		{

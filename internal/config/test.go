@@ -72,6 +72,9 @@ func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	mock.BrowserFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Browser(hostname)
 	}
+	mock.ClipboardFunc = func() gh.ConfigEntry {
+		return cfg.Clipboard()
+	}
 	mock.TelemetryFunc = func() gh.ConfigEntry {
 		return cfg.Telemetry()
 	}
