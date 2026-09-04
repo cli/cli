@@ -29,7 +29,15 @@ import (
 )
 
 func ghMain() int {
+	if repositoryCreationIsManaged(os.Args[1:], os.Getenv("GH_ACCEPTANCE_FIXTURE_MODE")) {
+		fmt.Fprintln(os.Stderr, "gh repo create requires 'fixture-repo none'")
+		return 1
+	}
 	return int(ghcmd.Main())
+}
+
+func repositoryCreationIsManaged(args []string, fixtureMode string) bool {
+	return len(args) > 1 && args[0] == "repo" && args[1] == "create" && fixtureMode != "none"
 }
 
 func TestMain(m *testing.M) {
@@ -67,218 +75,151 @@ func TestSandboxFilePath(t *testing.T) {
 	assert.EqualError(t, err, "path must stay within the testscript sandbox")
 }
 
-func TestAPI(t *testing.T) {
+func TestRepositoryCreationIsManaged(t *testing.T) {
+	assert.True(t, repositoryCreationIsManaged([]string{"repo", "create", "example"}, "shared"))
+	assert.True(t, repositoryCreationIsManaged([]string{"repo", "create", "example"}, "isolated"))
+	assert.True(t, repositoryCreationIsManaged([]string{"repo", "create", "example"}, "undeclared"))
+	assert.False(t, repositoryCreationIsManaged([]string{"repo", "create", "example"}, "none"))
+	assert.False(t, repositoryCreationIsManaged([]string{"repo", "view", "example"}, "shared"))
+}
+
+func TestAcceptance(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "api"))
-}
+	fixtureRepositories, err := newFixtureRepositoryManager(tsEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := fixtureRepositories.cleanup(); err != nil {
+			t.Errorf("cleaning up fixture repositories: %v", err)
+		}
+	})
 
-func TestAuth(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
+	testGroups, err := selectAcceptanceTestGroups(
+		acceptanceTestGroups(t),
+		os.Getenv("GH_ACCEPTANCE_GROUP"),
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "auth"))
-}
+	validateAcceptanceScripts(t, tsEnv, testGroups)
 
-func TestGists(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
+	for _, group := range testGroups {
+		t.Run(group, func(t *testing.T) {
+			testscript.Run(t, testScriptParamsFor(t, tsEnv, fixtureRepositories, group))
+		})
 	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "gist"))
 }
 
-func TestGPGKeys(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "gpg-key"))
-}
-
-func TestExtensions(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "extension"))
-}
-
-func TestIssues(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "issue"))
-}
-
-func TestDiscussions(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "discussion"))
-}
-
-func TestIssues2_0(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "issues-2.0"))
-}
-
-func TestLabels(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "label"))
-}
-
-func TestOrg(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "org"))
-}
-
-func TestProject(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "project"))
-}
-
-func TestPullRequests(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "pr"))
-}
-
-func TestReleases(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "release"))
-}
-
-func TestRepo(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "repo"))
-}
-
-func TestRulesets(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "ruleset"))
-}
-
-func TestSearches(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "search"))
-}
-
-func TestSecrets(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "secret"))
-}
-
-func TestSSHKeys(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "ssh-key"))
-}
-
-func TestVariables(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "variable"))
-}
-
-func TestWorkflows(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "workflow"))
-}
-
-func TestTelemetry(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "telemetry"))
-}
-
-func testScriptParamsFor(t *testing.T, tsEnv testScriptEnv, command string) testscript.Params {
+func validateAcceptanceScripts(t *testing.T, tsEnv testScriptEnv, groups []string) {
 	t.Helper()
-	files, filtered := selectScripts(command, tsEnv.scripts)
 
-	var dir string
-	if !filtered {
-		// No filter was set - run everything in the directory.
-		dir = path.Join("testdata", command)
-	} else if len(files) == 0 {
-		// A filter was set but none of the selected scripts belong to this
-		// command directory, so skip rather than running the whole directory.
+	for _, group := range groups {
+		candidates, _, err := acceptanceScriptCandidates(tsEnv, group)
+		require.NoError(t, err)
+		for _, file := range candidates {
+			require.NoError(t, validateFixtureRepositoryDeclaration(file))
+		}
+	}
+}
+
+func acceptanceTestGroups(t *testing.T) []string {
+	t.Helper()
+
+	entries, err := os.ReadDir("testdata")
+	require.NoError(t, err)
+
+	var groups []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		files, err := filepath.Glob(filepath.Join("testdata", entry.Name(), "*.txtar"))
+		require.NoError(t, err)
+		if len(files) > 0 {
+			groups = append(groups, entry.Name())
+		}
+	}
+	require.NotEmpty(t, groups)
+	return groups
+}
+
+func selectAcceptanceTestGroups(available []string, requested string) ([]string, error) {
+	if requested == "" || requested == "all" {
+		return available, nil
+	}
+
+	for _, group := range available {
+		if group == requested {
+			return []string{requested}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unknown acceptance test group %q; available groups: %s", requested, strings.Join(available, ", "))
+}
+
+func TestSelectAcceptanceTestGroups(t *testing.T) {
+	available := []string{"api", "pr", "repo"}
+
+	tests := []struct {
+		name      string
+		requested string
+		want      []string
+		wantErr   string
+	}{
+		{name: "empty selects all", want: available},
+		{name: "all selects all", requested: "all", want: available},
+		{name: "group selects one", requested: "pr", want: []string{"pr"}},
+		{name: "unknown group errors", requested: "pull-request", wantErr: `unknown acceptance test group "pull-request"; available groups: api, pr, repo`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := selectAcceptanceTestGroups(available, tt.requested)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func testScriptParamsFor(t *testing.T, tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManager, command string) testscript.Params {
+	t.Helper()
+
+	candidates, filtered, err := acceptanceScriptCandidates(tsEnv, command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filtered && len(candidates) == 0 {
 		t.Skipf("testdata/%s: no selected script belongs to this command directory", command)
 	}
 
 	return testscript.Params{
-		Dir:                 dir,
-		Files:               files,
+		Files:               candidates,
 		Setup:               sharedSetup(tsEnv),
-		Cmds:                sharedCmds(tsEnv),
+		Cmds:                sharedCmds(tsEnv, fixtureRepositories),
 		RequireExplicitExec: true,
 		RequireUniqueNames:  true,
 		TestWork:            tsEnv.preserveWorkDir,
 	}
+}
+
+func acceptanceScriptCandidates(tsEnv testScriptEnv, command string) ([]string, bool, error) {
+	files, filtered := selectScripts(command, tsEnv.scripts)
+	if filtered {
+		return files, true, nil
+	}
+	files, err := filepath.Glob(filepath.Join("testdata", command, "*.txtar"))
+	return files, false, err
 }
 
 var keyT struct{}
@@ -321,6 +262,7 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 				return fmt.Errorf("writing sandbox hosts.yml: %w", err)
 			}
 		}
+		ts.Setenv("GH_ACCEPTANCE_FIXTURE_MODE", "undeclared")
 
 		ts.Setenv("RANDOM_STRING", randomString(10))
 
@@ -354,7 +296,7 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 }
 
 // sharedCmds defines a collection of custom testscript commands for our use.
-func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, neg bool, args []string) {
+func sharedCmds(tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManager) map[string]func(ts *testscript.TestScript, neg bool, args []string) {
 	return map[string]func(ts *testscript.TestScript, neg bool, args []string){
 		"defer": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
@@ -371,6 +313,17 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 			}
 
 			ts.Defer(func() {
+				if args[0] == "cleanup-repo" {
+					if len(args) != 2 {
+						tt.Fatal("usage: defer cleanup-repo REPO")
+						return
+					}
+					if err := fixtureRepositories.delete(args[1]); err != nil {
+						tt.Fatal(err)
+					}
+					return
+				}
+
 				// If you're wondering why we're not using ts.Check here, it's because it raises a panic, and testscript
 				// only catches the panics directly from commands, not from the deferred functions. So what we do
 				// instead is grab the `t` in the setup function and store it as a value. It's important that we use
@@ -398,6 +351,23 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 
 				ts.Setenv(env[:i], strings.ToUpper(env[i+1:]))
 			}
+		},
+		"fixture-repo": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! fixture-repo")
+			}
+			if len(args) == 1 && args[0] == "none" {
+				ts.Setenv("GH_ACCEPTANCE_FIXTURE_MODE", "none")
+				return
+			}
+			if len(args) != 2 || (args[0] != "shared" && args[0] != "isolated") {
+				ts.Fatalf("usage: fixture-repo (shared|isolated) ENV_VAR, or fixture-repo none")
+			}
+
+			repository, err := fixtureRepositories.repository(args[0])
+			ts.Check(err)
+			ts.Setenv("GH_ACCEPTANCE_FIXTURE_MODE", args[0])
+			ts.Setenv(args[1], repository)
 		},
 		"generate-ssh-key": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
@@ -659,12 +629,4 @@ func (e *testScriptEnv) fromEnv() error {
 	}
 
 	return nil
-}
-
-func TestSkills(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-	testscript.Run(t, testScriptParamsFor(t, tsEnv, "skills"))
 }

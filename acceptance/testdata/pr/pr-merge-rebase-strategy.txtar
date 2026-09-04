@@ -1,29 +1,32 @@
+
 # Use gh as a credential helper
 exec gh auth setup-git
 
 # Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
-
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+fixture-repo shared REPO
+env BRANCH_NAME=${SCRIPT_NAME}-${RANDOM_STRING}
+env PR_TITLE=${SCRIPT_NAME}-${RANDOM_STRING}
+env BASE_BRANCH=${SCRIPT_NAME}-${RANDOM_STRING}-base
 
 # Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+exec gh repo clone $ORG/$REPO
 
-# Prepare a branch to PR with a single file
-cd $SCRIPT_NAME-$RANDOM_STRING
-exec git checkout -b feature-branch
+# Prepare a unique base branch and a branch to PR with a single file
+cd $REPO
+exec git checkout -b $BASE_BRANCH
+exec git push -u origin $BASE_BRANCH
+exec git checkout -b $BRANCH_NAME
 mv ../file.txt file.txt
 exec git add .
 exec git commit -m 'Add file.txt'
-exec git push -u origin feature-branch
+exec git push -u origin $BRANCH_NAME
 
 # Create the PR
-exec gh pr create --title 'Feature Title' --body 'Feature Body'
+exec gh pr create --base $BASE_BRANCH --title $PR_TITLE --body 'Feature Body'
 stdout2env PR_URL
 
-# Check that the file doesn't exist on the main branch
-exec git checkout main
+# Check that the file doesn't exist on the base branch
+exec git checkout $BASE_BRANCH
 ! exists file.txt
 
 # Merge the PR
@@ -33,8 +36,8 @@ exec gh pr merge $PR_URL --rebase
 exec gh pr view $PR_URL
 stdout 'state:\tMERGED$'
 
-# Pull and check the file exists on the main branch
-exec git pull -r
+# Pull and check the file exists on the unique base branch
+exec git pull -r origin $BASE_BRANCH
 exists file.txt
 
 # And check our commit was rebased

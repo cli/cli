@@ -184,7 +184,7 @@ expect_gh() {
 	out=$(run_gh "$@" 2>"$WORK/stderr.txt")
 	rc=$?
 
-	if [ $rc -ne 0 ]; then
+	if [ "$rc" -ne 0 ]; then
 		fail "$desc: gh exited $rc: $(tr '\n' ' ' <"$WORK/stderr.txt")"
 		return 1
 	fi
@@ -205,7 +205,7 @@ expect_gh_failure() {
 	out=$(run_gh "$@" 2>&1)
 	rc=$?
 
-	if [ $rc -ne 0 ]; then
+	if [ "$rc" -ne 0 ]; then
 		pass "$desc"
 	else
 		fail "$desc: gh unexpectedly succeeded with [$out]"
@@ -329,14 +329,14 @@ blackhole_off
 if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 	[ -n "$ORG_TOKEN" ] || die "GH_APIHOST_ORG_TOKEN is required for the acceptance run"
 
-	# run_subset <test function> <script> <token> runs exactly one acceptance
+	# run_subset <group> <script> <token> runs exactly one acceptance
 	# script. Scripts are run one at a time rather than batched per test
-	# function because a test function bundles scripts that fail for unrelated
+	# group because a group bundles scripts that fail for unrelated
 	# reasons, which would hide a script turning green on its own.
 	run_subset() {
-		local testfunc="$1" script="$2" tok="$3"
+		local group="$1" script="$2" tok="$3"
 		local logfile rc
-		logfile="$WORK/subset-${testfunc}-${script%.txtar}.log"
+		logfile="$WORK/subset-${group}-${script%.txtar}.log"
 		# Tee to a file so we can inspect output for "no tests to run" while
 		# still streaming it live to the terminal. pipefail would make the
 		# pipeline exit with tee's status; PIPESTATUS[0] extracts go test's
@@ -346,12 +346,13 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 		GH_ACCEPTANCE_TOKEN="$tok" \
 		GH_ACCEPTANCE_USER="$EXPECTED_LOGIN" \
 		GH_ACCEPTANCE_API_HOST="$GATEWAY_HOST" \
+		GH_ACCEPTANCE_GROUP="$group" \
 		GH_ACCEPTANCE_SCRIPT="$script" \
 		SSL_CERT_FILE="$BUNDLE" \
 		go test -tags=acceptance -count=1 -parallel=1 -timeout=45m \
-			-run "^$testfunc\$" ./acceptance 2>&1 | tee "$logfile"
+			-run '^TestAcceptance$' ./acceptance 2>&1 | tee "$logfile"
 		rc=${PIPESTATUS[0]}
-		if [ $rc -ne 0 ]; then
+		if [ "$rc" -ne 0 ]; then
 			SUBSET_REDS=$((SUBSET_REDS + 1))
 			SUBSET_RED_NAMES="${SUBSET_RED_NAMES:+${SUBSET_RED_NAMES} }${script}"
 			record "$script" FAIL
@@ -370,23 +371,23 @@ if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
 	PHASE=4
 	write_config yes "$ORG_TOKEN"
 
-	run_subset TestAPI        basic-rest.txtar                        "$ORG_TOKEN"
-	run_subset TestAPI        basic-graphql.txtar                     "$ORG_TOKEN"
-	run_subset TestReleases   release-upload-download.txtar           "$ORG_TOKEN"
-	run_subset TestRepo       repo-delete.txtar                       "$ORG_TOKEN"
-	run_subset TestRepo       repo-list-rename.txtar                  "$ORG_TOKEN"
-	run_subset TestRepo       repo-read-file.txtar                    "$ORG_TOKEN"
-	run_subset TestRepo       repo-rename-transfer-ownership.txtar    "$ORG_TOKEN"
-	run_subset TestWorkflows  run-download.txtar                      "$ORG_TOKEN"
-	run_subset TestExtensions extension.txtar                         "$ORG_TOKEN"
-	run_subset TestSearches   search-issues.txtar                     "$ORG_TOKEN"
-	run_subset TestAuth       auth-status.txtar                       "$ORG_TOKEN"
+	run_subset api       basic-rest.txtar                        "$ORG_TOKEN"
+	run_subset api       basic-graphql.txtar                     "$ORG_TOKEN"
+	run_subset release   release-upload-download.txtar           "$ORG_TOKEN"
+	run_subset repo      repo-delete.txtar                       "$ORG_TOKEN"
+	run_subset repo      repo-list-rename.txtar                  "$ORG_TOKEN"
+	run_subset repo      repo-read-file.txtar                    "$ORG_TOKEN"
+	run_subset repo      repo-rename-transfer-ownership.txtar    "$ORG_TOKEN"
+	run_subset workflow  run-download.txtar                      "$ORG_TOKEN"
+	run_subset extension extension.txtar                         "$ORG_TOKEN"
+	run_subset search    search-issues.txtar                     "$ORG_TOKEN"
+	run_subset auth      auth-status.txtar                       "$ORG_TOKEN"
 
 	heading "Phase 5: user-scoped acceptance subset through the gateway"
 	PHASE=5
 	write_config yes "$TOKEN"
 
-	run_subset TestGists      gist-create-view-delete.txtar           "$TOKEN"
+	run_subset gist gist-create-view-delete.txtar "$TOKEN"
 
 	blackhole_off
 fi

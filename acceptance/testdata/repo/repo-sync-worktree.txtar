@@ -1,14 +1,13 @@
+
 # Use gh as a credential helper
 exec gh auth setup-git
 
 # Create and clone a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private --clone
-
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+fixture-repo isolated REPO
+exec gh repo clone $ORG/$REPO
 
 # Advance the default branch on the remote, then rewind the local branch so a sync is required
-cd $SCRIPT_NAME-$RANDOM_STRING
+cd $REPO
 mv ../asset.txt asset.txt
 exec git add .
 exec git commit -m 'Add asset.txt'
@@ -26,11 +25,11 @@ stdout '^main$'
 # Syncing from the linked worktree must refuse rather than silently move the default branch ref
 cd ../topic-worktree
 ! exec gh repo sync
-stderr 'can''t sync "main" because it''s checked out in another worktree at .*'$SCRIPT_NAME'-'$RANDOM_STRING'$'
+stderr 'can''t sync "main" because it''s checked out in another worktree at .*'$REPO'$'
 stderr 'tip: run `gh repo sync` from that worktree instead'
 
 # The primary worktree's branch and working tree are left untouched
-cd ../$SCRIPT_NAME-$RANDOM_STRING
+cd ../$REPO
 exec git rev-parse HEAD
 stdout $PRIMARY_HEAD
 exec git status --porcelain

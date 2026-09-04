@@ -1,5 +1,8 @@
+
 # It's unclear what we want to do with these acceptance tests beyond our GHEC discovery, so skip new ones by default
 skip
+
+fixture-repo none
 
 # Set up env var
 env REPO=${SCRIPT_NAME}-${RANDOM_STRING}

@@ -1,20 +1,19 @@
-# Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
 
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+# Create a repository with a file so it has a default branch
+fixture-repo shared REPO
+env ISSUE_PREFIX=${SCRIPT_NAME}-${RANDOM_STRING}
 
 # Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+exec gh repo clone $ORG/$REPO
 
-cd $SCRIPT_NAME-$RANDOM_STRING
+cd $REPO
 
 # Create the parent issue
-exec gh issue create --title 'parent' --body ''
+exec gh issue create --title $ISSUE_PREFIX-parent --body ''
 stdout2env PARENT_URL
 
 # Create a child via --parent on create
-exec gh issue create --title 'child via create' --body '' --parent $PARENT_URL
+exec gh issue create --title $ISSUE_PREFIX-child-via-create --body '' --parent $PARENT_URL
 stdout2env CHILD_URL
 
 # Confirm parent is set

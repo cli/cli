@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # Pagination returns results on page 2
 exec gh skill search --owner github copilot --page 2
 stdout 'copilot'

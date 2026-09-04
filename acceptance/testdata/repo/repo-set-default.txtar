@@ -1,17 +1,16 @@
-# Create and clone a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private --clone
 
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+# Create and clone a repository with a file so it has a default branch
+fixture-repo shared REPO
+exec gh repo clone $ORG/$REPO
 
 # Ensure that no default is set
-cd $SCRIPT_NAME-$RANDOM_STRING
+cd $REPO
 exec gh repo set-default --view
 stderr 'No default remote repository has been set. To learn more about the default repository, run: gh repo set-default --help'
 
 # Set the default
-exec gh repo set-default $ORG/$SCRIPT_NAME-$RANDOM_STRING
+exec gh repo set-default $ORG/$REPO
 
 # Check that the default is set
 exec gh repo set-default --view
-stdout $ORG/$SCRIPT_NAME-$RANDOM_STRING
+stdout $ORG/$REPO

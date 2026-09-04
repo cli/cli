@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # Setup environment variables used for testscript
 env2upper VAR_NAME=${SCRIPT_NAME}_${RANDOM_STRING}
 

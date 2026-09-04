@@ -1,15 +1,15 @@
+
 # Full publish lifecycle: create repo, publish, install from it, clean up
 
 # Use gh as a credential helper
 exec gh auth setup-git
 
 # Create a private repo for testing
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --private --add-readme
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+fixture-repo isolated REPO
 
 # Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
-cd $SCRIPT_NAME-$RANDOM_STRING
+exec gh repo clone $ORG/$REPO
+cd $REPO
 
 # Add a test skill
 mkdir skills/hello-world/scripts
@@ -27,7 +27,7 @@ exec gh release view v0.1.0
 stdout 'v0.1.0'
 
 # Install from our test repo
-exec gh skill install $ORG/$SCRIPT_NAME-$RANDOM_STRING hello-world --scope user --force
+exec gh skill install $ORG/$REPO hello-world --scope user --force
 stdout 'Installed hello-world'
 
 # Verify installed files exist with correct metadata
@@ -36,11 +36,11 @@ exists $HOME/.copilot/skills/hello-world/scripts/setup.sh
 grep 'github-repo' $HOME/.copilot/skills/hello-world/SKILL.md
 
 # Install with --pin
-exec gh skill install $ORG/$SCRIPT_NAME-$RANDOM_STRING hello-world --scope user --force --pin v0.1.0
+exec gh skill install $ORG/$REPO hello-world --scope user --force --pin v0.1.0
 stdout 'Installed hello-world'
 
 # Preview from our test repo
-exec gh skill preview $ORG/$SCRIPT_NAME-$RANDOM_STRING hello-world
+exec gh skill preview $ORG/$REPO hello-world
 stdout 'Hello World'
 
 # Update dry-run should find installed skill

@@ -24,6 +24,12 @@ The token to use for authenticating with the `GH_ACCEPTANCE_HOST`. This must alr
 
 It's recommended to create and use a Legacy PAT for this; Fine-Grained PATs do not offer all the necessary privileges required. You can use an OAuth token provided via `gh auth login --web` and can provide it to the acceptance tests via `GH_ACCEPTANCE_TOKEN=$(gh auth token --hostname <host>)` but this can be a bit confusing and annoying if you `gh auth login` again without `-s` and lose the required scopes.
 
+Managed fixture repositories reduce repository creation by sharing state where
+tests can safely coexist.
+
+Acceptance test groups are discovered from the directories under `testdata`, so
+adding a group does not require updating the test harness.
+
 ---
 
 A full example invocation can be found below:
@@ -35,7 +41,7 @@ GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go
 While writing a new test, it can be useful to target that specific script by providing the `GH_ACCEPTANCE_SCRIPT` env var in combination with the `-run` flag, for example:
 
 ```
-GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -run ^TestPullRequests$ ./acceptance
+GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -run '^TestAcceptance$/^pr$' ./acceptance
 ```
 
 #### Code Coverage
@@ -61,9 +67,50 @@ The following custom environment variables are made available to the scripts:
  * `HOME`: Set to the initial working directory. Required for `git` operations
  * `GH_CONFIG_DIR`: Set to the initial working directory. Required for `gh` operations
 
+#### Script Metadata
+
+Every script must declare exactly one repository fixture mode:
+
+```txtar
+fixture-repo shared REPO
+fixture-repo isolated REPO
+fixture-repo none
+```
+
+`shared` reuses one initialized private repository across all opting-in scripts
+in the test process. Shared scripts must tolerate concurrent and accumulated
+state: use unique resource names, paginate and filter list operations, capture
+resource IDs instead of selecting the first or latest result, and avoid
+repository-global or default-branch mutations.
+
+`isolated` creates an initialized private repository exclusively for the script.
+Use it when clean state or repository-global mutation is required.
+
+`none` creates no managed repository. Use it when no repository is needed or
+when a test needs multiple repositories, public visibility, special creation
+options, or direct coverage of repository lifecycle commands. In that mode, the
+script owns creation and cleanup.
+
 #### Custom Commands
 
 The following custom commands are defined within [`acceptance_test.go`](./acceptance_test.go) to help with writing tests:
+
+- `fixture-repo`: select the script's repository fixture mode. For `shared` and
+  `isolated`, the final argument names the environment variable that receives
+  the repository's bare name.
+
+  ```txtar
+  fixture-repo shared REPO
+  exec gh issue create --repo $ORG/$REPO --title $SCRIPT_NAME-$RANDOM_STRING --body Body
+  ```
+
+- `cleanup-repo`: idempotently delete an unmanaged repository during deferred
+  cleanup. Use this when a lifecycle test may have already deleted or renamed
+  the repository.
+
+  ```txtar
+  defer cleanup-repo $SCRIPT_NAME-$RANDOM_STRING
+  ```
 
 - `defer`: register a command to run after the testscript completes
 
@@ -136,8 +183,9 @@ When tests fail they fail like this:
 
 ```
 ➜ go test -tags=acceptance ./acceptance
---- FAIL: TestPullRequests (0.00s)
-    --- FAIL: TestPullRequests/pr-merge (11.07s)
+--- FAIL: TestAcceptance (0.00s)
+    --- FAIL: TestAcceptance/pr (0.00s)
+        --- FAIL: TestAcceptance/pr/pr-merge (11.07s)
         testscript.go:584: WORK=/private/var/folders/45/sdnm1hp10nj1s9q57dp3bc5h0000gn/T/go-test-script2778137936/script-pr-merge
             # Use gh as a credential helper (0.693s)
             # Create a repository with a file so it has a default branch (1.155s)

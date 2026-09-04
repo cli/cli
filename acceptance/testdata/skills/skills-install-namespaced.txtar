@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # Two namespaced skills with different base names in the same repo should
 # be independently installable using path-based disambiguation.
 # Skills are installed flat (by base name) so each must have a unique name.
