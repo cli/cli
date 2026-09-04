@@ -10,11 +10,10 @@ stdout2env PROJECT_NUMBER
 
 defer gh project delete --owner=${ORG} ${PROJECT_NUMBER}
 
-# Clone the repo
-exec gh repo clone ${ORG}/${REPO}
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create an issue in the repo
-cd ${REPO}
 exec gh issue create --title $ISSUE_TITLE --body 'Feature Body' --project ${PROJECT_TITLE}
 stdout2env ISSUE_URL
 

@@ -3,11 +3,12 @@
 fixture-repo shared REPO
 env TAG=v${SCRIPT_NAME}-${RANDOM_STRING}
 
-# Clone the repo
-exec gh repo clone $ORG/$REPO
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create a release in the repo
-cd $REPO
+mkdir downloads
+cd downloads
 exec gh release create $TAG --notes 'awesome release'
 
 # Upload an asset to the release
