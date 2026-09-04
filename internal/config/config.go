@@ -704,9 +704,8 @@ var Options = []ConfigOption{
 		Description:   "toggle interactive prompting in the terminal",
 		DefaultValue:  "enabled",
 		AllowedValues: []string{"enabled", "disabled"},
-		Scope:         ConfigScopeGlobalOnly,
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.Prompt("").Value
+			return c.Prompt(hostname).Value
 		},
 	},
 	{
@@ -714,9 +713,8 @@ var Options = []ConfigOption{
 		Description:   "toggle preference for editor-based interactive prompting in the terminal",
 		DefaultValue:  "disabled",
 		AllowedValues: []string{"enabled", "disabled"},
-		Scope:         ConfigScopeGlobalOnly,
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.PreferEditorPrompt("").Value
+			return c.PreferEditorPrompt(hostname).Value
 		},
 	},
 	{
@@ -794,7 +792,6 @@ var Options = []ConfigOption{
 		Description:   "whether telemetry is enabled, disabled, or logging",
 		DefaultValue:  "enabled",
 		AllowedValues: []string{"enabled", "disabled", "log"},
-		Scope:         ConfigScopeGlobalOnly,
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Telemetry().Value
 		},

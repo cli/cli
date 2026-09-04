@@ -114,6 +114,16 @@ func Test_setRun(t *testing.T) {
 			expectedValue: "vim",
 		},
 		{
+			name: "set existing global setting scoped by host",
+			input: &SetOptions{
+				Config:   config.NewMockConfig(),
+				Hostname: "github.com",
+				Key:      "prompt",
+				Value:    "disabled",
+			},
+			expectedValue: "disabled",
+		},
+		{
 			name: "set api_host scoped by host",
 			input: &SetOptions{
 				Config:   config.NewMockConfig(),
@@ -246,6 +256,9 @@ func Test_validateScope(t *testing.T) {
 	assert.NoError(t, validateScope("api_host", "github.example.com"))
 	assert.EqualError(t, validateScope("clipboard", "github.com"), "--host cannot be used when setting clipboard")
 	assert.NoError(t, validateScope("clipboard", ""))
+	assert.NoError(t, validateScope("prompt", "github.com"))
+	assert.NoError(t, validateScope("prefer_editor_prompt", "github.com"))
+	assert.NoError(t, validateScope("telemetry", "github.com"))
 	assert.NoError(t, validateScope("editor", "github.com"))
 	assert.NoError(t, validateScope("editor", ""))
 	assert.NoError(t, validateScope("unknown", "github.com"))
