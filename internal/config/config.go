@@ -638,7 +638,7 @@ http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
 browser:
 # Whether to copy one-time OAuth device codes to the clipboard. Supported values: enabled, disabled
-clipboard: disabled
+clipboard: enabled
 # Whether to display labels using their RGB hex color codes in terminals that support truecolor. Supported values: enabled, disabled
 color_labels: disabled
 # Whether customizable, 4-bit accessible colors should be used. Supported values: enabled, disabled
@@ -744,7 +744,7 @@ var Options = []ConfigOption{
 	{
 		Key:           clipboardKey,
 		Description:   "whether to copy one-time OAuth device codes to the clipboard",
-		DefaultValue:  "disabled",
+		DefaultValue:  "enabled",
 		AllowedValues: []string{"enabled", "disabled"},
 		Scope:         ConfigScopeGlobalOnly,
 		CurrentValue: func(c gh.Config, hostname string) string {

@@ -44,7 +44,8 @@ func TestShouldCopyToClipboard(t *testing.T) {
 		want       bool
 	}{
 		{
-			name: "disabled by default",
+			name: "enabled by default",
+			want: true,
 		},
 		{
 			name:       "enabled by configuration",
