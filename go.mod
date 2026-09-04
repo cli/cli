@@ -19,7 +19,7 @@ require (
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/cli/go-gh/v2 v2.16.0
-	github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24
+	github.com/cli/go-internal v0.0.0-20260902074248-d0d5505d94b4
 	github.com/cli/oauth v1.2.2
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.7

@@ -645,6 +645,8 @@ func validateAcceptanceScripts(t *testing.T, tsEnv testScriptEnv, groups []strin
 		require.NoError(t, err)
 		for _, file := range candidates {
 			require.NoError(t, validateFixtureRepositoryDeclaration(file))
+			_, err := requiresUserCapabilityForScript(file)
+			require.NoError(t, err)
 		}
 	}
 }
@@ -713,19 +715,128 @@ func TestSelectAcceptanceTestGroups(t *testing.T) {
 	}
 }
 
+type acceptanceScript struct {
+	file                   string
+	requiresUserCapability bool
+}
+
+func filterAcceptanceScripts(candidates []acceptanceScript, filtered, hasUserCapability bool) ([]string, string, error) {
+	if filtered && len(candidates) == 0 {
+		return nil, "no selected script belongs to this command directory", nil
+	}
+
+	files := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.requiresUserCapability && !hasUserCapability {
+			if filtered {
+				return nil, "", fmt.Errorf("%s requires a token that authenticates a user", candidate.file)
+			}
+			continue
+		}
+		files = append(files, candidate.file)
+	}
+	if len(files) == 0 {
+		return nil, "all scripts require a token that authenticates a user", nil
+	}
+
+	return files, "", nil
+}
+
+func TestFilterAcceptanceScripts(t *testing.T) {
+	userOnly := acceptanceScript{file: "user.txtar", requiresUserCapability: true}
+	compatible := acceptanceScript{file: "installation.txtar"}
+
+	tests := []struct {
+		name              string
+		candidates        []acceptanceScript
+		filtered          bool
+		hasUserCapability bool
+		wantFiles         []string
+		wantSkip          string
+		wantErr           string
+	}{
+		{
+			name:              "user token keeps all scripts",
+			candidates:        []acceptanceScript{userOnly, compatible},
+			hasUserCapability: true,
+			wantFiles:         []string{"user.txtar", "installation.txtar"},
+		},
+		{
+			name:       "installation token omits user-only scripts",
+			candidates: []acceptanceScript{userOnly, compatible},
+			wantFiles:  []string{"installation.txtar"},
+		},
+		{
+			name:       "all incompatible scripts skip",
+			candidates: []acceptanceScript{userOnly},
+			wantSkip:   "all scripts require a token that authenticates a user",
+		},
+		{
+			name:     "empty explicit selection skips",
+			filtered: true,
+			wantSkip: "no selected script belongs to this command directory",
+		},
+		{
+			name:       "explicit compatible selection remains",
+			candidates: []acceptanceScript{compatible},
+			filtered:   true,
+			wantFiles:  []string{"installation.txtar"},
+		},
+		{
+			name:       "explicit incompatible selection errors",
+			candidates: []acceptanceScript{userOnly},
+			filtered:   true,
+			wantErr:    "user.txtar requires a token that authenticates a user",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files, skipReason, err := filterAcceptanceScripts(tt.candidates, tt.filtered, tt.hasUserCapability)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantFiles, files)
+			assert.Equal(t, tt.wantSkip, skipReason)
+		})
+	}
+}
+
 func testScriptParamsFor(t *testing.T, tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManager, command string) testscript.Params {
 	t.Helper()
 
-	candidates, filtered, err := acceptanceScriptCandidates(tsEnv, command)
+	scriptFiles, filtered, err := acceptanceScriptCandidates(tsEnv, command)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filtered && len(candidates) == 0 {
-		t.Skipf("testdata/%s: no selected script belongs to this command directory", command)
+
+	candidates := make([]acceptanceScript, 0, len(scriptFiles))
+	for _, file := range scriptFiles {
+		requiresUserCapability, err := requiresUserCapabilityForScript(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		candidates = append(candidates, acceptanceScript{
+			file:                   file,
+			requiresUserCapability: requiresUserCapability,
+		})
+	}
+
+	files, skipReason, err := filterAcceptanceScripts(candidates, filtered, tsEnv.hasUserCapability)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if skipReason != "" {
+		if filtered {
+			t.Skipf("testdata/%s: %s", command, skipReason)
+		}
+		t.Skip(skipReason)
 	}
 
 	return testscript.Params{
-		Files:               candidates,
+		Files:               files,
 		Setup:               sharedSetup(tsEnv),
 		Cmds:                sharedCmds(tsEnv, fixtureRepositories),
 		RequireExplicitExec: true,
@@ -1174,10 +1285,11 @@ func (e missingEnvError) Error() string {
 }
 
 type testScriptEnv struct {
-	host  string
-	org   string
-	token string
-	user  string
+	host              string
+	org               string
+	token             string
+	user              string
+	hasUserCapability bool
 
 	// scripts optionally narrows a run to named scripts within the command
 	// directory being run. Empty means run every script in the directory.
@@ -1223,6 +1335,11 @@ func (e *testScriptEnv) fromEnv() error {
 	e.host = envMap["GH_ACCEPTANCE_HOST"]
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
+	var err error
+	e.hasUserCapability, err = tokenHasUserCapability(e.token)
+	if err != nil {
+		return err
+	}
 
 	e.scripts = parseScriptFilter(os.Getenv("GH_ACCEPTANCE_SCRIPT"))
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
