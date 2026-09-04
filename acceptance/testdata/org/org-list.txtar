@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # This test could fail if the user is a member of more than 30 organizations because
 # the `gh org list` command only returns the first 30 organizations the user is a member of
 

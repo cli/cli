@@ -1,15 +1,18 @@
+
 # List directory contents of a repository without cloning.
 
 # Use gh as a credential helper
 exec gh auth setup-git
 
 # Create a private repo with a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --private --add-readme
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+fixture-repo shared REPO
+env CONTENT_BRANCH=${SCRIPT_NAME}-${RANDOM_STRING}
+env V2_BRANCH=${SCRIPT_NAME}-${RANDOM_STRING}-v2
 
 # Clone the repo and add a docs dir plus an executable script
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
-cd $SCRIPT_NAME-$RANDOM_STRING
+exec gh repo clone $ORG/$REPO
+cd $REPO
+exec git checkout -b $CONTENT_BRANCH
 mkdir docs
 mkdir script
 cp $WORK/guide.md docs/guide.md
@@ -17,49 +20,49 @@ cp $WORK/run.sh script/run.sh
 chmod 755 script/run.sh
 exec git add -A
 exec git commit -m 'Add docs and script'
-exec git push origin main
+exec git push -u origin $CONTENT_BRANCH
 
 # Add a v2 branch with an extra file in docs, to exercise --ref
-exec git checkout -b v2
+exec git checkout -b $V2_BRANCH
 cp $WORK/extra.md docs/extra.md
 exec git add -A
 exec git commit -m 'Add docs/extra.md on v2'
-exec git push -u origin v2
-exec git checkout main
+exec git push -u origin $V2_BRANCH
+exec git checkout $CONTENT_BRANCH
 
 # List the repository root. Non-TTY output is tab-separated as type, name,
 # octal mode, and byte size. Directories report mode 040000 and size 0; the
 # auto-generated README has a non-deterministic size, so match it as digits.
-exec gh repo read-dir
+exec gh repo read-dir --ref $CONTENT_BRANCH
 stdout '^file\tREADME\.md\t100644\t\d+$'
 stdout '^dir\tdocs\t040000\t0$'
 stdout '^dir\tscript\t040000\t0$'
 
 # List a subdirectory
-exec gh repo read-dir docs
+exec gh repo read-dir docs --ref $CONTENT_BRANCH
 stdout '^file\tguide\.md\t100644\t19$'
 ! stdout 'extra\.md'
 
 # Executable files are reported as a file with octal mode 100755
-exec gh repo read-dir script --json name,type,modeOctal --jq '.entries[] | .name + " " + .type + " " + .modeOctal'
+exec gh repo read-dir script --ref $CONTENT_BRANCH --json name,type,modeOctal --jq '.entries[] | .name + " " + .type + " " + .modeOctal'
 stdout '^run\.sh file 100755$'
 
 # JSON output lists directory entries
-exec gh repo read-dir --json name,type --jq '.entries[] | select(.type=="dir") | .name'
+exec gh repo read-dir --ref $CONTENT_BRANCH --json name,type --jq '.entries[] | select(.type=="dir") | .name'
 stdout '^docs$'
 stdout '^script$'
 
 # A ref can select a different tree
-exec gh repo read-dir docs --ref v2
+exec gh repo read-dir docs --ref $V2_BRANCH
 stdout 'guide\.md'
 stdout 'extra\.md'
 
 # Error: the path points to a file, not a directory
-! exec gh repo read-dir README.md
+! exec gh repo read-dir README.md --ref $CONTENT_BRANCH
 stderr 'is a file, not a directory'
 
 # Error: the path does not exist
-! exec gh repo read-dir does-not-exist
+! exec gh repo read-dir does-not-exist --ref $CONTENT_BRANCH
 stderr 'could not find'
 
 -- guide.md --

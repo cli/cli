@@ -1,5 +1,8 @@
+
 skip 'it creates a fork owned by the user running the test'
 skip 'this never worked, but could be fixed if we fixed show-refs'
+
+fixture-repo none
 
 # Setup environment variables used for testscript
 env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
