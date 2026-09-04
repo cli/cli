@@ -5,7 +5,10 @@
 exec gh auth setup-git
 
 # Create a repository with a file so it has a default branch
-fixture-repo isolated REPO
+fixture-repo none
+env REPO=$SCRIPT_NAME-$RANDOM_STRING
+exec gh repo create $ORG/$REPO --add-readme --public
+defer cleanup-repo $REPO
 
 # Clone the repo
 exec gh repo clone $ORG/$REPO
