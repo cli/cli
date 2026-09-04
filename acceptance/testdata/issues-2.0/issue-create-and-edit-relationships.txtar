@@ -3,10 +3,8 @@
 fixture-repo shared REPO
 env ISSUE_PREFIX=${SCRIPT_NAME}-${RANDOM_STRING}
 
-# Clone the repo
-exec gh repo clone $ORG/$REPO
-
-cd $REPO
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create the two helper issues that the main issue will block / be blocked by
 exec gh issue create --title $ISSUE_PREFIX-blocker --body ''

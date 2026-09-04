@@ -6,9 +6,8 @@ env2upper VAR_NAME=TESTSCRIPTS_ENV_${RANDOM_STRING}
 # Create a repository where the variable will be registered
 fixture-repo shared REPO
 
-# Clone the repo
-exec gh repo clone $ORG/$REPO
-cd $REPO
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create a repository environment, will fail if organization does not have environment support
 exec gh api /repos/$ORG/$REPO/environments/$ENV_NAME -X PUT --jq '.name'

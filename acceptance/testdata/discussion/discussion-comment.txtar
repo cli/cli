@@ -2,9 +2,8 @@
 # Create a repository with a file so it has a default branch
 fixture-repo shared REPO
 
-# Clone the repo
-exec gh repo clone $ORG/$REPO
-cd $REPO
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Enable discussions
 exec gh api repos/$ORG/$REPO -X PATCH -F has_discussions=true

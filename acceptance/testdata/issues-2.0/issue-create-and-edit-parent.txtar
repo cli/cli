@@ -3,10 +3,8 @@
 fixture-repo shared REPO
 env ISSUE_PREFIX=${SCRIPT_NAME}-${RANDOM_STRING}
 
-# Clone the repo
-exec gh repo clone $ORG/$REPO
-
-cd $REPO
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create the parent issue
 exec gh issue create --title $ISSUE_PREFIX-parent --body ''
