@@ -1,35 +1,35 @@
+
 # Checkout a PR into a git worktree, then reuse that worktree, rename its branch,
 # force sync it, and add a second worktree once the local branch already exists.
 
 # Set up env vars
-env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
 
 # Use gh as a credential helper
 exec gh auth setup-git
 
 # Create a repository with a file so it has a default branch
-exec gh repo create ${ORG}/${REPO} --add-readme --private
-
-# Defer repo cleanup
-defer gh repo delete --yes ${ORG}/${REPO}
+fixture-repo shared REPO
+env BRANCH_NAME=${SCRIPT_NAME}-${RANDOM_STRING}
+env PR_TITLE=${SCRIPT_NAME}-${RANDOM_STRING}
+env RENAMED_BRANCH=${SCRIPT_NAME}-${RANDOM_STRING}-renamed
 
 # Clone the repo
 exec gh repo clone ${ORG}/${REPO}
 
 # Prepare a branch to PR
 cd ${REPO}
-exec git checkout -b feature-branch
+exec git checkout -b $BRANCH_NAME
 exec git commit --allow-empty -m 'Empty Commit'
-exec git push -u origin feature-branch
+exec git push -u origin $BRANCH_NAME
 
 # Create the PR
-exec gh pr create --title 'Feature Title' --body 'Feature Body'
+exec gh pr create --title $PR_TITLE --body 'Feature Body'
 stdout2env PR_URL
 
 # Remove the local branch so checkout has to create it from the remote
 exec git checkout main
-exec git branch -D feature-branch
-stdout 'Deleted branch feature-branch'
+exec git branch -D $BRANCH_NAME
+stdout $BRANCH_NAME
 
 # Targeting an existing, non-empty directory that is not a linked worktree is
 # rejected up front with a clear error instead of deferring to git worktree add.
@@ -43,7 +43,7 @@ exists ../wt
 
 # The worktree is on the PR branch
 exec git -C ../wt rev-parse --abbrev-ref HEAD
-stdout '(?m)^feature-branch$'
+stdout '(?m)^'$BRANCH_NAME'$'
 
 # The main working copy stays on the default branch
 exec git rev-parse --abbrev-ref HEAD
@@ -52,16 +52,16 @@ stdout '(?m)^main$'
 # Checking out the same PR into the same worktree again reuses it
 exec gh pr checkout ${PR_URL} --worktree ../wt
 exec git -C ../wt rev-parse --abbrev-ref HEAD
-stdout '(?m)^feature-branch$'
+stdout '(?m)^'$BRANCH_NAME'$'
 
 # The main working copy is left untouched
 exec git rev-parse --abbrev-ref HEAD
 stdout '(?m)^main$'
 
 # Checking out into the reused worktree with a new branch name creates that branch
-exec gh pr checkout ${PR_URL} --worktree ../wt --branch renamed-branch
+exec gh pr checkout ${PR_URL} --worktree ../wt --branch $RENAMED_BRANCH
 exec git -C ../wt rev-parse --abbrev-ref HEAD
-stdout '(?m)^renamed-branch$'
+stdout '(?m)^'$RENAMED_BRANCH'$'
 
 # The main working copy is left untouched
 exec git rev-parse --abbrev-ref HEAD
@@ -70,13 +70,13 @@ stdout '(?m)^main$'
 # Give the worktree's PR branch a local commit so it diverges from the PR head.
 # A plain reuse would fast-forward-only merge and keep this commit, so --force is
 # required to discard it with a hard reset.
-exec git -C ../wt checkout feature-branch
+exec git -C ../wt checkout $BRANCH_NAME
 exec git -C ../wt commit --allow-empty -m 'Diverging local commit'
 
 # Force checking out the PR into the reused worktree hard resets it to the PR head
 exec gh pr checkout ${PR_URL} --worktree ../wt --force
 exec git -C ../wt rev-parse --abbrev-ref HEAD
-stdout '(?m)^feature-branch$'
+stdout '(?m)^'$BRANCH_NAME'$'
 
 # The diverging local commit was discarded by the hard reset
 exec git -C ../wt log -1 --format=%s
@@ -85,7 +85,7 @@ exec git -C ../wt log -1 --format=%s
 # The worktree branch now matches the PR head
 exec git -C ../wt rev-parse HEAD
 stdout2env WT_HEAD
-exec git rev-parse origin/feature-branch
+exec git rev-parse origin/$BRANCH_NAME
 stdout ${WT_HEAD}
 
 # The main working copy is left untouched
@@ -98,7 +98,7 @@ exec git worktree remove ../wt
 exec gh pr checkout ${PR_URL} --worktree ../wt2
 exists ../wt2
 exec git -C ../wt2 rev-parse --abbrev-ref HEAD
-stdout '(?m)^feature-branch$'
+stdout '(?m)^'$BRANCH_NAME'$'
 
 # The main working copy is left untouched
 exec git rev-parse --abbrev-ref HEAD
@@ -107,7 +107,7 @@ stdout '(?m)^main$'
 # Now create a two-sided divergence: advance the remote PR branch with a pushed
 # commit the local branch will not have...
 exec git -C ../wt2 commit --allow-empty -m 'Remote commit'
-exec git -C ../wt2 push origin feature-branch
+exec git -C ../wt2 push origin $BRANCH_NAME
 
 # ...then rewind the local branch and give it a different, local-only commit, so
 # neither branch is an ancestor of the other
@@ -125,7 +125,7 @@ stdout 'Local commit'
 # Forcing the checkout hard resets the branch to the advanced PR head
 exec gh pr checkout ${PR_URL} --worktree ../wt2 --force
 exec git -C ../wt2 rev-parse --abbrev-ref HEAD
-stdout '(?m)^feature-branch$'
+stdout '(?m)^'$BRANCH_NAME'$'
 exec git -C ../wt2 log -1 --format=%s
 stdout 'Remote commit'
 ! stdout 'Local commit'
@@ -133,7 +133,7 @@ stdout 'Remote commit'
 # The worktree branch now matches the advanced PR head
 exec git -C ../wt2 rev-parse HEAD
 stdout2env WT2_HEAD
-exec git rev-parse origin/feature-branch
+exec git rev-parse origin/$BRANCH_NAME
 stdout ${WT2_HEAD}
 
 # The main working copy is left untouched

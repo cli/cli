@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # Dry-run update should find the installed skill and report status
 exec gh skill update --dry-run --all --dir $WORK/skills-dir
 stdout 'git-commit'

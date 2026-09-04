@@ -79,6 +79,10 @@ Test architecture for commands should generally follow this pattern:
 - One table test for the command constructor (`NewCmdFoo`) to verify flag parsing and `Opts` curation.
 - One table test for the run function (`fooRun`) to verify business logic, output, and mocked HTTP/Git interactions.
 
+New or materially changed commands should add or update acceptance coverage when
+the behavior requires live GitHub resources. Use the
+[`writing-acceptance-tests` skill](.github/skills/writing-acceptance-tests/SKILL.md).
+
 ### HTTP Mocking
 
 Use `httpmock.Registry` with `defer reg.Verify(t)` to ensure all stubs are called:

@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # Telemetry log mode outputs command invocation event to stderr
 env GH_TELEMETRY=log
 env GH_TELEMETRY_SAMPLE_RATE=100

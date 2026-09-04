@@ -1,17 +1,14 @@
+
 # It's unclear what we want to do with these acceptance tests beyond our GHEC discovery, so skip new ones by default
 skip
 
 # Set up env vars
-env REPO=${ORG}/${SCRIPT_NAME}-${RANDOM_STRING}
 
 # Create a repository with a file so it has a default branch
-exec gh repo create ${REPO} --add-readme --private
-
-# Defer repo cleanup
-defer gh repo delete --yes ${REPO}
+fixture-repo isolated REPO
 
 # Set the repo to be targeted by all following commands
-env GH_REPO=${REPO}
+env GH_REPO=${ORG}/${REPO}
 
 # Listing the cache non-interactively shows nothing
 exec gh cache list

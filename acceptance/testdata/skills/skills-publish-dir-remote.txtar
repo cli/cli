@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # When a directory argument is provided to `gh skill publish --dry-run`,
 # the remote detection must use the target directory's git remotes,
 # not the current working directory's remotes.

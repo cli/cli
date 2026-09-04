@@ -1,26 +1,25 @@
-# Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
 
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+# Create a repository with a file so it has a default branch
+fixture-repo shared REPO
+env TAG=v${SCRIPT_NAME}-${RANDOM_STRING}
 
 # Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+exec gh repo clone $ORG/$REPO
 
 # Create a release in the repo
-cd $SCRIPT_NAME-$RANDOM_STRING
-exec gh release create v1.2.3 --notes 'awesome release' --latest
+cd $REPO
+exec gh release create $TAG --notes 'awesome release'
 
 # Upload an asset to the release
-exec gh release upload v1.2.3 ../asset.txt
+exec gh release upload $TAG ../asset.txt
 
 # Download the asset from the release
-exec gh release download v1.2.3
+exec gh release download $TAG
 exists asset.txt
 
 # Download the asset in archive form
-exec gh release download v1.2.3 --archive=zip
-exists $SCRIPT_NAME-$RANDOM_STRING-1.2.3.zip
+exec gh release download $TAG --archive=zip --output source.zip
+exists source.zip
 
 -- asset.txt --
 Hello, world!

@@ -1,7 +1,10 @@
+
 # Verify that gh tells an extension when it is being run as an extension
 
 # Skip if Bash is not available given script extension
 [!exec:bash] skip
+
+fixture-repo none
 
 # Setup environment variables used for testscript
 env EXT_NAME=printenv-${RANDOM_STRING}
