@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -26,6 +27,14 @@ func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt boo
 	c[fmt.Sprintf("%s:%s", host, "oauth_token")] = token
 	c[fmt.Sprintf("%s:%s", host, "git_protocol")] = gitProtocol
 	return false, nil
+}
+
+func (c tinyConfig) TokenForUser(host, _ string) (string, string, error) {
+	token, ok := c[fmt.Sprintf("%s:%s", host, "oauth_token")]
+	if !ok {
+		return "", "", errors.New("token not found")
+	}
+	return token, "oauth_token", nil
 }
 
 func (c tinyConfig) UsersForHost(hostname string) []string {
@@ -75,16 +84,58 @@ func TestShouldCopyToClipboard(t *testing.T) {
 
 func TestLogin(t *testing.T) {
 	tests := []struct {
-		name         string
-		opts         LoginOptions
-		httpStubs    func(*testing.T, *httpmock.Registry)
-		runStubs     func(*testing.T, *run.CommandStubber, *LoginOptions)
-		wantsConfig  map[string]string
-		wantsErr     string
-		stdout       string
-		stderr       string
-		stderrAssert func(*testing.T, *LoginOptions, string)
+		name             string
+		opts             LoginOptions
+		httpStubs        func(*testing.T, *httpmock.Registry)
+		runStubs         func(*testing.T, *run.CommandStubber, *LoginOptions)
+		wantsConfig      map[string]string
+		wantsErr         string
+		stdout           string
+		stderr           string
+		stderrAssert     func(*testing.T, *LoginOptions, string)
+		previousToken    string
+		wantRevokedToken string
 	}{
+		{
+			name: "re-authentication revokes previous OAuth token",
+			opts: LoginOptions{
+				Prompter: &prompter.PrompterMock{
+					SelectFunc: func(prompt, _ string, opts []string) (int, error) {
+						if prompt == "How would you like to authenticate GitHub CLI?" {
+							return prompter.IndexFor(opts, "Paste an authentication token")
+						}
+						return -1, prompter.NoSuchPromptErr(prompt)
+					},
+					AuthTokenFunc: func() (string, error) {
+						return "gho_new", nil
+					},
+				},
+				Hostname:         "github.com",
+				Interactive:      true,
+				GitProtocol:      "ssh",
+				SkipSSHKeyPrompt: true,
+			},
+			previousToken:    "gho_previous",
+			wantRevokedToken: "gho_previous",
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
+			},
+			wantsConfig: map[string]string{
+				"github.com:user":         "monalisa",
+				"github.com:oauth_token":  "gho_new",
+				"github.com:git_protocol": "ssh",
+			},
+			stderr: heredoc.Doc(`
+				Tip: you can generate a Personal Access Token here https://github.com/settings/tokens
+				The minimum required scopes are 'repo', 'read:org'.
+				- gh config set -h github.com git_protocol ssh
+				✓ Configured git protocol
+				✓ Logged in as monalisa
+			`),
+		},
 		{
 			name: "tty, prompt (protocol: ssh, create key: yes)",
 			opts: LoginOptions{
@@ -298,11 +349,21 @@ func TestLogin(t *testing.T) {
 			}
 
 			cfg := tinyConfig{}
+			if tt.previousToken != "" {
+				cfg[fmt.Sprintf("%s:%s", tt.opts.Hostname, "oauth_token")] = tt.previousToken
+			}
 			ios, _, stdout, stderr := iostreams.Test()
+			var revokedToken string
 
 			tt.opts.IO = ios
 			tt.opts.Config = &cfg
 			tt.opts.HTTPClient = &http.Client{Transport: reg}
+			tt.opts.PlainHTTPClient = &http.Client{Transport: reg}
+			tt.opts.RevokeToken = func(_ *http.Client, hostname, token string) error {
+				require.Equal(t, tt.opts.Hostname, hostname)
+				revokedToken = token
+				return nil
+			}
 			tt.opts.CredentialFlow = &GitCredentialFlow{
 				// Intentionally not instantiating anything in here because the tests do not hit this code path.
 				// Right now it's better to panic if we write a test that hits the code than say, start calling
@@ -325,6 +386,7 @@ func TestLogin(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.stdout, stdout.String())
+			assert.Equal(t, tt.wantRevokedToken, revokedToken)
 
 			if tt.stderrAssert != nil {
 				tt.stderrAssert(t, &tt.opts, stderr.String())

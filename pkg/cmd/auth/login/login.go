@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -24,6 +25,7 @@ type LoginOptions struct {
 	Config          func() (gh.Config, error)
 	HttpClient      func() (*http.Client, error)
 	PlainHttpClient func() (*http.Client, error)
+	RevokeToken     func(*http.Client, string, string) error
 	GitClient       *git.Client
 	Prompter        shared.Prompt
 	Browser         browser.Browser
@@ -48,6 +50,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		Config:          f.Config,
 		HttpClient:      f.HttpClient,
 		PlainHttpClient: f.PlainHttpClient,
+		RevokeToken:     authflow.RevokeToken,
 		GitClient:       f.GitClient,
 		Prompter:        f.Prompter,
 		Browser:         f.Browser,
@@ -70,6 +73,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			If a credential store is not found or there is an issue using it gh will fallback
 			to writing the token to a plain text file. See %[1]sgh auth status%[1]s for its
 			stored location.
+			When an account is re-authenticated on GitHub.com or GitHub Enterprise Cloud,
+			its previous GitHub CLI OAuth token is revoked.
 
 			Alternatively, use %[1]s--with-token%[1]s to pass in a personal access token (classic) on standard input.
 			The minimum required scopes for the token are: %[1]srepo%[1]s, %[1]sread:org%[1]s, and %[1]sgist%[1]s.
@@ -212,9 +217,16 @@ func loginRun(opts *LoginOptions) error {
 			return fmt.Errorf("error retrieving current user: %w", err)
 		}
 
+		previousToken, _, _ := authCfg.TokenForUser(hostname, username)
+
 		// Adding a user key ensures that a nonempty host section gets written to the config file.
-		_, loginErr := authCfg.Login(hostname, username, opts.Token, opts.GitProtocol, !opts.InsecureStorage)
-		return loginErr
+		if _, err := authCfg.Login(hostname, username, opts.Token, opts.GitProtocol, !opts.InsecureStorage); err != nil {
+			return err
+		}
+		if err := shared.RevokeOAuthTokenIfChanged(plainHTTPClient, hostname, previousToken, opts.Token, opts.RevokeToken); err != nil {
+			return fmt.Errorf("failed to revoke previous authentication token: %w", err)
+		}
+		return nil
 	}
 
 	return shared.Login(&shared.LoginOptions{
@@ -242,6 +254,7 @@ func loginRun(opts *LoginOptions) error {
 		SecureStorage:    !opts.InsecureStorage,
 		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
 		CopyToClipboard:  copyToClipboard,
+		RevokeToken:      opts.RevokeToken,
 	})
 }
 

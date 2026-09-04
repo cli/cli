@@ -301,6 +301,21 @@ func TestLoginInsecureStorage(t *testing.T) {
 	requireKeyWithValue(t, authCfg.cfg, []string{hostsKey, "github.com", oauthTokenKey}, "test-token")
 }
 
+func TestLoginInsecureStorageRemovesOldSecureToken(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "old-token", "", true)
+	require.NoError(t, err)
+
+	_, err = authCfg.Login("github.com", "test-user", "new-token", "", false)
+	require.NoError(t, err)
+
+	_, err = authCfg.TokenFromKeyringForUser("github.com", "test-user")
+	require.ErrorIs(t, err, keyring.ErrNotFound)
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "new-token", token)
+	require.Equal(t, "oauth_token", source)
+}
+
 func TestLoginSetsUserForProvidedHost(t *testing.T) {
 	// Given we are not logged in
 	authCfg := newTestAuthConfig(t)
@@ -406,6 +421,8 @@ func TestLogoutOfActiveUserSwitchesUserIfPossible(t *testing.T) {
 
 	usersForHost := authCfg.UsersForHost("github.com")
 	require.NotContains(t, "active-user", usersForHost)
+	_, err = authCfg.TokenFromKeyringForUser("github.com", "active-user")
+	require.ErrorIs(t, err, keyring.ErrNotFound)
 }
 
 func TestLogoutOfInactiveUserDoesNotSwitchUser(t *testing.T) {
@@ -428,6 +445,8 @@ func TestLogoutOfInactiveUserDoesNotSwitchUser(t *testing.T) {
 	activeUser, err := authCfg.ActiveUser("github.com")
 	require.NoError(t, err)
 	require.Equal(t, "active-user", activeUser)
+	_, err = authCfg.TokenFromKeyringForUser("github.com", "inactive-user-1")
+	require.ErrorIs(t, err, keyring.ErrNotFound)
 }
 
 // Note that I'm not sure this test enforces particularly desirable behaviour

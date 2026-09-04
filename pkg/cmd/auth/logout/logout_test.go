@@ -2,15 +2,22 @@ package logout
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/keyring"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/require"
 )
@@ -53,14 +60,14 @@ func Test_NewCmdLogout(t *testing.T) {
 			tty:  true,
 			cli:  "--user monalisa",
 			wants: LogoutOptions{
-				Username: "github.com",
+				Username: "monalisa",
 			},
 		},
 		{
 			name: "nontty with user",
 			cli:  "--user monalisa",
 			wants: LogoutOptions{
-				Username: "github.com",
+				Username: "monalisa",
 			},
 		},
 		{
@@ -111,6 +118,7 @@ func Test_NewCmdLogout(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
+			require.Equal(t, tt.wants.Username, gotOpts.Username)
 		})
 	}
 }
@@ -337,6 +345,13 @@ func Test_logoutRun_tty(t *testing.T) {
 				tt.prompterStubs(pm)
 			}
 			tt.opts.Prompter = pm
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+
+			cs, restoreRun := run.Stub()
+			defer restoreRun(t)
+			if tt.wantErr == "" {
+				cs.Register(`git credential reject`, 0, "")
+			}
 
 			err := logoutRun(tt.opts)
 			if tt.wantErr != "" {
@@ -525,6 +540,13 @@ func Test_logoutRun_nontty(t *testing.T) {
 			ios.SetStdinTTY(false)
 			ios.SetStdoutTTY(false)
 			tt.opts.IO = ios
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+
+			cs, restoreRun := run.Stub()
+			defer restoreRun(t)
+			if tt.wantErr == "" {
+				cs.Register(`git credential reject`, 0, "")
+			}
 
 			err := logoutRun(tt.opts)
 			if tt.wantErr != "" {
@@ -547,6 +569,126 @@ func Test_logoutRun_nontty(t *testing.T) {
 
 			if tt.assertToken != nil {
 				tt.assertToken(t, cfg)
+			}
+		})
+	}
+}
+
+func Test_logoutRun_credentialCleanup(t *testing.T) {
+	tests := []struct {
+		name       string
+		hostname   string
+		token      string
+		revokeErr  error
+		staleToken string
+		expectGit  bool
+		gitExit    int
+		wantErr    string
+		wantErrOut string
+		wantToken  bool
+	}{
+		{
+			name:       "revokes OAuth token before local cleanup",
+			hostname:   "github.com",
+			token:      "gho_test-token",
+			expectGit:  true,
+			wantErrOut: "Logged out of github.com account monalisa",
+		},
+		{
+			name:       "revokes active OAuth token and leftover keyring token",
+			hostname:   "github.com",
+			token:      "gho_current-token",
+			staleToken: "gho_stale-token",
+			expectGit:  true,
+			wantErrOut: "Logged out of github.com account monalisa",
+		},
+		{
+			name:      "retains OAuth token when revocation fails",
+			hostname:  "github.com",
+			token:     "gho_test-token",
+			revokeErr: errors.New("HTTP 422: Validation Failed"),
+			wantErr:   "failed to revoke authentication token: HTTP 422: Validation Failed",
+			wantToken: true,
+		},
+		{
+			name:       "skips revocation for GitHub Enterprise Server",
+			hostname:   "example.com",
+			token:      "gho_test-token",
+			expectGit:  true,
+			wantErrOut: "Logged out of example.com account monalisa",
+		},
+		{
+			name:       "warns when git credential cleanup fails",
+			hostname:   "github.com",
+			token:      "ghp_test-token",
+			expectGit:  true,
+			gitExit:    1,
+			wantErrOut: "Failed to remove credentials from git credential helper",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, restoreRun := run.Stub()
+			defer restoreRun(t)
+			if tt.expectGit {
+				cs.Register(`git credential reject`, tt.gitExit, "")
+			}
+
+			cfg, _ := config.NewIsolatedTestConfig(t, "")
+			secureStorage := true
+			if tt.staleToken != "" {
+				secureStorage = false
+			}
+			_, err := cfg.Authentication().Login(tt.hostname, "monalisa", tt.token, "https", secureStorage)
+			require.NoError(t, err)
+			if tt.staleToken != "" {
+				require.NoError(t, keyring.Set("gh:"+tt.hostname, "monalisa", tt.staleToken))
+			}
+
+			httpClient := &http.Client{}
+			var revokedTokens []string
+			ios, _, _, stderr := iostreams.Test()
+			opts := &LogoutOptions{
+				IO:              ios,
+				Config:          func() (gh.Config, error) { return cfg, nil },
+				PlainHttpClient: func() (*http.Client, error) { return httpClient, nil },
+				RevokeToken: func(_ *http.Client, gotHostname, token string) error {
+					require.Equal(t, tt.hostname, gotHostname)
+					revokedTokens = append(revokedTokens, token)
+					return tt.revokeErr
+				},
+				GitClient: &git.Client{GitPath: "some/path/git"},
+				Hostname:  tt.hostname,
+				Username:  "monalisa",
+			}
+
+			err = logoutRun(opts)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			if tt.wantErrOut != "" {
+				require.Contains(t, stderr.String(), tt.wantErrOut)
+			}
+
+			if strings.HasPrefix(tt.token, string(gh.TokenTypeOAuth)) && !ghauth.IsEnterprise(tt.hostname) {
+				wantTokens := []string{tt.token}
+				if tt.staleToken != "" {
+					wantTokens = []string{tt.staleToken, tt.token}
+				}
+				require.Equal(t, wantTokens, revokedTokens)
+			} else {
+				require.Empty(t, revokedTokens)
+			}
+
+			token, _, tokenErr := cfg.Authentication().TokenForUser(tt.hostname, "monalisa")
+			if tt.wantToken {
+				require.NoError(t, tokenErr)
+				require.Equal(t, tt.token, token)
+			} else {
+				require.Error(t, tokenErr)
 			}
 		})
 	}

@@ -222,17 +222,36 @@ type authOut struct {
 
 func Test_refreshRun(t *testing.T) {
 	tests := []struct {
-		name          string
-		opts          *RefreshOptions
-		prompterStubs func(*prompter.PrompterMock)
-		cfgHosts      []string
-		authOut       authOut
-		oldScopes     string
-		clipboard     string
-		wantErr       string
-		nontty        bool
-		wantAuthArgs  authArgs
+		name             string
+		opts             *RefreshOptions
+		prompterStubs    func(*prompter.PrompterMock)
+		cfgHosts         []string
+		authOut          authOut
+		oldScopes        string
+		oldToken         string
+		clipboard        string
+		wantErr          string
+		wantRevokedToken string
+		nontty           bool
+		wantAuthArgs     authArgs
 	}{
+		{
+			name:     "revokes previous OAuth token",
+			cfgHosts: []string{"github.com"},
+			oldToken: "gho_previous",
+			authOut: authOut{
+				username: "test-user",
+				token:    "gho_new",
+			},
+			opts: &RefreshOptions{Hostname: "github.com"},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     true,
+			},
+			wantRevokedToken: "gho_previous",
+		},
 		{
 			name:    "no hosts configured",
 			opts:    &RefreshOptions{},
@@ -542,7 +561,11 @@ func Test_refreshRun(t *testing.T) {
 				cfg.Set("", "clipboard", tt.clipboard)
 			}
 			for _, hostname := range tt.cfgHosts {
-				_, err := cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
+				oldToken := tt.oldToken
+				if oldToken == "" {
+					oldToken = "abc123"
+				}
+				_, err := cfg.Authentication().Login(hostname, "test-user", oldToken, "https", false)
 				require.NoError(t, err)
 			}
 			tt.opts.Config = func() (gh.Config, error) {
@@ -555,11 +578,15 @@ func Test_refreshRun(t *testing.T) {
 			tt.opts.IO = ios
 
 			httpReg := &httpmock.Registry{}
+			expectedOldToken := tt.oldToken
+			if expectedOldToken == "" {
+				expectedOldToken = "abc123"
+			}
 			httpReg.Register(
 				httpmock.REST("GET", ""),
 				func(req *http.Request) (*http.Response, error) {
 					statusCode := 200
-					if req.Header.Get("Authorization") != "token abc123" {
+					if req.Header.Get("Authorization") != "token "+expectedOldToken {
 						statusCode = 400
 					}
 					return &http.Response{
@@ -574,6 +601,12 @@ func Test_refreshRun(t *testing.T) {
 			)
 			tt.opts.PlainHttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: httpReg}, nil
+			}
+			var revokedToken string
+			tt.opts.RevokeToken = func(_ *http.Client, hostname, token string) error {
+				require.Equal(t, aa.hostname, hostname)
+				revokedToken = token
+				return nil
 			}
 
 			pm := &prompter.PrompterMock{}
@@ -599,7 +632,12 @@ func Test_refreshRun(t *testing.T) {
 			activeUser, _ := authCfg.ActiveUser(aa.hostname)
 			activeToken, _ := authCfg.ActiveToken(aa.hostname)
 			require.Equal(t, "test-user", activeUser)
-			require.Equal(t, "xyz456", activeToken)
+			wantActiveToken := "xyz456"
+			if tt.authOut.token != "" {
+				wantActiveToken = tt.authOut.token
+			}
+			require.Equal(t, wantActiveToken, activeToken)
+			require.Equal(t, tt.wantRevokedToken, revokedToken)
 		})
 	}
 }

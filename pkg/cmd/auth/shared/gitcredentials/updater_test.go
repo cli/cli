@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func configureStoreCredentialHelper(t *testing.T) {
+func configureStoreCredentialHelper(t *testing.T) string {
 	t.Helper()
 	tmpCredentialsFile := filepath.Join(t.TempDir(), "credentials")
 
@@ -22,6 +23,7 @@ func configureStoreCredentialHelper(t *testing.T) {
 	cmd, err := gc.Command(context.Background(), "config", "--global", "--add", "credential.helper", fmt.Sprintf("store --file %s", tmpCredentialsFile))
 	require.NoError(t, err)
 	require.NoError(t, cmd.Run())
+	return tmpCredentialsFile
 }
 
 func fillCredentials(t *testing.T) string {
@@ -82,4 +84,22 @@ host=github.com
 username=monalisa
 password=new-password
 `), fillCredentials(t))
+}
+
+func TestRejectRemovesOnlyMatchingCredentials(t *testing.T) {
+	git.IsolateConfig(t)
+	credentialsFile := configureStoreCredentialHelper(t)
+
+	u := &gitcredentials.Updater{GitClient: &git.Client{}}
+	require.NoError(t, u.Update("github.com", "monalisa", "password"))
+
+	require.NoError(t, u.Reject("github.com", "octocat"))
+	contents, err := os.ReadFile(credentialsFile)
+	require.NoError(t, err)
+	require.NotEmpty(t, contents)
+
+	require.NoError(t, u.Reject("github.com", "monalisa"))
+	contents, err = os.ReadFile(credentialsFile)
+	require.NoError(t, err)
+	require.Empty(t, contents)
 }

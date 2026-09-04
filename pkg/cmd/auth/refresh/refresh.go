@@ -25,6 +25,7 @@ type RefreshOptions struct {
 	IO              *iostreams.IOStreams
 	Config          func() (gh.Config, error)
 	PlainHttpClient func() (*http.Client, error)
+	RevokeToken     func(*http.Client, string, string) error
 	GitClient       *git.Client
 	Prompter        shared.Prompt
 
@@ -50,6 +51,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			return token(t), username(u), err
 		},
 		PlainHttpClient: f.PlainHttpClient,
+		RevokeToken:     authflow.RevokeToken,
 		GitClient:       f.GitClient,
 		Prompter:        f.Prompter,
 	}
@@ -75,6 +77,9 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			If you have multiple accounts in %[1]sgh auth status%[1]s and want to refresh the credentials for an
 			inactive account, you will have to use %[1]sgh auth switch%[1]s to that account first before using
 			this command, and then switch back when you are done.
+
+			On GitHub.com and GitHub Enterprise Cloud, the previous GitHub CLI OAuth token
+			is revoked after the refreshed token is stored.
 
 			For more information on OAuth scopes, see
 			<https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps/>.
@@ -166,8 +171,9 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes := set.NewStringSet()
 
+	oldToken, _ := authCfg.ActiveToken(hostname)
 	if !opts.ResetScopes {
-		if oldToken, _ := authCfg.ActiveToken(hostname); oldToken != "" {
+		if oldToken != "" {
 			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken); err == nil {
 				for s := range strings.SplitSeq(oldScopes, ",") {
 					s = strings.TrimSpace(s)
@@ -211,6 +217,9 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 	if _, err := authCfg.Login(hostname, string(authedUser), string(authedToken), "", !opts.InsecureStorage); err != nil {
 		return err
+	}
+	if err := shared.RevokeOAuthTokenIfChanged(plainHTTPClient, hostname, oldToken, string(authedToken), opts.RevokeToken); err != nil {
+		return fmt.Errorf("failed to revoke previous authentication token: %w", err)
 	}
 
 	cs := opts.IO.ColorScheme()

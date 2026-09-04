@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"context"
-
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -80,6 +79,32 @@ func TestRequestWithHeader(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, "application/vnd.github.raw", reg.Requests[0].Header.Get("Accept"))
+}
+
+func TestRequestWithoutHTTPLogging(t *testing.T) {
+	var receivedBody string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		receivedBody = string(body)
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer ts.Close()
+
+	var log bytes.Buffer
+	httpClient, err := NewHTTPClient(HTTPClientOptions{
+		Log:            &log,
+		LogVerboseHTTP: true,
+	})
+	require.NoError(t, err)
+
+	resp, err := NewClientFromHTTP(httpClient).Request(
+		ts.URL, http.MethodPost, ts.URL, strings.NewReader(`{"access_token":"secret"}`), WithoutHTTPLogging())
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, `{"access_token":"secret"}`, receivedBody)
+	assert.Empty(t, log.String())
 }
 
 // The transport supplies default headers of its own, so a per-request header is only useful if it

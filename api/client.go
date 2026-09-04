@@ -13,6 +13,7 @@ import (
 
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
+	"github.com/henvic/httpretty"
 )
 
 const (
@@ -60,6 +61,7 @@ type RequestOption func(*requestConfig)
 type requestConfig struct {
 	headers           map[string]string
 	endpointScopes    string
+	hideFromLog       bool
 	noFollowRedirects bool
 }
 
@@ -92,6 +94,13 @@ func WithoutFollowingRedirects() RequestOption {
 func WithEndpointScopes(scopes string) RequestOption {
 	return func(cfg *requestConfig) {
 		cfg.endpointScopes = scopes
+	}
+}
+
+// WithoutHTTPLogging prevents the request and response from being written to the HTTP debug log.
+func WithoutHTTPLogging() RequestOption {
+	return func(cfg *requestConfig) {
+		cfg.hideFromLog = true
 	}
 }
 
@@ -220,6 +229,9 @@ func (c Client) Request(hostname string, method string, p string, body io.Reader
 // the response is returned unread and the caller is responsible for closing its body.
 func (c Client) RequestWithContext(ctx context.Context, hostname string, method string, p string, body io.Reader, opts ...RequestOption) (*http.Response, error) {
 	cfg := newRequestConfig(opts)
+	if cfg.hideFromLog {
+		ctx = httpretty.WithHide(ctx)
+	}
 	clientOpts := clientOptions(hostname, c.http.Transport)
 	maps.Copy(clientOpts.Headers, cfg.headers)
 	if cfg.noFollowRedirects {

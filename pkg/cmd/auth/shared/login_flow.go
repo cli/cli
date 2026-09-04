@@ -21,6 +21,7 @@ const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
 	Login(string, string, string, string, bool) (bool, error)
+	TokenForUser(string, string) (string, string, error)
 	UsersForHost(string) []string
 }
 
@@ -40,6 +41,7 @@ type LoginOptions struct {
 	SecureStorage    bool
 	SkipSSHKeyPrompt bool
 	CopyToClipboard  bool
+	RevokeToken      func(*http.Client, string, string) error
 
 	sshContext ssh.Context
 }
@@ -195,6 +197,7 @@ func Login(opts *LoginOptions) error {
 	// for the first time.
 	usersForHost := cfg.UsersForHost(hostname)
 	userWasAlreadyLoggedIn := slices.Contains(usersForHost, username)
+	previousToken, _, _ := cfg.TokenForUser(hostname, username)
 
 	if gitProtocol != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
@@ -207,6 +210,9 @@ func Login(opts *LoginOptions) error {
 	}
 	if insecureStorageUsed {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication credentials saved in plain text\n", cs.Yellow("!"))
+	}
+	if err := RevokeOAuthTokenIfChanged(opts.PlainHTTPClient, hostname, previousToken, authToken, opts.RevokeToken); err != nil {
+		return fmt.Errorf("failed to revoke previous authentication token: %w", err)
 	}
 
 	if opts.CredentialFlow.ShouldSetup() {

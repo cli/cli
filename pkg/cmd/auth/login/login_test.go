@@ -309,16 +309,45 @@ func Test_NewCmdLogin(t *testing.T) {
 
 func Test_loginRun_nontty(t *testing.T) {
 	tests := []struct {
-		name            string
-		opts            *LoginOptions
-		env             map[string]string
-		httpStubs       func(*httpmock.Registry)
-		cfgStubs        func(*testing.T, gh.Config)
-		wantHosts       string
-		wantErr         string
-		wantStderr      string
-		wantSecureToken string
+		name             string
+		opts             *LoginOptions
+		env              map[string]string
+		httpStubs        func(*httpmock.Registry)
+		cfgStubs         func(*testing.T, gh.Config)
+		wantHosts        string
+		wantErr          string
+		wantStderr       string
+		wantSecureToken  string
+		wantRevokedToken string
 	}{
+		{
+			name: "with-token revokes previous OAuth token for same user",
+			opts: &LoginOptions{
+				Hostname:        "github.com",
+				Token:           "ghp_new-token",
+				InsecureStorage: true,
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				_, err := c.Authentication().Login("github.com", "monalisa", "gho_previous-token", "https", false)
+				require.NoError(t, err)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
+			},
+			wantHosts: heredoc.Doc(`
+				github.com:
+				    users:
+				        monalisa:
+				            oauth_token: ghp_new-token
+				    git_protocol: https
+				    user: monalisa
+				    oauth_token: ghp_new-token
+			`),
+			wantRevokedToken: "gho_previous-token",
+		},
 		{
 			name: "insecure with token",
 			opts: &LoginOptions{
@@ -495,6 +524,12 @@ func Test_loginRun_nontty(t *testing.T) {
 			tt.opts.PlainHttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			var revokedToken string
+			tt.opts.RevokeToken = func(_ *http.Client, hostname, token string) error {
+				require.Equal(t, tt.opts.Hostname, hostname)
+				revokedToken = token
+				return nil
+			}
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
@@ -522,6 +557,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
 			assert.Equal(t, tt.wantSecureToken, secureToken)
+			assert.Equal(t, tt.wantRevokedToken, revokedToken)
 		})
 	}
 }

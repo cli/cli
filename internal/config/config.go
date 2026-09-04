@@ -431,6 +431,7 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	if !secureStorage || setErr != nil {
 		// And set the oauth token under the user for later switching
 		c.cfg.Set([]string{hostsKey, hostname, usersKey, username, oauthTokenKey}, token)
+		_ = keyring.Delete(keyringServiceName(hostname), username)
 		insecureStorageUsed = true
 	}
 
@@ -490,13 +491,13 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 // It will remove the auth token from the encrypted storage if it exists there.
 func (c *AuthConfig) Logout(hostname, username string) error {
 	users := c.UsersForHost(hostname)
+	_ = keyring.Delete(keyringServiceName(hostname), username)
 
 	// If there is only one (or zero) users, then we remove the host
 	// and unset the keyring tokens.
 	if len(users) < 2 {
 		_ = c.cfg.Remove([]string{hostsKey, hostname})
 		_ = keyring.Delete(keyringServiceName(hostname), "")
-		_ = keyring.Delete(keyringServiceName(hostname), username)
 		return ghConfig.Write(c.cfg)
 	}
 
