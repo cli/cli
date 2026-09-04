@@ -81,9 +81,9 @@ Use synthetic names, repositories, hosts, and content. Remap home and config
 roots into the workspace, then clear inherited credential variables and
 quarantine every config source the selected product can read. For `gh`, point
 `GH_CONFIG_DIR` at an empty private directory and clear `GH_TOKEN`,
-`GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN`, `GH_HOST`, and `GH_REPO`. If the behavior
-inherently needs a service, use only an approved synthetic endpoint and account;
-stop if safe credentials or data are unavailable.
+`GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `GH_HOST`, and
+`GH_REPO`. If the behavior inherently needs a service, use only an approved
+synthetic endpoint and account; stop if safe credentials or data are unavailable.
 
 Select a shell accepted by `Set Shell` in the installed VHS version and use only
 that shell's syntax in `Type` commands. An executable being installed does not
@@ -113,6 +113,7 @@ Env XDG_CONFIG_HOME "<ABSOLUTE_TEMP_PATH>/config"
 Env GH_TOKEN ""
 Env GITHUB_TOKEN ""
 Env GH_ENTERPRISE_TOKEN ""
+Env GITHUB_ENTERPRISE_TOKEN ""
 Env GH_HOST ""
 Env GH_REPO ""
 Env NO_COLOR "1"
