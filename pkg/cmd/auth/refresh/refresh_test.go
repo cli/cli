@@ -17,10 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func boolPtr(value bool) *bool {
-	return &value
-}
-
 func Test_NewCmdRefresh(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -43,7 +39,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-c",
 			wants: RefreshOptions{
 				Hostname:  "",
-				Clipboard: boolPtr(true),
+				Clipboard: new(true),
 			},
 		},
 		{
@@ -55,7 +51,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-h aline.cedrac -c",
 			wants: RefreshOptions{
 				Hostname:  "aline.cedrac",
-				Clipboard: boolPtr(true),
+				Clipboard: new(true),
 			},
 		},
 		{
@@ -71,7 +67,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-h aline.cedrac -c",
 			wants: RefreshOptions{
 				Hostname:  "aline.cedrac",
-				Clipboard: boolPtr(true),
+				Clipboard: new(true),
 			},
 		},
 		{
@@ -80,7 +76,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-h aline.cedrac --clipboard=false",
 			wants: RefreshOptions{
 				Hostname:  "aline.cedrac",
-				Clipboard: boolPtr(false),
+				Clipboard: new(false),
 			},
 		},
 		{
@@ -276,7 +272,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			opts: &RefreshOptions{
 				Hostname:  "",
-				Clipboard: boolPtr(true),
+				Clipboard: new(true),
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
@@ -308,7 +304,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			opts: &RefreshOptions{
 				Hostname:  "github.com",
-				Clipboard: boolPtr(false),
+				Clipboard: new(false),
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",

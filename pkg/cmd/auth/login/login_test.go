@@ -33,10 +33,6 @@ func stubHomeDir(t *testing.T, dir string) {
 	t.Setenv(homeEnv, dir)
 }
 
-func boolPtr(value bool) *bool {
-	return &value
-}
-
 func Test_NewCmdLogin(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -141,7 +137,7 @@ func Test_NewCmdLogin(t *testing.T) {
 				Hostname:    "github.com",
 				Web:         true,
 				Interactive: true,
-				Clipboard:   boolPtr(true),
+				Clipboard:   new(true),
 			},
 		},
 		{
@@ -150,7 +146,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			wants: LoginOptions{
 				Hostname:  "github.com",
 				Web:       true,
-				Clipboard: boolPtr(true),
+				Clipboard: new(true),
 			},
 		},
 		{
@@ -159,7 +155,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			wants: LoginOptions{
 				Hostname:  "github.com",
 				Web:       true,
-				Clipboard: boolPtr(false),
+				Clipboard: new(false),
 			},
 		},
 		{

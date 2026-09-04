@@ -74,8 +74,7 @@ func setRun(opts *SetOptions) error {
 
 	err = ValidateValue(opts.Key, opts.Value)
 	if err != nil {
-		var invalidValue InvalidValueError
-		if errors.As(err, &invalidValue) {
+		if invalidValue, ok := errors.AsType[InvalidValueError](err); ok {
 			var values []string
 			for _, v := range invalidValue.ValidValues {
 				values = append(values, fmt.Sprintf("'%s'", v))

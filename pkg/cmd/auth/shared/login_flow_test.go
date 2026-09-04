@@ -32,10 +32,6 @@ func (c tinyConfig) UsersForHost(hostname string) []string {
 	return nil
 }
 
-func boolPtr(value bool) *bool {
-	return &value
-}
-
 func TestShouldCopyToClipboard(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -55,13 +51,13 @@ func TestShouldCopyToClipboard(t *testing.T) {
 		{
 			name:       "explicit flag enables disabled configuration",
 			configured: "disabled",
-			flagValue:  boolPtr(true),
+			flagValue:  new(true),
 			want:       true,
 		},
 		{
 			name:       "explicit flag disables enabled configuration",
 			configured: "enabled",
-			flagValue:  boolPtr(false),
+			flagValue:  new(false),
 		},
 	}
 

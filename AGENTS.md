@@ -17,8 +17,9 @@ go test -tags acceptance ./acceptance      # Acceptance tests
 make lint                                  # golangci-lint (same as CI)
 ```
 
-**Before committing, ensure both tests and linter pass:**
+**Before committing, run `go fix` on each changed Go package and ensure both tests and linter pass:**
 ```bash
+go fix ./pkg/cmd/issue/list/...  # Replace with the changed package paths
 go test ./...
 make lint
 ```
