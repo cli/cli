@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +38,38 @@ func NewTestAssets(t *testing.T, names ...string) []UserAsset {
 	assets, err := attachFlag.UserAssets()
 	require.NoError(t, err)
 	return assets
+}
+
+// NewTestInvocationTelemetry returns telemetry started with the given
+// attachment count.
+func NewTestInvocationTelemetry(t *testing.T, recorder ghtelemetry.CommandRecorder, attachCount int) *InvocationTelemetry {
+	t.Helper()
+
+	cmd := &cobra.Command{Use: "test"}
+	attachFlag := AddFlag(cmd)
+	for i := range attachCount {
+		require.NoError(t, cmd.Flags().Set(flagName, "attachment-"+strconv.Itoa(i)+".png"))
+	}
+	invocationTelemetry := NewInvocationTelemetry(attachFlag, recorder)
+	invocationTelemetry.start("gh test")
+	return invocationTelemetry
+}
+
+// AssertTestTelemetryEvents verifies the completed invocation event shape.
+func AssertTestTelemetryEvents(t *testing.T, events []ghtelemetry.Event, attachCount int, result UploadResult) {
+	t.Helper()
+
+	require.Equal(t, []ghtelemetry.Event{
+		{
+			Type:       "attachment_invocation",
+			Dimensions: ghtelemetry.Dimensions{"command": "gh test"},
+			Measures: ghtelemetry.Measures{
+				"attach_count":      int64(attachCount),
+				"append_ops_count":  int64(result.AppendOperations),
+				"replace_ops_count": int64(result.ReplaceOperations),
+			},
+		},
+	}, events)
 }
 
 // StubUpload registers one upload of name against repositoryID, answering with

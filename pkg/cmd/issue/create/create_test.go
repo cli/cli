@@ -277,6 +277,12 @@ func TestNewCmdCreate(t *testing.T) {
 			wantAssetPaths: []string{tmpImage},
 		},
 		{
+			name:     "attach telemetry survives argument validation",
+			tty:      false,
+			cli:      fmt.Sprintf(`unexpected --attach '%s'`, tmpImage),
+			wantsErr: true,
+		},
+		{
 			name:        "attach conflict is reported before a missing file",
 			tty:         false,
 			cli:         `-t mytitle -b mybody --web --attach ./nope.png`,
@@ -325,6 +331,7 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)
 			_, err = cmd.ExecuteC()
+			recorder.Flush()
 			if cmd.Flags().Changed("attach") {
 				values, flagErr := cmd.Flags().GetStringArray("attach")
 				require.NoError(t, flagErr)
@@ -332,7 +339,11 @@ func TestNewCmdCreate(t *testing.T) {
 				require.Len(t, recorder.Events, 1)
 				assert.Equal(t, "attachment_invocation", recorder.Events[0].Type)
 				assert.Equal(t, cmd.CommandPath(), recorder.Events[0].Dimensions["command"])
-				assert.Equal(t, int64(len(values)), recorder.Events[0].Measures["attach_count"])
+				assert.Equal(t, ghtelemetry.Measures{
+					"attach_count":      int64(len(values)),
+					"append_ops_count":  0,
+					"replace_ops_count": 0,
+				}, recorder.Events[0].Measures)
 			} else {
 				assert.Empty(t, recorder.Events)
 				assert.Zero(t, recorder.LastSampleRate)
@@ -376,17 +387,18 @@ func TestNewCmdCreate(t *testing.T) {
 
 func Test_createRun(t *testing.T) {
 	tests := []struct {
-		name        string
-		opts        CreateOptions
-		attach      []string
-		host        string
-		config      string
-		httpStubs   func(*testing.T, *httpmock.Registry)
-		promptStubs func(*testing.T, *prompter.PrompterMock)
-		wantsStdout string
-		wantsStderr string
-		wantsBrowse string
-		wantsErr    string
+		name           string
+		opts           CreateOptions
+		attach         []string
+		host           string
+		config         string
+		httpStubs      func(*testing.T, *httpmock.Registry)
+		promptStubs    func(*testing.T, *prompter.PrompterMock)
+		wantsStdout    string
+		wantsStderr    string
+		wantsBrowse    string
+		wantsErr       string
+		wantOperations *attachments.UploadResult
 	}{
 		{
 			name: "no args",
@@ -596,6 +608,10 @@ func Test_createRun(t *testing.T) {
 			attach:      []string{"shot.png"},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+			wantOperations: &attachments.UploadResult{
+				Uploaded:          1,
+				ReplaceOperations: 1,
+			},
 		},
 		{
 			name: "editor and template",
@@ -1186,6 +1202,10 @@ func Test_createRun(t *testing.T) {
 						}))
 			},
 			wantsErr: "could not upload ./second.png: attaching files requires write access to the repository",
+			wantOperations: &attachments.UploadResult{
+				Uploaded:         1,
+				AppendOperations: 1,
+			},
 		},
 		{
 			name: "a create that fails after an upload failed reports both",
@@ -1415,6 +1435,10 @@ func Test_createRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				opts.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
+			attachmentRecorder := &telemetry.CommandRecorderSpy{}
+			if tt.wantOperations != nil {
+				opts.AttachTelemetry = attachments.NewTestInvocationTelemetry(t, attachmentRecorder, len(tt.attach))
+			}
 			opts.Config = func() (gh.Config, error) {
 				cfg := tt.config
 				if cfg == "" {
@@ -1424,6 +1448,10 @@ func Test_createRun(t *testing.T) {
 			}
 
 			err := createRun(opts)
+			if tt.wantOperations != nil {
+				attachmentRecorder.Flush()
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
+			}
 			if tt.wantsErr == "" {
 				require.NoError(t, err)
 			} else {

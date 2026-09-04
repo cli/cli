@@ -1,6 +1,7 @@
 package attachments
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -90,12 +91,14 @@ func TestAddFlag(t *testing.T) {
 	}
 }
 
-func TestFlagRecordTelemetry(t *testing.T) {
+func TestInvocationTelemetry(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     string
-		wantEvent bool
-		wantCount int64
+		name              string
+		input             string
+		wantEvent         bool
+		wantCount         int64
+		operations        *UploadResult
+		wantValidationErr string
 	}{
 		{
 			name:  "flag not passed",
@@ -113,14 +116,50 @@ func TestFlagRecordTelemetry(t *testing.T) {
 			wantEvent: true,
 			wantCount: 3,
 		},
+		{
+			name:      "successful markdown operations",
+			input:     "--attach ./first.png --attach ./second.png",
+			wantEvent: true,
+			wantCount: 2,
+			operations: &UploadResult{
+				Uploaded:          2,
+				AppendOperations:  1,
+				ReplaceOperations: 1,
+			},
+		},
+		{
+			name:       "upload flow with no completed operations",
+			input:      "--attach ./first.png",
+			wantEvent:  true,
+			wantCount:  1,
+			operations: &UploadResult{},
+		},
+		{
+			name:              "over attachment limit",
+			input:             strings.Repeat("--attach ./missing.png ", maxAttachments+1),
+			wantEvent:         true,
+			wantCount:         maxAttachments + 1,
+			wantValidationErr: "`--attach` accepts at most 50 values per command",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, attachFlag := attachCmd(t, tt.input)
 			recorder := &telemetry.CommandRecorderSpy{}
+			invocationTelemetry := NewInvocationTelemetry(attachFlag, recorder)
 
-			attachFlag.RecordTelemetry("gh issue comment", recorder)
+			invocationTelemetry.start("gh issue comment")
+			assert.Empty(t, recorder.Events)
+			if tt.operations != nil {
+				invocationTelemetry.RecordOperations(*tt.operations)
+			}
+			if tt.wantValidationErr != "" {
+				_, err := attachFlag.UserAssets()
+				require.EqualError(t, err, tt.wantValidationErr)
+			}
+			recorder.Flush()
+			recorder.Flush()
 
 			if !tt.wantEvent {
 				assert.Empty(t, recorder.Events)
@@ -129,17 +168,63 @@ func TestFlagRecordTelemetry(t *testing.T) {
 			}
 
 			require.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
-			require.Equal(t, []ghtelemetry.Event{{
+			wantEvents := []ghtelemetry.Event{{
 				Type: "attachment_invocation",
 				Dimensions: ghtelemetry.Dimensions{
 					"command": "gh issue comment",
 				},
 				Measures: ghtelemetry.Measures{
-					"attach_count": tt.wantCount,
+					"attach_count":      tt.wantCount,
+					"append_ops_count":  0,
+					"replace_ops_count": 0,
 				},
-			}}, recorder.Events)
+			}}
+			if tt.operations != nil {
+				wantEvents[0].Measures["append_ops_count"] = int64(tt.operations.AppendOperations)
+				wantEvents[0].Measures["replace_ops_count"] = int64(tt.operations.ReplaceOperations)
+			}
+			require.Equal(t, wantEvents, recorder.Events)
 		})
 	}
+}
+
+func TestInvocationTelemetryWrapArgsRecordsBeforePersistentPreRunError(t *testing.T) {
+	recorder := &telemetry.CommandRecorderSpy{}
+	cmd := &cobra.Command{
+		Use:  "comment",
+		Args: cobra.ExactArgs(1),
+		RunE: func(*cobra.Command, []string) error {
+			return errors.New("run should not be called")
+		},
+	}
+	attachFlag := AddFlag(cmd)
+	invocationTelemetry := NewInvocationTelemetry(attachFlag, recorder)
+	cmd.Args = invocationTelemetry.WrapArgs(cmd.Args)
+
+	root := &cobra.Command{
+		Use:           "gh",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return errors.New("authentication failed")
+		},
+	}
+	root.AddCommand(cmd)
+	root.SetArgs([]string{"comment", "1", "--attach", "./shot.png"})
+
+	_, err := root.ExecuteC()
+	require.EqualError(t, err, "authentication failed")
+	recorder.Flush()
+
+	require.Equal(t, []ghtelemetry.Event{{
+		Type:       "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "gh comment"},
+		Measures: ghtelemetry.Measures{
+			"attach_count":      1,
+			"append_ops_count":  0,
+			"replace_ops_count": 0,
+		},
+	}}, recorder.Events)
 }
 
 func TestFlagUserAssets(t *testing.T) {

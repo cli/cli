@@ -421,6 +421,27 @@ func TestServiceFlush(t *testing.T) {
 		assert.Equal(t, int64(150), event.Measures["duration_ms"])
 	})
 
+	t.Run("resolves deferred events when flushing", func(t *testing.T) {
+		t.Cleanup(stubDeviceID("test-device"))
+
+		var captured SendTelemetryPayload
+		svc := newService(func(p SendTelemetryPayload) { captured = p }, nil)
+		measure := int64(0)
+		svc.RecordDeferred(func() ghtelemetry.Event {
+			return ghtelemetry.Event{
+				Type:     "deferred",
+				Measures: ghtelemetry.Measures{"count": measure},
+			}
+		})
+		measure = 2
+
+		svc.Flush()
+
+		require.Len(t, captured.Events, 1)
+		assert.Equal(t, "deferred", captured.Events[0].Type)
+		assert.Equal(t, int64(2), captured.Events[0].Measures["count"])
+	})
+
 	t.Run("flushes multiple events", func(t *testing.T) {
 		t.Cleanup(stubDeviceID("test-device"))
 

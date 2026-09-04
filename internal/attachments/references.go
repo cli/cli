@@ -14,9 +14,9 @@ import (
 )
 
 // This file finds the places a body already points at an attached file, and
-// repoints them. A file the author never mentioned is not its business: it is
-// reported in ToAppend and appended by attach.go, which knows that an image and
-// a video append different markdown.
+// repoints them. A file with no rewritten reference is reported in ToAppend and
+// appended by attach.go, which knows that an image and a video append different
+// markdown.
 //
 // The parts below run in that order: the two entry points, finding the
 // references, working out which attached file each one names, locating its
@@ -43,13 +43,15 @@ type attachmentArg struct {
 	RendersAsPlayer bool
 }
 
-// attachedMarkdown is the outcome of attaching, one field per flow. A file the
-// author already referenced is rewritten where they wrote it. A file they never
-// mentioned is left for the caller to append, because appending needs to know
-// how an image and a video each render and this file does not.
+// attachedMarkdown is the outcome of attaching, one field per flow. A file
+// rewritten where the author referenced it contributes one replacement,
+// regardless of how many references changed. A file that was not rewritten is
+// left for the caller to append, because appending needs to know how an image
+// and a video each render and this file does not.
 type attachedMarkdown struct {
-	Rewritten string
-	ToAppend  []attachmentArg
+	Rewritten         string
+	ToAppend          []attachmentArg
+	ReplaceOperations int
 }
 
 // attachableMarkdown is markdown scanned for the files it references, held
@@ -78,9 +80,10 @@ func newAttachableMarkdown(md string, attachmentArgs []attachmentArg) (attachabl
 	return attachableMarkdown{markdown: md, refs: refs, args: attachmentArgs}, nil
 }
 
-// attachAssetsToMarkdown points every markdown reference to an attached file
-// at that file's asset URL, and reports which arguments the markdown never
-// referenced.
+// attachAssetsToMarkdown points every rewritable markdown reference to an
+// attached file at that file's asset URL. It reports one replacement per
+// successfully rewritten attachment and which uploaded arguments remain to
+// append.
 //
 //	![alt](./file) alone in a paragraph   image: swap the path   video: the bare URL, which plays
 //	![alt](./file) anywhere else          image: swap the path   video: becomes [alt](URL)
@@ -173,12 +176,22 @@ func attachAssetsToMarkdown(v attachableMarkdown) (attachedMarkdown, error) {
 	out, written := applyEdits(md, edits)
 
 	var unreferenced []attachmentArg
+	replaced := 0
 	for i, a := range attachmentArgs {
-		if a.URL != "" && !written[i] {
+		if a.URL == "" {
+			continue
+		}
+		if written[i] {
+			replaced++
+		} else {
 			unreferenced = append(unreferenced, a)
 		}
 	}
-	return attachedMarkdown{Rewritten: out, ToAppend: unreferenced}, nil
+	return attachedMarkdown{
+		Rewritten:         out,
+		ToAppend:          unreferenced,
+		ReplaceOperations: replaced,
+	}, nil
 }
 
 // checkVideoReferenceImages returns an error naming every video the markdown

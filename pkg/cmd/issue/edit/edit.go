@@ -51,9 +51,10 @@ type EditOptions struct {
 	AddBlocking     []string
 	RemoveBlocking  []string
 
-	AttachFlag *attachments.Flag
-	Assets     []attachments.UserAsset
-	Config     func() (gh.Config, error)
+	AttachFlag      *attachments.Flag
+	AttachTelemetry *attachments.InvocationTelemetry
+	Assets          []attachments.UserAsset
+	Config          func() (gh.Config, error)
 
 	prShared.Editable
 }
@@ -123,8 +124,6 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF 
 		`),
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.AttachFlag.RecordTelemetry(cmd.CommandPath(), telemetry)
-
 			issueNumbers, baseRepo, err := issueShared.ParseIssuesFromArgs(args)
 			if err != nil {
 				return err
@@ -274,6 +273,8 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF 
 	cmd.Flags().StringSliceVar(&opts.AddBlocking, "add-blocking", nil, "Add 'blocking' relationships by issue `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.RemoveBlocking, "remove-blocking", nil, "Remove 'blocking' relationships by issue `number` or URL")
 	opts.AttachFlag = attachments.AddFlag(cmd)
+	opts.AttachTelemetry = attachments.NewInvocationTelemetry(opts.AttachFlag, telemetry)
+	cmd.Args = opts.AttachTelemetry.WrapArgs(cmd.Args)
 
 	return cmd
 }
@@ -418,10 +419,11 @@ func editRun(opts *EditOptions) error {
 		// This sits outside the loop below so each file uploads once, and
 		// Clone carries the merged body into the issue. Nothing that can
 		// prompt or cancel may follow an upload.
-		var uploaded int
-		body, uploaded, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		var uploadResult attachments.UploadResult
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		opts.AttachTelemetry.RecordOperations(uploadResult)
 
-		if uploaded > 0 {
+		if uploadResult.Uploaded > 0 {
 			editable.Body.Value = body
 			editable.Body.Edited = true
 		} else {
