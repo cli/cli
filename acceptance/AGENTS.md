@@ -7,7 +7,7 @@ tokens.
 ## Adding or Changing Tests
 
 - Put each script in `testdata/<group>/`. Groups are discovered automatically;
-  do not register them in the Go harness.
+  do not register them in the Go harness, workflow, or dispatch helper.
 - Every `.txtar` script must start with exactly one capability declaration:
 
   ```txtar
