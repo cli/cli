@@ -140,21 +140,22 @@ func TestGitHubRepo_withParent(t *testing.T) {
 	assert.False(t, repo.ViewerCanTriage())
 }
 
-// TestBaseRepoQueriesSelectDatabaseID guards the 3 queries that build the base
-// repository. Each selection is written by hand, and a field left out of one
-// of them is silently zero rather than an error, so the selection is asserted
-// against the request instead of the response.
-func TestBaseRepoQueriesSelectDatabaseID(t *testing.T) {
+// TestBaseRepoQuerySelections guards fields that must be explicitly requested.
+// A field left out of a query is silently zero rather than an error, so the
+// selection is asserted against the request instead of the response.
+func TestBaseRepoQuerySelections(t *testing.T) {
 	tests := []struct {
 		name    string
 		matcher httpmock.Matcher
 		body    string
+		fields  []string
 		call    func(*Client) error
 	}{
 		{
 			name:    "GitHubRepo",
 			matcher: httpmock.GraphQL(`query RepositoryInfo\b`),
 			body:    `{ "data": { "repository": { "id": "REPOID", "databaseId": 1234 } } }`,
+			fields:  []string{"databaseId", "sshUrl"},
 			call: func(client *Client) error {
 				_, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
 				return err
@@ -164,6 +165,7 @@ func TestBaseRepoQueriesSelectDatabaseID(t *testing.T) {
 			name:    "RepoNetwork",
 			matcher: httpmock.GraphQL(`query RepositoryNetwork\b`),
 			body:    `{ "data": { "repo_000": { "id": "REPOID", "databaseId": 1234 } } }`,
+			fields:  []string{"databaseId"},
 			call: func(client *Client) error {
 				_, err := RepoNetwork(client, []ghrepo.Interface{ghrepo.New("OWNER", "REPO")})
 				return err
@@ -173,6 +175,7 @@ func TestBaseRepoQueriesSelectDatabaseID(t *testing.T) {
 			name:    "IssueRepoInfo",
 			matcher: httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 			body:    `{ "data": { "repository": { "id": "REPOID", "databaseId": 1234 } } }`,
+			fields:  []string{"databaseId"},
 			call: func(client *Client) error {
 				_, err := IssueRepoInfo(client, ghrepo.New("OWNER", "REPO"))
 				return err
@@ -191,7 +194,9 @@ func TestBaseRepoQueriesSelectDatabaseID(t *testing.T) {
 			}))
 
 			require.NoError(t, tt.call(newTestClient(httpReg)))
-			assert.Contains(t, query, "databaseId")
+			for _, field := range tt.fields {
+				assert.Contains(t, query, field)
+			}
 		})
 	}
 }
