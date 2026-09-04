@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
@@ -29,6 +30,50 @@ func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt boo
 
 func (c tinyConfig) UsersForHost(hostname string) []string {
 	return nil
+}
+
+func boolPtr(value bool) *bool {
+	return &value
+}
+
+func TestShouldCopyToClipboard(t *testing.T) {
+	tests := []struct {
+		name       string
+		configured string
+		flagValue  *bool
+		want       bool
+	}{
+		{
+			name: "disabled by default",
+		},
+		{
+			name:       "enabled by configuration",
+			configured: "enabled",
+			want:       true,
+		},
+		{
+			name:       "explicit flag enables disabled configuration",
+			configured: "disabled",
+			flagValue:  boolPtr(true),
+			want:       true,
+		},
+		{
+			name:       "explicit flag disables enabled configuration",
+			configured: "enabled",
+			flagValue:  boolPtr(false),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.NewMockConfig()
+			if tt.configured != "" {
+				cfg.Set("", "clipboard", tt.configured)
+			}
+
+			require.Equal(t, tt.want, ShouldCopyToClipboard(cfg, tt.flagValue))
+		})
+	}
 }
 
 func TestLogin(t *testing.T) {

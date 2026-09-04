@@ -32,6 +32,7 @@ func TestNewConfigProvidesFallback(t *testing.T) {
 	requireKeyWithValue(t, spiedCfg, []string{aliasesKey, "co"}, "pr checkout")
 	requireKeyWithValue(t, spiedCfg, []string{httpUnixSocketKey}, "")
 	requireKeyWithValue(t, spiedCfg, []string{browserKey}, "")
+	requireKeyWithValue(t, spiedCfg, []string{clipboardKey}, "disabled")
 	requireKeyWithValue(t, spiedCfg, []string{colorLabelsKey}, "disabled")
 }
 
@@ -46,6 +47,7 @@ func TestGetOrDefaultApplicationDefaults(t *testing.T) {
 		{pagerKey, ""},
 		{httpUnixSocketKey, ""},
 		{browserKey, ""},
+		{clipboardKey, "disabled"},
 	}
 
 	for _, tt := range tests {
@@ -138,6 +140,7 @@ func TestFallbackConfig(t *testing.T) {
 	requireKeyWithValue(t, cfg, []string{aliasesKey, "co"}, "pr checkout")
 	requireKeyWithValue(t, cfg, []string{httpUnixSocketKey}, "")
 	requireKeyWithValue(t, cfg, []string{browserKey}, "")
+	requireKeyWithValue(t, cfg, []string{clipboardKey}, "disabled")
 	requireKeyWithValue(t, cfg, []string{colorLabelsKey}, "disabled")
 	requireNoKey(t, cfg, []string{"unknown"})
 }
@@ -210,6 +213,27 @@ func TestTelemetry(t *testing.T) {
 		entry := c.Telemetry()
 
 		require.Equal(t, "log", entry.Value)
+		require.Equal(t, gh.ConfigUserProvided, entry.Source)
+	})
+}
+
+func TestClipboard(t *testing.T) {
+	t.Run("returns default when not configured", func(t *testing.T) {
+		c := newTestConfig()
+
+		entry := c.Clipboard()
+
+		require.Equal(t, "disabled", entry.Value)
+		require.Equal(t, gh.ConfigDefaultProvided, entry.Source)
+	})
+
+	t.Run("returns user configured value", func(t *testing.T) {
+		c := newTestConfig()
+		c.Set("", clipboardKey, "enabled")
+
+		entry := c.Clipboard()
+
+		require.Equal(t, "enabled", entry.Value)
 		require.Equal(t, gh.ConfigUserProvided, entry.Source)
 	})
 }

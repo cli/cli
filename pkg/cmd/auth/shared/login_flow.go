@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
@@ -41,6 +42,14 @@ type LoginOptions struct {
 	CopyToClipboard  bool
 
 	sshContext ssh.Context
+}
+
+// ShouldCopyToClipboard resolves an explicit flag value before falling back to configuration.
+func ShouldCopyToClipboard(cfg gh.Config, flagValue *bool) bool {
+	if flagValue != nil {
+		return *flagValue
+	}
+	return cfg.Clipboard().Value == "enabled"
 }
 
 func Login(opts *LoginOptions) error {

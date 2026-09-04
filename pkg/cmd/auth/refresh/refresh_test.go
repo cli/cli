@@ -17,6 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func boolPtr(value bool) *bool {
+	return &value
+}
+
 func Test_NewCmdRefresh(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -39,7 +43,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-c",
 			wants: RefreshOptions{
 				Hostname:  "",
-				Clipboard: true,
+				Clipboard: boolPtr(true),
 			},
 		},
 		{
@@ -51,7 +55,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-h aline.cedrac -c",
 			wants: RefreshOptions{
 				Hostname:  "aline.cedrac",
-				Clipboard: true,
+				Clipboard: boolPtr(true),
 			},
 		},
 		{
@@ -67,7 +71,16 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-h aline.cedrac -c",
 			wants: RefreshOptions{
 				Hostname:  "aline.cedrac",
-				Clipboard: true,
+				Clipboard: boolPtr(true),
+			},
+		},
+		{
+			name: "tty hostname and clipboard disabled",
+			tty:  true,
+			cli:  "-h aline.cedrac --clipboard=false",
+			wants: RefreshOptions{
+				Hostname:  "aline.cedrac",
+				Clipboard: boolPtr(false),
 			},
 		},
 		{
@@ -219,6 +232,7 @@ func Test_refreshRun(t *testing.T) {
 		cfgHosts      []string
 		authOut       authOut
 		oldScopes     string
+		clipboard     string
 		wantErr       string
 		nontty        bool
 		wantAuthArgs  authArgs
@@ -261,13 +275,46 @@ func Test_refreshRun(t *testing.T) {
 			},
 			opts: &RefreshOptions{
 				Hostname:  "",
-				Clipboard: true,
+				Clipboard: boolPtr(true),
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
 				scopes:        []string{},
 				secureStorage: true,
 				clipboard:     true,
+			},
+		},
+		{
+			name: "clipboard enabled by configuration",
+			cfgHosts: []string{
+				"github.com",
+			},
+			clipboard: "enabled",
+			opts: &RefreshOptions{
+				Hostname: "github.com",
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     true,
+			},
+		},
+		{
+			name: "clipboard flag overrides enabled configuration",
+			cfgHosts: []string{
+				"github.com",
+			},
+			clipboard: "enabled",
+			opts: &RefreshOptions{
+				Hostname:  "github.com",
+				Clipboard: boolPtr(false),
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     false,
 			},
 		},
 		{
@@ -483,6 +530,9 @@ func Test_refreshRun(t *testing.T) {
 			}
 
 			cfg, _ := config.NewIsolatedTestConfig(t, "")
+			if tt.clipboard != "" {
+				cfg.Set("", "clipboard", tt.clipboard)
+			}
 			for _, hostname := range tt.cfgHosts {
 				_, err := cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
 				require.NoError(t, err)

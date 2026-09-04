@@ -22,6 +22,7 @@ const (
 	accessiblePrompterKey = "accessible_prompter"
 	aliasesKey            = "aliases"
 	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
+	clipboardKey          = "clipboard"
 	colorLabelsKey        = "color_labels"
 	apiHostKey            = "api_host" // used by cli/go-gh to redirect API requests for a host
 	editorKey             = "editor"   // used by cli/go-gh to open interactive text editor
@@ -130,6 +131,11 @@ func (c *cfg) AccessiblePrompter(hostname string) gh.ConfigEntry {
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, browserKey).Unwrap()
+}
+
+func (c *cfg) Clipboard() gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault("", clipboardKey).Unwrap()
 }
 
 func (c *cfg) ColorLabels(hostname string) gh.ConfigEntry {
@@ -631,6 +637,8 @@ aliases:
 http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
 browser:
+# Whether to copy one-time OAuth device codes to the clipboard. Supported values: enabled, disabled
+clipboard: disabled
 # Whether to display labels using their RGB hex color codes in terminals that support truecolor. Supported values: enabled, disabled
 color_labels: disabled
 # Whether customizable, 4-bit accessible colors should be used. Supported values: enabled, disabled
@@ -641,12 +649,25 @@ accessible_prompter: disabled
 spinner: enabled
 `
 
+// ConfigScope controls whether a configuration option can be set globally, per host, or both.
+type ConfigScope int
+
+const (
+	// ConfigScopeGlobalOrHost allows an option to be set globally or for a specific host.
+	ConfigScopeGlobalOrHost ConfigScope = iota
+	// ConfigScopeGlobalOnly allows an option to be set only at the global level.
+	ConfigScopeGlobalOnly
+	// ConfigScopeHostOnly requires an option to be set for a specific host.
+	ConfigScopeHostOnly
+)
+
+// ConfigOption describes a supported configuration key.
 type ConfigOption struct {
 	Key           string
 	Description   string
 	DefaultValue  string
 	AllowedValues []string
-	PerHostOnly   bool
+	Scope         ConfigScope
 	CurrentValue  func(c gh.Config, hostname string) string
 }
 
@@ -655,7 +676,7 @@ var Options = []ConfigOption{
 		Key:          apiHostKey,
 		Description:  "experimental: the hostname to use when making API requests for a GitHub host. Note: this is not a security boundary and requests to the canonical host will remain authenticated",
 		DefaultValue: "",
-		PerHostOnly:  true,
+		Scope:        ConfigScopeHostOnly,
 		CurrentValue: func(c gh.Config, hostname string) string {
 			apiHost, _ := c.Authentication().APIHostForHost(hostname)
 			return apiHost
@@ -683,8 +704,9 @@ var Options = []ConfigOption{
 		Description:   "toggle interactive prompting in the terminal",
 		DefaultValue:  "enabled",
 		AllowedValues: []string{"enabled", "disabled"},
+		Scope:         ConfigScopeGlobalOnly,
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.Prompt(hostname).Value
+			return c.Prompt("").Value
 		},
 	},
 	{
@@ -692,8 +714,9 @@ var Options = []ConfigOption{
 		Description:   "toggle preference for editor-based interactive prompting in the terminal",
 		DefaultValue:  "disabled",
 		AllowedValues: []string{"enabled", "disabled"},
+		Scope:         ConfigScopeGlobalOnly,
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.PreferEditorPrompt(hostname).Value
+			return c.PreferEditorPrompt("").Value
 		},
 	},
 	{
@@ -718,6 +741,16 @@ var Options = []ConfigOption{
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Browser(hostname).Value
+		},
+	},
+	{
+		Key:           clipboardKey,
+		Description:   "whether to copy one-time OAuth device codes to the clipboard",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		Scope:         ConfigScopeGlobalOnly,
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Clipboard().Value
 		},
 	},
 	{
@@ -761,6 +794,7 @@ var Options = []ConfigOption{
 		Description:   "whether telemetry is enabled, disabled, or logging",
 		DefaultValue:  "enabled",
 		AllowedValues: []string{"enabled", "disabled", "log"},
+		Scope:         ConfigScopeGlobalOnly,
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Telemetry().Value
 		},

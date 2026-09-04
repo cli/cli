@@ -62,8 +62,8 @@ func NewCmdConfigSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Co
 }
 
 func setRun(opts *SetOptions) error {
-	if isPerHostOnly(opts.Key) && opts.Hostname == "" {
-		return cmdutil.FlagErrorf("--host required when setting %s", opts.Key)
+	if err := validateScope(opts.Key, opts.Hostname); err != nil {
+		return cmdutil.FlagErrorf("%s", err)
 	}
 
 	err := ValidateKey(opts.Key)
@@ -103,14 +103,21 @@ func ValidateKey(key string) error {
 	return fmt.Errorf("invalid key")
 }
 
-func isPerHostOnly(key string) bool {
+func validateScope(key, hostname string) error {
 	for _, configKey := range config.Options {
 		if key == configKey.Key {
-			return configKey.PerHostOnly
+			switch {
+			case configKey.Scope == config.ConfigScopeHostOnly && hostname == "":
+				return fmt.Errorf("--host required when setting %s", key)
+			case configKey.Scope == config.ConfigScopeGlobalOnly && hostname != "":
+				return fmt.Errorf("--host cannot be used when setting %s", key)
+			default:
+				return nil
+			}
 		}
 	}
 
-	return false
+	return nil
 }
 
 type InvalidValueError struct {

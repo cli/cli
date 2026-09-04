@@ -41,6 +41,8 @@ type Config interface {
 	AccessiblePrompter(hostname string) ConfigEntry
 	// Browser returns the configured browser, optionally scoped by host.
 	Browser(hostname string) ConfigEntry
+	// Clipboard returns the configured clipboard setting, ignoring host scoping since clipboard is a global setting.
+	Clipboard() ConfigEntry
 	// ColorLabels returns the configured color_label setting, optionally scoped by host.
 	ColorLabels(hostname string) ConfigEntry
 	// Editor returns the configured editor, optionally scoped by host.
