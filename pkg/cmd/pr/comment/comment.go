@@ -57,8 +57,6 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 		`),
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			opts.AttachFlag.RecordTelemetry(cmd.CommandPath(), telemetry)
-
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
 				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
@@ -115,6 +113,8 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 	cmd.Flags().BoolVar(&opts.DeleteLastConfirmed, "yes", false, "Skip the delete confirmation prompt when --delete-last is provided")
 	cmd.Flags().BoolVar(&opts.CreateIfNone, "create-if-none", false, "Create a new comment if no comments are found. Can be used only with --edit-last")
 	opts.AttachFlag = attachments.AddFlag(cmd)
+	opts.AttachTelemetry = attachments.NewInvocationTelemetry(opts.AttachFlag, telemetry)
+	cmd.Args = opts.AttachTelemetry.WrapArgs(cmd.Args)
 
 	return cmd
 }

@@ -276,6 +276,12 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:     "--attach telemetry survives argument validation",
+			input:    fmt.Sprintf("--attach '%s'", tmpImage),
+			isTTY:    false,
+			wantsErr: true,
+		},
+		{
 			name:  "--attach with --body keeps the body and records that one was given",
 			input: fmt.Sprintf("1 --body test --attach '%s'", tmpImage),
 			output: shared.CommentableOptions{
@@ -423,6 +429,7 @@ func TestNewCmdComment(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			recorder.Flush()
 			if cmd.Flags().Changed("attach") {
 				values, flagErr := cmd.Flags().GetStringArray("attach")
 				require.NoError(t, flagErr)
@@ -430,7 +437,11 @@ func TestNewCmdComment(t *testing.T) {
 				require.Len(t, recorder.Events, 1)
 				assert.Equal(t, "attachment_invocation", recorder.Events[0].Type)
 				assert.Equal(t, cmd.CommandPath(), recorder.Events[0].Dimensions["command"])
-				assert.Equal(t, int64(len(values)), recorder.Events[0].Measures["attach_count"])
+				assert.Equal(t, ghtelemetry.Measures{
+					"attach_count":      int64(len(values)),
+					"append_ops_count":  0,
+					"replace_ops_count": 0,
+				}, recorder.Events[0].Measures)
 			} else {
 				assert.Empty(t, recorder.Events)
 				assert.Zero(t, recorder.LastSampleRate)

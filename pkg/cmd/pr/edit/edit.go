@@ -40,9 +40,10 @@ type EditOptions struct {
 	SelectorArg string
 	Interactive bool
 
-	AttachFlag *attachments.Flag
-	Assets     []attachments.UserAsset
-	Config     func() (gh.Config, error)
+	AttachFlag      *attachments.Flag
+	AttachTelemetry *attachments.InvocationTelemetry
+	Assets          []attachments.UserAsset
+	Config          func() (gh.Config, error)
 
 	shared.Editable
 }
@@ -135,8 +136,6 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF 
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.AttachFlag.RecordTelemetry(cmd.CommandPath(), telemetry)
-
 			opts.Finder = shared.NewFinder(f)
 
 			// support `-R, --repo` override
@@ -258,6 +257,8 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF 
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the pull request belongs to by `name`")
 	cmd.Flags().BoolVar(&removeMilestone, "remove-milestone", false, "Remove the milestone association from the pull request")
 	opts.AttachFlag = attachments.AddFlag(cmd)
+	opts.AttachTelemetry = attachments.NewInvocationTelemetry(opts.AttachFlag, telemetry)
+	cmd.Args = opts.AttachTelemetry.WrapArgs(cmd.Args)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base")
 
@@ -423,14 +424,15 @@ func editRun(opts *EditOptions) error {
 		}
 
 		// Nothing that can prompt or cancel may follow this.
-		var uploaded int
-		body, uploaded, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		var uploadResult attachments.UploadResult
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		opts.AttachTelemetry.RecordOperations(uploadResult)
 
 		// With nothing uploaded, even a body the caller typed goes unwritten:
 		// its references are still local paths, which render broken. The other
 		// fields are innocent of the upload, so they proceed either way.
-		editable.Body.Edited = uploaded > 0
-		if uploaded > 0 {
+		editable.Body.Edited = uploadResult.Uploaded > 0
+		if uploadResult.Uploaded > 0 {
 			editable.Body.Value = body
 		}
 

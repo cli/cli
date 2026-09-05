@@ -317,6 +317,11 @@ func TestNewCmdEdit(t *testing.T) {
 			wantAssetPaths: []string{tmpImage},
 		},
 		{
+			name:     "attach telemetry survives argument validation",
+			input:    fmt.Sprintf("23 24 --attach '%s'", tmpImage),
+			wantsErr: true,
+		},
+		{
 			name:  "attach with body records the body that replaces the old one",
 			input: fmt.Sprintf("23 --body 'a new body' --attach '%s'", tmpImage),
 			output: EditOptions{
@@ -369,6 +374,7 @@ func TestNewCmdEdit(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			recorder.Flush()
 			if cmd.Flags().Changed("attach") {
 				values, flagErr := cmd.Flags().GetStringArray("attach")
 				require.NoError(t, flagErr)
@@ -376,7 +382,11 @@ func TestNewCmdEdit(t *testing.T) {
 				require.Len(t, recorder.Events, 1)
 				assert.Equal(t, "attachment_invocation", recorder.Events[0].Type)
 				assert.Equal(t, cmd.CommandPath(), recorder.Events[0].Dimensions["command"])
-				assert.Equal(t, int64(len(values)), recorder.Events[0].Measures["attach_count"])
+				assert.Equal(t, ghtelemetry.Measures{
+					"attach_count":      int64(len(values)),
+					"append_ops_count":  0,
+					"replace_ops_count": 0,
+				}, recorder.Events[0].Measures)
 			} else {
 				assert.Empty(t, recorder.Events)
 				assert.Zero(t, recorder.LastSampleRate)
@@ -428,6 +438,7 @@ func Test_editRun(t *testing.T) {
 		stdout             string
 		stderr             string
 		wantErr            string
+		wantOperations     *attachments.UploadResult
 	}{
 		{
 			name: "non-interactive",
@@ -1290,6 +1301,10 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+			wantOperations: &attachments.UploadResult{
+				Uploaded:         1,
+				AppendOperations: 1,
+			},
 		},
 		{
 			name: "an empty body flag clears the body and leaves the attachment",
@@ -1371,6 +1386,10 @@ func Test_editRun(t *testing.T) {
 			},
 			stdout:  "https://github.com/OWNER/REPO/pull/123\n",
 			wantErr: "could not upload ./b.png: attaching files requires write access to the repository",
+			wantOperations: &attachments.UploadResult{
+				Uploaded:         1,
+				AppendOperations: 1,
+			},
 		},
 		{
 			name: "a sole failed upload leaves the body alone and still edits the title",
@@ -1674,6 +1693,10 @@ func Test_editRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
+			attachmentRecorder := &telemetry.CommandRecorderSpy{}
+			if tt.wantOperations != nil {
+				tt.input.AttachTelemetry = attachments.NewTestInvocationTelemetry(t, attachmentRecorder, len(tt.attach))
+			}
 
 			// The host comes from the pull request the row's finder returns, so
 			// a row can hold a token for a host the config's default is not.
@@ -1693,6 +1716,10 @@ func Test_editRun(t *testing.T) {
 			tt.input.Finder = fieldCapturingFinder{PRFinder: tt.input.Finder, fields: &lookupFields}
 
 			err := editRun(tt.input)
+			if tt.wantOperations != nil {
+				attachmentRecorder.Flush()
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
+			}
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 			} else {

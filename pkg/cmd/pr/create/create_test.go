@@ -297,6 +297,11 @@ func TestNewCmdCreate(t *testing.T) {
 			wantAssetPaths: []string{tmpImage},
 		},
 		{
+			name:     "attach telemetry survives argument validation",
+			cli:      fmt.Sprintf("unexpected --attach '%s'", tmpImage),
+			wantsErr: true,
+		},
+		{
 			name:              "attach rejects a missing file",
 			cli:               "--title mytitle --body mybody --attach ./nope.png",
 			wantsErr:          true,
@@ -349,6 +354,7 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
 			_, err = cmd.ExecuteC()
+			recorder.Flush()
 			if cmd.Flags().Changed("attach") {
 				values, flagErr := cmd.Flags().GetStringArray("attach")
 				require.NoError(t, flagErr)
@@ -356,7 +362,11 @@ func TestNewCmdCreate(t *testing.T) {
 				require.Len(t, recorder.Events, 1)
 				assert.Equal(t, "attachment_invocation", recorder.Events[0].Type)
 				assert.Equal(t, cmd.CommandPath(), recorder.Events[0].Dimensions["command"])
-				assert.Equal(t, int64(len(values)), recorder.Events[0].Measures["attach_count"])
+				assert.Equal(t, ghtelemetry.Measures{
+					"attach_count":      int64(len(values)),
+					"append_ops_count":  0,
+					"replace_ops_count": 0,
+				}, recorder.Events[0].Measures)
 			} else {
 				assert.Empty(t, recorder.Events)
 				assert.Zero(t, recorder.LastSampleRate)
@@ -419,6 +429,7 @@ func Test_createRun(t *testing.T) {
 		customBranchConfig bool
 		// Defaults to WRITE, which can upload.
 		repoPermission string
+		wantOperations *attachments.UploadResult
 	}{
 		{
 			name: "nontty web",
@@ -1776,6 +1787,10 @@ func Test_createRun(t *testing.T) {
 						}))
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
+			wantOperations: &attachments.UploadResult{
+				Uploaded:          1,
+				ReplaceOperations: 1,
+			},
 		},
 		{
 
@@ -1871,6 +1886,10 @@ func Test_createRun(t *testing.T) {
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 			wantErr:     "could not upload ./bad.png: attaching files requires write access to the repository",
+			wantOperations: &attachments.UploadResult{
+				Uploaded:         1,
+				AppendOperations: 1,
+			},
 		},
 		{
 			name: "the only upload failing creates no pull request",
@@ -2041,6 +2060,10 @@ func Test_createRun(t *testing.T) {
 				cleanSetup = tt.setup(&opts, t)
 			}
 			defer cleanSetup()
+			attachmentRecorder := &telemetry.CommandRecorderSpy{}
+			if tt.wantOperations != nil {
+				opts.AttachTelemetry = attachments.NewTestInvocationTelemetry(t, attachmentRecorder, len(opts.Assets))
+			}
 
 			// All tests in this function use github.com behavior
 			opts.Detector = &fd.EnabledDetectorMock{}
@@ -2050,6 +2073,10 @@ func Test_createRun(t *testing.T) {
 			}
 
 			err := createRun(&opts)
+			if tt.wantOperations != nil {
+				attachmentRecorder.Flush()
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(opts.Assets), *tt.wantOperations)
+			}
 			output := &test.CmdOut{
 				OutBuf:     stdout,
 				ErrBuf:     stderr,

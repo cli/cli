@@ -61,6 +61,7 @@ type CommentableOptions struct {
 	BodyProvided     bool
 	KeepExistingBody bool
 	AttachFlag       *attachments.Flag
+	AttachTelemetry  *attachments.InvocationTelemetry
 	Assets           []attachments.UserAsset
 	Config           func() (gh.Config, error)
 }
@@ -353,8 +354,9 @@ func bodyForWrite(opts *CommentableOptions, uploader *attachments.Uploader) (bod
 	if uploader == nil {
 		return opts.Body, true, nil
 	}
-	body, uploaded, err := uploader.UploadAndAttach(context.Background(), opts.Body, opts.Assets)
-	if err != nil && uploaded == 0 {
+	body, uploadResult, err := uploader.UploadAndAttach(context.Background(), opts.Body, opts.Assets)
+	opts.AttachTelemetry.RecordOperations(uploadResult)
+	if err != nil && uploadResult.Uploaded == 0 {
 		return "", false, err
 	}
 	return body, true, err

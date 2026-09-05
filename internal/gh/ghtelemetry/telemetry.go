@@ -21,6 +21,8 @@ type EventRecorder interface {
 
 type CommandRecorder interface {
 	EventRecorder
+	// RecordDeferred schedules an event to be resolved when telemetry flushes.
+	RecordDeferred(func() Event)
 	SetSampleRate(rate int)
 }
 

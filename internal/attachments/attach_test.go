@@ -41,14 +41,15 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		files    []string
-		args     []string
-		body     string
-		uploads  []upload
-		wantBody string
-		// What a caller keys on to decide whether a body is worth writing.
+		name         string
+		files        []string
+		args         []string
+		body         string
+		uploads      []upload
+		wantBody     string
 		wantUploaded int
+		wantAppend   int
+		wantReplace  int
 		wantErr      string
 	}{
 		{
@@ -59,6 +60,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{201, `{"url":"https://github.com/user-attachments/assets/1"}`}},
 			wantBody:     "See below\n\n![login](https://github.com/user-attachments/assets/1)",
 			wantUploaded: 1,
+			wantAppend:   1,
 		},
 		{
 			name:    "appends a video as a paragraph of its own",
@@ -70,6 +72,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			// paragraph, so it must not land on the end of the line above.
 			wantBody:     "Watch this:\n\nhttps://github.com/user-attachments/assets/2",
 			wantUploaded: 1,
+			wantAppend:   1,
 		},
 		{
 			name:         "appends to an empty body without leading blank lines",
@@ -79,6 +82,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{201, `{"url":"https://github.com/user-attachments/assets/1"}`}},
 			wantBody:     "![login](https://github.com/user-attachments/assets/1)",
 			wantUploaded: 1,
+			wantAppend:   1,
 		},
 		{
 			name:         "does not stack blank lines on a body that ends with them",
@@ -88,6 +92,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{201, `{"url":"https://github.com/user-attachments/assets/1"}`}},
 			wantBody:     "See below\n\n![login](https://github.com/user-attachments/assets/1)",
 			wantUploaded: 1,
+			wantAppend:   1,
 		},
 		{
 			name:    "appends several assets in the order they were written",
@@ -100,6 +105,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 				"![After the fix](https://example.com/2)\n\n" +
 				"https://example.com/3",
 			wantUploaded: 3,
+			wantAppend:   3,
 		},
 		{
 			name:         "rewrites a reference in place instead of appending it",
@@ -109,6 +115,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{201, `{"url":"https://example.com/1"}`}},
 			wantBody:     "The error:\n\n![the login screen](https://example.com/1)\n\nThat is all.",
 			wantUploaded: 1,
+			wantReplace:  1,
 		},
 		{
 			name:         "rewrites what the body references and appends what it does not",
@@ -118,6 +125,8 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{201, `{"url":"https://example.com/1"}`}, {201, `{"url":"https://example.com/2"}`}},
 			wantBody:     "![the login screen](https://example.com/1)\n\n![after](https://example.com/2)",
 			wantUploaded: 2,
+			wantAppend:   1,
+			wantReplace:  1,
 		},
 		{
 			// Three files and two replies: c is never attempted, which the
@@ -129,6 +138,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{201, `{"url":"https://example.com/1"}`}, {404, `{"message":"Not Found"}`}},
 			wantBody:     "Three files\n\n![a](https://example.com/1)",
 			wantUploaded: 1,
+			wantAppend:   1,
 			wantErr:      "could not upload ./b.png: attaching files requires write access to the repository",
 		},
 		{
@@ -170,6 +180,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{201, `{"url":"https://example.com/1"}`}},
 			wantBody:     "[clip][c]\n\n[c]: https://example.com/1",
 			wantUploaded: 1,
+			wantReplace:  1,
 		},
 		{
 			// The only place a UserAsset becomes an attachmentArg, so the only row
@@ -183,6 +194,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			uploads:      []upload{{201, `{"url":"https://example.com/1"}`}},
 			wantBody:     "The crash [repro.mp4](https://example.com/1) reproduces every time.",
 			wantUploaded: 1,
+			wantReplace:  1,
 		},
 	}
 
@@ -202,7 +214,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 				)
 			}
 
-			body, uploaded, err := testUploader(reg).UploadAndAttach(context.Background(), tt.body, assets)
+			body, result, err := testUploader(reg).UploadAndAttach(context.Background(), tt.body, assets)
 
 			if tt.wantErr == "" {
 				require.NoError(t, err)
@@ -210,7 +222,10 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 				require.EqualError(t, err, tt.wantErr)
 			}
 			assert.Equal(t, tt.wantBody, body)
-			assert.Equal(t, tt.wantUploaded, uploaded)
+			assert.Equal(t, tt.wantUploaded, result.Uploaded)
+			assert.Equal(t, tt.wantAppend, result.AppendOperations)
+			assert.Equal(t, tt.wantReplace, result.ReplaceOperations)
+			assert.Equal(t, result.Uploaded, result.AppendOperations+result.ReplaceOperations)
 
 			// The bytes go up in the order they were attached, so a failure
 			// stops the ones after it rather than reordering them.
@@ -239,11 +254,11 @@ func TestUploaderUploadAndAttachUploadsOnceForRepeatedReferences(t *testing.T) {
 		httpmock.StatusStringResponse(201, `{"url":"https://example.com/1"}`),
 	)
 
-	body, uploaded, err := testUploader(reg).UploadAndAttach(context.Background(),
+	body, result, err := testUploader(reg).UploadAndAttach(context.Background(),
 		"![one](./shot.png)\n\ntext\n\n![two](./shot.png)", assets)
 
 	require.NoError(t, err)
-	assert.Equal(t, 1, uploaded)
+	assert.Equal(t, UploadResult{Uploaded: 1, ReplaceOperations: 1}, result)
 	assert.Equal(t, "![one](https://example.com/1)\n\ntext\n\n![two](https://example.com/1)", body)
 	assert.Len(t, reg.Requests, 1)
 }
@@ -252,10 +267,10 @@ func TestUploaderUploadAndAttachNoAssets(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
 
-	body, uploaded, err := testUploader(reg).UploadAndAttach(context.Background(), "unchanged\n", nil)
+	body, result, err := testUploader(reg).UploadAndAttach(context.Background(), "unchanged\n", nil)
 
 	require.NoError(t, err)
-	assert.Zero(t, uploaded)
+	assert.Equal(t, UploadResult{}, result)
 	assert.Equal(t, "unchanged\n", body)
 	assert.Empty(t, reg.Requests)
 }
@@ -299,12 +314,12 @@ func TestUploaderUploadAndAttachDoesNotLeakTheAssetURLIntoAnError(t *testing.T) 
 		httpmock.StatusStringResponse(404, `{"message":"Not Found"}`),
 	)
 
-	body, uploaded, err := testUploader(reg).UploadAndAttach(context.Background(), "", assets)
+	body, result, err := testUploader(reg).UploadAndAttach(context.Background(), "", assets)
 
 	require.Error(t, err)
 	// One asset is up and cannot be deleted, so the caller must write this
 	// body even though the call failed.
-	assert.Equal(t, 1, uploaded)
+	assert.Equal(t, UploadResult{Uploaded: 1, AppendOperations: 1}, result)
 	assert.NotContains(t, err.Error(), "secret-asset")
 	assert.Contains(t, body, "secret-asset")
 }
@@ -324,9 +339,9 @@ func TestUploaderUploadAndAttachAbsolutePathReference(t *testing.T) {
 		httpmock.StatusStringResponse(201, `{"url":"https://example.com/1"}`),
 	)
 
-	body, uploaded, err := testUploader(reg).UploadAndAttach(context.Background(), "![shot](./shot.png)", assets)
+	body, result, err := testUploader(reg).UploadAndAttach(context.Background(), "![shot](./shot.png)", assets)
 
 	require.NoError(t, err)
-	assert.Equal(t, 1, uploaded)
+	assert.Equal(t, UploadResult{Uploaded: 1, ReplaceOperations: 1}, result)
 	assert.Equal(t, "![shot](https://example.com/1)", body)
 }

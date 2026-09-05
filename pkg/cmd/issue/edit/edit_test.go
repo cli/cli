@@ -410,6 +410,12 @@ func TestNewCmdEdit(t *testing.T) {
 			wantAssetPaths: []string{tmpImage},
 		},
 		{
+			name:        "attach telemetry survives argument validation",
+			input:       fmt.Sprintf("--attach '%s'", tmpImage),
+			wantsErr:    true,
+			wantsErrMsg: "requires at least 1 arg(s), only received 0",
+		},
+		{
 			name:  "attach flag beside another edit flag",
 			input: fmt.Sprintf("23 --add-label bug --attach '%s'", tmpImage),
 			output: EditOptions{
@@ -470,6 +476,7 @@ func TestNewCmdEdit(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			recorder.Flush()
 			if cmd.Flags().Changed("attach") {
 				values, flagErr := cmd.Flags().GetStringArray("attach")
 				require.NoError(t, flagErr)
@@ -477,7 +484,11 @@ func TestNewCmdEdit(t *testing.T) {
 				require.Len(t, recorder.Events, 1)
 				assert.Equal(t, "attachment_invocation", recorder.Events[0].Type)
 				assert.Equal(t, cmd.CommandPath(), recorder.Events[0].Dimensions["command"])
-				assert.Equal(t, int64(len(values)), recorder.Events[0].Measures["attach_count"])
+				assert.Equal(t, ghtelemetry.Measures{
+					"attach_count":      int64(len(values)),
+					"append_ops_count":  0,
+					"replace_ops_count": 0,
+				}, recorder.Events[0].Measures)
 			} else {
 				assert.Empty(t, recorder.Events)
 				assert.Zero(t, recorder.LastSampleRate)
@@ -547,6 +558,7 @@ func Test_editRun(t *testing.T) {
 		// Used instead of wantErrMsg when the subject is which errors survive,
 		// leaving their wording to the layer that formats them.
 		wantErrContains []string
+		wantOperations  *attachments.UploadResult
 	}{
 		{
 			name: "non-interactive",
@@ -1379,6 +1391,10 @@ func Test_editRun(t *testing.T) {
 				mockIssueUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+			wantOperations: &attachments.UploadResult{
+				Uploaded:         1,
+				AppendOperations: 1,
+			},
 		},
 		{
 			name: "a body flag replaces the body the attachment is then appended to",
@@ -1533,6 +1549,10 @@ func Test_editRun(t *testing.T) {
 			stdout:          "https://github.com/OWNER/REPO/issue/123\n",
 			wantErr:         true,
 			wantErrContains: []string{"./second.png"},
+			wantOperations: &attachments.UploadResult{
+				Uploaded:         1,
+				AppendOperations: 1,
+			},
 		},
 		{
 			name: "a sole failed upload does not write the body",
@@ -1746,6 +1766,10 @@ func Test_editRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
+			attachmentRecorder := &telemetry.CommandRecorderSpy{}
+			if tt.wantOperations != nil {
+				tt.input.AttachTelemetry = attachments.NewTestInvocationTelemetry(t, attachmentRecorder, len(tt.attach))
+			}
 
 			hostTokens := tt.hostTokens
 			if hostTokens == nil {
@@ -1756,6 +1780,10 @@ func Test_editRun(t *testing.T) {
 			}
 
 			err := editRun(tt.input)
+			if tt.wantOperations != nil {
+				attachmentRecorder.Flush()
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
+			}
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.wantErrMsg != "" {

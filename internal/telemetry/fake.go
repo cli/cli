@@ -20,6 +20,7 @@ func (r *EventRecorderSpy) Flush() {}
 type CommandRecorderSpy struct {
 	Events         []ghtelemetry.Event
 	LastSampleRate int
+	deferredEvents []func() ghtelemetry.Event
 }
 
 func (r *CommandRecorderSpy) Record(event ghtelemetry.Event) {
@@ -28,8 +29,17 @@ func (r *CommandRecorderSpy) Record(event ghtelemetry.Event) {
 
 func (r *CommandRecorderSpy) Disable() {}
 
+func (r *CommandRecorderSpy) RecordDeferred(event func() ghtelemetry.Event) {
+	r.deferredEvents = append(r.deferredEvents, event)
+}
+
 func (r *CommandRecorderSpy) SetSampleRate(rate int) {
 	r.LastSampleRate = rate
 }
 
-func (r *CommandRecorderSpy) Flush() {}
+func (r *CommandRecorderSpy) Flush() {
+	for _, event := range r.deferredEvents {
+		r.Events = append(r.Events, event())
+	}
+	r.deferredEvents = nil
+}

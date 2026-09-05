@@ -247,8 +247,9 @@ func NewService(flusher func(SendTelemetryPayload), opts ...telemetryServiceOpti
 }
 
 type recordedEvent struct {
-	event      ghtelemetry.Event
-	recordedAt time.Time
+	event         ghtelemetry.Event
+	deferredEvent func() ghtelemetry.Event
+	recordedAt    time.Time
 }
 
 type service struct {
@@ -277,6 +278,13 @@ func (s *service) Record(event ghtelemetry.Event) {
 	defer s.mu.Unlock()
 
 	s.events = append(s.events, recordedEvent{event: event, recordedAt: time.Now()})
+}
+
+func (s *service) RecordDeferred(event func() ghtelemetry.Event) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.events = append(s.events, recordedEvent{deferredEvent: event, recordedAt: time.Now()})
 }
 
 func (s *service) SetSampleRate(rate int) {
@@ -315,16 +323,21 @@ func (s *service) Flush() {
 	}
 
 	for i, recorded := range events {
+		event := recorded.event
+		if recorded.deferredEvent != nil {
+			event = recorded.deferredEvent()
+		}
+
 		dimensions := map[string]string{
 			"timestamp": recorded.recordedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
 		}
 		maps.Copy(dimensions, s.commonDimensions)
-		maps.Copy(dimensions, recorded.event.Dimensions)
+		maps.Copy(dimensions, event.Dimensions)
 
 		payload.Events[i] = PayloadEvent{
-			Type:       recorded.event.Type,
+			Type:       event.Type,
 			Dimensions: dimensions,
-			Measures:   recorded.event.Measures,
+			Measures:   event.Measures,
 		}
 	}
 
@@ -417,6 +430,8 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 type NoOpService struct{}
 
 func (s *NoOpService) Record(event ghtelemetry.Event) {}
+
+func (s *NoOpService) RecordDeferred(event func() ghtelemetry.Event) {}
 
 func (s *NoOpService) Disable() {}
 
