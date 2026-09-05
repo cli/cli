@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cli/safeexec"
+	"github.com/google/shlex"
 )
 
 type printer interface {
@@ -77,9 +78,14 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string, 
 		cmdArgs = append(cmdArgs, command...)
 	}
 
-	exe, err := safeexec.LookPath("ssh")
+	exe, args, err := getSSHCommand()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to execute ssh: %w", err)
+	}
+
+	// If we have custom args from the environment variable, insert them at the beginning
+	if len(args) > 0 {
+		cmdArgs = append(args, cmdArgs...)
 	}
 
 	cmd := exec.CommandContext(ctx, exe, cmdArgs...)
@@ -127,9 +133,14 @@ func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 		cmdArgs = append(cmdArgs, arg)
 	}
 
-	exe, err := safeexec.LookPath("scp")
+	exe, args, err := getSCPCommand()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute scp: %w", err)
+	}
+
+	// If we have custom args from the environment variable, insert them at the beginning
+	if len(args) > 0 {
+		cmdArgs = append(args, cmdArgs...)
 	}
 
 	// Beware: invalid syntax causes scp to exit 1 with
@@ -171,4 +182,53 @@ func parseArgs(args []string, unaryFlags string) (cmdArgs, command []string, err
 	}
 
 	return cmdArgs, command, nil
+}
+
+// getCommandFromEnv returns the path to a command and any additional arguments based on an environment variable.
+// If the environment variable is set, its value is parsed to extract both the command path and any additional arguments.
+// Otherwise, it looks for the default command in the PATH.
+func getCommandFromEnv(envVar, defaultCmd string) (string, []string, error) {
+	if cmdLine := os.Getenv(envVar); cmdLine != "" {
+		// Parse the command line respecting quotes using shlex
+		args, err := shlex.Split(cmdLine)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid %s: %w", envVar, err)
+		}
+		if len(args) == 0 {
+			return "", nil, fmt.Errorf("empty %s", envVar)
+		}
+
+		// If the command is a path, use it directly
+		// Otherwise, use safeexec.LookPath to find the executable
+		cmd := args[0]
+		if !strings.Contains(cmd, "/") {
+			cmd, err = safeexec.LookPath(cmd)
+			if err != nil {
+				return "", nil, fmt.Errorf("failed to find command '%s' specified in %s: %w", args[0], envVar, err)
+			}
+		}
+
+		return cmd, args[1:], nil
+	}
+
+	cmd, err := safeexec.LookPath(defaultCmd)
+	return cmd, nil, err
+}
+
+// getSSHCommand returns the path to the SSH command to use and any additional arguments.
+// If the GH_CS_SSH_COMMAND environment variable is set, its value is parsed to extract
+// both the command path and any additional arguments.
+// Otherwise, it looks for the "ssh" command in the PATH.
+// Similar to GIT_SSH_COMMAND, this supports specifying both the command path and additional arguments.
+func getSSHCommand() (string, []string, error) {
+	return getCommandFromEnv("GH_CS_SSH_COMMAND", "ssh")
+}
+
+// getSCPCommand returns the path to the SCP command to use and any additional arguments.
+// If the GH_CS_SCP_COMMAND environment variable is set, its value is parsed to extract
+// both the command path and any additional arguments.
+// Otherwise, it looks for the "scp" command in the PATH.
+// Similar to GIT_SSH_COMMAND, this supports specifying both the command path and additional arguments.
+func getSCPCommand() (string, []string, error) {
+	return getCommandFromEnv("GH_CS_SCP_COMMAND", "scp")
 }
