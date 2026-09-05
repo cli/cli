@@ -1379,6 +1379,104 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
+			name: "fill falls back to a base branch on another remote",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.Autofill = true
+				opts.HeadBranch = "feature"
+				opts.BaseBranch = "some-branch"
+				opts.Remotes = func() (context.Remotes, error) {
+					return context.Remotes{
+						{
+							Remote: &git.Remote{Name: "upstream", Resolved: "base"},
+							Repo:   ghrepo.New("OWNER", "REPO"),
+						},
+						{
+							Remote: &git.Remote{Name: "origin"},
+							Repo:   ghrepo.New("MyOrg", "REPO"),
+						},
+					}, nil
+				}
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(
+					"git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry upstream/some-branch...feature",
+					1,
+					"fatal: ambiguous argument 'upstream/some-branch...feature': unknown revision",
+				)
+				cs.Register(
+					"git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/some-branch...feature",
+					0,
+					"3a9b48085046d156c5acce8f3b3a0532cd706a4a\u0000first commit of pr\u0000first commit description\u0000\n",
+				)
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]interface{}) {
+							assert.Equal(t, "some-branch", input["baseRefName"])
+							assert.Equal(t, "first commit of pr", input["title"])
+						}),
+				)
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into some-branch in OWNER/REPO\n\n",
+		},
+		{
+			name: "web fill resolves a qualified base branch to its repository",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.Autofill = true
+				opts.WebMode = true
+				opts.HeadBranch = "MyOrg:wiggles/xuzt"
+				opts.BaseBranch = "MyOrg:some-branch"
+				opts.Remotes = func() (context.Remotes, error) {
+					return context.Remotes{
+						{
+							Remote: &git.Remote{Name: "upstream", Resolved: "base"},
+							Repo:   ghrepo.New("OWNER", "REPO"),
+						},
+						{
+							Remote: &git.Remote{Name: "origin"},
+							Repo:   ghrepo.New("MyOrg", "FORK"),
+						},
+					}, nil
+				}
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(
+					"git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/some-branch...wiggles/xuzt",
+					0,
+					"3a9b48085046d156c5acce8f3b3a0532cd706a4a\u0000first commit of pr\u0000first commit description\u0000\n",
+				)
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQLQuery(`
+						{ "data": { "repository": {
+							"id": "MYORG_REPOID",
+							"name": "FORK",
+							"owner": {"login": "MyOrg"},
+							"defaultBranchRef": {"name": "master"},
+							"viewerPermission": "WRITE"
+						} } }`,
+						func(_ string, variables map[string]interface{}) {
+							assert.Equal(t, "MyOrg", variables["owner"])
+							assert.Equal(t, "FORK", variables["name"])
+						}),
+				)
+			},
+			expectedErrOut: "Opening https://github.com/MyOrg/FORK/compare/some-branch...MyOrg:wiggles/xuzt in your browser.\n",
+			expectedBrowse: "https://github.com/MyOrg/FORK/compare/some-branch...MyOrg:wiggles%2Fxuzt?body=first+commit+description&expand=1&title=first+commit+of+pr",
+		},
+		{
 			name: "fill-first flag provided",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
