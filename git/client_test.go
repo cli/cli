@@ -43,6 +43,7 @@ func TestClientCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given a client with explicit executable, streams, and repository context
 			in, out, errOut := &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{}
 			client := Client{
 				Stdin:   in,
@@ -51,8 +52,12 @@ func TestClientCommand(t *testing.T) {
 				RepoDir: tt.repoDir,
 				GitPath: tt.gitPath,
 			}
-			cmd, err := client.Command(context.Background(), "ref-log")
-			assert.NoError(t, err)
+
+			// When a Git command is created
+			cmd, err := client.Command(t.Context(), "ref-log")
+
+			// Then the executable, repository arguments, and streams are wired
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantExe, cmd.Path)
 			assert.Equal(t, tt.wantArgs, cmd.Args)
 			assert.Equal(t, in, cmd.Stdin)
@@ -116,82 +121,49 @@ func TestClientAuthenticatedCommandRejectsEmptyCredentialPattern(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
-func TestClientRemotes(t *testing.T) {
-	IsolateConfig(t)
-	tempDir := t.TempDir()
-	initRepo(t, tempDir)
-	gitDir := filepath.Join(tempDir, ".git")
-	remoteFile := filepath.Join(gitDir, "config")
-	remotes := `
-[remote "origin"]
-	url = git@example.com:monalisa/origin.git
-[remote "test"]
-	url = git://github.com/hubot/test.git
-	gh-resolved = other
-[remote "upstream"]
-	url = https://github.com/monalisa/upstream.git
-	gh-resolved = base
-[remote "github"]
-	url = git@github.com:hubot/github.git
-`
-	f, err := os.OpenFile(remoteFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
-	assert.NoError(t, err)
-	_, err = f.Write([]byte(remotes))
-	assert.NoError(t, err)
-	err = f.Close()
-	assert.NoError(t, err)
-	client := Client{
-		RepoDir: tempDir,
-	}
-	rs, err := client.Remotes(context.Background())
-	assert.NoError(t, err)
-	assert.Equal(t, 4, len(rs))
-	assert.Equal(t, "upstream", rs[0].Name)
-	assert.Equal(t, "base", rs[0].Resolved)
-	assert.Equal(t, "github", rs[1].Name)
-	assert.Equal(t, "", rs[1].Resolved)
-	assert.Equal(t, "origin", rs[2].Name)
-	assert.Equal(t, "", rs[2].Resolved)
-	assert.Equal(t, "test", rs[3].Name)
-	assert.Equal(t, "other", rs[3].Resolved)
+func TestClientRemotesReturnsSortedRemotesWithResolutions(t *testing.T) {
+	// Given remotes with resolution metadata
+	repo := newTestRepo(t)
+	repo.run(t, "remote", "add", "origin", "git@example.com:monalisa/origin.git")
+	repo.run(t, "remote", "add", "test", "git://github.com/hubot/test.git")
+	repo.run(t, "remote", "add", "upstream", "https://github.com/monalisa/upstream.git")
+	repo.run(t, "remote", "add", "github", "git@github.com:hubot/github.git")
+	repo.run(t, "config", "remote.test.gh-resolved", "other")
+	repo.run(t, "config", "remote.upstream.gh-resolved", "base")
+
+	// When the remotes are listed
+	remotes, err := repo.client.Remotes(t.Context())
+
+	// Then preferred names are sorted first and resolutions are associated by name
+	require.NoError(t, err)
+	require.Len(t, remotes, 4)
+	assert.Equal(t, "upstream", remotes[0].Name)
+	assert.Equal(t, "base", remotes[0].Resolved)
+	assert.Equal(t, "github", remotes[1].Name)
+	assert.Empty(t, remotes[1].Resolved)
+	assert.Equal(t, "origin", remotes[2].Name)
+	assert.Empty(t, remotes[2].Resolved)
+	assert.Equal(t, "test", remotes[3].Name)
+	assert.Equal(t, "other", remotes[3].Resolved)
 }
 
-func TestClientRemotes_no_resolved_remote(t *testing.T) {
-	IsolateConfig(t)
-	tempDir := t.TempDir()
-	initRepo(t, tempDir)
-	gitDir := filepath.Join(tempDir, ".git")
-	remoteFile := filepath.Join(gitDir, "config")
-	remotes := `
-[remote "origin"]
-	url = git@example.com:monalisa/origin.git
-[remote "test"]
-	url = git://github.com/hubot/test.git
-[remote "upstream"]
-	url = https://github.com/monalisa/upstream.git
-[remote "github"]
-	url = git@github.com:hubot/github.git
-`
-	f, err := os.OpenFile(remoteFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
-	assert.NoError(t, err)
-	_, err = f.Write([]byte(remotes))
-	assert.NoError(t, err)
-	err = f.Close()
-	assert.NoError(t, err)
-	client := Client{
-		RepoDir: tempDir,
-	}
-	rs, err := client.Remotes(context.Background())
-	assert.NoError(t, err)
-	assert.Equal(t, 4, len(rs))
-	assert.Equal(t, "upstream", rs[0].Name)
-	assert.Equal(t, "github", rs[1].Name)
-	assert.Equal(t, "origin", rs[2].Name)
-	assert.Equal(t, "", rs[2].Resolved)
-	assert.Equal(t, "test", rs[3].Name)
+func TestClientRemotesToleratesMissingResolutionConfig(t *testing.T) {
+	// Given a remote without resolution metadata
+	repo := newTestRepo(t)
+	repo.run(t, "remote", "add", "origin", "git@example.com:monalisa/origin.git")
+
+	// When the remotes are listed
+	remotes, err := repo.client.Remotes(t.Context())
+
+	// Then Git's no-matching-config status is treated as an empty resolution
+	require.NoError(t, err)
+	require.Len(t, remotes, 1)
+	assert.Equal(t, "origin", remotes[0].Name)
+	assert.Empty(t, remotes[0].Resolved)
 }
 
 func TestParseRemotes(t *testing.T) {
+	// Given remote output with fetch-only, push-only, paired, and mixed URL forms
 	remoteList := []string{
 		"mona\tgit@github.com:monalisa/myfork.git (fetch)",
 		"origin\thttps://github.com/monalisa/octo-cat.git (fetch)",
@@ -203,28 +175,30 @@ func TestParseRemotes(t *testing.T) {
 		"koke\tgit://github.com/koke/grit.git (push)",
 	}
 
-	r := parseRemotes(remoteList)
-	assert.Equal(t, 5, len(r))
+	// When the output is parsed
+	remotes := parseRemotes(remoteList)
 
-	assert.Equal(t, "mona", r[0].Name)
-	assert.Equal(t, "ssh://git@github.com/monalisa/myfork.git", r[0].FetchURL.String())
-	assert.Nil(t, r[0].PushURL)
+	// Then each URL is associated with its named remote and direction
+	require.Len(t, remotes, 5)
+	assert.Equal(t, "mona", remotes[0].Name)
+	assert.Equal(t, "ssh://git@github.com/monalisa/myfork.git", remotes[0].FetchURL.String())
+	assert.Nil(t, remotes[0].PushURL)
 
-	assert.Equal(t, "origin", r[1].Name)
-	assert.Equal(t, "/monalisa/octo-cat.git", r[1].FetchURL.Path)
-	assert.Equal(t, "/monalisa/octo-cat-push.git", r[1].PushURL.Path)
+	assert.Equal(t, "origin", remotes[1].Name)
+	assert.Equal(t, "/monalisa/octo-cat.git", remotes[1].FetchURL.Path)
+	assert.Equal(t, "/monalisa/octo-cat-push.git", remotes[1].PushURL.Path)
 
-	assert.Equal(t, "upstream", r[2].Name)
-	assert.Equal(t, "example.com", r[2].FetchURL.Host)
-	assert.Equal(t, "github.com", r[2].PushURL.Host)
+	assert.Equal(t, "upstream", remotes[2].Name)
+	assert.Equal(t, "example.com", remotes[2].FetchURL.Host)
+	assert.Equal(t, "github.com", remotes[2].PushURL.Host)
 
-	assert.Equal(t, "zardoz", r[3].Name)
-	assert.Nil(t, r[3].FetchURL)
-	assert.Equal(t, "https://example.com/zed.git", r[3].PushURL.String())
+	assert.Equal(t, "zardoz", remotes[3].Name)
+	assert.Nil(t, remotes[3].FetchURL)
+	assert.Equal(t, "https://example.com/zed.git", remotes[3].PushURL.String())
 
-	assert.Equal(t, "koke", r[4].Name)
-	assert.Equal(t, "/koke/grit.git", r[4].FetchURL.Path)
-	assert.Equal(t, "/koke/grit.git", r[4].PushURL.Path)
+	assert.Equal(t, "koke", remotes[4].Name)
+	assert.Equal(t, "/koke/grit.git", remotes[4].FetchURL.Path)
+	assert.Equal(t, "/koke/grit.git", remotes[4].PushURL.Path)
 }
 
 func TestClientUpdateRemoteURLUpdatesConfiguredRemote(t *testing.T) {
@@ -484,23 +458,29 @@ func TestClientCommitsReportsInvalidRef(t *testing.T) {
 }
 
 func TestClientLastCommit(t *testing.T) {
+	// Given a repository fixture with two commits
 	IsolateConfig(t)
-	client := Client{
-		RepoDir: "./fixtures/simple.git",
-	}
-	c, err := client.LastCommit(context.Background())
-	assert.NoError(t, err)
-	assert.Equal(t, "6f1a2405cace1633d89a79c74c65f22fe78f9659", c.Sha)
-	assert.Equal(t, "Second commit", c.Title)
+	client := Client{RepoDir: "./fixtures/simple.git"}
+
+	// When its last commit is requested
+	commit, err := client.LastCommit(t.Context())
+
+	// Then the commit identity and title are returned
+	require.NoError(t, err)
+	assert.Equal(t, "6f1a2405cace1633d89a79c74c65f22fe78f9659", commit.Sha)
+	assert.Equal(t, "Second commit", commit.Title)
 }
 
 func TestClientCommitBody(t *testing.T) {
+	// Given a repository fixture with a commit body
 	IsolateConfig(t)
-	client := Client{
-		RepoDir: "./fixtures/simple.git",
-	}
-	body, err := client.CommitBody(context.Background(), "6f1a2405cace1633d89a79c74c65f22fe78f9659")
-	assert.NoError(t, err)
+	client := Client{RepoDir: "./fixtures/simple.git"}
+
+	// When the body is requested
+	body, err := client.CommitBody(t.Context(), "6f1a2405cace1633d89a79c74c65f22fe78f9659")
+
+	// Then the complete body is returned
+	require.NoError(t, err)
 	assert.Equal(t, "I'm starting to get the hang of things\n", body)
 }
 
@@ -553,7 +533,7 @@ func TestClientReadBranchConfigPropagatesGitError(t *testing.T) {
 	assert.Empty(t, branchConfig)
 }
 
-func Test_parseBranchConfig(t *testing.T) {
+func TestParseBranchConfig(t *testing.T) {
 	tests := []struct {
 		name             string
 		configLines      []string
@@ -637,22 +617,19 @@ func Test_parseBranchConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			branchConfig := parseBranchConfig(tt.configLines)
-			assert.Equalf(t, tt.wantBranchConfig.RemoteName, branchConfig.RemoteName, "unexpected RemoteName")
-			assert.Equalf(t, tt.wantBranchConfig.MergeRef, branchConfig.MergeRef, "unexpected MergeRef")
-			assert.Equalf(t, tt.wantBranchConfig.MergeBase, branchConfig.MergeBase, "unexpected MergeBase")
-			assert.Equalf(t, tt.wantBranchConfig.PushRemoteName, branchConfig.PushRemoteName, "unexpected PushRemoteName")
-			if tt.wantBranchConfig.RemoteURL != nil {
-				assert.Equalf(t, tt.wantBranchConfig.RemoteURL.String(), branchConfig.RemoteURL.String(), "unexpected RemoteURL")
-			}
-			if tt.wantBranchConfig.PushRemoteURL != nil {
-				assert.Equalf(t, tt.wantBranchConfig.PushRemoteURL.String(), branchConfig.PushRemoteURL.String(), "unexpected PushRemoteURL")
-			}
+			// Given branch configuration output
+			configLines := tt.configLines
+
+			// When the output is parsed
+			branchConfig := parseBranchConfig(configLines)
+
+			// Then each supported key is mapped to its typed field
+			assert.Equal(t, tt.wantBranchConfig, branchConfig)
 		})
 	}
 }
 
-func Test_parseRemoteURLOrName(t *testing.T) {
+func TestParseRemoteURLOrName(t *testing.T) {
 	tests := []struct {
 		name           string
 		value          string
@@ -691,7 +668,13 @@ func Test_parseRemoteURLOrName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			remoteURL, remoteName := parseRemoteURLOrName(tt.value)
+			// Given a configured branch remote value
+			value := tt.value
+
+			// When it is classified
+			remoteURL, remoteName := parseRemoteURLOrName(value)
+
+			// Then URLs and names are returned through their distinct fields
 			assert.Equal(t, tt.wantRemoteURL, remoteURL)
 			assert.Equal(t, tt.wantRemoteName, remoteName)
 		})
@@ -827,95 +810,73 @@ func TestClientPushRevisionReportsMalformedSymbolicRef(t *testing.T) {
 	assert.Empty(t, trackingRef)
 }
 
-func TestRemoteTrackingRef(t *testing.T) {
-	t.Run("parsing", func(t *testing.T) {
-		t.Parallel()
+func TestParseRemoteTrackingRef(t *testing.T) {
+	tests := []struct {
+		name string
+		ref  string
+		want RemoteTrackingRef
+	}{
+		{
+			name: "branch without slash",
+			ref:  "refs/remotes/origin/branchName",
+			want: RemoteTrackingRef{Remote: "origin", Branch: "branchName"},
+		},
+		{
+			name: "branch with slash",
+			ref:  "refs/remotes/origin/branch/name",
+			want: RemoteTrackingRef{Remote: "origin", Branch: "branch/name"},
+		},
+	}
 
-		tests := []struct {
-			name                  string
-			remoteTrackingRef     string
-			wantRemoteTrackingRef RemoteTrackingRef
-			wantError             error
-		}{
-			{
-				name:              "valid remote tracking ref without slash in branch name",
-				remoteTrackingRef: "refs/remotes/origin/branchName",
-				wantRemoteTrackingRef: RemoteTrackingRef{
-					Remote: "origin",
-					Branch: "branchName",
-				},
-			},
-			{
-				name:              "valid remote tracking ref with slash in branch name",
-				remoteTrackingRef: "refs/remotes/origin/branch/name",
-				wantRemoteTrackingRef: RemoteTrackingRef{
-					Remote: "origin",
-					Branch: "branch/name",
-				},
-			},
-			// TODO: Uncomment when we support slashes in remote names
-			// {
-			// 	name: "valid remote tracking ref with slash in remote name",
-			// 	remoteTrackingRef: "refs/remotes/my/origin/branchName",
-			// 	wantRemoteTrackingRef: RemoteTrackingRef{
-			// 		Remote: "my/origin",
-			// 		Branch: "branchName",
-			// 	},
-			// },
-			// {
-			// 	name: 			"valid remote tracking ref with slash in remote name and branch name",
-			// 	remoteTrackingRef: "refs/remotes/my/origin/branch/name",
-			// 	wantRemoteTrackingRef: RemoteTrackingRef{
-			// 		Remote: "my/origin",
-			// 		Branch: "branch/name",
-			// 	},
-			// },
-			{
-				name:                  "incorrect parts",
-				remoteTrackingRef:     "refs/remotes/origin",
-				wantRemoteTrackingRef: RemoteTrackingRef{},
-				wantError:             fmt.Errorf("remote tracking branch must have format refs/remotes/<remote>/<branch> but was: refs/remotes/origin"),
-			},
-			{
-				name:                  "incorrect prefix type",
-				remoteTrackingRef:     "invalid/remotes/origin/branchName",
-				wantRemoteTrackingRef: RemoteTrackingRef{},
-				wantError:             fmt.Errorf("remote tracking branch must have format refs/remotes/<remote>/<branch> but was: invalid/remotes/origin/branchName"),
-			},
-			{
-				name:                  "incorrect ref type",
-				remoteTrackingRef:     "refs/invalid/origin/branchName",
-				wantRemoteTrackingRef: RemoteTrackingRef{},
-				wantError:             fmt.Errorf("remote tracking branch must have format refs/remotes/<remote>/<branch> but was: refs/invalid/origin/branchName"),
-			},
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given a qualified remote-tracking ref
+			ref := tt.ref
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			// When it is parsed
+			trackingRef, err := ParseRemoteTrackingRef(ref)
 
-				trackingRef, err := ParseRemoteTrackingRef(tt.remoteTrackingRef)
-				if tt.wantError != nil {
-					require.Equal(t, tt.wantError, err)
-					return
-				}
+			// Then the remote and complete branch name are returned
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, trackingRef)
+		})
+	}
+}
 
-				require.NoError(t, err)
-				assert.Equal(t, tt.wantRemoteTrackingRef, trackingRef)
-			})
-		}
-	})
+func TestParseRemoteTrackingRefReportsMalformedInput(t *testing.T) {
+	tests := []struct {
+		name string
+		ref  string
+	}{
+		{name: "missing branch", ref: "refs/remotes/origin"},
+		{name: "incorrect refs prefix", ref: "invalid/remotes/origin/branchName"},
+		{name: "incorrect ref type", ref: "refs/invalid/origin/branchName"},
+	}
 
-	t.Run("stringifying", func(t *testing.T) {
-		t.Parallel()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given a string outside the remote-tracking ref grammar
+			ref := tt.ref
 
-		remoteTrackingRef := RemoteTrackingRef{
-			Remote: "origin",
-			Branch: "branchName",
-		}
+			// When it is parsed
+			trackingRef, err := ParseRemoteTrackingRef(ref)
 
-		require.Equal(t, "refs/remotes/origin/branchName", remoteTrackingRef.String())
-	})
+			// Then the invalid value is included in the format diagnostic
+			require.EqualError(t, err, "remote tracking branch must have format refs/remotes/<remote>/<branch> but was: "+ref)
+			assert.Empty(t, trackingRef)
+		})
+	}
+}
+
+func TestRemoteTrackingRefString(t *testing.T) {
+	// Given a remote and branch name
+	trackingRef := RemoteTrackingRef{Remote: "origin", Branch: "branchName"}
+
+	// When the tracking ref is formatted
+	ref := trackingRef.String()
+
+	// Then a qualified remote-tracking ref is returned
+	assert.Equal(t, "refs/remotes/origin/branchName", ref)
 }
 
 func TestClientDeleteLocalTagRemovesTag(t *testing.T) {
@@ -1508,9 +1469,15 @@ func TestParseCloneArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args, dir := parseCloneArgs(tt.args)
+			// Given optional clone modifiers and a possible target directory
+			extraArgs := tt.args
+
+			// When clone arguments are separated from the target
+			args, dir := parseCloneArgs(extraArgs)
 			got := wanted{args: args, dir: dir}
-			assert.Equal(t, got, tt.want)
+
+			// Then modifiers stay ordered and a leading target is returned separately
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -1544,22 +1511,6 @@ func TestClientAddRemoteTracksSpecificBranches(t *testing.T) {
 	assert.Equal(t, "test", remote.Name)
 	assert.Equal(t, remoteURL, repo.run(t, "remote", "get-url", "test"))
 	assert.Equal(t, "+refs/heads/trunk:refs/remotes/test/trunk\n+refs/heads/dev:refs/remotes/test/dev", repo.run(t, "config", "--get-all", "remote.test.fetch"))
-}
-
-func initRepo(t *testing.T, dir string) {
-	errBuf := &bytes.Buffer{}
-	inBuf := &bytes.Buffer{}
-	outBuf := &bytes.Buffer{}
-	client := Client{
-		RepoDir: dir,
-		Stderr:  errBuf,
-		Stdin:   inBuf,
-		Stdout:  outBuf,
-	}
-	cmd, err := client.Command(context.Background(), []string{"init", "--quiet"}...)
-	assert.NoError(t, err)
-	_, err = cmd.Output()
-	assert.NoError(t, err)
 }
 
 type testRepo struct {
@@ -1716,97 +1667,78 @@ func TestHelperProcess(t *testing.T) {
 }
 
 func TestCredentialPatternFromGitURL(t *testing.T) {
-	tests := []struct {
-		name                  string
-		gitURL                string
-		wantErr               bool
-		wantCredentialPattern CredentialPattern
-	}{
-		{
-			name:   "Given a well formed gitURL, it returns the corresponding CredentialPattern",
-			gitURL: "https://github.com/OWNER/REPO.git",
-			wantCredentialPattern: CredentialPattern{
-				pattern:     "https://github.com",
-				allMatching: false,
-			},
-		},
-		{
-			name: "Given a malformed gitURL, it returns an error",
-			// This pattern is copied from the tests in ParseURL
-			// Unexpectedly, a non URL-like string did not error in ParseURL
-			gitURL:  "ssh://git@[/tmp/git-repo",
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			credentialPattern, err := CredentialPatternFromGitURL(tt.gitURL)
-			if tt.wantErr {
-				assert.ErrorContains(t, err, "failed to parse remote URL")
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.wantCredentialPattern, credentialPattern)
-			}
-		})
-	}
+	// Given a well-formed HTTPS Git URL
+	gitURL := "https://github.com/OWNER/REPO.git"
+
+	// When its credential scope is derived
+	credentialPattern, err := CredentialPatternFromGitURL(gitURL)
+
+	// Then credentials are scoped to the URL's HTTPS host
+	require.NoError(t, err)
+	assert.Equal(t, CredentialPattern{pattern: "https://github.com"}, credentialPattern)
+}
+
+func TestCredentialPatternFromGitURLReportsMalformedURL(t *testing.T) {
+	// Given a Git URL with a malformed bracketed host
+	gitURL := "ssh://git@[/tmp/git-repo"
+
+	// When its credential scope is derived
+	credentialPattern, err := CredentialPatternFromGitURL(gitURL)
+
+	// Then the URL parsing failure is reported with context
+	require.ErrorContains(t, err, "failed to parse remote URL")
+	assert.Empty(t, credentialPattern)
 }
 
 func TestCredentialPatternFromHost(t *testing.T) {
+	// Given a Git host
+	host := "github.com"
+
+	// When its credential scope is derived
+	credentialPattern := CredentialPatternFromHost(host)
+
+	// Then credentials are scoped to that host over HTTPS
+	assert.Equal(t, CredentialPattern{pattern: "https://github.com"}, credentialPattern)
+}
+
+func TestParsePushDefault(t *testing.T) {
 	tests := []struct {
-		name                  string
-		host                  string
-		wantCredentialPattern CredentialPattern
+		value string
+		want  PushDefault
 	}{
-		{
-			name: "Given a well formed host, it returns the corresponding CredentialPattern",
-			host: "github.com",
-			wantCredentialPattern: CredentialPattern{
-				pattern:     "https://github.com",
-				allMatching: false,
-			},
-		},
+		{value: "nothing", want: PushDefaultNothing},
+		{value: "current", want: PushDefaultCurrent},
+		{value: "upstream", want: PushDefaultUpstream},
+		{value: "tracking", want: PushDefaultTracking},
+		{value: "simple", want: PushDefaultSimple},
+		{value: "matching", want: PushDefaultMatching},
 	}
+
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			credentialPattern := CredentialPatternFromHost(tt.host)
-			require.Equal(t, tt.wantCredentialPattern, credentialPattern)
+		t.Run(tt.value, func(t *testing.T) {
+			// Given a supported push.default value
+			value := tt.value
+
+			// When it is parsed
+			pushDefault, err := ParsePushDefault(value)
+
+			// Then the matching typed value is returned
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, pushDefault)
 		})
 	}
 }
 
-func TestPushDefault(t *testing.T) {
-	t.Run("it parses valid values correctly", func(t *testing.T) {
-		t.Parallel()
+func TestParsePushDefaultReportsUnknownValue(t *testing.T) {
+	// Given an unsupported push.default value
+	value := "invalid"
 
-		tests := []struct {
-			value               string
-			expectedPushDefault PushDefault
-		}{
-			{"nothing", PushDefaultNothing},
-			{"current", PushDefaultCurrent},
-			{"upstream", PushDefaultUpstream},
-			{"tracking", PushDefaultTracking},
-			{"simple", PushDefaultSimple},
-			{"matching", PushDefaultMatching},
-		}
+	// When it is parsed
+	pushDefault, err := ParsePushDefault(value)
 
-		for _, test := range tests {
-			t.Run(test.value, func(t *testing.T) {
-				t.Parallel()
-
-				pushDefault, err := ParsePushDefault(test.value)
-				require.NoError(t, err)
-				assert.Equal(t, test.expectedPushDefault, pushDefault)
-			})
-		}
-	})
-
-	t.Run("it returns an error for invalid values", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := ParsePushDefault("invalid")
-		require.Error(t, err)
-	})
+	// Then the unknown value is identified
+	require.EqualError(t, err, "unknown push.default value: invalid")
+	assert.Empty(t, pushDefault)
 }
 
 func createCommandContext(t *testing.T, exitStatus int, stdout, stderr string) (*exec.Cmd, commandCtx) {
@@ -1969,8 +1901,27 @@ func TestClientIsIgnoredReportsMissingGitExecutable(t *testing.T) {
 }
 
 func TestShortSHA(t *testing.T) {
-	assert.Equal(t, "abc123de", ShortSHA("abc123def456789"))
-	assert.Equal(t, "short", ShortSHA("short"))
+	tests := []struct {
+		name string
+		sha  string
+		want string
+	}{
+		{name: "long SHA", sha: "abc123def456789", want: "abc123de"},
+		{name: "short value", sha: "short", want: "short"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given a commit identifier
+			sha := tt.sha
+
+			// When it is shortened for display
+			shortSHA := ShortSHA(sha)
+
+			// Then at most the first eight characters are returned
+			assert.Equal(t, tt.want, shortSHA)
+		})
+	}
 }
 
 func TestParseWorktrees(t *testing.T) {
@@ -2060,21 +2011,57 @@ func TestParseWorktrees(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseWorktrees([]byte(tt.out))
-			assert.Equal(t, tt.want, got)
+			// Given porcelain output from git worktree list
+			output := []byte(tt.out)
+
+			// When the worktree records are parsed
+			worktrees := parseWorktrees(output)
+
+			// Then paths, refs, and state flags are preserved
+			assert.Equal(t, tt.want, worktrees)
 		})
 	}
 }
 
-func TestWorktreeForBranch(t *testing.T) {
+func TestWorktreeForBranchReturnsExactMatch(t *testing.T) {
+	// Given worktrees for main and a nested feature branch
 	worktrees := []Worktree{
 		{Path: "/path/to/main", Ref: "refs/heads/main"},
 		{Path: "/path/to/feature", Ref: "refs/heads/feature/one"},
 	}
 
-	assert.Equal(t, &worktrees[1], WorktreeForBranch(worktrees, "feature/one"))
-	assert.Nil(t, WorktreeForBranch(worktrees, "feature"))
-	assert.Nil(t, WorktreeForBranch(worktrees, "missing"))
+	// When the nested feature branch is located
+	worktree := WorktreeForBranch(worktrees, "feature/one")
+
+	// Then its exact worktree is returned
+	assert.Equal(t, &worktrees[1], worktree)
+}
+
+func TestWorktreeForBranchRejectsNonMatchingBranch(t *testing.T) {
+	worktrees := []Worktree{
+		{Path: "/path/to/main", Ref: "refs/heads/main"},
+		{Path: "/path/to/feature", Ref: "refs/heads/feature/one"},
+	}
+	tests := []struct {
+		name   string
+		branch string
+	}{
+		{name: "partial branch name", branch: "feature"},
+		{name: "missing branch", branch: "missing"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given worktrees without the exact requested branch
+			branch := tt.branch
+
+			// When the branch is located
+			worktree := WorktreeForBranch(worktrees, branch)
+
+			// Then no worktree is returned
+			assert.Nil(t, worktree)
+		})
+	}
 }
 
 func TestClientWorktreesListsRepositoryWorktrees(t *testing.T) {
