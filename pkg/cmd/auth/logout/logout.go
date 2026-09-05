@@ -6,26 +6,30 @@ import (
 	"slices"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
 type LogoutOptions struct {
-	IO       *iostreams.IOStreams
-	Config   func() (gh.Config, error)
-	Prompter shared.Prompt
-	Hostname string
-	Username string
+	IO        *iostreams.IOStreams
+	Config    func() (gh.Config, error)
+	GitClient *git.Client
+	Prompter  shared.Prompt
+	Hostname  string
+	Username  string
 }
 
 func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Command {
 	opts := &LogoutOptions{
-		IO:       f.IOStreams,
-		Config:   f.Config,
-		Prompter: f.Prompter,
+		IO:        f.IOStreams,
+		Config:    f.Config,
+		GitClient: f.GitClient,
+		Prompter:  f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -153,15 +157,29 @@ func logoutRun(opts *LogoutOptions) error {
 	// We can ignore the error here because a host must always have an active user
 	preLogoutActiveUser, _ := authCfg.ActiveUser(hostname)
 
+	cs := opts.IO.ColorScheme()
+
 	if err := authCfg.Logout(hostname, username); err != nil {
 		return err
+	}
+
+	// Clear credentials from the git credential helper. During login, if the
+	// user opted to authenticate git, we stored the token via
+	// `git credential approve`. We now call `git credential reject` to remove
+	// it. This is safe even when gh itself is the credential helper, because
+	// gh's erase operation is a no-op.
+	credentialUpdater := &gitcredentials.Updater{GitClient: opts.GitClient}
+	if err := credentialUpdater.Reject(hostname); err != nil {
+		// Log but don't fail the logout if credential rejection fails,
+		// e.g., git may not be installed.
+		fmt.Fprintf(opts.IO.ErrOut, "%s Failed to remove credentials from git credential helper: %v\n",
+			cs.WarningIcon(), err)
 	}
 
 	postLogoutActiveUser, _ := authCfg.ActiveUser(hostname)
 	hasSwitchedToNewUser := preLogoutActiveUser != postLogoutActiveUser &&
 		postLogoutActiveUser != ""
 
-	cs := opts.IO.ColorScheme()
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s account %s\n",
 		cs.SuccessIcon(), hostname, cs.Bold(username))
 
