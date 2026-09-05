@@ -890,12 +890,197 @@ func Test_createRun(t *testing.T) {
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
 		},
 		{
+			// Setting a type requires triage access. Without it the picker is
+			// skipped entirely, so the types are never even fetched.
+			name: "interactive does not prompt for type without triage access",
+			opts: CreateOptions{
+				Interactive: true,
+				Detector:    &fd.EnabledDetectorMock{},
+				Title:       "feature request",
+				Body:        "would be nice to have",
+			},
+			promptStubs: func(_ *testing.T, pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What's next?":
+						return prompter.IndexFor(options, "Submit")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true,
+							"viewerPermission": "READ"
+						} } }`))
+				// A failed types fetch also silently skips the picker, so
+				// asserting on the prompt alone would pass even ungated.
+				// Exclude proves the gate short-circuits before the fetch.
+				r.Exclude(t, httpmock.GraphQL(`query RepositoryIssueTypes\b`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			// Triage is the lowest role that can set a type, so the picker is
+			// still offered to it.
+			name: "interactive prompts for type with triage access",
+			opts: CreateOptions{
+				Interactive: true,
+				Detector:    &fd.EnabledDetectorMock{},
+				Title:       "feature request",
+				Body:        "would be nice to have",
+			},
+			promptStubs: func(_ *testing.T, pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "Issue type":
+						return prompter.IndexFor(options, "Feature")
+					case "What's next?":
+						return prompter.IndexFor(options, "Submit")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true,
+							"viewerPermission": "TRIAGE"
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "issueTypes": { "nodes": [
+							{ "id": "IT_1", "name": "Bug", "description": "", "color": "d73a4a" },
+							{ "id": "IT_2", "name": "Feature", "description": "", "color": "0075ca" }
+						] } } } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "updateIssueIssueType": { "issue": { "id": "ISSUE_ID_123" } } } }`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "IT_2", inputs["issueTypeId"])
+						}))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
 			name: "create with type not found",
 			opts: CreateOptions{
 				Detector:  &fd.EnabledDetectorMock{},
 				Title:     "bug title",
 				Body:      "bug body",
 				IssueType: "Bugz",
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "issueTypes": { "nodes": [
+							{ "id": "IT_1", "name": "Bug", "description": "", "color": "d73a4a" },
+							{ "id": "IT_2", "name": "Feature", "description": "", "color": "0075ca" },
+							{ "id": "IT_3", "name": "Task", "description": "", "color": "e4e669" }
+						] } } } }`))
+				// An unknown type is user error, so it must fail before the
+				// issue exists rather than leave one behind.
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
+			},
+			wantsErr: `type "Bugz" not found; available types: Bug, Feature, Task`,
+		},
+		{
+			// A reference that cannot be resolved is user error too, and is
+			// resolved in the same pre-create step.
+			name: "create with unresolvable parent",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "child issue",
+				Body:     "child body",
+				Parent:   "999",
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`query IssueNodeID\b`),
+					httpmock.StringResponse(`
+						{ "errors": [ { "type": "NOT_FOUND", "message": "Could not resolve to an Issue with the number of 999." } ] }`))
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
+			},
+			wantsErr: `resolving --parent reference "999": GraphQL: Could not resolve to an Issue with the number of 999.`,
+		},
+		{
+			// Refs are resolved in a loop, so a later ref failing after an
+			// earlier one succeeded must still abort before the issue exists.
+			name: "create with unresolvable blocked-by among several",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "blocked issue",
+				Body:      "blocked body",
+				BlockedBy: []string{"200", "999"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					issueNodeIDByNumberMatcher(200),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "BLOCKER_ID_200" } } } }`))
+				r.Register(
+					issueNodeIDByNumberMatcher(999),
+					httpmock.StringResponse(`
+						{ "errors": [ { "type": "NOT_FOUND", "message": "Could not resolve to an Issue with the number of 999." } ] }`))
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
+			},
+			wantsErr: `resolving --blocked-by reference "999": GraphQL: Could not resolve to an Issue with the number of 999.`,
+		},
+		{
+			name: "create with type that cannot be set",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "bug title",
+				Body:      "bug body",
+				IssueType: "Bug",
 			},
 			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
 				r.Register(
@@ -916,12 +1101,22 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
 					httpmock.StringResponse(`
 						{ "data": { "repository": { "issueTypes": { "nodes": [
-							{ "id": "IT_1", "name": "Bug", "description": "", "color": "d73a4a" },
-							{ "id": "IT_2", "name": "Feature", "description": "", "color": "0075ca" },
-							{ "id": "IT_3", "name": "Task", "description": "", "color": "e4e669" }
+							{ "id": "IT_1", "name": "Bug", "description": "", "color": "d73a4a" }
 						] } } } }`))
+				// The issue exists by now; the type cannot be applied because
+				// the user lacks permission on the repository.
+				r.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.StringResponse(`
+						{ "errors": [
+							{
+								"type": "FORBIDDEN",
+								"message": "monalisa does not have the correct permissions to execute `+"`UpdateIssueIssueType`"+`"
+							}
+						] }`))
 			},
-			wantsErr: `type "Bugz" not found; available types: Bug, Feature, Task`,
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n! Issue created, but not all fields could be set: GraphQL: monalisa does not have the correct permissions to execute `UpdateIssueIssueType`\n",
 		},
 		{
 			name: "create with parent",
