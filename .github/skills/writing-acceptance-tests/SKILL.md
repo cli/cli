@@ -11,6 +11,19 @@ creation and cloning without allowing concurrent scripts to interfere.
 Read `acceptance/README.md` and nearby scripts before editing. Test groups are
 discovered from `acceptance/testdata/<group>/`; do not register them manually.
 
+## Declare token capability
+
+Every `.txtar` script must start with exactly one capability declaration:
+
+```txtar
+# requires-user-capability: false
+```
+
+Set the declaration to `true` only when the script requires a user principal,
+such as account SSH/GPG keys, personal-account forks, or user membership APIs.
+Repository and organization operations supported by an installation token
+should use `false`.
+
 ## Choose one repository mode
 
 Every script must contain exactly one declaration:
@@ -73,7 +86,7 @@ Run metadata checks without live credentials:
 
 ```sh
 go test -tags=acceptance \
-  -run '^(TestSelectAcceptanceTestGroups|TestAcceptanceScriptsDeclareFixtureRepository|TestValidateFixtureRepositoryDeclaration|TestFixtureRepositoryManager)$' \
+  -run '^(TestSelectAcceptanceTestGroups|TestTokenHasUserCapability|TestAcceptanceScriptsDeclareUserCapabilityRequirement|TestAcceptanceScriptsDeclareFixtureRepository|TestRequiresUserCapabilityForScriptErrors|TestValidateFixtureRepositoryDeclaration|TestFixtureRepositoryManager)$' \
   ./acceptance
 ```
 

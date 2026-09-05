@@ -124,6 +124,8 @@ func validateAcceptanceScripts(t *testing.T, tsEnv testScriptEnv, groups []strin
 		require.NoError(t, err)
 		for _, file := range candidates {
 			require.NoError(t, validateFixtureRepositoryDeclaration(file))
+			_, err := requiresUserCapabilityForScript(file)
+			require.NoError(t, err)
 		}
 	}
 }
@@ -203,8 +205,26 @@ func testScriptParamsFor(t *testing.T, tsEnv testScriptEnv, fixtureRepositories 
 		t.Skipf("testdata/%s: no selected script belongs to this command directory", command)
 	}
 
+	files := make([]string, 0, len(candidates))
+	for _, file := range candidates {
+		requiresUserCapability, err := requiresUserCapabilityForScript(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if requiresUserCapability && !tsEnv.hasUserCapability {
+			if filtered {
+				t.Fatalf("%s requires a token that authenticates a user", file)
+			}
+			continue
+		}
+		files = append(files, file)
+	}
+	if len(files) == 0 {
+		t.Skip("all scripts require a token that authenticates a user")
+	}
+
 	return testscript.Params{
-		Files:               candidates,
+		Files:               files,
 		Setup:               sharedSetup(tsEnv),
 		Cmds:                sharedCmds(tsEnv, fixtureRepositories),
 		RequireExplicitExec: true,
@@ -569,10 +589,11 @@ func (e missingEnvError) Error() string {
 }
 
 type testScriptEnv struct {
-	host  string
-	org   string
-	token string
-	user  string
+	host              string
+	org               string
+	token             string
+	user              string
+	hasUserCapability bool
 
 	// scripts optionally narrows a run to named scripts within the command
 	// directory being run. Empty means run every script in the directory.
@@ -618,6 +639,11 @@ func (e *testScriptEnv) fromEnv() error {
 	e.host = envMap["GH_ACCEPTANCE_HOST"]
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
+	var err error
+	e.hasUserCapability, err = tokenHasUserCapability(e.token)
+	if err != nil {
+		return err
+	}
 
 	e.scripts = parseScriptFilter(os.Getenv("GH_ACCEPTANCE_SCRIPT"))
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
