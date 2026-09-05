@@ -298,26 +298,24 @@ func editRun(opts *EditOptions) error {
 		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
 	}
 
-	findOptions := shared.FindOptions{
-		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "author", "url", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone"},
-		Detector: opts.Detector,
-	}
-
-	if len(opts.Assets) > 0 {
-		findOptions.Fields = append(findOptions.Fields, "repository")
-	}
-
 	issueFeatures, err := opts.Detector.IssueFeatures()
 	if err != nil {
 		return err
 	}
 
-	// TODO ApiActorsSupported
-	if issueFeatures.ApiActorsSupported {
-		findOptions.Fields = append(findOptions.Fields, "assignedActors")
-	} else {
-		findOptions.Fields = append(findOptions.Fields, "assignees")
+	editable := opts.Editable
+	editable.Reviewers.Selectable = true
+
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields: pullRequestLookupFields(
+			editable,
+			opts.Interactive,
+			len(opts.Assets) > 0,
+			issueFeatures.ApiActorsSupported,
+			opts.Detector.ProjectsV1() == gh.ProjectsV1Supported,
+		),
+		Detector: opts.Detector,
 	}
 
 	pr, repo, err := opts.Finder.Find(findOptions)
@@ -342,8 +340,6 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
-	editable := opts.Editable
-	editable.Reviewers.Selectable = true
 	editable.Title.Default = pr.Title
 	editable.Body.Default = pr.Body
 	editable.Base.Default = pr.BaseRefName
@@ -452,6 +448,53 @@ func editRun(opts *EditOptions) error {
 	fmt.Fprintln(opts.IO.Out, pr.URL)
 
 	return uploadErr
+}
+
+func pullRequestLookupFields(editable shared.Editable, interactive, hasAssets, apiActorsSupported, projectsV1Supported bool) []string {
+	fields := []string{"id", "url"}
+
+	if interactive {
+		fields = append(fields, "author", "title", "body", "baseRefName", "reviewRequests", "labels")
+		if projectsV1Supported {
+			fields = append(fields, "projectCards")
+		}
+		fields = append(fields, "projectItems", "milestone")
+		// TODO ApiActorsSupported
+		if apiActorsSupported {
+			fields = append(fields, "assignedActors")
+		} else {
+			fields = append(fields, "assignees")
+		}
+	} else {
+		if hasAssets && !editable.Body.Edited {
+			fields = append(fields, "body")
+		}
+		if editable.Reviewers.Edited {
+			fields = append(fields, "reviewRequests")
+		}
+		if editable.Assignees.Edited {
+			// TODO ApiActorsSupported
+			if apiActorsSupported {
+				fields = append(fields, "assignedActors")
+			} else {
+				fields = append(fields, "assignees")
+			}
+		}
+		if editable.Projects.Edited {
+			if projectsV1Supported {
+				fields = append(fields, "projectCards")
+			}
+			if len(editable.Projects.Remove) > 0 {
+				fields = append(fields, "projectItems")
+			}
+		}
+	}
+
+	if hasAssets {
+		fields = append(fields, "repository")
+	}
+
+	return fields
 }
 
 // reviewerSearchFunc is intended to be an arg for MultiSelectWithSearch

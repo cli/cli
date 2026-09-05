@@ -1618,7 +1618,7 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
 		{
-			name: "the lookup does not ask for the repository id without an attachment",
+			name: "title-only lookup avoids unrelated fields",
 			input: &EditOptions{
 				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
@@ -1638,7 +1638,8 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockPullRequestUpdate(reg)
 			},
-			wantNoLookupFields: []string{"repository"},
+			wantLookupFields:   []string{"id", "url"},
+			wantNoLookupFields: []string{"author", "title", "body", "baseRefName", "reviewRequests", "assignedActors", "assignees", "labels", "projectCards", "projectItems", "milestone", "repository"},
 			stdout:             "https://github.com/OWNER/REPO/pull/123\n",
 		},
 	}
@@ -1707,6 +1708,153 @@ func Test_editRun(t *testing.T) {
 			for _, field := range tt.wantNoLookupFields {
 				assert.NotContains(t, lookupFields, field)
 			}
+		})
+	}
+}
+
+func Test_pullRequestLookupFields(t *testing.T) {
+	tests := []struct {
+		name                string
+		editable            shared.Editable
+		interactive         bool
+		hasAssets           bool
+		apiActorsSupported  bool
+		projectsV1Supported bool
+		want                []string
+	}{
+		{
+			name: "title",
+			editable: shared.Editable{
+				Title: shared.EditableString{Edited: true},
+			},
+			want: []string{"id", "url"},
+		},
+		{
+			name: "body",
+			editable: shared.Editable{
+				Body: shared.EditableString{Edited: true},
+			},
+			want: []string{"id", "url"},
+		},
+		{
+			name: "base",
+			editable: shared.Editable{
+				Base: shared.EditableString{Edited: true},
+			},
+			want: []string{"id", "url"},
+		},
+		{
+			name: "reviewers",
+			editable: shared.Editable{
+				Reviewers: shared.EditableReviewers{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
+			want: []string{"id", "url", "reviewRequests"},
+		},
+		{
+			name: "assignees with actors",
+			editable: shared.Editable{
+				Assignees: shared.EditableAssignees{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
+			apiActorsSupported: true,
+			want:               []string{"id", "url", "assignedActors"},
+		},
+		{
+			name: "assignees without actors",
+			editable: shared.Editable{
+				Assignees: shared.EditableAssignees{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
+			want: []string{"id", "url", "assignees"},
+		},
+		{
+			name: "labels",
+			editable: shared.Editable{
+				Labels: shared.EditableSlice{Edited: true},
+			},
+			want: []string{"id", "url"},
+		},
+		{
+			name: "projects v1 add",
+			editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Add: []string{"Roadmap"}, Edited: true},
+				},
+			},
+			projectsV1Supported: true,
+			want:                []string{"id", "url", "projectCards"},
+		},
+		{
+			name: "projects v2 add",
+			editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Add: []string{"Roadmap"}, Edited: true},
+				},
+			},
+			want: []string{"id", "url"},
+		},
+		{
+			name: "projects v2 remove",
+			editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Remove: []string{"Roadmap"}, Edited: true},
+				},
+			},
+			want: []string{"id", "url", "projectItems"},
+		},
+		{
+			name: "projects v1 remove",
+			editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Remove: []string{"Roadmap"}, Edited: true},
+				},
+			},
+			projectsV1Supported: true,
+			want:                []string{"id", "url", "projectCards", "projectItems"},
+		},
+		{
+			name: "milestone",
+			editable: shared.Editable{
+				Milestone: shared.EditableString{Edited: true},
+			},
+			want: []string{"id", "url"},
+		},
+		{
+			name:      "attachment",
+			hasAssets: true,
+			want:      []string{"id", "url", "body", "repository"},
+		},
+		{
+			name: "attachment with replacement body",
+			editable: shared.Editable{
+				Body: shared.EditableString{Edited: true},
+			},
+			hasAssets: true,
+			want:      []string{"id", "url", "repository"},
+		},
+		{
+			name:                "interactive with actors",
+			interactive:         true,
+			apiActorsSupported:  true,
+			projectsV1Supported: true,
+			want:                []string{"id", "url", "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone", "assignedActors"},
+		},
+		{
+			name:        "interactive without actors and with attachment",
+			interactive: true,
+			hasAssets:   true,
+			want:        []string{"id", "url", "author", "title", "body", "baseRefName", "reviewRequests", "labels", "projectItems", "milestone", "assignees", "repository"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := pullRequestLookupFields(tt.editable, tt.interactive, tt.hasAssets, tt.apiActorsSupported, tt.projectsV1Supported)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -2000,6 +2148,11 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			Finder: shared.NewFinder(f),
 
 			SelectorArg: "https://github.com/cli/cli/pull/123",
+			Editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
 		})
 
 		// Verify that our request contained projectCards
@@ -2031,6 +2184,11 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			Finder: shared.NewFinder(f),
 
 			SelectorArg: "https://github.com/cli/cli/pull/123",
+			Editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{Edited: true},
+				},
+			},
 		})
 
 		// Verify that our request did not contain projectCards
