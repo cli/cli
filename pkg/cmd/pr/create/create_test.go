@@ -601,6 +601,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register("git rev-parse --symbolic-full-name feature@{push}", 0, "refs/remotes/origin/feature")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
 				cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature", 1, "")
+				cs.Register("git rev-parse --symbolic-full-name HEAD@{upstream}", 128, "")
 				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
@@ -712,6 +713,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register("git rev-parse --symbolic-full-name feature@{push}", 0, "refs/remotes/origin/feature")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
+				cs.Register("git rev-parse --symbolic-full-name HEAD@{upstream}", 128, "")
 				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
@@ -760,6 +762,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register("git rev-parse --symbolic-full-name feature@{push}", 0, "refs/remotes/origin/feature")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
+				cs.Register("git rev-parse --symbolic-full-name HEAD@{upstream}", 128, "")
 				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
@@ -816,6 +819,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add origin https://github.com/monalisa/REPO.git`, 0, "")
+				cs.Register("git rev-parse --symbolic-full-name HEAD@{upstream}", 128, "")
 				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 				cs.Register(`git config --add remote.upstream.gh-resolved base`, 0, "")
 			},
@@ -1102,6 +1106,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register("git rev-parse --symbolic-full-name feature@{push}", 0, "refs/remotes/origin/feature")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
+				cs.Register("git rev-parse --symbolic-full-name HEAD@{upstream}", 128, "")
 				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
@@ -1136,6 +1141,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register("git rev-parse --symbolic-full-name feature@{push}", 0, "refs/remotes/origin/feature")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
+				cs.Register("git rev-parse --symbolic-full-name HEAD@{upstream}", 128, "")
 				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {

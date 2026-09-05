@@ -907,7 +907,7 @@ func (c *Client) Pull(ctx context.Context, remote, branch string, mods ...Comman
 	return cmd.Run()
 }
 
-func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
+func (c *Client) PushWithTracking(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
 	args := []string{"push", "--set-upstream", remote, ref}
 	cmd, err := c.AuthenticatedCommand(ctx, AllMatchingCredentialsPattern, args...)
 	if err != nil {
@@ -917,6 +917,36 @@ func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...Co
 		mod(cmd)
 	}
 	return cmd.Run()
+}
+
+func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
+	args := []string{"push", remote, ref}
+	cmd, err := c.AuthenticatedCommand(ctx, AllMatchingCredentialsPattern, args...)
+	if err != nil {
+		return err
+	}
+	for _, mod := range mods {
+		mod(cmd)
+	}
+	return cmd.Run()
+}
+
+// HasRemoteTrackingRef returns true if the given branch has an upstream
+// configured. An empty branch name argument works as if it's set to "HEAD".
+//
+// Note that a non-nil error doesn't necessarily mean anything is broken. For
+// example, if the given branch name does not exist or the branch exists but
+// does not track any remote, then an error will be returned. The caller should
+// consider how to handle the error.
+func (c *Client) HasRemoteTrackingRef(ctx context.Context, branch string) (bool, error) {
+	_, err := c.revParse(ctx, "--symbolic-full-name", branch+"@{upstream}")
+	if err != nil {
+		// The git rev-parse command does not differentiate between the branch not existing
+		// and the branch not having an upstream configured. In both cases, it exits with
+		// code 128. Therefore, we return false with the error so that callers can decide.
+		return false, err
+	}
+	return true, nil
 }
 
 func (c *Client) Clone(ctx context.Context, cloneURL string, args []string, mods ...CommandModifier) (string, error) {

@@ -679,7 +679,7 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	if opts.Push && repoType == working {
-		err := opts.GitClient.Push(context.Background(), baseRemote, "HEAD")
+		err := opts.GitClient.PushWithTracking(context.Background(), baseRemote, "HEAD")
 		if err != nil {
 			return err
 		}
