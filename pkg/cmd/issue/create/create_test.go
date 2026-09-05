@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
@@ -1520,6 +1521,49 @@ func TestIssueCreate(t *testing.T) {
 	}
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
+}
+
+func TestIssueCreate_projectMissingReadScope(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`{ "data": { "repository": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`{ "data": { "organization": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`),
+	)
+	for _, query := range []string{
+		`query RepositoryProjectV2List\b`,
+		`query OrganizationProjectV2List\b`,
+		`query UserProjectV2List\b`,
+	} {
+		http.Register(
+			httpmock.GraphQL(query),
+			httpmock.StringResponse(`{
+				"errors": [{
+					"type": "INSUFFICIENT_SCOPES",
+					"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'project']."
+				}]
+			}`),
+		)
+	}
+
+	_, err := runCommand(http, false, `-t hello -b body -p roadmap`, nil)
+	require.EqualError(t, err, "error: your authentication token is missing required scopes [read:project or project]\nUpdate your authentication token to include one of: read:project, project")
+	var missingScopesErr api.MissingScopesError
+	require.ErrorAs(t, err, &missingScopesErr)
+	require.Equal(t, api.ScopeRequirements{{Scopes: []string{"read:project", "project"}}}, missingScopesErr.Requirements)
 }
 
 func TestIssueCreate_recover(t *testing.T) {

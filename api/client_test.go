@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -43,6 +44,77 @@ func TestGraphQL(t *testing.T) {
 	req := http.Requests[0]
 	reqBody, _ := io.ReadAll(req.Body)
 	assert.Equal(t, `{"query":"QUERY","variables":{"name":"Mona"}}`, string(reqBody))
+}
+
+func TestGraphQLScopeRequirements(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(
+		httpmock.GraphQL(""),
+		httpmock.StringResponse(`{
+			"errors": [
+				{
+					"type": "INSUFFICIENT_SCOPES",
+					"message": "The 'dataType' field requires one of the following scopes: ['project', 'read:project', 'project']."
+				},
+				{
+					"type": "INSUFFICIENT_SCOPES",
+					"message": "The 'other' field requires one of the following scopes: ['read:discussion']."
+				},
+				{
+					"type": "INSUFFICIENT_SCOPES",
+					"message": "The 'duplicate' field requires one of the following scopes: ['read:project', 'project']."
+				},
+				{
+					"type": "NOT_FOUND",
+					"message": "not a scope error"
+				}
+			]
+		}`),
+	)
+
+	err := client.GraphQL("github.com", "", nil, &struct{}{})
+	require.Error(t, err)
+	require.Equal(t, ScopeRequirements{
+		{Scopes: []string{"read:discussion"}},
+		{Scopes: []string{"read:project", "project"}},
+	}, GraphQLScopeRequirements(fmt.Errorf("wrapped: %w", err)))
+	require.EqualError(t,
+		MissingScopesError{Requirements: GraphQLScopeRequirements(err)},
+		"error: your authentication token is missing required scopes [read:discussion, (read:project or project)]\nUpdate your authentication token to include: read:discussion and one of (read:project, project)",
+	)
+
+	missingScopeErr := GraphQLMissingScopeError(err, "read:project")
+	require.EqualError(t, missingScopeErr, "error: your authentication token is missing required scopes [read:project or project]\nUpdate your authentication token to include one of: read:project, project")
+	var typedErr MissingScopesError
+	require.ErrorAs(t, fmt.Errorf("wrapped: %w", missingScopeErr), &typedErr)
+	require.Equal(t, ScopeRequirements{{Scopes: []string{"read:project", "project"}}}, typedErr.Requirements)
+
+	require.Empty(t, GraphQLScopeRequirements(errors.New("not a GraphQL error")))
+	require.NoError(t, GraphQLMissingScopeError(errors.New("not a GraphQL error"), "read:project"))
+}
+
+func TestGraphQLScopeRequirementsSingleton(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(
+		httpmock.GraphQL(""),
+		httpmock.StringResponse(`{
+			"errors": [{
+				"type": "INSUFFICIENT_SCOPES",
+				"message": "The 'dataType' field requires one of the following scopes: ['read:project']."
+			}]
+		}`),
+	)
+
+	err := client.GraphQL("github.com", "", nil, &struct{}{})
+	require.Error(t, err)
+	require.Equal(t, ScopeRequirements{{Scopes: []string{"read:project"}}}, GraphQLScopeRequirements(err))
+	require.EqualError(t, GraphQLMissingScopeError(err, "read:project"), "error: your authentication token is missing required scopes [read:project]\nUpdate your authentication token to include: read:project")
 }
 
 func TestGraphQLError(t *testing.T) {

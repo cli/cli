@@ -460,6 +460,20 @@ func Test_createRun(t *testing.T) {
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 		{
+			name:      "nontty project missing read scope",
+			httpStubs: mockProjectMissingReadScope,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.Projects = []string{"roadmap"}
+				return func() {}
+			},
+			wantErr: "error: your authentication token is missing required scopes [read:project or project]\nUpdate your authentication token to include one of: read:project, project",
+		},
+		{
 			name: "same head and base branch should error",
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.TitleProvided = true
@@ -3061,6 +3075,32 @@ func mockRetrieveProjects(_ *testing.T, reg *httpmock.Registry) {
 					"pageInfo": { "hasNextPage": false }
 				} } } }
 				`))
+}
+
+func mockProjectMissingReadScope(reg *httpmock.Registry, _ *testing.T) {
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`{ "data": { "repository": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`),
+	)
+	reg.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`{ "data": { "organization": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`),
+	)
+	for _, query := range []string{
+		`query RepositoryProjectV2List\b`,
+		`query OrganizationProjectV2List\b`,
+		`query UserProjectV2List\b`,
+	} {
+		reg.Register(
+			httpmock.GraphQL(query),
+			httpmock.StringResponse(`{
+				"errors": [{
+					"type": "INSUFFICIENT_SCOPES",
+					"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'project']."
+				}]
+			}`),
+		)
+	}
 }
 
 // TODO projectsV1Deprecation
