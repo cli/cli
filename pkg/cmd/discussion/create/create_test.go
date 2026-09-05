@@ -3,12 +3,15 @@ package create
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/discussion/client"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -148,6 +151,7 @@ func TestCreateRun(t *testing.T) {
 		isTTY        bool
 		stdinContent string
 		setupMock    func(*client.DiscussionClientMock)
+		httpStubs    func(*httpmock.Registry)
 		prompter     *prompter.PrompterMock
 		wantErr      string
 		wantOut      string
@@ -275,6 +279,12 @@ func TestCreateRun(t *testing.T) {
 					return sampleDiscussion(), nil
 				}
 			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/DISCUSSION_TEMPLATE/general.yml"),
+					httpmock.StatusStringResponse(404, `{"message":"Not Found"}`),
+				)
+			},
 			prompter: &prompter.PrompterMock{
 				InputFunc: func(prompt, defaultValue string) (string, error) {
 					return "My question", nil
@@ -286,6 +296,57 @@ func TestCreateRun(t *testing.T) {
 				MarkdownEditorFunc: func(prompt, defaultValue string, blankAllowed bool) (string, error) {
 					assert.False(t, blankAllowed, "body editor should not allow blank input")
 					return "Some body text", nil
+				},
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
+		},
+		{
+			name: "tty walks category form fields when one exists",
+			opts: CreateOptions{
+				Title:    "My question",
+				Category: "Q&A",
+			},
+			isTTY: true,
+			setupMock: func(m *client.DiscussionClientMock) {
+				m.ListCategoriesFunc = func(repo ghrepo.Interface) ([]client.DiscussionCategory, error) {
+					return sampleCategories(), nil
+				}
+				m.CreateFunc = func(repo ghrepo.Interface, input client.CreateDiscussionInput) (*client.Discussion, error) {
+					assert.Equal(t, "### Summary\n\nSomething broke\n\n### Platform\n\niOS\n", input.Body)
+					return sampleDiscussion(), nil
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/DISCUSSION_TEMPLATE/q-a.yml"),
+					httpmock.StringResponse(strings.Join([]string{
+						"body:",
+						"  - type: input",
+						"    attributes:",
+						"      label: 'Summary'",
+						"    validations:",
+						"      required: true",
+						"  - type: dropdown",
+						"    attributes:",
+						"      label: 'Platform'",
+						"      options:",
+						"        - 'iOS'",
+						"        - 'Android'",
+						"    validations:",
+						"      required: true",
+						"",
+					}, "\n")),
+				)
+			},
+			prompter: &prompter.PrompterMock{
+				InputFunc: func(prompt, defaultValue string) (string, error) {
+					assert.Equal(t, "Summary", prompt)
+					return "Something broke", nil
+				},
+				SelectFunc: func(prompt, defaultValue string, options []string) (int, error) {
+					assert.Equal(t, "Platform", prompt)
+					assert.Equal(t, []string{"iOS", "Android"}, options)
+					return 0, nil
 				},
 			},
 			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
@@ -354,6 +415,12 @@ func TestCreateRun(t *testing.T) {
 					return sampleDiscussion(), nil
 				}
 			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/DISCUSSION_TEMPLATE/q-a.yml"),
+					httpmock.StatusStringResponse(404, `{"message":"Not Found"}`),
+				)
+			},
 			prompter: &prompter.PrompterMock{
 				MarkdownEditorFunc: func(prompt, defaultValue string, blankAllowed bool) (string, error) {
 					return "Prompted body", nil
@@ -413,6 +480,12 @@ func TestCreateRun(t *testing.T) {
 					return sampleCategories(), nil
 				}
 			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/DISCUSSION_TEMPLATE/general.yml"),
+					httpmock.StatusStringResponse(404, `{"message":"Not Found"}`),
+				)
+			},
 			prompter: &prompter.PrompterMock{
 				MarkdownEditorFunc: func(prompt, defaultValue string, blankAllowed bool) (string, error) {
 					return "   ", nil
@@ -435,6 +508,12 @@ func TestCreateRun(t *testing.T) {
 			mockClient := &client.DiscussionClientMock{}
 			tt.setupMock(mockClient)
 
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+
 			opts := tt.opts
 			opts.IO = ios
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
@@ -442,6 +521,9 @@ func TestCreateRun(t *testing.T) {
 			}
 			opts.Client = func() (client.DiscussionClient, error) {
 				return mockClient, nil
+			}
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
 			}
 			if tt.prompter != nil {
 				opts.Prompter = tt.prompter
