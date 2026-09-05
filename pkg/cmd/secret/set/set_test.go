@@ -926,6 +926,19 @@ func Test_getSecretsFromOptions(t *testing.T) {
 				"QUOTED": "my value",
 			},
 		},
+		{
+			name: "secrets from file with CRLF line endings",
+			opts: SetOptions{
+				Body: "",
+				EnvFile: genFile("FOO=bar\r\nQUOTED=\"my value\"\r\n#IGNORED=true\r\nexport SHELL=bash\r\n"),
+			},
+			stdin: `FOO=bar`,
+			want: map[string]string{
+				"FOO":    "bar",
+				"SHELL":  "bash",
+				"QUOTED": "my value",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -397,7 +397,7 @@ func getSecretsFromOptions(opts *SetOptions) (map[string][]byte, error) {
 			return nil, fmt.Errorf("no secrets found in file")
 		}
 		for key, value := range envs {
-			secrets[key] = []byte(value)
+			secrets[key] = bytes.TrimRight([]byte(value), "\r")
 		}
 		return secrets, nil
 	}
