@@ -317,42 +317,21 @@ func TestClientCurrentBranchReportsDetachedHead(t *testing.T) {
 	assert.Empty(t, branch)
 }
 
-func TestClientShowRefs(t *testing.T) {
-	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantRefs      []Ref
-		wantErrorMsg  string
-	}{
-		{
-			name:          "show refs with one valid ref and one invalid ref",
-			cmdExitStatus: 128,
-			cmdStdout:     "9ea76237a557015e73446d33268569a114c0649c refs/heads/valid",
-			cmdStderr:     "fatal: 'refs/heads/invalid' - not a valid ref",
-			wantCmdArgs:   `path/to/git show-ref --verify -- refs/heads/valid refs/heads/invalid`,
-			wantRefs: []Ref{{
-				Hash: "9ea76237a557015e73446d33268569a114c0649c",
-				Name: "refs/heads/valid",
-			}},
-			wantErrorMsg: "failed to run git: fatal: 'refs/heads/invalid' - not a valid ref",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			refs, err := client.ShowRefs(context.Background(), []string{"refs/heads/valid", "refs/heads/invalid"})
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			assert.EqualError(t, err, tt.wantErrorMsg)
-			assert.Equal(t, tt.wantRefs, refs)
-		})
-	}
+func TestClientShowRefsReturnsExistingRefsAlongsideMissingRefError(t *testing.T) {
+	// Given a repository with one requested branch and one missing branch
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	wantHash := repo.run(t, "rev-parse", "HEAD")
+
+	// When both refs are resolved
+	refs, err := repo.client.ShowRefs(t.Context(), []string{"refs/heads/trunk", "refs/heads/missing"})
+
+	// Then the existing ref and the semantic Git error are both returned
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.NotZero(t, gitError.ExitCode)
+	assert.Equal(t, []Ref{{Hash: wantHash, Name: "refs/heads/trunk"}}, refs)
 }
 
 func TestClientConfigReturnsConfiguredValue(t *testing.T) {
@@ -428,231 +407,83 @@ func TestClientUncommittedChangeCountIncludesTrackedAndUntrackedFiles(t *testing
 	assert.Equal(t, 2, count)
 }
 
-type stubbedCommit struct {
-	Sha   string
-	Title string
-	Body  string
-}
+func TestClientCommitsReturnsCommitMetadata(t *testing.T) {
+	// Given a branch with commits containing empty and multiline bodies
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "base")
+	baseRef := repo.run(t, "rev-parse", "HEAD")
+	repo.run(t, "checkout", "--quiet", "-b", "feature")
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "first commit")
+	firstSHA := repo.run(t, "rev-parse", "HEAD")
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "second commit", "-m", "first line\nsecond line")
+	secondSHA := repo.run(t, "rev-parse", "HEAD")
 
-type stubbedCommitsCommandData struct {
-	ExitStatus int
+	// When commits unique to the feature branch are requested
+	commits, err := repo.client.Commits(t.Context(), baseRef, "feature")
 
-	ErrMsg string
-
-	Commits []stubbedCommit
-}
-
-func TestClientCommits(t *testing.T) {
-	tests := []struct {
-		name         string
-		testData     stubbedCommitsCommandData
-		wantCmdArgs  string
-		wantCommits  []*Commit
-		wantErrorMsg string
-	}{
-		{
-			name: "single commit no body",
-			testData: stubbedCommitsCommandData{
-				Commits: []stubbedCommit{
-					{
-						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-						Title: "testing testability test",
-						Body:  "",
-					},
-				},
-			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
-			wantCommits: []*Commit{{
-				Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-				Title: "testing testability test",
-			}},
-		},
-		{
-			name: "single commit with body",
-			testData: stubbedCommitsCommandData{
-				Commits: []stubbedCommit{
-					{
-						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-						Title: "testing testability test",
-						Body:  "This is the body",
-					},
-				},
-			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
-			wantCommits: []*Commit{{
-				Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-				Title: "testing testability test",
-				Body:  "This is the body",
-			}},
-		},
-		{
-			name: "multiple commits with bodies",
-			testData: stubbedCommitsCommandData{
-				Commits: []stubbedCommit{
-					{
-						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-						Title: "testing testability test",
-						Body:  "This is the body",
-					},
-					{
-						Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
-						Title: "testing testability test 2",
-						Body:  "This is the body 2",
-					},
-				},
-			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
-			wantCommits: []*Commit{
-				{
-					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-					Title: "testing testability test",
-					Body:  "This is the body",
-				},
-				{
-					Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
-					Title: "testing testability test 2",
-					Body:  "This is the body 2",
-				},
-			},
-		},
-		{
-			name: "multiple commits mixed bodies",
-			testData: stubbedCommitsCommandData{
-				Commits: []stubbedCommit{
-					{
-						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-						Title: "testing testability test",
-					},
-					{
-						Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
-						Title: "testing testability test 2",
-						Body:  "This is the body 2",
-					},
-				},
-			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
-			wantCommits: []*Commit{
-				{
-					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-					Title: "testing testability test",
-				},
-				{
-					Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
-					Title: "testing testability test 2",
-					Body:  "This is the body 2",
-				},
-			},
-		},
-		{
-			name: "multiple commits newlines in bodies",
-			testData: stubbedCommitsCommandData{
-				Commits: []stubbedCommit{
-					{
-						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-						Title: "testing testability test",
-						Body:  "This is the body\nwith a newline",
-					},
-					{
-						Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
-						Title: "testing testability test 2",
-						Body:  "This is the body 2",
-					},
-				},
-			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
-			wantCommits: []*Commit{
-				{
-					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
-					Title: "testing testability test",
-					Body:  "This is the body\nwith a newline",
-				},
-				{
-					Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
-					Title: "testing testability test 2",
-					Body:  "This is the body 2",
-				},
-			},
-		},
-		{
-			name: "no commits between SHAs",
-			testData: stubbedCommitsCommandData{
-				Commits: []stubbedCommit{},
-			},
-			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
-			wantErrorMsg: "could not find any commits between SHA1 and SHA2",
-		},
-		{
-			name: "git error",
-			testData: stubbedCommitsCommandData{
-				ErrMsg:     "git error message",
-				ExitStatus: 1,
-			},
-			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
-			wantErrorMsg: "failed to run git: git error message",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommitsCommandContext(t, tt.testData)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			commits, err := client.Commits(context.Background(), "SHA1", "SHA2")
-			require.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			if tt.wantErrorMsg != "" {
-				require.EqualError(t, err, tt.wantErrorMsg)
-			} else {
-				require.NoError(t, err)
-			}
-			require.Equal(t, tt.wantCommits, commits)
-		})
-	}
-}
-
-func TestCommitsHelperProcess(t *testing.T) {
-	if os.Getenv("GH_WANT_HELPER_PROCESS") != "1" {
-		return
-	}
-
-	var td stubbedCommitsCommandData
-	_ = json.Unmarshal([]byte(os.Getenv("GH_COMMITS_TEST_DATA")), &td)
-
-	if td.ErrMsg != "" {
-		fmt.Fprint(os.Stderr, td.ErrMsg)
-	} else {
-		var sb strings.Builder
-		for _, commit := range td.Commits {
-			sb.WriteString(commit.Sha)
-			sb.WriteString("\u0000")
-			sb.WriteString(commit.Title)
-			sb.WriteString("\u0000")
-			sb.WriteString(commit.Body)
-			sb.WriteString("\u0000")
-			sb.WriteString("\n")
-		}
-		fmt.Fprint(os.Stdout, sb.String())
-	}
-
-	os.Exit(td.ExitStatus)
-}
-
-func createCommitsCommandContext(t *testing.T, testData stubbedCommitsCommandData) (*exec.Cmd, commandCtx) {
-	t.Helper()
-
-	b, err := json.Marshal(testData)
+	// Then each commit's repository metadata is returned newest first
 	require.NoError(t, err)
+	assert.Equal(t, []*Commit{
+		{Sha: secondSHA, Title: "second commit", Body: "first line\nsecond line\n"},
+		{Sha: firstSHA, Title: "first commit"},
+	}, commits)
+}
 
-	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestCommitsHelperProcess", "--")
-	cmd.Env = append(os.Environ(),
-		"GH_WANT_HELPER_PROCESS=1",
-		"GH_COMMITS_TEST_DATA="+string(b),
-	)
-	return cmd, func(ctx context.Context, exe string, args ...string) *exec.Cmd {
-		cmd.Args = append(cmd.Args, exe)
-		cmd.Args = append(cmd.Args, args...)
-		return cmd
-	}
+func TestClientCommitsReportsNoCommitsBetweenRefs(t *testing.T) {
+	// Given two refs that identify the same commit
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+
+	// When commits between the refs are requested
+	commits, err := repo.client.Commits(t.Context(), "trunk", "trunk")
+
+	// Then the empty comparison is reported
+	require.EqualError(t, err, "could not find any commits between trunk and trunk")
+	assert.Nil(t, commits)
+}
+
+func TestClientCommitsExcludesBaseSideCommits(t *testing.T) {
+	// Given divergent branches with patch-equivalent commits and one unique feature commit
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	repo.run(t, "checkout", "--quiet", "-b", "feature")
+	require.NoError(t, os.WriteFile(filepath.Join(repo.dir, "shared.txt"), []byte("shared\n"), 0600))
+	repo.run(t, "add", "shared.txt")
+	t.Setenv("GIT_COMMITTER_DATE", "2000-01-01T00:00:00Z")
+	repo.run(t, "commit", "--quiet", "-m", "feature shared change")
+	sharedCommit := repo.run(t, "rev-parse", "HEAD")
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "feature-only commit")
+	uniqueCommit := repo.run(t, "rev-parse", "HEAD")
+	repo.run(t, "checkout", "--quiet", "trunk")
+	t.Setenv("GIT_COMMITTER_DATE", "2001-01-01T00:00:00Z")
+	repo.run(t, "cherry-pick", "--quiet", sharedCommit)
+
+	// When commits unique to the feature branch are requested
+	commits, err := repo.client.Commits(t.Context(), "trunk", "feature")
+
+	// Then only the feature side of the symmetric difference is returned
+	require.NoError(t, err)
+	assert.Equal(t, []*Commit{
+		{Sha: uniqueCommit, Title: "feature-only commit"},
+		{Sha: sharedCommit, Title: "feature shared change"},
+	}, commits)
+}
+
+func TestClientCommitsReportsInvalidRef(t *testing.T) {
+	// Given a repository without the requested head ref
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+
+	// When commits for the missing ref are requested
+	commits, err := repo.client.Commits(t.Context(), "trunk", "missing")
+
+	// Then Git's invalid revision error is returned
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.NotZero(t, gitError.ExitCode)
+	assert.Contains(t, gitError.Stderr, "trunk...missing")
+	assert.Nil(t, commits)
 }
 
 func TestClientLastCommit(t *testing.T) {
@@ -676,81 +507,53 @@ func TestClientCommitBody(t *testing.T) {
 	assert.Equal(t, "I'm starting to get the hang of things\n", body)
 }
 
-func TestClientReadBranchConfig(t *testing.T) {
-	tests := []struct {
-		name             string
-		cmds             mockedCommands
-		branch           string
-		wantBranchConfig BranchConfig
-		wantError        *GitError
-	}{
-		{
-			name: "when the git config has no (remote|merge|pushremote|gh-merge-base) keys, it should return an empty BranchConfig and no error",
-			cmds: mockedCommands{
-				`path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote|gh-merge-base)$`: {
-					ExitStatus: 1,
-				},
-			},
-			branch:           "trunk",
-			wantBranchConfig: BranchConfig{},
-			wantError:        nil,
-		},
-		{
-			name: "when the git fails to read the config, it should return an empty BranchConfig and the error",
-			cmds: mockedCommands{
-				`path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote|gh-merge-base)$`: {
-					ExitStatus: 2,
-					Stderr:     "git error",
-				},
-			},
-			branch:           "trunk",
-			wantBranchConfig: BranchConfig{},
-			wantError: &GitError{
-				ExitCode: 2,
-				Stderr:   "git error",
-			},
-		},
-		{
-			name: "when the config is read, it should return the correct BranchConfig",
-			cmds: mockedCommands{
-				`path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote|gh-merge-base)$`: {
-					Stdout: heredoc.Doc(`
-						branch.trunk.remote upstream
-						branch.trunk.merge refs/heads/trunk
-						branch.trunk.pushremote origin
-						branch.trunk.gh-merge-base gh-merge-base
-					`),
-				},
-			},
-			branch: "trunk",
-			wantBranchConfig: BranchConfig{
-				RemoteName:     "upstream",
-				PushRemoteName: "origin",
-				MergeRef:       "refs/heads/trunk",
-				MergeBase:      "gh-merge-base",
-			},
-			wantError: nil,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmdCtx := createMockedCommandContext(t, tt.cmds)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			branchConfig, err := client.ReadBranchConfig(context.Background(), tt.branch)
-			if tt.wantError != nil {
-				var gitError *GitError
-				require.ErrorAs(t, err, &gitError)
-				assert.Equal(t, tt.wantError.ExitCode, gitError.ExitCode)
-				assert.Equal(t, tt.wantError.Stderr, gitError.Stderr)
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equal(t, tt.wantBranchConfig, branchConfig)
-		})
-	}
+func TestClientReadBranchConfigReturnsEmptyConfigWhenUnset(t *testing.T) {
+	// Given a repository without branch configuration
+	repo := newTestRepo(t)
+
+	// When the branch configuration is read
+	branchConfig, err := repo.client.ReadBranchConfig(t.Context(), "trunk")
+
+	// Then an empty configuration is returned without error
+	require.NoError(t, err)
+	assert.Equal(t, BranchConfig{}, branchConfig)
+}
+
+func TestClientReadBranchConfigReturnsConfiguredValues(t *testing.T) {
+	// Given all supported branch configuration values set through the client
+	repo := newTestRepo(t)
+	require.NoError(t, repo.client.SetBranchConfig(t.Context(), "trunk", "remote", "upstream"))
+	require.NoError(t, repo.client.SetBranchConfig(t.Context(), "trunk", "merge", "refs/heads/trunk"))
+	require.NoError(t, repo.client.SetBranchConfig(t.Context(), "trunk", "pushremote", "origin"))
+	require.NoError(t, repo.client.SetBranchConfig(t.Context(), "trunk", MergeBaseConfig, "release"))
+
+	// When the branch configuration is read
+	branchConfig, err := repo.client.ReadBranchConfig(t.Context(), "trunk")
+
+	// Then the persisted configuration is returned
+	require.NoError(t, err)
+	assert.Equal(t, BranchConfig{
+		RemoteName:     "upstream",
+		PushRemoteName: "origin",
+		MergeRef:       "refs/heads/trunk",
+		MergeBase:      "release",
+	}, branchConfig)
+}
+
+func TestClientReadBranchConfigPropagatesGitError(t *testing.T) {
+	// Given a client whose repository directory no longer exists
+	repo := newTestRepo(t)
+	require.NoError(t, os.RemoveAll(repo.dir))
+
+	// When branch configuration is read
+	branchConfig, err := repo.client.ReadBranchConfig(t.Context(), "trunk")
+
+	// Then the repository error is preserved
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.Equal(t, 128, gitError.ExitCode)
+	assert.Empty(t, branchConfig)
 }
 
 func Test_parseBranchConfig(t *testing.T) {
@@ -898,196 +701,133 @@ func Test_parseRemoteURLOrName(t *testing.T) {
 	}
 }
 
-func TestClientPushDefault(t *testing.T) {
-	tests := []struct {
-		name            string
-		commandResult   commandResult
-		wantPushDefault PushDefault
-		wantError       *GitError
-	}{
-		{
-			name: "push default is not set",
-			commandResult: commandResult{
-				ExitStatus: 1,
-				Stderr:     "error: key does not contain a section: remote.pushDefault",
-			},
-			wantPushDefault: PushDefaultSimple,
-			wantError:       nil,
-		},
-		{
-			name: "push default is set to current",
-			commandResult: commandResult{
-				ExitStatus: 0,
-				Stdout:     "current",
-			},
-			wantPushDefault: PushDefaultCurrent,
-			wantError:       nil,
-		},
-		{
-			name: "push default errors",
-			commandResult: commandResult{
-				ExitStatus: 128,
-				Stderr:     "fatal: git error",
-			},
-			wantPushDefault: "",
-			wantError: &GitError{
-				ExitCode: 128,
-				Stderr:   "fatal: git error",
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmdCtx := createMockedCommandContext(t, mockedCommands{
-				`path/to/git config push.default`: tt.commandResult,
-			},
-			)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			pushDefault, err := client.PushDefault(context.Background())
-			if tt.wantError != nil {
-				var gitError *GitError
-				require.ErrorAs(t, err, &gitError)
-				assert.Equal(t, tt.wantError.ExitCode, gitError.ExitCode)
-				assert.Equal(t, tt.wantError.Stderr, gitError.Stderr)
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equal(t, tt.wantPushDefault, pushDefault)
-		})
-	}
+func TestClientPushDefaultReturnsGitDefaultWhenUnset(t *testing.T) {
+	// Given a repository without push.default
+	repo := newTestRepo(t)
+
+	// When push.default is read
+	pushDefault, err := repo.client.PushDefault(t.Context())
+
+	// Then Git's default behavior is returned
+	require.NoError(t, err)
+	assert.Equal(t, PushDefaultSimple, pushDefault)
 }
 
-func TestClientRemotePushDefault(t *testing.T) {
-	tests := []struct {
-		name                  string
-		commandResult         commandResult
-		wantRemotePushDefault string
-		wantError             *GitError
-	}{
-		{
-			name: "remote.pushDefault is not set",
-			commandResult: commandResult{
-				ExitStatus: 1,
-				Stderr:     "error: key does not contain a section: remote.pushDefault",
-			},
-			wantRemotePushDefault: "",
-			wantError:             nil,
-		},
-		{
-			name: "remote.pushDefault is set to origin",
-			commandResult: commandResult{
-				ExitStatus: 0,
-				Stdout:     "origin",
-			},
-			wantRemotePushDefault: "origin",
-			wantError:             nil,
-		},
-		{
-			name: "remote.pushDefault errors",
-			commandResult: commandResult{
-				ExitStatus: 128,
-				Stderr:     "fatal: git error",
-			},
-			wantRemotePushDefault: "",
-			wantError: &GitError{
-				ExitCode: 128,
-				Stderr:   "fatal: git error",
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmdCtx := createMockedCommandContext(t, mockedCommands{
-				`path/to/git config remote.pushDefault`: tt.commandResult,
-			},
-			)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			pushDefault, err := client.RemotePushDefault(context.Background())
-			if tt.wantError != nil {
-				var gitError *GitError
-				require.ErrorAs(t, err, &gitError)
-				assert.Equal(t, tt.wantError.ExitCode, gitError.ExitCode)
-				assert.Equal(t, tt.wantError.Stderr, gitError.Stderr)
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equal(t, tt.wantRemotePushDefault, pushDefault)
-		})
-	}
+func TestClientPushDefaultReturnsConfiguredValue(t *testing.T) {
+	// Given a repository configured to push the current branch
+	repo := newTestRepo(t)
+	repo.run(t, "config", "push.default", "current")
+
+	// When push.default is read
+	pushDefault, err := repo.client.PushDefault(t.Context())
+
+	// Then the configured behavior is returned
+	require.NoError(t, err)
+	assert.Equal(t, PushDefaultCurrent, pushDefault)
 }
 
-func TestClientParsePushRevision(t *testing.T) {
-	tests := []struct {
-		name                   string
-		branch                 string
-		commandResult          commandResult
-		wantParsedPushRevision RemoteTrackingRef
-		wantError              error
-	}{
-		{
-			name:   "@{push} resolves to refs/remotes/origin/branchName",
-			branch: "branchName",
-			commandResult: commandResult{
-				ExitStatus: 0,
-				Stdout:     "refs/remotes/origin/branchName",
-			},
-			wantParsedPushRevision: RemoteTrackingRef{Remote: "origin", Branch: "branchName"},
-		},
-		{
-			name: "@{push} doesn't resolve",
-			commandResult: commandResult{
-				ExitStatus: 128,
-				Stderr:     "fatal: git error",
-			},
-			wantParsedPushRevision: RemoteTrackingRef{},
-			wantError: &GitError{
-				ExitCode: 128,
-				Stderr:   "fatal: git error",
-			},
-		},
-		{
-			name: "@{push} resolves to something surprising",
-			commandResult: commandResult{
-				ExitStatus: 0,
-				Stdout:     "not/a/valid/remote/ref",
-			},
-			wantParsedPushRevision: RemoteTrackingRef{},
-			wantError:              fmt.Errorf("could not parse push revision: remote tracking branch must have format refs/remotes/<remote>/<branch> but was: not/a/valid/remote/ref"),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd := fmt.Sprintf("path/to/git rev-parse --symbolic-full-name %s@{push}", tt.branch)
-			cmdCtx := createMockedCommandContext(t, mockedCommands{
-				args(cmd): tt.commandResult,
-			})
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			trackingRef, err := client.PushRevision(context.Background(), tt.branch)
-			if tt.wantError != nil {
-				var wantErrorAsGit *GitError
-				if errors.As(tt.wantError, &wantErrorAsGit) {
-					var gitError *GitError
-					require.ErrorAs(t, err, &gitError)
-					assert.Equal(t, wantErrorAsGit.ExitCode, gitError.ExitCode)
-					assert.Equal(t, wantErrorAsGit.Stderr, gitError.Stderr)
-				} else {
-					assert.Equal(t, err, tt.wantError)
-				}
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equal(t, tt.wantParsedPushRevision, trackingRef)
-		})
-	}
+func TestClientPushDefaultPropagatesGitError(t *testing.T) {
+	// Given a client whose repository directory no longer exists
+	repo := newTestRepo(t)
+	require.NoError(t, os.RemoveAll(repo.dir))
+
+	// When push.default is read
+	pushDefault, err := repo.client.PushDefault(t.Context())
+
+	// Then the repository error is preserved
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.Equal(t, 128, gitError.ExitCode)
+	assert.Empty(t, pushDefault)
+}
+
+func TestClientRemotePushDefaultReturnsEmptyWhenUnset(t *testing.T) {
+	// Given a repository without remote.pushDefault
+	repo := newTestRepo(t)
+
+	// When remote.pushDefault is read
+	remote, err := repo.client.RemotePushDefault(t.Context())
+
+	// Then no preferred remote is returned
+	require.NoError(t, err)
+	assert.Empty(t, remote)
+}
+
+func TestClientRemotePushDefaultReturnsConfiguredRemote(t *testing.T) {
+	// Given a repository with a preferred push remote
+	repo := newTestRepo(t)
+	repo.run(t, "config", "remote.pushDefault", "origin")
+
+	// When remote.pushDefault is read
+	remote, err := repo.client.RemotePushDefault(t.Context())
+
+	// Then the configured remote is returned
+	require.NoError(t, err)
+	assert.Equal(t, "origin", remote)
+}
+
+func TestClientRemotePushDefaultPropagatesGitError(t *testing.T) {
+	// Given a client whose repository directory no longer exists
+	repo := newTestRepo(t)
+	require.NoError(t, os.RemoveAll(repo.dir))
+
+	// When remote.pushDefault is read
+	remote, err := repo.client.RemotePushDefault(t.Context())
+
+	// Then the repository error is preserved
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.Equal(t, 128, gitError.ExitCode)
+	assert.Empty(t, remote)
+}
+
+func TestClientPushRevisionReturnsConfiguredTrackingRef(t *testing.T) {
+	// Given a branch configured to push to an origin tracking branch
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	repo.run(t, "remote", "add", "origin", filepath.Join(t.TempDir(), "remote.git"))
+	repo.run(t, "config", "branch.trunk.remote", "origin")
+	repo.run(t, "config", "branch.trunk.merge", "refs/heads/trunk")
+	repo.run(t, "update-ref", "refs/remotes/origin/trunk", "HEAD")
+
+	// When the branch's push revision is resolved
+	trackingRef, err := repo.client.PushRevision(t.Context(), "trunk")
+
+	// Then the configured remote tracking ref is returned
+	require.NoError(t, err)
+	assert.Equal(t, RemoteTrackingRef{Remote: "origin", Branch: "trunk"}, trackingRef)
+}
+
+func TestClientPushRevisionReportsUnresolvedBranch(t *testing.T) {
+	// Given a repository without the requested branch
+	repo := newTestRepo(t)
+
+	// When its push revision is resolved
+	trackingRef, err := repo.client.PushRevision(t.Context(), "missing")
+
+	// Then Git's revision error is returned
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.NotZero(t, gitError.ExitCode)
+	assert.Empty(t, trackingRef)
+}
+
+func TestClientPushRevisionReportsMalformedSymbolicRef(t *testing.T) {
+	// Given Git returns a symbolic push ref outside refs/remotes
+	cmdCtx := createMockedCommandContext(t, mockedCommands{
+		`path/to/git rev-parse --symbolic-full-name trunk@{push}`: {Stdout: "not/a/valid/remote/ref"},
+	})
+	client := Client{GitPath: "path/to/git", commandContext: cmdCtx}
+
+	// When the push revision is parsed
+	trackingRef, err := client.PushRevision(t.Context(), "trunk")
+
+	// Then the malformed ref is reported with context
+	require.EqualError(t, err, "could not parse push revision: remote tracking branch must have format refs/remotes/<remote>/<branch> but was: not/a/valid/remote/ref")
+	assert.Empty(t, trackingRef)
 }
 
 func TestRemoteTrackingRef(t *testing.T) {
@@ -1181,319 +921,230 @@ func TestRemoteTrackingRef(t *testing.T) {
 	})
 }
 
-func TestClientDeleteLocalTag(t *testing.T) {
-	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantErrorMsg  string
-	}{
-		{
-			name:        "delete local tag",
-			wantCmdArgs: `path/to/git tag -d v1.0`,
-		},
-		{
-			name:          "git error",
-			cmdExitStatus: 1,
-			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git tag -d v1.0`,
-			wantErrorMsg:  "failed to run git: git error message",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			err := client.DeleteLocalTag(context.Background(), "v1.0")
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			if tt.wantErrorMsg == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tt.wantErrorMsg)
-			}
-		})
-	}
+func TestClientDeleteLocalTagRemovesTag(t *testing.T) {
+	// Given a repository with a local tag
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	repo.run(t, "tag", "v1.0")
+
+	// When the tag is deleted
+	err := repo.client.DeleteLocalTag(t.Context(), "v1.0")
+
+	// Then the tag no longer resolves
+	require.NoError(t, err)
+	assert.Empty(t, repo.run(t, "tag", "--list", "v1.0"))
 }
 
-func TestClientDeleteLocalBranch(t *testing.T) {
-	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantErrorMsg  string
-	}{
-		{
-			name:        "delete local branch",
-			wantCmdArgs: `path/to/git branch -D trunk`,
-		},
-		{
-			name:          "git error",
-			cmdExitStatus: 1,
-			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git branch -D trunk`,
-			wantErrorMsg:  "failed to run git: git error message",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			err := client.DeleteLocalBranch(context.Background(), "trunk")
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			if tt.wantErrorMsg == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tt.wantErrorMsg)
-			}
-		})
-	}
+func TestClientDeleteLocalTagReportsMissingTag(t *testing.T) {
+	// Given a repository without the requested tag
+	repo := newTestRepo(t)
+
+	// When the missing tag is deleted
+	err := repo.client.DeleteLocalTag(t.Context(), "missing")
+
+	// Then Git's missing tag error is returned
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.NotZero(t, gitError.ExitCode)
 }
 
-func TestClientHasLocalBranch(t *testing.T) {
-	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantOut       bool
-	}{
-		{
-			name:        "has local branch",
-			wantCmdArgs: `path/to/git rev-parse --verify refs/heads/trunk`,
-			wantOut:     true,
-		},
-		{
-			name:          "does not have local branch",
-			cmdExitStatus: 1,
-			wantCmdArgs:   `path/to/git rev-parse --verify refs/heads/trunk`,
-			wantOut:       false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			out := client.HasLocalBranch(context.Background(), "trunk")
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			assert.Equal(t, out, tt.wantOut)
-		})
-	}
+func TestClientDeleteLocalBranchRemovesBranch(t *testing.T) {
+	// Given a repository with a local feature branch
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	repo.run(t, "branch", "feature")
+
+	// When the branch is deleted
+	err := repo.client.DeleteLocalBranch(t.Context(), "feature")
+
+	// Then the branch no longer exists
+	require.NoError(t, err)
+	assert.False(t, repo.client.HasLocalBranch(t.Context(), "feature"), "deleted branch should not resolve")
 }
 
-func TestClientCheckoutBranch(t *testing.T) {
-	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantErrorMsg  string
-	}{
-		{
-			name:        "checkout branch",
-			wantCmdArgs: `path/to/git checkout trunk`,
-		},
-		{
-			name:          "git error",
-			cmdExitStatus: 1,
-			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git checkout trunk`,
-			wantErrorMsg:  "failed to run git: git error message",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			err := client.CheckoutBranch(context.Background(), "trunk")
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			if tt.wantErrorMsg == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tt.wantErrorMsg)
-			}
-		})
-	}
+func TestClientDeleteLocalBranchReportsCheckedOutBranch(t *testing.T) {
+	// Given a repository whose trunk branch is checked out
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+
+	// When the checked out branch is deleted
+	err := repo.client.DeleteLocalBranch(t.Context(), "trunk")
+
+	// Then Git rejects the deletion and the branch remains
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.NotZero(t, gitError.ExitCode)
+	assert.True(t, repo.client.HasLocalBranch(t.Context(), "trunk"), "checked out branch should remain")
 }
 
-func TestClientCheckoutNewBranch(t *testing.T) {
-	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantErrorMsg  string
-	}{
-		{
-			name:        "checkout new branch",
-			wantCmdArgs: `path/to/git checkout -b trunk --track origin/trunk`,
-		},
-		{
-			name:          "git error",
-			cmdExitStatus: 1,
-			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git checkout -b trunk --track origin/trunk`,
-			wantErrorMsg:  "failed to run git: git error message",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			err := client.CheckoutNewBranch(context.Background(), "origin", "trunk")
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			if tt.wantErrorMsg == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tt.wantErrorMsg)
-			}
-		})
-	}
+func TestClientHasLocalBranchFindsExistingBranch(t *testing.T) {
+	// Given a repository with a trunk commit
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+
+	// When the local branch is checked
+	exists := repo.client.HasLocalBranch(t.Context(), "trunk")
+
+	// Then the branch is found
+	assert.True(t, exists, "trunk should resolve as a local branch")
 }
 
-func TestClientToplevelDir(t *testing.T) {
-	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantDir       string
-		wantErrorMsg  string
-	}{
-		{
-			name:        "top level dir",
-			cmdStdout:   "/path/to/repo",
-			wantCmdArgs: `path/to/git rev-parse --show-toplevel`,
-			wantDir:     "/path/to/repo",
-		},
-		{
-			name:          "git error",
-			cmdExitStatus: 1,
-			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git rev-parse --show-toplevel`,
-			wantErrorMsg:  "failed to run git: git error message",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			dir, err := client.ToplevelDir(context.Background())
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			if tt.wantErrorMsg == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tt.wantErrorMsg)
-			}
-			assert.Equal(t, tt.wantDir, dir)
-		})
-	}
+func TestClientHasLocalBranchRejectsMissingBranch(t *testing.T) {
+	// Given a repository without a feature branch
+	repo := newTestRepo(t)
+
+	// When the local branch is checked
+	exists := repo.client.HasLocalBranch(t.Context(), "feature")
+
+	// Then the branch is not found
+	assert.False(t, exists, "missing branch should not resolve")
 }
 
-func TestClientGitDir(t *testing.T) {
-	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantDir       string
-		wantErrorMsg  string
-	}{
-		{
-			name:        "git dir",
-			cmdStdout:   "/path/to/repo/.git",
-			wantCmdArgs: `path/to/git rev-parse --git-dir`,
-			wantDir:     "/path/to/repo/.git",
-		},
-		{
-			name:          "git error",
-			cmdExitStatus: 1,
-			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git rev-parse --git-dir`,
-			wantErrorMsg:  "failed to run git: git error message",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			dir, err := client.GitDir(context.Background())
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			if tt.wantErrorMsg == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tt.wantErrorMsg)
-			}
-			assert.Equal(t, tt.wantDir, dir)
-		})
-	}
+func TestClientCheckoutBranchSwitchesBranches(t *testing.T) {
+	// Given a repository checked out on feature with a trunk branch
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	repo.run(t, "checkout", "--quiet", "-b", "feature")
+
+	// When trunk is checked out
+	err := repo.client.CheckoutBranch(t.Context(), "trunk")
+
+	// Then trunk becomes the current branch
+	require.NoError(t, err)
+	assert.Equal(t, "trunk", repo.run(t, "branch", "--show-current"))
 }
 
-func TestClientPathFromRoot(t *testing.T) {
-	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantErrorMsg  string
-		wantDir       string
-	}{
-		{
-			name:        "current path from root",
-			cmdStdout:   "some/path/",
-			wantCmdArgs: `path/to/git rev-parse --show-prefix`,
-			wantDir:     "some/path",
-		},
-		{
-			name:          "git error",
-			cmdExitStatus: 1,
-			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git rev-parse --show-prefix`,
-			wantDir:       "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
-			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
-			}
-			dir := client.PathFromRoot(context.Background())
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
-			assert.Equal(t, tt.wantDir, dir)
-		})
-	}
+func TestClientCheckoutBranchReportsMissingBranch(t *testing.T) {
+	// Given a repository without the requested branch
+	repo := newTestRepo(t)
+
+	// When the missing branch is checked out
+	err := repo.client.CheckoutBranch(t.Context(), "missing")
+
+	// Then Git's checkout error is returned
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.NotZero(t, gitError.ExitCode)
+}
+
+func TestClientCheckoutNewBranchTracksRemoteBranch(t *testing.T) {
+	// Given a repository with an origin feature tracking ref
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	repo.run(t, "remote", "add", "origin", filepath.Join(t.TempDir(), "remote.git"))
+	repo.run(t, "update-ref", "refs/remotes/origin/feature", "HEAD")
+
+	// When a local branch is created from that tracking ref
+	err := repo.client.CheckoutNewBranch(t.Context(), "origin", "feature")
+
+	// Then the new branch is current and tracks origin
+	require.NoError(t, err)
+	assert.Equal(t, "feature", repo.run(t, "branch", "--show-current"))
+	assert.Equal(t, "origin", repo.run(t, "config", "branch.feature.remote"))
+	assert.Equal(t, "refs/heads/feature", repo.run(t, "config", "branch.feature.merge"))
+}
+
+func TestClientCheckoutNewBranchReportsMissingTrackingBranch(t *testing.T) {
+	// Given a repository without the requested remote tracking branch
+	repo := newTestRepo(t)
+
+	// When a local branch is created from it
+	err := repo.client.CheckoutNewBranch(t.Context(), "origin", "missing")
+
+	// Then Git's checkout error is returned and no branch is created
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.NotZero(t, gitError.ExitCode)
+	assert.False(t, repo.client.HasLocalBranch(t.Context(), "missing"), "failed checkout should not create a branch")
+}
+
+func TestClientToplevelDirReturnsRepositoryRootFromSubdirectory(t *testing.T) {
+	// Given a client operating from a nested repository directory
+	repo := newTestRepo(t)
+	nestedDir := filepath.Join(repo.dir, "some", "path")
+	require.NoError(t, os.MkdirAll(nestedDir, 0700))
+	client := Client{RepoDir: nestedDir}
+
+	// When the top-level directory is requested
+	dir, err := client.ToplevelDir(t.Context())
+
+	// Then the repository root is returned
+	require.NoError(t, err)
+	assert.Equal(t, filepath.ToSlash(repo.dir), filepath.ToSlash(dir))
+}
+
+func TestClientToplevelDirReportsNonRepository(t *testing.T) {
+	// Given a client outside a Git repository
+	IsolateConfig(t)
+	client := Client{RepoDir: t.TempDir()}
+
+	// When the top-level directory is requested
+	dir, err := client.ToplevelDir(t.Context())
+
+	// Then Git's repository error is returned
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.Equal(t, 128, gitError.ExitCode)
+	assert.Empty(t, dir)
+}
+
+func TestClientGitDirReturnsRepositoryMetadataDirectory(t *testing.T) {
+	// Given a local Git repository
+	repo := newTestRepo(t)
+
+	// When the Git metadata directory is requested
+	dir, err := repo.client.GitDir(t.Context())
+
+	// Then Git identifies the repository's metadata directory
+	require.NoError(t, err)
+	assert.Equal(t, ".git", dir)
+}
+
+func TestClientGitDirReportsNonRepository(t *testing.T) {
+	// Given a client outside a Git repository
+	IsolateConfig(t)
+	client := Client{RepoDir: t.TempDir()}
+
+	// When the Git metadata directory is requested
+	dir, err := client.GitDir(t.Context())
+
+	// Then Git's repository error is returned
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.Equal(t, 128, gitError.ExitCode)
+	assert.Empty(t, dir)
+}
+
+func TestClientPathFromRootReturnsNestedPath(t *testing.T) {
+	// Given a client operating from a nested repository directory
+	repo := newTestRepo(t)
+	nestedDir := filepath.Join(repo.dir, "some", "path")
+	require.NoError(t, os.MkdirAll(nestedDir, 0700))
+	client := Client{RepoDir: nestedDir}
+
+	// When its path relative to the repository root is requested
+	dir := client.PathFromRoot(t.Context())
+
+	// Then the nested path is returned without a trailing separator
+	assert.Equal(t, "some/path", filepath.ToSlash(dir))
+}
+
+func TestClientPathFromRootReturnsEmptyOutsideRepository(t *testing.T) {
+	// Given a client outside a Git repository
+	IsolateConfig(t)
+	client := Client{RepoDir: t.TempDir()}
+
+	// When its path relative to a repository root is requested
+	dir := client.PathFromRoot(t.Context())
+
+	// Then no path is returned
+	assert.Empty(t, dir)
 }
 
 func TestClientUnsetRemoteResolutionRemovesResolution(t *testing.T) {
@@ -1915,7 +1566,9 @@ func newTestRepo(t *testing.T) *testRepo {
 	IsolateConfig(t)
 	t.Setenv("GIT_TERMINAL_PROMPT", "0")
 
-	repo := &testRepo{dir: t.TempDir()}
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	repo := &testRepo{dir: dir}
 	repo.client = &Client{RepoDir: repo.dir}
 	repo.run(t, "init", "--quiet", "--initial-branch=trunk")
 	repo.run(t, "config", "user.name", "GitHub CLI Test")
@@ -2371,28 +2024,61 @@ func TestWorktreeForBranch(t *testing.T) {
 	assert.Nil(t, WorktreeForBranch(worktrees, "missing"))
 }
 
-func TestClientWorktreeRemove(t *testing.T) {
-	cmd, cmdCtx := createCommandContext(t, 0, "", "")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
-
-	err := client.WorktreeRemove(context.Background(), "-feature")
-
+func TestClientWorktreesListsRepositoryWorktrees(t *testing.T) {
+	// Given a repository with a linked feature worktree
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	repo.run(t, "branch", "feature")
+	worktreeParent, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
-	assert.Equal(t, "path/to/git worktree remove -- -feature", strings.Join(cmd.Args[3:], " "))
+	worktreeDir := filepath.Join(worktreeParent, "feature")
+	repo.run(t, "worktree", "add", "--quiet", worktreeDir, "feature")
+
+	// When repository worktrees are listed
+	worktrees, err := repo.client.Worktrees(t.Context())
+
+	// Then the primary and linked worktrees are returned with their refs
+	require.NoError(t, err)
+	assert.Equal(t, []Worktree{
+		{Path: filepath.ToSlash(repo.dir), Ref: "refs/heads/trunk"},
+		{Path: filepath.ToSlash(worktreeDir), Ref: "refs/heads/feature"},
+	}, worktrees)
 }
 
-func TestClientWorktreePrune(t *testing.T) {
-	cmd, cmdCtx := createCommandContext(t, 0, "", "")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+func TestClientWorktreeRemoveRemovesOptionLikePath(t *testing.T) {
+	// Given a linked worktree whose relative path begins with a dash
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	repo.run(t, "branch", "feature")
+	repo.run(t, "worktree", "add", "--quiet", "--", "-feature", "feature")
 
-	err := client.WorktreePrune(context.Background())
+	// When the option-like path is removed
+	err := repo.client.WorktreeRemove(t.Context(), "-feature")
 
+	// Then the option separator protects the path and the worktree is removed
 	require.NoError(t, err)
-	assert.Equal(t, "path/to/git worktree prune", strings.Join(cmd.Args[3:], " "))
+	_, statErr := os.Stat(filepath.Join(repo.dir, "-feature"))
+	assert.ErrorIs(t, statErr, os.ErrNotExist)
+	worktrees, listErr := repo.client.Worktrees(t.Context())
+	require.NoError(t, listErr)
+	assert.Nil(t, WorktreeForBranch(worktrees, "feature"))
+}
+
+func TestClientWorktreePruneRemovesMissingWorktreeMetadata(t *testing.T) {
+	// Given a linked worktree whose directory was removed outside Git
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	repo.run(t, "branch", "feature")
+	worktreeDir := filepath.Join(t.TempDir(), "feature")
+	repo.run(t, "worktree", "add", "--quiet", worktreeDir, "feature")
+	require.NoError(t, os.RemoveAll(worktreeDir))
+
+	// When stale worktree metadata is pruned
+	err := repo.client.WorktreePrune(t.Context())
+
+	// Then the missing worktree is no longer listed
+	require.NoError(t, err)
+	worktrees, listErr := repo.client.Worktrees(t.Context())
+	require.NoError(t, listErr)
+	assert.Nil(t, WorktreeForBranch(worktrees, "feature"))
 }
