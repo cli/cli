@@ -56,6 +56,7 @@ type SearchOptions struct {
 	Prompter       prompter.Prompter
 	ExecutablePath string // path to the current gh binary for install subprocess
 	Exporter       cmdutil.Exporter
+	newCommand     func(string, ...string) *exec.Cmd
 
 	// User inputs
 	Query string
@@ -73,6 +74,7 @@ func NewCmdSearch(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, run
 		Config:         f.Config,
 		Prompter:       f.Prompter,
 		ExecutablePath: f.ExecutablePath,
+		newCommand:     exec.Command,
 	}
 
 	cmd := &cobra.Command{
@@ -511,18 +513,33 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 	tw := opts.IO.TerminalWidth()
 	descWidth := max(tw-11, 30)
 
+	type resultKey struct {
+		repo string
+		name string
+	}
+	resultCounts := make(map[resultKey]int)
+	for _, s := range skills {
+		key := resultKey{repo: strings.ToLower(s.Repo), name: strings.ToLower(s.qualifiedName())}
+		resultCounts[key]++
+	}
+
 	options := make([]string, len(skills))
 	for i, s := range skills {
 		starStr := ""
 		if s.Stars > 0 {
 			starStr = "  " + cs.Muted("★ "+formatStars(s.Stars))
 		}
+		pathStr := ""
+		key := resultKey{repo: strings.ToLower(s.Repo), name: strings.ToLower(s.qualifiedName())}
+		if resultCounts[key] > 1 {
+			pathStr = "  " + cs.Muted(strings.TrimSuffix(s.Path, "/SKILL.md"))
+		}
 		descStr := ""
 		if s.Description != "" {
 			desc := strings.Join(strings.Fields(s.Description), " ")
 			descStr = "\n       " + cs.Muted(text.Truncate(descWidth, desc))
 		}
-		options[i] = s.qualifiedName() + "  " + cs.Muted(s.Repo) + starStr + descStr
+		options[i] = s.qualifiedName() + "  " + cs.Muted(s.Repo) + pathStr + starStr + descStr
 	}
 
 	indices, err := opts.Prompter.MultiSelect(
@@ -569,16 +586,13 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 		fmt.Fprintf(opts.IO.ErrOut, "\n%s Installing %s from %s...\n",
 			cs.Blue("::"), displayName, s.Repo)
 
-		// Use the repo-relative directory path (e.g. "skills/author/name")
-		// for disambiguation when installing namespaced skills, so the
-		// install command can resolve the exact skill without ambiguity.
-		installArg := s.SkillName
-		if s.Namespace != "" {
-			installArg = strings.TrimSuffix(s.Path, "/SKILL.md")
+		newCommand := opts.newCommand
+		if newCommand == nil {
+			newCommand = exec.Command
 		}
 
 		//nolint:gosec // arguments are from user-selected search results, not arbitrary input
-		cmd := exec.Command(opts.ExecutablePath, "skills", "install", s.Repo, installArg,
+		cmd := newCommand(opts.ExecutablePath, "skills", "install", s.Repo, s.Path,
 			"--agent", host.ID, "--scope", scope)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = opts.IO.Out
@@ -765,14 +779,11 @@ func fetchPrimaryPages(client *api.Client, host, query string, displayPage, disp
 	return allItems, totalCount, nil
 }
 
-// deduplicateResults extracts unique (repo, namespace, skill name) triples from code search hits.
+// deduplicateResults extracts unique repository paths from code search hits.
 func deduplicateResults(items []codeSearchItem) []skillResult {
-	// skillResultKey is a typed map key that deduplicates by (repo, namespace,
-	// skill name). All fields are lowercased for case-insensitive comparison.
 	type skillResultKey struct {
-		repo      string
-		namespace string
-		skillName string
+		repo string
+		path string
 	}
 	seen := make(map[skillResultKey]struct{})
 	var results []skillResult
@@ -783,9 +794,8 @@ func deduplicateResults(items []codeSearchItem) []skillResult {
 			continue
 		}
 		key := skillResultKey{
-			repo:      strings.ToLower(item.Repository.FullName),
-			namespace: strings.ToLower(namespace),
-			skillName: strings.ToLower(skillName),
+			repo: strings.ToLower(item.Repository.FullName),
+			path: item.Path,
 		}
 		if _, ok := seen[key]; ok {
 			continue

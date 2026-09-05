@@ -113,6 +113,18 @@ func TestMatchSkillConventions(t *testing.T) {
 			wantConvention: "skills",
 		},
 		{
+			name:           "nested skill without skills directory",
+			path:           "performance/r8-analyzer/SKILL.md",
+			wantName:       "r8-analyzer",
+			wantConvention: "nested",
+		},
+		{
+			name:           "deeply nested skill without skills directory",
+			path:           "jetpack-compose/migration/migrate-xml-views/SKILL.md",
+			wantName:       "migrate-xml-views",
+			wantConvention: "nested",
+		},
+		{
 			name:           "nested namespaced skills directory",
 			path:           "terraform/code-generation/skills/hashicorp/terraform-style-guide/SKILL.md",
 			wantName:       "terraform-style-guide",
@@ -139,6 +151,11 @@ func TestMatchSkillConventions(t *testing.T) {
 		{
 			name:    "nested skills under hidden dir excluded",
 			path:    ".claude/skills/code-review/SKILL.md",
+			wantNil: true,
+		},
+		{
+			name:    "nested skill under hidden dir excluded",
+			path:    "catalog/.hidden/code-review/SKILL.md",
 			wantNil: true,
 		},
 		{
@@ -967,6 +984,23 @@ func TestDiscoverSkills(t *testing.T) {
 			},
 			wantSkills: []string{"code-review", "tf-lint"},
 		},
+		{
+			name: "discovers nested skills without skills directory",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/abc123"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "abc123", "truncated": false,
+						"tree": []map[string]interface{}{
+							{"path": "performance/r8-analyzer", "type": "tree", "sha": "tree-sha-1"},
+							{"path": "performance/r8-analyzer/SKILL.md", "type": "blob", "sha": "blob-1"},
+							{"path": "testing/testing-setup", "type": "tree", "sha": "tree-sha-2"},
+							{"path": "testing/testing-setup/SKILL.md", "type": "blob", "sha": "blob-2"},
+						},
+					}))
+			},
+			wantSkills: []string{"r8-analyzer", "testing-setup"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1282,6 +1316,32 @@ func TestDiscoverSkillByPath(t *testing.T) {
 			wantNS:   "hashicorp",
 		},
 		{
+			name:      "extra directories after skills are not treated as namespace",
+			skillPath: "catalog/skills/group/sub/lint",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/contents/catalog%2Fskills%2Fgroup%2Fsub"),
+					httpmock.JSONResponse([]map[string]interface{}{
+						{"name": "lint", "path": "catalog/skills/group/sub/lint", "sha": "tree-sha", "type": "dir"},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "tree-sha", "truncated": false,
+						"tree": []map[string]interface{}{
+							{"path": "SKILL.md", "type": "blob", "sha": "blob-sha"},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/blob-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "blob-sha", "encoding": "base64", "content": "IyBTa2lsbA==",
+					}))
+			},
+			wantName:       "lint",
+			wantConvention: "nested",
+		},
+		{
 			name:      "plugins path sets namespace and convention",
 			skillPath: "plugins/hubot/skills/pr-summary",
 			stubs: func(reg *httpmock.Registry) {
@@ -1422,6 +1482,19 @@ func TestDiscoverLocalSkills(t *testing.T) {
 			},
 			wantSkills: []string{"terraform-style-guide", "terraform-test"},
 		},
+		{
+			name:      "discovers nested skills without skills directory",
+			createDir: true,
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				for _, p := range []string{"performance/r8-analyzer", "testing/testing-setup"} {
+					skillDir := filepath.Join(dir, filepath.FromSlash(p))
+					require.NoError(t, os.MkdirAll(skillDir, 0o755))
+					require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# "+filepath.Base(p)), 0o644))
+				}
+			},
+			wantSkills: []string{"r8-analyzer", "testing-setup"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1531,6 +1604,7 @@ func TestMatchesSkillPath(t *testing.T) {
 		{name: "non-skill file", path: "README.md", wantName: ""},
 		{name: "non-SKILL.md in skill dir", path: "skills/code-review/prompt.txt", wantName: ""},
 		{name: "nested skills convention", path: "terraform/code-generation/skills/terraform-style-guide/SKILL.md", wantName: "terraform-style-guide"},
+		{name: "nested skill without skills directory", path: "performance/r8-analyzer/SKILL.md", wantName: "r8-analyzer"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1555,6 +1629,7 @@ func TestMatchSkillPath(t *testing.T) {
 		{name: "root convention", path: "my-skill/SKILL.md", wantName: "my-skill", wantNamespace: ""},
 		{name: "nested skills convention", path: "terraform/code-generation/skills/terraform-style-guide/SKILL.md", wantName: "terraform-style-guide", wantNamespace: ""},
 		{name: "nested namespaced convention", path: "terraform/code-generation/skills/hashicorp/terraform-style-guide/SKILL.md", wantName: "terraform-style-guide", wantNamespace: "hashicorp"},
+		{name: "nested skill without skills directory", path: "performance/r8-analyzer/SKILL.md", wantName: "r8-analyzer", wantNamespace: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
