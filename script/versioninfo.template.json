@@ -24,7 +24,7 @@
         "FileDescription": "GitHub CLI",
         "FileVersion": "",
         "InternalName": "gh",
-        "LegalCopyright": "",
+        "LegalCopyright": "Copyright (C) GitHub, Inc. All rights reserved.",
         "LegalTrademarks": "",
         "OriginalFilename": "gh.exe",
         "PrivateBuild": "",
