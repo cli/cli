@@ -1,16 +1,14 @@
+
 # Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+fixture-repo shared REPO
+env ISSUE_TITLE=${SCRIPT_NAME}-${RANDOM_STRING}
 
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
-
-# Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create an issue in the repo
-cd $SCRIPT_NAME-$RANDOM_STRING
 
-exec gh issue create --title 'Feature Request' --body $RANDOM_STRING
+exec gh issue create --title $ISSUE_TITLE --body $RANDOM_STRING
 
 # It takes some time for the issue to be created and indexed. Search reads a
 # separate index rather than the issue itself, so this wait is longer than the
@@ -18,5 +16,5 @@ exec gh issue create --title 'Feature Request' --body $RANDOM_STRING
 sleep 20
 
 # Search for the issue
-exec gh search issues $RANDOM_STRING -R $ORG/$SCRIPT_NAME-$RANDOM_STRING
+exec gh search issues $RANDOM_STRING -R $ORG/$REPO
 stdout $RANDOM_STRING

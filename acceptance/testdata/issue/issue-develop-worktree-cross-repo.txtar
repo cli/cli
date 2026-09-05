@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # Develop an issue in a branch repository worktree, then reuse that worktree.
 
 # Set up env vars
@@ -7,12 +10,12 @@ env BRANCH_REPO=${SCRIPT_NAME}-branch-${RANDOM_STRING}
 # Use gh as a credential helper
 exec gh auth setup-git
 
-# Create the issue and branch repositories
+# Create the issue repository
 exec gh repo create ${ORG}/${ISSUE_REPO} --add-readme --private
-exec gh repo create ${ORG}/${BRANCH_REPO} --add-readme --private
-
-# Defer repo cleanup
 defer gh repo delete --yes ${ORG}/${ISSUE_REPO}
+
+# Create the branch repository
+exec gh repo create ${ORG}/${BRANCH_REPO} --add-readme --private
 defer gh repo delete --yes ${ORG}/${BRANCH_REPO}
 
 # Clone the issue repository and configure the branch repository as a remote

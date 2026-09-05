@@ -1,17 +1,15 @@
+
 # Use gh as a credential helper
 exec gh auth setup-git
 
 # Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
-
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+fixture-repo isolated REPO
 
 # Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+exec gh repo clone $ORG/$REPO
 
 # commit the workflow file
-cd $SCRIPT_NAME-$RANDOM_STRING
+cd $REPO
 mkdir .github/workflows
 mv ../workflow.yml .github/workflows/workflow.yml
 exec git add .github/workflows/workflow.yml

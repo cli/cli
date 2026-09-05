@@ -1,17 +1,13 @@
+
 # Setup environment variables used for testscript
-env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
-env ENV_NAME=testscripts
-env VAR_NAME=TESTSCRIPTS_ENV
+env ENV_NAME=testscripts-${RANDOM_STRING}
+env2upper VAR_NAME=TESTSCRIPTS_ENV_${RANDOM_STRING}
 
 # Create a repository where the variable will be registered
-exec gh repo create $ORG/$REPO --add-readme --private
+fixture-repo shared REPO
 
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$REPO
-
-# Clone the repo
-exec gh repo clone $ORG/$REPO
-cd $REPO
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create a repository environment, will fail if organization does not have environment support
 exec gh api /repos/$ORG/$REPO/environments/$ENV_NAME -X PUT --jq '.name'

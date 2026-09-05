@@ -1,15 +1,9 @@
+
 # Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+fixture-repo shared REPO
 
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
-
-# Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
-cd $SCRIPT_NAME-$RANDOM_STRING
-
-# Enable discussions
-exec gh api repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING -X PATCH -F has_discussions=true
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create a discussion to comment on
 exec gh discussion create --title 'Comment Test' --body 'Discussion for comment tests' --category 'General'

@@ -1,7 +1,7 @@
+
 skip 'it creates a fork owned by the user running the test'
 
 # Setup environment variables used for testscript
-env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
 
 # Use gh as a credential helper
 exec gh auth setup-git
@@ -11,10 +11,7 @@ exec gh api user --jq .login
 stdout2env USER
 
 # Create a repository to act as upstream with a file so it has a default branch
-exec gh repo create ${ORG}/${REPO} --add-readme --private
-
-# Defer repo cleanup of upstream
-defer gh repo delete --yes ${ORG}/${REPO}
+fixture-repo isolated REPO
 
 # Clone the repo
 exec gh repo clone ${ORG}/${REPO}

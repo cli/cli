@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # Official extension stubs (the hidden commands suggesting installation of
 # GitHub-owned extensions) are safe to report via telemetry: their command
 # names come from a fixed, hard-coded registry and do not contain any
