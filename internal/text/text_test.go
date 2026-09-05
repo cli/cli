@@ -174,6 +174,11 @@ func TestDisplayURL(t *testing.T) {
 			url:  "http://github.com/cli/cli/issues/9470",
 			want: "http://github.com/cli/cli/issues/9470",
 		},
+		{
+			name: "preserve percent-encoding in path",
+			url:  "https://github.com/OWNER/REPO/compare/main...test-%22quoted%22-branch?expand=1",
+			want: "https://github.com/OWNER/REPO/compare/main...test-%22quoted%22-branch",
+		},
 	}
 
 	for _, tt := range tests {
