@@ -3,11 +3,17 @@ package telemetry
 import "github.com/cli/cli/v2/internal/gh/ghtelemetry"
 
 type EventRecorderSpy struct {
-	Events []ghtelemetry.Event
+	Events  []ghtelemetry.Event
+	Options []ghtelemetry.RecordOptions
 }
 
-func (r *EventRecorderSpy) Record(event ghtelemetry.Event) {
+func (r *EventRecorderSpy) Record(event ghtelemetry.Event, opts ...ghtelemetry.RecordOption) {
 	r.Events = append(r.Events, event)
+	var options ghtelemetry.RecordOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	r.Options = append(r.Options, options)
 }
 
 func (r *EventRecorderSpy) Disable() {}
@@ -19,11 +25,17 @@ func (r *EventRecorderSpy) Flush() {}
 // assert on the sampling behavior commands attempt to configure.
 type CommandRecorderSpy struct {
 	Events         []ghtelemetry.Event
+	Options        []ghtelemetry.RecordOptions
 	LastSampleRate int
 }
 
-func (r *CommandRecorderSpy) Record(event ghtelemetry.Event) {
+func (r *CommandRecorderSpy) Record(event ghtelemetry.Event, opts ...ghtelemetry.RecordOption) {
 	r.Events = append(r.Events, event)
+	var options ghtelemetry.RecordOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	r.Options = append(r.Options, options)
 }
 
 func (r *CommandRecorderSpy) Disable() {}

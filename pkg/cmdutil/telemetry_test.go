@@ -37,6 +37,11 @@ func TestRecordTelemetry(t *testing.T) {
 		assert.Equal(t, "command_invocation", event.Type)
 		assert.Equal(t, "gh pr list", event.Dimensions["command"])
 		assert.Equal(t, "repo,web", event.Dimensions["flags"])
+
+		// command_invocation should opt in to common dimensions
+		require.Len(t, recorder.Options, 1)
+		assert.True(t, recorder.Options[0].IncludeCommonDimensions,
+			"command_invocation should include common dimensions")
 	})
 
 	t.Run("is a no-op when original RunE is nil", func(t *testing.T) {

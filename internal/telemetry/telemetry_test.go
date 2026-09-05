@@ -374,7 +374,7 @@ func TestServiceDeviceIDFallback(t *testing.T) {
 	var captured SendTelemetryPayload
 	svc := newService(func(p SendTelemetryPayload) { captured = p }, nil)
 
-	svc.Record(ghtelemetry.Event{Type: "test"})
+	svc.Record(ghtelemetry.Event{Type: "test"}, ghtelemetry.IncludeCommonDimensions())
 	svc.Flush()
 
 	require.Len(t, captured.Events, 1)
@@ -397,7 +397,7 @@ func TestServiceFlush(t *testing.T) {
 		assert.Empty(t, captured.Events, "payload should have no events")
 	})
 
-	t.Run("flushes events with merged dimensions", func(t *testing.T) {
+	t.Run("flushes events with merged dimensions when IncludeCommonDimensions is set", func(t *testing.T) {
 		t.Cleanup(stubDeviceID("test-device"))
 
 		var captured SendTelemetryPayload
@@ -407,7 +407,7 @@ func TestServiceFlush(t *testing.T) {
 			Type:       "command_invocation",
 			Dimensions: map[string]string{"command": "gh pr list"},
 			Measures:   map[string]int64{"duration_ms": 150},
-		})
+		}, ghtelemetry.IncludeCommonDimensions())
 		svc.Flush()
 
 		require.Len(t, captured.Events, 1)
@@ -419,6 +419,28 @@ func TestServiceFlush(t *testing.T) {
 		assert.NotEmpty(t, event.Dimensions["timestamp"])
 		assert.NotEmpty(t, event.Dimensions["invocation_id"])
 		assert.Equal(t, int64(150), event.Measures["duration_ms"])
+	})
+
+	t.Run("excludes common dimensions by default", func(t *testing.T) {
+		t.Cleanup(stubDeviceID("test-device"))
+
+		var captured SendTelemetryPayload
+		svc := newService(func(p SendTelemetryPayload) { captured = p }, ghtelemetry.Dimensions{"version": "2.45.0"})
+
+		svc.Record(ghtelemetry.Event{
+			Type:       "skill_install",
+			Dimensions: map[string]string{"skill_name": "terraform"},
+		})
+		svc.Flush()
+
+		require.Len(t, captured.Events, 1)
+		event := captured.Events[0]
+		assert.Equal(t, "skill_install", event.Type)
+		assert.Equal(t, "terraform", event.Dimensions["skill_name"])
+		assert.NotEmpty(t, event.Dimensions["timestamp"])
+		assert.NotEmpty(t, event.Dimensions["sample_rate"])
+		assert.Empty(t, event.Dimensions["device_id"], "common dimensions should not be included by default")
+		assert.Empty(t, event.Dimensions["invocation_id"], "common dimensions should not be included by default")
 	})
 
 	t.Run("flushes multiple events", func(t *testing.T) {
@@ -459,7 +481,7 @@ func TestServiceFlush(t *testing.T) {
 		svc.Record(ghtelemetry.Event{
 			Type:       "test",
 			Dimensions: map[string]string{"shared": "event-level"},
-		})
+		}, ghtelemetry.IncludeCommonDimensions())
 		svc.Flush()
 
 		require.Len(t, captured.Events, 1)
@@ -579,37 +601,20 @@ func TestServiceSampling(t *testing.T) {
 		assert.False(t, called, "flusher should not be called after SetSampleRate reduced the rate")
 	})
 
-	t.Run("SetSampleRate updates sample_rate dimension", func(t *testing.T) {
+	t.Run("SetSampleRate is reflected in sample_rate dimension", func(t *testing.T) {
 		t.Cleanup(stubDeviceID("test-device"))
 
 		var captured SendTelemetryPayload
-		svc := newService(func(p SendTelemetryPayload) { captured = p }, ghtelemetry.Dimensions{
-			"sample_rate": "1",
-		})
+		svc := newService(func(p SendTelemetryPayload) { captured = p }, nil)
 		svc.sampleRate = 1
 		svc.sampleBucket = 0
 
 		svc.SetSampleRate(100)
-		svc.Record(ghtelemetry.Event{Type: "test"})
+		svc.Record(ghtelemetry.Event{Type: "test"}, ghtelemetry.IncludeCommonDimensions())
 		svc.Flush()
 
 		require.Len(t, captured.Events, 1)
 		assert.Equal(t, "100", captured.Events[0].Dimensions["sample_rate"])
-	})
-
-	t.Run("WithSampleRate option sets rate on construction", func(t *testing.T) {
-		t.Cleanup(stubDeviceID("test-device"))
-
-		called := false
-		svc := NewService(func(SendTelemetryPayload) { called = true }, WithSampleRate(1))
-
-		svc.Record(ghtelemetry.Event{Type: "test"})
-		svc.Flush()
-
-		// We can't control the bucket from NewService, so we just verify
-		// the service was created without error and Flush doesn't panic.
-		// The actual sampling behavior is tested via direct struct manipulation above.
-		_ = called
 	})
 }
 
@@ -625,7 +630,7 @@ func TestWithAdditionalCommonDimensions(t *testing.T) {
 		}),
 	)
 
-	svc.Record(ghtelemetry.Event{Type: "test"})
+	svc.Record(ghtelemetry.Event{Type: "test"}, ghtelemetry.IncludeCommonDimensions())
 	svc.Flush()
 
 	require.Len(t, captured.Events, 1)

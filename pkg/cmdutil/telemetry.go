@@ -34,7 +34,7 @@ func RecordTelemetry(cmd *cobra.Command, telemetry ghtelemetry.EventRecorder) {
 				"command": cmd.CommandPath(),
 				"flags":   strings.Join(flags, ","),
 			},
-		})
+		}, ghtelemetry.IncludeCommonDimensions())
 
 		return runErr
 	}

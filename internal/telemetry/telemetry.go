@@ -247,8 +247,9 @@ func NewService(flusher func(SendTelemetryPayload), opts ...telemetryServiceOpti
 }
 
 type recordedEvent struct {
-	event      ghtelemetry.Event
-	recordedAt time.Time
+	event                   ghtelemetry.Event
+	recordedAt              time.Time
+	includeCommonDimensions bool
 }
 
 type service struct {
@@ -272,11 +273,20 @@ func (s *service) Disable() {
 	s.disabled = true
 }
 
-func (s *service) Record(event ghtelemetry.Event) {
+func (s *service) Record(event ghtelemetry.Event, opts ...ghtelemetry.RecordOption) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.events = append(s.events, recordedEvent{event: event, recordedAt: time.Now()})
+	var options ghtelemetry.RecordOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	s.events = append(s.events, recordedEvent{
+		event:                   event,
+		recordedAt:              time.Now(),
+		includeCommonDimensions: options.IncludeCommonDimensions,
+	})
 }
 
 func (s *service) SetSampleRate(rate int) {
@@ -284,7 +294,6 @@ func (s *service) SetSampleRate(rate int) {
 	defer s.mu.Unlock()
 
 	s.sampleRate = rate
-	s.commonDimensions["sample_rate"] = strconv.Itoa(rate)
 }
 
 func (s *service) Flush() {
@@ -316,9 +325,12 @@ func (s *service) Flush() {
 
 	for i, recorded := range events {
 		dimensions := map[string]string{
-			"timestamp": recorded.recordedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
+			"timestamp":   recorded.recordedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
+			"sample_rate": strconv.Itoa(s.sampleRate),
 		}
-		maps.Copy(dimensions, s.commonDimensions)
+		if recorded.includeCommonDimensions {
+			maps.Copy(dimensions, s.commonDimensions)
+		}
 		maps.Copy(dimensions, recorded.event.Dimensions)
 
 		payload.Events[i] = PayloadEvent{
@@ -416,7 +428,7 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 
 type NoOpService struct{}
 
-func (s *NoOpService) Record(event ghtelemetry.Event) {}
+func (s *NoOpService) Record(event ghtelemetry.Event, opts ...ghtelemetry.RecordOption) {}
 
 func (s *NoOpService) Disable() {}
 
