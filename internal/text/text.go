@@ -77,7 +77,12 @@ func DisplayURL(urlStr string) string {
 	if scheme == "" {
 		scheme = "https"
 	}
-	return scheme + "://" + u.Hostname() + u.Path
+	path := u.Path
+	// Preserve percent-encoding from the original URL path
+	if u.RawPath != "" {
+		path = u.RawPath
+	}
+	return scheme + "://" + u.Hostname() + path
 }
 
 // RemoveDiacritics returns the input value without "diacritics", or accent marks
