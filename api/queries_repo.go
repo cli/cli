@@ -364,6 +364,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		databaseId
 		name
 		owner { login }
+		sshUrl
 		hasIssuesEnabled
 		description
 		hasWikiEnabled
