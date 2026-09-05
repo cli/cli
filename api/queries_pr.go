@@ -55,7 +55,11 @@ type PullRequest struct {
 	PotentialMergeCommit *Commit
 
 	Files struct {
-		Nodes []PullRequestFile
+		Nodes    []PullRequestFile
+		PageInfo struct {
+			HasNextPage bool
+			EndCursor   string
+		}
 	}
 
 	Author              Author
@@ -79,6 +83,10 @@ type PullRequest struct {
 	Commits struct {
 		TotalCount int
 		Nodes      []PullRequestCommit
+		PageInfo   struct {
+			HasNextPage bool
+			EndCursor   string
+		}
 	}
 	StatusCheckRollup struct {
 		Nodes []StatusCheckRollupNode
@@ -292,7 +300,7 @@ type PullRequestCommitCommit struct {
 			Email string
 			User  GitHubUser
 		}
-	}
+	} `graphql:"authors(first: 100)"`
 	MessageHeadline string
 	MessageBody     string
 	CommittedDate   time.Time
