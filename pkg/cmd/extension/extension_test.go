@@ -43,13 +43,61 @@ func TestUpdateAvailable_CurrentVersionIsLatestVersion(t *testing.T) {
 }
 
 func TestUpdateAvailable(t *testing.T) {
-	e := &Extension{
-		kind:           BinaryKind,
-		currentVersion: "1.0.0",
-		latestVersion:  "1.1.0",
+	tests := []struct {
+		name           string
+		kind           ExtensionKind
+		currentVersion string
+		latestVersion  string
+		want           bool
+	}{
+		{
+			name:           "binary extension: stable release before prerelease should not upgrade",
+			kind:           BinaryKind,
+			currentVersion: "v0.1.7-rc.1",
+			latestVersion:  "v0.1.6",
+			want:           false,
+		},
+		{
+			name:           "binary extension: stable release after prerelease should upgrade",
+			kind:           BinaryKind,
+			currentVersion: "v0.1.7-rc.1",
+			latestVersion:  "v0.1.7",
+			want:           true,
+		},
+		{
+			name:           "binary extension: regular semver upgrade",
+			kind:           BinaryKind,
+			currentVersion: "1.0.0",
+			latestVersion:  "1.1.0",
+			want:           true,
+		},
+		{
+			name:           "binary extension: unparseable version falls back to inequality",
+			kind:           BinaryKind,
+			currentVersion: "custom-build-a",
+			latestVersion:  "custom-build-b",
+			want:           true,
+		},
+		{
+			name:           "git extension: simple tag difference indicates update",
+			kind:           GitKind,
+			currentVersion: "abc1234",
+			latestVersion:  "def5678",
+			want:           true,
+		},
 	}
 
-	assert.True(t, e.UpdateAvailable())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := &Extension{
+				kind:           tt.kind,
+				currentVersion: tt.currentVersion,
+				latestVersion:  tt.latestVersion,
+			}
+
+			assert.Equal(t, tt.want, e.UpdateAvailable())
+		})
+	}
 }
 
 func TestOwnerLocalExtension(t *testing.T) {

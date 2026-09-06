@@ -11,6 +11,7 @@ import (
 
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v3"
 )
 
@@ -212,12 +213,23 @@ func (e *Extension) Owner() string {
 }
 
 func (e *Extension) UpdateAvailable() bool {
+	currentVersion := e.CurrentVersion()
+	latestVersion := e.LatestVersion()
 	if e.IsLocal() ||
-		e.CurrentVersion() == "" ||
-		e.LatestVersion() == "" ||
-		e.CurrentVersion() == e.LatestVersion() {
+		currentVersion == "" ||
+		latestVersion == "" ||
+		currentVersion == latestVersion {
 		return false
 	}
+
+	if e.IsBinary() {
+		current, currentErr := version.NewVersion(currentVersion)
+		latest, latestErr := version.NewVersion(latestVersion)
+		if currentErr == nil && latestErr == nil {
+			return latest.GreaterThan(current)
+		}
+	}
+
 	return true
 }
 
