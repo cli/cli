@@ -186,24 +186,6 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-func Test_interactiveRepoNameAndOwner_repromptsForBlankName(t *testing.T) {
-	pm := prompter.NewMockPrompter(t)
-	pm.RegisterInput("Repository name", func(string, string) (string, error) {
-		return " ", nil
-	})
-	pm.RegisterInput("Repository name", func(string, string) (string, error) {
-		return "OWNER/REPO", nil
-	})
-	ios, _, _, stderr := iostreams.Test()
-
-	name, owner, err := interactiveRepoNameAndOwner(nil, "github.com", pm, ios, "")
-
-	require.NoError(t, err)
-	assert.Equal(t, "REPO", name)
-	assert.Equal(t, "OWNER", owner)
-	assert.Equal(t, "X Repository name cannot be blank\n", stderr.String())
-}
-
 func Test_createRun(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -216,6 +198,52 @@ func Test_createRun(t *testing.T) {
 		wantErr     bool
 		errMsg      string
 	}{
+		{
+			name: "interactive create from scratch with empty name",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					if message != "Repository name" || len(p.InputCalls()) != 1 {
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+					return "", nil
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Create a new repository on github.com from scratch")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			wantErr: true,
+			errMsg:  "repository name cannot be blank",
+		},
+		{
+			name: "interactive create from scratch with whitespace-only name",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					if message != "Repository name" || len(p.InputCalls()) != 1 {
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+					return " \t ", nil
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Create a new repository on github.com from scratch")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			wantErr: true,
+			errMsg:  "repository name cannot be blank",
+		},
 		{
 			name:       "interactive create from scratch with gitignore and license",
 			opts:       &CreateOptions{Interactive: true},
@@ -1095,9 +1123,9 @@ func Test_createRun(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errMsg)
-				return
+			} else {
+				require.NoError(t, err)
 			}
-			require.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, "", stderr.String())
 		})
