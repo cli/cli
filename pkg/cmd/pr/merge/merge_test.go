@@ -1948,6 +1948,93 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 	assert.Equal(t, "✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
+func TestPrAddToMergeQueue_AutoMergeDisabled(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"1",
+		&api.PullRequest{
+			ID:                  "THE-ID",
+			Number:              1,
+			State:               "OPEN",
+			Title:               "The title of the PR",
+			MergeStateStatus:    "CLEAN",
+			IsInMergeQueue:      false,
+			IsMergeQueueEnabled: true,
+			BaseRefName:         "main",
+			Repository: &api.PRRepository{
+				AutoMergeAllowed: false,
+			},
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestEnqueue\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.NotContains(t, input, "expectedHeadOid")
+		}),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 1")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
+}
+
+func TestPrAddToMergeQueue_AutoMergeDisabled_MatchHeadCommit(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"1",
+		&api.PullRequest{
+			ID:                  "THE-ID",
+			Number:              1,
+			State:               "OPEN",
+			Title:               "The title of the PR",
+			MergeStateStatus:    "CLEAN",
+			IsInMergeQueue:      false,
+			IsMergeQueueEnabled: true,
+			BaseRefName:         "main",
+			HeadRefOid:          "1234567890abcdef",
+			Repository: &api.PRRepository{
+				AutoMergeAllowed: false,
+			},
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestEnqueue\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "1234567890abcdef", input["expectedHeadOid"].(string))
+		}),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 1 --match-head-commit 1234567890abcdef")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
+}
+
 func TestPrAddToMergeQueueAdmin(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

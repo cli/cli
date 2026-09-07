@@ -262,6 +262,7 @@ type PRRepository struct {
 	DatabaseID int64 `json:"databaseId,omitempty"`
 	// One of ADMIN, MAINTAIN, WRITE, TRIAGE, READ.
 	ViewerPermission string `json:"viewerPermission,omitempty"`
+	AutoMergeAllowed bool   `json:"autoMergeAllowed,omitempty"`
 }
 
 type AutoMergeRequest struct {

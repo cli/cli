@@ -41,7 +41,12 @@ func TestPullRequestGraphQL(t *testing.T) {
 		{
 			name:   "repository",
 			fields: []string{"repository"},
-			want:   "repository{id,name,nameWithOwner,databaseId,viewerPermission}",
+			want:   "repository{id,name,nameWithOwner,databaseId,viewerPermission,autoMergeAllowed}",
+		},
+		{
+			name:   "autoMergeAllowed",
+			fields: []string{"autoMergeAllowed"},
+			want:   "repository{autoMergeAllowed}",
 		},
 		{
 			// headRepository shares a Go type with the selection above, which
@@ -96,7 +101,7 @@ func TestIssueGraphQL(t *testing.T) {
 		{
 			name:   "repository",
 			fields: []string{"repository"},
-			want:   "repository{id,name,nameWithOwner,databaseId,viewerPermission}",
+			want:   "repository{id,name,nameWithOwner,databaseId,viewerPermission,autoMergeAllowed}",
 		},
 	}
 	for _, tt := range tests {

@@ -408,7 +408,7 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `milestone{number,title,description,dueOn}`)
 		case "repository":
 			// Selects every field PRRepository declares.
-			q = append(q, `repository{id,name,nameWithOwner,databaseId,viewerPermission}`)
+			q = append(q, `repository{id,name,nameWithOwner,databaseId,viewerPermission,autoMergeAllowed}`)
 		case "reactionGroups":
 			q = append(q, `reactionGroups{content,users{totalCount}}`)
 		case "mergeCommit":
@@ -417,6 +417,8 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `potentialMergeCommit{oid}`)
 		case "autoMergeRequest":
 			q = append(q, autoMergeRequest)
+		case "autoMergeAllowed": // pseudo-field
+			q = append(q, `repository{autoMergeAllowed}`)
 		case "comments":
 			q = append(q, issueComments)
 		case "lastComment": // pseudo-field

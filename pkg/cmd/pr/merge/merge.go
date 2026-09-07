@@ -200,6 +200,7 @@ type mergeContext struct {
 	crossRepoPR        bool
 	deleteBranch       bool
 	mergeQueueRequired bool
+	autoMergeAllowed   bool
 }
 
 // Attempt to disable auto merge on the pull request.
@@ -300,8 +301,12 @@ func (m *mergeContext) merge() error {
 			// only warn for now
 			_ = m.warnf("%s The merge strategy for %s is set by the merge queue\n", m.cs.Yellow("!"), m.pr.BaseRefName)
 		}
-		// auto merge will either enable auto merge or add to the merge queue
-		payload.auto = true
+		if m.autoMergeAllowed {
+			// auto merge will either enable auto merge or add to the merge queue
+			payload.auto = true
+		} else {
+			payload.enqueue = true
+		}
 	} else {
 		// get user input if not already given
 		if m.opts.MergeStrategyEmpty {
@@ -568,7 +573,7 @@ func (m *mergeContext) infof(format string, args ...any) error {
 func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName", "baseRefName", "headRefOid", "isInMergeQueue", "isMergeQueueEnabled"},
+		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName", "baseRefName", "headRefOid", "isInMergeQueue", "isMergeQueueEnabled", "autoMergeAllowed"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -578,6 +583,11 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return nil, err
+	}
+
+	autoMergeAllowed := true
+	if pr.Repository != nil {
+		autoMergeAllowed = pr.Repository.AutoMergeAllowed
 	}
 
 	return &mergeContext{
@@ -593,6 +603,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		autoMerge:          opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
 		localBranchExists:  opts.CanDeleteLocalBranch && opts.GitClient.HasLocalBranch(context.Background(), pr.HeadRefName),
 		mergeQueueRequired: pr.IsMergeQueueEnabled,
+		autoMergeAllowed:   autoMergeAllowed,
 	}, nil
 }
 
