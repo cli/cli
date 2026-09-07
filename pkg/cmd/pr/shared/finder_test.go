@@ -1016,6 +1016,7 @@ func TestPreloadPrFiles(t *testing.T) {
 		setupPR   func() *api.PullRequest
 		httpStub  func(*httpmock.Registry)
 		wantPaths []string
+		wantErr   bool
 	}{
 		{
 			name: "no pagination needed",
@@ -1055,6 +1056,32 @@ func TestPreloadPrFiles(t *testing.T) {
 			},
 			wantPaths: []string{"file1.go", "file2.go", "file3.go"},
 		},
+		{
+			name: "subsequent page error is returned",
+			setupPR: func() *api.PullRequest {
+				pr := &api.PullRequest{ID: "PR_123"}
+				pr.Files.Nodes = []api.PullRequestFile{
+					{Path: "file1.go"},
+				}
+				pr.Files.PageInfo.HasNextPage = true
+				pr.Files.PageInfo.EndCursor = "page1"
+				return pr
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query FilesForPullRequest\b`),
+					httpmock.StringResponse(`{"data":{"node":{"files":{
+						"nodes":[{"path":"file2.go","additions":5,"deletions":2,"changeType":"ADDED"}],
+						"pageInfo":{"hasNextPage":true,"endCursor":"page2"}}}}}`),
+				)
+				r.Register(
+					httpmock.GraphQL(`query FilesForPullRequest\b`),
+					httpmock.StatusStringResponse(500, "server error"),
+				)
+			},
+			wantPaths: []string{"file1.go", "file2.go"},
+			wantErr:   true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1070,14 +1097,18 @@ func TestPreloadPrFiles(t *testing.T) {
 			pr := tt.setupPR()
 
 			err := preloadPrFiles(client, repo, pr)
-			require.NoError(t, err)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.False(t, pr.Files.PageInfo.HasNextPage)
+			}
 
 			var gotPaths []string
 			for _, f := range pr.Files.Nodes {
 				gotPaths = append(gotPaths, f.Path)
 			}
 			assert.Equal(t, tt.wantPaths, gotPaths)
-			assert.False(t, pr.Files.PageInfo.HasNextPage)
 		})
 	}
 }
@@ -1088,6 +1119,7 @@ func TestPreloadPrCommits(t *testing.T) {
 		setupPR  func() *api.PullRequest
 		httpStub func(*httpmock.Registry)
 		wantOIDs []string
+		wantErr  bool
 	}{
 		{
 			name: "no pagination needed",
@@ -1128,6 +1160,32 @@ func TestPreloadPrCommits(t *testing.T) {
 			},
 			wantOIDs: []string{"aaa", "bbb", "ccc"},
 		},
+		{
+			name: "subsequent page error is returned",
+			setupPR: func() *api.PullRequest {
+				pr := &api.PullRequest{ID: "PR_123"}
+				pr.Commits.Nodes = []api.PullRequestCommit{
+					{Commit: api.PullRequestCommitCommit{OID: "aaa"}},
+				}
+				pr.Commits.PageInfo.HasNextPage = true
+				pr.Commits.PageInfo.EndCursor = "page1"
+				return pr
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query CommitsForPullRequest\b`),
+					httpmock.StringResponse(`{"data":{"node":{"commits":{
+						"nodes":[{"commit":{"oid":"bbb","authors":{"nodes":[]},"messageHeadline":"second","messageBody":"","committedDate":"2025-01-01T00:00:00Z","authoredDate":"2025-01-01T00:00:00Z"}}],
+						"pageInfo":{"hasNextPage":true,"endCursor":"page2"}}}}}`),
+				)
+				r.Register(
+					httpmock.GraphQL(`query CommitsForPullRequest\b`),
+					httpmock.StatusStringResponse(500, "server error"),
+				)
+			},
+			wantOIDs: []string{"aaa", "bbb"},
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1143,15 +1201,19 @@ func TestPreloadPrCommits(t *testing.T) {
 			pr := tt.setupPR()
 
 			err := preloadPrCommits(client, repo, pr)
-			require.NoError(t, err)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, len(tt.wantOIDs), pr.Commits.TotalCount)
+				assert.False(t, pr.Commits.PageInfo.HasNextPage)
+			}
 
 			var gotOIDs []string
 			for _, c := range pr.Commits.Nodes {
 				gotOIDs = append(gotOIDs, c.Commit.OID)
 			}
 			assert.Equal(t, tt.wantOIDs, gotOIDs)
-			assert.Equal(t, len(tt.wantOIDs), pr.Commits.TotalCount)
-			assert.False(t, pr.Commits.PageInfo.HasNextPage)
 		})
 	}
 }

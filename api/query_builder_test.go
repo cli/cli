@@ -29,6 +29,11 @@ func TestPullRequestGraphQL(t *testing.T) {
 			want:   "files(first: 100) {nodes {additions,deletions,path,changeType},pageInfo{hasNextPage,endCursor}}",
 		},
 		{
+			name:   "commits includes pageInfo",
+			fields: []string{"commits"},
+			want:   "commits(first: 100) {nodes {commit {authors(first:100) {nodes {name,email,user{id,login}}},messageHeadline,messageBody,oid,committedDate,authoredDate}},pageInfo{hasNextPage,endCursor}}",
+		},
+		{
 			name:   "invalid fields",
 			fields: []string{"isPinned", "stateReason", "number"},
 			want:   "number",
