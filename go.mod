@@ -42,7 +42,7 @@ require (
 	github.com/mattn/go-colorable v0.1.15
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
-	github.com/microsoft/dev-tunnels v0.1.27
+	github.com/microsoft/dev-tunnels v0.2.0
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/rivo/tview v0.42.0
