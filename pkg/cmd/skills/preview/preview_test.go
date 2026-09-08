@@ -980,6 +980,11 @@ func TestPreviewRun_InteractiveTelemetryCapturesSelectedSkillName(t *testing.T) 
 	event := recorder.Events[0]
 	assert.Equal(t, "skill_preview", event.Type)
 	assert.Equal(t, "beta", event.Dimensions["skill_name"], "telemetry should capture the selected skill name, not the empty opts.SkillName")
+
+	// Skill events must not include common dimensions (device_id, etc.)
+	require.Len(t, recorder.Options, 1)
+	assert.False(t, recorder.Options[0].IncludeCommonDimensions,
+		"skill_preview should not include common dimensions")
 }
 
 func TestPreviewRun_TelemetryVisibility(t *testing.T) {

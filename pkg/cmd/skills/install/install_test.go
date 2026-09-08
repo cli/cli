@@ -2629,6 +2629,11 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			assert.Equal(t, "skill_install", event.Type)
 			assert.NotEmpty(t, event.Dimensions["agent_hosts"], "agent_hosts should always be present")
 
+			// Skill events must not include common dimensions (device_id, etc.)
+			require.Len(t, recorder.Options, 1)
+			assert.False(t, recorder.Options[0].IncludeCommonDimensions,
+				"skill_install should not include common dimensions")
+
 			// skill_host_type is always recorded (categorized, no raw hostname for enterprise/tenancy).
 			assert.Equal(t, "github.com", event.Dimensions["skill_host_type"])
 

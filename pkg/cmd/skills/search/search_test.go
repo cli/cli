@@ -650,4 +650,9 @@ func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 		"skill_search_install must not record the search query")
 	assert.Empty(t, installEvent.Dimensions["owner"],
 		"skill_search_install must not record the search owner filter")
+
+	// Skill events must not include common dimensions (device_id, etc.)
+	require.Len(t, recorder.Options, 1)
+	assert.False(t, recorder.Options[0].IncludeCommonDimensions,
+		"skill_search_install should not include common dimensions")
 }
