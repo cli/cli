@@ -2170,6 +2170,97 @@ func TestProjectsV1Deprecation(t *testing.T) {
 	})
 }
 
+func TestIssueCreate_assigneeFailureStillOutputsURL(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"id": "NEWISSUEID",
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]any) {
+			assert.Equal(t, "hello", inputs["title"])
+			assert.Equal(t, "world", inputs["body"])
+		}))
+	http.Register(
+		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+		httpmock.StringResponse(`
+		{ "errors": [{ "message": "GraphQL: user doesn't have the correct permissions" }] }
+	`))
+
+	output, err := runCommand(http, true, `-a monalisa -t hello -b "world"`, nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "permissions")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
+}
+
+func TestIssueCreate_assigneeFailureDoesNotPreserveInput(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.StringResponse(`
+		{ "data": { "createIssue": { "issue": {
+			"id": "NEWISSUEID",
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`))
+	http.Register(
+		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+		httpmock.StringResponse(`
+		{ "errors": [{ "message": "GraphQL: user doesn't have the correct permissions" }] }
+	`))
+
+	pm := &prompter.PrompterMock{}
+	output, err := runCommand(http, true, `-a monalisa -t hello -b "world"`, pm)
+	assert.Error(t, err)
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
+	assert.NotContains(t, output.ErrBuf.String(), "To restore: gh issue create --recover")
+}
+
+func TestIssueCreate_creationFailureDoesNotOutputURL(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.StringResponse(`
+		{ "errors": [{ "message": "GraphQL: cannot create issue" }] }
+	`))
+
+	output, err := runCommand(http, true, `-t hello -b "world"`, nil)
+	assert.Error(t, err)
+	assert.Empty(t, output.String())
+}
+
 // issueNodeIDByNumberMatcher matches an IssueNodeID GraphQL query whose
 // number variable equals the given value. Used by tests that issue
 // multiple IssueNodeID lookups and need stubs to route by issue number

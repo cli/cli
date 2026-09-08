@@ -42,13 +42,21 @@ type IssueMetadataState struct {
 	MetadataResult *api.RepoMetadataResult
 
 	dirty bool // whether user i/o has modified this
+	cleaned bool // whether the issue/pr has been created, suppressing input preservation
 }
 
 func (tb *IssueMetadataState) MarkDirty() {
 	tb.dirty = true
 }
 
+func (tb *IssueMetadataState) Clean() {
+	tb.cleaned = true
+}
+
 func (tb *IssueMetadataState) IsDirty() bool {
+	if tb.cleaned {
+		return false
+	}
 	return tb.dirty || tb.HasMetadata()
 }
 

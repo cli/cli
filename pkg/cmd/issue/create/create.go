@@ -479,6 +479,10 @@ func createRun(opts *CreateOptions) (err error) {
 
 		var newIssue *api.Issue
 		newIssue, err = api.IssueCreate(apiClient, repo, params)
+		if newIssue != nil {
+			tb.Clean()
+			fmt.Fprintln(opts.IO.Out, newIssue.URL)
+		}
 		if err != nil {
 			return
 		}
@@ -491,8 +495,6 @@ func createRun(opts *CreateOptions) (err error) {
 		if err = api.DeferredUpdateIssue(apiClient, updateOpts); err != nil {
 			return
 		}
-
-		fmt.Fprintln(opts.IO.Out, newIssue.URL)
 	} else {
 		panic("Unreachable state")
 	}
