@@ -77,9 +77,9 @@ type CreateOptions struct {
 
 	DryRun bool
 
-	AttachFlag      *attachments.Flag
-	AttachTelemetry *attachments.InvocationTelemetry
-	Assets          []attachments.UserAsset
+	AttachFlag  *attachments.Flag
+	AttachEvent ghtelemetry.PendingEvent
+	Assets      []attachments.UserAsset
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
@@ -273,7 +273,10 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			$ gh pr create --attach './login.png#The login error state'
 			$ gh pr create --attach ./before.png --attach ./after.png
 		`),
-		Args:    cmdutil.NoArgsQuoteReminder,
+		Args: func(cmd *cobra.Command, args []string) error {
+			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			return cmdutil.NoArgsQuoteReminder(cmd, args)
+		},
 		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
@@ -403,8 +406,6 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
 	opts.AttachFlag = attachments.AddFlag(cmd)
-	opts.AttachTelemetry = attachments.NewInvocationTelemetry(opts.AttachFlag, telemetry)
-	cmd.Args = opts.AttachTelemetry.WrapArgs(cmd.Args)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -1129,7 +1130,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	var uploadErr error
 	if uploader != nil {
 		body, uploadResult, err := uploader.UploadAndAttach(context.Background(), state.Body, opts.Assets)
-		opts.AttachTelemetry.RecordOperations(uploadResult)
+		attachments.RecordOperations(opts.AttachEvent, uploadResult)
 		// With nothing uploaded, a body that lost the files it was written
 		// around is not what the caller asked to create. The branch is already
 		// pushed by now, so the message says what was not created rather than

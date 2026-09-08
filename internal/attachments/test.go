@@ -40,9 +40,8 @@ func NewTestAssets(t *testing.T, names ...string) []UserAsset {
 	return assets
 }
 
-// NewTestInvocationTelemetry returns telemetry started with the given
-// attachment count.
-func NewTestInvocationTelemetry(t *testing.T, recorder ghtelemetry.InvocationRecorder, attachCount int) *InvocationTelemetry {
+// BeginTestTelemetry returns a pending event with the given attachment count.
+func BeginTestTelemetry(t *testing.T, recorder ghtelemetry.InvocationRecorder, attachCount int) ghtelemetry.PendingEvent {
 	t.Helper()
 
 	cmd := &cobra.Command{Use: "test"}
@@ -50,9 +49,7 @@ func NewTestInvocationTelemetry(t *testing.T, recorder ghtelemetry.InvocationRec
 	for i := range attachCount {
 		require.NoError(t, cmd.Flags().Set(flagName, "attachment-"+strconv.Itoa(i)+".png"))
 	}
-	invocationTelemetry := NewInvocationTelemetry(attachFlag, recorder)
-	invocationTelemetry.start("gh test")
-	return invocationTelemetry
+	return BeginTelemetry(attachFlag, recorder, "gh test")
 }
 
 // AssertTestTelemetryEvents verifies the completed invocation event shape.

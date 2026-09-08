@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -61,7 +62,7 @@ type CommentableOptions struct {
 	BodyProvided     bool
 	KeepExistingBody bool
 	AttachFlag       *attachments.Flag
-	AttachTelemetry  *attachments.InvocationTelemetry
+	AttachEvent      ghtelemetry.PendingEvent
 	Assets           []attachments.UserAsset
 	Config           func() (gh.Config, error)
 }
@@ -355,7 +356,7 @@ func bodyForWrite(opts *CommentableOptions, uploader *attachments.Uploader) (bod
 		return opts.Body, true, nil
 	}
 	body, uploadResult, err := uploader.UploadAndAttach(context.Background(), opts.Body, opts.Assets)
-	opts.AttachTelemetry.RecordOperations(uploadResult)
+	attachments.RecordOperations(opts.AttachEvent, uploadResult)
 	if err != nil && uploadResult.Uploaded == 0 {
 		return "", false, err
 	}

@@ -1,7 +1,6 @@
 package attachments
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -91,7 +90,7 @@ func TestAddFlag(t *testing.T) {
 	}
 }
 
-func TestInvocationTelemetry(t *testing.T) {
+func TestAttachmentTelemetry(t *testing.T) {
 	tests := []struct {
 		name              string
 		input             string
@@ -147,12 +146,11 @@ func TestInvocationTelemetry(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, attachFlag := attachCmd(t, tt.input)
 			recorder := &telemetry.InvocationRecorderSpy{}
-			invocationTelemetry := NewInvocationTelemetry(attachFlag, recorder)
 
-			invocationTelemetry.start("gh issue comment")
+			event := BeginTelemetry(attachFlag, recorder, "gh issue comment")
 			assert.Empty(t, recorder.Events)
 			if tt.operations != nil {
-				invocationTelemetry.RecordOperations(*tt.operations)
+				RecordOperations(event, *tt.operations)
 			}
 			if tt.wantValidationErr != "" {
 				_, err := attachFlag.UserAssets()
@@ -186,45 +184,6 @@ func TestInvocationTelemetry(t *testing.T) {
 			require.Equal(t, wantEvents, recorder.Events)
 		})
 	}
-}
-
-func TestInvocationTelemetryWrapArgsRecordsBeforePersistentPreRunError(t *testing.T) {
-	recorder := &telemetry.InvocationRecorderSpy{}
-	cmd := &cobra.Command{
-		Use:  "comment",
-		Args: cobra.ExactArgs(1),
-		RunE: func(*cobra.Command, []string) error {
-			return errors.New("run should not be called")
-		},
-	}
-	attachFlag := AddFlag(cmd)
-	invocationTelemetry := NewInvocationTelemetry(attachFlag, recorder)
-	cmd.Args = invocationTelemetry.WrapArgs(cmd.Args)
-
-	root := &cobra.Command{
-		Use:           "gh",
-		SilenceErrors: true,
-		SilenceUsage:  true,
-		PersistentPreRunE: func(*cobra.Command, []string) error {
-			return errors.New("authentication failed")
-		},
-	}
-	root.AddCommand(cmd)
-	root.SetArgs([]string{"comment", "1", "--attach", "./shot.png"})
-
-	_, err := root.ExecuteC()
-	require.EqualError(t, err, "authentication failed")
-	recorder.Finish()
-
-	require.Equal(t, []ghtelemetry.Event{{
-		Type:       "attachment_invocation",
-		Dimensions: ghtelemetry.Dimensions{"command": "gh comment"},
-		Measures: ghtelemetry.Measures{
-			"attach_count":      1,
-			"append_ops_count":  0,
-			"replace_ops_count": 0,
-		},
-	}}, recorder.Events)
 }
 
 func TestFlagUserAssets(t *testing.T) {

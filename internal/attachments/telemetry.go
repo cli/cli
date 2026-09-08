@@ -1,65 +1,36 @@
 package attachments
 
-import (
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
-	"github.com/spf13/cobra"
-)
+import "github.com/cli/cli/v2/internal/gh/ghtelemetry"
 
-// InvocationTelemetry records telemetry for one command invocation using
-// attachments.
-type InvocationTelemetry struct {
-	flag     *Flag
-	recorder ghtelemetry.InvocationRecorder
-	event    ghtelemetry.PendingEvent
-}
-
-// NewInvocationTelemetry creates attachment telemetry for flag.
-func NewInvocationTelemetry(flag *Flag, recorder ghtelemetry.InvocationRecorder) *InvocationTelemetry {
-	return &InvocationTelemetry{
-		flag:     flag,
-		recorder: recorder,
-	}
-}
-
-// WrapArgs starts attachment telemetry before argument validation.
-func (t *InvocationTelemetry) WrapArgs(validate cobra.PositionalArgs) cobra.PositionalArgs {
-	return func(cmd *cobra.Command, args []string) error {
-		t.start(cmd.CommandPath())
-		return validate(cmd, args)
-	}
-}
-
-func (t *InvocationTelemetry) start(command string) {
-	if t == nil {
-		return
+// BeginTelemetry records attachment usage before validation and promotes full sampling.
+// It returns nil if the flag was not passed or the flag or recorder is absent.
+func BeginTelemetry(flag *Flag, recorder ghtelemetry.InvocationRecorder, command string) ghtelemetry.PendingEvent {
+	if recorder == nil || flag == nil || !flag.Changed() {
+		return nil
 	}
 
-	t.event = nil
-	if t.recorder == nil || t.flag == nil || !t.flag.Changed() {
-		return
-	}
-
-	t.recorder.SetSampleRate(ghtelemetry.SAMPLE_ALL)
-	t.event = t.recorder.Begin(ghtelemetry.Event{
+	recorder.SetSampleRate(ghtelemetry.SAMPLE_ALL)
+	return recorder.Begin(ghtelemetry.Event{
 		Type: "attachment_invocation",
 		Dimensions: ghtelemetry.Dimensions{
 			"command": command,
 		},
 		Measures: ghtelemetry.Measures{
-			"attach_count":      int64(len(t.flag.values)),
+			"attach_count":      int64(len(flag.values)),
 			"append_ops_count":  0,
 			"replace_ops_count": 0,
 		},
 	})
 }
 
-// RecordOperations adds successful markdown operations to the invocation.
-func (t *InvocationTelemetry) RecordOperations(result UploadResult) {
-	if t == nil || t.event == nil {
+// RecordOperations upserts completed markdown operation counts, including partial results.
+// A nil event means there is no attachment telemetry to update.
+func RecordOperations(event ghtelemetry.PendingEvent, result UploadResult) {
+	if event == nil {
 		return
 	}
 
-	t.event.UpsertMeasures(ghtelemetry.Measures{
+	event.UpsertMeasures(ghtelemetry.Measures{
 		"append_ops_count":  int64(result.AppendOperations),
 		"replace_ops_count": int64(result.ReplaceOperations),
 	})

@@ -58,9 +58,9 @@ type CreateOptions struct {
 	BlockedBy   []string
 	Blocking    []string
 
-	AttachFlag      *attachments.Flag
-	AttachTelemetry *attachments.InvocationTelemetry
-	Assets          []attachments.UserAsset
+	AttachFlag  *attachments.Flag
+	AttachEvent ghtelemetry.PendingEvent
+	Assets      []attachments.UserAsset
 }
 
 func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CreateOptions) error) *cobra.Command {
@@ -119,7 +119,10 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			$ gh issue create --parent https://github.com/cli/go-gh/issues/42
 			$ gh issue create --blocked-by 200,201 --blocking 300
 		`),
-		Args:    cmdutil.NoArgsQuoteReminder,
+		Args: func(cmd *cobra.Command, args []string) error {
+			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			return cmdutil.NoArgsQuoteReminder(cmd, args)
+		},
 		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -193,8 +196,6 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 	cmd.Flags().StringSliceVar(&opts.BlockedBy, "blocked-by", nil, "Mark the new issue as blocked by these issue `numbers` or URLs")
 	cmd.Flags().StringSliceVar(&opts.Blocking, "blocking", nil, "Mark the new issue as blocking these issue `numbers` or URLs")
 	opts.AttachFlag = attachments.AddFlag(cmd)
-	opts.AttachTelemetry = attachments.NewInvocationTelemetry(opts.AttachFlag, telemetry)
-	cmd.Args = opts.AttachTelemetry.WrapArgs(cmd.Args)
 
 	return cmd
 }
@@ -468,7 +469,7 @@ func createRun(opts *CreateOptions) (err error) {
 		// issue is created and the failures are reported.
 		if uploader != nil {
 			body, uploadResult, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.Assets)
-			opts.AttachTelemetry.RecordOperations(uploadResult)
+			attachments.RecordOperations(opts.AttachEvent, uploadResult)
 			if uploadErr != nil && uploadResult.Uploaded == 0 {
 				err = uploadErr
 				return

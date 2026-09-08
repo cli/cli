@@ -22,6 +22,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -478,6 +479,49 @@ func TestNewCmdComment(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewCmdCommentRecordsAttachmentsBeforePersistentPreRunError(t *testing.T) {
+	t.Parallel()
+
+	// Given an attachment command whose parent rejects execution before PreRunE
+	ios, _, _, _ := iostreams.Test()
+	f := &cmdutil.Factory{
+		IOStreams: ios,
+		Browser:   &browser.Stub{},
+		Config:    testConfig(),
+	}
+	recorder := &telemetry.InvocationRecorderSpy{}
+	cmd := NewCmdComment(f, recorder, func(*shared.CommentableOptions) error {
+		return errors.New("run should not be called")
+	})
+	root := &cobra.Command{
+		Use:           "gh",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return errors.New("authentication failed")
+		},
+	}
+	root.AddCommand(cmd)
+	root.SetArgs([]string{"comment", "1", "--attach", "./shot.png"})
+
+	// When authentication fails and telemetry is completed
+	_, err := root.ExecuteC()
+	require.EqualError(t, err, "authentication failed")
+	recorder.Finish()
+
+	// Then the attempted attachment is retained without completed operations
+	assert.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
+	assert.Equal(t, []ghtelemetry.Event{{
+		Type:       "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "gh comment"},
+		Measures: ghtelemetry.Measures{
+			"attach_count":      1,
+			"append_ops_count":  0,
+			"replace_ops_count": 0,
+		},
+	}}, recorder.Events)
 }
 
 func Test_commentRun(t *testing.T) {

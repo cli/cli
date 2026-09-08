@@ -2062,7 +2062,7 @@ func Test_createRun(t *testing.T) {
 			defer cleanSetup()
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				opts.AttachTelemetry = attachments.NewTestInvocationTelemetry(t, attachmentRecorder, len(opts.Assets))
+				opts.AttachEvent = attachments.BeginTestTelemetry(t, attachmentRecorder, len(opts.Assets))
 			}
 
 			// All tests in this function use github.com behavior

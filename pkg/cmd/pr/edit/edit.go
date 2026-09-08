@@ -40,10 +40,10 @@ type EditOptions struct {
 	SelectorArg string
 	Interactive bool
 
-	AttachFlag      *attachments.Flag
-	AttachTelemetry *attachments.InvocationTelemetry
-	Assets          []attachments.UserAsset
-	Config          func() (gh.Config, error)
+	AttachFlag  *attachments.Flag
+	AttachEvent ghtelemetry.PendingEvent
+	Assets      []attachments.UserAsset
+	Config      func() (gh.Config, error)
 
 	shared.Editable
 }
@@ -134,7 +134,10 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			$ gh pr edit 23 --milestone "Version 1"
 			$ gh pr edit 23 --remove-milestone
 		`),
-		Args: cobra.MaximumNArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			return cobra.MaximumNArgs(1)(cmd, args)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
 
@@ -257,8 +260,6 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the pull request belongs to by `name`")
 	cmd.Flags().BoolVar(&removeMilestone, "remove-milestone", false, "Remove the milestone association from the pull request")
 	opts.AttachFlag = attachments.AddFlag(cmd)
-	opts.AttachTelemetry = attachments.NewInvocationTelemetry(opts.AttachFlag, telemetry)
-	cmd.Args = opts.AttachTelemetry.WrapArgs(cmd.Args)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base")
 
@@ -426,7 +427,7 @@ func editRun(opts *EditOptions) error {
 		// Nothing that can prompt or cancel may follow this.
 		var uploadResult attachments.UploadResult
 		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
-		opts.AttachTelemetry.RecordOperations(uploadResult)
+		attachments.RecordOperations(opts.AttachEvent, uploadResult)
 
 		// With nothing uploaded, even a body the caller typed goes unwritten:
 		// its references are still local paths, which render broken. The other

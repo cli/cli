@@ -1437,7 +1437,7 @@ func Test_createRun(t *testing.T) {
 			}
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				opts.AttachTelemetry = attachments.NewTestInvocationTelemetry(t, attachmentRecorder, len(tt.attach))
+				opts.AttachEvent = attachments.BeginTestTelemetry(t, attachmentRecorder, len(tt.attach))
 			}
 			opts.Config = func() (gh.Config, error) {
 				cfg := tt.config

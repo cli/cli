@@ -1768,7 +1768,7 @@ func Test_editRun(t *testing.T) {
 			}
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				tt.input.AttachTelemetry = attachments.NewTestInvocationTelemetry(t, attachmentRecorder, len(tt.attach))
+				tt.input.AttachEvent = attachments.BeginTestTelemetry(t, attachmentRecorder, len(tt.attach))
 			}
 
 			hostTokens := tt.hostTokens

@@ -51,10 +51,10 @@ type EditOptions struct {
 	AddBlocking     []string
 	RemoveBlocking  []string
 
-	AttachFlag      *attachments.Flag
-	AttachTelemetry *attachments.InvocationTelemetry
-	Assets          []attachments.UserAsset
-	Config          func() (gh.Config, error)
+	AttachFlag  *attachments.Flag
+	AttachEvent ghtelemetry.PendingEvent
+	Assets      []attachments.UserAsset
+	Config      func() (gh.Config, error)
 
 	prShared.Editable
 }
@@ -122,7 +122,10 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			$ gh issue edit 100 --add-sub-issue 123,124
 			$ gh issue edit 123 --add-blocked-by 200 --add-blocking 300,301
 		`),
-		Args: cobra.MinimumNArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			return cobra.MinimumNArgs(1)(cmd, args)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			issueNumbers, baseRepo, err := issueShared.ParseIssuesFromArgs(args)
 			if err != nil {
@@ -273,8 +276,6 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 	cmd.Flags().StringSliceVar(&opts.AddBlocking, "add-blocking", nil, "Add 'blocking' relationships by issue `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.RemoveBlocking, "remove-blocking", nil, "Remove 'blocking' relationships by issue `number` or URL")
 	opts.AttachFlag = attachments.AddFlag(cmd)
-	opts.AttachTelemetry = attachments.NewInvocationTelemetry(opts.AttachFlag, telemetry)
-	cmd.Args = opts.AttachTelemetry.WrapArgs(cmd.Args)
 
 	return cmd
 }
@@ -421,7 +422,7 @@ func editRun(opts *EditOptions) error {
 		// prompt or cancel may follow an upload.
 		var uploadResult attachments.UploadResult
 		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
-		opts.AttachTelemetry.RecordOperations(uploadResult)
+		attachments.RecordOperations(opts.AttachEvent, uploadResult)
 
 		if uploadResult.Uploaded > 0 {
 			editable.Body.Value = body
