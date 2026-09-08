@@ -393,6 +393,8 @@ func issueStateTitleWithColor(cs *iostreams.ColorScheme, issue *api.Issue) strin
 	state := "Open"
 	if issue.State == "CLOSED" {
 		state = "Closed"
+	} else if issue.State == "MERGED" {
+                state = "Merged"
 	}
 	return colorFunc(state)
 }
