@@ -438,7 +438,7 @@ func TestNewCmdComment(t *testing.T) {
 			assert.NoError(t, err)
 
 			var gotOpts *shared.CommentableOptions
-			recorder := &telemetry.CommandRecorderSpy{}
+			recorder := &telemetry.InvocationRecorderSpy{}
 			cmd := NewCmdComment(f, recorder, func(opts *shared.CommentableOptions) error {
 				gotOpts = opts
 				return nil

@@ -361,7 +361,7 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.NoError(t, err)
 
 			var gotOpts *EditOptions
-			recorder := &telemetry.CommandRecorderSpy{}
+			recorder := &telemetry.InvocationRecorderSpy{}
 			cmd := NewCmdEdit(f, recorder, func(opts *EditOptions) error {
 				gotOpts = opts
 				return nil
@@ -1693,7 +1693,7 @@ func Test_editRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
-			attachmentRecorder := &telemetry.CommandRecorderSpy{}
+			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
 				tt.input.AttachTelemetry = attachments.NewTestInvocationTelemetry(t, attachmentRecorder, len(tt.attach))
 			}

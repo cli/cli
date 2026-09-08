@@ -84,7 +84,7 @@ func TestNewCmdPreview(t *testing.T) {
 			}
 
 			var gotOpts *PreviewOptions
-			cmd := NewCmdPreview(f, &telemetry.NoOpInvocation{}, func(opts *PreviewOptions) error {
+			cmd := NewCmdPreview(f, &telemetry.EventRecorderSpy{}, func(opts *PreviewOptions) error {
 				gotOpts = opts
 				return nil
 			})

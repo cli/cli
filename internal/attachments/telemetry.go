@@ -9,12 +9,12 @@ import (
 // attachments.
 type InvocationTelemetry struct {
 	flag     *Flag
-	recorder ghtelemetry.CommandRecorder
+	recorder ghtelemetry.InvocationRecorder
 	event    ghtelemetry.PendingEvent
 }
 
 // NewInvocationTelemetry creates attachment telemetry for flag.
-func NewInvocationTelemetry(flag *Flag, recorder ghtelemetry.CommandRecorder) *InvocationTelemetry {
+func NewInvocationTelemetry(flag *Flag, recorder ghtelemetry.InvocationRecorder) *InvocationTelemetry {
 	return &InvocationTelemetry{
 		flag:     flag,
 		recorder: recorder,

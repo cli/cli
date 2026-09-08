@@ -104,7 +104,7 @@ func TestNewCmdSearch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{}
 			var gotOpts *SearchOptions
-			cmd := NewCmdSearch(f, &telemetry.NoOpInvocation{}, func(opts *SearchOptions) error {
+			cmd := NewCmdSearch(f, &telemetry.EventRecorderSpy{}, func(opts *SearchOptions) error {
 				gotOpts = opts
 				return nil
 			})

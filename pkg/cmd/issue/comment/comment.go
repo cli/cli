@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*prShared.CommentableOptions) error) *cobra.Command {
+func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*prShared.CommentableOptions) error) *cobra.Command {
 	opts := &prShared.CommentableOptions{
 		IO:                        f.IOStreams,
 		HttpClient:                f.HttpClient,

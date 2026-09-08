@@ -6,34 +6,30 @@ import (
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 )
 
+var (
+	_ ghtelemetry.EventRecorder = (*EventRecorderSpy)(nil)
+	_ ghtelemetry.Invocation    = (*InvocationRecorderSpy)(nil)
+)
+
+// EventRecorderSpy captures complete events immediately. Finish includes pending
+// events in recording order and freezes their handles without requiring policy methods.
 type EventRecorderSpy struct {
-	Events []ghtelemetry.Event
+	Events   []ghtelemetry.Event
+	events   []*ghtelemetry.Event
+	finished bool
 }
 
+// Record captures a complete event without waiting for Finish.
 func (r *EventRecorderSpy) Record(event ghtelemetry.Event) {
-	r.Events = append(r.Events, event)
-}
-
-func (r *EventRecorderSpy) Disable() {}
-
-// CommandRecorderSpy is a test double for ghtelemetry.CommandRecorder.
-// Finish exposes completed events. LastSampleRate captures the sampling policy
-// commands attempt to configure.
-type CommandRecorderSpy struct {
-	Events         []ghtelemetry.Event
-	LastSampleRate int
-	events         []*ghtelemetry.Event
-	finished       bool
-}
-
-func (r *CommandRecorderSpy) Record(event ghtelemetry.Event) {
+	if r.finished {
+		return
+	}
 	r.BeginEvent(event)
+	r.Events = append(r.Events, cloneEvent(event))
 }
-
-func (r *CommandRecorderSpy) Disable() {}
 
 // BeginEvent captures initial facts and returns a handle for subsequent updates.
-func (r *CommandRecorderSpy) BeginEvent(event ghtelemetry.Event) ghtelemetry.PendingEvent {
+func (r *EventRecorderSpy) BeginEvent(event ghtelemetry.Event) ghtelemetry.PendingEvent {
 	if r.finished {
 		return noOpPendingEvent{}
 	}
@@ -42,24 +38,35 @@ func (r *CommandRecorderSpy) BeginEvent(event ghtelemetry.Event) ghtelemetry.Pen
 	return &pendingEventSpy{recorder: r, event: &event}
 }
 
-func (r *CommandRecorderSpy) SetSampleRate(rate int) {
-	r.LastSampleRate = rate
-}
-
 // Finish snapshots recorded facts into Events once.
-func (r *CommandRecorderSpy) Finish() {
+func (r *EventRecorderSpy) Finish() {
 	if r.finished {
 		return
 	}
 	r.finished = true
+	r.Events = nil
 	for _, event := range r.events {
 		r.Events = append(r.Events, cloneEvent(*event))
 	}
 	r.events = nil
 }
 
+// InvocationRecorderSpy adds invocation policy to EventRecorderSpy.
+type InvocationRecorderSpy struct {
+	EventRecorderSpy
+	LastSampleRate int
+}
+
+// Disable leaves captured events available for assertions.
+func (r *InvocationRecorderSpy) Disable() {}
+
+// SetSampleRate captures the sampling policy requested by a command.
+func (r *InvocationRecorderSpy) SetSampleRate(rate int) {
+	r.LastSampleRate = rate
+}
+
 type pendingEventSpy struct {
-	recorder *CommandRecorderSpy
+	recorder *EventRecorderSpy
 	event    *ghtelemetry.Event
 }
 

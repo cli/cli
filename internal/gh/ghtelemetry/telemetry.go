@@ -21,21 +21,23 @@ type Disabler interface {
 	Disable()
 }
 
+// EventRecorder produces complete or in-progress events.
 type EventRecorder interface {
 	Record(event Event)
-	Disabler
-}
-
-type CommandRecorder interface {
-	EventRecorder
 	// BeginEvent records initial facts that can be updated until invocation completion.
 	BeginEvent(Event) PendingEvent
+}
+
+// InvocationRecorder produces events and controls invocation-wide reporting policy.
+type InvocationRecorder interface {
+	EventRecorder
+	Disabler
 	SetSampleRate(rate int)
 }
 
-// Invocation collects telemetry throughout command execution and completes it once.
+// Invocation owns the lifetime of telemetry collection for a command execution.
 type Invocation interface {
-	CommandRecorder
+	InvocationRecorder
 	Finish()
 }
 

@@ -59,7 +59,7 @@ type EditOptions struct {
 	prShared.Editable
 }
 
-func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*EditOptions) error) *cobra.Command {
+func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
 		IO:                 f.IOStreams,
 		HttpClient:         f.HttpClient,

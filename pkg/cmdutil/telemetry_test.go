@@ -18,7 +18,7 @@ func TestRecordTelemetry(t *testing.T) {
 		t.Parallel()
 
 		// Given a command that requires a positional argument
-		recorder := &telemetry.CommandRecorderSpy{}
+		recorder := &telemetry.EventRecorderSpy{}
 		cmd := &cobra.Command{
 			Use:           "list",
 			Args:          cobra.ExactArgs(1),
@@ -63,7 +63,7 @@ func TestRecordTelemetry(t *testing.T) {
 			t.Parallel()
 
 			// Given a command without argument validation
-			recorder := &telemetry.CommandRecorderSpy{}
+			recorder := &telemetry.EventRecorderSpy{}
 			cmd := &cobra.Command{
 				Use:  "list",
 				RunE: func(cmd *cobra.Command, args []string) error { return nil },
@@ -97,7 +97,7 @@ func TestRecordTelemetry(t *testing.T) {
 		t.Parallel()
 
 		// Given a command using Run instead of RunE
-		recorder := &telemetry.CommandRecorderSpy{}
+		recorder := &telemetry.EventRecorderSpy{}
 		output := &bytes.Buffer{}
 		cmd := &cobra.Command{
 			Use: "test",
@@ -123,7 +123,7 @@ func TestRecordTelemetry(t *testing.T) {
 		t.Parallel()
 
 		// Given a command that manually parses flags before execution fails
-		recorder := &telemetry.CommandRecorderSpy{}
+		recorder := &telemetry.EventRecorderSpy{}
 		expectedErr := fmt.Errorf("something went wrong")
 		cmd := &cobra.Command{
 			Use:                "copilot",
@@ -158,7 +158,7 @@ func TestRecordTelemetry(t *testing.T) {
 		t.Parallel()
 
 		// Given a command whose parent rejects execution before RunE
-		recorder := &telemetry.CommandRecorderSpy{}
+		recorder := &telemetry.EventRecorderSpy{}
 		expectedErr := fmt.Errorf("authentication required")
 		root := &cobra.Command{
 			Use:               "gh",
@@ -191,7 +191,7 @@ func TestRecordTelemetry(t *testing.T) {
 		t.Parallel()
 
 		// Given a command whose pre-run validation fails
-		recorder := &telemetry.CommandRecorderSpy{}
+		recorder := &telemetry.EventRecorderSpy{}
 		expectedErr := fmt.Errorf("incompatible flags")
 		cmd := &cobra.Command{
 			Use:           "list",
@@ -218,7 +218,7 @@ func TestRecordTelemetry(t *testing.T) {
 		t.Parallel()
 
 		// Given a command with telemetry disabled
-		recorder := &telemetry.CommandRecorderSpy{}
+		recorder := &telemetry.EventRecorderSpy{}
 		cmd := &cobra.Command{
 			Use:  "internal",
 			RunE: func(cmd *cobra.Command, args []string) error { return nil },
@@ -241,7 +241,7 @@ func TestRecordTelemetryForSubcommands(t *testing.T) {
 	t.Parallel()
 
 	// Given a command tree instrumented from its root
-	recorder := &telemetry.CommandRecorderSpy{}
+	recorder := &telemetry.EventRecorderSpy{}
 	root := &cobra.Command{Use: "gh"}
 	parent := &cobra.Command{Use: "pr"}
 	child := &cobra.Command{

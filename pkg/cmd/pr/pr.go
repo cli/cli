@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdPR(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder) *cobra.Command {
+func NewCmdPR(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pr <command>",
 		Short: "Manage pull requests",

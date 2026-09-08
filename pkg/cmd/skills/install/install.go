@@ -73,7 +73,7 @@ type InstallOptions struct {
 }
 
 // NewCmdInstall creates the "skills install" command.
-func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*InstallOptions) error) *cobra.Command {
+func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.EventRecorder, runF func(*InstallOptions) error) *cobra.Command {
 	opts := &InstallOptions{
 		IO:         f.IOStreams,
 		Telemetry:  telemetry,

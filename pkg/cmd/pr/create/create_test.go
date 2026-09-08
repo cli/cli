@@ -342,7 +342,7 @@ func TestNewCmdCreate(t *testing.T) {
 			}
 
 			var opts *CreateOptions
-			recorder := &telemetry.CommandRecorderSpy{}
+			recorder := &telemetry.InvocationRecorderSpy{}
 			cmd := NewCmdCreate(f, recorder, func(o *CreateOptions) error {
 				opts = o
 				return nil
@@ -2060,7 +2060,7 @@ func Test_createRun(t *testing.T) {
 				cleanSetup = tt.setup(&opts, t)
 			}
 			defer cleanSetup()
-			attachmentRecorder := &telemetry.CommandRecorderSpy{}
+			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
 				opts.AttachTelemetry = attachments.NewTestInvocationTelemetry(t, attachmentRecorder, len(opts.Assets))
 			}

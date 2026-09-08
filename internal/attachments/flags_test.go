@@ -146,7 +146,7 @@ func TestInvocationTelemetry(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, attachFlag := attachCmd(t, tt.input)
-			recorder := &telemetry.CommandRecorderSpy{}
+			recorder := &telemetry.InvocationRecorderSpy{}
 			invocationTelemetry := NewInvocationTelemetry(attachFlag, recorder)
 
 			invocationTelemetry.start("gh issue comment")
@@ -189,7 +189,7 @@ func TestInvocationTelemetry(t *testing.T) {
 }
 
 func TestInvocationTelemetryWrapArgsRecordsBeforePersistentPreRunError(t *testing.T) {
-	recorder := &telemetry.CommandRecorderSpy{}
+	recorder := &telemetry.InvocationRecorderSpy{}
 	cmd := &cobra.Command{
 		Use:  "comment",
 		Args: cobra.ExactArgs(1),

@@ -42,7 +42,7 @@ func NewTestAssets(t *testing.T, names ...string) []UserAsset {
 
 // NewTestInvocationTelemetry returns telemetry started with the given
 // attachment count.
-func NewTestInvocationTelemetry(t *testing.T, recorder ghtelemetry.CommandRecorder, attachCount int) *InvocationTelemetry {
+func NewTestInvocationTelemetry(t *testing.T, recorder ghtelemetry.InvocationRecorder, attachCount int) *InvocationTelemetry {
 	t.Helper()
 
 	cmd := &cobra.Command{Use: "test"}

@@ -12,6 +12,11 @@ import (
 	"github.com/google/uuid"
 )
 
+var (
+	_ ghtelemetry.Invocation = (*Invocation)(nil)
+	_ ghtelemetry.Invocation = (*NoOpInvocation)(nil)
+)
+
 // Invocation owns telemetry facts and reporting policy for one command execution.
 // Finish must run after command execution and before delivery is flushed.
 type Invocation struct {

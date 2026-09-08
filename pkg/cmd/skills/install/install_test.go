@@ -157,7 +157,7 @@ func TestNewCmdInstall(t *testing.T) {
 			}
 
 			var gotOpts *InstallOptions
-			cmd := NewCmdInstall(f, &telemetry.NoOpInvocation{}, func(opts *InstallOptions) error {
+			cmd := NewCmdInstall(f, &telemetry.EventRecorderSpy{}, func(opts *InstallOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -198,7 +198,7 @@ func TestNewCmdInstall(t *testing.T) {
 	t.Run("command metadata", func(t *testing.T) {
 		ios, _, _, _ := iostreams.Test()
 		f := &cmdutil.Factory{IOStreams: ios, Prompter: &prompter.PrompterMock{}, GitClient: &git.Client{}}
-		cmd := NewCmdInstall(f, &telemetry.NoOpInvocation{}, nil)
+		cmd := NewCmdInstall(f, &telemetry.EventRecorderSpy{}, nil)
 
 		assert.Equal(t, "install <repository> [<skill[@version]>] [flags]", cmd.Use)
 		assert.NotEmpty(t, cmd.Short)

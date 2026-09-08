@@ -10,7 +10,7 @@ import (
 )
 
 // RecordTelemetry instruments a command with an invocation-owned telemetry event.
-func RecordTelemetry(cmd *cobra.Command, telemetry ghtelemetry.CommandRecorder) {
+func RecordTelemetry(cmd *cobra.Command, telemetry ghtelemetry.EventRecorder) {
 	if isTelemetryDisabled(cmd) {
 		return
 	}
@@ -54,7 +54,7 @@ func telemetryFlags(cmd *cobra.Command) string {
 }
 
 // RecordTelemetryForSubcommands instruments all descendants of a command.
-func RecordTelemetryForSubcommands(cmd *cobra.Command, telemetry ghtelemetry.CommandRecorder) {
+func RecordTelemetryForSubcommands(cmd *cobra.Command, telemetry ghtelemetry.EventRecorder) {
 	for _, c := range cmd.Commands() {
 		RecordTelemetry(c, telemetry)
 		RecordTelemetryForSubcommands(c, telemetry)

@@ -63,7 +63,7 @@ type CreateOptions struct {
 	Assets          []attachments.UserAsset
 }
 
-func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*CreateOptions) error) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
