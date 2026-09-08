@@ -1,7 +1,9 @@
 # API and hosts
 
-Read this before editing or reviewing HTTP requests, host selection,
-authentication, or GitHub Enterprise Server (GHES) capability checks.
+[Development guides](README.md)
+
+Conventions for changing and reviewing HTTP requests, host selection,
+authentication, and GitHub Enterprise Server (GHES) capability checks.
 
 ## Choose the host the operation actually targets
 
@@ -17,20 +19,20 @@ first determine whether the operation already has an explicit or repository
 host. A default must not override a repository selected by `-R` or `GH_REPO`.
 
 See `listRun`, `issueList`, and `milestoneByNumber` in
-[issue/list](../../pkg/cmd/issue/list/list.go) for resolved-repository host use,
-and `AuthConfig.DefaultHost` in [config.go](../../internal/config/config.go)
+[issue/list](../pkg/cmd/issue/list/list.go) for resolved-repository host use,
+and `AuthConfig.DefaultHost` in [config.go](../internal/config/config.go)
 for configured default behavior. Preserve delayed Factory binding described in
-[Commands](commands.md#structure-and-lifecycle).
+[Command development](command-development.md#structure-and-lifecycle).
 
 ## Reuse clients, authentication, and request handling
 
 Obtain the command's configured HTTP client from its existing dependency.
-[`factory.New` and `HttpClientFunc`](../../pkg/cmd/factory/default.go) wire
+[`factory.New` and `HttpClientFunc`](../pkg/cmd/factory/default.go) wire
 configuration, authentication, I/O, and transport behavior. Do not substitute a
 bare client, copy token lookup, or hand-build an API endpoint for a normal
 GitHub API operation.
 
-[`api.NewClientFromHTTP`](../../api/client.go) wraps that client. Reuse its
+[`api.NewClientFromHTTP`](../api/client.go) wraps that client. Reuse its
 `GraphQL`/`Query`/`Mutate` and `REST` methods, or the existing request surface
 appropriate to the response. Pass the chosen host and a relative API path.
 Preserve endpoint-specific headers, scopes, redirect policy, error handling,
@@ -38,15 +40,15 @@ and pagination through the shared abstractions. Avoid extra round trips and
 request only fields the command needs, including requested JSON export fields.
 
 When changing API routing or constructing a client/request, also read
-[`api_host`](../api-host.md); consult its
-[test harness](../api-host-test-harness.md) when exercising routing changes.
+[`api_host`](api-host.md); consult its
+[test harness](api-host-test-harness.md) when exercising routing changes.
 The logical GitHub host still owns authentication, Git remotes, and web URLs;
 an API gateway is not a replacement repository host. Do not assume every
 command or service is already migrated or should use the gateway.
 
 ## Feature detection and cleanup
 
-Reuse [`featuredetection.Detector`](../../internal/featuredetection/feature_detection.go)
+Reuse [`featuredetection.Detector`](../internal/featuredetection/feature_detection.go)
 and existing capability definitions instead of scattered version tests.
 Construct the detector for the target host using the existing client/cache
 pattern. Propagate detection errors rather than treating them as unsupported.

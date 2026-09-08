@@ -219,7 +219,7 @@ but still real improvement.
 The oracle is the grep going to zero for that pattern, plus tests passing.
 
 **`ghinstance.Default()` call sites.** Read
-[API and hosts](../../../docs/agent-guides/api-and-hosts.md) before choosing one.
+[API and hosts](../../../docs/api-and-hosts.md) before choosing one.
 The function always returns `github.com`; first establish whether the call site
 should honor a resolved repository, explicit host, or configured default:
 
@@ -240,7 +240,7 @@ The oracle is weak, so these are not eligible by default. Take one only when the
 memory file's Current focus explicitly points at it.
 
 **Feature detection cleanups.**
-[API and hosts](../../../docs/agent-guides/api-and-hosts.md#feature-detection-and-cleanup)
+[API and hosts](../../../docs/api-and-hosts.md#feature-detection-and-cleanup)
 requires a `// TODO <cleanupIdentifier>` comment above temporary feature-gate
 branches, not permanent GHES exclusions. The identifier groups sites that must be
 removed together once the API is GA on all supported GHES versions:
@@ -303,7 +303,7 @@ such as `internal/text`, then the standard library.
 
 New behavior needs a test. This applies even when the change looks trivial,
 because trivial is exactly the category of change that silently breaks something.
-Read [Testing](../../../docs/agent-guides/testing.md) before editing tests:
+Read [Testing](../../../docs/testing.md) before editing tests:
 use the relevant behavioral seam, `httpmock` for HTTP, `require` for error
 assertions, and `iostreams.Test()` for output.
 

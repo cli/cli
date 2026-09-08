@@ -36,7 +36,7 @@ Run the new binary as:
 
 Run tests with: `go test ./...`
 
-See [project layout documentation](../docs/project-layout.md) for information on where to find specific source files.
+See the [development guides](../docs/README.md) for project layout, command conventions, testing, and API/host behavior.
 
 ## Submitting a pull request
 

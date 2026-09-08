@@ -52,13 +52,14 @@ public contribution process.
 ## Read before changing
 
 Read only the guides matching the task, before editing or reviewing that area.
-These guides carry repository conventions, not optional suggestions.
+These are the same [development guides](docs/README.md) used by human
+contributors. They carry repository conventions, not optional suggestions.
 
 | When the task involves | Read first |
 | --- | --- |
-| Command wiring, flags, prompts, help, or output | [Commands](docs/agent-guides/commands.md) |
-| Tests, fixtures, or generated test doubles | [Testing](docs/agent-guides/testing.md) |
-| API calls, host/auth selection, or GHES capabilities | [API and hosts](docs/agent-guides/api-and-hosts.md) |
+| Command wiring, flags, prompts, help, or output | [Command development](docs/command-development.md) |
+| Tests, fixtures, or generated test doubles | [Testing](docs/testing.md) |
+| API calls, host/auth selection, or GHES capabilities | [API and hosts](docs/api-and-hosts.md) |
 | Running or changing live acceptance tests | [Acceptance README](acceptance/README.md) |
 | Finding source files | [Project layout](docs/project-layout.md) |
 | Toolchain or environment setup | [CONTRIBUTING](.github/CONTRIBUTING.md#building-the-project), [go.mod](go.mod), and the [Copilot setup workflow](.github/workflows/copilot-setup-steps.yml) where applicable |
@@ -72,25 +73,11 @@ make                       # Unix: bin/gh
 go run script/build.go     # Windows: bin/gh.exe
 ```
 
-Exercise the built binary, not an installed `gh`. Start with affected-package
-tests; substitute the actual package and test name in these examples:
-
-```sh
-go test ./pkg/cmd/issue/list/... -run '^TestNewCmdList$'
-go test ./pkg/cmd/issue/list/...
-```
-
-Before committing code changes, run the existing quality gates:
-
-```sh
-go fix ./pkg/cmd/issue/list/...  # Substitute changed packages; inspect its edits
-go test ./...
-make lint                      # golangci-lint run ./...
-```
-
-These are not full CI parity: [Go CI](.github/workflows/go.yml) adds
-race/integration coverage and [lint CI](.github/workflows/lint.yml) adds module,
-modernization, license, and vulnerability checks. Report blocked checks honestly.
+Exercise the built binary, not an installed `gh`. Follow the shared
+[local validation guide](docs/testing.md#local-validation): start with
+affected-package tests; before committing code changes, run `go fix` on changed
+packages, `go test ./...`, and `make lint`. The guide distinguishes these gates
+from additional CI checks. Report blocked checks honestly.
 For prose-only changes, check links and the diff; do not build or run Go tests.
 
 ## Implementation and handoff

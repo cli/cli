@@ -18,7 +18,7 @@ Before critiquing the diff, establish what the change is for and whether it was 
 
 ## Conventions
 
-Read [AGENTS.md](../../../AGENTS.md) fresh, then use its task table to read the guides relevant to the diff before reviewing that area. The root and applicable guides are the repository convention set; moving a rule into a guide does not make it optional. In particular, command/output changes use [Commands](../../../docs/agent-guides/commands.md), tests use [Testing](../../../docs/agent-guides/testing.md), and API/host/feature changes use [API and hosts](../../../docs/agent-guides/api-and-hosts.md). Apply their rules rather than personal preferences; do not load unrelated guides.
+Read [AGENTS.md](../../../AGENTS.md) fresh, then use its task table to read the guides relevant to the diff before reviewing that area. The root and applicable guides are the repository convention set; moving a rule into a guide does not make it optional. In particular, command/output changes use [Command development](../../../docs/command-development.md), tests use [Testing](../../../docs/testing.md), and API/host/feature changes use [API and hosts](../../../docs/api-and-hosts.md). Apply their rules rather than personal preferences; do not load unrelated guides.
 
 If a finding concerns a vulnerability, stop public reporting and follow [SECURITY](../../SECURITY.md). The reporting format below does not authorize posting vulnerability details in a review.
 
