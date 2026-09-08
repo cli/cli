@@ -86,7 +86,9 @@ tree from the same parent, include the script's `$RANDOM_STRING` in the commit
 contents or message; branch names do not affect commit IDs.
 
 `isolated` creates an initialized private repository exclusively for the script.
-Use it when clean state or repository-global mutation is required.
+Use it when clean state, repository-global mutation, or multiple coordinated Git
+ref updates are required. Consolidate related operations into one isolated
+script when they can share that repository sequentially.
 
 `none` creates no managed repository. Use it when no repository is needed or
 when a test needs multiple repositories, public visibility, special creation
@@ -100,6 +102,10 @@ For Code Search's 10 requests/minute bucket, use at most five HTTP requests in
 the entire acceptance process even when they run sequentially. This leaves room
 for pagination, retries, and other token activity. Keep representative live
 coverage and use unit tests for remaining variants.
+
+Tests that cancel workflow runs should use a self-contained, deliberately
+long-running job so it cannot finish before the cancellation request, plus a
+short job timeout to bound a failed cancellation.
 
 #### Custom Commands
 

@@ -18,7 +18,7 @@ Every script must contain exactly one declaration:
 | Mode | Use when |
 | --- | --- |
 | `fixture-repo shared REPO` | One initialized private repository is enough and every operation can coexist with concurrent and accumulated state. |
-| `fixture-repo isolated REPO` | One initialized private repository is enough, but the test needs clean state or changes repository-global state. |
+| `fixture-repo isolated REPO` | One initialized private repository is enough, but the test needs clean state, changes repository-global state, or performs multiple coordinated Git ref updates. |
 | `fixture-repo none` | No repository is needed, or the test needs multiple repositories, public visibility, special creation options, or repository lifecycle coverage. |
 
 Managed fixtures are initialized, have discussions enabled, and are deleted by
@@ -45,9 +45,9 @@ when the repository already contains unrelated resources.
   affect commit IDs, so include the script's `$RANDOM_STRING` in the commit
   contents or message when scripts could otherwise create the same tree from the
   same parent.
-- Consolidate repository-scoped operations that GitHub serializes, such as
-  merging pull requests, into one script so they run sequentially. Otherwise,
-  use `isolated`.
+- Consolidate related repository-scoped operations, such as merging pull
+  requests, into one `isolated` script. Unique refs do not prevent concurrent
+  Git pushes and merges in a shared repository from contending.
 - GitHub normalizes some identifiers. Use `env2upper` for Actions variables and
   secrets whose generated names are asserted later.
 - Capture the created resource's URL or ID. Filter and paginate list operations;
@@ -72,6 +72,10 @@ remaining variants to unit tests.
 Use bounded condition-based waits for asynchronously registered resources.
 Fixed sleeps are both slower when registration is fast and unreliable when it
 is slow. Use `wait-for-run` before watching or inspecting a workflow run.
+Cancellation tests must use a self-contained workflow with a deliberately long
+step so the run cannot finish before the cancellation request, plus a short job
+timeout so a failed cancellation cannot run for the full step. Do not lengthen
+registration sleeps to compensate for a short or externally dependent job.
 
 ## Organization safety
 
