@@ -76,7 +76,7 @@ func TestKramdownCompatibleDocs(t *testing.T) {
 		},
 	}
 
-	cmd, err := NewCmdRoot(f, &telemetry.NoOpInvocation{}, "N/A", "")
+	cmd, err := NewCmdRoot(f, &telemetry.NoOpService{}, "N/A", "")
 	require.NoError(t, err)
 
 	var walk func(*cobra.Command)

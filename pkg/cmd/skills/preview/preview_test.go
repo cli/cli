@@ -425,7 +425,7 @@ func TestPreviewRun(t *testing.T) {
 			tt.opts.IO = ios
 
 			tt.opts.Prompter = &prompter.PrompterMock{}
-			tt.opts.Telemetry = &telemetry.NoOpInvocation{}
+			tt.opts.Telemetry = &telemetry.NoOpService{}
 
 			err := previewRun(tt.opts)
 
@@ -448,7 +448,7 @@ func TestPreviewRun_UnsupportedHost(t *testing.T) {
 		IO:         ios,
 		HttpClient: func() (*http.Client, error) { return &http.Client{}, nil },
 		repo:       ghrepo.NewWithHost("github", "awesome-copilot", "acme.ghes.com"),
-		Telemetry:  &telemetry.NoOpInvocation{},
+		Telemetry:  &telemetry.NoOpService{},
 	})
 	require.ErrorContains(t, err, "does not currently support GitHub Enterprise Server")
 }
@@ -510,7 +510,7 @@ func TestPreviewRun_Interactive(t *testing.T) {
 		HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 		Prompter:   pm,
 		repo:       ghrepo.New("owner", "repo"),
-		Telemetry:  &telemetry.NoOpInvocation{},
+		Telemetry:  &telemetry.NoOpService{},
 	}
 
 	err := previewRun(opts)
@@ -606,7 +606,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 			Prompter:   pm,
 			repo:       ghrepo.New("owner", "repo"),
 			SkillName:  "my-skill",
-			Telemetry:  &telemetry.NoOpInvocation{},
+			Telemetry:  &telemetry.NoOpService{},
 		}
 
 		err := previewRun(opts)
@@ -690,7 +690,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 				renderCalls++
 				return fmt.Sprintf("rendered:%s", filePath)
 			},
-			Telemetry: &telemetry.NoOpInvocation{},
+			Telemetry: &telemetry.NoOpService{},
 		}
 
 		err := previewRun(opts)
@@ -716,7 +716,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("owner", "repo"),
 			SkillName:  "my-skill",
-			Telemetry:  &telemetry.NoOpInvocation{},
+			Telemetry:  &telemetry.NoOpService{},
 		}
 
 		err := previewRun(opts)
@@ -823,7 +823,7 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("monalisa", "skills-repo"),
 			SkillName:  "my-skill",
-			Telemetry:  &telemetry.NoOpInvocation{},
+			Telemetry:  &telemetry.NoOpService{},
 		}
 
 		err := previewRun(opts)
@@ -861,7 +861,7 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("monalisa", "skills-repo"),
 			SkillName:  "my-skill",
-			Telemetry:  &telemetry.NoOpInvocation{},
+			Telemetry:  &telemetry.NoOpService{},
 		}
 
 		err := previewRun(opts)
@@ -894,7 +894,7 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("monalisa", "skills-repo"),
 			SkillName:  "my-skill",
-			Telemetry:  &telemetry.NoOpInvocation{},
+			Telemetry:  &telemetry.NoOpService{},
 		}
 
 		err := previewRun(opts)
@@ -1253,7 +1253,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("owner", "repo"),
 			SkillName:  "my-skill",
-			Telemetry:  &telemetry.NoOpInvocation{},
+			Telemetry:  &telemetry.NoOpService{},
 		}
 
 		err := previewRun(opts)
@@ -1302,7 +1302,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			repo:            ghrepo.New("owner", "repo"),
 			SkillName:       "hidden-skill",
 			AllowHiddenDirs: true,
-			Telemetry:       &telemetry.NoOpInvocation{},
+			Telemetry:       &telemetry.NoOpService{},
 		}
 
 		err := previewRun(opts)
@@ -1347,7 +1347,7 @@ func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
 			Prompter:   &prompter.PrompterMock{},
 			repo:       ghrepo.New("owner", "repo"),
 			SkillName:  "hidden-skill",
-			Telemetry:  &telemetry.NoOpInvocation{},
+			Telemetry:  &telemetry.NoOpService{},
 		}
 
 		err := previewRun(opts)

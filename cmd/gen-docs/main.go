@@ -54,7 +54,7 @@ func run(args []string) error {
 			return config.NewMockConfigFromString(""), nil
 		},
 		ExtensionManager: &em{},
-	}, &telemetry.NoOpInvocation{}, "", "")
+	}, &telemetry.NoOpService{}, "", "")
 	rootCmd.InitDefaultHelpCmd()
 
 	if err := os.MkdirAll(*dir, 0755); err != nil {

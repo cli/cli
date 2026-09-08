@@ -11,23 +11,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInvocationCopiesFactsAtTheirRecordingTime(t *testing.T) {
+func TestServiceCopiesFactsAtTheirRecordingTime(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	synctest.Test(t, func(t *testing.T) {
 		// Given a producer that reuses its event and update maps
 		var payload SendTelemetryPayload
-		invocation := NewInvocation(func(p SendTelemetryPayload) { payload = p })
+		service := NewService(func(p SendTelemetryPayload) { payload = p })
 		facts := ghtelemetry.Event{
 			Type:       "command_invocation",
 			Dimensions: ghtelemetry.Dimensions{"command": "gh issue create"},
 			Measures:   ghtelemetry.Measures{"count": 1},
 		}
 		startedAt := time.Now()
-		pending := invocation.BeginEvent(facts)
+		pending := service.BeginEvent(facts)
 		time.Sleep(time.Second)
 		facts.Type = "completed_step"
-		invocation.Record(facts)
+		service.Record(facts)
 
 		// When the producer updates pending facts and later reuses those maps
 		facts.Dimensions["command"] = "unrelated"
@@ -39,7 +39,7 @@ func TestInvocationCopiesFactsAtTheirRecordingTime(t *testing.T) {
 		dimensions["flags"] = "unrelated"
 		measures["count"] = 99
 		time.Sleep(time.Second)
-		invocation.Finish()
+		service.Finish()
 
 		// Then event order, original timestamps, and independently owned facts survive
 		require.Len(t, payload.Events, 2)
@@ -56,19 +56,19 @@ func TestInvocationCopiesFactsAtTheirRecordingTime(t *testing.T) {
 	})
 }
 
-func TestInvocationPromotesAllEventsBeforeCompletion(t *testing.T) {
+func TestServicePromotesAllEventsBeforeCompletion(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	// Given a command that discovers its full-sampling policy after recording facts
 	var payload SendTelemetryPayload
-	invocation := NewInvocation(func(p SendTelemetryPayload) { payload = p }, WithSampleRate(1))
-	invocation.Record(ghtelemetry.Event{Type: "completed_step"})
-	pending := invocation.BeginEvent(ghtelemetry.Event{Type: "attachment_invocation"})
+	service := NewService(func(p SendTelemetryPayload) { payload = p }, WithSampleRate(1))
+	service.Record(ghtelemetry.Event{Type: "completed_step"})
+	pending := service.BeginEvent(ghtelemetry.Event{Type: "attachment_invocation"})
 
 	// When attachment usage promotes the invocation before it finishes
-	invocation.SetSampleRate(ghtelemetry.SAMPLE_ALL)
+	service.SetSampleRate(ghtelemetry.SAMPLE_ALL)
 	pending.SetMeasures(ghtelemetry.Measures{"attach_count": 2})
-	invocation.Finish()
+	service.Finish()
 
 	// Then immediate and pending events share the promoted sampling policy
 	require.Len(t, payload.Events, 2)
@@ -80,47 +80,47 @@ func TestInvocationPromotesAllEventsBeforeCompletion(t *testing.T) {
 	assert.Equal(t, int64(2), payload.Events[1].Measures["attach_count"])
 }
 
-func TestInvocationDisablingOverridesPromotedPendingEvents(t *testing.T) {
+func TestServiceDisablingOverridesPromotedPendingEvents(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	// Given immediate and pending events in a fully sampled invocation
 	var payloads []SendTelemetryPayload
-	invocation := NewInvocation(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-	invocation.Record(ghtelemetry.Event{Type: "completed_step"})
-	pending := invocation.BeginEvent(ghtelemetry.Event{Type: "attachment_invocation"})
-	invocation.SetSampleRate(ghtelemetry.SAMPLE_ALL)
+	service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
+	service.Record(ghtelemetry.Event{Type: "completed_step"})
+	pending := service.BeginEvent(ghtelemetry.Event{Type: "attachment_invocation"})
+	service.SetSampleRate(ghtelemetry.SAMPLE_ALL)
 
 	// When host discovery disables telemetry before completion
-	invocation.Disable()
+	service.Disable()
 	pending.SetMeasures(ghtelemetry.Measures{"attach_count": 2})
-	invocation.Record(ghtelemetry.Event{Type: "another_step"})
-	invocation.Finish()
+	service.Record(ghtelemetry.Event{Type: "another_step"})
+	service.Finish()
 
 	// Then delivery receives only the empty payload used by log mode
 	require.Len(t, payloads, 1)
 	assert.Empty(t, payloads[0].Events)
 }
 
-func TestInvocationCompletionCannotBeReopened(t *testing.T) {
+func TestServiceCompletionCannotBeReopened(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	// Given a completed invocation with one pending event
 	var payloads []SendTelemetryPayload
-	invocation := NewInvocation(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-	pending := invocation.BeginEvent(ghtelemetry.Event{
+	service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
+	pending := service.BeginEvent(ghtelemetry.Event{
 		Type:       "command_invocation",
 		Dimensions: ghtelemetry.Dimensions{"command": "gh issue create"},
 	})
-	invocation.Finish()
+	service.Finish()
 
 	// When cleanup repeats or code holding an old handle attempts further recording
 	pending.SetDimensions(ghtelemetry.Dimensions{"command": "changed"})
-	invocation.Record(ghtelemetry.Event{Type: "too_late"})
-	late := invocation.BeginEvent(ghtelemetry.Event{Type: "also_too_late"})
+	service.Record(ghtelemetry.Event{Type: "too_late"})
+	late := service.BeginEvent(ghtelemetry.Event{Type: "also_too_late"})
 	late.SetDimensions(ghtelemetry.Dimensions{"command": "changed"})
 	late.SetMeasures(ghtelemetry.Measures{"count": 1})
-	invocation.Finish()
-	invocation.Finish()
+	service.Finish()
+	service.Finish()
 
 	// Then the original snapshot is delivered exactly once
 	require.Len(t, payloads, 1)
@@ -129,19 +129,19 @@ func TestInvocationCompletionCannotBeReopened(t *testing.T) {
 	assert.Equal(t, "gh issue create", payloads[0].Events[0].Dimensions["command"])
 }
 
-func TestInvocationCleanupDuringSendCannotChangePayload(t *testing.T) {
+func TestServiceCleanupDuringSendCannotChangePayload(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	// Given a sender that is still working when command cleanup runs
 	sendStarted := make(chan struct{})
 	allowSend := make(chan struct{})
 	var payloads []SendTelemetryPayload
-	invocation := NewInvocation(func(payload SendTelemetryPayload) {
+	service := NewService(func(payload SendTelemetryPayload) {
 		close(sendStarted)
 		<-allowSend
 		payloads = append(payloads, payload)
 	})
-	pending := invocation.BeginEvent(ghtelemetry.Event{
+	pending := service.BeginEvent(ghtelemetry.Event{
 		Type:       "attachment_invocation",
 		Dimensions: ghtelemetry.Dimensions{"command": "gh issue create"},
 		Measures:   ghtelemetry.Measures{"append_ops_count": 1},
@@ -150,7 +150,7 @@ func TestInvocationCleanupDuringSendCannotChangePayload(t *testing.T) {
 	// When cleanup updates an old handle and repeats completion during sending
 	done := make(chan struct{})
 	go func() {
-		invocation.Finish()
+		service.Finish()
 		close(done)
 	}()
 	<-sendStarted
@@ -158,8 +158,8 @@ func TestInvocationCleanupDuringSendCannotChangePayload(t *testing.T) {
 	go func() {
 		pending.SetDimensions(ghtelemetry.Dimensions{"command": "changed"})
 		pending.SetMeasures(ghtelemetry.Measures{"append_ops_count": 99})
-		invocation.Record(ghtelemetry.Event{Type: "too_late"})
-		invocation.Finish()
+		service.Record(ghtelemetry.Event{Type: "too_late"})
+		service.Finish()
 		close(cleanupDone)
 	}()
 
@@ -179,13 +179,13 @@ func TestInvocationCleanupDuringSendCannotChangePayload(t *testing.T) {
 	assert.Equal(t, int64(1), payloads[0].Events[0].Measures["append_ops_count"])
 }
 
-func TestInvocationCollectsConcurrentFacts(t *testing.T) {
+func TestServiceCollectsConcurrentFacts(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	// Given two command activities contributing to the same pending event
 	var payload SendTelemetryPayload
-	invocation := NewInvocation(func(p SendTelemetryPayload) { payload = p })
-	pending := invocation.BeginEvent(ghtelemetry.Event{Type: "attachment_invocation"})
+	service := NewService(func(p SendTelemetryPayload) { payload = p })
+	pending := service.BeginEvent(ghtelemetry.Event{Type: "attachment_invocation"})
 
 	// When both activities finish before command completion
 	var workers sync.WaitGroup
@@ -198,7 +198,7 @@ func TestInvocationCollectsConcurrentFacts(t *testing.T) {
 		pending.SetMeasures(ghtelemetry.Measures{"replace_ops_count": 2})
 	})
 	workers.Wait()
-	invocation.Finish()
+	service.Finish()
 
 	// Then the completed event contains both activities' facts
 	require.Len(t, payload.Events, 1)

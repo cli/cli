@@ -1580,7 +1580,7 @@ func TestInstallRun(t *testing.T) {
 					Agent:        "claude-code",
 					Scope:        "user",
 					ScopeChanged: true,
-					Telemetry:    &telemetry.NoOpInvocation{},
+					Telemetry:    &telemetry.NoOpService{},
 				}
 			},
 			assert: func(t *testing.T) {
@@ -1611,7 +1611,7 @@ func TestInstallRun(t *testing.T) {
 					Agent:        "pi",
 					Scope:        "user",
 					ScopeChanged: true,
-					Telemetry:    &telemetry.NoOpInvocation{},
+					Telemetry:    &telemetry.NoOpService{},
 				}
 			},
 			assert: func(t *testing.T) {
@@ -1644,7 +1644,7 @@ func TestInstallRun(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 			opts := tt.opts(ios, reg)
 			if opts.Telemetry == nil {
-				opts.Telemetry = &telemetry.NoOpInvocation{}
+				opts.Telemetry = &telemetry.NoOpService{}
 			}
 
 			err := installRun(opts)
@@ -1701,7 +1701,7 @@ func TestInstallRun_AllInstallsRemoteSkills(t *testing.T) {
 		Scope:        "project",
 		ScopeChanged: true,
 		Dir:          targetDir,
-		Telemetry:    &telemetry.NoOpInvocation{},
+		Telemetry:    &telemetry.NoOpService{},
 	})
 	require.NoError(t, err)
 	assert.Contains(t, stdout.String(), "Installed code-review")
@@ -1762,7 +1762,7 @@ func TestInstallRun_DeduplicatesSharedProjectDirAcrossHosts(t *testing.T) {
 		SkillSource: "monalisa/octocat-skills",
 		SkillName:   "git-commit",
 		Force:       true,
-		Telemetry:   &telemetry.NoOpInvocation{},
+		Telemetry:   &telemetry.NoOpService{},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 1, strings.Count(stdout.String(), "Installed git-commit"))
@@ -2787,7 +2787,7 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 							return 0, nil
 						},
 					},
-					Telemetry:    &telemetry.NoOpInvocation{},
+					Telemetry:    &telemetry.NoOpService{},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
 					Agent:        "github-copilot",
@@ -2829,7 +2829,7 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 							return 1, nil
 						},
 					},
-					Telemetry:    &telemetry.NoOpInvocation{},
+					Telemetry:    &telemetry.NoOpService{},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
 					Agent:        "github-copilot",
@@ -2858,7 +2858,7 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
-					Telemetry:    &telemetry.NoOpInvocation{},
+					Telemetry:    &telemetry.NoOpService{},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
 					Agent:        "github-copilot",
@@ -2892,7 +2892,7 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
-					Telemetry:    &telemetry.NoOpInvocation{},
+					Telemetry:    &telemetry.NoOpService{},
 					SkillSource:  "monalisa/skills-repo",
 					SkillName:    "git-commit",
 					Agent:        "github-copilot",

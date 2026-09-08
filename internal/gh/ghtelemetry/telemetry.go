@@ -35,8 +35,8 @@ type InvocationRecorder interface {
 	SetSampleRate(rate int)
 }
 
-// Invocation owns the lifetime of telemetry collection for a command execution.
-type Invocation interface {
+// Service collects telemetry for one command execution and sends it on Finish.
+type Service interface {
 	InvocationRecorder
 	Finish()
 }

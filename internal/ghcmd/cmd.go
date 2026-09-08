@@ -83,34 +83,34 @@ func Main() exitCode {
 		"spinner_disabled":    strconv.FormatBool(ioStreams.GetSpinnerDisabled()),
 	}
 
-	var invocation ghtelemetry.Invocation
+	var telemetryService ghtelemetry.Service
 	switch {
 	case cfgErr != nil:
 		// Without a valid on-disk config we can't honour user telemetry preferences, so disable it to be safe.
-		invocation = &telemetry.NoOpInvocation{}
+		telemetryService = &telemetry.NoOpService{}
 	default:
 		telemetryState := telemetry.ParseTelemetryState(cfg.Telemetry().Value)
 		telemetryDisabled := mightBeGHESUser(cfg)
 
 		switch telemetryState {
 		case telemetry.Disabled:
-			invocation = &telemetry.NoOpInvocation{}
+			telemetryService = &telemetry.NoOpService{}
 		case telemetry.Logged:
-			// Always construct the real invocation in log mode so that the log
+			// Always construct the real service in log mode so that the log
 			// flusher runs and surfaces an explicit "Telemetry payload: none"
 			// marker when no events will be sent. This gives the user an
 			// observable signal that telemetry is wired up even when their
 			// context (e.g. GHES) causes events to be dropped.
-			invocation = telemetry.NewInvocation(
+			telemetryService = telemetry.NewService(
 				telemetry.LogFlusher(ioStreams.ErrOut, ioStreams.ColorEnabled()),
 				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
 			)
 			if telemetryDisabled {
-				invocation.Disable()
+				telemetryService.Disable()
 			}
 		case telemetry.Enabled:
 			if telemetryDisabled {
-				invocation = &telemetry.NoOpInvocation{}
+				telemetryService = &telemetry.NoOpService{}
 				break
 			}
 			sampleRate := 1
@@ -118,7 +118,7 @@ func Main() exitCode {
 				sampleRate = v
 			}
 			additionalCommonDimensions["sample_rate"] = strconv.Itoa(sampleRate)
-			invocation = telemetry.NewInvocation(
+			telemetryService = telemetry.NewService(
 				telemetry.GitHubFlusher(ghExecutablePath),
 				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
 				telemetry.WithSampleRate(sampleRate),
@@ -129,9 +129,9 @@ func Main() exitCode {
 		}
 	}
 	// Complete and send events even when returning before Cobra reaches RunE.
-	defer invocation.Finish()
+	defer telemetryService.Finish()
 
-	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, invocation)
+	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
 
 	if cfgErr == nil {
 		var m migration.MultiAccount
@@ -174,7 +174,7 @@ func Main() exitCode {
 		cobra.MousetrapHelpText = ""
 	}
 
-	rootCmd, err := root.NewCmdRoot(cmdFactory, invocation, buildVersion, buildDate)
+	rootCmd, err := root.NewCmdRoot(cmdFactory, telemetryService, buildVersion, buildDate)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to create root command: %s\n", err)
 		return exitError

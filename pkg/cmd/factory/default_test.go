@@ -353,7 +353,7 @@ func TestSSOURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := config.NewMockConfig()
 			ios, _, _, stderr := iostreams.Test()
-			client, err := HttpClientFunc(func() (gh.Config, error) { return cfg, nil }, ios, "v1.2.3", "", &telemetry.NoOpInvocation{})()
+			client, err := HttpClientFunc(func() (gh.Config, error) { return cfg, nil }, ios, "v1.2.3", "", &telemetry.NoOpService{})()
 			require.NoError(t, err)
 			req, err := http.NewRequest("GET", ts.URL, nil)
 			if tt.sso != "" {
@@ -383,7 +383,7 @@ func TestPlainHttpClient(t *testing.T) {
 	defer ts.Close()
 
 	ios, _, _, _ := iostreams.Test()
-	client, err := plainHttpClientFunc(ios, "v1.2.3", "", &telemetry.NoOpInvocation{})()
+	client, err := plainHttpClientFunc(ios, "v1.2.3", "", &telemetry.NoOpService{})()
 	require.NoError(t, err)
 
 	req, err := http.NewRequest("GET", ts.URL, nil)

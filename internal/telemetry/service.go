@@ -13,13 +13,13 @@ import (
 )
 
 var (
-	_ ghtelemetry.Invocation = (*Invocation)(nil)
-	_ ghtelemetry.Invocation = (*NoOpInvocation)(nil)
+	_ ghtelemetry.Service = (*Service)(nil)
+	_ ghtelemetry.Service = (*NoOpService)(nil)
 )
 
-// Invocation owns telemetry facts and reporting policy for one command execution.
+// Service records telemetry facts and reporting policy for one command execution.
 // Finish must run after command execution to send the completed payload.
-type Invocation struct {
+type Service struct {
 	mu               sync.Mutex
 	send             func(SendTelemetryPayload)
 	commonDimensions ghtelemetry.Dimensions
@@ -36,35 +36,35 @@ type invocationEvent struct {
 }
 
 type pendingEvent struct {
-	invocation *Invocation
-	recorded   *invocationEvent
+	service  *Service
+	recorded *invocationEvent
 }
 
-type invocationOptions struct {
+type serviceOptions struct {
 	additionalDimensions ghtelemetry.Dimensions
 	sampleRate           int
 }
 
-type invocationOption func(*invocationOptions)
+type serviceOption func(*serviceOptions)
 
 // WithAdditionalCommonDimensions sets dimensions shared by every invocation event.
-func WithAdditionalCommonDimensions(dimensions ghtelemetry.Dimensions) invocationOption {
-	return func(options *invocationOptions) {
+func WithAdditionalCommonDimensions(dimensions ghtelemetry.Dimensions) serviceOption {
+	return func(options *serviceOptions) {
 		maps.Copy(options.additionalDimensions, dimensions)
 	}
 }
 
 // WithSampleRate selects invocation-wide sampling. Rates 0 and 100 retain all
 // events; rates between them select a percentage using the invocation ID.
-func WithSampleRate(rate int) invocationOption {
-	return func(options *invocationOptions) {
+func WithSampleRate(rate int) serviceOption {
+	return func(options *serviceOptions) {
 		options.sampleRate = rate
 	}
 }
 
-// NewInvocation creates an invocation using send to deliver its completed payload.
-func NewInvocation(send func(SendTelemetryPayload), opts ...invocationOption) *Invocation {
-	options := invocationOptions{
+// NewService creates a telemetry service using send to deliver its completed payload.
+func NewService(send func(SendTelemetryPayload), opts ...serviceOption) *Service {
+	options := serviceOptions{
 		additionalDimensions: make(ghtelemetry.Dimensions),
 	}
 	for _, opt := range opts {
@@ -87,7 +87,7 @@ func NewInvocation(send func(SendTelemetryPayload), opts ...invocationOption) *I
 	hash := uuid.NewSHA1(uuid.Nil, []byte(invocationID))
 	sampleBucket := byte(binary.BigEndian.Uint32(hash[:4]) % 100)
 
-	return &Invocation{
+	return &Service{
 		send:             send,
 		commonDimensions: commonDimensions,
 		sampleRate:       options.sampleRate,
@@ -95,16 +95,16 @@ func NewInvocation(send func(SendTelemetryPayload), opts ...invocationOption) *I
 	}
 }
 
-// Record copies a complete event into the invocation.
+// Record copies a complete event into the service.
 // Recording after Finish has no effect.
-func (i *Invocation) Record(event ghtelemetry.Event) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
+func (s *Service) Record(event ghtelemetry.Event) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if i.finished {
+	if s.finished {
 		return
 	}
-	i.events = append(i.events, &invocationEvent{
+	s.events = append(s.events, &invocationEvent{
 		event:      cloneEvent(event),
 		recordedAt: time.Now(),
 	})
@@ -112,26 +112,26 @@ func (i *Invocation) Record(event ghtelemetry.Event) {
 
 // BeginEvent copies an event's initial facts and returns a handle for adding
 // facts until Finish. Events begun after Finish are not recorded.
-func (i *Invocation) BeginEvent(event ghtelemetry.Event) ghtelemetry.PendingEvent {
-	i.mu.Lock()
-	defer i.mu.Unlock()
+func (s *Service) BeginEvent(event ghtelemetry.Event) ghtelemetry.PendingEvent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if i.finished {
+	if s.finished {
 		return noOpPendingEvent{}
 	}
 	recorded := &invocationEvent{
 		event:      cloneEvent(event),
 		recordedAt: time.Now(),
 	}
-	i.events = append(i.events, recorded)
-	return &pendingEvent{invocation: i, recorded: recorded}
+	s.events = append(s.events, recorded)
+	return &pendingEvent{service: s, recorded: recorded}
 }
 
 func (p *pendingEvent) SetDimensions(dimensions ghtelemetry.Dimensions) {
-	p.invocation.mu.Lock()
-	defer p.invocation.mu.Unlock()
+	p.service.mu.Lock()
+	defer p.service.mu.Unlock()
 
-	if p.invocation.finished {
+	if p.service.finished {
 		return
 	}
 	if p.recorded.event.Dimensions == nil {
@@ -141,10 +141,10 @@ func (p *pendingEvent) SetDimensions(dimensions ghtelemetry.Dimensions) {
 }
 
 func (p *pendingEvent) SetMeasures(measures ghtelemetry.Measures) {
-	p.invocation.mu.Lock()
-	defer p.invocation.mu.Unlock()
+	p.service.mu.Lock()
+	defer p.service.mu.Unlock()
 
-	if p.invocation.finished {
+	if p.service.finished {
 		return
 	}
 	if p.recorded.event.Measures == nil {
@@ -155,44 +155,44 @@ func (p *pendingEvent) SetMeasures(measures ghtelemetry.Measures) {
 
 // SetSampleRate selects the sampling policy for the whole invocation.
 // Changes after Finish have no effect.
-func (i *Invocation) SetSampleRate(rate int) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
+func (s *Service) SetSampleRate(rate int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if i.finished {
+	if s.finished {
 		return
 	}
-	i.sampleRate = rate
-	i.commonDimensions["sample_rate"] = strconv.Itoa(rate)
+	s.sampleRate = rate
+	s.commonDimensions["sample_rate"] = strconv.Itoa(rate)
 }
 
 // Disable suppresses all events in the invocation, including already recorded
 // events. It must be called before Finish.
-func (i *Invocation) Disable() {
-	i.mu.Lock()
-	defer i.mu.Unlock()
+func (s *Service) Disable() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	i.disabled = true
+	s.disabled = true
 }
 
-// Finish snapshots the invocation once and sends its payload after releasing the lock.
+// Finish snapshots the recorded events once and sends their payload after releasing the lock.
 // Sampling and telemetry eligibility apply to immediate and pending events alike.
-func (i *Invocation) Finish() {
-	i.mu.Lock()
+func (s *Service) Finish() {
+	s.mu.Lock()
 
-	if i.finished {
-		i.mu.Unlock()
+	if s.finished {
+		s.mu.Unlock()
 		return
 	}
-	i.finished = true
+	s.finished = true
 
-	if i.sampleRate > 0 && i.sampleRate < 100 && int(i.sampleBucket) >= i.sampleRate {
-		i.mu.Unlock()
+	if s.sampleRate > 0 && s.sampleRate < 100 && int(s.sampleBucket) >= s.sampleRate {
+		s.mu.Unlock()
 		return
 	}
 
-	events := i.events
-	if i.disabled {
+	events := s.events
+	if s.disabled {
 		events = nil
 	}
 
@@ -202,7 +202,7 @@ func (i *Invocation) Finish() {
 		dimensions := map[string]string{
 			"timestamp": recorded.recordedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
 		}
-		maps.Copy(dimensions, i.commonDimensions)
+		maps.Copy(dimensions, s.commonDimensions)
 		maps.Copy(dimensions, recorded.event.Dimensions)
 		payload.Events[index] = PayloadEvent{
 			Type:       recorded.event.Type,
@@ -210,9 +210,9 @@ func (i *Invocation) Finish() {
 			Measures:   maps.Clone(recorded.event.Measures),
 		}
 	}
-	i.mu.Unlock()
+	s.mu.Unlock()
 
-	i.send(payload)
+	s.send(payload)
 }
 
 func cloneEvent(event ghtelemetry.Event) ghtelemetry.Event {
@@ -228,22 +228,22 @@ type noOpPendingEvent struct{}
 func (noOpPendingEvent) SetDimensions(ghtelemetry.Dimensions) {}
 func (noOpPendingEvent) SetMeasures(ghtelemetry.Measures)     {}
 
-// NoOpInvocation discards telemetry when collection is disabled.
-type NoOpInvocation struct{}
+// NoOpService discards telemetry when collection is disabled.
+type NoOpService struct{}
 
 // Record discards the event.
-func (*NoOpInvocation) Record(ghtelemetry.Event) {}
+func (*NoOpService) Record(ghtelemetry.Event) {}
 
 // BeginEvent returns an inert handle without retaining the event.
-func (*NoOpInvocation) BeginEvent(ghtelemetry.Event) ghtelemetry.PendingEvent {
+func (*NoOpService) BeginEvent(ghtelemetry.Event) ghtelemetry.PendingEvent {
 	return noOpPendingEvent{}
 }
 
 // Disable leaves telemetry disabled.
-func (*NoOpInvocation) Disable() {}
+func (*NoOpService) Disable() {}
 
 // SetSampleRate leaves telemetry disabled.
-func (*NoOpInvocation) SetSampleRate(int) {}
+func (*NoOpService) SetSampleRate(int) {}
 
 // Finish has no payload to complete.
-func (*NoOpInvocation) Finish() {}
+func (*NoOpService) Finish() {}

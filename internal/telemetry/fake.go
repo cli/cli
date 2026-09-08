@@ -8,7 +8,7 @@ import (
 
 var (
 	_ ghtelemetry.EventRecorder = (*EventRecorderSpy)(nil)
-	_ ghtelemetry.Invocation    = (*InvocationRecorderSpy)(nil)
+	_ ghtelemetry.Service       = (*InvocationRecorderSpy)(nil)
 )
 
 // EventRecorderSpy captures complete events immediately. Finish includes pending

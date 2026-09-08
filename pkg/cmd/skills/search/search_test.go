@@ -374,7 +374,7 @@ func TestSearchRun(t *testing.T) {
 			ios.SetStdoutTTY(tt.tty)
 			ios.SetStderrTTY(tt.tty)
 			tt.opts.IO = ios
-			tt.opts.Telemetry = &telemetry.NoOpInvocation{}
+			tt.opts.Telemetry = &telemetry.NoOpService{}
 
 			defer reg.Verify(t)
 			err := searchRun(tt.opts)

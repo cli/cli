@@ -433,7 +433,7 @@ func TestNewCmdApiTelemetry(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	var payload telemetry.SendTelemetryPayload
-	recorder := telemetry.NewInvocation(func(p telemetry.SendTelemetryPayload) {
+	recorder := telemetry.NewService(func(p telemetry.SendTelemetryPayload) {
 		payload = p
 	})
 	recorder.Record(ghtelemetry.Event{Type: "command"})

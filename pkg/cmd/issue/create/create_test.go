@@ -1493,7 +1493,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 		Prompter: pm,
 	}
 
-	cmd := NewCmdCreate(factory, &telemetry.NoOpInvocation{}, func(opts *CreateOptions) error {
+	cmd := NewCmdCreate(factory, &telemetry.NoOpService{}, func(opts *CreateOptions) error {
 		opts.RootDirOverride = rootDir
 		opts.Detector = &fd.EnabledDetectorMock{}
 		return createRun(opts)
