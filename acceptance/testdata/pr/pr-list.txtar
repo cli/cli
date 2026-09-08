@@ -19,6 +19,6 @@ exec git push -u origin $BRANCH_NAME
 # Create the PR
 exec gh pr create --title $PR_TITLE --body 'Feature Body'
 
-# List PRs and see the new PR is in the paginated list output
-exec gh pr list --limit 1000 --json title --jq='.[] | select(.title == "'$PR_TITLE'") | .title'
-stdout $PR_TITLE
+# List PRs and see the new PR is in the paginated default output
+exec gh pr list --limit 1000
+stdout $PR_TITLE'\t'$BRANCH_NAME'\tOPEN'

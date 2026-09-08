@@ -2,6 +2,7 @@
 # Create a repository with a file so it has a default branch
 fixture-repo shared REPO
 env TAG=v${SCRIPT_NAME}-${RANDOM_STRING}
+env ARCHIVE_FILENAME=${REPO}-${TAG}.zip
 
 # Target the fixture repository
 env GH_REPO=$ORG/$REPO
@@ -19,8 +20,8 @@ exec gh release download $TAG
 exists asset.txt
 
 # Download the asset in archive form
-exec gh release download $TAG --archive=zip --output source.zip
-exists source.zip
+exec gh release download $TAG --archive=zip
+exists $ARCHIVE_FILENAME
 
 -- asset.txt --
 Hello, world!

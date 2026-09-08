@@ -27,4 +27,5 @@ stdout $BRANCH_NAME
 
 # Checkout the PR
 exec gh pr checkout $PR_URL
-stderr $BRANCH_NAME
+exec git branch --show-current
+stdout '^'$BRANCH_NAME'$'

@@ -9,6 +9,6 @@ env GH_REPO=$ORG/$REPO
 # Create a release in the repo
 exec gh release create $TAG --notes 'awesome release'
 
-# Find the release in the paginated list
-exec gh release list --limit 1000 --json tagName --jq='.[] | select(.tagName == "'$TAG'") | .tagName'
+# Find the release in the paginated default output
+exec gh release list --limit 1000
 stdout $TAG

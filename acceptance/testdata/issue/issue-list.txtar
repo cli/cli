@@ -9,6 +9,6 @@ env GH_REPO=$ORG/$REPO
 # Create an issue in the repo
 exec gh issue create --title $ISSUE_TITLE --body 'Feature Body'
 
-# Check the issue is included in the paginated list output
-exec gh issue list --limit 1000 --json title --jq='.[] | select(.title == "'$ISSUE_TITLE'") | .title'
-stdout $ISSUE_TITLE
+# Check the issue is included in the paginated default output
+exec gh issue list --limit 1000
+stdout 'OPEN\t'$ISSUE_TITLE
