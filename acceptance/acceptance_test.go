@@ -41,8 +41,10 @@ func repositoryCreationIsManaged(args []string, fixtureMode string) bool {
 }
 
 const (
-	workflowRunPollAttempts = 7
-	workflowRunPollInterval = 5 * time.Second
+	workflowRunPollAttempts       = 7
+	workflowRunPollInterval       = 5 * time.Second
+	workflowRunStatusPollAttempts = 61
+	workflowRunStatusPollInterval = time.Second
 )
 
 func waitForWorkflowRun(list func() (string, error), sleep func(time.Duration)) (string, error) {
@@ -59,6 +61,25 @@ func waitForWorkflowRun(list func() (string, error), sleep func(time.Duration)) 
 		}
 	}
 	return "", errors.New("workflow run did not register within 30 seconds")
+}
+
+func waitForWorkflowRunStatus(view func() (string, error), expected string, sleep func(time.Duration)) error {
+	for attempt := 0; attempt < workflowRunStatusPollAttempts; attempt++ {
+		status, err := view()
+		if err != nil {
+			return err
+		}
+		if status == expected {
+			return nil
+		}
+		if status == "completed" {
+			return fmt.Errorf("workflow run completed before reaching status %q", expected)
+		}
+		if attempt < workflowRunStatusPollAttempts-1 {
+			sleep(workflowRunStatusPollInterval)
+		}
+	}
+	return fmt.Errorf("workflow run did not reach status %q within 60 seconds", expected)
 }
 
 func outputForEnvironment(output string) (string, error) {
@@ -154,6 +175,59 @@ func TestWaitForWorkflowRun(t *testing.T) {
 		assert.Equal(t, workflowRunPollAttempts, attempts)
 		assert.Equal(t, workflowRunPollAttempts-1, sleeps)
 	})
+}
+
+func TestWaitForWorkflowRunStatus(t *testing.T) {
+	// Given a workflow run that is registered but still queued
+	statuses := []string{"queued", "in_progress"}
+	var sleeps []time.Duration
+
+	// When waiting for the run to start
+	err := waitForWorkflowRunStatus(func() (string, error) {
+		status := statuses[0]
+		statuses = statuses[1:]
+		return status, nil
+	}, "in_progress", func(duration time.Duration) {
+		sleeps = append(sleeps, duration)
+	})
+
+	// Then polling continues until cancellation can target the active run
+	require.NoError(t, err)
+	assert.Equal(t, []time.Duration{workflowRunStatusPollInterval}, sleeps)
+}
+
+func TestWaitForWorkflowRunStatusStopsWhenRunCompletes(t *testing.T) {
+	// Given a workflow run that completed before reaching the expected status
+	view := func() (string, error) {
+		return "completed", nil
+	}
+
+	// When waiting for a status the run can no longer reach
+	err := waitForWorkflowRunStatus(view, "in_progress", func(time.Duration) {
+		t.Fatal("unexpected sleep")
+	})
+
+	// Then the failed precondition is reported immediately
+	require.EqualError(t, err, `workflow run completed before reaching status "in_progress"`)
+}
+
+func TestWaitForWorkflowRunStatusTimesOut(t *testing.T) {
+	// Given a workflow run that remains queued
+	var attempts int
+	var sleeps int
+
+	// When waiting for it to start
+	err := waitForWorkflowRunStatus(func() (string, error) {
+		attempts++
+		return "queued", nil
+	}, "in_progress", func(time.Duration) {
+		sleeps++
+	})
+
+	// Then the wait stops after one minute
+	require.EqualError(t, err, `workflow run did not reach status "in_progress" within 60 seconds`)
+	assert.Equal(t, 61, attempts)
+	assert.Equal(t, 60, sleeps)
 }
 
 func TestOutputForEnvironment(t *testing.T) {
@@ -544,6 +618,22 @@ func sharedCmds(tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManag
 			}, time.Sleep)
 			ts.Check(err)
 			ts.Setenv(args[0], runID)
+		},
+		"wait-for-run-status": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! wait-for-run-status")
+			}
+			if len(args) != 2 {
+				ts.Fatalf("usage: wait-for-run-status RUN_ID STATUS")
+			}
+
+			err := waitForWorkflowRunStatus(func() (string, error) {
+				if err := ts.Exec("gh", "run", "view", args[0], "--json", "status", "--jq", ".status"); err != nil {
+					return "", err
+				}
+				return strings.TrimSpace(ts.ReadFile("stdout")), nil
+			}, args[1], time.Sleep)
+			ts.Check(err)
 		},
 		"sleep": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {

@@ -38,11 +38,18 @@ A full example invocation can be found below:
 GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance ./acceptance
 ```
 
-While writing a new test, it can be useful to target that specific script by providing the `GH_ACCEPTANCE_SCRIPT` env var in combination with the `-run` flag, for example:
+While writing a new test, target the smallest live surface that can reproduce
+the behavior. Provide one or more comma-separated script names with
+`GH_ACCEPTANCE_SCRIPT`, use `-run` to select their group, and use `-count=1` to
+bypass Go's test cache:
 
 ```
-GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -run '^TestAcceptance$/^pr$' ./acceptance
+GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -count=1 -run '^TestAcceptance$/^pr$' ./acceptance
 ```
+
+Start with one script for a deterministic failure. If concurrency is part of
+the failure, select only the scripts that exercise the contended resource and
+repeat that focused set before widening to the complete group or suite.
 
 #### Code Coverage
 
@@ -105,7 +112,9 @@ coverage and use unit tests for remaining variants.
 
 Tests that cancel workflow runs should use a self-contained, deliberately
 long-running job so it cannot finish before the cancellation request, plus a
-short job timeout to bound a failed cancellation.
+short job timeout to bound a failed cancellation. Wait for the run to become
+`in_progress` before canceling, but do not wait for GitHub to finish processing
+an accepted cancellation request.
 
 #### Custom Commands
 
@@ -126,6 +135,16 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
 
   ```txtar
   defer cleanup-repo $SCRIPT_NAME-$RANDOM_STRING
+  ```
+
+- `wait-for-run-status`: poll a registered workflow run until it reaches the
+  requested status. Use this before operations such as cancellation that can
+  race with run startup.
+
+  ```txtar
+  wait-for-run RUN_ID
+  wait-for-run-status $RUN_ID in_progress
+  exec gh run cancel $RUN_ID
   ```
 
 - `defer`: register a command to run after the testscript completes

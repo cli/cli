@@ -74,8 +74,13 @@ Fixed sleeps are both slower when registration is fast and unreliable when it
 is slow. Use `wait-for-run` before watching or inspecting a workflow run.
 Cancellation tests must use a self-contained workflow with a deliberately long
 step so the run cannot finish before the cancellation request, plus a short job
-timeout so a failed cancellation cannot run for the full step. Do not lengthen
-registration sleeps to compensate for a short or externally dependent job.
+timeout so a failed cancellation cannot run for the full step. After
+registration, use `wait-for-run-status RUN_ID in_progress` before cancellation
+because the cancellation endpoint can reject a run that is still starting. Do
+not wait for GitHub to finish cancellation after the command confirms that the
+request was submitted; that tests Actions' eventual behavior rather than the
+CLI contract. Do not lengthen registration sleeps to compensate for a short or
+externally dependent job.
 
 ## Organization safety
 
@@ -107,3 +112,6 @@ go test -tags=acceptance \
 
 Run a changed live script with `GH_ACCEPTANCE_GROUP` and
 `GH_ACCEPTANCE_SCRIPT`; see `acceptance/README.md` for the credential variables.
+Use `-count=1` to bypass the Go test cache. Start with one script. If concurrency
+is required to reproduce the behavior, pass only the contending scripts as a
+comma-separated filter and repeat that focused set before widening the run.
