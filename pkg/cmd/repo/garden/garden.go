@@ -395,6 +395,10 @@ func plantGarden(r *rand.Rand, commits []*Commit, geo *Geometry) [][]*Cell {
 			chance := r.Float64()
 			if chance <= geo.Density {
 				commit := commits[cellIx]
+				shortSha := commit.Sha
+				if len(shortSha) > 6 {
+					shortSha = shortSha[0:6]
+				}
 				garden[y] = append(garden[y], &Cell{
 					Char:       commits[cellIx].Char,
 					StatusLine: fmt.Sprintf("You're standing at a flower called %s planted by %s.", commit.Sha[0:6], commit.Handle),
@@ -463,21 +467,24 @@ func statusLine(garden [][]*Cell, player *Player, io *iostreams.IOStreams) strin
 
 func shaToColorFunc(sha string) func(string) string {
 	return func(c string) string {
-		red, err := strconv.ParseInt(sha[0:2], 16, 64)
+		// Pad or truncate sha to at least 6 hex characters defensively
+		safeSha := sha
+		if len(safeSha) < 6 {
+			safeSha = safeSha + "000000"[:6-len(safeSha)]
+		}
+
+		red, err := strconv.ParseInt(safeSha[0:2], 16, 64)
 		if err != nil {
 			panic(err)
 		}
-
-		green, err := strconv.ParseInt(sha[2:4], 16, 64)
+		green, err := strconv.ParseInt(safeSha[2:4], 16, 64)
 		if err != nil {
 			panic(err)
 		}
-
-		blue, err := strconv.ParseInt(sha[4:6], 16, 64)
+		blue, err := strconv.ParseInt(safeSha[4:6], 16, 64)
 		if err != nil {
 			panic(err)
 		}
-
 		return fmt.Sprintf("\033[38;2;%d;%d;%dm%s\033[0m", red, green, blue, c)
 	}
 }
@@ -489,7 +496,13 @@ func computeSeed(seed string) int64 {
 		lol.WriteString(fmt.Sprintf("%d", int(r)))
 	}
 
-	result, err := strconv.ParseInt(lol.String()[0:10], 10, 64)
+	seedStr := lol.String()
+	// Defensively bound the slice if the repository name yields a short decimal string
+	if len(seedStr) > 10 {
+		seedStr = seedStr[0:10]
+	}
+
+	result, err := strconv.ParseInt(seedStr, 10, 64)
 	if err != nil {
 		panic(err)
 	}
