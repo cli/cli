@@ -19,8 +19,8 @@ exec git add .github/workflows/workflow.yml
 exec git commit -m 'Create workflow with escape sequences'
 exec git push -u origin main
 
-# Sleep because it takes a second for the workflow to register
-sleep 1
+# Wait for the workflow definition to register
+wait-for-workflow 'Escape Sequence PoC'
 
 # Run the workflow
 exec gh workflow run 'Escape Sequence PoC'

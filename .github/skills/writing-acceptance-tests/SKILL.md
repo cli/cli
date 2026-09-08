@@ -30,6 +30,11 @@ repository should still exist under that name. Use `defer cleanup-repo $REPO`
 when testing deletion or renaming; it is scoped to `$ORG` and treats an already
 absent repository as success.
 
+Repositories created with an initial commit can remain busy after `gh repo
+create` returns. Before renaming one, use `wait-for-repository-ready
+$ORG/$REPO` to wait for its default-branch commit rather than sleeping or
+retrying the rename.
+
 ## Shared fixture contract
 
 Scripts within a group run concurrently. A shared script must remain correct
@@ -71,7 +76,8 @@ remaining variants to unit tests.
 
 Use bounded condition-based waits for asynchronously registered resources.
 Fixed sleeps are both slower when registration is fast and unreliable when it
-is slow. Use `wait-for-run` before watching or inspecting a workflow run.
+is slow. Use `wait-for-workflow` after pushing a new workflow definition, then
+use `wait-for-run` before watching or inspecting a triggered workflow run.
 Cancellation tests must use a self-contained workflow with a deliberately long
 step so the run cannot finish before the cancellation request, plus a short job
 timeout so a failed cancellation cannot run for the full step. After

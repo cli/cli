@@ -41,14 +41,16 @@ func repositoryCreationIsManaged(args []string, fixtureMode string) bool {
 }
 
 const (
-	workflowRunPollAttempts       = 7
-	workflowRunPollInterval       = 5 * time.Second
+	workflowPollAttempts          = 13
+	workflowPollInterval          = 5 * time.Second
 	workflowRunStatusPollAttempts = 61
 	workflowRunStatusPollInterval = time.Second
+	repositoryReadyPollAttempts   = 31
+	repositoryReadyPollInterval   = time.Second
 )
 
 func waitForWorkflowRun(list func() (string, error), sleep func(time.Duration)) (string, error) {
-	for attempt := 0; attempt < workflowRunPollAttempts; attempt++ {
+	for attempt := 0; attempt < workflowPollAttempts; attempt++ {
 		runID, err := list()
 		if err != nil {
 			return "", err
@@ -56,11 +58,45 @@ func waitForWorkflowRun(list func() (string, error), sleep func(time.Duration)) 
 		if runID != "" {
 			return runID, nil
 		}
-		if attempt < workflowRunPollAttempts-1 {
-			sleep(workflowRunPollInterval)
+		if attempt < workflowPollAttempts-1 {
+			sleep(workflowPollInterval)
 		}
 	}
-	return "", errors.New("workflow run did not register within 30 seconds")
+	return "", errors.New("workflow run did not register within 60 seconds")
+}
+
+func waitForWorkflow(list func() ([]string, error), expected string, sleep func(time.Duration)) error {
+	for attempt := 0; attempt < workflowPollAttempts; attempt++ {
+		workflows, err := list()
+		if err != nil {
+			return err
+		}
+		for _, workflow := range workflows {
+			if workflow == expected {
+				return nil
+			}
+		}
+		if attempt < workflowPollAttempts-1 {
+			sleep(workflowPollInterval)
+		}
+	}
+	return fmt.Errorf("workflow %q did not register within 60 seconds", expected)
+}
+
+func waitForRepositoryReady(check func() (bool, error), sleep func(time.Duration)) error {
+	for attempt := 0; attempt < repositoryReadyPollAttempts; attempt++ {
+		ready, err := check()
+		if err != nil {
+			return err
+		}
+		if ready {
+			return nil
+		}
+		if attempt < repositoryReadyPollAttempts-1 {
+			sleep(repositoryReadyPollInterval)
+		}
+	}
+	return errors.New("repository did not finish initializing within 30 seconds")
 }
 
 func waitForWorkflowRunStatus(view func() (string, error), expected string, sleep func(time.Duration)) error {
@@ -148,7 +184,7 @@ func TestWaitForWorkflowRun(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "1234", runID)
-		assert.Equal(t, []time.Duration{workflowRunPollInterval, workflowRunPollInterval}, sleeps)
+		assert.Equal(t, []time.Duration{workflowPollInterval, workflowPollInterval}, sleeps)
 	})
 
 	t.Run("returns list error", func(t *testing.T) {
@@ -171,10 +207,103 @@ func TestWaitForWorkflowRun(t *testing.T) {
 			sleeps++
 		})
 
-		require.EqualError(t, err, "workflow run did not register within 30 seconds")
-		assert.Equal(t, workflowRunPollAttempts, attempts)
-		assert.Equal(t, workflowRunPollAttempts-1, sleeps)
+		require.EqualError(t, err, "workflow run did not register within 60 seconds")
+		assert.Equal(t, 13, attempts)
+		assert.Equal(t, 12, sleeps)
 	})
+}
+
+func TestWaitForWorkflow(t *testing.T) {
+	// Given a workflow definition that appears after GitHub processes the pushed file
+	var attempts int
+	var sleeps []time.Duration
+
+	// When waiting for the workflow by name
+	err := waitForWorkflow(func() ([]string, error) {
+		attempts++
+		if attempts == 3 {
+			return []string{"Other Workflow", "Test Workflow Name"}, nil
+		}
+		return []string{"Other Workflow"}, nil
+	}, "Test Workflow Name", func(duration time.Duration) {
+		sleeps = append(sleeps, duration)
+	})
+
+	// Then polling continues until that exact workflow is registered
+	require.NoError(t, err)
+	assert.Equal(t, []time.Duration{workflowPollInterval, workflowPollInterval}, sleeps)
+}
+
+func TestWaitForWorkflowTimesOut(t *testing.T) {
+	// Given a pushed workflow definition that never appears
+	var attempts int
+	var sleeps int
+
+	// When waiting for the workflow by name
+	err := waitForWorkflow(func() ([]string, error) {
+		attempts++
+		return []string{"Other Workflow"}, nil
+	}, "Test Workflow Name", func(time.Duration) {
+		sleeps++
+	})
+
+	// Then the wait stops after one minute
+	require.EqualError(t, err, `workflow "Test Workflow Name" did not register within 60 seconds`)
+	assert.Equal(t, 13, attempts)
+	assert.Equal(t, 12, sleeps)
+}
+
+func TestWaitForRepositoryReady(t *testing.T) {
+	// Given a repository whose initialized default branch appears after creation
+	checks := []bool{false, false, true}
+	var sleeps []time.Duration
+
+	// When waiting for repository initialization to finish
+	err := waitForRepositoryReady(func() (bool, error) {
+		ready := checks[0]
+		checks = checks[1:]
+		return ready, nil
+	}, func(duration time.Duration) {
+		sleeps = append(sleeps, duration)
+	})
+
+	// Then polling continues until the default branch commit is available
+	require.NoError(t, err)
+	assert.Equal(t, []time.Duration{repositoryReadyPollInterval, repositoryReadyPollInterval}, sleeps)
+}
+
+func TestWaitForRepositoryReadyTimesOut(t *testing.T) {
+	// Given a repository whose default branch remains unavailable
+	var attempts int
+	var sleeps int
+
+	// When waiting for repository initialization to finish
+	err := waitForRepositoryReady(func() (bool, error) {
+		attempts++
+		return false, nil
+	}, func(time.Duration) {
+		sleeps++
+	})
+
+	// Then the wait stops after thirty seconds
+	require.EqualError(t, err, "repository did not finish initializing within 30 seconds")
+	assert.Equal(t, 31, attempts)
+	assert.Equal(t, 30, sleeps)
+}
+
+func TestWaitForRepositoryReadyReturnsUnexpectedError(t *testing.T) {
+	// Given a repository readiness check that fails unexpectedly
+	check := func() (bool, error) {
+		return false, errors.New("checking repository")
+	}
+
+	// When waiting for repository initialization to finish
+	err := waitForRepositoryReady(check, func(time.Duration) {
+		t.Fatal("unexpected sleep")
+	})
+
+	// Then the unexpected failure is returned instead of retried
+	require.EqualError(t, err, "checking repository")
 }
 
 func TestWaitForWorkflowRunStatus(t *testing.T) {
@@ -618,6 +747,46 @@ func sharedCmds(tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManag
 			}, time.Sleep)
 			ts.Check(err)
 			ts.Setenv(args[0], runID)
+		},
+		"wait-for-workflow": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! wait-for-workflow")
+			}
+			if len(args) != 1 {
+				ts.Fatalf("usage: wait-for-workflow NAME")
+			}
+
+			err := waitForWorkflow(func() ([]string, error) {
+				if err := ts.Exec("gh", "workflow", "list", "--all", "--limit", "1000", "--json", "name", "--jq", ".[].name"); err != nil {
+					return nil, err
+				}
+				output := strings.TrimSpace(ts.ReadFile("stdout"))
+				if output == "" {
+					return nil, nil
+				}
+				return strings.Split(output, "\n"), nil
+			}, args[0], time.Sleep)
+			ts.Check(err)
+		},
+		"wait-for-repository-ready": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! wait-for-repository-ready")
+			}
+			if len(args) != 1 {
+				ts.Fatalf("usage: wait-for-repository-ready OWNER/REPO")
+			}
+
+			err := waitForRepositoryReady(func() (bool, error) {
+				if err := ts.Exec("gh", "api", "repos/"+args[0]+"/commits/HEAD", "--silent"); err != nil {
+					stderr := ts.ReadFile("stderr")
+					if strings.Contains(stderr, "HTTP 404") || strings.Contains(stderr, "HTTP 409") {
+						return false, nil
+					}
+					return false, err
+				}
+				return true, nil
+			}, time.Sleep)
+			ts.Check(err)
 		},
 		"wait-for-run-status": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {

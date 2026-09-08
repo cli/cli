@@ -16,8 +16,8 @@ exec git add .github/workflows/workflow.yml
 exec git commit -m 'Create workflow file'
 exec git push -u origin main
 
-# Sleep because it takes a second for the workflow to register
-sleep 1
+# Wait for the workflow definition to register
+wait-for-workflow 'Test Workflow Name'
 
 # Check the workflow is indeed created
 exec gh workflow list

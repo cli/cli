@@ -116,6 +116,10 @@ short job timeout to bound a failed cancellation. Wait for the run to become
 `in_progress` before canceling, but do not wait for GitHub to finish processing
 an accepted cancellation request.
 
+After pushing a new workflow file, use `wait-for-workflow` instead of a fixed
+sleep before invoking or inspecting it. Use `wait-for-run` to allow up to one
+minute for a triggered run to appear.
+
 #### Custom Commands
 
 The following custom commands are defined within [`acceptance_test.go`](./acceptance_test.go) to help with writing tests:
@@ -135,6 +139,21 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
 
   ```txtar
   defer cleanup-repo $SCRIPT_NAME-$RANDOM_STRING
+  ```
+
+- `wait-for-workflow`: poll until GitHub registers a pushed workflow definition.
+
+  ```txtar
+  wait-for-workflow 'Test Workflow Name'
+  exec gh workflow run 'Test Workflow Name'
+  ```
+
+- `wait-for-repository-ready`: poll until an initialized repository's default
+  branch commit is available. Use it before repository-global operations that
+  can conflict with asynchronous repository initialization.
+
+  ```txtar
+  wait-for-repository-ready $ORG/$REPO
   ```
 
 - `wait-for-run-status`: poll a registered workflow run until it reaches the

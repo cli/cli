@@ -92,18 +92,27 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 
 type fixtureRepositoryManager struct {
 	client fixtureRepositoryClient
+	sleep  func(time.Duration)
 
 	mu           sync.Mutex
 	shared       string
 	repositories []string
 }
 
+const (
+	repositoryDeletePollAttempts = 31
+	repositoryDeletePollInterval = time.Second
+)
+
 func newFixtureRepositoryManager(tsEnv testScriptEnv) (*fixtureRepositoryManager, error) {
 	client, err := newLiveFixtureRepositoryClient(tsEnv)
 	if err != nil {
 		return nil, err
 	}
-	return &fixtureRepositoryManager{client: client}, nil
+	return &fixtureRepositoryManager{
+		client: client,
+		sleep:  time.Sleep,
+	}, nil
 }
 
 func (m *fixtureRepositoryManager) repository(mode string) (string, error) {
@@ -131,7 +140,7 @@ func (m *fixtureRepositoryManager) cleanup() error {
 
 	var errs []error
 	for i := len(m.repositories) - 1; i >= 0; i-- {
-		if err := m.client.delete(m.repositories[i]); err != nil {
+		if err := m.deleteRepository(m.repositories[i]); err != nil {
 			errs = append(errs, fmt.Errorf("deleting %s: %w", m.repositories[i], err))
 		}
 	}
@@ -141,12 +150,34 @@ func (m *fixtureRepositoryManager) cleanup() error {
 func (m *fixtureRepositoryManager) delete(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.client.delete(name)
+	return m.deleteRepository(name)
+}
+
+func (m *fixtureRepositoryManager) deleteRepository(name string) error {
+	var conflictErr error
+	for attempt := 0; attempt < repositoryDeletePollAttempts; attempt++ {
+		err := m.client.delete(name)
+		if err == nil {
+			return nil
+		}
+
+		var httpErr *ghAPI.HTTPError
+		if !errors.As(err, &httpErr) || httpErr.StatusCode != http.StatusConflict {
+			return err
+		}
+		conflictErr = err
+
+		if attempt < repositoryDeletePollAttempts-1 {
+			m.sleep(repositoryDeletePollInterval)
+		}
+	}
+	return fmt.Errorf("repository operation remained in progress for 30 seconds: %w", conflictErr)
 }
 
 type fakeFixtureRepositoryClient struct {
-	created []string
-	deleted []string
+	created      []string
+	deleted      []string
+	deleteErrors []error
 }
 
 func (c *fakeFixtureRepositoryClient) create(name string) error {
@@ -156,6 +187,11 @@ func (c *fakeFixtureRepositoryClient) create(name string) error {
 
 func (c *fakeFixtureRepositoryClient) delete(name string) error {
 	c.deleted = append(c.deleted, name)
+	if len(c.deleteErrors) > 0 {
+		err := c.deleteErrors[0]
+		c.deleteErrors = c.deleteErrors[1:]
+		return err
+	}
 	return nil
 }
 
@@ -178,6 +214,31 @@ func TestFixtureRepositoryManager(t *testing.T) {
 
 	require.NoError(t, manager.cleanup())
 	assert.Equal(t, []string{secondIsolated, firstIsolated, firstShared}, client.deleted)
+}
+
+func TestFixtureRepositoryManagerRetriesConflictingDelete(t *testing.T) {
+	// Given a repository whose preceding operation is still settling
+	client := &fakeFixtureRepositoryClient{
+		deleteErrors: []error{
+			&ghAPI.HTTPError{StatusCode: http.StatusConflict},
+			&ghAPI.HTTPError{StatusCode: http.StatusConflict},
+		},
+	}
+	var sleeps []time.Duration
+	manager := &fixtureRepositoryManager{
+		client: client,
+		sleep: func(duration time.Duration) {
+			sleeps = append(sleeps, duration)
+		},
+	}
+
+	// When deferred cleanup deletes the repository
+	err := manager.delete("renamed")
+
+	// Then only the conflicting operation is retried until deletion succeeds
+	require.NoError(t, err)
+	assert.Equal(t, []string{"renamed", "renamed", "renamed"}, client.deleted)
+	assert.Equal(t, []time.Duration{repositoryDeletePollInterval, repositoryDeletePollInterval}, sleeps)
 }
 
 func TestRegisterFixtureRepositoryCleanup(t *testing.T) {
