@@ -41,6 +41,10 @@ when the repository already contains unrelated resources.
 - Give resources unique, reasonably short names using `$RANDOM_STRING`, adding
   `$SCRIPT_NAME` only when useful. Width-constrained commands such as
   `gh pr status` truncate long titles.
+- Make commits unique across concurrent scripts. Unique branch names do not
+  affect commit IDs, so include the script's `$RANDOM_STRING` in the commit
+  contents or message when scripts could otherwise create the same tree from the
+  same parent.
 - GitHub normalizes some identifiers. Use `env2upper` for Actions variables and
   secrets whose generated names are asserted later.
 - Capture the created resource's URL or ID. Filter and paginate list operations;
@@ -50,6 +54,17 @@ when the repository already contains unrelated resources.
 
 If any operation violates this contract, use `isolated`; do not weaken
 assertions to make sharing appear safe.
+
+## API request budgets
+
+Scripts share token-wide API rate limits. Count requests across the whole test
+process and combine compatible live assertions. Keep coverage for a narrowly
+limited endpoint in one script so concurrent scripts cannot burst the limit.
+For Code Search's 10 requests/minute bucket, use at most five HTTP requests in
+the entire acceptance process, even when they run sequentially. This reserves
+half the bucket for pagination, retries, and other token activity. Count the
+requests made by each command, keep representative live coverage, and move
+remaining variants to unit tests.
 
 ## Organization safety
 

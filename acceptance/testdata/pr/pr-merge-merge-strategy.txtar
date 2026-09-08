@@ -18,7 +18,7 @@ exec git push -u origin $BASE_BRANCH
 exec git checkout -b $BRANCH_NAME
 mv ../file.txt file.txt
 exec git add .
-exec git commit -m 'Add file.txt'
+exec git commit -m 'Add file.txt' -m $BRANCH_NAME
 exec git push -u origin $BRANCH_NAME
 
 # Create the PR

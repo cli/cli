@@ -81,7 +81,9 @@ fixture-repo none
 in the test process. Shared scripts must tolerate concurrent and accumulated
 state: use unique resource names, paginate and filter list operations, capture
 resource IDs instead of selecting the first or latest result, and avoid
-repository-global or default-branch mutations.
+repository-global or default-branch mutations. When scripts create the same
+tree from the same parent, include the script's `$RANDOM_STRING` in the commit
+contents or message; branch names do not affect commit IDs.
 
 `isolated` creates an initialized private repository exclusively for the script.
 Use it when clean state or repository-global mutation is required.
@@ -90,6 +92,14 @@ Use it when clean state or repository-global mutation is required.
 when a test needs multiple repositories, public visibility, special creation
 options, or direct coverage of repository lifecycle commands. In that mode, the
 script owns creation and cleanup.
+
+Scripts share token-wide API rate limits. Count requests across the whole test
+process and combine compatible live assertions. Keep coverage for a narrowly
+limited endpoint in one script so concurrent scripts cannot burst the limit.
+For Code Search's 10 requests/minute bucket, use at most five HTTP requests in
+the entire acceptance process even when they run sequentially. This leaves room
+for pagination, retries, and other token activity. Keep representative live
+coverage and use unit tests for remaining variants.
 
 #### Custom Commands
 
