@@ -28,16 +28,16 @@ type EventRecorder interface {
 	Begin(Event) PendingEvent
 }
 
-// InvocationRecorder produces events and controls invocation-wide reporting policy.
+// InvocationRecorder produces events and controls invocation-wide sampling.
 type InvocationRecorder interface {
 	EventRecorder
-	Disabler
 	SetSampleRate(rate int)
 }
 
 // Service collects telemetry for one command execution and sends it on Finish.
 type Service interface {
 	InvocationRecorder
+	Disabler
 	Finish()
 }
 

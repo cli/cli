@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	_ ghtelemetry.EventRecorder = (*EventRecorderSpy)(nil)
-	_ ghtelemetry.Service       = (*InvocationRecorderSpy)(nil)
+	_ ghtelemetry.EventRecorder      = (*EventRecorderSpy)(nil)
+	_ ghtelemetry.InvocationRecorder = (*InvocationRecorderSpy)(nil)
 )
 
 // EventRecorderSpy captures complete events immediately. Finish includes pending
@@ -51,14 +51,11 @@ func (r *EventRecorderSpy) Finish() {
 	r.events = nil
 }
 
-// InvocationRecorderSpy adds invocation policy to EventRecorderSpy.
+// InvocationRecorderSpy adds invocation sampling to EventRecorderSpy.
 type InvocationRecorderSpy struct {
 	EventRecorderSpy
 	LastSampleRate int
 }
-
-// Disable leaves captured events available for assertions.
-func (r *InvocationRecorderSpy) Disable() {}
 
 // SetSampleRate captures the sampling policy requested by a command.
 func (r *InvocationRecorderSpy) SetSampleRate(rate int) {
