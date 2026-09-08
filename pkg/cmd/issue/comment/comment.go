@@ -57,10 +57,7 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 			# Attach multiple files by repeating the flag
 			$ gh issue comment 12 --attach ./before.png --attach ./after.png
 		`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
-			return cobra.ExactArgs(1)(cmd, args)
-		},
+		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			opts.RetrieveCommentable = func() (prShared.Commentable, ghrepo.Interface, error) {
 				// TODO wm: more testing
@@ -102,7 +99,7 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 
 				return issue, baseRepo, nil
 			}
-			if err := prShared.CommentablePreRun(cmd, opts); err != nil {
+			if err := prShared.CommentablePreRun(cmd, opts, telemetry); err != nil {
 				return err
 			}
 

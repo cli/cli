@@ -122,10 +122,7 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			$ gh issue edit 100 --add-sub-issue 123,124
 			$ gh issue edit 123 --add-blocked-by 200 --add-blocking 300,301
 		`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
-			return cobra.MinimumNArgs(1)(cmd, args)
-		},
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			issueNumbers, baseRepo, err := issueShared.ParseIssuesFromArgs(args)
 			if err != nil {
@@ -215,11 +212,11 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 				opts.Editable.IssueType.Edited = true
 			}
 
-			resolved, err := opts.AttachFlag.UserAssets()
+			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
 			}
-			opts.Assets = resolved
 
 			// An empty --parent resolves to no work, so it counts as an edit
 			// only here, where passing the flag at all suppresses the survey.

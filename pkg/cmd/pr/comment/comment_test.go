@@ -34,6 +34,14 @@ func TestNewCmdComment(t *testing.T) {
 	tmpImage := filepath.Join(t.TempDir(), "login.png")
 	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
 
+	attachmentEvent := []ghtelemetry.Event{{
+		Type:       "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "comment"},
+		Measures: ghtelemetry.Measures{
+			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
+		},
+	}}
+
 	tests := []struct {
 		name             string
 		input            string
@@ -42,6 +50,8 @@ func TestNewCmdComment(t *testing.T) {
 		wantsErr         bool
 		wantsErrContains string
 		isTTY            bool
+		wantEvents       []ghtelemetry.Event
+		wantSampleRate   int
 
 		// Which fields the lookup asks for is decided at construction, so it
 		// can only be proved here.
@@ -287,8 +297,10 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:  "--attach alone is enough of a body to post without prompting",
-			input: fmt.Sprintf("1 --attach '%s'", tmpImage),
+			name:           "--attach alone is enough of a body to post without prompting",
+			input:          fmt.Sprintf("1 --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -298,14 +310,16 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:     "--attach telemetry survives argument validation",
+			name:     "argument validation skips attachment telemetry",
 			input:    fmt.Sprintf("1 2 --attach '%s'", tmpImage),
 			isTTY:    false,
 			wantsErr: true,
 		},
 		{
-			name:  "--attach with --body keeps the body and records that one was given",
-			input: fmt.Sprintf("1 --body test --attach '%s'", tmpImage),
+			name:           "--attach with --body keeps the body and records that one was given",
+			input:          fmt.Sprintf("1 --body test --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeInline,
@@ -316,8 +330,10 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:  "--attach with --edit-last is accepted and needs no body",
-			input: fmt.Sprintf("1 --edit-last --attach '%s'", tmpImage),
+			name:           "--attach with --edit-last is accepted and needs no body",
+			input:          fmt.Sprintf("1 --edit-last --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -329,8 +345,10 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			// KeepExistingBody is set either way. BodyProvided is what decides
 			// that this one replaces the comment rather than keeping it.
-			name:  "--attach with --edit-last and --body records the body that replaces the comment",
-			input: fmt.Sprintf("1 --edit-last --body 'a new body' --attach '%s'", tmpImage),
+			name:           "--attach with --edit-last and --body records the body that replaces the comment",
+			input:          fmt.Sprintf("1 --edit-last --body 'a new body' --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeInline,
@@ -361,10 +379,14 @@ func TestNewCmdComment(t *testing.T) {
 			isTTY:            true,
 			wantsErr:         true,
 			wantsErrContains: "./nope.png: ",
+			wantEvents:       attachmentEvent,
+			wantSampleRate:   ghtelemetry.SAMPLE_ALL,
 		},
 		{
-			name:  "--attach asks the pull request lookup for the repository id",
-			input: fmt.Sprintf("1 --attach '%s'", tmpImage),
+			name:           "--attach asks the pull request lookup for the repository id",
+			input:          fmt.Sprintf("1 --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -389,6 +411,7 @@ func TestNewCmdComment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given command inputs and their expected attachment telemetry
 			ios, stdin, _, _ := iostreams.Test()
 			isTTY := tt.isTTY
 			ios.SetStdoutTTY(isTTY)
@@ -435,7 +458,7 @@ func TestNewCmdComment(t *testing.T) {
 			}
 
 			argv, err := shlex.Split(tt.input)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var gotOpts *shared.CommentableOptions
 			recorder := &telemetry.InvocationRecorderSpy{}
@@ -450,33 +473,21 @@ func TestNewCmdComment(t *testing.T) {
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
 
+			// When the command executes and telemetry is completed
 			_, err = cmd.ExecuteC()
 			recorder.Finish()
-			if cmd.Flags().Changed("attach") {
-				values, flagErr := cmd.Flags().GetStringArray("attach")
-				require.NoError(t, flagErr)
-				require.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
-				require.Len(t, recorder.Events, 1)
-				assert.Equal(t, "attachment_invocation", recorder.Events[0].Type)
-				assert.Equal(t, cmd.CommandPath(), recorder.Events[0].Dimensions["command"])
-				assert.Equal(t, ghtelemetry.Measures{
-					"attach_count":      int64(len(values)),
-					"append_ops_count":  0,
-					"replace_ops_count": 0,
-				}, recorder.Events[0].Measures)
-			} else {
-				assert.Empty(t, recorder.Events)
-				assert.Zero(t, recorder.LastSampleRate)
-			}
+			// Then telemetry starts only if execution reaches attachment validation
+			assert.Equal(t, tt.wantEvents, recorder.Events)
+			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.wantsErrContains != "" {
-					assert.ErrorContains(t, err, tt.wantsErrContains)
+					require.ErrorContains(t, err, tt.wantsErrContains)
 				}
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.InputType, gotOpts.InputType)
 			assert.Equal(t, tt.output.Body, gotOpts.Body)

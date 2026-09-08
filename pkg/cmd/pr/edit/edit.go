@@ -134,10 +134,7 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			$ gh pr edit 23 --milestone "Version 1"
 			$ gh pr edit 23 --remove-milestone
 		`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
-			return cobra.MaximumNArgs(1)(cmd, args)
-		},
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
 
@@ -223,11 +220,12 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 				// see the `Editable.MilestoneId` method.
 			}
 
-			resolved, err := opts.AttachFlag.UserAssets()
+			var err error
+			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
 			}
-			opts.Assets = resolved
 
 			if !opts.Editable.Dirty() && len(opts.Assets) == 0 {
 				opts.Interactive = true

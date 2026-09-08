@@ -273,10 +273,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			$ gh pr create --attach './login.png#The login error state'
 			$ gh pr create --attach ./before.png --attach ./after.png
 		`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
-			return cmdutil.NoArgsQuoteReminder(cmd, args)
-		},
+		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
@@ -372,6 +369,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				return err
 			}
 
+			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err

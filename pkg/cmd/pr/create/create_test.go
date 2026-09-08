@@ -44,6 +44,14 @@ func TestNewCmdCreate(t *testing.T) {
 	tmpImage := filepath.Join(t.TempDir(), "shot.png")
 	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
 
+	attachmentEvent := []ghtelemetry.Event{{
+		Type:       "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "create"},
+		Measures: ghtelemetry.Measures{
+			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
+		},
+	}}
+
 	tests := []struct {
 		name        string
 		tty         bool
@@ -57,6 +65,8 @@ func TestNewCmdCreate(t *testing.T) {
 		wantErrIsNotExist bool
 		wantAssetPaths    []string
 		wantsOpts         CreateOptions
+		wantEvents        []ghtelemetry.Event
+		wantSampleRate    int
 	}{
 		{
 			name:     "empty non-tty",
@@ -295,9 +305,11 @@ func TestNewCmdCreate(t *testing.T) {
 				MaintainerCanModify: true,
 			},
 			wantAssetPaths: []string{tmpImage},
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
-			name:     "attach telemetry survives argument validation",
+			name:     "argument validation skips attachment telemetry",
 			cli:      fmt.Sprintf("unexpected --attach '%s'", tmpImage),
 			wantsErr: true,
 		},
@@ -307,6 +319,8 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr:          true,
 			wantsErrMsg:       "./nope.png: ",
 			wantErrIsNotExist: true,
+			wantEvents:        attachmentEvent,
+			wantSampleRate:    ghtelemetry.SAMPLE_ALL,
 		},
 		{
 			name:        "attach conflict is reported before a missing file",
@@ -323,6 +337,7 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given command inputs and their expected attachment telemetry
 			ios, stdin, stdout, stderr := iostreams.Test()
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
@@ -353,24 +368,12 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetArgs(args)
 			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
+			// When the command executes and telemetry is completed
 			_, err = cmd.ExecuteC()
 			recorder.Finish()
-			if cmd.Flags().Changed("attach") {
-				values, flagErr := cmd.Flags().GetStringArray("attach")
-				require.NoError(t, flagErr)
-				require.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
-				require.Len(t, recorder.Events, 1)
-				assert.Equal(t, "attachment_invocation", recorder.Events[0].Type)
-				assert.Equal(t, cmd.CommandPath(), recorder.Events[0].Dimensions["command"])
-				assert.Equal(t, ghtelemetry.Measures{
-					"attach_count":      int64(len(values)),
-					"append_ops_count":  0,
-					"replace_ops_count": 0,
-				}, recorder.Events[0].Measures)
-			} else {
-				assert.Empty(t, recorder.Events)
-				assert.Zero(t, recorder.LastSampleRate)
-			}
+			// Then telemetry starts only if execution reaches attachment validation
+			assert.Equal(t, tt.wantEvents, recorder.Events)
+			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
 				if tt.wantsErrMsg != "" {
 					if tt.wantErrIsNotExist {

@@ -2,7 +2,8 @@ package attachments
 
 import "github.com/cli/cli/v2/internal/gh/ghtelemetry"
 
-// BeginTelemetry records attachment usage before validation and promotes full sampling.
+// BeginTelemetry records attachment usage and promotes full sampling.
+// Call it immediately before Flag.UserAssets so rejected attachments are counted.
 // It returns nil if the flag was not passed or the flag or recorder is absent.
 func BeginTelemetry(flag *Flag, recorder ghtelemetry.InvocationRecorder, command string) ghtelemetry.PendingEvent {
 	if recorder == nil || flag == nil || !flag.Changed() {

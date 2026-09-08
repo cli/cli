@@ -55,10 +55,7 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 			# Attach multiple files by repeating the flag
 			$ gh pr comment 13 --attach ./before.png --attach ./after.png
 		`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
-			return cobra.MaximumNArgs(1)(cmd, args)
-		},
+		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
 				return cmdutil.FlagErrorf("argument required when using the --repo flag")
@@ -81,7 +78,7 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 					Fields:   fields,
 				})
 			}
-			if err := shared.CommentablePreRun(cmd, opts); err != nil {
+			if err := shared.CommentablePreRun(cmd, opts, telemetry); err != nil {
 				return err
 			}
 

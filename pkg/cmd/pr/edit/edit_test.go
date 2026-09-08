@@ -35,6 +35,14 @@ func TestNewCmdEdit(t *testing.T) {
 	tmpImage := filepath.Join(t.TempDir(), "shot.png")
 	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
 
+	attachmentEvent := []ghtelemetry.Event{{
+		Type:       "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "edit"},
+		Measures: ghtelemetry.Measures{
+			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
+		},
+	}}
+
 	tests := []struct {
 		name             string
 		input            string
@@ -43,6 +51,8 @@ func TestNewCmdEdit(t *testing.T) {
 		wantAssetPaths   []string
 		expectedBaseRepo ghrepo.Interface
 		wantsErr         bool
+		wantEvents       []ghtelemetry.Event
+		wantSampleRate   int
 	}{
 		{
 			name:  "no argument",
@@ -315,9 +325,11 @@ func TestNewCmdEdit(t *testing.T) {
 				Interactive: false,
 			},
 			wantAssetPaths: []string{tmpImage},
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
-			name:     "attach telemetry survives argument validation",
+			name:     "argument validation skips attachment telemetry",
 			input:    fmt.Sprintf("23 24 --attach '%s'", tmpImage),
 			wantsErr: true,
 		},
@@ -335,15 +347,25 @@ func TestNewCmdEdit(t *testing.T) {
 				},
 			},
 			wantAssetPaths: []string{tmpImage},
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
-			name:     "attach rejects a missing file",
-			input:    "23 --attach ./nope.png",
+			name:           "attach rejects a missing file",
+			input:          "23 --attach ./nope.png",
+			wantsErr:       true,
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+		},
+		{
+			name:     "body flag conflict skips attachment telemetry",
+			input:    fmt.Sprintf("23 --body test --body-file '%s' --attach '%s'", tmpFile, tmpImage),
 			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given command inputs and their expected attachment telemetry
 			ios, stdin, _, _ := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
@@ -358,7 +380,7 @@ func TestNewCmdEdit(t *testing.T) {
 			}
 
 			argv, err := shlex.Split(tt.input)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var gotOpts *EditOptions
 			recorder := &telemetry.InvocationRecorderSpy{}
@@ -373,30 +395,18 @@ func TestNewCmdEdit(t *testing.T) {
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
 
+			// When the command executes and telemetry is completed
 			_, err = cmd.ExecuteC()
 			recorder.Finish()
-			if cmd.Flags().Changed("attach") {
-				values, flagErr := cmd.Flags().GetStringArray("attach")
-				require.NoError(t, flagErr)
-				require.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
-				require.Len(t, recorder.Events, 1)
-				assert.Equal(t, "attachment_invocation", recorder.Events[0].Type)
-				assert.Equal(t, cmd.CommandPath(), recorder.Events[0].Dimensions["command"])
-				assert.Equal(t, ghtelemetry.Measures{
-					"attach_count":      int64(len(values)),
-					"append_ops_count":  0,
-					"replace_ops_count": 0,
-				}, recorder.Events[0].Measures)
-			} else {
-				assert.Empty(t, recorder.Events)
-				assert.Zero(t, recorder.LastSampleRate)
-			}
+			// Then telemetry starts only if execution reaches attachment validation
+			assert.Equal(t, tt.wantEvents, recorder.Events)
+			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.output.SelectorArg, gotOpts.SelectorArg)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.Editable, gotOpts.Editable)

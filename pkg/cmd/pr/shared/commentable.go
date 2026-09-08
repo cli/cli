@@ -67,7 +67,7 @@ type CommentableOptions struct {
 	Config           func() (gh.Config, error)
 }
 
-func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
+func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions, telemetry ghtelemetry.InvocationRecorder) error {
 	inputFlags := 0
 	if cmd.Flags().Changed("body") {
 		opts.InputType = InputTypeInline
@@ -105,11 +105,12 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 		return err
 	}
 
-	resolved, err := opts.AttachFlag.UserAssets()
+	var err error
+	opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+	opts.Assets, err = opts.AttachFlag.UserAssets()
 	if err != nil {
 		return err
 	}
-	opts.Assets = resolved
 
 	// An asset is a body input on its own, so `--attach shot.png` alone
 	// posts an image with no text. It is not part of the mutually exclusive

@@ -119,10 +119,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			$ gh issue create --parent https://github.com/cli/go-gh/issues/42
 			$ gh issue create --blocked-by 200,201 --blocking 300
 		`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
-			return cmdutil.NoArgsQuoteReminder(cmd, args)
-		},
+		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -168,6 +165,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				return err
 			}
 
+			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err

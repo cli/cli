@@ -137,6 +137,7 @@ func TestCommentablePreRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given comment inputs and the files they reference
 			t.Chdir(t.TempDir())
 			require.NoError(t, os.WriteFile("shot.png", []byte("the bytes"), 0o600))
 
@@ -148,8 +149,10 @@ func TestCommentablePreRun(t *testing.T) {
 			opts := &CommentableOptions{IO: ios}
 			cmd := commentableCmd(t, opts, tt.input)
 
-			err := CommentablePreRun(cmd, opts)
+			// When comment preparation validates those inputs
+			err := CommentablePreRun(cmd, opts, nil)
 
+			// Then it reports the validation error or prepares the comment options
 			if tt.wantErr != "" {
 				if tt.wantErrIsNotExist {
 					require.ErrorIs(t, err, fs.ErrNotExist)
