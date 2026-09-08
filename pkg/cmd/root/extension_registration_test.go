@@ -78,7 +78,7 @@ func TestNewCmdRoot_ExtensionRegistration(t *testing.T) {
 				ExtensionManager: em,
 			}
 
-			cmd, err := NewCmdRoot(f, &telemetry.NoOpService{}, "", "")
+			cmd, err := NewCmdRoot(f, &telemetry.NoOpInvocation{}, "", "")
 			require.NoError(t, err)
 
 			// Verify skipped extensions (should find core command registered, not extension)

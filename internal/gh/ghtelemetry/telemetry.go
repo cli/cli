@@ -10,6 +10,13 @@ type Event struct {
 	Measures   Measures
 }
 
+// PendingEvent accepts additional facts until its invocation finishes.
+// Setters copy their input and have no effect after completion.
+type PendingEvent interface {
+	SetDimensions(Dimensions)
+	SetMeasures(Measures)
+}
+
 type Disabler interface {
 	Disable()
 }
@@ -21,14 +28,15 @@ type EventRecorder interface {
 
 type CommandRecorder interface {
 	EventRecorder
-	// RecordDeferred schedules an event to be resolved when telemetry flushes.
-	RecordDeferred(func() Event)
+	// BeginEvent records initial facts that can be updated until invocation completion.
+	BeginEvent(Event) PendingEvent
 	SetSampleRate(rate int)
 }
 
-type Service interface {
+// Invocation collects telemetry throughout command execution and completes it once.
+type Invocation interface {
 	CommandRecorder
-	Flush()
+	Finish()
 }
 
 const SAMPLE_ALL = 100

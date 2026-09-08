@@ -88,7 +88,7 @@ func TestNewCmdList(t *testing.T) {
 			}
 
 			var gotOpts *ListOptions
-			cmd := NewCmdList(f, &telemetry.NoOpService{}, func(opts *ListOptions) error {
+			cmd := NewCmdList(f, &telemetry.NoOpInvocation{}, func(opts *ListOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -466,6 +466,7 @@ func TestListRun(t *testing.T) {
 			opts := tt.opts(ios, repoDir, homeDir, spy)
 
 			err := listRun(opts)
+			spy.Finish()
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

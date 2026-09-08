@@ -104,7 +104,7 @@ func TestNewCmdSearch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{}
 			var gotOpts *SearchOptions
-			cmd := NewCmdSearch(f, &telemetry.NoOpService{}, func(opts *SearchOptions) error {
+			cmd := NewCmdSearch(f, &telemetry.NoOpInvocation{}, func(opts *SearchOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -374,7 +374,7 @@ func TestSearchRun(t *testing.T) {
 			ios.SetStdoutTTY(tt.tty)
 			ios.SetStderrTTY(tt.tty)
 			tt.opts.IO = ios
-			tt.opts.Telemetry = &telemetry.NoOpService{}
+			tt.opts.Telemetry = &telemetry.NoOpInvocation{}
 
 			defer reg.Verify(t)
 			err := searchRun(tt.opts)

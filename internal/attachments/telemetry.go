@@ -10,7 +10,7 @@ import (
 type InvocationTelemetry struct {
 	flag     *Flag
 	recorder ghtelemetry.CommandRecorder
-	event    *ghtelemetry.Event
+	event    ghtelemetry.PendingEvent
 }
 
 // NewInvocationTelemetry creates attachment telemetry for flag.
@@ -39,7 +39,8 @@ func (t *InvocationTelemetry) start(command string) {
 		return
 	}
 
-	event := &ghtelemetry.Event{
+	t.recorder.SetSampleRate(ghtelemetry.SAMPLE_ALL)
+	t.event = t.recorder.BeginEvent(ghtelemetry.Event{
 		Type: "attachment_invocation",
 		Dimensions: ghtelemetry.Dimensions{
 			"command": command,
@@ -49,11 +50,6 @@ func (t *InvocationTelemetry) start(command string) {
 			"append_ops_count":  0,
 			"replace_ops_count": 0,
 		},
-	}
-	t.event = event
-	t.recorder.SetSampleRate(ghtelemetry.SAMPLE_ALL)
-	t.recorder.RecordDeferred(func() ghtelemetry.Event {
-		return *event
 	})
 }
 
@@ -63,6 +59,8 @@ func (t *InvocationTelemetry) RecordOperations(result UploadResult) {
 		return
 	}
 
-	t.event.Measures["append_ops_count"] = int64(result.AppendOperations)
-	t.event.Measures["replace_ops_count"] = int64(result.ReplaceOperations)
+	t.event.SetMeasures(ghtelemetry.Measures{
+		"append_ops_count":  int64(result.AppendOperations),
+		"replace_ops_count": int64(result.ReplaceOperations),
+	})
 }

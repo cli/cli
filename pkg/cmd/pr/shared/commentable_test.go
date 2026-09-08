@@ -495,7 +495,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 
 			err := CommentableRun(&opts)
 			if tt.wantOperations != nil {
-				attachmentRecorder.Flush()
+				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
 			}
 

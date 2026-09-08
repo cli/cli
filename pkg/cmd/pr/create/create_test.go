@@ -354,7 +354,7 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
 			_, err = cmd.ExecuteC()
-			recorder.Flush()
+			recorder.Finish()
 			if cmd.Flags().Changed("attach") {
 				values, flagErr := cmd.Flags().GetStringArray("attach")
 				require.NoError(t, flagErr)
@@ -2074,7 +2074,7 @@ func Test_createRun(t *testing.T) {
 
 			err := createRun(&opts)
 			if tt.wantOperations != nil {
-				attachmentRecorder.Flush()
+				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(opts.Assets), *tt.wantOperations)
 			}
 			output := &test.CmdOut{

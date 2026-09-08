@@ -331,7 +331,7 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)
 			_, err = cmd.ExecuteC()
-			recorder.Flush()
+			recorder.Finish()
 			if cmd.Flags().Changed("attach") {
 				values, flagErr := cmd.Flags().GetStringArray("attach")
 				require.NoError(t, flagErr)
@@ -1449,7 +1449,7 @@ func Test_createRun(t *testing.T) {
 
 			err := createRun(opts)
 			if tt.wantOperations != nil {
-				attachmentRecorder.Flush()
+				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
 			}
 			if tt.wantsErr == "" {
@@ -1493,7 +1493,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 		Prompter: pm,
 	}
 
-	cmd := NewCmdCreate(factory, &telemetry.NoOpService{}, func(opts *CreateOptions) error {
+	cmd := NewCmdCreate(factory, &telemetry.NoOpInvocation{}, func(opts *CreateOptions) error {
 		opts.RootDirOverride = rootDir
 		opts.Detector = &fd.EnabledDetectorMock{}
 		return createRun(opts)

@@ -1,26 +1,20 @@
 // Package telemetry provides best-effort usage telemetry for gh commands.
+// Invocations collect facts until completion; delivery sends completed payloads.
 package telemetry
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/google/uuid"
 	"github.com/mgutz/ansi"
@@ -144,29 +138,6 @@ func ParseTelemetryState(configValue string) TelemetryState {
 	return Enabled
 }
 
-type telemetryServiceOpts struct {
-	additionalDimensions ghtelemetry.Dimensions
-	sampleRate           int
-}
-
-type telemetryServiceOption func(*telemetryServiceOpts)
-
-// WithAdditionalCommonDimensions allows setting additional common dimensions that will be included with every telemetry event recorded by the service.
-func WithAdditionalCommonDimensions(dimensions ghtelemetry.Dimensions) telemetryServiceOption {
-	return func(s *telemetryServiceOpts) {
-		maps.Copy(s.additionalDimensions, dimensions)
-	}
-}
-
-// WithSampleRate allows setting a sample rate (0-100) for telemetry events. Events recorded with the Unsampled option will be sent regardless of the sample rate.
-// Sampling is based on invocation ID, so an entire invocation will be included or excluded as a whole. This ensures that related events are not split between sampled and unsampled,
-// which could lead to incomplete data and incorrect assumptions.
-func WithSampleRate(rate int) telemetryServiceOption {
-	return func(s *telemetryServiceOpts) {
-		s.sampleRate = rate
-	}
-}
-
 // LogFlusher returns a flush function that writes telemetry payloads to the provided log writer. This is used for the "log" telemetry mode, which is intended for debugging and development.
 // When there are no events to report (for example the command opted out of telemetry, the user is on GHES, or no events were recorded), a "Telemetry payload: none" marker is written so that the absence of events is observable.
 var LogFlusher = func(log io.Writer, colorEnabled bool) func(payload SendTelemetryPayload) {
@@ -207,141 +178,6 @@ var GitHubFlusher = func(executable string) func(payload SendTelemetryPayload) {
 		}
 		SpawnSendTelemetry(executable, payload)
 	}
-}
-
-// NewService creates a new telemetry service with the provided flush function and options.
-func NewService(flusher func(SendTelemetryPayload), opts ...telemetryServiceOption) ghtelemetry.Service {
-	telemetryServiceOpts := telemetryServiceOpts{
-		additionalDimensions: make(ghtelemetry.Dimensions),
-	}
-	for _, opt := range opts {
-		opt(&telemetryServiceOpts)
-	}
-
-	deviceID, err := deviceIDFunc()
-	if err != nil {
-		deviceID = "<unknown>"
-	}
-
-	invocationID := uuid.NewString()
-
-	var commonDimensions = ghtelemetry.Dimensions{
-		"device_id":     deviceID,
-		"invocation_id": invocationID,
-		"os":            runtime.GOOS,
-		"architecture":  runtime.GOARCH,
-	}
-	maps.Copy(commonDimensions, telemetryServiceOpts.additionalDimensions)
-
-	hash := uuid.NewSHA1(uuid.Nil, []byte(invocationID))
-	sampleBucket := byte(binary.BigEndian.Uint32(hash[:4]) % 100)
-
-	s := &service{
-		flush:            flusher,
-		commonDimensions: commonDimensions,
-		sampleRate:       telemetryServiceOpts.sampleRate,
-		sampleBucket:     sampleBucket,
-	}
-
-	return s
-}
-
-type recordedEvent struct {
-	event         ghtelemetry.Event
-	deferredEvent func() ghtelemetry.Event
-	recordedAt    time.Time
-}
-
-type service struct {
-	mu               sync.RWMutex
-	flush            func(payload SendTelemetryPayload)
-	previouslyCalled bool
-
-	commonDimensions ghtelemetry.Dimensions
-	sampleRate       int
-	sampleBucket     byte
-
-	events []recordedEvent
-
-	disabled bool
-}
-
-func (s *service) Disable() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.disabled = true
-}
-
-func (s *service) Record(event ghtelemetry.Event) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.events = append(s.events, recordedEvent{event: event, recordedAt: time.Now()})
-}
-
-func (s *service) RecordDeferred(event func() ghtelemetry.Event) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.events = append(s.events, recordedEvent{deferredEvent: event, recordedAt: time.Now()})
-}
-
-func (s *service) SetSampleRate(rate int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.sampleRate = rate
-	s.commonDimensions["sample_rate"] = strconv.Itoa(rate)
-}
-
-func (s *service) Flush() {
-	// This shouldn't really be required since flush should only be called once, but just in case...
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.previouslyCalled {
-		return
-	}
-	s.previouslyCalled = true
-
-	if s.sampleRate > 0 && s.sampleRate < 100 && int(s.sampleBucket) >= s.sampleRate {
-		return
-	}
-
-	// When the service has been disabled mid-invocation (e.g. an enterprise host
-	// was contacted), discard any recorded events. We still call the flusher
-	// with an empty payload so that the log-mode flusher can surface the
-	// absence of telemetry rather than leaving the user staring at silence.
-	events := s.events
-	if s.disabled {
-		events = nil
-	}
-
-	payload := SendTelemetryPayload{
-		Events: make([]PayloadEvent, len(events)),
-	}
-
-	for i, recorded := range events {
-		event := recorded.event
-		if recorded.deferredEvent != nil {
-			event = recorded.deferredEvent()
-		}
-
-		dimensions := map[string]string{
-			"timestamp": recorded.recordedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
-		}
-		maps.Copy(dimensions, s.commonDimensions)
-		maps.Copy(dimensions, event.Dimensions)
-
-		payload.Events[i] = PayloadEvent{
-			Type:       event.Type,
-			Dimensions: dimensions,
-			Measures:   event.Measures,
-		}
-	}
-
-	s.flush(payload)
 }
 
 // maxPayloadSize is a safety limit for the telemetry payload written to the
@@ -426,15 +262,3 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 	// Release resources associated with the child process since we will never Wait for it.
 	_ = cmd.Process.Release()
 }
-
-type NoOpService struct{}
-
-func (s *NoOpService) Record(event ghtelemetry.Event) {}
-
-func (s *NoOpService) RecordDeferred(event func() ghtelemetry.Event) {}
-
-func (s *NoOpService) Disable() {}
-
-func (s *NoOpService) SetSampleRate(rate int) {}
-
-func (s *NoOpService) Flush() {}

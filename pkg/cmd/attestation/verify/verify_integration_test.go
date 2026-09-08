@@ -36,7 +36,7 @@ func TestVerifyIntegration(t *testing.T) {
 		ios,
 		"test",
 		"",
-		&telemetry.NoOpService{},
+		&telemetry.NoOpInvocation{},
 	)()
 	require.NoError(t, err)
 
@@ -156,7 +156,7 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 		ios,
 		"test",
 		"",
-		&telemetry.NoOpService{},
+		&telemetry.NoOpInvocation{},
 	)()
 	require.NoError(t, err)
 
@@ -234,7 +234,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		ios,
 		"test",
 		"",
-		&telemetry.NoOpService{},
+		&telemetry.NoOpInvocation{},
 	)()
 	require.NoError(t, err)
 
@@ -331,7 +331,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 		ios,
 		"test",
 		"",
-		&telemetry.NoOpService{},
+		&telemetry.NoOpInvocation{},
 	)()
 	require.NoError(t, err)
 

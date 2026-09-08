@@ -433,9 +433,10 @@ func TestNewCmdApiTelemetry(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	var payload telemetry.SendTelemetryPayload
-	recorder := telemetry.NewService(func(p telemetry.SendTelemetryPayload) {
+	delivery := telemetry.NewDelivery(func(p telemetry.SendTelemetryPayload) {
 		payload = p
 	})
+	recorder := telemetry.NewInvocation(delivery)
 	recorder.Record(ghtelemetry.Event{Type: "command"})
 
 	ios, _, _, _ := iostreams.Test()
@@ -449,7 +450,8 @@ func TestNewCmdApiTelemetry(t *testing.T) {
 
 	_, err := cmd.ExecuteC()
 	require.NoError(t, err)
-	recorder.Flush()
+	recorder.Finish()
+	delivery.Flush()
 
 	assert.Empty(t, payload.Events)
 }

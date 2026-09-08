@@ -158,8 +158,8 @@ func TestInvocationTelemetry(t *testing.T) {
 				_, err := attachFlag.UserAssets()
 				require.EqualError(t, err, tt.wantValidationErr)
 			}
-			recorder.Flush()
-			recorder.Flush()
+			recorder.Finish()
+			recorder.Finish()
 
 			if !tt.wantEvent {
 				assert.Empty(t, recorder.Events)
@@ -214,7 +214,7 @@ func TestInvocationTelemetryWrapArgsRecordsBeforePersistentPreRunError(t *testin
 
 	_, err := root.ExecuteC()
 	require.EqualError(t, err, "authentication failed")
-	recorder.Flush()
+	recorder.Finish()
 
 	require.Equal(t, []ghtelemetry.Event{{
 		Type:       "attachment_invocation",

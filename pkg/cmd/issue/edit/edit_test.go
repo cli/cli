@@ -476,7 +476,7 @@ func TestNewCmdEdit(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
-			recorder.Flush()
+			recorder.Finish()
 			if cmd.Flags().Changed("attach") {
 				values, flagErr := cmd.Flags().GetStringArray("attach")
 				require.NoError(t, flagErr)
@@ -1781,7 +1781,7 @@ func Test_editRun(t *testing.T) {
 
 			err := editRun(tt.input)
 			if tt.wantOperations != nil {
-				attachmentRecorder.Flush()
+				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
 			}
 			if tt.wantErr {
