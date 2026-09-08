@@ -52,7 +52,7 @@ type EditOptions struct {
 	RemoveBlocking  []string
 
 	AttachFlag  *attachments.Flag
-	AttachEvent ghtelemetry.PendingEvent
+	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
 	Config      func() (gh.Config, error)
 
@@ -212,7 +212,7 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 				opts.Editable.IssueType.Edited = true
 			}
 
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			opts.AttachEvent = attachments.Begin(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -419,7 +419,7 @@ func editRun(opts *EditOptions) error {
 		// prompt or cancel may follow an upload.
 		var uploadResult attachments.UploadResult
 		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
-		attachments.RecordOperations(opts.AttachEvent, uploadResult)
+		opts.AttachEvent.RecordOperations(uploadResult)
 
 		if uploadResult.Uploaded > 0 {
 			editable.Body.Value = body

@@ -41,7 +41,7 @@ type EditOptions struct {
 	Interactive bool
 
 	AttachFlag  *attachments.Flag
-	AttachEvent ghtelemetry.PendingEvent
+	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
 	Config      func() (gh.Config, error)
 
@@ -221,7 +221,7 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			}
 
 			var err error
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			opts.AttachEvent = attachments.Begin(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -425,7 +425,7 @@ func editRun(opts *EditOptions) error {
 		// Nothing that can prompt or cancel may follow this.
 		var uploadResult attachments.UploadResult
 		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
-		attachments.RecordOperations(opts.AttachEvent, uploadResult)
+		opts.AttachEvent.RecordOperations(uploadResult)
 
 		// With nothing uploaded, even a body the caller typed goes unwritten:
 		// its references are still local paths, which render broken. The other

@@ -150,7 +150,7 @@ func TestCommentablePreRun(t *testing.T) {
 			cmd := commentableCmd(t, opts, tt.input)
 
 			// When comment preparation validates those inputs
-			err := CommentablePreRun(cmd, opts, nil)
+			err := CommentablePreRun(cmd, opts, &telemetry.NoOpService{})
 
 			// Then it reports the validation error or prepares the comment options
 			if tt.wantErr != "" {
@@ -454,9 +454,10 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			if len(tt.attach) > 0 {
 				opts.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
+			// Given a pending event for the supplied attachments
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				opts.AttachEvent = attachments.BeginTestTelemetry(t, attachmentRecorder, len(tt.attach))
+				opts.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
 			}
 
 			host := tt.host
@@ -496,7 +497,9 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 				}, ghrepo.NewWithHost("OWNER", "REPO", host), nil
 			}
 
+			// When writing the comment processes the attachments
 			err := CommentableRun(&opts)
+			// Then telemetry retains completed operations, including partial results
 			if tt.wantOperations != nil {
 				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)

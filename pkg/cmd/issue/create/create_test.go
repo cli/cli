@@ -1438,9 +1438,10 @@ func Test_createRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				opts.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
+			// Given a pending event for the supplied attachments
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				opts.AttachEvent = attachments.BeginTestTelemetry(t, attachmentRecorder, len(tt.attach))
+				opts.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
 			}
 			opts.Config = func() (gh.Config, error) {
 				cfg := tt.config
@@ -1450,7 +1451,9 @@ func Test_createRun(t *testing.T) {
 				return config.NewMockConfigFromString(cfg), nil
 			}
 
+			// When issue creation processes the attachments
 			err := createRun(opts)
+			// Then telemetry retains completed operations, including partial results
 			if tt.wantOperations != nil {
 				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)

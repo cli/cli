@@ -100,8 +100,9 @@ func TestAttachmentTelemetry(t *testing.T) {
 		wantValidationErr string
 	}{
 		{
-			name:  "flag not passed",
-			input: "",
+			name:       "flag not passed ignores operation updates",
+			input:      "",
+			operations: &UploadResult{AppendOperations: 1, ReplaceOperations: 1},
 		},
 		{
 			name:      "one attachment",
@@ -134,6 +135,13 @@ func TestAttachmentTelemetry(t *testing.T) {
 			operations: &UploadResult{},
 		},
 		{
+			name:              "empty path still counts",
+			input:             `--attach ""`,
+			wantEvent:         true,
+			wantCount:         1,
+			wantValidationErr: "cannot attach an empty path; --attach needs a file path",
+		},
+		{
 			name:              "over attachment limit",
 			input:             strings.Repeat("--attach ./missing.png ", maxAttachments+1),
 			wantEvent:         true,
@@ -144,13 +152,15 @@ func TestAttachmentTelemetry(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given raw attachment inputs, including values validation will reject
 			_, attachFlag := attachCmd(t, tt.input)
 			recorder := &telemetry.InvocationRecorderSpy{}
 
-			event := BeginTelemetry(attachFlag, recorder, "gh issue comment")
+			// When telemetry begins before validation and captures operation results
+			event := Begin(recorder, "gh issue comment", attachFlag.Count())
 			assert.Empty(t, recorder.Events)
 			if tt.operations != nil {
-				RecordOperations(event, *tt.operations)
+				event.RecordOperations(*tt.operations)
 			}
 			if tt.wantValidationErr != "" {
 				_, err := attachFlag.UserAssets()
@@ -159,7 +169,9 @@ func TestAttachmentTelemetry(t *testing.T) {
 			recorder.Finish()
 			recorder.Finish()
 
+			// Then the completed event retains raw counts, or nothing if no flag was supplied
 			if !tt.wantEvent {
+				assert.Nil(t, event)
 				assert.Empty(t, recorder.Events)
 				assert.Zero(t, recorder.LastSampleRate)
 				return
@@ -184,6 +196,29 @@ func TestAttachmentTelemetry(t *testing.T) {
 			require.Equal(t, wantEvents, recorder.Events)
 		})
 	}
+}
+
+func TestTelemetryEventReplacesOperationCounts(t *testing.T) {
+	// Given an attachment event with previously recorded operation counts
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	var payload telemetry.SendTelemetryPayload
+	service := telemetry.NewService(func(p telemetry.SendTelemetryPayload) {
+		payload = p
+	})
+	event := Begin(service, "gh issue comment", 2)
+	event.RecordOperations(UploadResult{AppendOperations: 2})
+
+	// When a later result replaces those counts and the invocation finishes
+	event.RecordOperations(UploadResult{Uploaded: 1, ReplaceOperations: 1})
+	service.Finish()
+
+	// Then the payload contains the latest counts, including a reset to zero
+	require.Len(t, payload.Events, 1)
+	assert.Equal(t, map[string]int64{
+		"attach_count":      2,
+		"append_ops_count":  0,
+		"replace_ops_count": 1,
+	}, payload.Events[0].Measures)
 }
 
 func TestFlagUserAssets(t *testing.T) {

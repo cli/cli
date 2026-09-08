@@ -2063,9 +2063,10 @@ func Test_createRun(t *testing.T) {
 				cleanSetup = tt.setup(&opts, t)
 			}
 			defer cleanSetup()
+			// Given a pending event for the supplied attachments
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				opts.AttachEvent = attachments.BeginTestTelemetry(t, attachmentRecorder, len(opts.Assets))
+				opts.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(opts.Assets))
 			}
 
 			// All tests in this function use github.com behavior
@@ -2075,7 +2076,9 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git status --porcelain`, 0, "")
 			}
 
+			// When pull request creation processes the attachments
 			err := createRun(&opts)
+			// Then telemetry retains completed operations, including partial results
 			if tt.wantOperations != nil {
 				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(opts.Assets), *tt.wantOperations)

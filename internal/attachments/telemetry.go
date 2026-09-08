@@ -2,36 +2,48 @@ package attachments
 
 import "github.com/cli/cli/v2/internal/gh/ghtelemetry"
 
-// BeginTelemetry records attachment usage and promotes full sampling.
-// Call it immediately before Flag.UserAssets so rejected attachments are counted.
-// It returns nil if the flag was not passed or the flag or recorder is absent.
-func BeginTelemetry(flag *Flag, recorder ghtelemetry.InvocationRecorder, command string) ghtelemetry.PendingEvent {
-	if recorder == nil || flag == nil || !flag.Changed() {
+// TelemetryEvent tracks attachment-specific facts in a pending telemetry event.
+// [ghtelemetry.Service.Finish] owns completion; later updates are ignored.
+type TelemetryEvent struct {
+	pendingEvent ghtelemetry.PendingEvent
+}
+
+// Begin starts an attachment event at full sampling for the raw supplied count.
+// A zero count returns nil without changing sampling. recorder is required;
+// use a no-op service when telemetry is disabled.
+// Call immediately before Flag.UserAssets so invalid and over-limit inputs count.
+func Begin(recorder ghtelemetry.InvocationRecorder, command string, attachCount int) *TelemetryEvent {
+	if attachCount == 0 {
 		return nil
 	}
 
 	recorder.SetSampleRate(ghtelemetry.SAMPLE_ALL)
-	return recorder.Begin(ghtelemetry.Event{
+	pendingEvent := recorder.Begin(ghtelemetry.Event{
 		Type: "attachment_invocation",
 		Dimensions: ghtelemetry.Dimensions{
 			"command": command,
 		},
 		Measures: ghtelemetry.Measures{
-			"attach_count":      int64(len(flag.values)),
+			"attach_count":      int64(attachCount),
 			"append_ops_count":  0,
 			"replace_ops_count": 0,
 		},
 	})
+
+	return &TelemetryEvent{
+		pendingEvent: pendingEvent,
+	}
 }
 
-// RecordOperations upserts completed markdown operation counts, including partial results.
-// A nil event means there is no attachment telemetry to update.
-func RecordOperations(event ghtelemetry.PendingEvent, result UploadResult) {
-	if event == nil {
+// RecordOperations replaces, rather than adds to, the completed operation counts.
+// Pass partial results before handling an upload error so successful work is retained.
+// A nil event, returned by Begin for zero attachments, is a no-op.
+func (e *TelemetryEvent) RecordOperations(result UploadResult) {
+	if e == nil {
 		return
 	}
 
-	event.UpsertMeasures(ghtelemetry.Measures{
+	e.pendingEvent.UpsertMeasures(ghtelemetry.Measures{
 		"append_ops_count":  int64(result.AppendOperations),
 		"replace_ops_count": int64(result.ReplaceOperations),
 	})

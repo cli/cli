@@ -78,7 +78,7 @@ type CreateOptions struct {
 	DryRun bool
 
 	AttachFlag  *attachments.Flag
-	AttachEvent ghtelemetry.PendingEvent
+	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
 }
 
@@ -369,7 +369,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				return err
 			}
 
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			opts.AttachEvent = attachments.Begin(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -1128,7 +1128,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	var uploadErr error
 	if uploader != nil {
 		body, uploadResult, err := uploader.UploadAndAttach(context.Background(), state.Body, opts.Assets)
-		attachments.RecordOperations(opts.AttachEvent, uploadResult)
+		opts.AttachEvent.RecordOperations(uploadResult)
 		// With nothing uploaded, a body that lost the files it was written
 		// around is not what the caller asked to create. The branch is already
 		// pushed by now, so the message says what was not created rather than

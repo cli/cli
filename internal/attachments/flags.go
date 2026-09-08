@@ -39,6 +39,12 @@ func (f *Flag) Changed() bool {
 	return f.flag.Changed
 }
 
+// Count returns the number of supplied attachment values before validation.
+// Absent flags count as zero; empty paths and values over the limit still count.
+func (f *Flag) Count() int {
+	return len(f.values)
+}
+
 // UserAssets validates the files named by the attachment flag, keeping them in
 // the order they were written. It returns nothing when the flag was not passed.
 func (f *Flag) UserAssets() ([]UserAsset, error) {

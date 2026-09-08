@@ -59,7 +59,7 @@ type CreateOptions struct {
 	Blocking    []string
 
 	AttachFlag  *attachments.Flag
-	AttachEvent ghtelemetry.PendingEvent
+	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
 }
 
@@ -165,7 +165,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				return err
 			}
 
-			opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+			opts.AttachEvent = attachments.Begin(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -467,7 +467,7 @@ func createRun(opts *CreateOptions) (err error) {
 		// issue is created and the failures are reported.
 		if uploader != nil {
 			body, uploadResult, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.Assets)
-			attachments.RecordOperations(opts.AttachEvent, uploadResult)
+			opts.AttachEvent.RecordOperations(uploadResult)
 			if uploadErr != nil && uploadResult.Uploaded == 0 {
 				err = uploadErr
 				return

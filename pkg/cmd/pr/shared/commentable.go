@@ -62,7 +62,7 @@ type CommentableOptions struct {
 	BodyProvided     bool
 	KeepExistingBody bool
 	AttachFlag       *attachments.Flag
-	AttachEvent      ghtelemetry.PendingEvent
+	AttachEvent      *attachments.TelemetryEvent
 	Assets           []attachments.UserAsset
 	Config           func() (gh.Config, error)
 }
@@ -106,7 +106,7 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions, telemetry g
 	}
 
 	var err error
-	opts.AttachEvent = attachments.BeginTelemetry(opts.AttachFlag, telemetry, cmd.CommandPath())
+	opts.AttachEvent = attachments.Begin(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 	opts.Assets, err = opts.AttachFlag.UserAssets()
 	if err != nil {
 		return err
@@ -357,7 +357,7 @@ func bodyForWrite(opts *CommentableOptions, uploader *attachments.Uploader) (bod
 		return opts.Body, true, nil
 	}
 	body, uploadResult, err := uploader.UploadAndAttach(context.Background(), opts.Body, opts.Assets)
-	attachments.RecordOperations(opts.AttachEvent, uploadResult)
+	opts.AttachEvent.RecordOperations(uploadResult)
 	if err != nil && uploadResult.Uploaded == 0 {
 		return "", false, err
 	}

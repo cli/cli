@@ -1703,9 +1703,10 @@ func Test_editRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
+			// Given a pending event for the supplied attachments
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				tt.input.AttachEvent = attachments.BeginTestTelemetry(t, attachmentRecorder, len(tt.attach))
+				tt.input.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
 			}
 
 			// The host comes from the pull request the row's finder returns, so
@@ -1725,7 +1726,9 @@ func Test_editRun(t *testing.T) {
 			var lookupFields []string
 			tt.input.Finder = fieldCapturingFinder{PRFinder: tt.input.Finder, fields: &lookupFields}
 
+			// When pull request editing processes the attachments
 			err := editRun(tt.input)
+			// Then telemetry retains completed operations, including partial results
 			if tt.wantOperations != nil {
 				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
