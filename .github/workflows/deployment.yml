@@ -372,22 +372,15 @@ jobs:
       - name: Set up GPG
         if: inputs.environment == 'production'
         env:
-          GPG_PUBKEY: ${{ secrets.GPG_PUBKEY }}
-          GPG_KEY: ${{ secrets.GPG_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          GPG_KEYGRIP: ${{ secrets.GPG_KEYGRIP }}
           GPG_PUBKEY_2026: ${{ secrets.GPG_PUBKEY_2026 }}
           GPG_KEY_2026: ${{ secrets.GPG_KEY_2026 }}
           GPG_PASSPHRASE_2026: ${{ secrets.GPG_PASSPHRASE_2026 }}
           GPG_KEYGRIP_2026: ${{ secrets.GPG_KEYGRIP_2026 }}
         run: |
-          base64 -d <<<"$GPG_PUBKEY" | gpg --import --no-tty --batch --yes
-          base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
           base64 -d <<<"$GPG_PUBKEY_2026" | gpg --import --no-tty --batch --yes
           base64 -d <<<"$GPG_KEY_2026" | gpg --import --no-tty --batch --yes
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
           gpg-connect-agent RELOADAGENT /bye
-          base64 -d <<<"$GPG_PASSPHRASE" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP"
           base64 -d <<<"$GPG_PASSPHRASE_2026" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP_2026"
       - name: Sign RPMs
         if: inputs.environment == 'production'
@@ -408,7 +401,7 @@ jobs:
           ./script/createrepo.sh
           cp -r dist/repodata site/packages/rpm/
           pushd site/packages/rpm
-          gpg --yes --detach-sign --armor --default-key 2C6106201985B60E6C7AC87323F3D4EA75716059 repodata/repomd.xml
+          gpg --yes --detach-sign --armor --default-key 7F38BBB59D064DBCB3D84D725612B36462313325 repodata/repomd.xml
           popd
       - name: Run reprepro
         if: ${{ inputs.environment == 'production' }}
