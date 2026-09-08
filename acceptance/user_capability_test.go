@@ -15,6 +15,16 @@ import (
 var fixtureRepositoryEnvironmentVariable = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 var directRepositoryCreation = regexp.MustCompile(`^(?:\[[^]]+\] )*(?:! )?exec gh repo create(?: |$)`)
 
+const fixtureRepositoryDeclarationHelp = `choose one:
+  fixture-repo shared REPO
+  fixture-repo isolated REPO
+  fixture-repo none
+
+Use shared when concurrent scripts can safely reuse the repository, isolated
+when the script needs clean or repository-global state, and none when the
+script creates its own repositories or does not need one.
+See acceptance/README.md#script-metadata for details.`
+
 func validateFixtureRepositoryDeclaration(file string) error {
 	f, err := os.Open(file)
 	if err != nil {
@@ -42,7 +52,7 @@ func validateFixtureRepositoryDeclaration(file string) error {
 	}
 
 	if len(declarations) != 1 {
-		return fmt.Errorf("%s: script must contain exactly one fixture-repo declaration", file)
+		return fmt.Errorf("%s: script must contain exactly one fixture-repo declaration; %s", file, fixtureRepositoryDeclarationHelp)
 	}
 
 	declaration := declarations[0]
@@ -51,14 +61,14 @@ func validateFixtureRepositoryDeclaration(file string) error {
 		return nil
 	case len(declaration) == 3 && (declaration[1] == "shared" || declaration[1] == "isolated"):
 		if !fixtureRepositoryEnvironmentVariable.MatchString(declaration[2]) {
-			return fmt.Errorf("%s: fixture repository environment variable must match %s", file, fixtureRepositoryEnvironmentVariable)
+			return fmt.Errorf("%s: fixture repository environment variable must match %s; for example:\n  fixture-repo shared REPO", file, fixtureRepositoryEnvironmentVariable)
 		}
 		if hasDirectRepositoryCreation {
-			return fmt.Errorf("%s: scripts using a managed fixture repository must not run gh repo create", file)
+			return fmt.Errorf("%s: scripts using a managed fixture repository must not run gh repo create; either remove gh repo create or use:\n  fixture-repo none", file)
 		}
 		return nil
 	default:
-		return fmt.Errorf("%s: fixture-repo declaration must be 'fixture-repo shared ENV_VAR', 'fixture-repo isolated ENV_VAR', or 'fixture-repo none'", file)
+		return fmt.Errorf("%s: invalid fixture-repo declaration; %s", file, fixtureRepositoryDeclarationHelp)
 	}
 }
 
@@ -95,32 +105,32 @@ func TestValidateFixtureRepositoryDeclaration(t *testing.T) {
 		{
 			name:    "missing",
 			content: "",
-			wantErr: "exactly one",
+			wantErr: "choose one:\n  fixture-repo shared REPO\n  fixture-repo isolated REPO\n  fixture-repo none",
 		},
 		{
 			name:    "multiple",
 			content: "fixture-repo shared REPO\nfixture-repo isolated OTHER_REPO\n",
-			wantErr: "exactly one",
+			wantErr: "choose one:\n  fixture-repo shared REPO\n  fixture-repo isolated REPO\n  fixture-repo none",
 		},
 		{
 			name:    "invalid mode",
 			content: "fixture-repo pristine REPO\n",
-			wantErr: "declaration must be",
+			wantErr: "choose one:\n  fixture-repo shared REPO\n  fixture-repo isolated REPO\n  fixture-repo none",
 		},
 		{
 			name:    "invalid environment variable",
 			content: "fixture-repo shared repo\n",
-			wantErr: "environment variable",
+			wantErr: "for example:\n  fixture-repo shared REPO",
 		},
 		{
 			name:    "managed fixture creates repository",
 			content: "fixture-repo isolated REPO\nexec gh repo create $ORG/example --private\n",
-			wantErr: "must not run gh repo create",
+			wantErr: "either remove gh repo create or use:\n  fixture-repo none",
 		},
 		{
 			name:    "managed fixture conditionally creates repository",
 			content: "fixture-repo shared REPO\n[windows] ! exec gh repo create $ORG/example --private\n",
-			wantErr: "must not run gh repo create",
+			wantErr: "either remove gh repo create or use:\n  fixture-repo none",
 		},
 		{
 			name: "ignores archive contents",
