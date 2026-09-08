@@ -24,7 +24,7 @@ func TestServiceCopiesFactsAtTheirRecordingTime(t *testing.T) {
 			Measures:   ghtelemetry.Measures{"count": 1},
 		}
 		startedAt := time.Now()
-		pending := service.BeginEvent(facts)
+		pending := service.Begin(facts)
 		time.Sleep(time.Second)
 		facts.Type = "completed_step"
 		service.Record(facts)
@@ -63,7 +63,7 @@ func TestServicePromotesAllEventsBeforeCompletion(t *testing.T) {
 	var payload SendTelemetryPayload
 	service := NewService(func(p SendTelemetryPayload) { payload = p }, WithSampleRate(1))
 	service.Record(ghtelemetry.Event{Type: "completed_step"})
-	pending := service.BeginEvent(ghtelemetry.Event{Type: "attachment_invocation"})
+	pending := service.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
 
 	// When attachment usage promotes the invocation before it finishes
 	service.SetSampleRate(ghtelemetry.SAMPLE_ALL)
@@ -87,7 +87,7 @@ func TestServiceDisablingOverridesPromotedPendingEvents(t *testing.T) {
 	var payloads []SendTelemetryPayload
 	service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
 	service.Record(ghtelemetry.Event{Type: "completed_step"})
-	pending := service.BeginEvent(ghtelemetry.Event{Type: "attachment_invocation"})
+	pending := service.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
 	service.SetSampleRate(ghtelemetry.SAMPLE_ALL)
 
 	// When host discovery disables telemetry before completion
@@ -107,7 +107,7 @@ func TestServiceCompletionCannotBeReopened(t *testing.T) {
 	// Given a completed invocation with one pending event
 	var payloads []SendTelemetryPayload
 	service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-	pending := service.BeginEvent(ghtelemetry.Event{
+	pending := service.Begin(ghtelemetry.Event{
 		Type:       "command_invocation",
 		Dimensions: ghtelemetry.Dimensions{"command": "gh issue create"},
 	})
@@ -116,7 +116,7 @@ func TestServiceCompletionCannotBeReopened(t *testing.T) {
 	// When cleanup repeats or code holding an old handle attempts further recording
 	pending.SetDimensions(ghtelemetry.Dimensions{"command": "changed"})
 	service.Record(ghtelemetry.Event{Type: "too_late"})
-	late := service.BeginEvent(ghtelemetry.Event{Type: "also_too_late"})
+	late := service.Begin(ghtelemetry.Event{Type: "also_too_late"})
 	late.SetDimensions(ghtelemetry.Dimensions{"command": "changed"})
 	late.SetMeasures(ghtelemetry.Measures{"count": 1})
 	service.Finish()
@@ -141,7 +141,7 @@ func TestServiceCleanupDuringSendCannotChangePayload(t *testing.T) {
 		<-allowSend
 		payloads = append(payloads, payload)
 	})
-	pending := service.BeginEvent(ghtelemetry.Event{
+	pending := service.Begin(ghtelemetry.Event{
 		Type:       "attachment_invocation",
 		Dimensions: ghtelemetry.Dimensions{"command": "gh issue create"},
 		Measures:   ghtelemetry.Measures{"append_ops_count": 1},
@@ -185,7 +185,7 @@ func TestServiceCollectsConcurrentFacts(t *testing.T) {
 	// Given two command activities contributing to the same pending event
 	var payload SendTelemetryPayload
 	service := NewService(func(p SendTelemetryPayload) { payload = p })
-	pending := service.BeginEvent(ghtelemetry.Event{Type: "attachment_invocation"})
+	pending := service.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
 
 	// When both activities finish before command completion
 	var workers sync.WaitGroup

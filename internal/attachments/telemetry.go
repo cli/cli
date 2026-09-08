@@ -40,7 +40,7 @@ func (t *InvocationTelemetry) start(command string) {
 	}
 
 	t.recorder.SetSampleRate(ghtelemetry.SAMPLE_ALL)
-	t.event = t.recorder.BeginEvent(ghtelemetry.Event{
+	t.event = t.recorder.Begin(ghtelemetry.Event{
 		Type: "attachment_invocation",
 		Dimensions: ghtelemetry.Dimensions{
 			"command": command,

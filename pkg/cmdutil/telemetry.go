@@ -22,7 +22,7 @@ func RecordTelemetry(cmd *cobra.Command, telemetry ghtelemetry.EventRecorder) {
 	var event ghtelemetry.PendingEvent
 	currentArgs := cmd.Args
 	cmd.Args = func(cmd *cobra.Command, args []string) error {
-		event = telemetry.BeginEvent(ghtelemetry.Event{
+		event = telemetry.Begin(ghtelemetry.Event{
 			Type: "command_invocation",
 			Dimensions: ghtelemetry.Dimensions{
 				"command": cmd.CommandPath(),

@@ -24,12 +24,12 @@ func (r *EventRecorderSpy) Record(event ghtelemetry.Event) {
 	if r.finished {
 		return
 	}
-	r.BeginEvent(event)
+	r.Begin(event)
 	r.Events = append(r.Events, cloneEvent(event))
 }
 
-// BeginEvent captures initial facts and returns a handle for subsequent updates.
-func (r *EventRecorderSpy) BeginEvent(event ghtelemetry.Event) ghtelemetry.PendingEvent {
+// Begin captures initial facts and returns a handle for subsequent updates.
+func (r *EventRecorderSpy) Begin(event ghtelemetry.Event) ghtelemetry.PendingEvent {
 	if r.finished {
 		return noOpPendingEvent{}
 	}

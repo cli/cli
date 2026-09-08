@@ -357,7 +357,7 @@ func TestServiceFinishSendsPendingEvents(t *testing.T) {
 	service := NewService(func(payload SendTelemetryPayload) {
 		payloads = append(payloads, payload)
 	})
-	event := service.BeginEvent(ghtelemetry.Event{
+	event := service.Begin(ghtelemetry.Event{
 		Type: "attachment_invocation",
 		Measures: ghtelemetry.Measures{
 			"attach_count":      2,
@@ -702,7 +702,7 @@ func TestNoOpService(t *testing.T) {
 	service := &NoOpService{}
 	// All methods should be safe to call without panicking
 	service.Record(ghtelemetry.Event{Type: "test"})
-	event := service.BeginEvent(ghtelemetry.Event{Type: "pending"})
+	event := service.Begin(ghtelemetry.Event{Type: "pending"})
 	event.SetDimensions(ghtelemetry.Dimensions{"key": "value"})
 	event.SetMeasures(ghtelemetry.Measures{"count": 1})
 	service.Disable()

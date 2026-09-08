@@ -24,8 +24,8 @@ type Disabler interface {
 // EventRecorder produces complete or in-progress events.
 type EventRecorder interface {
 	Record(event Event)
-	// BeginEvent records initial facts that can be updated until invocation completion.
-	BeginEvent(Event) PendingEvent
+	// Begin records initial facts that can be updated until invocation completion.
+	Begin(Event) PendingEvent
 }
 
 // InvocationRecorder produces events and controls invocation-wide reporting policy.

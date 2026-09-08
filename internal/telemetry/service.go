@@ -110,9 +110,9 @@ func (s *Service) Record(event ghtelemetry.Event) {
 	})
 }
 
-// BeginEvent copies an event's initial facts and returns a handle for adding
+// Begin copies an event's initial facts and returns a handle for adding
 // facts until Finish. Events begun after Finish are not recorded.
-func (s *Service) BeginEvent(event ghtelemetry.Event) ghtelemetry.PendingEvent {
+func (s *Service) Begin(event ghtelemetry.Event) ghtelemetry.PendingEvent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -234,8 +234,8 @@ type NoOpService struct{}
 // Record discards the event.
 func (*NoOpService) Record(ghtelemetry.Event) {}
 
-// BeginEvent returns an inert handle without retaining the event.
-func (*NoOpService) BeginEvent(ghtelemetry.Event) ghtelemetry.PendingEvent {
+// Begin returns an inert handle without retaining the event.
+func (*NoOpService) Begin(ghtelemetry.Event) ghtelemetry.PendingEvent {
 	return noOpPendingEvent{}
 }
 
