@@ -93,11 +93,7 @@ func TestAcceptance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		if err := fixtureRepositories.cleanup(); err != nil {
-			t.Errorf("cleaning up fixture repositories: %v", err)
-		}
-	})
+	registerFixtureRepositoryCleanup(t, tsEnv.skipDefer, fixtureRepositories)
 
 	testGroups, err := selectAcceptanceTestGroups(
 		acceptanceTestGroups(t),
@@ -114,6 +110,18 @@ func TestAcceptance(t *testing.T) {
 			testscript.Run(t, testScriptParamsFor(t, tsEnv, fixtureRepositories, group))
 		})
 	}
+}
+
+func registerFixtureRepositoryCleanup(t *testing.T, skip bool, fixtureRepositories *fixtureRepositoryManager) {
+	t.Helper()
+	if skip {
+		return
+	}
+	t.Cleanup(func() {
+		if err := fixtureRepositories.cleanup(); err != nil {
+			t.Errorf("cleaning up fixture repositories: %v", err)
+		}
+	})
 }
 
 func validateAcceptanceScripts(t *testing.T, tsEnv testScriptEnv, groups []string) {

@@ -33,11 +33,11 @@ exec gh api -X PUT repos/$ORG/$REPO/contents/assets/logo.png -f message='Add bin
 # Create a text file containing ANSI terminal escape sequences via the Contents API
 exec gh api -X PUT repos/$ORG/$REPO/contents/ansi.txt -f message='Add ansi' -f content=G1szMW1oZWxsbxtbMG0K -f branch=$CONTENT_BRANCH
 
-# Read a file from the unique content branch: raw content goes to stdout
-exec gh repo read-file docs/guide.md --ref $CONTENT_BRANCH
-cmp stdout $WORK/guide.md
+# Read the shared fixture's README from its default branch
+exec gh repo read-file README.md
+stdout $REPO
 
-# Read the same file at a specific ref
+# Read a file at a specific ref
 exec gh repo read-file docs/guide.md --ref $V2_BRANCH
 cmp stdout $WORK/guide-v2.md
 

@@ -24,9 +24,11 @@ Every script must contain exactly one declaration:
 Managed fixtures are initialized, have discussions enabled, and are deleted by
 the harness. Scripts using `shared` or `isolated` must not run `gh repo create`.
 
-With `none`, create every required repository explicitly under `$ORG` and
-immediately register `defer cleanup-repo $REPO`. The cleanup is idempotent when a
-test deletes or renames the repository itself.
+With `none`, create every required repository explicitly and immediately
+register deferred cleanup. Use `defer gh repo delete --yes $ORG/$REPO` when the
+repository should still exist under that name. Use `defer cleanup-repo $REPO`
+when testing deletion or renaming; it is scoped to `$ORG` and treats an already
+absent repository as success.
 
 ## Shared fixture contract
 

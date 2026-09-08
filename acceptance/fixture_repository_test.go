@@ -180,6 +180,32 @@ func TestFixtureRepositoryManager(t *testing.T) {
 	assert.Equal(t, []string{secondIsolated, firstIsolated, firstShared}, client.deleted)
 }
 
+func TestRegisterFixtureRepositoryCleanup(t *testing.T) {
+	tests := []struct {
+		name        string
+		skip        bool
+		wantDeleted int
+	}{
+		{name: "cleans up managed repositories", wantDeleted: 1},
+		{name: "preserves managed repositories", skip: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeFixtureRepositoryClient{}
+			manager := &fixtureRepositoryManager{client: client}
+			_, err := manager.repository("shared")
+			require.NoError(t, err)
+
+			t.Run("register cleanup", func(t *testing.T) {
+				registerFixtureRepositoryCleanup(t, tt.skip, manager)
+			})
+
+			assert.Len(t, client.deleted, tt.wantDeleted)
+		})
+	}
+}
+
 func TestLiveFixtureRepositoryClientUsesAPIHost(t *testing.T) {
 	var request *http.Request
 	var requestBody []byte
