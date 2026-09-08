@@ -160,6 +160,14 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
   stdout2env PR_URL
   ```
 
+- `wait-for-run`: poll for a workflow run until it registers, then set an
+  environment variable to its database ID. Pass `gh run list` filter flags after
+  the variable name.
+
+  ```txtar
+  wait-for-run RUN_ID --branch $WORKFLOW_BRANCH --event push
+  ```
+
 - `jq-assert`: evaluate a jq expression on a JSON environment variable and assert the result matches a regexp
 
   ```txtar

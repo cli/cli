@@ -26,12 +26,12 @@ stdout 'Test Workflow Name'
 # Run the workflow
 exec gh workflow run 'Test Workflow Name'
 
-# It takes some time for a workflow run to register
-sleep 10
+# Wait for the run to register
+wait-for-run RUN_ID
 
 # Check the workflow run exists
 exec gh run list
-stdout 'Test Workflow Name' 
+stdout 'Test Workflow Name'
 
 -- workflow.yml --
 # This is a basic workflow to help you get started with Actions

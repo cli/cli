@@ -7,6 +7,9 @@ fixture-repo shared REPO
 env BRANCH_NAME=${SCRIPT_NAME}-${RANDOM_STRING}
 env PR_TITLE=${SCRIPT_NAME}-${RANDOM_STRING}
 env BASE_BRANCH=${SCRIPT_NAME}-${RANDOM_STRING}-base
+env REBASE_BRANCH_NAME=${SCRIPT_NAME}-${RANDOM_STRING}-rebase
+env REBASE_PR_TITLE=${SCRIPT_NAME}-${RANDOM_STRING}-rebase
+env REBASE_BASE_BRANCH=${SCRIPT_NAME}-${RANDOM_STRING}-rebase-base
 
 # Clone the repo
 exec gh repo clone $ORG/$REPO
@@ -44,5 +47,31 @@ exists file.txt
 exec git show HEAD
 stdout 'Merge pull request #[0-9]+'
 
+# Prepare unique branches for a rebase merge
+exec git checkout -b $REBASE_BASE_BRANCH origin/main
+exec git push -u origin $REBASE_BASE_BRANCH
+exec git checkout -b $REBASE_BRANCH_NAME
+mv ../rebase-file.txt rebase-file.txt
+exec git add .
+exec git commit -m 'Add rebase-file.txt' -m $REBASE_BRANCH_NAME
+exec git push -u origin $REBASE_BRANCH_NAME
+
+# Create and merge the PR with the rebase strategy
+exec gh pr create --base $REBASE_BASE_BRANCH --title $REBASE_PR_TITLE --body 'Feature Body'
+stdout2env REBASE_PR_URL
+exec git checkout $REBASE_BASE_BRANCH
+! exists rebase-file.txt
+exec gh pr merge $REBASE_PR_URL --rebase
+
+# Check the rebased commit landed on the unique base branch
+exec gh pr view $REBASE_PR_URL
+stdout 'state:\tMERGED$'
+exec git pull -r origin $REBASE_BASE_BRANCH
+exists rebase-file.txt
+exec git show HEAD
+stdout 'Add rebase-file.txt'
+
 -- file.txt --
 Unimportant contents
+-- rebase-file.txt --
+Unimportant rebase contents

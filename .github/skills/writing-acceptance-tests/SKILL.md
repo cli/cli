@@ -45,6 +45,9 @@ when the repository already contains unrelated resources.
   affect commit IDs, so include the script's `$RANDOM_STRING` in the commit
   contents or message when scripts could otherwise create the same tree from the
   same parent.
+- Consolidate repository-scoped operations that GitHub serializes, such as
+  merging pull requests, into one script so they run sequentially. Otherwise,
+  use `isolated`.
 - GitHub normalizes some identifiers. Use `env2upper` for Actions variables and
   secrets whose generated names are asserted later.
 - Capture the created resource's URL or ID. Filter and paginate list operations;
@@ -65,6 +68,10 @@ the entire acceptance process, even when they run sequentially. This reserves
 half the bucket for pagination, retries, and other token activity. Count the
 requests made by each command, keep representative live coverage, and move
 remaining variants to unit tests.
+
+Use bounded condition-based waits for asynchronously registered resources.
+Fixed sleeps are both slower when registration is fast and unreliable when it
+is slow. Use `wait-for-run` before watching or inspecting a workflow run.
 
 ## Organization safety
 

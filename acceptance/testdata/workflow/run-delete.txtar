@@ -26,12 +26,8 @@ stdout 'Test Workflow Name'
 # Run the workflow
 exec gh workflow run 'Test Workflow Name'
 
-# It takes some time for a workflow run to register
-sleep 10
-
-# Get the run ID we want to watch & delete
-exec gh run list --json databaseId --jq '.[0].databaseId'
-stdout2env RUN_ID
+# Wait for the run to register
+wait-for-run RUN_ID
 
 # Wait for workflow to complete
 exec gh run watch $RUN_ID --exit-status

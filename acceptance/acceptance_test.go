@@ -40,6 +40,34 @@ func repositoryCreationIsManaged(args []string, fixtureMode string) bool {
 	return len(args) > 1 && args[0] == "repo" && args[1] == "create" && fixtureMode != "none"
 }
 
+const (
+	workflowRunPollAttempts = 7
+	workflowRunPollInterval = 5 * time.Second
+)
+
+func waitForWorkflowRun(list func() (string, error), sleep func(time.Duration)) (string, error) {
+	for attempt := 0; attempt < workflowRunPollAttempts; attempt++ {
+		runID, err := list()
+		if err != nil {
+			return "", err
+		}
+		if runID != "" {
+			return runID, nil
+		}
+		if attempt < workflowRunPollAttempts-1 {
+			sleep(workflowRunPollInterval)
+		}
+	}
+	return "", errors.New("workflow run did not register within 30 seconds")
+}
+
+func outputForEnvironment(output string) (string, error) {
+	if strings.TrimSpace(output) == "" {
+		return "", errors.New("command output is empty")
+	}
+	return strings.TrimRight(output, "\n"), nil
+}
+
 func TestMain(m *testing.M) {
 	os.Exit(testscript.RunMain(m, map[string]func() int{
 		"gh": ghMain,
@@ -81,6 +109,60 @@ func TestRepositoryCreationIsManaged(t *testing.T) {
 	assert.True(t, repositoryCreationIsManaged([]string{"repo", "create", "example"}, "undeclared"))
 	assert.False(t, repositoryCreationIsManaged([]string{"repo", "create", "example"}, "none"))
 	assert.False(t, repositoryCreationIsManaged([]string{"repo", "view", "example"}, "shared"))
+}
+
+func TestWaitForWorkflowRun(t *testing.T) {
+	t.Run("returns registered run", func(t *testing.T) {
+		var attempts int
+		var sleeps []time.Duration
+		runID, err := waitForWorkflowRun(func() (string, error) {
+			attempts++
+			if attempts == 3 {
+				return "1234", nil
+			}
+			return "", nil
+		}, func(duration time.Duration) {
+			sleeps = append(sleeps, duration)
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "1234", runID)
+		assert.Equal(t, []time.Duration{workflowRunPollInterval, workflowRunPollInterval}, sleeps)
+	})
+
+	t.Run("returns list error", func(t *testing.T) {
+		_, err := waitForWorkflowRun(func() (string, error) {
+			return "", errors.New("listing runs")
+		}, func(time.Duration) {
+			t.Fatal("unexpected sleep")
+		})
+
+		require.EqualError(t, err, "listing runs")
+	})
+
+	t.Run("times out", func(t *testing.T) {
+		var attempts int
+		var sleeps int
+		_, err := waitForWorkflowRun(func() (string, error) {
+			attempts++
+			return "", nil
+		}, func(time.Duration) {
+			sleeps++
+		})
+
+		require.EqualError(t, err, "workflow run did not register within 30 seconds")
+		assert.Equal(t, workflowRunPollAttempts, attempts)
+		assert.Equal(t, workflowRunPollAttempts-1, sleeps)
+	})
+}
+
+func TestOutputForEnvironment(t *testing.T) {
+	value, err := outputForEnvironment("1234\n")
+	require.NoError(t, err)
+	assert.Equal(t, "1234", value)
+
+	_, err = outputForEnvironment("\n")
+	require.EqualError(t, err, "command output is empty")
 }
 
 func TestAcceptance(t *testing.T) {
@@ -440,7 +522,28 @@ func sharedCmds(tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManag
 				ts.Fatalf("usage: stdout2env name")
 			}
 
-			ts.Setenv(args[0], strings.TrimRight(ts.ReadFile("stdout"), "\n"))
+			value, err := outputForEnvironment(ts.ReadFile("stdout"))
+			ts.Check(err)
+			ts.Setenv(args[0], value)
+		},
+		"wait-for-run": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! wait-for-run")
+			}
+			if len(args) < 1 {
+				ts.Fatalf("usage: wait-for-run ENV_VAR [run-list-flags...]")
+			}
+
+			runID, err := waitForWorkflowRun(func() (string, error) {
+				listArgs := append([]string{"run", "list"}, args[1:]...)
+				listArgs = append(listArgs, "--limit", "1", "--json", "databaseId", "--jq", ".[].databaseId")
+				if err := ts.Exec("gh", listArgs...); err != nil {
+					return "", err
+				}
+				return strings.TrimSpace(ts.ReadFile("stdout")), nil
+			}, time.Sleep)
+			ts.Check(err)
+			ts.Setenv(args[0], runID)
 		},
 		"sleep": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
