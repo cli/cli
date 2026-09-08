@@ -395,9 +395,17 @@ func plantGarden(r *rand.Rand, commits []*Commit, geo *Geometry) [][]*Cell {
 			chance := r.Float64()
 			if chance <= geo.Density {
 				commit := commits[cellIx]
+				shaPrefix := commit.Sha
+
+				if len(shaPrefix) > 6 {
+					shaPrefix = shaPrefix[:6]
+				} else {
+					shaPrefix = "abcdef"
+				}
+
 				garden[y] = append(garden[y], &Cell{
 					Char:       commits[cellIx].Char,
-					StatusLine: fmt.Sprintf("You're standing at a flower called %s planted by %s.", commit.Sha[0:6], commit.Handle),
+					StatusLine: fmt.Sprintf("You're standing at a flower called %s planted by %s.", shaPrefix, commit.Handle),
 				})
 				cellIx++
 			} else {
@@ -489,9 +497,18 @@ func computeSeed(seed string) int64 {
 		lol.WriteString(fmt.Sprintf("%d", int(r)))
 	}
 
-	result, err := strconv.ParseInt(lol.String()[0:10], 10, 64)
+	// in first place i put the limit in 10 to continue with the initial logic
+	limit := 10
+
+	// if the seed has less than 5 of len, i put in limit the double of the length of seed to have access to the limit of the slice
+	if len(seed) < 5 {
+		limit = len(seed) * 2
+	}
+
+	result, err := strconv.ParseInt(lol.String()[0:limit], 10, 64)
 	if err != nil {
-		panic(err)
+		// if error exist, the function return -1 to prevent and continue with the execution of the cli
+		return -1
 	}
 
 	return result
