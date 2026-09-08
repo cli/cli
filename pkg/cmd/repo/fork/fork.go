@@ -54,6 +54,7 @@ type ForkOptions struct {
 }
 
 type errWithExitCode interface {
+	error
 	ExitCode() int
 }
 
