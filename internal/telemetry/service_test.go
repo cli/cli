@@ -34,8 +34,8 @@ func TestServiceCopiesFactsAtTheirRecordingTime(t *testing.T) {
 		facts.Measures["count"] = 99
 		dimensions := ghtelemetry.Dimensions{"flags": "attach"}
 		measures := ghtelemetry.Measures{"count": 2}
-		pending.SetDimensions(dimensions)
-		pending.SetMeasures(measures)
+		pending.UpsertDimensions(dimensions)
+		pending.UpsertMeasures(measures)
 		dimensions["flags"] = "unrelated"
 		measures["count"] = 99
 		time.Sleep(time.Second)
@@ -67,7 +67,7 @@ func TestServicePromotesAllEventsBeforeCompletion(t *testing.T) {
 
 	// When attachment usage promotes the invocation before it finishes
 	service.SetSampleRate(ghtelemetry.SAMPLE_ALL)
-	pending.SetMeasures(ghtelemetry.Measures{"attach_count": 2})
+	pending.UpsertMeasures(ghtelemetry.Measures{"attach_count": 2})
 	service.Finish()
 
 	// Then immediate and pending events share the promoted sampling policy
@@ -92,7 +92,7 @@ func TestServiceDisablingOverridesPromotedPendingEvents(t *testing.T) {
 
 	// When host discovery disables telemetry before completion
 	service.Disable()
-	pending.SetMeasures(ghtelemetry.Measures{"attach_count": 2})
+	pending.UpsertMeasures(ghtelemetry.Measures{"attach_count": 2})
 	service.Record(ghtelemetry.Event{Type: "another_step"})
 	service.Finish()
 
@@ -114,11 +114,11 @@ func TestServiceCompletionCannotBeReopened(t *testing.T) {
 	service.Finish()
 
 	// When cleanup repeats or code holding an old handle attempts further recording
-	pending.SetDimensions(ghtelemetry.Dimensions{"command": "changed"})
+	pending.UpsertDimensions(ghtelemetry.Dimensions{"command": "changed"})
 	service.Record(ghtelemetry.Event{Type: "too_late"})
 	late := service.Begin(ghtelemetry.Event{Type: "also_too_late"})
-	late.SetDimensions(ghtelemetry.Dimensions{"command": "changed"})
-	late.SetMeasures(ghtelemetry.Measures{"count": 1})
+	late.UpsertDimensions(ghtelemetry.Dimensions{"command": "changed"})
+	late.UpsertMeasures(ghtelemetry.Measures{"count": 1})
 	service.Finish()
 	service.Finish()
 
@@ -156,8 +156,8 @@ func TestServiceCleanupDuringSendCannotChangePayload(t *testing.T) {
 	<-sendStarted
 	cleanupDone := make(chan struct{})
 	go func() {
-		pending.SetDimensions(ghtelemetry.Dimensions{"command": "changed"})
-		pending.SetMeasures(ghtelemetry.Measures{"append_ops_count": 99})
+		pending.UpsertDimensions(ghtelemetry.Dimensions{"command": "changed"})
+		pending.UpsertMeasures(ghtelemetry.Measures{"append_ops_count": 99})
 		service.Record(ghtelemetry.Event{Type: "too_late"})
 		service.Finish()
 		close(cleanupDone)
@@ -190,12 +190,12 @@ func TestServiceCollectsConcurrentFacts(t *testing.T) {
 	// When both activities finish before command completion
 	var workers sync.WaitGroup
 	workers.Go(func() {
-		pending.SetDimensions(ghtelemetry.Dimensions{"command": "gh issue create"})
-		pending.SetMeasures(ghtelemetry.Measures{"append_ops_count": 1})
+		pending.UpsertDimensions(ghtelemetry.Dimensions{"command": "gh issue create"})
+		pending.UpsertMeasures(ghtelemetry.Measures{"append_ops_count": 1})
 	})
 	workers.Go(func() {
-		pending.SetDimensions(ghtelemetry.Dimensions{"flags": "attach"})
-		pending.SetMeasures(ghtelemetry.Measures{"replace_ops_count": 2})
+		pending.UpsertDimensions(ghtelemetry.Dimensions{"flags": "attach"})
+		pending.UpsertMeasures(ghtelemetry.Measures{"replace_ops_count": 2})
 	})
 	workers.Wait()
 	service.Finish()

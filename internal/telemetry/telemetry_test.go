@@ -369,7 +369,7 @@ func TestServiceFinishSendsPendingEvents(t *testing.T) {
 	require.Empty(t, payloads, "unfinished events must not be sent")
 
 	// When the command supplies its operations and finishes the invocation
-	event.SetMeasures(ghtelemetry.Measures{
+	event.UpsertMeasures(ghtelemetry.Measures{
 		"append_ops_count":  1,
 		"replace_ops_count": 1,
 	})
@@ -703,8 +703,8 @@ func TestNoOpService(t *testing.T) {
 	// All methods should be safe to call without panicking
 	service.Record(ghtelemetry.Event{Type: "test"})
 	event := service.Begin(ghtelemetry.Event{Type: "pending"})
-	event.SetDimensions(ghtelemetry.Dimensions{"key": "value"})
-	event.SetMeasures(ghtelemetry.Measures{"count": 1})
+	event.UpsertDimensions(ghtelemetry.Dimensions{"key": "value"})
+	event.UpsertMeasures(ghtelemetry.Measures{"count": 1})
 	service.Disable()
 	service.SetSampleRate(50)
 	service.Finish()

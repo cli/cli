@@ -11,10 +11,11 @@ type Event struct {
 }
 
 // PendingEvent accepts additional facts until its invocation finishes.
-// Setters copy their input and have no effect after completion.
+// Upserts copy supplied entries, inserting new keys and overwriting existing ones.
+// Unspecified keys are unchanged. Calls after completion have no effect.
 type PendingEvent interface {
-	SetDimensions(Dimensions)
-	SetMeasures(Measures)
+	UpsertDimensions(Dimensions)
+	UpsertMeasures(Measures)
 }
 
 type Disabler interface {

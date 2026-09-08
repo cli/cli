@@ -39,7 +39,7 @@ func RecordTelemetry(cmd *cobra.Command, telemetry ghtelemetry.EventRecorder) {
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		runErr := currentRunE(cmd, args)
 		// Commands with DisableFlagParsing may parse their flags inside RunE.
-		event.SetDimensions(ghtelemetry.Dimensions{"flags": telemetryFlags(cmd)})
+		event.UpsertDimensions(ghtelemetry.Dimensions{"flags": telemetryFlags(cmd)})
 		return runErr
 	}
 }

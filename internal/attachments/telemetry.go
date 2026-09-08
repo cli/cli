@@ -59,7 +59,7 @@ func (t *InvocationTelemetry) RecordOperations(result UploadResult) {
 		return
 	}
 
-	t.event.SetMeasures(ghtelemetry.Measures{
+	t.event.UpsertMeasures(ghtelemetry.Measures{
 		"append_ops_count":  int64(result.AppendOperations),
 		"replace_ops_count": int64(result.ReplaceOperations),
 	})

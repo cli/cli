@@ -67,7 +67,7 @@ type pendingEventSpy struct {
 	event    *ghtelemetry.Event
 }
 
-func (p *pendingEventSpy) SetDimensions(dimensions ghtelemetry.Dimensions) {
+func (p *pendingEventSpy) UpsertDimensions(dimensions ghtelemetry.Dimensions) {
 	if p.recorder.finished {
 		return
 	}
@@ -77,7 +77,7 @@ func (p *pendingEventSpy) SetDimensions(dimensions ghtelemetry.Dimensions) {
 	maps.Copy(p.event.Dimensions, dimensions)
 }
 
-func (p *pendingEventSpy) SetMeasures(measures ghtelemetry.Measures) {
+func (p *pendingEventSpy) UpsertMeasures(measures ghtelemetry.Measures) {
 	if p.recorder.finished {
 		return
 	}

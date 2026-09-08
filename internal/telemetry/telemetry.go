@@ -311,7 +311,7 @@ func (s *Service) Begin(event ghtelemetry.Event) ghtelemetry.PendingEvent {
 	return &pendingEvent{service: s, recorded: recorded}
 }
 
-func (p *pendingEvent) SetDimensions(dimensions ghtelemetry.Dimensions) {
+func (p *pendingEvent) UpsertDimensions(dimensions ghtelemetry.Dimensions) {
 	p.service.mu.Lock()
 	defer p.service.mu.Unlock()
 
@@ -324,7 +324,7 @@ func (p *pendingEvent) SetDimensions(dimensions ghtelemetry.Dimensions) {
 	maps.Copy(p.recorded.event.Dimensions, dimensions)
 }
 
-func (p *pendingEvent) SetMeasures(measures ghtelemetry.Measures) {
+func (p *pendingEvent) UpsertMeasures(measures ghtelemetry.Measures) {
 	p.service.mu.Lock()
 	defer p.service.mu.Unlock()
 
@@ -483,8 +483,8 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 
 type noOpPendingEvent struct{}
 
-func (noOpPendingEvent) SetDimensions(ghtelemetry.Dimensions) {}
-func (noOpPendingEvent) SetMeasures(ghtelemetry.Measures)     {}
+func (noOpPendingEvent) UpsertDimensions(ghtelemetry.Dimensions) {}
+func (noOpPendingEvent) UpsertMeasures(ghtelemetry.Measures)     {}
 
 // NoOpService discards telemetry when collection is disabled.
 type NoOpService struct{}
