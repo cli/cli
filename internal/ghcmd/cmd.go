@@ -84,7 +84,6 @@ func Main() exitCode {
 	}
 
 	var invocation ghtelemetry.Invocation
-	var delivery *telemetry.Delivery
 	switch {
 	case cfgErr != nil:
 		// Without a valid on-disk config we can't honour user telemetry preferences, so disable it to be safe.
@@ -102,9 +101,8 @@ func Main() exitCode {
 			// marker when no events will be sent. This gives the user an
 			// observable signal that telemetry is wired up even when their
 			// context (e.g. GHES) causes events to be dropped.
-			delivery = telemetry.NewDelivery(telemetry.LogFlusher(ioStreams.ErrOut, ioStreams.ColorEnabled()))
 			invocation = telemetry.NewInvocation(
-				delivery,
+				telemetry.LogFlusher(ioStreams.ErrOut, ioStreams.ColorEnabled()),
 				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
 			)
 			if telemetryDisabled {
@@ -120,9 +118,8 @@ func Main() exitCode {
 				sampleRate = v
 			}
 			additionalCommonDimensions["sample_rate"] = strconv.Itoa(sampleRate)
-			delivery = telemetry.NewDelivery(telemetry.GitHubFlusher(ghExecutablePath))
 			invocation = telemetry.NewInvocation(
-				delivery,
+				telemetry.GitHubFlusher(ghExecutablePath),
 				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
 				telemetry.WithSampleRate(sampleRate),
 			)
@@ -131,10 +128,7 @@ func Main() exitCode {
 			return exitError
 		}
 	}
-	if delivery != nil {
-		defer delivery.Flush()
-	}
-	// Complete events before flushing, including returns before Cobra reaches RunE.
+	// Complete and send events even when returning before Cobra reaches RunE.
 	defer invocation.Finish()
 
 	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, invocation)

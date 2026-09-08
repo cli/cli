@@ -18,10 +18,10 @@ var (
 )
 
 // Invocation owns telemetry facts and reporting policy for one command execution.
-// Finish must run after command execution and before delivery is flushed.
+// Finish must run after command execution to send the completed payload.
 type Invocation struct {
 	mu               sync.Mutex
-	delivery         *Delivery
+	send             func(SendTelemetryPayload)
 	commonDimensions ghtelemetry.Dimensions
 	sampleRate       int
 	sampleBucket     byte
@@ -62,8 +62,8 @@ func WithSampleRate(rate int) invocationOption {
 	}
 }
 
-// NewInvocation creates an invocation whose completed payload is queued for delivery.
-func NewInvocation(delivery *Delivery, opts ...invocationOption) *Invocation {
+// NewInvocation creates an invocation using send to deliver its completed payload.
+func NewInvocation(send func(SendTelemetryPayload), opts ...invocationOption) *Invocation {
 	options := invocationOptions{
 		additionalDimensions: make(ghtelemetry.Dimensions),
 	}
@@ -88,7 +88,7 @@ func NewInvocation(delivery *Delivery, opts ...invocationOption) *Invocation {
 	sampleBucket := byte(binary.BigEndian.Uint32(hash[:4]) % 100)
 
 	return &Invocation{
-		delivery:         delivery,
+		send:             send,
 		commonDimensions: commonDimensions,
 		sampleRate:       options.sampleRate,
 		sampleBucket:     sampleBucket,
@@ -175,18 +175,19 @@ func (i *Invocation) Disable() {
 	i.disabled = true
 }
 
-// Finish snapshots the invocation once and queues its payload without sending it.
+// Finish snapshots the invocation once and sends its payload after releasing the lock.
 // Sampling and telemetry eligibility apply to immediate and pending events alike.
 func (i *Invocation) Finish() {
 	i.mu.Lock()
-	defer i.mu.Unlock()
 
 	if i.finished {
+		i.mu.Unlock()
 		return
 	}
 	i.finished = true
 
 	if i.sampleRate > 0 && i.sampleRate < 100 && int(i.sampleBucket) >= i.sampleRate {
+		i.mu.Unlock()
 		return
 	}
 
@@ -209,7 +210,9 @@ func (i *Invocation) Finish() {
 			Measures:   maps.Clone(recorded.event.Measures),
 		}
 	}
-	i.delivery.enqueue(payload)
+	i.mu.Unlock()
+
+	i.send(payload)
 }
 
 func cloneEvent(event ghtelemetry.Event) ghtelemetry.Event {

@@ -299,16 +299,14 @@ func TestNewInvocationLogModeFlushesToWriter(t *testing.T) {
 	// Given an invocation with log delivery
 	t.Cleanup(stubDeviceID("test-device"))
 	var buf bytes.Buffer
-	delivery := NewDelivery(LogFlusher(&buf, false))
-	invocation := NewInvocation(delivery)
+	invocation := NewInvocation(LogFlusher(&buf, false))
 
-	// When the invocation finishes and delivery is flushed
+	// When the invocation finishes
 	invocation.Record(ghtelemetry.Event{
 		Type:       "test_event",
 		Dimensions: map[string]string{"key": "value"},
 	})
 	invocation.Finish()
-	delivery.Flush()
 
 	// Then the writer receives the recorded event
 	output := buf.String()
@@ -322,13 +320,11 @@ func TestNewInvocationLogModeWithColorLogsToWriter(t *testing.T) {
 	// Given an invocation with colored log delivery
 	t.Cleanup(stubDeviceID("test-device"))
 	var buf bytes.Buffer
-	delivery := NewDelivery(LogFlusher(&buf, true))
-	invocation := NewInvocation(delivery)
+	invocation := NewInvocation(LogFlusher(&buf, true))
 
-	// When the invocation finishes and delivery is flushed
+	// When the invocation finishes
 	invocation.Record(ghtelemetry.Event{Type: "color_event"})
 	invocation.Finish()
-	delivery.Flush()
 
 	// Then the writer receives the event with ANSI color codes
 	output := buf.String()
@@ -353,15 +349,14 @@ func TestLogFlusherWritesNoneMarkerForEmptyPayload(t *testing.T) {
 	})
 }
 
-func TestInvocationFinishesPendingEventsBeforeDelivery(t *testing.T) {
+func TestInvocationFinishSendsPendingEvents(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
 	// Given an invocation whose attachment operations are not yet known
 	var payloads []SendTelemetryPayload
-	delivery := NewDelivery(func(payload SendTelemetryPayload) {
+	invocation := NewInvocation(func(payload SendTelemetryPayload) {
 		payloads = append(payloads, payload)
 	})
-	invocation := NewInvocation(delivery)
 	event := invocation.BeginEvent(ghtelemetry.Event{
 		Type: "attachment_invocation",
 		Measures: ghtelemetry.Measures{
@@ -371,19 +366,16 @@ func TestInvocationFinishesPendingEventsBeforeDelivery(t *testing.T) {
 		},
 	})
 
-	// When delivery is flushed before the invocation finishes
-	delivery.Flush()
-	require.Empty(t, payloads, "delivery must not finalize an unfinished invocation")
+	require.Empty(t, payloads, "unfinished events must not be sent")
+
+	// When the command supplies its operations and finishes the invocation
 	event.SetMeasures(ghtelemetry.Measures{
 		"append_ops_count":  1,
 		"replace_ops_count": 1,
 	})
 	invocation.Finish()
-	require.Empty(t, payloads, "completion must not send telemetry")
-	event.SetMeasures(ghtelemetry.Measures{"append_ops_count": 99})
-	delivery.Flush()
 
-	// Then delivery contains the snapshot taken at invocation completion
+	// Then Finish sends the completed snapshot without a separate flush
 	require.Len(t, payloads, 1)
 	require.Len(t, payloads[0].Events, 1)
 	assert.Equal(t, "attachment_invocation", payloads[0].Events[0].Type)
@@ -398,13 +390,11 @@ func TestInvocationDeviceIDFallback(t *testing.T) {
 	// Given device ID discovery fails
 	t.Cleanup(stubDeviceIDError(errors.New("no device id")))
 	var captured SendTelemetryPayload
-	delivery := NewDelivery(func(p SendTelemetryPayload) { captured = p })
-	invocation := NewInvocation(delivery)
+	invocation := NewInvocation(func(p SendTelemetryPayload) { captured = p })
 
 	// When a recorded event is completed and delivered
 	invocation.Record(ghtelemetry.Event{Type: "test"})
 	invocation.Finish()
-	delivery.Flush()
 
 	// Then the payload identifies the device as unknown
 	require.Len(t, captured.Events, 1)
@@ -416,12 +406,10 @@ func TestInvocationFinish(t *testing.T) {
 		// Given an invocation without events and log delivery
 		t.Cleanup(stubDeviceID("test-device"))
 		var buf bytes.Buffer
-		delivery := NewDelivery(LogFlusher(&buf, false))
-		invocation := NewInvocation(delivery)
+		invocation := NewInvocation(LogFlusher(&buf, false))
 
-		// When the invocation finishes and delivery is flushed
+		// When the invocation finishes
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then log mode explains the absence of telemetry
 		assert.Equal(t, "Telemetry payload: none\n", buf.String())
@@ -431,8 +419,7 @@ func TestInvocationFinish(t *testing.T) {
 		// Given an invocation with common dimensions
 		t.Cleanup(stubDeviceID("test-device"))
 		var captured SendTelemetryPayload
-		delivery := NewDelivery(func(p SendTelemetryPayload) { captured = p })
-		invocation := NewInvocation(delivery, WithAdditionalCommonDimensions(ghtelemetry.Dimensions{"version": "2.45.0"}))
+		invocation := NewInvocation(func(p SendTelemetryPayload) { captured = p }, WithAdditionalCommonDimensions(ghtelemetry.Dimensions{"version": "2.45.0"}))
 
 		// When an event with its own dimensions and measures is completed and delivered
 		invocation.Record(ghtelemetry.Event{
@@ -441,7 +428,6 @@ func TestInvocationFinish(t *testing.T) {
 			Measures:   map[string]int64{"duration_ms": 150},
 		})
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then the payload includes both common and event-specific facts
 		require.Len(t, captured.Events, 1)
@@ -459,14 +445,12 @@ func TestInvocationFinish(t *testing.T) {
 		// Given an invocation with two recorded events
 		t.Cleanup(stubDeviceID("test-device"))
 		var captured SendTelemetryPayload
-		delivery := NewDelivery(func(p SendTelemetryPayload) { captured = p })
-		invocation := NewInvocation(delivery)
+		invocation := NewInvocation(func(p SendTelemetryPayload) { captured = p })
 		invocation.Record(ghtelemetry.Event{Type: "event1"})
 		invocation.Record(ghtelemetry.Event{Type: "event2"})
 
-		// When the invocation finishes and delivery is flushed
+		// When the invocation finishes
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then both events are delivered in recording order
 		require.Len(t, captured.Events, 2)
@@ -478,17 +462,13 @@ func TestInvocationFinish(t *testing.T) {
 		// Given an invocation with a recorded event
 		t.Cleanup(stubDeviceID("test-device"))
 		var payloads []SendTelemetryPayload
-		delivery := NewDelivery(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		invocation := NewInvocation(delivery)
+		invocation := NewInvocation(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
 		invocation.Record(ghtelemetry.Event{Type: "test"})
 
-		// When completion and delivery are repeated
+		// When completion is repeated
 		invocation.Finish()
-		delivery.Flush()
 		invocation.Finish()
-		delivery.Flush()
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then the recorded event is delivered exactly once
 		require.Len(t, payloads, 1)
@@ -500,40 +480,35 @@ func TestInvocationFinish(t *testing.T) {
 		// Given common and event dimensions share a key
 		t.Cleanup(stubDeviceID("test-device"))
 		var captured SendTelemetryPayload
-		delivery := NewDelivery(func(p SendTelemetryPayload) { captured = p })
-		invocation := NewInvocation(delivery, WithAdditionalCommonDimensions(ghtelemetry.Dimensions{"shared": "common"}))
+		invocation := NewInvocation(func(p SendTelemetryPayload) { captured = p }, WithAdditionalCommonDimensions(ghtelemetry.Dimensions{"shared": "common"}))
 		invocation.Record(ghtelemetry.Event{
 			Type:       "test",
 			Dimensions: map[string]string{"shared": "event-level"},
 		})
 
-		// When the invocation finishes and delivery is flushed
+		// When the invocation finishes
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then the event dimension takes precedence
 		require.Len(t, captured.Events, 1)
 		assert.Equal(t, "event-level", captured.Events[0].Dimensions["shared"])
 	})
 
-	t.Run("timestamps reflect record time not completion or delivery time", func(t *testing.T) {
+	t.Run("timestamps reflect record time not completion time", func(t *testing.T) {
 		t.Cleanup(stubDeviceID("test-device"))
 		synctest.Test(t, func(t *testing.T) {
 			// Given events recorded at distinct times
 			var captured SendTelemetryPayload
-			delivery := NewDelivery(func(p SendTelemetryPayload) { captured = p })
-			invocation := NewInvocation(delivery)
+			invocation := NewInvocation(func(p SendTelemetryPayload) { captured = p })
 			firstRecordedAt := time.Now()
 			invocation.Record(ghtelemetry.Event{Type: "early"})
 			time.Sleep(50 * time.Millisecond)
 			secondRecordedAt := time.Now()
 			invocation.Record(ghtelemetry.Event{Type: "late"})
 
-			// When completion and delivery each happen later
+			// When completion happens later
 			time.Sleep(time.Second)
 			invocation.Finish()
-			time.Sleep(time.Second)
-			delivery.Flush()
 
 			// Then each timestamp reflects when its event was recorded
 			require.Len(t, captured.Events, 2)
@@ -590,15 +565,13 @@ func TestInvocationSampling(t *testing.T) {
 			// Given a configured sample rate and a deterministic sampling bucket
 			t.Cleanup(stubDeviceID("test-device"))
 			var payloads []SendTelemetryPayload
-			delivery := NewDelivery(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-			invocation := NewInvocation(delivery, WithSampleRate(tt.sampleRate))
+			invocation := NewInvocation(func(p SendTelemetryPayload) { payloads = append(payloads, p) }, WithSampleRate(tt.sampleRate))
 			// Fix the random bucket so sampling boundaries can be asserted through delivery.
 			invocation.sampleBucket = tt.sampleBucket
 
-			// When the invocation finishes and delivery is flushed
+			// When the invocation finishes
 			invocation.Record(ghtelemetry.Event{Type: "test"})
 			invocation.Finish()
-			delivery.Flush()
 
 			// Then only invocations selected by sampling are delivered
 			require.Len(t, payloads, tt.wantPayloads)
@@ -615,15 +588,13 @@ func TestInvocationSetSampleRate(t *testing.T) {
 		// Given an invocation that initially sends all events
 		t.Cleanup(stubDeviceID("test-device"))
 		var payloads []SendTelemetryPayload
-		delivery := NewDelivery(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		invocation := NewInvocation(delivery, WithSampleRate(0))
+		invocation := NewInvocation(func(p SendTelemetryPayload) { payloads = append(payloads, p) }, WithSampleRate(0))
 		invocation.sampleBucket = 50
 
 		// When its sample rate excludes the bucket before completion
 		invocation.SetSampleRate(10)
 		invocation.Record(ghtelemetry.Event{Type: "test"})
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then no payload is delivered
 		assert.Empty(t, payloads)
@@ -633,17 +604,15 @@ func TestInvocationSetSampleRate(t *testing.T) {
 		// Given an invocation with an initial sample_rate dimension
 		t.Cleanup(stubDeviceID("test-device"))
 		var captured SendTelemetryPayload
-		delivery := NewDelivery(func(p SendTelemetryPayload) { captured = p })
-		invocation := NewInvocation(delivery,
+		invocation := NewInvocation(func(p SendTelemetryPayload) { captured = p },
 			WithSampleRate(1),
 			WithAdditionalCommonDimensions(ghtelemetry.Dimensions{"sample_rate": "1"}),
 		)
 
-		// When the rate changes before completion and delivery
+		// When the rate changes before completion
 		invocation.SetSampleRate(100)
 		invocation.Record(ghtelemetry.Event{Type: "test"})
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then the payload describes the effective sample rate
 		require.Len(t, captured.Events, 1)
@@ -655,9 +624,8 @@ func TestWithAdditionalCommonDimensions(t *testing.T) {
 	// Given an invocation constructed with additional common dimensions
 	t.Cleanup(stubDeviceID("test-device"))
 	var captured SendTelemetryPayload
-	delivery := NewDelivery(func(p SendTelemetryPayload) { captured = p })
 	invocation := NewInvocation(
-		delivery,
+		func(p SendTelemetryPayload) { captured = p },
 		WithAdditionalCommonDimensions(ghtelemetry.Dimensions{
 			"version": "2.45.0",
 			"agent":   "none",
@@ -667,7 +635,6 @@ func TestWithAdditionalCommonDimensions(t *testing.T) {
 	// When a recorded event is completed and delivered
 	invocation.Record(ghtelemetry.Event{Type: "test"})
 	invocation.Finish()
-	delivery.Flush()
 
 	// Then both additional and standard dimensions are present
 	require.Len(t, captured.Events, 1)
@@ -684,14 +651,12 @@ func TestInvocationDisable(t *testing.T) {
 		// Given an invocation with a recorded event
 		t.Cleanup(stubDeviceID("test-device"))
 		var payloads []SendTelemetryPayload
-		delivery := NewDelivery(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		invocation := NewInvocation(delivery)
+		invocation := NewInvocation(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
 		invocation.Record(ghtelemetry.Event{Type: "test"})
 
-		// When telemetry is disabled before completion and delivery
+		// When telemetry is disabled before completion
 		invocation.Disable()
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then an empty payload is delivered so log mode can surface the absence
 		require.Len(t, payloads, 1)
@@ -702,16 +667,14 @@ func TestInvocationDisable(t *testing.T) {
 		// Given an invocation with multiple recorded events
 		t.Cleanup(stubDeviceID("test-device"))
 		var payloads []SendTelemetryPayload
-		delivery := NewDelivery(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		invocation := NewInvocation(delivery)
+		invocation := NewInvocation(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
 		invocation.Record(ghtelemetry.Event{Type: "event1"})
 		invocation.Record(ghtelemetry.Event{Type: "event2"})
 		invocation.Record(ghtelemetry.Event{Type: "event3"})
 
-		// When telemetry is disabled before completion and delivery
+		// When telemetry is disabled before completion
 		invocation.Disable()
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then none of the recorded events appear in the delivered payload
 		require.Len(t, payloads, 1)
@@ -722,14 +685,12 @@ func TestInvocationDisable(t *testing.T) {
 		// Given an invocation disabled before any events are recorded
 		t.Cleanup(stubDeviceID("test-device"))
 		var payloads []SendTelemetryPayload
-		delivery := NewDelivery(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		invocation := NewInvocation(delivery)
+		invocation := NewInvocation(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
 		invocation.Disable()
 
 		// When an event is recorded and the invocation completes
 		invocation.Record(ghtelemetry.Event{Type: "test"})
 		invocation.Finish()
-		delivery.Flush()
 
 		// Then the later event is excluded from the delivered payload
 		require.Len(t, payloads, 1)

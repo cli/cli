@@ -1,5 +1,5 @@
 // Package telemetry provides best-effort usage telemetry for gh commands.
-// Invocations collect facts until completion; delivery sends completed payloads.
+// Invocations collect facts until completion, then send completed payloads.
 package telemetry
 
 import (
