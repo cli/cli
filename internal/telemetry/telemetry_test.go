@@ -565,13 +565,13 @@ func TestServiceSampling(t *testing.T) {
 			// Given a configured sample rate and a deterministic sampling bucket
 			t.Cleanup(stubDeviceID("test-device"))
 			var payloads []SendTelemetryPayload
-			service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) }, WithSampleRate(tt.sampleRate))
+			svc := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) }, WithSampleRate(tt.sampleRate))
 			// Fix the random bucket so sampling boundaries can be asserted through delivery.
-			service.sampleBucket = tt.sampleBucket
+			svc.(*service).sampleBucket = tt.sampleBucket
 
 			// When the invocation finishes
-			service.Record(ghtelemetry.Event{Type: "test"})
-			service.Finish()
+			svc.Record(ghtelemetry.Event{Type: "test"})
+			svc.Finish()
 
 			// Then only invocations selected by sampling are delivered
 			require.Len(t, payloads, tt.wantPayloads)
@@ -588,13 +588,13 @@ func TestServiceSetSampleRate(t *testing.T) {
 		// Given an invocation that initially sends all events
 		t.Cleanup(stubDeviceID("test-device"))
 		var payloads []SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) }, WithSampleRate(0))
-		service.sampleBucket = 50
+		svc := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) }, WithSampleRate(0))
+		svc.(*service).sampleBucket = 50
 
 		// When its sample rate excludes the bucket before completion
-		service.SetSampleRate(10)
-		service.Record(ghtelemetry.Event{Type: "test"})
-		service.Finish()
+		svc.SetSampleRate(10)
+		svc.Record(ghtelemetry.Event{Type: "test"})
+		svc.Finish()
 
 		// Then no payload is delivered
 		assert.Empty(t, payloads)
