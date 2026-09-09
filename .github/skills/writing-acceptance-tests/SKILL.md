@@ -133,7 +133,7 @@ Run metadata checks without live credentials:
 
 ```sh
 go test -tags=acceptance \
-  -run '^(TestSelectAcceptanceTestGroups|TestFilterAcceptanceScripts|TestTokenHasUserCapability|TestAcceptanceScriptsDeclareUserCapabilityRequirement|TestAcceptanceScriptsDeclareFixtureRepository|TestRequiresUserCapabilityForScriptErrors|TestValidateFixtureRepositoryDeclaration|TestFixtureRepositoryManager)$' \
+  -run '^(TestSelectAcceptanceTestGroups|TestFilterAcceptanceScripts|TestTokenHasUserCapability|TestAcceptanceScriptsDeclareUserCapabilityRequirement|TestAcceptanceScriptsDeclareFixtureRepository|TestRequiresUserCapabilityForScript|TestValidateFixtureRepositoryDeclaration|TestFixtureRepositoryManager)$' \
   ./acceptance
 ```
 

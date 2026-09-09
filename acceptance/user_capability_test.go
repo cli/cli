@@ -177,12 +177,27 @@ func TestAcceptanceScriptsDeclareFixtureRepository(t *testing.T) {
 	}
 }
 
-func TestRequiresUserCapabilityForScriptErrors(t *testing.T) {
+func TestRequiresUserCapabilityForScript(t *testing.T) {
 	tests := []struct {
 		name    string
 		content string
+		want    bool
 		wantErr string
 	}{
+		{
+			name:    "requires user capability",
+			content: "# requires-user-capability: true\n",
+			want:    true,
+		},
+		{
+			name:    "does not require user capability",
+			content: "# requires-user-capability: false\n",
+		},
+		{
+			name:    "supports CRLF",
+			content: "# requires-user-capability: true\r\n",
+			want:    true,
+		},
 		{
 			name:    "missing",
 			content: "",
@@ -216,9 +231,10 @@ func TestRequiresUserCapabilityForScriptErrors(t *testing.T) {
 			file := filepath.Join(t.TempDir(), "script.txtar")
 			require.NoError(t, os.WriteFile(file, []byte(tt.content), 0o600))
 
-			_, err := requiresUserCapabilityForScript(file)
+			got, err := requiresUserCapabilityForScript(file)
 			if tt.wantErr == "" {
 				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
 			} else {
 				require.ErrorContains(t, err, tt.wantErr)
 			}

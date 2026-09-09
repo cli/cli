@@ -24,7 +24,7 @@ The token to use for authenticating with the `GH_ACCEPTANCE_HOST`. This must alr
 
 It's recommended to create and use a Legacy PAT for this; Fine-Grained PATs do not offer all the necessary privileges required. You can use an OAuth token provided via `gh auth login --web` and can provide it to the acceptance tests via `GH_ACCEPTANCE_TOKEN=$(gh auth token --hostname <host>)` but this can be a bit confusing and annoying if you `gh auth login` again without `-s` and lose the required scopes.
 
-The test harness infers whether a token authenticates a user from GitHub's documented token prefixes. OAuth (`gho_`), classic PAT (`ghp_`), fine-grained PAT (`github_pat_`), and GitHub App user (`ghu_`) tokens provide user capabilities. GitHub App installation (`ghs_`) tokens do not, so scripts marked `requires-user-capability: true` are skipped.
+The test harness infers whether a token authenticates a user from GitHub's documented token prefixes. OAuth (`gho_`), classic PAT (`ghp_`), fine-grained PAT (`github_pat_`), and GitHub App user (`ghu_`) tokens provide user capabilities. GitHub App installation (`ghs_`) tokens do not, so scripts marked `requires-user-capability: true` are omitted from unfiltered runs. Explicitly selecting an incompatible script with `GH_ACCEPTANCE_SCRIPT` fails with an error instead.
 
 Managed fixture repositories reduce repository creation by sharing state where
 tests can safely coexist.
