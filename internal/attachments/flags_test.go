@@ -270,11 +270,6 @@ func TestFlagUserAssets(t *testing.T) {
 			wantPaths: []string{"./before,after.png"},
 		},
 		{
-			name:      "keeps order for distinct files with identical contents",
-			input:     "--attach './b.png#Second' --attach ./a.png --attach ./c.mp4",
-			wantPaths: []string{"./b.png", "./a.png", "./c.mp4"},
-		},
-		{
 			name:    "the same file twice",
 			input:   "--attach ./a.png --attach './a.png#Another caption'",
 			wantErr: "./a.png and ./a.png are the same file; attached files must be unique",
@@ -322,8 +317,6 @@ func TestFlagUserAssets(t *testing.T) {
 				"shot#dark.png#first.png",
 				"caption.png",
 				"a.png",
-				"b.png",
-				"c.mp4",
 				"before,after.png",
 				"notes.txt",
 			} {
@@ -363,6 +356,36 @@ func TestFlagUserAssets(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("preserves input order", func(t *testing.T) {
+		// Given two files with different contents
+		t.Chdir(t.TempDir())
+		require.NoError(t, os.WriteFile("a.png", []byte("first"), 0o600))
+		require.NoError(t, os.WriteFile("b.png", []byte("second"), 0o600))
+
+		// When files are supplied in non-alphabetical order
+		resolved, err := assetsFromArgs(t, "./b.png", "./a.png")
+
+		// Then the resolved files retain that order
+		require.NoError(t, err)
+		require.Len(t, resolved, 2)
+		assert.Equal(t, []string{"./b.png", "./a.png"}, []string{resolved[0].Path(), resolved[1].Path()})
+	})
+
+	t.Run("allows distinct files with identical contents", func(t *testing.T) {
+		// Given two separate files containing the same bytes
+		t.Chdir(t.TempDir())
+		require.NoError(t, os.WriteFile("a.png", []byte("same contents"), 0o600))
+		require.NoError(t, os.WriteFile("b.png", []byte("same contents"), 0o600))
+
+		// When both files are supplied
+		resolved, err := assetsFromArgs(t, "./a.png", "./b.png")
+
+		// Then both files are accepted
+		require.NoError(t, err)
+		require.Len(t, resolved, 2)
+		assert.ElementsMatch(t, []string{"./a.png", "./b.png"}, []string{resolved[0].Path(), resolved[1].Path()})
+	})
 
 	t.Run("maximum number of attachments", func(t *testing.T) {
 		names := make([]string, maxAttachments)

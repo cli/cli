@@ -252,9 +252,9 @@ type recordedEvent struct {
 }
 
 type service struct {
-	mu               sync.RWMutex
-	flush            func(payload SendTelemetryPayload)
-	previouslyCalled bool
+	mu       sync.RWMutex
+	flush    func(payload SendTelemetryPayload)
+	finished bool
 
 	commonDimensions ghtelemetry.Dimensions
 	sampleRate       int
@@ -280,7 +280,7 @@ func (s *service) Record(event ghtelemetry.Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.previouslyCalled {
+	if s.finished {
 		return
 	}
 	s.events = append(s.events, &recordedEvent{event: cloneEvent(event), recordedAt: time.Now()})
@@ -292,7 +292,7 @@ func (s *service) Begin(event ghtelemetry.Event) ghtelemetry.PendingEvent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.previouslyCalled {
+	if s.finished {
 		return noOpPendingEvent{}
 	}
 	recorded := &recordedEvent{
@@ -309,7 +309,7 @@ func (s *service) SetSampleRate(rate int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.previouslyCalled {
+	if s.finished {
 		return
 	}
 	s.sampleRate = rate
@@ -321,11 +321,11 @@ func (s *service) SetSampleRate(rate int) {
 func (s *service) Finish() {
 	s.mu.Lock()
 
-	if s.previouslyCalled {
+	if s.finished {
 		s.mu.Unlock()
 		return
 	}
-	s.previouslyCalled = true
+	s.finished = true
 
 	if s.sampleRate > 0 && s.sampleRate < 100 && int(s.sampleBucket) >= s.sampleRate {
 		s.mu.Unlock()
@@ -374,7 +374,7 @@ func (p *pendingEvent) UpsertDimensions(dimensions ghtelemetry.Dimensions) {
 	p.service.mu.Lock()
 	defer p.service.mu.Unlock()
 
-	if p.service.previouslyCalled {
+	if p.service.finished {
 		return
 	}
 	if p.recorded.event.Dimensions == nil {
@@ -387,7 +387,7 @@ func (p *pendingEvent) UpsertMeasures(measures ghtelemetry.Measures) {
 	p.service.mu.Lock()
 	defer p.service.mu.Unlock()
 
-	if p.service.previouslyCalled {
+	if p.service.finished {
 		return
 	}
 	if p.recorded.event.Measures == nil {
