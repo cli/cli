@@ -8,6 +8,7 @@ import (
 	cryptorand "crypto/rand"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -65,6 +66,27 @@ func waitForWorkflowRun(list func() (string, error), sleep func(time.Duration)) 
 		}
 	}
 	return "", errWorkflowRunRegistrationTimeout
+}
+
+func workflowRunIDFromOutput(output string) string {
+	runURL, err := url.ParseRequestURI(strings.TrimSpace(output))
+	if err != nil || runURL.Scheme == "" || runURL.Host == "" ||
+		path.Base(path.Dir(runURL.Path)) != "runs" ||
+		path.Base(path.Dir(path.Dir(runURL.Path))) != "actions" {
+		return ""
+	}
+	runID := path.Base(runURL.Path)
+	if _, err := strconv.ParseInt(runID, 10, 64); err != nil {
+		return ""
+	}
+	return runID
+}
+
+func resolveWorkflowRunID(output string, list func() (string, error), sleep func(time.Duration)) (string, error) {
+	if runID := workflowRunIDFromOutput(output); runID != "" {
+		return runID, nil
+	}
+	return waitForWorkflowRun(list, sleep)
 }
 
 type workflowRunDiagnosticExecutor func(name string, args ...string) (stdout string, stderr string, err error)
@@ -287,6 +309,73 @@ func TestWaitForWorkflowRun(t *testing.T) {
 		assert.Equal(t, 13, attempts)
 		assert.Equal(t, 12, sleeps)
 	})
+}
+
+func TestWorkflowRunIDFromOutput(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{
+			name:   "GitHub.com workflow run URL",
+			output: "https://github.com/OWNER/REPO/actions/runs/1234\n",
+			want:   "1234",
+		},
+		{
+			name:   "GHEC workflow run URL",
+			output: "https://example.ghe.com/OWNER/REPO/actions/runs/5678\n",
+			want:   "5678",
+		},
+		{
+			name:   "empty legacy dispatch output",
+			output: "",
+		},
+		{
+			name:   "unrelated URL",
+			output: "https://github.com/OWNER/REPO/actions/workflows/main.yml",
+		},
+		{
+			name:   "non-numeric run identifier",
+			output: "https://github.com/OWNER/REPO/actions/runs/latest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, workflowRunIDFromOutput(tt.output))
+		})
+	}
+}
+
+func TestResolveWorkflowRunIDUsesDispatchOutput(t *testing.T) {
+	runID, err := resolveWorkflowRunID(
+		"https://github.com/OWNER/REPO/actions/runs/1234\n",
+		func() (string, error) {
+			t.Fatal("unexpected workflow run list")
+			return "", nil
+		},
+		func(time.Duration) {
+			t.Fatal("unexpected sleep")
+		},
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, "1234", runID)
+}
+
+func TestResolveWorkflowRunIDFallsBackToPolling(t *testing.T) {
+	var attempts int
+	runID, err := resolveWorkflowRunID("", func() (string, error) {
+		attempts++
+		return "5678", nil
+	}, func(time.Duration) {
+		t.Fatal("unexpected sleep")
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "5678", runID)
+	assert.Equal(t, 1, attempts)
 }
 
 func TestCollectWorkflowRunDiagnostics(t *testing.T) {
@@ -876,7 +965,7 @@ func sharedCmds(tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManag
 				ts.Fatalf("usage: wait-for-run ENV_VAR [run-list-flags...]")
 			}
 
-			runID, err := waitForWorkflowRun(func() (string, error) {
+			runID, err := resolveWorkflowRunID(ts.ReadFile("stdout"), func() (string, error) {
 				listArgs := append([]string{"run", "list"}, args[1:]...)
 				listArgs = append(listArgs, "--limit", "1", "--json", "databaseId", "--jq", ".[].databaseId")
 				if err := ts.Exec("gh", listArgs...); err != nil {

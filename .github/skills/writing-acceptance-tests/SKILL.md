@@ -80,6 +80,8 @@ Use bounded condition-based waits for asynchronously registered resources.
 Fixed sleeps are both slower when registration is fast and unreliable when it
 is slow. Use `wait-for-workflow` after pushing a new workflow definition, then
 use `wait-for-run` before watching or inspecting a triggered workflow run.
+After `gh workflow run`, `wait-for-run` captures the returned run URL when the
+server provides one and falls back to polling for older servers.
 On timeout, `wait-for-run` captures the pushed commit and remote ref, workflow
 files, recent unfiltered runs, commit check suites, and an Actions API request
 ID. Use that evidence to distinguish event ingestion, run indexing, filtering,

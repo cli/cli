@@ -118,7 +118,9 @@ an accepted cancellation request.
 
 After pushing a new workflow file, use `wait-for-workflow` instead of a fixed
 sleep before invoking or inspecting it. Use `wait-for-run` to allow up to one
-minute for a triggered run to appear. If that deadline expires, the helper logs
+minute for a triggered run to appear. After `gh workflow run`, the helper uses
+the run URL returned by GitHub.com or a compatible GitHub Enterprise Server and
+only polls when no URL is available. If that deadline expires, the helper logs
 the run filters, local and remote refs, workflow files, recent runs, commit check
 suites, and an Actions API request ID before the repository is cleaned up.
 
