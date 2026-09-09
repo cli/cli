@@ -99,6 +99,9 @@ var HelpTopics = []helpTopic{
 			When an extension is executed, gh checks for new versions for the executed extension once every 24 hours.
 			If a newer version was found, an upgrade notice is displayed on standard error.
 
+			%[1]sGH_EXTENSION%[1]s: set to %[1]s1%[1]s by gh when it invokes an extension, allowing an extension to
+			tell whether it was run as %[1]sgh <extension>%[1]s or directly as a standalone program.
+
 			%[1]sGH_CONFIG_DIR%[1]s: the directory where gh will store configuration files. If not specified,
 			the default value will be one of the following paths (in order of precedence):
 			  - %[1]s$XDG_CONFIG_HOME/gh%[1]s (if %[1]s$XDG_CONFIG_HOME%[1]s is set),
@@ -108,7 +111,8 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_PROMPT_DISABLED%[1]s: set to any value to disable interactive prompting in the terminal.
 
 			%[1]sGH_PATH%[1]s: set the path to the gh executable, useful for when gh can not properly determine
-			its own path such as in the cygwin terminal.
+			its own path such as in the cygwin terminal. gh also sets this when invoking extensions so they
+			can call back into the same gh executable.
 
 			%[1]sGH_MDWIDTH%[1]s: default maximum width for markdown render wrapping.  The max width of lines
 			wrapped on the terminal will be taken as the lesser of the terminal width, this value, or 120 if
