@@ -53,10 +53,11 @@ type Manager struct {
 	gitClient  gitClient
 	config     gh.Config
 	io         *iostreams.IOStreams
+	ghPath     string
 	dryRunMode bool
 }
 
-func NewManager(ios *iostreams.IOStreams, gc *git.Client) *Manager {
+func NewManager(ios *iostreams.IOStreams, gc *git.Client, ghPath string) *Manager {
 	return &Manager{
 		dataDir: config.DataDir,
 		updateDir: func() string {
@@ -74,6 +75,7 @@ func NewManager(ios *iostreams.IOStreams, gc *git.Client) *Manager {
 		},
 		io:        ios,
 		gitClient: &gitExecuter{client: gc},
+		ghPath:    ghPath,
 	}
 }
 
@@ -128,9 +130,8 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 		forwardArgs = append([]string{"-c", `command "$@"`, "--", exe}, forwardArgs...)
 		externalCmd = m.newCommand(shExe, forwardArgs...)
 	}
-	// Signal to the extension that it is being run by gh rather than standalone, so it can
-	// adjust things like usage strings.
-	externalCmd.Env = append(externalCmd.Environ(), "GH_EXTENSION=1")
+	// Tell the extension that gh dispatched it and provide a reliable path back to this executable.
+	externalCmd.Env = append(externalCmd.Environ(), "GH_EXTENSION=1", "GH_PATH="+m.ghPath)
 
 	externalCmd.Stdin = stdin
 	externalCmd.Stdout = stdout
