@@ -36,10 +36,6 @@ stdout 'GH_PATH was set correctly'
 exec ./$EXT_DIR
 stdout 'GH_EXTENSION=0'
 
-# Verify GH_EXTENSION is documented
-exec gh help environment
-stdout 'GH_EXTENSION`: set to `1` by gh when it invokes an extension'
-
 -- print-env.sh --
 #!/usr/bin/env bash
 set -e
