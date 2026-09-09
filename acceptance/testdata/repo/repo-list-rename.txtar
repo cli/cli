@@ -3,6 +3,7 @@ fixture-repo none
 
 # Create a repository with a file so it has a default branch
 exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+# Register both possible names so failures before or after the rename cannot leak the repository.
 defer cleanup-repo $SCRIPT_NAME-$RANDOM_STRING
 defer cleanup-repo $SCRIPT_NAME-$RANDOM_STRING-renamed
 
