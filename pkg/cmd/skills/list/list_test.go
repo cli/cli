@@ -145,8 +145,9 @@ func TestListRun(t *testing.T) {
 			},
 			wantStdout: "git-commit\tcursor\tproject\tmonalisa/skills-repo\n",
 			verify: func(t *testing.T, stdout string, spy *telemetry.EventRecorderSpy) {
-				require.Len(t, spy.Events, 1)
-				event := spy.Events[0]
+				events := spy.Events()
+				require.Len(t, events, 1)
+				event := events[0]
 				assert.Equal(t, "skill_list", event.Type)
 				assert.Equal(t, "cursor", event.Dimensions["agent_hosts"])
 				assert.Equal(t, "project", event.Dimensions["scope"])
@@ -182,7 +183,7 @@ func TestListRun(t *testing.T) {
 				}
 			]`, filepath.Join("HOME", ".copilot", "skills", "code-review")),
 			verify: func(t *testing.T, stdout string, spy *telemetry.EventRecorderSpy) {
-				assert.Equal(t, "json", spy.Events[0].Dimensions["format"])
+				assert.Equal(t, "json", spy.Events()[0].Dimensions["format"])
 			},
 		},
 		{

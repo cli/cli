@@ -395,11 +395,10 @@ func TestNewCmdEdit(t *testing.T) {
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
 
-			// When the command executes and telemetry is completed
+			// When the command executes
 			_, err = cmd.ExecuteC()
-			recorder.Finish()
 			// Then telemetry starts only if execution reaches attachment validation
-			assert.Equal(t, tt.wantEvents, recorder.Events)
+			assert.Equal(t, tt.wantEvents, recorder.Events())
 			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
 				require.Error(t, err)
@@ -1700,7 +1699,7 @@ func Test_editRun(t *testing.T) {
 			// Given a pending event when operation counts are under test
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				tt.input.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
+				tt.input.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
 			}
 
 			// The host comes from the pull request the row's finder returns, so
@@ -1724,8 +1723,7 @@ func Test_editRun(t *testing.T) {
 			err := editRun(tt.input)
 			if tt.wantOperations != nil {
 				// Then telemetry retains completed operations, including partial results
-				attachmentRecorder.Finish()
-				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(tt.attach), *tt.wantOperations)
 			}
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)

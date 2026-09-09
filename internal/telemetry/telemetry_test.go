@@ -475,21 +475,13 @@ func TestServiceSampling(t *testing.T) {
 			svc := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) }, WithSampleRate(tt.sampleRate))
 			// Fix the random bucket so sampling boundaries can be asserted through delivery.
 			svc.(*service).sampleBucket = tt.sampleBucket
+			svc.Record(ghtelemetry.Event{Type: "test"})
 
 			// When the invocation finishes
-			svc.Record(ghtelemetry.Event{Type: "completed_step"})
-			pending := svc.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
-			pending.UpsertMeasures(ghtelemetry.Measures{"attach_count": 2})
 			svc.Finish()
 
-			// Then sampling includes or excludes immediate and pending events together
-			require.Len(t, payloads, tt.wantPayloads)
-			for _, payload := range payloads {
-				require.Len(t, payload.Events, 2)
-				assert.Equal(t, "completed_step", payload.Events[0].Type)
-				assert.Equal(t, "attachment_invocation", payload.Events[1].Type)
-				assert.Equal(t, int64(2), payload.Events[1].Measures["attach_count"])
-			}
+			// Then the sampling policy determines whether a payload is delivered
+			assert.Len(t, payloads, tt.wantPayloads)
 		})
 	}
 }

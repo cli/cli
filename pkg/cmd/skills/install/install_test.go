@@ -2624,8 +2624,9 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Len(t, recorder.Events, 1)
-			event := recorder.Events[0]
+			events := recorder.Events()
+			require.Len(t, events, 1)
+			event := events[0]
 			assert.Equal(t, "skill_install", event.Type)
 			assert.NotEmpty(t, event.Dimensions["agent_hosts"], "agent_hosts should always be present")
 
@@ -2720,8 +2721,9 @@ func TestInstallRun_TelemetryMultipleSkills(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Len(t, recorder.Events, 1)
-	event := recorder.Events[0]
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	event := events[0]
 	assert.Equal(t, "skill_install", event.Type)
 	assert.Equal(t, "public", event.Dimensions["repo_visibility"])
 

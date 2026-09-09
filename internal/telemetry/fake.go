@@ -11,44 +11,30 @@ var (
 	_ ghtelemetry.InvocationRecorder = (*InvocationRecorderSpy)(nil)
 )
 
-// EventRecorderSpy captures complete events immediately. Finish includes pending
-// events in recording order and freezes their handles without requiring policy methods.
+// EventRecorderSpy captures recorded and pending events in recording order.
 type EventRecorderSpy struct {
-	Events   []ghtelemetry.Event
-	events   []*ghtelemetry.Event
-	finished bool
+	events []*ghtelemetry.Event
 }
 
-// Record captures a complete event without waiting for Finish.
+// Record captures a complete event.
 func (r *EventRecorderSpy) Record(event ghtelemetry.Event) {
-	if r.finished {
-		return
-	}
 	r.Begin(event)
-	r.Events = append(r.Events, cloneEvent(event))
 }
 
 // Begin captures initial facts and returns a handle for subsequent updates.
 func (r *EventRecorderSpy) Begin(event ghtelemetry.Event) ghtelemetry.PendingEvent {
-	if r.finished {
-		return noOpPendingEvent{}
-	}
 	event = cloneEvent(event)
 	r.events = append(r.events, &event)
-	return &pendingEventSpy{recorder: r, event: &event}
+	return &pendingEventSpy{event: &event}
 }
 
-// Finish snapshots recorded facts into Events once.
-func (r *EventRecorderSpy) Finish() {
-	if r.finished {
-		return
-	}
-	r.finished = true
-	r.Events = nil
+// Events returns copies of all captured events with their latest updates.
+func (r *EventRecorderSpy) Events() []ghtelemetry.Event {
+	var events []ghtelemetry.Event
 	for _, event := range r.events {
-		r.Events = append(r.Events, cloneEvent(*event))
+		events = append(events, cloneEvent(*event))
 	}
-	r.events = nil
+	return events
 }
 
 // InvocationRecorderSpy adds invocation sampling to EventRecorderSpy.
@@ -63,14 +49,10 @@ func (r *InvocationRecorderSpy) SetSampleRate(rate int) {
 }
 
 type pendingEventSpy struct {
-	recorder *EventRecorderSpy
-	event    *ghtelemetry.Event
+	event *ghtelemetry.Event
 }
 
 func (p *pendingEventSpy) UpsertDimensions(dimensions ghtelemetry.Dimensions) {
-	if p.recorder.finished {
-		return
-	}
 	if p.event.Dimensions == nil {
 		p.event.Dimensions = make(ghtelemetry.Dimensions)
 	}
@@ -78,9 +60,6 @@ func (p *pendingEventSpy) UpsertDimensions(dimensions ghtelemetry.Dimensions) {
 }
 
 func (p *pendingEventSpy) UpsertMeasures(measures ghtelemetry.Measures) {
-	if p.recorder.finished {
-		return
-	}
 	if p.event.Measures == nil {
 		p.event.Measures = make(ghtelemetry.Measures)
 	}

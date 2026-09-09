@@ -345,11 +345,10 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetArgs(args)
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)
-			// When the command executes and telemetry is completed
+			// When the command executes
 			_, err = cmd.ExecuteC()
-			recorder.Finish()
 			// Then telemetry starts only if execution reaches attachment validation
-			assert.Equal(t, tt.wantEvents, recorder.Events)
+			assert.Equal(t, tt.wantEvents, recorder.Events())
 			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
 				require.Error(t, err)
@@ -1436,7 +1435,7 @@ func Test_createRun(t *testing.T) {
 			// Given a pending event when operation counts are under test
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				opts.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
+				opts.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
 			}
 			opts.Config = func() (gh.Config, error) {
 				cfg := tt.config
@@ -1450,8 +1449,7 @@ func Test_createRun(t *testing.T) {
 			err := createRun(opts)
 			if tt.wantOperations != nil {
 				// Then telemetry retains completed operations, including partial results
-				attachmentRecorder.Finish()
-				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(tt.attach), *tt.wantOperations)
 			}
 			if tt.wantsErr == "" {
 				require.NoError(t, err)

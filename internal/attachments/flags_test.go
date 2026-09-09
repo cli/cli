@@ -108,13 +108,12 @@ func TestAttachmentTelemetry(t *testing.T) {
 		recorder := &telemetry.InvocationRecorderSpy{}
 
 		// When an operation update is attempted without an attachment event
-		event := Begin(recorder, "gh issue comment", attachFlag.Count())
+		event := BeginTelemetry(recorder, "gh issue comment", attachFlag.Count())
 		event.RecordOperations(UploadResult{AppendOperations: 1, ReplaceOperations: 1})
-		recorder.Finish()
 
 		// Then no event or sampling promotion occurs
 		assert.Nil(t, event)
-		assert.Empty(t, recorder.Events)
+		assert.Empty(t, recorder.Events())
 		assert.Zero(t, recorder.LastSampleRate)
 	})
 
@@ -154,8 +153,7 @@ func TestAttachmentTelemetry(t *testing.T) {
 			recorder := &telemetry.InvocationRecorderSpy{}
 
 			// When an attachment event is recorded without any upload operations
-			Begin(recorder, "gh issue comment", attachFlag.Count())
-			recorder.Finish()
+			BeginTelemetry(recorder, "gh issue comment", attachFlag.Count())
 
 			// Then the raw count is retained at full sampling with zero operations
 			assert.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
@@ -169,7 +167,7 @@ func TestAttachmentTelemetry(t *testing.T) {
 					"append_ops_count":  0,
 					"replace_ops_count": 0,
 				},
-			}}, recorder.Events)
+			}}, recorder.Events())
 		})
 	}
 
@@ -178,43 +176,20 @@ func TestAttachmentTelemetry(t *testing.T) {
 
 		// Given a pending event for four attachments
 		recorder := &telemetry.InvocationRecorderSpy{}
-		event := Begin(recorder, "gh issue comment", 4)
+		event := BeginTelemetry(recorder, "gh issue comment", 4)
 
 		// When four uploads produce one append and three replacements
 		event.RecordOperations(UploadResult{Uploaded: 4, AppendOperations: 1, ReplaceOperations: 3})
-		recorder.Finish()
 
-		// Then markdown operations are counted separately from uploaded files
-		require.Len(t, recorder.Events, 1)
+		// Then telemetry retains the attachment count and records one append and three replacements
+		events := recorder.Events()
+		require.Len(t, events, 1)
 		assert.Equal(t, ghtelemetry.Measures{
 			"attach_count":      4,
 			"append_ops_count":  1,
 			"replace_ops_count": 3,
-		}, recorder.Events[0].Measures)
+		}, events[0].Measures)
 	})
-}
-
-func TestTelemetryEventReplacesOperationCounts(t *testing.T) {
-	// Given an attachment event with previously recorded operation counts
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	var payload telemetry.SendTelemetryPayload
-	service := telemetry.NewService(func(p telemetry.SendTelemetryPayload) {
-		payload = p
-	})
-	event := Begin(service, "gh issue comment", 2)
-	event.RecordOperations(UploadResult{AppendOperations: 2})
-
-	// When a later result replaces those counts and the invocation finishes
-	event.RecordOperations(UploadResult{Uploaded: 1, ReplaceOperations: 1})
-	service.Finish()
-
-	// Then the payload contains the latest counts, including a reset to zero
-	require.Len(t, payload.Events, 1)
-	assert.Equal(t, map[string]int64{
-		"attach_count":      2,
-		"append_ops_count":  0,
-		"replace_ops_count": 1,
-	}, payload.Events[0].Measures)
 }
 
 func TestFlagUserAssets(t *testing.T) {

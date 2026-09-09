@@ -8,11 +8,11 @@ type TelemetryEvent struct {
 	pendingEvent ghtelemetry.PendingEvent
 }
 
-// Begin starts an attachment event at full sampling for the raw supplied count.
+// BeginTelemetry starts an attachment event at full sampling for the raw supplied count.
 // A zero count returns nil without changing sampling. recorder is required;
 // use a no-op service when telemetry is disabled.
 // Call immediately before Flag.UserAssets so invalid and over-limit inputs count.
-func Begin(recorder ghtelemetry.InvocationRecorder, command string, attachCount int) *TelemetryEvent {
+func BeginTelemetry(recorder ghtelemetry.InvocationRecorder, command string, attachCount int) *TelemetryEvent {
 	if attachCount == 0 {
 		return nil
 	}

@@ -473,11 +473,10 @@ func TestNewCmdComment(t *testing.T) {
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
 
-			// When the command executes and telemetry is completed
+			// When the command executes
 			_, err = cmd.ExecuteC()
-			recorder.Finish()
 			// Then telemetry starts only if execution reaches attachment validation
-			assert.Equal(t, tt.wantEvents, recorder.Events)
+			assert.Equal(t, tt.wantEvents, recorder.Events())
 			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
 				require.Error(t, err)

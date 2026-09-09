@@ -368,11 +368,10 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetArgs(args)
 			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
-			// When the command executes and telemetry is completed
+			// When the command executes
 			_, err = cmd.ExecuteC()
-			recorder.Finish()
 			// Then telemetry starts only if execution reaches attachment validation
-			assert.Equal(t, tt.wantEvents, recorder.Events)
+			assert.Equal(t, tt.wantEvents, recorder.Events())
 			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
 				if tt.wantsErrMsg != "" {
@@ -2061,7 +2060,7 @@ func Test_createRun(t *testing.T) {
 			// Given a pending event when operation counts are under test
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				opts.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(opts.Assets))
+				opts.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(opts.Assets))
 			}
 
 			// All tests in this function use github.com behavior
@@ -2075,8 +2074,7 @@ func Test_createRun(t *testing.T) {
 			err := createRun(&opts)
 			if tt.wantOperations != nil {
 				// Then telemetry retains completed operations, including partial results
-				attachmentRecorder.Finish()
-				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(opts.Assets), *tt.wantOperations)
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(opts.Assets), *tt.wantOperations)
 			}
 			output := &test.CmdOut{
 				OutBuf:     stdout,

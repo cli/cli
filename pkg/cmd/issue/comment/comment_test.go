@@ -452,11 +452,10 @@ func TestNewCmdComment(t *testing.T) {
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
 
-			// When the command executes and telemetry is completed
+			// When the command executes
 			_, err = cmd.ExecuteC()
-			recorder.Finish()
 			// Then telemetry starts only if execution reaches attachment validation
-			assert.Equal(t, tt.wantEvents, recorder.Events)
+			assert.Equal(t, tt.wantEvents, recorder.Events())
 			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
 				require.Error(t, err)
@@ -494,6 +493,8 @@ func TestNewCmdComment(t *testing.T) {
 
 func TestNewCmdCommentRecordsRejectedAttachmentCount(t *testing.T) {
 	// Given 51 attachment values and a normally sampled telemetry service
+	// NewService reads or creates a device-id file, so isolate it from the user's state.
+	// An injectable device-ID lookup could avoid this process-wide override and allow parallel tests.
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	ios, _, _, _ := iostreams.Test()
 	f := &cmdutil.Factory{
@@ -557,13 +558,12 @@ func TestNewCmdCommentSkipsAttachmentsOnPersistentPreRunError(t *testing.T) {
 	root.AddCommand(cmd)
 	root.SetArgs([]string{"comment", "1", "--attach", "./shot.png"})
 
-	// When authentication fails and telemetry is completed
+	// When authentication fails
 	_, err := root.ExecuteC()
-	recorder.Finish()
 
 	// Then attachment validation has not begun, so no event or sampling promotion occurs
 	require.EqualError(t, err, "authentication failed")
-	assert.Empty(t, recorder.Events)
+	assert.Empty(t, recorder.Events())
 	assert.Zero(t, recorder.LastSampleRate)
 }
 

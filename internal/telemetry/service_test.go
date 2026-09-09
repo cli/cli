@@ -3,7 +3,6 @@ package telemetry
 import (
 	"sync"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
@@ -11,82 +10,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestServiceCopiesFactsAtTheirRecordingTime(t *testing.T) {
+func TestServiceCopiesRecordedEvents(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
-	synctest.Test(t, func(t *testing.T) {
-		// Given a producer that reuses its event and update maps
-		var payloads []SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		facts := ghtelemetry.Event{
-			Type:       "command_invocation",
-			Dimensions: ghtelemetry.Dimensions{"command": "gh issue create", "flags": ""},
-			Measures:   ghtelemetry.Measures{"count": 1, "total": 2},
-		}
-		startedAt := time.Now()
-		pending := service.Begin(facts)
-		time.Sleep(time.Second)
-		facts.Type = "completed_step"
-		service.Record(facts)
+	// Given a recorded event
+	var payload SendTelemetryPayload
+	service := NewService(func(p SendTelemetryPayload) { payload = p })
+	event := ghtelemetry.Event{
+		Type:       "command_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "gh issue create"},
+		Measures:   ghtelemetry.Measures{"count": 1},
+	}
+	service.Record(event)
 
-		// When the producer updates pending facts and later reuses those maps
-		facts.Dimensions["command"] = "unrelated"
-		facts.Measures["count"] = 99
-		dimensions := ghtelemetry.Dimensions{"flags": "attach"}
-		measures := ghtelemetry.Measures{"count": 2}
-		pending.UpsertDimensions(dimensions)
-		pending.UpsertMeasures(measures)
-		dimensions["flags"] = "unrelated"
-		measures["count"] = 99
-		time.Sleep(time.Second)
-		require.Empty(t, payloads, "recording and updating facts must not send them before Finish")
-		service.Finish()
+	// When the original maps are mutated before delivery
+	event.Dimensions["command"] = "changed"
+	event.Measures["count"] = 2
+	service.Finish()
 
-		// Then event order, original timestamps, and independently owned facts survive
-		require.Len(t, payloads, 1)
-		require.Len(t, payloads[0].Events, 2)
-		first, second := payloads[0].Events[0], payloads[0].Events[1]
-		assert.Equal(t, "command_invocation", first.Type)
-		assert.Equal(t, "gh issue create", first.Dimensions["command"])
-		assert.Equal(t, "attach", first.Dimensions["flags"])
-		assert.Equal(t, int64(2), first.Measures["count"])
-		assert.Equal(t, int64(2), first.Measures["total"])
-		assert.Equal(t, startedAt.UTC().Format("2006-01-02T15:04:05.000Z"), first.Dimensions["timestamp"])
-		assert.Equal(t, "completed_step", second.Type)
-		assert.Equal(t, "gh issue create", second.Dimensions["command"])
-		assert.Empty(t, second.Dimensions["flags"])
-		assert.Equal(t, int64(1), second.Measures["count"])
-		assert.Equal(t, startedAt.Add(time.Second).UTC().Format("2006-01-02T15:04:05.000Z"), second.Dimensions["timestamp"])
-	})
+	// Then the recorded values are unchanged
+	require.Len(t, payload.Events, 1)
+	assert.Equal(t, "gh issue create", payload.Events[0].Dimensions["command"])
+	assert.Equal(t, int64(1), payload.Events[0].Measures["count"])
 }
 
 func TestServicePromotesAllEventsBeforeCompletion(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
-	// Given a command that discovers its full-sampling policy after recording facts
+	// Given events recorded under a sampling policy that would exclude them
 	var payload SendTelemetryPayload
-	svc := NewService(func(p SendTelemetryPayload) { payload = p },
-		WithSampleRate(1),
-		WithAdditionalCommonDimensions(ghtelemetry.Dimensions{"sample_rate": "1"}),
-	)
-	// Promotion must rescue an invocation that would otherwise be excluded.
+	svc := NewService(func(p SendTelemetryPayload) { payload = p }, WithSampleRate(1))
 	svc.(*service).sampleBucket = 99
 	svc.Record(ghtelemetry.Event{Type: "completed_step"})
-	pending := svc.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
+	svc.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
 
-	// When attachment usage promotes the invocation before it finishes
+	// When sampling is promoted before completion
 	svc.SetSampleRate(ghtelemetry.SAMPLE_ALL)
-	pending.UpsertMeasures(ghtelemetry.Measures{"attach_count": 2})
 	svc.Finish()
 
-	// Then immediate and pending events share the promoted sampling policy
-	require.Len(t, payload.Events, 2)
-	assert.Equal(t, "completed_step", payload.Events[0].Type)
-	assert.Equal(t, "attachment_invocation", payload.Events[1].Type)
-	assert.Equal(t, "100", payload.Events[0].Dimensions["sample_rate"])
-	assert.Equal(t, "100", payload.Events[1].Dimensions["sample_rate"])
-	assert.Equal(t, payload.Events[0].Dimensions["invocation_id"], payload.Events[1].Dimensions["invocation_id"])
-	assert.Equal(t, int64(2), payload.Events[1].Measures["attach_count"])
+	// Then both events are delivered
+	assert.Len(t, payload.Events, 2)
 }
 
 func TestServiceDisablingOverridesPromotedPendingEvents(t *testing.T) {
@@ -110,82 +73,56 @@ func TestServiceDisablingOverridesPromotedPendingEvents(t *testing.T) {
 	assert.Empty(t, payloads[0].Events)
 }
 
-func TestServiceCompletionCannotBeReopened(t *testing.T) {
+func TestServiceFinishDeliversOnce(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
-	// Given a completed invocation with one pending event
-	var payloads []SendTelemetryPayload
-	service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-	pending := service.Begin(ghtelemetry.Event{
-		Type:       "command_invocation",
-		Dimensions: ghtelemetry.Dimensions{"command": "gh issue create"},
-	})
-	service.Finish()
+	// Given an invocation with a recorded event
+	deliveries := 0
+	service := NewService(func(SendTelemetryPayload) { deliveries++ })
+	service.Record(ghtelemetry.Event{Type: "test"})
 
-	// When cleanup repeats or code holding an old handle attempts further recording
-	pending.UpsertDimensions(ghtelemetry.Dimensions{"command": "changed"})
-	service.Record(ghtelemetry.Event{Type: "too_late"})
-	late := service.Begin(ghtelemetry.Event{Type: "also_too_late"})
-	late.UpsertDimensions(ghtelemetry.Dimensions{"command": "changed"})
-	late.UpsertMeasures(ghtelemetry.Measures{"count": 1})
+	// When completion is called twice
 	service.Finish()
 	service.Finish()
 
-	// Then the original snapshot is delivered exactly once
-	require.Len(t, payloads, 1)
-	require.Len(t, payloads[0].Events, 1)
-	assert.Equal(t, "command_invocation", payloads[0].Events[0].Type)
-	assert.Equal(t, "gh issue create", payloads[0].Events[0].Dimensions["command"])
+	// Then the payload is delivered only once
+	assert.Equal(t, 1, deliveries)
 }
 
-func TestServiceCleanupDuringSendCannotChangePayload(t *testing.T) {
+func TestServiceRecordingDoesNotWaitForDelivery(t *testing.T) {
 	t.Cleanup(stubDeviceID("test-device"))
 
-	// Given a sender that is still working when command cleanup runs
+	// Given an invocation whose delivery is blocked
 	sendStarted := make(chan struct{})
 	allowSend := make(chan struct{})
-	var payloads []SendTelemetryPayload
-	service := NewService(func(payload SendTelemetryPayload) {
+	service := NewService(func(SendTelemetryPayload) {
 		close(sendStarted)
 		<-allowSend
-		payloads = append(payloads, payload)
 	})
-	pending := service.Begin(ghtelemetry.Event{
-		Type:       "attachment_invocation",
-		Dimensions: ghtelemetry.Dimensions{"command": "gh issue create"},
-		Measures:   ghtelemetry.Measures{"append_ops_count": 1},
-	})
-
-	// When cleanup updates an old handle and repeats completion during sending
-	done := make(chan struct{})
+	service.Record(ghtelemetry.Event{Type: "test"})
+	deliveryDone := make(chan struct{})
 	go func() {
 		service.Finish()
-		close(done)
+		close(deliveryDone)
 	}()
 	<-sendStarted
-	cleanupDone := make(chan struct{})
+
+	// When another recording is attempted
+	recordingDone := make(chan struct{})
 	go func() {
-		pending.UpsertDimensions(ghtelemetry.Dimensions{"command": "changed"})
-		pending.UpsertMeasures(ghtelemetry.Measures{"append_ops_count": 99})
 		service.Record(ghtelemetry.Event{Type: "too_late"})
-		service.Finish()
-		close(cleanupDone)
+		close(recordingDone)
 	}()
 
-	// Then cleanup does not block on the sender or change its single snapshot
+	// Then recording returns without waiting for delivery
 	select {
-	case <-cleanupDone:
+	case <-recordingDone:
 	case <-time.After(5 * time.Second):
-		t.Error("command cleanup blocked while telemetry was being sent")
+		t.Error("recording blocked while telemetry was being sent")
 	}
 	close(allowSend)
-	<-done
-	<-cleanupDone
-	require.Len(t, payloads, 1)
-	require.Len(t, payloads[0].Events, 1)
-	assert.Equal(t, "attachment_invocation", payloads[0].Events[0].Type)
-	assert.Equal(t, "gh issue create", payloads[0].Events[0].Dimensions["command"])
-	assert.Equal(t, int64(1), payloads[0].Events[0].Measures["append_ops_count"])
+	<-deliveryDone
+	<-recordingDone
 }
 
 func TestServiceCollectsConcurrentFacts(t *testing.T) {

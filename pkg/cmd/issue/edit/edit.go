@@ -212,7 +212,7 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 				opts.Editable.IssueType.Edited = true
 			}
 
-			opts.AttachEvent = attachments.Begin(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err

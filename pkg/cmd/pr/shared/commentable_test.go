@@ -446,7 +446,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			// Given a pending event when operation counts are under test
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
-				opts.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
+				opts.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
 			}
 
 			host := tt.host
@@ -490,8 +490,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			err := CommentableRun(&opts)
 			if tt.wantOperations != nil {
 				// Then telemetry retains completed operations, including partial results
-				attachmentRecorder.Finish()
-				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(tt.attach), *tt.wantOperations)
 			}
 
 			if tt.wantErr != "" {

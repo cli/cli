@@ -165,7 +165,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				return err
 			}
 
-			opts.AttachEvent = attachments.Begin(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err

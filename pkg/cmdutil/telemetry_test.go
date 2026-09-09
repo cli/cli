@@ -30,16 +30,16 @@ func TestRecordTelemetry(t *testing.T) {
 		cmd.SetArgs([]string{"--web"})
 		cmdutil.RecordTelemetry(cmd, recorder)
 
-		// When Cobra rejects its arguments and the invocation finishes
+		// When Cobra rejects its arguments
 		_, err := cmd.ExecuteC()
-		recorder.Finish()
 
 		// Then the failure is preserved and the command is still recorded
 		require.EqualError(t, err, "accepts 1 arg(s), received 0")
-		require.Len(t, recorder.Events, 1)
-		assert.Equal(t, "command_invocation", recorder.Events[0].Type)
-		assert.Equal(t, "list", recorder.Events[0].Dimensions["command"])
-		assert.Equal(t, "web", recorder.Events[0].Dimensions["flags"])
+		events := recorder.Events()
+		require.Len(t, events, 1)
+		assert.Equal(t, "command_invocation", events[0].Type)
+		assert.Equal(t, "list", events[0].Dimensions["command"])
+		assert.Equal(t, "web", events[0].Dimensions["flags"])
 	})
 
 	tests := []struct {
@@ -78,18 +78,18 @@ func TestRecordTelemetry(t *testing.T) {
 			root.SetArgs(append([]string{"pr", "list"}, tt.args...))
 			cmdutil.RecordTelemetry(cmd, recorder)
 
-			// When Cobra executes the command and the invocation finishes
+			// When Cobra executes the command
 			_, err := root.ExecuteC()
-			recorder.Finish()
 
 			// Then only the command path and explicitly supplied flag names are recorded
 			require.NoError(t, err)
-			require.Len(t, recorder.Events, 1)
-			assert.Equal(t, "command_invocation", recorder.Events[0].Type)
+			events := recorder.Events()
+			require.Len(t, events, 1)
+			assert.Equal(t, "command_invocation", events[0].Type)
 			assert.Equal(t, ghtelemetry.Dimensions{
 				"command": "gh pr list",
 				"flags":   tt.flags,
-			}, recorder.Events[0].Dimensions)
+			}, events[0].Dimensions)
 		})
 	}
 
@@ -109,14 +109,13 @@ func TestRecordTelemetry(t *testing.T) {
 		cmd.SetArgs([]string{})
 		cmdutil.RecordTelemetry(cmd, recorder)
 
-		// When Cobra executes the command and the invocation finishes
+		// When Cobra executes the command
 		_, err := cmd.ExecuteC()
-		recorder.Finish()
 
 		// Then its original behavior is retained without telemetry
 		require.NoError(t, err)
 		assert.Equal(t, "command output\n", output.String())
-		assert.Empty(t, recorder.Events)
+		assert.Empty(t, recorder.Events())
 	})
 
 	t.Run("records flags parsed during RunE even when execution fails", func(t *testing.T) {
@@ -142,16 +141,16 @@ func TestRecordTelemetry(t *testing.T) {
 		cmd.SetArgs([]string{"--remove"})
 		cmdutil.RecordTelemetry(cmd, recorder)
 
-		// When Cobra executes the command and the invocation finishes
+		// When Cobra executes the command
 		_, err := cmd.ExecuteC()
-		recorder.Finish()
 
 		// Then the error is preserved and the late-parsed flag is recorded
 		require.ErrorIs(t, err, expectedErr)
-		require.Len(t, recorder.Events, 1)
-		assert.Equal(t, "command_invocation", recorder.Events[0].Type)
-		assert.Equal(t, "copilot", recorder.Events[0].Dimensions["command"])
-		assert.Equal(t, "remove", recorder.Events[0].Dimensions["flags"])
+		events := recorder.Events()
+		require.Len(t, events, 1)
+		assert.Equal(t, "command_invocation", events[0].Type)
+		assert.Equal(t, "copilot", events[0].Dimensions["command"])
+		assert.Equal(t, "remove", events[0].Dimensions["flags"])
 	})
 
 	t.Run("records commands rejected by a parent persistent pre-run", func(t *testing.T) {
@@ -175,16 +174,16 @@ func TestRecordTelemetry(t *testing.T) {
 		root.SetArgs([]string{"list", "--web"})
 		cmdutil.RecordTelemetry(cmd, recorder)
 
-		// When Cobra rejects the command and the invocation finishes
+		// When Cobra rejects the command
 		_, err := root.ExecuteC()
-		recorder.Finish()
 
 		// Then the parent error is preserved and the attempted command is recorded
 		require.ErrorIs(t, err, expectedErr)
-		require.Len(t, recorder.Events, 1)
-		assert.Equal(t, "command_invocation", recorder.Events[0].Type)
-		assert.Equal(t, "gh list", recorder.Events[0].Dimensions["command"])
-		assert.Equal(t, "web", recorder.Events[0].Dimensions["flags"])
+		events := recorder.Events()
+		require.Len(t, events, 1)
+		assert.Equal(t, "command_invocation", events[0].Type)
+		assert.Equal(t, "gh list", events[0].Dimensions["command"])
+		assert.Equal(t, "web", events[0].Dimensions["flags"])
 	})
 
 	t.Run("records commands rejected by their pre-run", func(t *testing.T) {
@@ -203,15 +202,15 @@ func TestRecordTelemetry(t *testing.T) {
 		cmd.SetArgs([]string{})
 		cmdutil.RecordTelemetry(cmd, recorder)
 
-		// When Cobra rejects the command and the invocation finishes
+		// When Cobra rejects the command
 		_, err := cmd.ExecuteC()
-		recorder.Finish()
 
 		// Then the validation error is preserved and the attempted command is recorded
 		require.ErrorIs(t, err, expectedErr)
-		require.Len(t, recorder.Events, 1)
-		assert.Equal(t, "command_invocation", recorder.Events[0].Type)
-		assert.Equal(t, "list", recorder.Events[0].Dimensions["command"])
+		events := recorder.Events()
+		require.Len(t, events, 1)
+		assert.Equal(t, "command_invocation", events[0].Type)
+		assert.Equal(t, "list", events[0].Dimensions["command"])
 	})
 
 	t.Run("skips commands with telemetry disabled", func(t *testing.T) {
@@ -227,13 +226,12 @@ func TestRecordTelemetry(t *testing.T) {
 		cmdutil.DisableTelemetry(cmd)
 		cmdutil.RecordTelemetry(cmd, recorder)
 
-		// When Cobra executes the command and the invocation finishes
+		// When Cobra executes the command
 		_, err := cmd.ExecuteC()
-		recorder.Finish()
 
 		// Then the command succeeds without recording telemetry
 		require.NoError(t, err)
-		assert.Empty(t, recorder.Events, "telemetry should not be recorded for disabled commands")
+		assert.Empty(t, recorder.Events(), "telemetry should not be recorded for disabled commands")
 	})
 }
 
@@ -257,13 +255,13 @@ func TestRecordTelemetryForSubcommands(t *testing.T) {
 	root.SetArgs([]string{"pr", "list"})
 	cmdutil.RecordTelemetryForSubcommands(root, recorder)
 
-	// When Cobra executes a nested command and the invocation finishes
+	// When Cobra executes a nested command
 	_, err := root.ExecuteC()
-	recorder.Finish()
 
 	// Then only the invoked descendant is recorded
 	require.NoError(t, err)
-	require.Len(t, recorder.Events, 1)
-	assert.Equal(t, "command_invocation", recorder.Events[0].Type)
-	assert.Equal(t, "gh pr list", recorder.Events[0].Dimensions["command"])
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	assert.Equal(t, "command_invocation", events[0].Type)
+	assert.Equal(t, "gh pr list", events[0].Dimensions["command"])
 }
