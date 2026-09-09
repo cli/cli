@@ -1,29 +1,26 @@
+
 # Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+fixture-repo shared REPO
+env ISSUE_PREFIX=${SCRIPT_NAME}-${RANDOM_STRING}
 
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
-
-# Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
-
-cd $SCRIPT_NAME-$RANDOM_STRING
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create a parent, a sub-issue, a blocker, and a blocked target
-exec gh issue create --title 'parent' --body ''
+exec gh issue create --title $ISSUE_PREFIX-parent --body ''
 stdout2env PARENT_URL
 
-exec gh issue create --title 'sub' --body ''
+exec gh issue create --title $ISSUE_PREFIX-sub --body ''
 stdout2env SUB_URL
 
-exec gh issue create --title 'blocker' --body ''
+exec gh issue create --title $ISSUE_PREFIX-blocker --body ''
 stdout2env BLOCKER_URL
 
-exec gh issue create --title 'blocked' --body ''
+exec gh issue create --title $ISSUE_PREFIX-blocked --body ''
 stdout2env BLOCKED_URL
 
 # Create the main issue wired up to all four
-exec gh issue create --title 'main' --body '' --type 'Bug' --parent $PARENT_URL --blocked-by $BLOCKER_URL --blocking $BLOCKED_URL
+exec gh issue create --title $ISSUE_PREFIX-main --body '' --type 'Bug' --parent $PARENT_URL --blocked-by $BLOCKER_URL --blocking $BLOCKED_URL
 stdout2env MAIN_URL
 
 # Attach the sub-issue

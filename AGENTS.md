@@ -60,7 +60,7 @@ contributors. They carry repository conventions, not optional suggestions.
 | Command wiring, flags, prompts, help, or output | [Command development](docs/command-development.md) |
 | Tests, fixtures, or generated test doubles | [Testing](docs/testing.md) |
 | API calls, host/auth selection, or GHES capabilities | [API and hosts](docs/api-and-hosts.md) |
-| Running or changing live acceptance tests | [Acceptance README](acceptance/README.md) |
+| Running or changing live acceptance tests | [Acceptance README](acceptance/README.md) and [writing-acceptance-tests skill](.github/skills/writing-acceptance-tests/SKILL.md) |
 | Finding source files | [Project layout](docs/project-layout.md) |
 | Toolchain or environment setup | [CONTRIBUTING](.github/CONTRIBUTING.md#building-the-project), [go.mod](go.mod), and the [Copilot setup workflow](.github/workflows/copilot-setup-steps.yml) where applicable |
 

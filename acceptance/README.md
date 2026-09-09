@@ -24,6 +24,12 @@ The token to use for authenticating with the `GH_ACCEPTANCE_HOST`. This must alr
 
 It's recommended to create and use a Legacy PAT for this; Fine-Grained PATs do not offer all the necessary privileges required. You can use an OAuth token provided via `gh auth login --web` and can provide it to the acceptance tests via `GH_ACCEPTANCE_TOKEN=$(gh auth token --hostname <host>)` but this can be a bit confusing and annoying if you `gh auth login` again without `-s` and lose the required scopes.
 
+Managed fixture repositories reduce repository creation by sharing state where
+tests can safely coexist.
+
+Acceptance test groups are discovered from the directories under `testdata`, so
+adding a group does not require updating the test harness.
+
 ---
 
 A full example invocation can be found below:
@@ -32,11 +38,18 @@ A full example invocation can be found below:
 GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance ./acceptance
 ```
 
-While writing a new test, it can be useful to target that specific script by providing the `GH_ACCEPTANCE_SCRIPT` env var in combination with the `-run` flag, for example:
+While writing a new test, target the smallest live surface that can reproduce
+the behavior. Provide one or more comma-separated script names with
+`GH_ACCEPTANCE_SCRIPT`, use `-run` to select their group, and use `-count=1` to
+bypass Go's test cache:
 
 ```
-GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -run ^TestPullRequests$ ./acceptance
+GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -count=1 -run '^TestAcceptance$/^pr$' ./acceptance
 ```
+
+Start with one script for a deterministic failure. If concurrency is part of
+the failure, select only the scripts that exercise the contended resource and
+repeat that focused set before widening to the complete group or suite.
 
 #### Code Coverage
 
@@ -61,9 +74,104 @@ The following custom environment variables are made available to the scripts:
  * `HOME`: Set to the initial working directory. Required for `git` operations
  * `GH_CONFIG_DIR`: Set to the initial working directory. Required for `gh` operations
 
+#### Script Metadata
+
+Every script must declare exactly one repository fixture mode:
+
+```txtar
+fixture-repo shared REPO
+fixture-repo isolated REPO
+fixture-repo none
+```
+
+`shared` reuses one initialized private repository across all opting-in scripts
+in the test process. Shared scripts must tolerate concurrent and accumulated
+state: use unique resource names, paginate and filter list operations, capture
+resource IDs instead of selecting the first or latest result, and avoid
+repository-global or default-branch mutations. When scripts create the same
+tree from the same parent, include the script's `$RANDOM_STRING` in the commit
+contents or message; branch names do not affect commit IDs.
+
+`isolated` creates an initialized private repository exclusively for the script.
+Use it when clean state, repository-global mutation, or multiple coordinated Git
+ref updates are required. Consolidate related operations into one isolated
+script when they can share that repository sequentially.
+
+`none` creates no managed repository. Use it when no repository is needed or
+when a test needs multiple repositories, public visibility, special creation
+options, or direct coverage of repository lifecycle commands. In that mode, the
+script owns creation and cleanup.
+
+Scripts share token-wide API rate limits. Count requests across the whole test
+process and combine compatible live assertions. Keep coverage for a narrowly
+limited endpoint in one script so concurrent scripts cannot burst the limit.
+For Code Search's 10 requests/minute bucket, use at most five HTTP requests in
+the entire acceptance process even when they run sequentially. This leaves room
+for pagination, retries, and other token activity. Keep representative live
+coverage and use unit tests for remaining variants.
+
+Tests that cancel workflow runs should use a self-contained, deliberately
+long-running job so it cannot finish before the cancellation request, plus a
+short job timeout to bound a failed cancellation. Wait for the run to become
+`in_progress` before canceling, but do not wait for GitHub to finish processing
+an accepted cancellation request.
+
+After pushing a new workflow file, use `wait-for-workflow` instead of a fixed
+sleep before invoking or inspecting it. Use `wait-for-run` to allow up to one
+minute for a triggered run to appear. After `gh workflow run`, the helper uses
+the run URL returned by GitHub.com or a compatible GitHub Enterprise Server and
+only polls when no URL is available. If that deadline expires, the helper logs
+the run filters, local and remote refs, workflow files, recent runs, commit check
+suites, and an Actions API request ID before the repository is cleaned up.
+
 #### Custom Commands
 
 The following custom commands are defined within [`acceptance_test.go`](./acceptance_test.go) to help with writing tests:
+
+- `fixture-repo`: select the script's repository fixture mode. For `shared` and
+  `isolated`, the final argument names the environment variable that receives
+  the repository's bare name.
+
+  ```txtar
+  fixture-repo shared REPO
+  exec gh issue create --repo $ORG/$REPO --title $SCRIPT_NAME-$RANDOM_STRING --body Body
+  ```
+
+- `cleanup-repo`: idempotently delete an unmanaged repository during deferred
+  cleanup. Use this when a lifecycle test may have already deleted or renamed
+  the repository.
+
+  ```txtar
+  defer cleanup-repo $SCRIPT_NAME-$RANDOM_STRING
+  ```
+
+- `wait-for-workflow`: poll until GitHub registers a pushed workflow definition.
+
+  ```txtar
+  wait-for-workflow 'Test Workflow Name'
+  exec gh workflow run 'Test Workflow Name'
+  ```
+
+- `wait-for-repository-ready`: poll until an initialized repository's default
+  branch commit is available. Use it before repository-global operations that
+  can conflict with asynchronous repository initialization. Repository rename
+  is a narrow exception: GitHub can retain its creation-operation lock after
+  the commit becomes readable, so keep the `gh repo rename` command inline and
+  allow a 10-second stabilization delay after this check.
+
+  ```txtar
+  wait-for-repository-ready $ORG/$REPO
+  ```
+
+- `wait-for-run-status`: poll a registered workflow run until it reaches the
+  requested status. Use this before operations such as cancellation that can
+  race with run startup.
+
+  ```txtar
+  wait-for-run RUN_ID
+  wait-for-run-status $RUN_ID in_progress
+  exec gh run cancel $RUN_ID
+  ```
 
 - `defer`: register a command to run after the testscript completes
 
@@ -103,6 +211,14 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
   stdout2env PR_URL
   ```
 
+- `wait-for-run`: poll for a workflow run until it registers, then set an
+  environment variable to its database ID. Pass `gh run list` filter flags after
+  the variable name.
+
+  ```txtar
+  wait-for-run RUN_ID --branch $WORKFLOW_BRANCH --event push
+  ```
+
 - `jq-assert`: evaluate a jq expression on a JSON environment variable and assert the result matches a regexp
 
   ```txtar
@@ -136,8 +252,9 @@ When tests fail they fail like this:
 
 ```
 ➜ go test -tags=acceptance ./acceptance
---- FAIL: TestPullRequests (0.00s)
-    --- FAIL: TestPullRequests/pr-merge (11.07s)
+--- FAIL: TestAcceptance (0.00s)
+    --- FAIL: TestAcceptance/pr (0.00s)
+        --- FAIL: TestAcceptance/pr/pr-merge (11.07s)
         testscript.go:584: WORK=/private/var/folders/45/sdnm1hp10nj1s9q57dp3bc5h0000gn/T/go-test-script2778137936/script-pr-merge
             # Use gh as a credential helper (0.693s)
             # Create a repository with a file so it has a default branch (1.155s)

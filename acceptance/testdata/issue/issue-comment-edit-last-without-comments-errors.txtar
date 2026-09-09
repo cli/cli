@@ -1,18 +1,15 @@
+
 # Setup environment variables used for testscript
-env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
 
 # Create a repository with a file so it has a default branch
-exec gh repo create ${ORG}/${REPO} --add-readme --private
+fixture-repo shared REPO
+env ISSUE_TITLE=${SCRIPT_NAME}-${RANDOM_STRING}
 
-# Defer repo cleanup
-defer gh repo delete --yes ${ORG}/${REPO}
-
-# Clone the repo
-exec gh repo clone ${ORG}/${REPO}
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create an issue in the repo
-cd ${REPO}
-exec gh issue create --title 'Feature Request' --body 'Feature Body'
+exec gh issue create --title $ISSUE_TITLE --body 'Feature Body'
 stdout2env ISSUE_URL
 
 # Comment on the issue

@@ -1,3 +1,6 @@
+
+fixture-repo none
+
 # We aren't logged in at the moment, but GH_TOKEN will override the
 # need to login. We are going to clear GH_TOKEN first to ensure no
 # overrides are happening

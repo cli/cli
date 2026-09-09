@@ -1,4 +1,7 @@
+
 skip 'it modifies the user''s personal GitHub account SSH keys'
+
+fixture-repo none
 
 # scopes admin:ssh_signing_key,admin:public_key
 

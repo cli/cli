@@ -1,25 +1,23 @@
+
 # Setup useful env vars
-env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
 
 # Create a repository
-exec gh repo create ${ORG}/${REPO} --private
-
-# Defer repo cleanup
-defer gh repo delete --yes ${ORG}/${REPO}
+fixture-repo shared REPO
+env LABEL_NAME=acceptance-test-${RANDOM_STRING}
 
 # Set the GH_REPO env var to reduce redundant flags
 env GH_REPO=${ORG}/${REPO}
 
 # Create a custom label
-exec gh label create 'acceptance-test' --description 'First Description'
+exec gh label create $LABEL_NAME --description 'First Description'
 
 # List the labels and check our custom label is there
-exec gh label list
-stdout 'acceptance-test\tFirst Description'
+exec gh label list --limit 1000
+stdout $LABEL_NAME'\tFirst Description'
 
 # Edit the label
-exec gh label edit 'acceptance-test' --description 'Edited Description'
+exec gh label edit $LABEL_NAME --description 'Edited Description'
 
 # List the labels and check our custom label has been updated
-exec gh label list
-stdout 'acceptance-test\tEdited Description'
+exec gh label list --limit 1000
+stdout $LABEL_NAME'\tEdited Description'

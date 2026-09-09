@@ -1,5 +1,8 @@
+
 # Skip if Bash is not available given script extension
 [!exec:bash] skip
+
+fixture-repo none
 
 # Setup environment variables used for testscript
 env EXT_NAME=${SCRIPT_NAME}-${RANDOM_STRING}
