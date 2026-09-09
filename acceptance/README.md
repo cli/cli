@@ -158,6 +158,14 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
   wait-for-repository-ready $ORG/$REPO
   ```
 
+- `rename-repo`: rename a repository, retrying only while GitHub reports that a
+  conflicting repository operation is still in progress. Use it after
+  `wait-for-repository-ready` for repositories created with an initial commit.
+
+  ```txtar
+  rename-repo $ORG/$REPO $NEW_NAME
+  ```
+
 - `wait-for-run-status`: poll a registered workflow run until it reaches the
   requested status. Use this before operations such as cancellation that can
   race with run startup.

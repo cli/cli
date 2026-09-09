@@ -47,6 +47,8 @@ const (
 	workflowRunStatusPollInterval = time.Second
 	repositoryReadyPollAttempts   = 31
 	repositoryReadyPollInterval   = time.Second
+	repositoryRenamePollAttempts  = 31
+	repositoryRenamePollInterval  = time.Second
 )
 
 var errWorkflowRunRegistrationTimeout = errors.New("workflow run did not register within 60 seconds")
@@ -173,6 +175,26 @@ func waitForRepositoryReady(check func() (bool, error), sleep func(time.Duration
 		}
 	}
 	return errors.New("repository did not finish initializing within 30 seconds")
+}
+
+func retryRepositoryRename(rename func() (string, error), sleep func(time.Duration)) error {
+	var conflictErr error
+	for attempt := 0; attempt < repositoryRenamePollAttempts; attempt++ {
+		stderr, err := rename()
+		if err == nil {
+			return nil
+		}
+		if !strings.Contains(stderr, "HTTP 422") ||
+			!strings.Contains(stderr, "A conflicting repository operation is still in progress") {
+			return err
+		}
+		conflictErr = fmt.Errorf("%s: %w", strings.TrimSpace(stderr), err)
+
+		if attempt < repositoryRenamePollAttempts-1 {
+			sleep(repositoryRenamePollInterval)
+		}
+	}
+	return fmt.Errorf("repository rename remained blocked by another operation for 30 seconds: %w", conflictErr)
 }
 
 func waitForWorkflowRunStatus(view func() (string, error), expected string, sleep func(time.Duration)) error {
@@ -443,6 +465,65 @@ func TestWaitForRepositoryReadyReturnsUnexpectedError(t *testing.T) {
 
 	// Then the unexpected failure is returned instead of retried
 	require.EqualError(t, err, "checking repository")
+}
+
+func TestRetryRepositoryRenameRetriesConflictingOperation(t *testing.T) {
+	// Given a repository whose initialization operation is still settling
+	var attempts int
+	var sleeps []time.Duration
+	rename := func() (string, error) {
+		attempts++
+		if attempts < 3 {
+			return "HTTP 422: Validation Failed\nname A conflicting repository operation is still in progress", errors.New("exit status 1")
+		}
+		return "", nil
+	}
+
+	// When renaming the repository
+	err := retryRepositoryRename(rename, func(duration time.Duration) {
+		sleeps = append(sleeps, duration)
+	})
+
+	// Then only the known asynchronous conflict is retried
+	require.NoError(t, err)
+	assert.Equal(t, 3, attempts)
+	assert.Equal(t, []time.Duration{repositoryRenamePollInterval, repositoryRenamePollInterval}, sleeps)
+}
+
+func TestRetryRepositoryRenameReturnsUnrelatedError(t *testing.T) {
+	// Given a rename that fails validation for another reason
+	renameErr := errors.New("exit status 1")
+	var sleeps int
+
+	// When renaming the repository
+	err := retryRepositoryRename(func() (string, error) {
+		return "HTTP 422: Validation Failed\nname already exists", renameErr
+	}, func(time.Duration) {
+		sleeps++
+	})
+
+	// Then the error is returned without retrying
+	require.ErrorIs(t, err, renameErr)
+	assert.Zero(t, sleeps)
+}
+
+func TestRetryRepositoryRenameTimesOut(t *testing.T) {
+	// Given a repository operation that remains in progress
+	var attempts int
+	var sleeps int
+
+	// When renaming the repository
+	err := retryRepositoryRename(func() (string, error) {
+		attempts++
+		return "HTTP 422: Validation Failed\nname A conflicting repository operation is still in progress", errors.New("exit status 1")
+	}, func(time.Duration) {
+		sleeps++
+	})
+
+	// Then the retry remains bounded and reports the classified conflict
+	require.EqualError(t, err, "repository rename remained blocked by another operation for 30 seconds: HTTP 422: Validation Failed\nname A conflicting repository operation is still in progress: exit status 1")
+	assert.Equal(t, repositoryRenamePollAttempts, attempts)
+	assert.Equal(t, repositoryRenamePollAttempts-1, sleeps)
 }
 
 func TestWaitForWorkflowRunStatus(t *testing.T) {
@@ -931,6 +1012,20 @@ func sharedCmds(tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManag
 					return false, err
 				}
 				return true, nil
+			}, time.Sleep)
+			ts.Check(err)
+		},
+		"rename-repo": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! rename-repo")
+			}
+			if len(args) != 2 {
+				ts.Fatalf("usage: rename-repo OWNER/REPO NEW-NAME")
+			}
+
+			err := retryRepositoryRename(func() (string, error) {
+				err := ts.Exec("gh", "repo", "rename", args[1], "--repo="+args[0], "--yes")
+				return ts.ReadFile("stderr"), err
 			}, time.Sleep)
 			ts.Check(err)
 		},
