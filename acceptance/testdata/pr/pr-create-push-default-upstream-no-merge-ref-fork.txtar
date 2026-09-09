@@ -1,3 +1,4 @@
+# requires-user-capability: true
 
 skip 'it creates a fork owned by the user running the test'
 skip 'this never worked, but could be fixed if we fixed show-refs'
