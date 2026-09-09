@@ -25,16 +25,17 @@
 //
 //	// Every reasonable cancellation possible belongs here.
 //
-//	md, uploaded, err := uploader.UploadAndAttach(ctx, md, attachmentArgs)
-//	if uploaded == 0 {
+//	md, result, err := uploader.UploadAndAttach(ctx, md, attachmentArgs)
+//	if result.Uploaded == 0 {
 //		return err
 //	}
 //
 //	// Write md to target, then report err alongside whatever the write
 //	// returned.
 //
-// UploadAndAttach reports how many assets were successfully uploaded. The
-// caller must write the markdown when that count is above zero, including after
-// a partial failure, because what did upload must be referenced by something.
-// At zero nothing is stranded and nothing is written.
+// UploadAndAttach reports how many assets were successfully uploaded and how
+// they changed the markdown. The caller must write the markdown when Uploaded
+// is above zero, including after a partial failure, because what did upload must
+// be referenced by something. At zero nothing is stranded and nothing is
+// written.
 package attachments

@@ -449,7 +449,7 @@ func TestNewCmdApiTelemetry(t *testing.T) {
 
 	_, err := cmd.ExecuteC()
 	require.NoError(t, err)
-	recorder.Flush()
+	recorder.Finish()
 
 	assert.Empty(t, payload.Events)
 }

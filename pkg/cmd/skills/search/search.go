@@ -65,7 +65,7 @@ type SearchOptions struct {
 }
 
 // NewCmdSearch creates the "skills search" command.
-func NewCmdSearch(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*SearchOptions) error) *cobra.Command {
+func NewCmdSearch(f *cmdutil.Factory, telemetry ghtelemetry.EventRecorder, runF func(*SearchOptions) error) *cobra.Command {
 	opts := &SearchOptions{
 		IO:             f.IOStreams,
 		Telemetry:      telemetry,

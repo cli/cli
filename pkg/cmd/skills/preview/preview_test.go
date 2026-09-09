@@ -84,7 +84,7 @@ func TestNewCmdPreview(t *testing.T) {
 			}
 
 			var gotOpts *PreviewOptions
-			cmd := NewCmdPreview(f, &telemetry.NoOpService{}, func(opts *PreviewOptions) error {
+			cmd := NewCmdPreview(f, &telemetry.EventRecorderSpy{}, func(opts *PreviewOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -976,8 +976,9 @@ func TestPreviewRun_InteractiveTelemetryCapturesSelectedSkillName(t *testing.T) 
 	require.NoError(t, err)
 
 	// Verify the telemetry event captured the interactively-selected skill name, not empty string
-	require.Len(t, recorder.Events, 1)
-	event := recorder.Events[0]
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	event := events[0]
 	assert.Equal(t, "skill_preview", event.Type)
 	assert.Equal(t, "beta", event.Dimensions["skill_name"], "telemetry should capture the selected skill name, not the empty opts.SkillName")
 }
@@ -1086,8 +1087,9 @@ func TestPreviewRun_TelemetryVisibility(t *testing.T) {
 			err := previewRun(opts)
 			require.NoError(t, err)
 
-			require.Len(t, recorder.Events, 1)
-			event := recorder.Events[0]
+			events := recorder.Events()
+			require.Len(t, events, 1)
+			event := events[0]
 			assert.Equal(t, "skill_preview", event.Type)
 
 			// skill_host_type is always recorded (categorized, no raw hostname for enterprise/tenancy).

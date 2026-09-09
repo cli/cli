@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*prShared.CommentableOptions) error) *cobra.Command {
+func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*prShared.CommentableOptions) error) *cobra.Command {
 	opts := &prShared.CommentableOptions{
 		IO:                        f.IOStreams,
 		HttpClient:                f.HttpClient,
@@ -59,8 +59,6 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 		`),
 		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			opts.AttachFlag.RecordTelemetry(cmd.CommandPath(), telemetry)
-
 			opts.RetrieveCommentable = func() (prShared.Commentable, ghrepo.Interface, error) {
 				// TODO wm: more testing
 				issueNumber, parsedBaseRepo, err := shared.ParseIssueFromArg(args[0])
@@ -101,7 +99,7 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 
 				return issue, baseRepo, nil
 			}
-			if err := prShared.CommentablePreRun(cmd, opts); err != nil {
+			if err := prShared.CommentablePreRun(cmd, opts, telemetry); err != nil {
 				return err
 			}
 

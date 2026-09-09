@@ -61,7 +61,7 @@ func (ae *AuthError) Error() string {
 	return ae.err.Error()
 }
 
-func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, version, buildDate string) (*cobra.Command, error) {
+func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, version, buildDate string) (*cobra.Command, error) {
 	io := f.IOStreams
 	cfg, err := f.Config()
 	if err != nil {

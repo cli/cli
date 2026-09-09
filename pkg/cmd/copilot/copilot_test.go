@@ -115,7 +115,7 @@ func TestNewCmdCopilot(t *testing.T) {
 			assert.NoError(t, err)
 
 			var gotOpts *CopilotOptions
-			spy := &telemetry.CommandRecorderSpy{}
+			spy := &telemetry.InvocationRecorderSpy{}
 			cmd := NewCmdCopilot(f, spy, func(opts *CopilotOptions) error {
 				gotOpts = opts
 				return nil

@@ -128,7 +128,8 @@ func Main() exitCode {
 			return exitError
 		}
 	}
-	defer telemetryService.Flush()
+	// Complete and send events even when returning before Cobra reaches RunE.
+	defer telemetryService.Finish()
 
 	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
 

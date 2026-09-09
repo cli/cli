@@ -58,11 +58,12 @@ type CreateOptions struct {
 	BlockedBy   []string
 	Blocking    []string
 
-	AttachFlag *attachments.Flag
-	Assets     []attachments.UserAsset
+	AttachFlag  *attachments.Flag
+	AttachEvent *attachments.TelemetryEvent
+	Assets      []attachments.UserAsset
 }
 
-func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*CreateOptions) error) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
@@ -121,8 +122,6 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, run
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.AttachFlag.RecordTelemetry(cmd.CommandPath(), telemetry)
-
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 			opts.HasRepoOverride = cmd.Flags().Changed("repo")
@@ -166,6 +165,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, run
 				return err
 			}
 
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -466,8 +466,9 @@ func createRun(opts *CreateOptions) (err error) {
 		// not exist, so no issue is created. Once anything has uploaded the
 		// issue is created and the failures are reported.
 		if uploader != nil {
-			body, uploaded, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.Assets)
-			if uploadErr != nil && uploaded == 0 {
+			body, uploadResult, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.Assets)
+			opts.AttachEvent.RecordOperations(uploadResult)
+			if uploadErr != nil && uploadResult.Uploaded == 0 {
 				err = uploadErr
 				return
 			}

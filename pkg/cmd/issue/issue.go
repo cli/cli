@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdIssue(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder) *cobra.Command {
+func NewCmdIssue(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "issue <command>",
 		Short: "Manage issues",

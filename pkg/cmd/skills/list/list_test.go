@@ -88,7 +88,7 @@ func TestNewCmdList(t *testing.T) {
 			}
 
 			var gotOpts *ListOptions
-			cmd := NewCmdList(f, &telemetry.NoOpService{}, func(opts *ListOptions) error {
+			cmd := NewCmdList(f, &telemetry.EventRecorderSpy{}, func(opts *ListOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -123,18 +123,18 @@ func TestListRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		setup      func(t *testing.T, repoDir, homeDir string)
-		opts       func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions
+		opts       func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions
 		wantStdout string
 		wantJSON   string
 		wantErr    string
-		verify     func(t *testing.T, stdout string, spy *telemetry.CommandRecorderSpy)
+		verify     func(t *testing.T, stdout string, spy *telemetry.EventRecorderSpy)
 	}{
 		{
 			name: "lists project skill for selected shared agent",
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				writeSkill(t, repoDir, ".agents/skills/git-commit", remoteSkillFrontmatter("git-commit", "skills/git-commit", "refs/tags/v1.0.0", ""))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -144,9 +144,10 @@ func TestListRun(t *testing.T) {
 				}
 			},
 			wantStdout: "git-commit\tcursor\tproject\tmonalisa/skills-repo\n",
-			verify: func(t *testing.T, stdout string, spy *telemetry.CommandRecorderSpy) {
-				require.Len(t, spy.Events, 1)
-				event := spy.Events[0]
+			verify: func(t *testing.T, stdout string, spy *telemetry.EventRecorderSpy) {
+				events := spy.Events()
+				require.Len(t, events, 1)
+				event := events[0]
 				assert.Equal(t, "skill_list", event.Type)
 				assert.Equal(t, "cursor", event.Dimensions["agent_hosts"])
 				assert.Equal(t, "project", event.Dimensions["scope"])
@@ -158,7 +159,7 @@ func TestListRun(t *testing.T) {
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				writeSkill(t, homeDir, ".copilot/skills/code-review", remoteSkillFrontmatter("code-review", "skills/code-review", "refs/tags/v2.0.0", "v2.0.0"))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				exporter := cmdutil.NewJSONExporter()
 				exporter.SetFields([]string{"skillName", "agentHosts", "scope", "sourceURL", "version", "pinned", "path"})
 				return &ListOptions{
@@ -181,8 +182,8 @@ func TestListRun(t *testing.T) {
 					"path": %q
 				}
 			]`, filepath.Join("HOME", ".copilot", "skills", "code-review")),
-			verify: func(t *testing.T, stdout string, spy *telemetry.CommandRecorderSpy) {
-				assert.Equal(t, "json", spy.Events[0].Dimensions["format"])
+			verify: func(t *testing.T, stdout string, spy *telemetry.EventRecorderSpy) {
+				assert.Equal(t, "json", spy.Events()[0].Dimensions["format"])
 			},
 		},
 		{
@@ -190,7 +191,7 @@ func TestListRun(t *testing.T) {
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				writeSkill(t, homeDir, ".copilot/skills/tenant-skill", remoteSkillFrontmatterForRepo("tenant-skill", "https://octocorp.ghe.com/monalisa/skills-repo", "skills/tenant-skill", "refs/heads/main", ""))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				exporter := cmdutil.NewJSONExporter()
 				exporter.SetFields([]string{"skillName", "sourceURL", "path"})
 				return &ListOptions{
@@ -223,7 +224,7 @@ func TestListRun(t *testing.T) {
 					Body
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -235,7 +236,7 @@ func TestListRun(t *testing.T) {
 		},
 		{
 			name: "custom directory must exist",
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -263,7 +264,7 @@ func TestListRun(t *testing.T) {
 					Body
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -278,7 +279,7 @@ func TestListRun(t *testing.T) {
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				writeSkill(t, repoDir, "skills/openclaw-helper", remoteSkillFrontmatter("openclaw-helper", "skills/openclaw-helper", "refs/heads/main", ""))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -294,7 +295,7 @@ func TestListRun(t *testing.T) {
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				writeSkill(t, repoDir, ".agents/skills/xlsx-pro", remoteSkillFrontmatter("xlsx-pro", "skills/bob/xlsx-pro", "refs/heads/main", ""))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -310,7 +311,7 @@ func TestListRun(t *testing.T) {
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				writeSkill(t, repoDir, ".agents/skills/foo", remoteSkillFrontmatter("foo", "plugins/myplugin/skills/foo", "refs/heads/main", ""))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -333,7 +334,7 @@ func TestListRun(t *testing.T) {
 					Body
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				exporter := cmdutil.NewJSONExporter()
 				exporter.SetFields([]string{"skillName", "sourceURL", "version", "pinned"})
 				return &ListOptions{
@@ -356,7 +357,7 @@ func TestListRun(t *testing.T) {
 		},
 		{
 			name: "no installed skills returns no results",
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -369,7 +370,7 @@ func TestListRun(t *testing.T) {
 		},
 		{
 			name: "no installed skills with json returns empty array",
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				exporter := cmdutil.NewJSONExporter()
 				exporter.SetFields([]string{"skillName"})
 				return &ListOptions{
@@ -393,7 +394,7 @@ func TestListRun(t *testing.T) {
 				require.NoError(t, os.WriteFile(target, []byte("---\nname: linked\nmetadata:\n  local-path: /src/linked\n---\nBody\n"), 0o644))
 				require.NoError(t, os.Symlink(target, filepath.Join(skillDir, "SKILL.md")))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -413,7 +414,7 @@ func TestListRun(t *testing.T) {
 				require.NoError(t, os.MkdirAll(targetDir, 0o755))
 				require.NoError(t, os.Symlink(targetDir, filepath.Join(skillDir, "SKILL.md")))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -437,7 +438,7 @@ func TestListRun(t *testing.T) {
 					Body
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.EventRecorderSpy) *ListOptions {
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -462,7 +463,7 @@ func TestListRun(t *testing.T) {
 
 			ios, _, stdout, _ := iostreams.Test()
 			ios.SetStdoutTTY(false)
-			spy := &telemetry.CommandRecorderSpy{}
+			spy := &telemetry.EventRecorderSpy{}
 			opts := tt.opts(ios, repoDir, homeDir, spy)
 
 			err := listRun(opts)

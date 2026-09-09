@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*shared.CommentableOptions) error) *cobra.Command {
+func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*shared.CommentableOptions) error) *cobra.Command {
 	opts := &shared.CommentableOptions{
 		IO:                        f.IOStreams,
 		HttpClient:                f.HttpClient,
@@ -57,8 +57,6 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 		`),
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			opts.AttachFlag.RecordTelemetry(cmd.CommandPath(), telemetry)
-
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
 				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
@@ -80,7 +78,7 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 					Fields:   fields,
 				})
 			}
-			if err := shared.CommentablePreRun(cmd, opts); err != nil {
+			if err := shared.CommentablePreRun(cmd, opts, telemetry); err != nil {
 				return err
 			}
 

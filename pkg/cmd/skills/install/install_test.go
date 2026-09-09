@@ -157,7 +157,7 @@ func TestNewCmdInstall(t *testing.T) {
 			}
 
 			var gotOpts *InstallOptions
-			cmd := NewCmdInstall(f, &telemetry.NoOpService{}, func(opts *InstallOptions) error {
+			cmd := NewCmdInstall(f, &telemetry.EventRecorderSpy{}, func(opts *InstallOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -198,7 +198,7 @@ func TestNewCmdInstall(t *testing.T) {
 	t.Run("command metadata", func(t *testing.T) {
 		ios, _, _, _ := iostreams.Test()
 		f := &cmdutil.Factory{IOStreams: ios, Prompter: &prompter.PrompterMock{}, GitClient: &git.Client{}}
-		cmd := NewCmdInstall(f, &telemetry.NoOpService{}, nil)
+		cmd := NewCmdInstall(f, &telemetry.EventRecorderSpy{}, nil)
 
 		assert.Equal(t, "install <repository> [<skill[@version]>] [flags]", cmd.Use)
 		assert.NotEmpty(t, cmd.Short)
@@ -2624,8 +2624,9 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Len(t, recorder.Events, 1)
-			event := recorder.Events[0]
+			events := recorder.Events()
+			require.Len(t, events, 1)
+			event := events[0]
 			assert.Equal(t, "skill_install", event.Type)
 			assert.NotEmpty(t, event.Dimensions["agent_hosts"], "agent_hosts should always be present")
 
@@ -2720,8 +2721,9 @@ func TestInstallRun_TelemetryMultipleSkills(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Len(t, recorder.Events, 1)
-	event := recorder.Events[0]
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	event := events[0]
 	assert.Equal(t, "skill_install", event.Type)
 	assert.Equal(t, "public", event.Dimensions["repo_visibility"])
 
