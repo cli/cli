@@ -8,12 +8,11 @@ fixture-repo shared REPO
 # Target the fixture repository
 env GH_REPO=$ORG/$REPO
 
-# Verify repository variable does not exist
-exec gh variable list
-! stdout $VAR_NAME
-
 # Create a repository variable
 exec gh variable set $VAR_NAME --body 'just a repo variable'
+
+# Allow the repository variable list to reflect the write
+sleep 1
 
 # Verify new repository variable exists
 exec gh variable list

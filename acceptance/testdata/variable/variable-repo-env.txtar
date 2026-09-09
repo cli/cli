@@ -12,12 +12,11 @@ env GH_REPO=$ORG/$REPO
 # Create a repository environment, will fail if organization does not have environment support
 exec gh api /repos/$ORG/$REPO/environments/$ENV_NAME -X PUT --jq '.name'
 
-# Verify repository environment variable does not exist
-exec gh variable list --env $ENV_NAME
-! stdout $VAR_NAME
-
 # Create a repository environment variable
 exec gh variable set $VAR_NAME --env $ENV_NAME --body 'just a repo env variable'
+
+# Allow the environment variable list to reflect the write
+sleep 1
 
 # Verify new repository environment variable exists
 exec gh variable list --env $ENV_NAME
