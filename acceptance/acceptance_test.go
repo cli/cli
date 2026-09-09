@@ -49,6 +49,8 @@ const (
 	repositoryReadyPollInterval   = time.Second
 )
 
+var errWorkflowRunRegistrationTimeout = errors.New("workflow run did not register within 60 seconds")
+
 func waitForWorkflowRun(list func() (string, error), sleep func(time.Duration)) (string, error) {
 	for attempt := 0; attempt < workflowPollAttempts; attempt++ {
 		runID, err := list()
@@ -62,7 +64,81 @@ func waitForWorkflowRun(list func() (string, error), sleep func(time.Duration)) 
 			sleep(workflowPollInterval)
 		}
 	}
-	return "", errors.New("workflow run did not register within 60 seconds")
+	return "", errWorkflowRunRegistrationTimeout
+}
+
+type workflowRunDiagnosticExecutor func(name string, args ...string) (stdout string, stderr string, err error)
+
+func collectWorkflowRunDiagnostics(exec workflowRunDiagnosticExecutor, runListArgs []string) string {
+	var diagnostics strings.Builder
+	fmt.Fprintf(&diagnostics, "run filters: %s\n", strings.Join(runListArgs, " "))
+	run := func(label string, name string, args ...string) string {
+		stdout, stderr, err := exec(name, args...)
+		fmt.Fprintf(&diagnostics, "%s:\n", label)
+		if output := strings.TrimSpace(stdout); output != "" {
+			fmt.Fprintln(&diagnostics, output)
+		}
+		if output := strings.TrimSpace(stderr); output != "" {
+			fmt.Fprintf(&diagnostics, "stderr:\n%s\n", output)
+		}
+		if err != nil {
+			fmt.Fprintf(&diagnostics, "error: %v\n", err)
+		}
+		return strings.TrimSpace(stdout)
+	}
+
+	run("repository", "git", "remote", "get-url", "origin")
+	commit := run("local commit", "git", "rev-parse", "HEAD")
+	branch := commandFlagValue(runListArgs, "--branch", "-b")
+	event := commandFlagValue(runListArgs, "--event", "-e")
+
+	if branch != "" {
+		run("remote branch", "git", "ls-remote", "origin", "refs/heads/"+branch)
+	}
+	run("workflow files", "git", "ls-tree", "-r", "--name-only", "HEAD", ".github/workflows")
+	run("recent workflow runs", "gh", "run", "list", "--limit", "20", "--json", "databaseId,workflowName,event,headBranch,headSha,status,createdAt")
+
+	if commit != "" {
+		run(
+			"commit check suites",
+			"gh", "api", "repos/{owner}/{repo}/commits/"+commit+"/check-suites",
+			"--jq", `.check_suites[] | {id, status, conclusion, app: .app.slug, head_sha}`,
+		)
+	}
+
+	apiArgs := []string{
+		"api", "repos/{owner}/{repo}/actions/runs",
+		"--method", "GET",
+		"-f", "per_page=1",
+		"--include",
+		"--silent",
+	}
+	if branch != "" {
+		apiArgs = append(apiArgs, "-f", "branch="+branch)
+	}
+	if event != "" {
+		apiArgs = append(apiArgs, "-f", "event="+event)
+	}
+	if commit != "" {
+		apiArgs = append(apiArgs, "-f", "head_sha="+commit)
+	}
+	run("Actions API response headers", "gh", apiArgs...)
+
+	return strings.TrimSpace(diagnostics.String())
+}
+
+func commandFlagValue(args []string, names ...string) string {
+	for i, arg := range args {
+		for _, name := range names {
+			if arg == name && i+1 < len(args) {
+				return args[i+1]
+			}
+			if value, ok := strings.CutPrefix(arg, name+"="); ok {
+				return value
+			}
+		}
+	}
+	return ""
 }
 
 func waitForWorkflow(list func() ([]string, error), expected string, sleep func(time.Duration)) error {
@@ -211,6 +287,69 @@ func TestWaitForWorkflowRun(t *testing.T) {
 		assert.Equal(t, 13, attempts)
 		assert.Equal(t, 12, sleeps)
 	})
+}
+
+func TestCollectWorkflowRunDiagnostics(t *testing.T) {
+	// Given diagnostic commands that expose each Actions registration boundary
+	var actionsAPIArgs []string
+	exec := func(name string, args ...string) (string, string, error) {
+		switch {
+		case name == "git" && args[0] == "rev-parse":
+			return "abc123\n", "", nil
+		case name == "git" && args[0] == "remote":
+			return "https://github.com/example/repo.git\n", "", nil
+		case name == "git" && args[0] == "ls-remote":
+			return "abc123\trefs/heads/feature\n", "", nil
+		case name == "git" && args[0] == "ls-tree":
+			return ".github/workflows/workflow.yml\n", "", nil
+		case name == "gh" && args[0] == "run":
+			return `[{"databaseId":42,"headBranch":"other"}]`, "", nil
+		case name == "gh" && args[1] == "repos/{owner}/{repo}/commits/abc123/check-suites":
+			return `{"id":7,"app":"actions"}`, "", nil
+		case name == "gh" && args[1] == "repos/{owner}/{repo}/actions/runs":
+			actionsAPIArgs = append([]string(nil), args...)
+			return "x-github-request-id: REQUEST-ID\n", "", nil
+		default:
+			return "", "", fmt.Errorf("unexpected command: %s %s", name, strings.Join(args, " "))
+		}
+	}
+
+	// When collecting diagnostics for a run that did not register
+	diagnostics := collectWorkflowRunDiagnostics(exec, []string{"--branch", "feature", "--event", "push"})
+
+	// Then the snapshot includes evidence from every boundary and the request ID
+	assert.Contains(t, diagnostics, "run filters: --branch feature --event push")
+	assert.Contains(t, diagnostics, "repository:\nhttps://github.com/example/repo.git")
+	assert.Contains(t, diagnostics, "local commit:\nabc123")
+	assert.Contains(t, diagnostics, "remote branch:\nabc123\trefs/heads/feature")
+	assert.Contains(t, diagnostics, "workflow files:\n.github/workflows/workflow.yml")
+	assert.Contains(t, diagnostics, "recent workflow runs:\n"+`[{"databaseId":42,"headBranch":"other"}]`)
+	assert.Contains(t, diagnostics, "commit check suites:\n"+`{"id":7,"app":"actions"}`)
+	assert.Contains(t, diagnostics, "Actions API response headers:\nx-github-request-id: REQUEST-ID")
+	assert.Equal(t, []string{
+		"api", "repos/{owner}/{repo}/actions/runs",
+		"--method", "GET",
+		"-f", "per_page=1",
+		"--include",
+		"--silent",
+		"-f", "branch=feature",
+		"-f", "event=push",
+		"-f", "head_sha=abc123",
+	}, actionsAPIArgs)
+}
+
+func TestCollectWorkflowRunDiagnosticsIncludesCommandFailures(t *testing.T) {
+	// Given diagnostic commands that fail while gathering supplementary evidence
+	exec := func(string, ...string) (string, string, error) {
+		return "", "service unavailable", errors.New("exit status 1")
+	}
+
+	// When collecting diagnostics for a run that did not register
+	diagnostics := collectWorkflowRunDiagnostics(exec, nil)
+
+	// Then each failure is reported without replacing the original timeout
+	assert.Contains(t, diagnostics, "stderr:\nservice unavailable")
+	assert.Contains(t, diagnostics, "error: exit status 1")
 }
 
 func TestWaitForWorkflow(t *testing.T) {
@@ -745,6 +884,13 @@ func sharedCmds(tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManag
 				}
 				return strings.TrimSpace(ts.ReadFile("stdout")), nil
 			}, time.Sleep)
+			if errors.Is(err, errWorkflowRunRegistrationTimeout) {
+				diagnostics := collectWorkflowRunDiagnostics(func(name string, args ...string) (string, string, error) {
+					err := ts.Exec(name, args...)
+					return ts.ReadFile("stdout"), ts.ReadFile("stderr"), err
+				}, args[1:])
+				ts.Logf("workflow run registration diagnostics:\n%s", diagnostics)
+			}
 			ts.Check(err)
 			ts.Setenv(args[0], runID)
 		},

@@ -78,6 +78,10 @@ Use bounded condition-based waits for asynchronously registered resources.
 Fixed sleeps are both slower when registration is fast and unreliable when it
 is slow. Use `wait-for-workflow` after pushing a new workflow definition, then
 use `wait-for-run` before watching or inspecting a triggered workflow run.
+On timeout, `wait-for-run` captures the pushed commit and remote ref, workflow
+files, recent unfiltered runs, commit check suites, and an Actions API request
+ID. Use that evidence to distinguish event ingestion, run indexing, filtering,
+and push/setup failures before changing fixture isolation or timeout budgets.
 Cancellation tests must use a self-contained workflow with a deliberately long
 step so the run cannot finish before the cancellation request, plus a short job
 timeout so a failed cancellation cannot run for the full step. After

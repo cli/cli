@@ -118,7 +118,9 @@ an accepted cancellation request.
 
 After pushing a new workflow file, use `wait-for-workflow` instead of a fixed
 sleep before invoking or inspecting it. Use `wait-for-run` to allow up to one
-minute for a triggered run to appear.
+minute for a triggered run to appear. If that deadline expires, the helper logs
+the run filters, local and remote refs, workflow files, recent runs, commit check
+suites, and an Actions API request ID before the repository is cleaned up.
 
 #### Custom Commands
 
