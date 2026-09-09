@@ -931,6 +931,9 @@ func interactiveRepoNameAndOwner(client *http.Client, hostname string, prompter 
 	if err != nil {
 		return "", "", err
 	}
+	if strings.TrimSpace(name) == "" {
+		return "", "", errors.New("repository name cannot be blank")
+	}
 
 	name, owner, err := splitNameAndOwner(name)
 	if err != nil {
