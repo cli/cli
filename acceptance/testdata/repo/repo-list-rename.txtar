@@ -14,8 +14,11 @@ wait-for-repository-ready $ORG/$SCRIPT_NAME-$RANDOM_STRING
 exec gh repo list $ORG --json=name --jq='.[].name'
 stdout $SCRIPT_NAME-$RANDOM_STRING
 
+# GitHub can retain the repository creation lock after the default branch becomes readable.
+sleep 10
+
 # Rename the repo
-rename-repo $ORG/$SCRIPT_NAME-$RANDOM_STRING $SCRIPT_NAME-$RANDOM_STRING-renamed
+exec gh repo rename $SCRIPT_NAME-$RANDOM_STRING-renamed --repo=$ORG/$SCRIPT_NAME-$RANDOM_STRING --yes
 
 # List the repos and check for the renamed repo
 exec gh repo list $ORG --json=name --jq='.[].name'

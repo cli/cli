@@ -32,9 +32,10 @@ absent repository as success.
 
 Repositories created with an initial commit can remain busy after `gh repo
 create` returns. Before renaming one, use `wait-for-repository-ready
-$ORG/$REPO` to wait for its default-branch commit, then use `rename-repo
-$ORG/$REPO NEW-NAME` to retry only the exact asynchronous-operation conflict.
-Do not use a fixed sleep or a generic retry.
+$ORG/$REPO` to wait for its default-branch commit. GitHub can retain the
+repository creation lock after that commit becomes readable, so keep the
+`gh repo rename` command inline and allow a 10-second stabilization delay
+between this readiness check and that command.
 
 ## Shared fixture contract
 

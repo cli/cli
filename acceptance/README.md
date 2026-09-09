@@ -152,18 +152,13 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
 
 - `wait-for-repository-ready`: poll until an initialized repository's default
   branch commit is available. Use it before repository-global operations that
-  can conflict with asynchronous repository initialization.
+  can conflict with asynchronous repository initialization. Repository rename
+  is a narrow exception: GitHub can retain its creation-operation lock after
+  the commit becomes readable, so keep the `gh repo rename` command inline and
+  allow a 10-second stabilization delay after this check.
 
   ```txtar
   wait-for-repository-ready $ORG/$REPO
-  ```
-
-- `rename-repo`: rename a repository, retrying only while GitHub reports that a
-  conflicting repository operation is still in progress. Use it after
-  `wait-for-repository-ready` for repositories created with an initial commit.
-
-  ```txtar
-  rename-repo $ORG/$REPO $NEW_NAME
   ```
 
 - `wait-for-run-status`: poll a registered workflow run until it reaches the
