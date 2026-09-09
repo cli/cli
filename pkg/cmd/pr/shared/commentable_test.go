@@ -61,8 +61,6 @@ func TestCommentablePreRun(t *testing.T) {
 		wantBodyProvided  bool
 	}{
 		{
-			// A change that separates counting the input from resolving it
-			// fails here, since this row asserts both from one run.
 			name:           "attach alone is a body input and is resolved",
 			input:          "--attach ./shot.png",
 			wantInputType:  InputTypeInline,
@@ -212,10 +210,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantBody:             "see below\n\n![shot](https://example.com/1)",
 			wantStdout:           "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 			wantUploads:          1,
-			wantOperations: &attachments.UploadResult{
-				Uploaded:         1,
-				AppendOperations: 1,
-			},
+			wantOperations:       &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name:                 "creating writes what uploaded when one upload fails",
@@ -226,15 +221,12 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 				{Name: "a.png", Status: 201, Body: `{"url":"https://example.com/1"}`},
 				{Name: "b.png", Status: 404, Body: `{"message":"Not Found"}`},
 			},
-			wantQuery:   `mutation CommentCreate\b`,
-			wantBody:    "see below\n\n![a](https://example.com/1)",
-			wantStdout:  "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
-			wantErr:     "could not upload ./b.png: attaching files requires write access to the repository",
-			wantUploads: 2,
-			wantOperations: &attachments.UploadResult{
-				Uploaded:         1,
-				AppendOperations: 1,
-			},
+			wantQuery:      `mutation CommentCreate\b`,
+			wantBody:       "see below\n\n![a](https://example.com/1)",
+			wantStdout:     "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
+			wantErr:        "could not upload ./b.png: attaching files requires write access to the repository",
+			wantUploads:    2,
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name:                 "creating writes nothing when every upload fails",
@@ -272,14 +264,11 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 				{Name: "a.png", Status: 201, Body: `{"url":"https://example.com/1"}`},
 				{Name: "b.png", Status: 404, Body: `{"message":"Not Found"}`},
 			},
-			wantQuery:   `mutation CommentCreate\b`,
-			writeFails:  true,
-			wantErr:     "could not upload ./b.png: attaching files requires write access to the repository\nGraphQL: the write failed",
-			wantUploads: 2,
-			wantOperations: &attachments.UploadResult{
-				Uploaded:         1,
-				AppendOperations: 1,
-			},
+			wantQuery:      `mutation CommentCreate\b`,
+			writeFails:     true,
+			wantErr:        "could not upload ./b.png: attaching files requires write access to the repository\nGraphQL: the write failed",
+			wantUploads:    2,
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "editing keeps the comment when no body flag was given",
@@ -454,7 +443,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			if len(tt.attach) > 0 {
 				opts.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
-			// Given a pending event for the supplied attachments
+			// Given a pending event when operation counts are under test
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
 				opts.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
@@ -497,10 +486,10 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 				}, ghrepo.NewWithHost("OWNER", "REPO", host), nil
 			}
 
-			// When writing the comment processes the attachments
+			// When comment creation or editing runs
 			err := CommentableRun(&opts)
-			// Then telemetry retains completed operations, including partial results
 			if tt.wantOperations != nil {
+				// Then telemetry retains completed operations, including partial results
 				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
 			}

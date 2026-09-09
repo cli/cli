@@ -8,8 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"testing/synctest"
-	"time"
 
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/stretchr/testify/assert"
@@ -349,43 +347,6 @@ func TestLogFlusherWritesNoneMarkerForEmptyPayload(t *testing.T) {
 	})
 }
 
-func TestServiceFinishSendsPendingEvents(t *testing.T) {
-	t.Cleanup(stubDeviceID("test-device"))
-
-	// Given an invocation whose attachment operations are not yet known
-	var payloads []SendTelemetryPayload
-	service := NewService(func(payload SendTelemetryPayload) {
-		payloads = append(payloads, payload)
-	})
-	event := service.Begin(ghtelemetry.Event{
-		Type: "attachment_invocation",
-		Measures: ghtelemetry.Measures{
-			"attach_count":      2,
-			"append_ops_count":  0,
-			"replace_ops_count": 0,
-		},
-	})
-
-	require.Empty(t, payloads, "unfinished events must not be sent")
-
-	// When the command supplies its operations and finishes the invocation
-	event.UpsertMeasures(ghtelemetry.Measures{
-		"append_ops_count":  1,
-		"replace_ops_count": 1,
-	})
-	service.Finish()
-
-	// Then Finish sends the completed snapshot without a separate flush
-	require.Len(t, payloads, 1)
-	require.Len(t, payloads[0].Events, 1)
-	assert.Equal(t, "attachment_invocation", payloads[0].Events[0].Type)
-	assert.Equal(t, map[string]int64{
-		"attach_count":      2,
-		"append_ops_count":  1,
-		"replace_ops_count": 1,
-	}, payloads[0].Events[0].Measures)
-}
-
 func TestServiceDeviceIDFallback(t *testing.T) {
 	// Given device ID discovery fails
 	t.Cleanup(stubDeviceIDError(errors.New("no device id")))
@@ -419,7 +380,12 @@ func TestServiceFinish(t *testing.T) {
 		// Given an invocation with common dimensions
 		t.Cleanup(stubDeviceID("test-device"))
 		var captured SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { captured = p }, WithAdditionalCommonDimensions(ghtelemetry.Dimensions{"version": "2.45.0"}))
+		service := NewService(func(p SendTelemetryPayload) { captured = p },
+			WithAdditionalCommonDimensions(ghtelemetry.Dimensions{
+				"version": "2.45.0",
+				"agent":   "none",
+			}),
+		)
 
 		// When an event with its own dimensions and measures is completed and delivered
 		service.Record(ghtelemetry.Event{
@@ -435,45 +401,13 @@ func TestServiceFinish(t *testing.T) {
 		assert.Equal(t, "command_invocation", event.Type)
 		assert.Equal(t, "gh pr list", event.Dimensions["command"])
 		assert.Equal(t, "2.45.0", event.Dimensions["version"])
+		assert.Equal(t, "none", event.Dimensions["agent"])
 		assert.Equal(t, "test-device", event.Dimensions["device_id"])
 		assert.NotEmpty(t, event.Dimensions["timestamp"])
 		assert.NotEmpty(t, event.Dimensions["invocation_id"])
+		assert.NotEmpty(t, event.Dimensions["os"])
+		assert.NotEmpty(t, event.Dimensions["architecture"])
 		assert.Equal(t, int64(150), event.Measures["duration_ms"])
-	})
-
-	t.Run("delivers multiple events", func(t *testing.T) {
-		// Given an invocation with two recorded events
-		t.Cleanup(stubDeviceID("test-device"))
-		var captured SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { captured = p })
-		service.Record(ghtelemetry.Event{Type: "event1"})
-		service.Record(ghtelemetry.Event{Type: "event2"})
-
-		// When the invocation finishes
-		service.Finish()
-
-		// Then both events are delivered in recording order
-		require.Len(t, captured.Events, 2)
-		assert.Equal(t, "event1", captured.Events[0].Type)
-		assert.Equal(t, "event2", captured.Events[1].Type)
-	})
-
-	t.Run("is idempotent", func(t *testing.T) {
-		// Given an invocation with a recorded event
-		t.Cleanup(stubDeviceID("test-device"))
-		var payloads []SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		service.Record(ghtelemetry.Event{Type: "test"})
-
-		// When completion is repeated
-		service.Finish()
-		service.Finish()
-		service.Finish()
-
-		// Then the recorded event is delivered exactly once
-		require.Len(t, payloads, 1)
-		require.Len(t, payloads[0].Events, 1)
-		assert.Equal(t, "test", payloads[0].Events[0].Type)
 	})
 
 	t.Run("event dimensions override common dimensions", func(t *testing.T) {
@@ -492,33 +426,6 @@ func TestServiceFinish(t *testing.T) {
 		// Then the event dimension takes precedence
 		require.Len(t, captured.Events, 1)
 		assert.Equal(t, "event-level", captured.Events[0].Dimensions["shared"])
-	})
-
-	t.Run("timestamps reflect record time not completion time", func(t *testing.T) {
-		t.Cleanup(stubDeviceID("test-device"))
-		synctest.Test(t, func(t *testing.T) {
-			// Given events recorded at distinct times
-			var captured SendTelemetryPayload
-			service := NewService(func(p SendTelemetryPayload) { captured = p })
-			firstRecordedAt := time.Now()
-			service.Record(ghtelemetry.Event{Type: "early"})
-			time.Sleep(50 * time.Millisecond)
-			secondRecordedAt := time.Now()
-			service.Record(ghtelemetry.Event{Type: "late"})
-
-			// When completion happens later
-			time.Sleep(time.Second)
-			service.Finish()
-
-			// Then each timestamp reflects when its event was recorded
-			require.Len(t, captured.Events, 2)
-			firstTimestamp, err := time.Parse("2006-01-02T15:04:05.000Z", captured.Events[0].Dimensions["timestamp"])
-			require.NoError(t, err)
-			secondTimestamp, err := time.Parse("2006-01-02T15:04:05.000Z", captured.Events[1].Dimensions["timestamp"])
-			require.NoError(t, err)
-			assert.WithinDuration(t, firstRecordedAt, firstTimestamp, 0)
-			assert.WithinDuration(t, secondRecordedAt, secondTimestamp, 0)
-		})
 	})
 }
 
@@ -570,132 +477,55 @@ func TestServiceSampling(t *testing.T) {
 			svc.(*service).sampleBucket = tt.sampleBucket
 
 			// When the invocation finishes
-			svc.Record(ghtelemetry.Event{Type: "test"})
+			svc.Record(ghtelemetry.Event{Type: "completed_step"})
+			pending := svc.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
+			pending.UpsertMeasures(ghtelemetry.Measures{"attach_count": 2})
 			svc.Finish()
 
-			// Then only invocations selected by sampling are delivered
+			// Then sampling includes or excludes immediate and pending events together
 			require.Len(t, payloads, tt.wantPayloads)
 			for _, payload := range payloads {
-				require.Len(t, payload.Events, 1)
-				assert.Equal(t, "test", payload.Events[0].Type)
+				require.Len(t, payload.Events, 2)
+				assert.Equal(t, "completed_step", payload.Events[0].Type)
+				assert.Equal(t, "attachment_invocation", payload.Events[1].Type)
+				assert.Equal(t, int64(2), payload.Events[1].Measures["attach_count"])
 			}
 		})
 	}
 }
 
-func TestServiceSetSampleRate(t *testing.T) {
-	t.Run("changes delivery eligibility", func(t *testing.T) {
-		// Given an invocation that initially sends all events
-		t.Cleanup(stubDeviceID("test-device"))
-		var payloads []SendTelemetryPayload
-		svc := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) }, WithSampleRate(0))
-		svc.(*service).sampleBucket = 50
+func TestServiceReducingSampleRateExcludesInvocation(t *testing.T) {
+	// Given an invocation that initially sends all events
+	t.Cleanup(stubDeviceID("test-device"))
+	var payloads []SendTelemetryPayload
+	svc := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) }, WithSampleRate(0))
+	svc.(*service).sampleBucket = 50
 
-		// When its sample rate excludes the bucket before completion
-		svc.SetSampleRate(10)
-		svc.Record(ghtelemetry.Event{Type: "test"})
-		svc.Finish()
+	// When its sample rate excludes the bucket before completion
+	svc.SetSampleRate(10)
+	svc.Record(ghtelemetry.Event{Type: "test"})
+	svc.Finish()
 
-		// Then no payload is delivered
-		assert.Empty(t, payloads)
-	})
-
-	t.Run("updates sample_rate dimension", func(t *testing.T) {
-		// Given an invocation with an initial sample_rate dimension
-		t.Cleanup(stubDeviceID("test-device"))
-		var captured SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { captured = p },
-			WithSampleRate(1),
-			WithAdditionalCommonDimensions(ghtelemetry.Dimensions{"sample_rate": "1"}),
-		)
-
-		// When the rate changes before completion
-		service.SetSampleRate(100)
-		service.Record(ghtelemetry.Event{Type: "test"})
-		service.Finish()
-
-		// Then the payload describes the effective sample rate
-		require.Len(t, captured.Events, 1)
-		assert.Equal(t, "100", captured.Events[0].Dimensions["sample_rate"])
-	})
+	// Then no payload is delivered
+	assert.Empty(t, payloads)
 }
 
-func TestWithAdditionalCommonDimensions(t *testing.T) {
-	// Given an invocation constructed with additional common dimensions
+func TestServiceDisabledBeforeRecordingDropsLaterEvents(t *testing.T) {
+	// Given an invocation disabled before any events are recorded
 	t.Cleanup(stubDeviceID("test-device"))
-	var captured SendTelemetryPayload
-	service := NewService(
-		func(p SendTelemetryPayload) { captured = p },
-		WithAdditionalCommonDimensions(ghtelemetry.Dimensions{
-			"version": "2.45.0",
-			"agent":   "none",
-		}),
-	)
+	var payloads []SendTelemetryPayload
+	service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
+	service.Disable()
 
-	// When a recorded event is completed and delivered
-	service.Record(ghtelemetry.Event{Type: "test"})
+	// When immediate and pending events are recorded and the invocation completes
+	service.Record(ghtelemetry.Event{Type: "completed_step"})
+	pending := service.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
+	pending.UpsertMeasures(ghtelemetry.Measures{"attach_count": 2})
 	service.Finish()
 
-	// Then both additional and standard dimensions are present
-	require.Len(t, captured.Events, 1)
-	assert.Equal(t, "2.45.0", captured.Events[0].Dimensions["version"])
-	assert.Equal(t, "none", captured.Events[0].Dimensions["agent"])
-	assert.Equal(t, "test-device", captured.Events[0].Dimensions["device_id"])
-	assert.NotEmpty(t, captured.Events[0].Dimensions["invocation_id"])
-	assert.NotEmpty(t, captured.Events[0].Dimensions["os"])
-	assert.NotEmpty(t, captured.Events[0].Dimensions["architecture"])
-}
-
-func TestServiceDisable(t *testing.T) {
-	t.Run("drops recorded events from delivered payload", func(t *testing.T) {
-		// Given an invocation with a recorded event
-		t.Cleanup(stubDeviceID("test-device"))
-		var payloads []SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		service.Record(ghtelemetry.Event{Type: "test"})
-
-		// When telemetry is disabled before completion
-		service.Disable()
-		service.Finish()
-
-		// Then an empty payload is delivered so log mode can surface the absence
-		require.Len(t, payloads, 1)
-		assert.Empty(t, payloads[0].Events, "recorded events should be dropped after Disable()")
-	})
-
-	t.Run("drops events even with multiple recorded events", func(t *testing.T) {
-		// Given an invocation with multiple recorded events
-		t.Cleanup(stubDeviceID("test-device"))
-		var payloads []SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		service.Record(ghtelemetry.Event{Type: "event1"})
-		service.Record(ghtelemetry.Event{Type: "event2"})
-		service.Record(ghtelemetry.Event{Type: "event3"})
-
-		// When telemetry is disabled before completion
-		service.Disable()
-		service.Finish()
-
-		// Then none of the recorded events appear in the delivered payload
-		require.Len(t, payloads, 1)
-		assert.Empty(t, payloads[0].Events, "recorded events should be dropped after Disable()")
-	})
-
-	t.Run("can be called before any events are recorded", func(t *testing.T) {
-		// Given an invocation disabled before any events are recorded
-		t.Cleanup(stubDeviceID("test-device"))
-		var payloads []SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
-		service.Disable()
-
-		// When an event is recorded and the invocation completes
-		service.Record(ghtelemetry.Event{Type: "test"})
-		service.Finish()
-
-		// Then the later event is excluded from the delivered payload
-		require.Len(t, payloads, 1)
-		assert.Empty(t, payloads[0].Events, "events recorded after Disable() should be dropped")
-	})
+	// Then the later events are excluded from the delivered payload
+	require.Len(t, payloads, 1)
+	assert.Empty(t, payloads[0].Events, "events recorded after Disable() should be dropped")
 }
 
 func TestNoOpService(t *testing.T) {

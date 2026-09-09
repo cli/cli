@@ -249,6 +249,10 @@ func TestRecordTelemetryForSubcommands(t *testing.T) {
 		RunE: func(cmd *cobra.Command, args []string) error { return nil },
 	}
 	root.AddCommand(parent)
+	root.AddCommand(&cobra.Command{
+		Use:  "version",
+		RunE: func(cmd *cobra.Command, args []string) error { return nil },
+	})
 	parent.AddCommand(child)
 	root.SetArgs([]string{"pr", "list"})
 	cmdutil.RecordTelemetryForSubcommands(root, recorder)

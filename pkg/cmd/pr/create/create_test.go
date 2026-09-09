@@ -337,7 +337,7 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given command inputs and their expected attachment telemetry
+			// Given command inputs and an invocation recorder
 			ios, stdin, stdout, stderr := iostreams.Test()
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
@@ -1789,11 +1789,8 @@ func Test_createRun(t *testing.T) {
 							assert.Equal(t, "before ![the shot](https://github.com/user-attachments/assets/ASSET) after", input["body"])
 						}))
 			},
-			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
-			wantOperations: &attachments.UploadResult{
-				Uploaded:          1,
-				ReplaceOperations: 1,
-			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 
@@ -1887,12 +1884,9 @@ func Test_createRun(t *testing.T) {
 							assert.Equal(t, "my body\n\n![good](https://github.com/user-attachments/assets/ASSET)", input["body"])
 						}))
 			},
-			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
-			wantErr:     "could not upload ./bad.png: attaching files requires write access to the repository",
-			wantOperations: &attachments.UploadResult{
-				Uploaded:         1,
-				AppendOperations: 1,
-			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			wantErr:        "could not upload ./bad.png: attaching files requires write access to the repository",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "the only upload failing creates no pull request",
@@ -1949,7 +1943,8 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.StringResponse(`{"errors":[{"message":"the create failed"}]}`))
 			},
-			wantErr: "could not upload ./bad.png: attaching files requires write access to the repository\npull request create failed: GraphQL: the create failed",
+			wantErr:        "could not upload ./bad.png: attaching files requires write access to the repository\npull request create failed: GraphQL: the create failed",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a permission that cannot upload stops the command before it prompts",
@@ -2063,7 +2058,7 @@ func Test_createRun(t *testing.T) {
 				cleanSetup = tt.setup(&opts, t)
 			}
 			defer cleanSetup()
-			// Given a pending event for the supplied attachments
+			// Given a pending event when operation counts are under test
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
 				opts.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(opts.Assets))
@@ -2076,10 +2071,10 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git status --porcelain`, 0, "")
 			}
 
-			// When pull request creation processes the attachments
+			// When pull request creation runs
 			err := createRun(&opts)
-			// Then telemetry retains completed operations, including partial results
 			if tt.wantOperations != nil {
+				// Then telemetry retains completed operations, including partial results
 				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(opts.Assets), *tt.wantOperations)
 			}

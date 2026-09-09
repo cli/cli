@@ -314,7 +314,7 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given command inputs and their expected attachment telemetry
+			// Given command inputs and an invocation recorder
 			ios, stdin, stdout, stderr := iostreams.Test()
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
@@ -608,13 +608,10 @@ func Test_createRun(t *testing.T) {
 					return "title", "from editor ![shot](./shot.png)", nil
 				},
 			},
-			attach:      []string{"shot.png"},
-			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
-			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
-			wantOperations: &attachments.UploadResult{
-				Uploaded:          1,
-				ReplaceOperations: 1,
-			},
+			attach:         []string{"shot.png"},
+			wantsStdout:    "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr:    "\nCreating issue in OWNER/REPO\n\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name: "editor and template",
@@ -1204,11 +1201,8 @@ func Test_createRun(t *testing.T) {
 							assert.Equal(t, "a body\n\n![first](https://github.com/user-attachments/assets/AAA)", inputs["body"])
 						}))
 			},
-			wantsErr: "could not upload ./second.png: attaching files requires write access to the repository",
-			wantOperations: &attachments.UploadResult{
-				Uploaded:         1,
-				AppendOperations: 1,
-			},
+			wantsErr:       "could not upload ./second.png: attaching files requires write access to the repository",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a create that fails after an upload failed reports both",
@@ -1234,7 +1228,8 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation IssueCreate\b`),
 					httpmock.StringResponse(`{ "errors": [{ "message": "the create failed" }] }`))
 			},
-			wantsErr: "could not upload ./second.png: attaching files requires write access to the repository\nGraphQL: the create failed",
+			wantsErr:       "could not upload ./second.png: attaching files requires write access to the repository\nGraphQL: the create failed",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a body the attachment cannot be written into creates no issue",
@@ -1438,7 +1433,7 @@ func Test_createRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				opts.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
-			// Given a pending event for the supplied attachments
+			// Given a pending event when operation counts are under test
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
 				opts.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
@@ -1451,10 +1446,10 @@ func Test_createRun(t *testing.T) {
 				return config.NewMockConfigFromString(cfg), nil
 			}
 
-			// When issue creation processes the attachments
+			// When issue creation runs
 			err := createRun(opts)
-			// Then telemetry retains completed operations, including partial results
 			if tt.wantOperations != nil {
+				// Then telemetry retains completed operations, including partial results
 				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
 			}

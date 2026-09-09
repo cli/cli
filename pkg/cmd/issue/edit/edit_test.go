@@ -470,7 +470,7 @@ func TestNewCmdEdit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given command inputs and their expected attachment telemetry
+			// Given command inputs and an invocation recorder
 			ios, stdin, _, _ := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
@@ -1403,11 +1403,8 @@ func Test_editRun(t *testing.T) {
 				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
 				mockIssueUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
 			},
-			stdout: "https://github.com/OWNER/REPO/issue/123\n",
-			wantOperations: &attachments.UploadResult{
-				Uploaded:         1,
-				AppendOperations: 1,
-			},
+			stdout:         "https://github.com/OWNER/REPO/issue/123\n",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a body flag replaces the body the attachment is then appended to",
@@ -1562,10 +1559,7 @@ func Test_editRun(t *testing.T) {
 			stdout:          "https://github.com/OWNER/REPO/issue/123\n",
 			wantErr:         true,
 			wantErrContains: []string{"./second.png"},
-			wantOperations: &attachments.UploadResult{
-				Uploaded:         1,
-				AppendOperations: 1,
-			},
+			wantOperations:  &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a sole failed upload does not write the body",
@@ -1779,7 +1773,7 @@ func Test_editRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
-			// Given a pending event for the supplied attachments
+			// Given a pending event when operation counts are under test
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
 				tt.input.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
@@ -1793,10 +1787,10 @@ func Test_editRun(t *testing.T) {
 				return config.NewMockConfigFromString(hostsConfig(hostTokens)), nil
 			}
 
-			// When issue editing processes the attachments
+			// When issue editing runs
 			err := editRun(tt.input)
-			// Then telemetry retains completed operations, including partial results
 			if tt.wantOperations != nil {
+				// Then telemetry retains completed operations, including partial results
 				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
 			}

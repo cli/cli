@@ -16,12 +16,12 @@ func TestServiceCopiesFactsAtTheirRecordingTime(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		// Given a producer that reuses its event and update maps
-		var payload SendTelemetryPayload
-		service := NewService(func(p SendTelemetryPayload) { payload = p })
+		var payloads []SendTelemetryPayload
+		service := NewService(func(p SendTelemetryPayload) { payloads = append(payloads, p) })
 		facts := ghtelemetry.Event{
 			Type:       "command_invocation",
-			Dimensions: ghtelemetry.Dimensions{"command": "gh issue create"},
-			Measures:   ghtelemetry.Measures{"count": 1},
+			Dimensions: ghtelemetry.Dimensions{"command": "gh issue create", "flags": ""},
+			Measures:   ghtelemetry.Measures{"count": 1, "total": 2},
 		}
 		startedAt := time.Now()
 		pending := service.Begin(facts)
@@ -39,18 +39,22 @@ func TestServiceCopiesFactsAtTheirRecordingTime(t *testing.T) {
 		dimensions["flags"] = "unrelated"
 		measures["count"] = 99
 		time.Sleep(time.Second)
+		require.Empty(t, payloads, "recording and updating facts must not send them before Finish")
 		service.Finish()
 
 		// Then event order, original timestamps, and independently owned facts survive
-		require.Len(t, payload.Events, 2)
-		first, second := payload.Events[0], payload.Events[1]
+		require.Len(t, payloads, 1)
+		require.Len(t, payloads[0].Events, 2)
+		first, second := payloads[0].Events[0], payloads[0].Events[1]
 		assert.Equal(t, "command_invocation", first.Type)
 		assert.Equal(t, "gh issue create", first.Dimensions["command"])
 		assert.Equal(t, "attach", first.Dimensions["flags"])
 		assert.Equal(t, int64(2), first.Measures["count"])
+		assert.Equal(t, int64(2), first.Measures["total"])
 		assert.Equal(t, startedAt.UTC().Format("2006-01-02T15:04:05.000Z"), first.Dimensions["timestamp"])
 		assert.Equal(t, "completed_step", second.Type)
 		assert.Equal(t, "gh issue create", second.Dimensions["command"])
+		assert.Empty(t, second.Dimensions["flags"])
 		assert.Equal(t, int64(1), second.Measures["count"])
 		assert.Equal(t, startedAt.Add(time.Second).UTC().Format("2006-01-02T15:04:05.000Z"), second.Dimensions["timestamp"])
 	})
@@ -61,14 +65,19 @@ func TestServicePromotesAllEventsBeforeCompletion(t *testing.T) {
 
 	// Given a command that discovers its full-sampling policy after recording facts
 	var payload SendTelemetryPayload
-	service := NewService(func(p SendTelemetryPayload) { payload = p }, WithSampleRate(1))
-	service.Record(ghtelemetry.Event{Type: "completed_step"})
-	pending := service.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
+	svc := NewService(func(p SendTelemetryPayload) { payload = p },
+		WithSampleRate(1),
+		WithAdditionalCommonDimensions(ghtelemetry.Dimensions{"sample_rate": "1"}),
+	)
+	// Promotion must rescue an invocation that would otherwise be excluded.
+	svc.(*service).sampleBucket = 99
+	svc.Record(ghtelemetry.Event{Type: "completed_step"})
+	pending := svc.Begin(ghtelemetry.Event{Type: "attachment_invocation"})
 
 	// When attachment usage promotes the invocation before it finishes
-	service.SetSampleRate(ghtelemetry.SAMPLE_ALL)
+	svc.SetSampleRate(ghtelemetry.SAMPLE_ALL)
 	pending.UpsertMeasures(ghtelemetry.Measures{"attach_count": 2})
-	service.Finish()
+	svc.Finish()
 
 	// Then immediate and pending events share the promoted sampling policy
 	require.Len(t, payload.Events, 2)

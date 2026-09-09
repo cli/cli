@@ -365,7 +365,7 @@ func TestNewCmdEdit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given command inputs and their expected attachment telemetry
+			// Given command inputs and an invocation recorder
 			ios, stdin, _, _ := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
@@ -1310,11 +1310,8 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockPullRequestUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
 			},
-			stdout: "https://github.com/OWNER/REPO/pull/123\n",
-			wantOperations: &attachments.UploadResult{
-				Uploaded:         1,
-				AppendOperations: 1,
-			},
+			stdout:         "https://github.com/OWNER/REPO/pull/123\n",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "an empty body flag clears the body and leaves the attachment",
@@ -1394,12 +1391,9 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockPullRequestUpdateWithBody(t, reg, "the original body\n\n![a](https://example.com/1)")
 			},
-			stdout:  "https://github.com/OWNER/REPO/pull/123\n",
-			wantErr: "could not upload ./b.png: attaching files requires write access to the repository",
-			wantOperations: &attachments.UploadResult{
-				Uploaded:         1,
-				AppendOperations: 1,
-			},
+			stdout:         "https://github.com/OWNER/REPO/pull/123\n",
+			wantErr:        "could not upload ./b.png: attaching files requires write access to the repository",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a sole failed upload leaves the body alone and still edits the title",
@@ -1703,7 +1697,7 @@ func Test_editRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
-			// Given a pending event for the supplied attachments
+			// Given a pending event when operation counts are under test
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
 				tt.input.AttachEvent = attachments.Begin(attachmentRecorder, "gh test", len(tt.attach))
@@ -1726,10 +1720,10 @@ func Test_editRun(t *testing.T) {
 			var lookupFields []string
 			tt.input.Finder = fieldCapturingFinder{PRFinder: tt.input.Finder, fields: &lookupFields}
 
-			// When pull request editing processes the attachments
+			// When pull request editing runs
 			err := editRun(tt.input)
-			// Then telemetry retains completed operations, including partial results
 			if tt.wantOperations != nil {
+				// Then telemetry retains completed operations, including partial results
 				attachmentRecorder.Finish()
 				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events, len(tt.attach), *tt.wantOperations)
 			}

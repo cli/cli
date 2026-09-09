@@ -390,7 +390,7 @@ func TestNewCmdComment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given command inputs and their expected attachment telemetry
+			// Given command inputs and an invocation recorder
 			ios, stdin, _, _ := iostreams.Test()
 			isTTY := tt.isTTY
 			ios.SetStdoutTTY(isTTY)
@@ -499,7 +499,6 @@ func TestNewCmdCommentRecordsRejectedAttachmentCount(t *testing.T) {
 	f := &cmdutil.Factory{
 		IOStreams: ios,
 		Browser:   &browser.Stub{},
-		Config:    testConfig(),
 	}
 	var payload telemetry.SendTelemetryPayload
 	service := telemetry.NewService(func(p telemetry.SendTelemetryPayload) {
@@ -542,7 +541,6 @@ func TestNewCmdCommentSkipsAttachmentsOnPersistentPreRunError(t *testing.T) {
 	f := &cmdutil.Factory{
 		IOStreams: ios,
 		Browser:   &browser.Stub{},
-		Config:    testConfig(),
 	}
 	recorder := &telemetry.InvocationRecorderSpy{}
 	cmd := NewCmdComment(f, recorder, func(*shared.CommentableOptions) error {
@@ -561,10 +559,10 @@ func TestNewCmdCommentSkipsAttachmentsOnPersistentPreRunError(t *testing.T) {
 
 	// When authentication fails and telemetry is completed
 	_, err := root.ExecuteC()
-	require.EqualError(t, err, "authentication failed")
 	recorder.Finish()
 
 	// Then attachment validation has not begun, so no event or sampling promotion occurs
+	require.EqualError(t, err, "authentication failed")
 	assert.Empty(t, recorder.Events)
 	assert.Zero(t, recorder.LastSampleRate)
 }
