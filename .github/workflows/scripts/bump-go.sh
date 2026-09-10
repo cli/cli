@@ -50,7 +50,9 @@ fi
 REPO="cli/cli"
 MODULE_DIR=$(dirname "$GO_MOD")
 GO_SUM="$MODULE_DIR/go.sum"
-LINT_WORKFLOW="$REPO_ROOT/.github/workflows/lint.yml"
+# Keep this mutable pin outside .github/workflows because the workflow's
+# GITHUB_TOKEN cannot push commits that create or update workflow files.
+LINTER_VERSION_FILE="$REPO_ROOT/.github/golangci-lint-version"
 
 # ---- Discover latest stable Go release --------------------------------------
 if [[ -n "$TARGET_GO_VERSION" ]]; then
@@ -119,13 +121,12 @@ echo "  • running go mod tidy..."
 pushd "$MODULE_DIR" > /dev/null
 go mod tidy
 if ! git -C "$REPO_ROOT" diff --quiet -- "$GO_MOD"; then
-  lint_version_lines=$(grep -Ec '^[[:space:]]+version: v[0-9]+\.[0-9]+\.[0-9]+$' "$LINT_WORKFLOW" || true)
+  lint_version_lines=$(grep -Ec '^v[0-9]+\.[0-9]+\.[0-9]+$' "$LINTER_VERSION_FILE" || true)
   if [[ $lint_version_lines -ne 1 ]]; then
-    echo "Error: expected exactly one pinned golangci-lint version in '$LINT_WORKFLOW'" >&2
+    echo "Error: expected exactly one pinned golangci-lint version in '$LINTER_VERSION_FILE'" >&2
     exit 1
   fi
-  sed -i.bak -E "s/^([[:space:]]+version: )v[0-9]+\.[0-9]+\.[0-9]+$/\1v$LINTER_VERSION/" "$LINT_WORKFLOW"
-  rm -f "$LINT_WORKFLOW.bak"
+  printf 'v%s\n' "$LINTER_VERSION" > "$LINTER_VERSION_FILE"
   echo "  • set golangci-lint → v$LINTER_VERSION"
 else
   echo "  • Go version unchanged; keeping the existing golangci-lint pin"
