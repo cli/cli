@@ -1270,7 +1270,7 @@ func extractScriptName(vars []string) (string, bool) {
 	for _, kv := range vars {
 		if strings.HasPrefix(kv, "WORK=") {
 			v := strings.Split(kv, "=")[1]
-			return strings.CutPrefix(path.Base(v), "script-")
+			return strings.CutPrefix(filepath.Base(v), "script-")
 		}
 	}
 	return "", false
