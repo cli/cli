@@ -59,15 +59,6 @@ ref="${1:-}"
 command="${2:-all}"
 operating_system="${3:-all}"
 
-command_values=()
-while IFS= read -r group; do
-  command_values+=("$group")
-done < <(test_groups)
-if ! contains "$command" "${command_values[@]}"; then
-  echo "invalid command: $command" >&2
-  exit 1
-fi
-
 read -r -a operating_system_values <<<"$operating_systems"
 if ! contains "$operating_system" "${operating_system_values[@]}"; then
   echo "invalid operating system: $operating_system" >&2
@@ -79,6 +70,25 @@ if [[ -z "$ref" ]]; then
   if [[ -z "$ref" ]]; then
     echo "ref is required when HEAD is detached" >&2
     exit 1
+  fi
+fi
+
+active_runs="$(gh run list \
+  --repo "$repository" \
+  --workflow "$workflow" \
+  --limit 100 \
+  --json databaseId,headBranch,status,url \
+  --jq '.[] | select(.status != "completed") | "\(.databaseId)\t\(.status)\t\(.headBranch)\t\(.url)"')"
+if [[ -n "$active_runs" ]]; then
+  echo "warning: acceptance test workflows are already in flight; another run might be rate limited" >&2
+  printf '%s\n' "$active_runs" >&2
+
+  if [[ -t 0 ]]; then
+    read -r -p "Dispatch another acceptance test run? [y/N] " response
+    case "$response" in
+      y | Y | yes | YES | Yes) ;;
+      *) exit 1 ;;
+    esac
   fi
 fi
 

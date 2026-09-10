@@ -29,8 +29,9 @@ The test harness infers whether a token authenticates a user from GitHub's docum
 Users with write access can manually run the acceptance test workflow from a specified branch or tag in `cli/cli`. A run can target Linux, Windows, macOS, or all three, and can run either the complete suite or the tests for one command. The tests use a GitHub App installed for all repositories in the `gh-acceptance-testing` organization. The workflow uses the `gh-acceptance-testing` environment, where the App credentials are stored as the `GH_ACCEPTANCE_TESTING_APP_CLIENT_ID` and `GH_ACCEPTANCE_TESTING_APP_PRIVATE_KEY` secrets. Tests that require user authentication, including account key management and forks owned by a personal account, are excluded from this workflow based on each script's `requires-user-capability` declaration.
 
 Managed fixture repositories reduce repository creation by sharing state where
-tests can safely coexist. Workflow runs are serialized because every job uses
-the same GitHub App installation rate-limit buckets.
+tests can safely coexist. Every job uses the same GitHub App installation
+rate-limit buckets. The dispatch helper warns when another acceptance workflow
+is already in flight and asks interactive users to confirm another run.
 
 After the workflow exists on the default branch, use
 `script/run-acceptance [REF] [COMMAND] [OS]` to dispatch the version of the
