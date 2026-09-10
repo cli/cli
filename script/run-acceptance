@@ -4,7 +4,6 @@ set -euo pipefail
 
 readonly repository="cli/cli"
 readonly workflow="acceptance.yml"
-readonly workflow_ref="trunk"
 readonly operating_systems="all ubuntu-latest windows-latest macos-latest"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly repo_root
@@ -14,8 +13,8 @@ usage() {
   cat <<EOF
 Usage: script/run-acceptance [REF] [COMMAND] [OS]
 
-Dispatch acceptance tests for a branch or commit. REF defaults to the current
-branch. COMMAND and OS default to "all".
+Dispatch acceptance tests using the workflow from a branch or tag. REF defaults
+to the current branch. COMMAND and OS default to "all".
 
 List available command groups:
   script/run-acceptance groups
@@ -85,8 +84,7 @@ fi
 
 gh workflow run "$workflow" \
   --repo "$repository" \
-  --ref "$workflow_ref" \
-  --raw-field "ref=$ref" \
+  --ref "$ref" \
   --raw-field "command=$command" \
   --raw-field "os=$operating_system"
 

@@ -3,11 +3,6 @@ name: Acceptance Tests
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: Branch or commit to test
-        required: true
-        default: trunk
-        type: string
       os:
         description: Operating system to test
         required: true
@@ -27,6 +22,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: acceptance-tests
+  cancel-in-progress: false
+
 jobs:
   acceptance:
     environment: gh-acceptance-testing
@@ -40,7 +39,6 @@ jobs:
       - name: Check out tested revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up Go
