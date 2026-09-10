@@ -8,8 +8,7 @@ description: Use when adding or changing GitHub CLI acceptance tests, txtar scri
 Acceptance tests exercise `gh` against live GitHub resources. Minimize repository
 creation and cloning without allowing concurrent scripts to interfere.
 
-Read `acceptance/README.md` and nearby scripts before editing. Test groups are
-discovered from `acceptance/testdata/<group>/`; do not register them manually.
+Read `acceptance/README.md` and nearby scripts before editing.
 
 ## Declare token capability
 
