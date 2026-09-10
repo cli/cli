@@ -7,6 +7,9 @@ fixture-repo isolated REPO
 exec gh repo view $ORG/$REPO --json=isArchived --jq='.isArchived'
 stdout 'false'
 
+# Wait for asynchronous repository initialization before changing repository-global state
+wait-for-repository-ready $ORG/$REPO
+
 # Archive the repo
 exec gh repo archive $ORG/$REPO --yes
 
