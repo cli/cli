@@ -39,14 +39,10 @@ jobs:
           go mod tidy -diff
           go fix -diff ./...
 
-      - name: Read golangci-lint version
-        id: golangci-lint-version
-        run: echo "version=$(<.github/golangci-lint-version)" >> "$GITHUB_OUTPUT"
-
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: ${{ steps.golangci-lint-version.outputs.version }}
+          version-file: .github/golangci-lint-version
 
       # Verify that license generation succeeds for all release platforms (GOOS/GOARCH).
       # This catches issues like new dependencies with unrecognized licenses before release time.
