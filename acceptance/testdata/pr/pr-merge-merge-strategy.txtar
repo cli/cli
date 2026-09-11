@@ -33,8 +33,12 @@ stdout2env PR_URL
 exec git checkout $BASE_BRANCH
 ! exists file.txt
 
-# Merge the PR
-exec gh pr merge $PR_URL --merge
+# Merge the PR and delete its local and remote branches
+exec git show-ref --verify refs/heads/$BRANCH_NAME
+exec git ls-remote --exit-code origin refs/heads/$BRANCH_NAME
+exec gh pr merge $PR_URL --merge --delete-branch
+! exec git show-ref --verify refs/heads/$BRANCH_NAME
+! exec git ls-remote --exit-code origin refs/heads/$BRANCH_NAME
 
 # Check that the state of the PR is now merged
 exec gh pr view $PR_URL
