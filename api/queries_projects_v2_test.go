@@ -293,9 +293,29 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 		expectOut bool
 	}{
 		{
-			name:      "read scope error",
+			name:      "legacy read scope error",
 			errMsg:    "field requires one of the following scopes: ['read:project']",
 			expectOut: true,
+		},
+		{
+			name:      "wrapped legacy read scope error",
+			errMsg:    "wrapped: field requires one of the following scopes: ['read:project']",
+			expectOut: true,
+		},
+		{
+			name:      "different scope error",
+			errMsg:    "field requires one of the following scopes: ['read:discussion']",
+			expectOut: false,
+		},
+		{
+			name:      "empty scope clause",
+			errMsg:    "field requires one of the following scopes: []",
+			expectOut: false,
+		},
+		{
+			name:      "malformed scope clause",
+			errMsg:    "field requires one of the following scopes: ['read:project'",
+			expectOut: false,
 		},
 		{
 			name:      "repository projectsV2 field error",
@@ -345,6 +365,26 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 			assert.Equal(t, tt.expectOut, out)
 		})
 	}
+}
+
+func TestProjectsV2IgnorableError_structuredMissingProjectScopeAlternative(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	client := newTestClient(reg)
+
+	reg.Register(
+		httpmock.GraphQL(""),
+		httpmock.StringResponse(`{
+			"errors": [{
+				"type": "INSUFFICIENT_SCOPES",
+				"message": "The 'dataType' field requires one of the following scopes: ['read:project', 'project']."
+			}]
+		}`),
+	)
+
+	err := client.GraphQL("github.com", "", nil, &struct{}{})
+	require.Error(t, err)
+	assert.True(t, ProjectsV2IgnorableError(err))
 }
 
 func stripSpace(str string) string {

@@ -9,6 +9,8 @@ import (
 	"maps"
 	"net/http"
 	"regexp"
+	"slices"
+	"sort"
 	"strings"
 
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
@@ -26,6 +28,7 @@ const (
 )
 
 var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
+var requiredScopesRE = regexp.MustCompile(`one of the following scopes: \[(.+?)]`)
 
 func NewClientFromHTTP(httpClient *http.Client) *Client {
 	client := &Client{http: httpClient}
@@ -42,6 +45,151 @@ func (c *Client) HTTP() *http.Client {
 
 type GraphQLError struct {
 	*ghAPI.GraphQLError
+}
+
+// ScopeRequirement is a set of OAuth scopes where any one scope satisfies the requirement.
+type ScopeRequirement struct {
+	// Scopes lists the alternative scopes that satisfy the requirement.
+	Scopes []string
+}
+
+func (r ScopeRequirement) contains(scope string) bool {
+	return slices.Contains(r.Scopes, scope)
+}
+
+// ScopeRequirements is a set of OAuth scope requirements that must all be satisfied.
+type ScopeRequirements []ScopeRequirement
+
+func (requirements ScopeRequirements) containingAny(scopes ...string) ScopeRequirements {
+	var matches ScopeRequirements
+	for _, requirement := range requirements {
+		for _, scope := range scopes {
+			if requirement.contains(scope) {
+				matches = append(matches, requirement)
+				break
+			}
+		}
+	}
+	return normalizeScopeRequirements(matches)
+}
+
+// MissingScopesError reports OAuth scope requirements for an API operation.
+type MissingScopesError struct {
+	// Requirements lists the scope requirements that must all be satisfied.
+	Requirements ScopeRequirements
+}
+
+func (err MissingScopesError) Error() string {
+	message := fmt.Sprintf(
+		"error: your authentication token is missing required scopes [%s]",
+		formatScopeRequirements(err.Requirements, " or ", ", "),
+	)
+	if len(err.Requirements) == 1 && len(err.Requirements[0].Scopes) > 1 {
+		return fmt.Sprintf(
+			"%s\nUpdate your authentication token to include one of: %s",
+			message,
+			strings.Join(err.Requirements[0].Scopes, ", "),
+		)
+	}
+
+	formatted := make([]string, 0, len(err.Requirements))
+	for _, requirement := range err.Requirements {
+		if len(requirement.Scopes) == 1 {
+			formatted = append(formatted, requirement.Scopes[0])
+		} else {
+			formatted = append(formatted, fmt.Sprintf("one of (%s)", strings.Join(requirement.Scopes, ", ")))
+		}
+	}
+	return fmt.Sprintf(
+		"%s\nUpdate your authentication token to include: %s",
+		message,
+		strings.Join(formatted, " and "),
+	)
+}
+
+// GraphQLScopeRequirements returns OAuth scope requirements reported by a GraphQL response.
+// Each returned requirement preserves scopes that the server reports as alternatives.
+func GraphQLScopeRequirements(err error) ScopeRequirements {
+	var gerr GraphQLError
+	if !errors.As(err, &gerr) {
+		return nil
+	}
+
+	var requirements ScopeRequirements
+	for _, graphQLError := range gerr.Errors {
+		if graphQLError.Type != "INSUFFICIENT_SCOPES" {
+			continue
+		}
+		m := requiredScopesRE.FindStringSubmatch(graphQLError.Message)
+		if m == nil {
+			continue
+		}
+		var scopes []string
+		for _, scope := range strings.Split(m[1], ",") {
+			scope = strings.Trim(scope, "' ")
+			if scope != "" {
+				scopes = append(scopes, scope)
+			}
+		}
+		if len(scopes) > 0 {
+			requirements = append(requirements, ScopeRequirement{Scopes: scopes})
+		}
+	}
+	return normalizeScopeRequirements(requirements)
+}
+
+// GraphQLMissingScopeError returns a user-facing error when a GraphQL response reports a requirement containing any of scopes.
+func GraphQLMissingScopeError(err error, scopes ...string) error {
+	requirements := GraphQLScopeRequirements(err).containingAny(scopes...)
+	if len(requirements) == 0 {
+		return nil
+	}
+	return MissingScopesError{Requirements: requirements}
+}
+
+func normalizeScopeRequirements(requirements ScopeRequirements) ScopeRequirements {
+	unique := make(map[string]ScopeRequirement)
+	for _, requirement := range requirements {
+		scopes := append([]string(nil), requirement.Scopes...)
+		sort.Slice(scopes, func(i, j int) bool {
+			iRead := strings.HasPrefix(scopes[i], "read:")
+			jRead := strings.HasPrefix(scopes[j], "read:")
+			if iRead != jRead {
+				return iRead
+			}
+			return scopes[i] < scopes[j]
+		})
+		scopes = slices.Compact(scopes)
+		if len(scopes) == 0 {
+			continue
+		}
+		key := strings.Join(scopes, "\x00")
+		unique[key] = ScopeRequirement{Scopes: scopes}
+	}
+
+	keys := make([]string, 0, len(unique))
+	for key := range unique {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	normalized := make(ScopeRequirements, 0, len(keys))
+	for _, key := range keys {
+		normalized = append(normalized, unique[key])
+	}
+	return normalized
+}
+
+func formatScopeRequirements(requirements ScopeRequirements, alternativeSeparator, requirementSeparator string) string {
+	formatted := make([]string, 0, len(requirements))
+	for _, requirement := range requirements {
+		formattedRequirement := strings.Join(requirement.Scopes, alternativeSeparator)
+		if len(requirements) > 1 && len(requirement.Scopes) > 1 {
+			formattedRequirement = fmt.Sprintf("(%s)", formattedRequirement)
+		}
+		formatted = append(formatted, formattedRequirement)
+	}
+	return strings.Join(formatted, requirementSeparator)
 }
 
 type HTTPError struct {
