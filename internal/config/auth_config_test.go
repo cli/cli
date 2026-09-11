@@ -693,7 +693,7 @@ func TestUserWorksRightAfterMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we migrate
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
@@ -710,7 +710,7 @@ func TestGitProtocolWorksRightAfterMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we migrate
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
@@ -727,7 +727,7 @@ func TestHostsWorksRightAfterMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we migrate
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
@@ -743,7 +743,7 @@ func TestDefaultHostWorksRightAfterMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we migrate
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
@@ -760,7 +760,7 @@ func TestTokenWorksRightAfterMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we migrate
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
@@ -837,7 +837,7 @@ func TestLogoutRightAfterMigrationRemovesHost(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we migrate and logout
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
@@ -852,7 +852,7 @@ func TestLoginInsecurePostMigrationUsesConfigForToken(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	// When we migrate and login with insecure storage
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
@@ -871,7 +871,7 @@ func TestLoginPostMigrationSetsGitProtocol(t *testing.T) {
 	// Given we have logged in after migration
 	authCfg := newTestAuthConfig(t)
 
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
@@ -890,7 +890,7 @@ func TestLoginPostMigrationSetsUser(t *testing.T) {
 	// Given we have logged in after migration
 	authCfg := newTestAuthConfig(t)
 
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
@@ -912,7 +912,7 @@ func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we migrate and login again with secure storage
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 

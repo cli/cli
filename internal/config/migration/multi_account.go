@@ -68,22 +68,31 @@ type tokenSource struct {
 // breaking existing users of go-gh which looks at a specific location
 // in the config for oauth tokens that are stored insecurely.
 
-type MultiAccount struct {
+// MultiAccountDeprecated migrates the pre-v2.40 one-account-per-host
+// configuration into the multi-account schema.
+//
+// This migration no longer runs automatically. Its compatibility window
+// covered upgrades from versions that predated the multi-account schema.
+// Supported configurations now already use that schema, so running it before
+// every command no longer provides value. The implementation remains as
+// executable documentation of the original migration and its compatibility
+// constraints.
+type MultiAccountDeprecated struct {
 	// Allow injecting a transport layer in tests.
 	Transport http.RoundTripper
 }
 
-func (m MultiAccount) PreVersion() string {
+func (m MultiAccountDeprecated) PreVersion() string {
 	// It is expected that there is no version key since this migration
 	// introduces it.
 	return ""
 }
 
-func (m MultiAccount) PostVersion() string {
+func (m MultiAccountDeprecated) PostVersion() string {
 	return "1"
 }
 
-func (m MultiAccount) Do(c *config.Config) error {
+func (m MultiAccountDeprecated) Do(c *config.Config) error {
 	hostnames, err := c.Keys(hostsKey)
 	// [github.com, github.localhost]
 	// We wouldn't expect to have a hosts key when this is the first time anyone
