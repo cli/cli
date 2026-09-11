@@ -1,0 +1,230 @@
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Prepare a branch to PR
+cd $SCRIPT_NAME-$RANDOM_STRING
+
+exec git config user.name gh-acceptance-test-user
+exec git config user.email gh-acceptance-test-user@foo.bar
+
+# Create PR templates
+exec mkdir -p .github/PULL_REQUEST_TEMPLATE
+exec bash -c 'echo -n template-1 > .github/PULL_REQUEST_TEMPLATE/template-1.md'
+exec bash -c 'echo -n template-2 > .github/PULL_REQUEST_TEMPLATE/template-2.md'
+exec git add .github/PULL_REQUEST_TEMPLATE
+exec git commit -m 'Add templates'
+
+# Update .gitignore to exlucde files created for the test (e.g. PR body file)
+exec bash -c 'echo -n "test-*" > .gitignore'
+exec git add .gitignore
+exec git commit -m 'Update .gitignore'
+
+# Update main branch
+exec git push origin main
+
+# Create a feature branch
+exec git checkout -b feature-branch
+exec bash -c 'git commit --allow-empty -m $''Empty Commit 1\n\nfoo as body'''
+exec git push -u origin feature-branch
+
+# Set browser to echo to capture URLs
+exec gh config set browser echo
+
+# Try creating the PR in --web mode using different combinations of the options
+# that can affect the pre-filled body input box:
+# - --body-file <FILE>
+# - --body
+# - --fill*
+# - --template <FILE>
+# - no option
+#
+# Note that the list above is ordered by dominance. For example, --body-file
+# should always override any of the options above.
+#
+# Since --fill* behaviour depends on the number of commits, the test covers both
+# single-commit and multiple-commit setups.
+#
+# For more details check out:
+# - https://github.com/cli/cli/issues/10527#issuecomment-3164565422
+
+# 1. Try --body-file with other options
+
+# Create a file to contain the PR body
+exec bash -c 'echo -n foo > test-pr-body.md'
+
+exec gh pr create --web --body-file test-pr-body.md
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1
+
+# (we should make --body and --body-file mutually exclusive, and then this one should fail)
+exec gh pr create --web --body-file test-pr-body.md --body bar
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1
+
+#### Problem: --fill and --fill-first override body-file
+### exec gh pr create --web --body-file test-pr-body.md --fill
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+###
+### exec gh pr create --web --body-file test-pr-body.md --fill-first
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+
+#### Problem: --fill-verbose is not working so the "title" query param is not set as expected
+### exec gh pr create --web --body-file test-pr-body.md --fill-verbose
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+
+! exec gh pr create --web --body-file test-pr-body.md --template template-1.md
+stderr '`--template` is not supported when using `--body` or `--body-file`'
+
+# 2. Try --body with other options
+
+exec gh pr create --web --body foo
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1
+
+#### Problem: --fill and --fill-first override body
+### exec gh pr create --web --body foo --fill
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+###
+### exec gh pr create --web --body foo --fill-first
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+
+#### Problem: --fill-verbose is not working so the "title" query param is not set as expected
+### exec gh pr create --web --body foo --fill-verbose
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+
+! exec gh pr create --web --body foo --template template-1.md
+stderr '`--template` is not supported when using `--body` or `--body-file`'
+
+# 3. Try --fill* with other options
+
+# --fill and --fill-first should be mutually exclusive
+! exec gh pr create --web --fill --fill-first
+stderr '`--fill` is not supported with `--fill-first`'
+
+# --fill and --fill-verbose should be mutually exclusive
+! exec gh pr create --web --fill --fill-verbose
+stderr '`--fill-verbose` is not supported with `--fill`'
+
+# --fill-first and --fill-verbose should be mutually exclusive
+! exec gh pr create --web --fill-first --fill-verbose
+stderr '`--fill-verbose` is not supported with `--fill-first`'
+
+# Try creating PRs in --web mode
+
+exec gh pr create --web --fill
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo\+as\+body%0A&expand=1&title=.*
+
+exec gh pr create --web --fill-first
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo\+as\+body%0A&expand=1&title=.*
+
+#### Problem: --fill-verbose does not work
+### exec gh pr create --web --fill-verbose
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo\+as\+body%0A&expand=1&title=.*
+
+exec gh pr create --web --fill --template template-1.md
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo\+as\+body%0A&expand=1&title=.*
+
+exec gh pr create --web --fill-first --template template-1.md
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo\+as\+body%0A&expand=1&title=.*
+
+#### Problem: --fill-verbose does not work
+### exec gh pr create --web --fill-verbose --template template-1.md
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo\+as\+body%0A&expand=1&title=.*
+
+# 4. Try --template (no further options to combine with)
+
+exec gh pr create --web --template template-1.md
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=&expand=1&template=template-1\.md
+
+# 5. Try with no options
+
+exec gh pr create --web
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=&expand=1
+
+
+# Now we need to repeat the above test cases against a multi-commit history.
+
+# Add more commits
+exec bash -c 'git commit --allow-empty -m $''Empty Commit 2\n\nbar as body'''
+exec bash -c 'git commit --allow-empty -m $''Empty Commit 3\n\nbaz as body'''
+exec git push -u origin feature-branch
+
+# 1. Try --body-file with other options
+
+exec gh pr create --web --body-file test-pr-body.md
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1
+
+# (we should make --body and --body-file mutually exclusive, and then this one should fail)
+exec gh pr create --web --body-file test-pr-body.md --body bar
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1
+
+#### Problem: --fill and --fill-first override body-file
+### exec gh pr create --web --body-file test-pr-body.md --fill
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+###
+### exec gh pr create --web --body-file test-pr-body.md --fill-first
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+
+#### Problem: --fill-verbose is not working so the "title" query param is not set as expected
+### exec gh pr create --web --body-file test-pr-body.md --fill-verbose
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+
+! exec gh pr create --web --body-file test-pr-body.md --template template-1.md
+stderr '`--template` is not supported when using `--body` or `--body-file`'
+
+# 2. Try --body with other options
+
+exec gh pr create --web --body foo
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1
+
+#### Problem: --fill and --fill-first override body
+### exec gh pr create --web --body foo --fill
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+###
+### exec gh pr create --web --body foo --fill-first
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+
+#### Problem: --fill-verbose is not working so the "title" query param is not set as expected
+### exec gh pr create --web --body foo --fill-verbose
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo&expand=1&title=.*
+
+! exec gh pr create --web --body foo --template template-1.md
+stderr '`--template` is not supported when using `--body` or `--body-file`'
+
+# 3. Try --fill* with other options
+
+exec gh pr create --web --fill
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=-\+%2A%2AEmpty\+Commit\+1%2A%2A%0A-\+%2A%2AEmpty\+Commit\+2%2A%2A%0A-\+%2A%2AEmpty\+Commit\+3%2A%2A%0A&expand=1&title=.*
+
+exec gh pr create --web --fill-first
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo\+as\+body%0A&expand=1&title=.*
+
+#### Problem: --fill-verbose does not work
+### exec gh pr create --web --fill-verbose
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=-\+%2A%2AEmpty\+Commit\+1%2A%2A%0A\+\+foo\+as\+body%0A\+\+%0A%0A-\+%2A%2AEmpty\+Commit\+2%2A%2A%0A\+\+bar\+as\+body%0A\+\+%0A%0A-\+%2A%2AEmpty\+Commit\+3%2A%2A%0A\+\+baz\+as\+body%0A\+\+&expand=1&title=.*
+
+exec gh pr create --web --fill --template template-1.md
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=-\+%2A%2AEmpty\+Commit\+1%2A%2A%0A-\+%2A%2AEmpty\+Commit\+2%2A%2A%0A-\+%2A%2AEmpty\+Commit\+3%2A%2A%0A&expand=1&title=.*
+
+exec gh pr create --web --fill-first --template template-1.md
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=foo\+as\+body%0A&expand=1&title=.*
+
+#### Problem: --fill-verbose does not work
+### exec gh pr create --web --fill-verbose --template template-1.md
+### stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=-\+%2A%2AEmpty\+Commit\+1%2A%2A%0A\+\+foo\+as\+body%0A\+\+%0A%0A-\+%2A%2AEmpty\+Commit\+2%2A%2A%0A\+\+bar\+as\+body%0A\+\+%0A%0A-\+%2A%2AEmpty\+Commit\+3%2A%2A%0A\+\+baz\+as\+body%0A\+\+&expand=1&title=.*
+
+# 4. Try --template (no further options to combine with)
+
+exec gh pr create --web --template template-1.md
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=&expand=1&template=template-1\.md
+
+# 5. Try with no options
+
+exec gh pr create --web
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=&expand=1
