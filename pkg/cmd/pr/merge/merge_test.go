@@ -670,6 +670,32 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	`), output.Stderr())
 }
 
+func TestPrMerge_deleteBranch_ownerCaseMismatch(t *testing.T) {
+	reg := initFakeHTTP()
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("DELETE", "repos/SomeCoolProject/some-cool-repo/git/refs/heads%2Ftopic"),
+		httpmock.StringResponse(`{}`))
+
+	ios, _, _, _ := iostreams.Test()
+	opts := &MergeOptions{
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		IO: ios,
+		Finder: shared.NewMockFinder("", &api.PullRequest{
+			State:               "OPEN",
+			HeadRefName:         "topic",
+			HeadRepositoryOwner: api.Owner{Login: "somecoolproject"},
+		}, baseRepo("SomeCoolProject", "some-cool-repo", "main")),
+		DeleteBranch: true,
+	}
+
+	ctx, err := NewMergeContext(opts)
+	require.NoError(t, err)
+	require.NoError(t, ctx.deleteRemoteBranch())
+}
+
 func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 	tests := []struct {
 		name       string

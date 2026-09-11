@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -589,7 +590,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		httpClient:         httpClient,
 		merged:             pr.State == MergeStateStatusMerged,
 		deleteBranch:       opts.DeleteBranch,
-		crossRepoPR:        pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner(),
+		crossRepoPR:        !strings.EqualFold(pr.HeadRepositoryOwner.Login, baseRepo.RepoOwner()),
 		autoMerge:          opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
 		localBranchExists:  opts.CanDeleteLocalBranch && opts.GitClient.HasLocalBranch(context.Background(), pr.HeadRefName),
 		mergeQueueRequired: pr.IsMergeQueueEnabled,
