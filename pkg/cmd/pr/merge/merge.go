@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -569,7 +568,7 @@ func (m *mergeContext) infof(format string, args ...any) error {
 func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName", "baseRefName", "headRefOid", "isInMergeQueue", "isMergeQueueEnabled"},
+		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRefName", "baseRefName", "headRefOid", "isCrossRepository", "isInMergeQueue", "isMergeQueueEnabled"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -590,7 +589,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		httpClient:         httpClient,
 		merged:             pr.State == MergeStateStatusMerged,
 		deleteBranch:       opts.DeleteBranch,
-		crossRepoPR:        !strings.EqualFold(pr.HeadRepositoryOwner.Login, baseRepo.RepoOwner()),
+		crossRepoPR:        pr.IsCrossRepository,
 		autoMerge:          opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
 		localBranchExists:  opts.CanDeleteLocalBranch && opts.GitClient.HasLocalBranch(context.Background(), pr.HeadRefName),
 		mergeQueueRequired: pr.IsMergeQueueEnabled,
