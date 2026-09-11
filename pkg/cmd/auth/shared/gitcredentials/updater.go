@@ -13,12 +13,10 @@ type Updater struct {
 	GitClient *git.Client
 }
 
-// Update updates the git credentials for a given hostname, first by rejecting any existing credentials and then
-// approving the new credentials.
-func (u *Updater) Update(hostname, username, password string) error {
+// Reject removes any stored credentials for a given hostname from the git credential helper.
+func (u *Updater) Reject(hostname string) error {
 	ctx := context.TODO()
 
-	// clear previous cached credentials
 	rejectCmd, err := u.GitClient.Command(ctx, "credential", "reject")
 	if err != nil {
 		return err
@@ -30,9 +28,17 @@ func (u *Updater) Update(hostname, username, password string) error {
 	`, hostname))
 
 	_, err = rejectCmd.Output()
-	if err != nil {
+	return err
+}
+
+// Update updates the git credentials for a given hostname, first by rejecting any existing credentials and then
+// approving the new credentials.
+func (u *Updater) Update(hostname, username, password string) error {
+	if err := u.Reject(hostname); err != nil {
 		return err
 	}
+
+	ctx := context.TODO()
 
 	approveCmd, err := u.GitClient.Command(ctx, "credential", "approve")
 	if err != nil {
@@ -47,9 +53,5 @@ func (u *Updater) Update(hostname, username, password string) error {
 	`, hostname, username, password))
 
 	_, err = approveCmd.Output()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
