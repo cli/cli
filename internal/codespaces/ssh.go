@@ -71,6 +71,7 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string, 
 
 	cmdArgs = append(cmdArgs, connArgs...)
 	cmdArgs = append(cmdArgs, "-C") // Compression
+	cmdArgs = append(cmdArgs, "--") // end of ssh options
 	cmdArgs = append(cmdArgs, dst)  // user@host
 
 	if command != nil {
@@ -118,6 +119,7 @@ func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	}
 
 	cmdArgs = append(cmdArgs, connArgs...)
+	cmdArgs = append(cmdArgs, "--") // end of scp options
 
 	for _, arg := range command {
 		// Replace "remote:" prefix with (e.g.) "root@localhost:".
@@ -149,10 +151,17 @@ func parseSCPArgs(args []string) (cmdArgs, command []string, err error) {
 
 // parseArgs parses arguments into two distinct slices of flags and command. Parsing stops
 // as soon as a non-flag argument is found assuming the remaining arguments are the command.
-// It returns an error if a unary flag is provided without an argument.
+// A bare "--" is treated as the end-of-options marker: it is dropped and everything after it
+// is returned as the command. It returns an error if a unary flag is provided without an argument.
 func parseArgs(args []string, unaryFlags string) (cmdArgs, command []string, err error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+
+		// "--" marks the end of options; everything after it is the command.
+		if arg == "--" {
+			command = args[i+1:]
+			break
+		}
 
 		// if we've started parsing the command, set it to the rest of the args
 		if !strings.HasPrefix(arg, "-") {
