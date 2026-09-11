@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# bump-go.sh -- Update go.mod `go` directive and toolchain to latest stable Go release.
+# bump-go.sh -- Update Go and its version-coupled validation tools.
 #
 # Usage:
 #   ./bump-go.sh [--apply|-a] [--version <version>] <path/to/go.mod>
@@ -50,9 +50,10 @@ fi
 REPO="cli/cli"
 MODULE_DIR=$(dirname "$GO_MOD")
 GO_SUM="$MODULE_DIR/go.sum"
-# Keep this mutable pin outside .github/workflows because the workflow's
+# Keep these mutable pins outside .github/workflows because the workflow's
 # GITHUB_TOKEN cannot push commits that create or update workflow files.
 LINTER_VERSION_FILE="$REPO_ROOT/.github/golangci-lint-version"
+GOVULNCHECK_VERSION_FILE="$REPO_ROOT/.github/govulncheck-version"
 
 # ---- Discover latest stable Go release --------------------------------------
 if [[ -n "$TARGET_GO_VERSION" ]]; then
@@ -89,6 +90,30 @@ CURRENT_TOOLCHAIN=$(jq -r '.Toolchain // ""' <<< "$GO_MOD_JSON")
 
 echo "  → current go    : $CURRENT_GO_DIRECTIVE"
 echo "  → current tc    : ${CURRENT_TOOLCHAIN:-(none)}"
+
+GO_DIRECTIVE_CHANGED=0
+if [[ "$CURRENT_GO_DIRECTIVE" != "$GO_DIRECTIVE_VERSION" ]]; then
+  GO_DIRECTIVE_CHANGED=1
+fi
+
+govulncheck_version_lines=$(grep -Ec '^v[0-9]+\.[0-9]+\.[0-9]+$' "$GOVULNCHECK_VERSION_FILE" || true)
+if [[ $govulncheck_version_lines -ne 1 ]]; then
+  echo "Error: expected exactly one pinned govulncheck version in '$GOVULNCHECK_VERSION_FILE'" >&2
+  exit 1
+fi
+GOVULNCHECK_VERSION=$(grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' "$GOVULNCHECK_VERSION_FILE")
+
+if [[ $GO_DIRECTIVE_CHANGED -eq 1 ]]; then
+  # govulncheck builds SSA with x/tools, which must understand syntax added by
+  # the selected Go language version.
+  echo "Fetching latest govulncheck version..."
+  GOVULNCHECK_VERSION=$(go list -m -f '{{.Version}}' golang.org/x/vuln@latest)
+  if [[ ! "$GOVULNCHECK_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Error: unexpected govulncheck version '$GOVULNCHECK_VERSION'" >&2
+    exit 1
+  fi
+fi
+echo "  → govulncheck  : $GOVULNCHECK_VERSION"
 
 # ---- Prepare Git branch -----------------------------------------------------
 BRANCH="bump-go-$TOOLCHAIN_VERSION"
@@ -131,6 +156,13 @@ if ! git -C "$REPO_ROOT" diff --quiet -- "$GO_MOD"; then
 else
   echo "  • Go version unchanged; keeping the existing golangci-lint pin"
 fi
+if [[ $GO_DIRECTIVE_CHANGED -eq 1 ]]; then
+  sed -i.bak -E "s/^v[0-9]+\.[0-9]+\.[0-9]+$/$GOVULNCHECK_VERSION/" "$GOVULNCHECK_VERSION_FILE"
+  rm -f "$GOVULNCHECK_VERSION_FILE.bak"
+  echo "  • set govulncheck → $GOVULNCHECK_VERSION"
+else
+  echo "  • Go language version unchanged; keeping the existing govulncheck pin"
+fi
 echo "  • running go fix..."
 go fix ./...
 status=0
@@ -138,6 +170,8 @@ echo "  • running tests..."
 go test ./... || status=$?
 echo "  • running golangci-lint..."
 golangci-lint run ./... || status=$?
+echo "  • running govulncheck..."
+go run "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION" ./... || status=$?
 if [[ $status -ne 0 ]]; then
   exit "$status"
 fi
@@ -197,6 +231,7 @@ This PR updates Go to the latest stable release.
 * **go directive:** \`$FINAL_GO\`
 $TC_LINE
 * **golangci-lint:** \`v$LINTER_VERSION\`
+* **govulncheck:** \`$GOVULNCHECK_VERSION\`
 EOF
 )
 
