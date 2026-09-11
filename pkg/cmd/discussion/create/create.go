@@ -1,7 +1,9 @@
 package create
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -16,10 +18,11 @@ import (
 
 // CreateOptions holds the configuration for the discussion create command.
 type CreateOptions struct {
-	IO       *iostreams.IOStreams
-	BaseRepo func() (ghrepo.Interface, error)
-	Client   func() (client.DiscussionClient, error)
-	Prompter prompter.Prompter
+	IO         *iostreams.IOStreams
+	BaseRepo   func() (ghrepo.Interface, error)
+	Client     func() (client.DiscussionClient, error)
+	HttpClient func() (*http.Client, error)
+	Prompter   prompter.Prompter
 
 	Title    string
 	Body     string
@@ -31,9 +34,10 @@ type CreateOptions struct {
 // NewCmdCreate returns a cobra command for creating a GitHub Discussion.
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
-		IO:       f.IOStreams,
-		Prompter: f.Prompter,
-		Client:   shared.DiscussionClientFunc(f),
+		IO:         f.IOStreams,
+		Prompter:   f.Prompter,
+		Client:     shared.DiscussionClientFunc(f),
+		HttpClient: f.HttpClient,
 	}
 
 	cmd := &cobra.Command{
@@ -44,6 +48,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			With %[1]s--title%[1]s, %[1]s--body%[1]s (or %[1]s--body-file%[1]s), and %[1]s--category%[1]s, a discussion is created non-interactively.
 			Omitting any of these flags triggers interactive prompts when connected to a terminal.
+
+			If the selected category defines a Discussion Category Form (a
+			%[1]s.github/DISCUSSION_TEMPLATE/<category-slug>.yml%[1]s file), and %[1]s--body%[1]s/%[1]s--body-file%[1]s
+			was not given, the form's fields are prompted for individually instead of a single free-text body.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Create interactively
@@ -150,12 +158,12 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if opts.Body == "" {
-		opts.Body, err = opts.Prompter.MarkdownEditor("Discussion body", "", false)
+		if !opts.IO.CanPrompt() {
+			return cmdutil.FlagErrorf("discussion body cannot be blank")
+		}
+		opts.Body, err = promptBody(opts, repo, category.Slug)
 		if err != nil {
 			return err
-		}
-		if strings.TrimSpace(opts.Body) == "" {
-			return fmt.Errorf("body cannot be blank")
 		}
 	}
 
@@ -196,4 +204,37 @@ func createRun(opts *CreateOptions) error {
 	fmt.Fprintln(opts.IO.Out, discussion.URL)
 
 	return nil
+}
+
+// promptBody fills in the discussion body, either by walking the selected
+// category's Discussion Category Form field-by-field (if the repository
+// defines one at .github/DISCUSSION_TEMPLATE/<slug>.yml), or by falling back
+// to a single free-text editor prompt when no such form exists.
+func promptBody(opts *CreateOptions, repo ghrepo.Interface, categorySlug string) (string, error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return "", err
+	}
+
+	opts.IO.StartProgressIndicator()
+	tpl, err := shared.FetchCategoryTemplate(httpClient, repo, categorySlug)
+	opts.IO.StopProgressIndicator()
+
+	switch {
+	case errors.Is(err, shared.ErrCategoryTemplateNotFound):
+		body, err := opts.Prompter.MarkdownEditor("Discussion body", "", false)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(body) == "" {
+			return "", fmt.Errorf("body cannot be blank")
+		}
+		return body, nil
+
+	case err != nil:
+		return "", err
+
+	default:
+		return shared.PromptCategoryTemplate(opts.Prompter, opts.IO, tpl)
+	}
 }
