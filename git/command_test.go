@@ -9,7 +9,7 @@ import (
 
 func TestOutputReturnsCommandOutput(t *testing.T) {
 	// Given a command that writes to standard output
-	cmd, _ := createCommandContext(t, 0, "hello world", "")
+	cmd := createCommand(t, 0, "hello world", "")
 	command := Command{cmd}
 
 	// When its output is captured
@@ -23,7 +23,7 @@ func TestOutputReturnsCommandOutput(t *testing.T) {
 func TestOutputReturnsGitError(t *testing.T) {
 	// Given a command that fails with Git's not-a-repository diagnostic
 	stderr := "fatal: not a git repository (or any of the parent directories): .git"
-	cmd, _ := createCommandContext(t, 128, "", stderr)
+	cmd := createCommand(t, 128, "", stderr)
 	command := Command{cmd}
 
 	// When its output is captured

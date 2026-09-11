@@ -2,15 +2,12 @@ package git
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"os/exec"
 
 	"github.com/cli/cli/v2/internal/run"
 )
-
-type commandCtx = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 type Command struct {
 	*exec.Cmd

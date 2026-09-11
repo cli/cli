@@ -58,8 +58,7 @@ type Client struct {
 	Stdin   io.Reader
 	Stdout  io.Writer
 
-	commandContext commandCtx
-	mu             sync.Mutex
+	mu sync.Mutex
 }
 
 func (c *Client) Copy() *Client {
@@ -70,18 +69,12 @@ func (c *Client) Copy() *Client {
 		Stderr:  c.Stderr,
 		Stdin:   c.Stdin,
 		Stdout:  c.Stdout,
-
-		commandContext: c.commandContext,
 	}
 }
 
 func (c *Client) Command(ctx context.Context, args ...string) (*Command, error) {
 	if c.RepoDir != "" {
 		args = append([]string{"-C", c.RepoDir}, args...)
-	}
-	commandContext := exec.CommandContext
-	if c.commandContext != nil {
-		commandContext = c.commandContext
 	}
 	var err error
 	c.mu.Lock()
@@ -92,7 +85,7 @@ func (c *Client) Command(ctx context.Context, args ...string) (*Command, error) 
 	if err != nil {
 		return nil, err
 	}
-	cmd := commandContext(ctx, c.GitPath, args...)
+	cmd := exec.CommandContext(ctx, c.GitPath, args...)
 	cmd.Stderr = c.Stderr
 	cmd.Stdin = c.Stdin
 	cmd.Stdout = c.Stdout
@@ -644,6 +637,10 @@ func (c *Client) PushRevision(ctx context.Context, branch string) (RemoteTrackin
 		return RemoteTrackingRef{}, err
 	}
 
+	return parsePushRevision(revParseOut)
+}
+
+func parsePushRevision(revParseOut []byte) (RemoteTrackingRef, error) {
 	ref, err := ParseRemoteTrackingRef(firstLine(revParseOut))
 	if err != nil {
 		return RemoteTrackingRef{}, fmt.Errorf("could not parse push revision: %v", err)
