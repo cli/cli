@@ -21,7 +21,6 @@ import (
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/telemetry"
@@ -132,14 +131,6 @@ func Main() exitCode {
 	defer telemetryService.Finish()
 
 	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
-
-	if cfgErr == nil {
-		var m migration.MultiAccount
-		if err := cfg.Migrate(m); err != nil {
-			fmt.Fprintln(stderr, err)
-			return exitError
-		}
-	}
 
 	ctx := context.Background()
 	updateCtx, updateCancel := context.WithCancel(ctx)
