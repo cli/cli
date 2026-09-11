@@ -33,6 +33,21 @@ if ([string]::IsNullOrEmpty($_product_version)) {
     exit 1
 }
 
+$_product_version_components = [regex]::Match($_product_version, "^[^0-9]*([0-9]+)\.([0-9]+)\.([0-9]+)(?:\.([0-9]+))?")
+if (-not $_product_version_components.Success) {
+    Write-Host "error: product-version argument '$_product_version' must include semantic version numbers"
+    Write-Host $_usage
+    exit 1
+}
+
+$_version_major = [int]$_product_version_components.Groups[1].Value
+$_version_minor = [int]$_product_version_components.Groups[2].Value
+$_version_patch = [int]$_product_version_components.Groups[3].Value
+$_version_build = 0
+if (-not [string]::IsNullOrEmpty($_product_version_components.Groups[4].Value)) {
+    $_version_build = [int]$_product_version_components.Groups[4].Value
+}
+
 $_versioninfo_path = $args[2]
 if ([string]::IsNullOrEmpty($_versioninfo_path)) {
     Write-Host "error: path to versioninfo.json is missing"
@@ -65,6 +80,14 @@ goversioninfo `
     -64 -arm -platform-specific `
     -file-version "$_file_version" `
     -product-version "$_product_version" `
+    -ver-major "$_version_major" `
+    -ver-minor "$_version_minor" `
+    -ver-patch "$_version_patch" `
+    -ver-build "$_version_build" `
+    -product-ver-major "$_version_major" `
+    -product-ver-minor "$_version_minor" `
+    -product-ver-patch "$_version_patch" `
+    -product-ver-build "$_version_build" `
     "$_versioninfo_path"
 
 Move-Item -Path "resource_windows_*.syso" -Destination "$_output" -Force
