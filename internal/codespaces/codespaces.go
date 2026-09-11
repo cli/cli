@@ -117,8 +117,7 @@ func waitUntilCodespaceConnectionReady(ctx context.Context, progress progressInd
 	}, backoff.WithContext(codespaceStatePollingBackoff, ctx))
 
 	if err != nil {
-		var timeoutErr *TimeoutError
-		if errors.As(err, &timeoutErr) {
+		if _, ok := errors.AsType[*TimeoutError](err); ok {
 			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 

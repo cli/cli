@@ -442,8 +442,7 @@ func (s *StatusGetter) LoadSearchResults() error {
 	}
 	err := c.GraphQL(s.hostname(), searchQuery, variables, &resp)
 	if err != nil {
-		var gqlErrResponse api.GraphQLError
-		if errors.As(err, &gqlErrResponse) {
+		if gqlErrResponse, ok := errors.AsType[api.GraphQLError](err); ok {
 			gqlErrors := make([]ghAPI.GraphQLErrorItem, 0, len(gqlErrResponse.Errors))
 			// Exclude any FORBIDDEN errors and show status for what we can.
 			for _, gqlErr := range gqlErrResponse.Errors {

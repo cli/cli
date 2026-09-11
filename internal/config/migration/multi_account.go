@@ -88,8 +88,7 @@ func (m MultiAccount) Do(c *config.Config) error {
 	// [github.com, github.localhost]
 	// We wouldn't expect to have a hosts key when this is the first time anyone
 	// is logging in with the CLI.
-	var keyNotFoundError *config.KeyNotFoundError
-	if errors.As(err, &keyNotFoundError) {
+	if _, ok := errors.AsType[*config.KeyNotFoundError](err); ok {
 		return nil
 	}
 	if err != nil {
@@ -202,9 +201,8 @@ func migrateConfig(c *config.Config, hostname, username string) error {
 	c.Set(append(hostsKey, hostname, "users", username), "")
 
 	insecureToken, err := c.Get(append(hostsKey, hostname, "oauth_token"))
-	var keyNotFoundError *config.KeyNotFoundError
 	// If there is no token then we're done here
-	if errors.As(err, &keyNotFoundError) {
+	if _, ok := errors.AsType[*config.KeyNotFoundError](err); ok {
 		return nil
 	}
 

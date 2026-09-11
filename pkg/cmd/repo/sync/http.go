@@ -56,9 +56,8 @@ func triggerUpstreamMerge(client *api.Client, repo ghrepo.Interface, branch stri
 	if err != nil {
 		return "", err
 	}
-	var httpErr api.HTTPError
 	if err := client.REST(repo.RepoHost(), "POST", path.String(), &payload, &response); err != nil {
-		if errors.As(err, &httpErr) {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
 			switch httpErr.StatusCode {
 			case http.StatusUnprocessableEntity, http.StatusConflict:
 				if missingWorkflowScopeRE.MatchString(httpErr.Message) {

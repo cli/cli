@@ -327,7 +327,7 @@ func selectSSHKeys(
 	opts sshOptions,
 ) (*ssh.KeyPair, bool, error) {
 	customConfigPath := ""
-	for i := 0; i < len(args); i += 1 {
+	for i := range args {
 		arg := args[i]
 
 		if arg == "-i" {
@@ -784,7 +784,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 			// Escape it by prepending "./".
 			// TODO(adonovan): test on Windows, including with a c:\\foo path.
 			const sep = string(os.PathSeparator)
-			first := strings.Split(filepath.ToSlash(arg), sep)[0]
+			first, _, _ := strings.Cut(filepath.ToSlash(arg), sep)
 			if strings.Contains(first, ":") {
 				arg = "." + sep + arg
 			}

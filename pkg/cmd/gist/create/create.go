@@ -156,8 +156,7 @@ func createRun(opts *CreateOptions) error {
 	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		var httpError api.HTTPError
-		if errors.As(err, &httpError) {
+		if httpError, ok := errors.AsType[api.HTTPError](err); ok {
 			if httpError.StatusCode == http.StatusUnprocessableEntity {
 				if detectEmptyFiles(files) {
 					fmt.Fprintf(errOut, "%s Failed to create gist: %s\n", cs.FailureIcon(), "a gist file cannot be blank")

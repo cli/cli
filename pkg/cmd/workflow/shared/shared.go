@@ -134,8 +134,7 @@ func FindWorkflow(client *api.Client, repo ghrepo.Interface, workflowSelector st
 	if _, err := strconv.Atoi(workflowSelector); err == nil || isWorkflowFile(workflowSelector) {
 		workflow, err := getWorkflowByID(client, repo, workflowSelector)
 		if err != nil {
-			var httpErr api.HTTPError
-			if errors.As(err, &httpErr) {
+			if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
 				if httpErr.StatusCode == 404 {
 					httpErr.Message = fmt.Sprintf("workflow %s not found on the default branch", workflowSelector)
 				}

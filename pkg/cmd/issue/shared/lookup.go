@@ -174,8 +174,7 @@ func FindIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 	var resp response
 	client := api.NewClientFromHTTP(httpClient)
 	if err := client.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
-		var gerr api.GraphQLError
-		if errors.As(err, &gerr) {
+		if gerr, ok := errors.AsType[api.GraphQLError](err); ok {
 			if gerr.Match("NOT_FOUND", "repository.issue") && !resp.Repository.HasIssuesEnabled {
 				return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
 			} else if gerr.Match("FORBIDDEN", "repository.issue.projectCards.") {

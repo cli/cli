@@ -218,8 +218,7 @@ func ResolveRef(client *api.Client, host, owner, repo, version string) (*Resolve
 	// API error (403, 500, network failure, …) is surfaced immediately
 	// so it cannot silently mask problems and cause an unexpected ref to
 	// be used.
-	var nre *noReleasesError
-	if !errors.As(err, &nre) {
+	if _, ok := errors.AsType[*noReleasesError](err); !ok {
 		return nil, err
 	}
 	return resolveDefaultBranch(client, host, owner, repo)

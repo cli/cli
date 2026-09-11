@@ -194,10 +194,6 @@ func Main() exitCode {
 	rootCmd.SetArgs(expandedArgs)
 
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
-		var pagerPipeError *iostreams.ErrClosedPagerPipe
-		var noResultsError cmdutil.NoResultsError
-		var extError *root.ExternalCommandExitError
-		var authError *root.AuthError
 		if err == cmdutil.SilentError {
 			return exitError
 		} else if err == cmdutil.PendingError {
@@ -208,18 +204,18 @@ func Main() exitCode {
 				fmt.Fprint(stderr, "\n")
 			}
 			return exitCancel
-		} else if errors.As(err, &authError) {
+		} else if _, ok := errors.AsType[*root.AuthError](err); ok {
 			return exitAuth
-		} else if errors.As(err, &pagerPipeError) {
+		} else if _, ok := errors.AsType[*iostreams.ErrClosedPagerPipe](err); ok {
 			// ignore the error raised when piping to a closed pager
 			return exitOK
-		} else if errors.As(err, &noResultsError) {
+		} else if noResultsError, ok := errors.AsType[cmdutil.NoResultsError](err); ok {
 			if cmdFactory.IOStreams.IsStdoutTTY() {
 				fmt.Fprintln(stderr, noResultsError.Error())
 			}
 			// no results is not a command failure
 			return exitOK
-		} else if errors.As(err, &extError) {
+		} else if extError, ok := errors.AsType[*root.ExternalCommandExitError](err); ok {
 			// pass on exit codes from extensions and shell aliases
 			return exitCode(extError.ExitCode())
 		}
@@ -286,8 +282,7 @@ func isExtensionCommand(rootCmd *cobra.Command, args []string) bool {
 // JSON fields and environment variables they need to correct themselves without
 // a second round trip.
 func printError(out io.Writer, cs *iostreams.ColorScheme, err error, cmd *cobra.Command, debug, fullHelp bool) {
-	var dnsError *net.DNSError
-	if errors.As(err, &dnsError) {
+	if dnsError, ok := errors.AsType[*net.DNSError](err); ok {
 		fmt.Fprintf(out, "error connecting to %s\n", dnsError.Name)
 		if debug {
 			fmt.Fprintln(out, dnsError)

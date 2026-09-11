@@ -320,8 +320,7 @@ func handleResponse(err error) error {
 		return nil
 	}
 
-	var restErr *ghAPI.HTTPError
-	if errors.As(err, &restErr) {
+	if restErr, ok := errors.AsType[*ghAPI.HTTPError](err); ok {
 		return HTTPError{
 			HTTPError: restErr,
 			scopesSuggestion: generateScopesSuggestion(restErr.StatusCode,
@@ -331,8 +330,7 @@ func handleResponse(err error) error {
 		}
 	}
 
-	var gqlErr *ghAPI.GraphQLError
-	if errors.As(err, &gqlErr) {
+	if gqlErr, ok := errors.AsType[*ghAPI.GraphQLError](err); ok {
 		return GraphQLError{
 			GraphQLError: gqlErr,
 		}

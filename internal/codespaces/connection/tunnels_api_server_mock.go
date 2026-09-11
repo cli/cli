@@ -64,10 +64,8 @@ func NewMockHttpClient(opts ...mockClientOpt) (*http.Client, error) {
 				},
 				Endpoints: []tunnels.TunnelEndpoint{
 					{
-						HostID: "host1",
-						TunnelRelayTunnelEndpoint: tunnels.TunnelRelayTunnelEndpoint{
-							ClientRelayURI: hostURL,
-						},
+						HostID:         "host1",
+						ClientRelayURI: hostURL,
 					},
 				},
 			}

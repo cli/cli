@@ -123,8 +123,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 	err = deleteRepo(httpClient, toDelete)
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
 			statusCode := httpErr.HTTPError.StatusCode
 			if statusCode == http.StatusMovedPermanently ||
 				statusCode == http.StatusTemporaryRedirect ||

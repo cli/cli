@@ -73,8 +73,7 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		if expectScopes(e.Token) {
 			sb.WriteString(fmt.Sprintf("  - Token scopes: %s\n", cs.Bold(displayScopes(e.Scopes))))
 			if err := shared.HeaderHasMinimumScopes(e.Scopes); err != nil {
-				var missingScopesError *shared.MissingScopesError
-				if errors.As(err, &missingScopesError) {
+				if missingScopesError, ok := errors.AsType[*shared.MissingScopesError](err); ok {
 					missingScopes := strings.Join(missingScopesError.MissingScopes, ",")
 					sb.WriteString(fmt.Sprintf("  %s Missing required token scopes: %s\n",
 						cs.WarningIcon(),

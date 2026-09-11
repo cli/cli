@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -717,10 +718,10 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 	} else {
 		state.Title = humanize(ctx.PRRefs.UnqualifiedHeadRef())
 		var body strings.Builder
-		for i := len(commits) - 1; i >= 0; i-- {
-			fmt.Fprintf(&body, "- **%s**\n", commits[i].Title)
+		for i, commit := range slices.Backward(commits) {
+			fmt.Fprintf(&body, "- **%s**\n", commit.Title)
 			if addBody {
-				x := regexPattern.ReplaceAllString(commits[i].Body, "  ")
+				x := regexPattern.ReplaceAllString(commit.Body, "  ")
 				fmt.Fprintf(&body, "%s", x)
 
 				if i > 0 {
@@ -859,10 +860,8 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 
 		return newCreateContext(skipPushRefs{
 			qualifiedHeadRef: qualifiedHeadRef,
-			baseRefs: baseRefs{
-				baseRepo:       baseRepo,
-				baseBranchName: baseBranch,
-			},
+			baseRepo:         baseRepo,
+			baseBranchName:   baseBranch,
 		}), nil
 	}
 
@@ -1255,10 +1254,8 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		refs = pushableRefs{
 			headRepo:       forkedRepo,
 			headBranchName: forkableRefs.qualifiedHeadRef.BranchName(),
-			baseRefs: baseRefs{
-				baseRepo:       forkableRefs.baseRepo,
-				baseBranchName: forkableRefs.baseBranchName,
-			},
+			baseRepo:       forkableRefs.baseRepo,
+			baseBranchName: forkableRefs.baseBranchName,
 		}
 	}
 

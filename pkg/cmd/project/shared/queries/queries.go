@@ -1266,8 +1266,7 @@ func (c *Client) OwnerIDAndType(login string) (string, OwnerType, error) {
 		// Due to the way the queries are structured, we don't know if a login belongs to a user
 		// or to an org, even though they are unique. To deal with this, we try both - if neither
 		// is found, we return the error.
-		var graphErr api.GraphQLError
-		if errors.As(err, &graphErr) {
+		if graphErr, ok := errors.AsType[api.GraphQLError](err); ok {
 			if graphErr.Match("NOT_FOUND", "user") && graphErr.Match("NOT_FOUND", "organization") {
 				return "", "", err
 			} else if graphErr.Match("NOT_FOUND", "organization") { // org isn't found must be a user
@@ -1702,8 +1701,7 @@ func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) error {
 }
 
 func handleError(err error) error {
-	var gerr api.GraphQLError
-	if errors.As(err, &gerr) {
+	if gerr, ok := errors.AsType[api.GraphQLError](err); ok {
 		missing := set.NewStringSet()
 		for _, e := range gerr.Errors {
 			if e.Type != "INSUFFICIENT_SCOPES" {

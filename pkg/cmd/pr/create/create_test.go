@@ -2817,10 +2817,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "main",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "main",
 				},
 			},
 			want:    "https://github.com/OWNER/REPO/compare/main...feature?body=&expand=1",
@@ -2831,10 +2829,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("b"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "a",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "a",
 				},
 			},
 			state: shared.IssueMetadataState{
@@ -2848,10 +2844,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: mustParseQualifiedHeadRef("ORIGINOWNER:feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "UPSTREAMOWNER"}}, "github.com"),
-						baseBranchName: "main/trunk",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "UPSTREAMOWNER"}}, "github.com"),
+					baseBranchName:   "main/trunk",
 				},
 			},
 			want:    "https://github.com/UPSTREAMOWNER/REPO/compare/main%2Ftrunk...ORIGINOWNER:feature?body=&expand=1",
@@ -2868,10 +2862,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: mustParseQualifiedHeadRef("ORIGINOWNER:!$&'()+,;=@"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "UPSTREAMOWNER"}}, "github.com"),
-						baseBranchName: "main/trunk",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "UPSTREAMOWNER"}}, "github.com"),
+					baseBranchName:   "main/trunk",
 				},
 			},
 			want:    "https://github.com/UPSTREAMOWNER/REPO/compare/main%2Ftrunk...ORIGINOWNER:%21$&%27%28%29+%2C%3B=@?body=&expand=1",
@@ -2882,10 +2874,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "main",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "main",
 				},
 			},
 			state: shared.IssueMetadataState{
@@ -2901,10 +2891,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "main",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "main",
 				},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -2950,10 +2938,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "main",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "main",
 				},
 			},
 			state: shared.IssueMetadataState{

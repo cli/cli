@@ -578,42 +578,40 @@ func Test_editRun(t *testing.T) {
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
 				Interactive:  false,
-				Editable: prShared.Editable{
-					Title: prShared.EditableString{
-						Value:  "new title",
+				Title: prShared.EditableString{
+					Value:  "new title",
+					Edited: true,
+				},
+				Body: prShared.EditableString{
+					Value:  "new body",
+					Edited: true,
+				},
+				Assignees: prShared.EditableAssignees{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
 						Edited: true,
 					},
-					Body: prShared.EditableString{
-						Value:  "new body",
+				},
+				Labels: prShared.EditableSlice{
+					Add:    []string{"feature", "TODO", "bug"},
+					Remove: []string{"docs"},
+					Edited: true,
+				},
+				Projects: prShared.EditableProjects{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"Cleanup", "CleanupV2"},
+						Remove: []string{"Roadmap", "RoadmapV2"},
 						Edited: true,
 					},
-					Assignees: prShared.EditableAssignees{
-						EditableSlice: prShared.EditableSlice{
-							Add:    []string{"monalisa", "hubot"},
-							Remove: []string{"octocat"},
-							Edited: true,
-						},
-					},
-					Labels: prShared.EditableSlice{
-						Add:    []string{"feature", "TODO", "bug"},
-						Remove: []string{"docs"},
-						Edited: true,
-					},
-					Projects: prShared.EditableProjects{
-						EditableSlice: prShared.EditableSlice{
-							Add:    []string{"Cleanup", "CleanupV2"},
-							Remove: []string{"Roadmap", "RoadmapV2"},
-							Edited: true,
-						},
-					},
-					Milestone: prShared.EditableString{
-						Value:  "GA",
-						Edited: true,
-					},
-					Metadata: api.RepoMetadataResult{
-						Labels: []api.RepoLabel{
-							{Name: "docs", ID: "DOCSID"},
-						},
+				},
+				Milestone: prShared.EditableString{
+					Value:  "GA",
+					Edited: true,
+				},
+				Metadata: api.RepoMetadataResult{
+					Labels: []api.RepoLabel{
+						{Name: "docs", ID: "DOCSID"},
 					},
 				},
 				FetchOptions: prShared.FetchOptions,
@@ -635,30 +633,28 @@ func Test_editRun(t *testing.T) {
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{456, 123},
 				Interactive:  false,
-				Editable: prShared.Editable{
-					Assignees: prShared.EditableAssignees{
-						EditableSlice: prShared.EditableSlice{
-							Add:    []string{"monalisa", "hubot"},
-							Remove: []string{"octocat"},
-							Edited: true,
-						},
-					},
-					Labels: prShared.EditableSlice{
-						Add:    []string{"feature", "TODO", "bug"},
-						Remove: []string{"docs"},
+				Assignees: prShared.EditableAssignees{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
 						Edited: true,
 					},
-					Projects: prShared.EditableProjects{
-						EditableSlice: prShared.EditableSlice{
-							Add:    []string{"Cleanup", "CleanupV2"},
-							Remove: []string{"Roadmap", "RoadmapV2"},
-							Edited: true,
-						},
-					},
-					Milestone: prShared.EditableString{
-						Value:  "GA",
+				},
+				Labels: prShared.EditableSlice{
+					Add:    []string{"feature", "TODO", "bug"},
+					Remove: []string{"docs"},
+					Edited: true,
+				},
+				Projects: prShared.EditableProjects{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"Cleanup", "CleanupV2"},
+						Remove: []string{"Roadmap", "RoadmapV2"},
 						Edited: true,
 					},
+				},
+				Milestone: prShared.EditableString{
+					Value:  "GA",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -690,30 +686,28 @@ func Test_editRun(t *testing.T) {
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123, 9999},
 				Interactive:  false,
-				Editable: prShared.Editable{
-					Assignees: prShared.EditableAssignees{
-						EditableSlice: prShared.EditableSlice{
-							Add:    []string{"monalisa", "hubot"},
-							Remove: []string{"octocat"},
-							Edited: true,
-						},
-					},
-					Labels: prShared.EditableSlice{
-						Add:    []string{"feature", "TODO", "bug"},
-						Remove: []string{"docs"},
+				Assignees: prShared.EditableAssignees{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
 						Edited: true,
 					},
-					Projects: prShared.EditableProjects{
-						EditableSlice: prShared.EditableSlice{
-							Add:    []string{"Cleanup", "CleanupV2"},
-							Remove: []string{"Roadmap", "RoadmapV2"},
-							Edited: true,
-						},
-					},
-					Milestone: prShared.EditableString{
-						Value:  "GA",
+				},
+				Labels: prShared.EditableSlice{
+					Add:    []string{"feature", "TODO", "bug"},
+					Remove: []string{"docs"},
+					Edited: true,
+				},
+				Projects: prShared.EditableProjects{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"Cleanup", "CleanupV2"},
+						Remove: []string{"Roadmap", "RoadmapV2"},
 						Edited: true,
 					},
+				},
+				Milestone: prShared.EditableString{
+					Value:  "GA",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -738,18 +732,16 @@ func Test_editRun(t *testing.T) {
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123, 456},
 				Interactive:  false,
-				Editable: prShared.Editable{
-					Assignees: prShared.EditableAssignees{
-						EditableSlice: prShared.EditableSlice{
-							Add:    []string{"monalisa", "hubot"},
-							Remove: []string{"octocat"},
-							Edited: true,
-						},
-					},
-					Milestone: prShared.EditableString{
-						Value:  "GA",
+				Assignees: prShared.EditableAssignees{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
 						Edited: true,
 					},
+				},
+				Milestone: prShared.EditableString{
+					Value:  "GA",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -954,11 +946,9 @@ func Test_editRun(t *testing.T) {
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
 				Interactive:  false,
-				Editable: prShared.Editable{
-					IssueType: prShared.EditableString{
-						Value:  "Bug",
-						Edited: true,
-					},
+				IssueType: prShared.EditableString{
+					Value:  "Bug",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -991,11 +981,9 @@ func Test_editRun(t *testing.T) {
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
 				Interactive:  false,
-				Editable: prShared.Editable{
-					IssueType: prShared.EditableString{
-						Value:  "NotAType",
-						Edited: true,
-					},
+				IssueType: prShared.EditableString{
+					Value:  "NotAType",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -1352,11 +1340,9 @@ func Test_editRun(t *testing.T) {
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123, 456},
 				Interactive:  false,
-				Editable: prShared.Editable{
-					IssueType: prShared.EditableString{
-						Value:  "Bug",
-						Edited: true,
-					},
+				IssueType: prShared.EditableString{
+					Value:  "Bug",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -1410,11 +1396,9 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
-				Editable: prShared.Editable{
-					Body: prShared.EditableString{
-						Value:  "a new body",
-						Edited: true,
-					},
+				Body: prShared.EditableString{
+					Value:  "a new body",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -1431,11 +1415,9 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
-				Editable: prShared.Editable{
-					Body: prShared.EditableString{
-						Value:  "",
-						Edited: true,
-					},
+				Body: prShared.EditableString{
+					Value:  "",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -1452,11 +1434,9 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
-				Editable: prShared.Editable{
-					Title: prShared.EditableString{
-						Value:  "a new title",
-						Edited: true,
-					},
+				Title: prShared.EditableString{
+					Value:  "a new title",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -1524,11 +1504,9 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
-				Editable: prShared.Editable{
-					Title: prShared.EditableString{
-						Value:  "a new title",
-						Edited: true,
-					},
+				Title: prShared.EditableString{
+					Value:  "a new title",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -1597,11 +1575,9 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
-				Editable: prShared.Editable{
-					Body: prShared.EditableString{
-						Value:  "See below",
-						Edited: true,
-					},
+				Body: prShared.EditableString{
+					Value:  "See below",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -1619,11 +1595,9 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
-				Editable: prShared.Editable{
-					Title: prShared.EditableString{
-						Value:  "a new title",
-						Edited: true,
-					},
+				Title: prShared.EditableString{
+					Value:  "a new title",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -1714,11 +1688,9 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
-				Editable: prShared.Editable{
-					Title: prShared.EditableString{
-						Value:  "a new title",
-						Edited: true,
-					},
+				Title: prShared.EditableString{
+					Value:  "a new title",
+					Edited: true,
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -2174,12 +2146,10 @@ func TestApiActorsSupported(t *testing.T) {
 			},
 			Detector:     &fd.EnabledDetectorMock{},
 			IssueNumbers: []int{123},
-			Editable: prShared.Editable{
-				Assignees: prShared.EditableAssignees{
-					EditableSlice: prShared.EditableSlice{
-						Add:    []string{"monalisa", "octocat"},
-						Edited: true,
-					},
+			Assignees: prShared.EditableAssignees{
+				EditableSlice: prShared.EditableSlice{
+					Add:    []string{"monalisa", "octocat"},
+					Edited: true,
 				},
 			},
 		})
@@ -2214,12 +2184,10 @@ func TestApiActorsSupported(t *testing.T) {
 			},
 			Detector:     &fd.DisabledDetectorMock{},
 			IssueNumbers: []int{123},
-			Editable: prShared.Editable{
-				Assignees: prShared.EditableAssignees{
-					EditableSlice: prShared.EditableSlice{
-						Add:    []string{"monalisa", "octocat"},
-						Edited: true,
-					},
+			Assignees: prShared.EditableAssignees{
+				EditableSlice: prShared.EditableSlice{
+					Add:    []string{"monalisa", "octocat"},
+					Edited: true,
 				},
 			},
 		})
@@ -2257,12 +2225,10 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			Detector: &fd.EnabledDetectorMock{},
 
 			IssueNumbers: []int{123},
-			Editable: prShared.Editable{
-				Projects: prShared.EditableProjects{
-					EditableSlice: prShared.EditableSlice{
-						Add:    []string{"Test Project"},
-						Edited: true,
-					},
+			Projects: prShared.EditableProjects{
+				EditableSlice: prShared.EditableSlice{
+					Add:    []string{"Test Project"},
+					Edited: true,
 				},
 			},
 		})
@@ -2298,12 +2264,10 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			Detector: &fd.DisabledDetectorMock{},
 
 			IssueNumbers: []int{123},
-			Editable: prShared.Editable{
-				Projects: prShared.EditableProjects{
-					EditableSlice: prShared.EditableSlice{
-						Add:    []string{"Test Project"},
-						Edited: true,
-					},
+			Projects: prShared.EditableProjects{
+				EditableSlice: prShared.EditableSlice{
+					Add:    []string{"Test Project"},
+					Edited: true,
 				},
 			},
 		})
