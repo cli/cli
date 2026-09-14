@@ -13,11 +13,9 @@ func createSampleResult() *AttestationProcessingResult {
 		VerificationResult: &verify.VerificationResult{
 			Signature: &verify.SignatureVerificationResult{
 				Certificate: &certificate.Summary{
-					Extensions: certificate.Extensions{
-						SourceRepositoryOwnerURI: "https://github.com/owner",
-						SourceRepositoryURI:      "https://github.com/owner/repo",
-						Issuer:                   "https://token.actions.githubusercontent.com",
-					},
+					SourceRepositoryOwnerURI: "https://github.com/owner",
+					SourceRepositoryURI:      "https://github.com/owner/repo",
+					Issuer:                   "https://token.actions.githubusercontent.com",
 				},
 			},
 		},
@@ -27,10 +25,10 @@ func createSampleResult() *AttestationProcessingResult {
 func TestVerifyCertExtensions(t *testing.T) {
 	results := []*AttestationProcessingResult{createSampleResult()}
 
-	certSummary := certificate.Summary{}
-	certSummary.SourceRepositoryOwnerURI = "https://github.com/owner"
-	certSummary.SourceRepositoryURI = "https://github.com/owner/repo"
-	certSummary.Issuer = GitHubOIDCIssuer
+	certSummary := certificate.Summary{
+		SourceRepositoryOwnerURI: "https://github.com/owner",
+		SourceRepositoryURI:      "https://github.com/owner/repo",
+		Issuer:                   GitHubOIDCIssuer}
 
 	c := EnforcementCriteria{
 		Certificate: certSummary,

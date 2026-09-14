@@ -1127,8 +1127,7 @@ func TestClientParsePushRevision(t *testing.T) {
 			}
 			trackingRef, err := client.PushRevision(context.Background(), tt.branch)
 			if tt.wantError != nil {
-				var wantErrorAsGit *GitError
-				if errors.As(err, &wantErrorAsGit) {
+				if wantErrorAsGit, ok := errors.AsType[*GitError](err); ok {
 					var gitError *GitError
 					require.ErrorAs(t, err, &gitError)
 					assert.Equal(t, wantErrorAsGit.ExitCode, gitError.ExitCode)

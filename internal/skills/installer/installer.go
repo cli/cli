@@ -217,8 +217,7 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 		// guard against it in case the walk input is ever changed.
 		safeDest, err := safeSkillDir.Join(relPath)
 		if err != nil {
-			var traversalErr safepaths.PathTraversalError
-			if errors.As(err, &traversalErr) {
+			if _, ok := errors.AsType[safepaths.PathTraversalError](err); ok {
 				return fmt.Errorf("blocked path traversal in %q", relPath)
 			}
 			return fmt.Errorf("could not resolve destination path: %w", err)
@@ -279,8 +278,7 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 
 		safeDest, err := safeSkillDir.Join(relPath)
 		if err != nil {
-			var traversalErr safepaths.PathTraversalError
-			if errors.As(err, &traversalErr) {
+			if _, ok := errors.AsType[safepaths.PathTraversalError](err); ok {
 				return fmt.Errorf("blocked path traversal in %q", relPath)
 			}
 			return fmt.Errorf("could not resolve destination path: %w", err)
