@@ -25,6 +25,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// noIssueType is the interactive prompt choice for leaving an issue untyped.
+// It leads the option list, so later choices are offset by one from the issue
+// types fetched for the repository.
+const noIssueType = "(none)"
+
 type CreateOptions struct {
 	HttpClient       func() (*http.Client, error)
 	Config           func() (gh.Config, error)
@@ -363,17 +368,20 @@ func createRun(opts *CreateOptions) (err error) {
 		if opts.IssueType == "" {
 			issueTypes, typesErr := api.RepoIssueTypes(apiClient, baseRepo)
 			if typesErr == nil && len(issueTypes) > 0 {
-				typeNames := make([]string, len(issueTypes))
-				for i, t := range issueTypes {
-					typeNames[i] = t.Name
+				typeNames := make([]string, 0, len(issueTypes)+1)
+				typeNames = append(typeNames, noIssueType)
+				for _, t := range issueTypes {
+					typeNames = append(typeNames, t.Name)
 				}
 				var selected int
 				selected, err = opts.Prompter.Select("Issue type", "", typeNames)
 				if err != nil {
 					return
 				}
-				opts.IssueType = typeNames[selected]
-				opts.issueTypeID = issueTypes[selected].ID
+				if selected > 0 {
+					opts.IssueType = typeNames[selected]
+					opts.issueTypeID = issueTypes[selected-1].ID
+				}
 			}
 		}
 
