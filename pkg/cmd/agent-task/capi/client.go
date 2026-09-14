@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+
+	"github.com/cli/cli/v2/internal/gh"
 )
 
 //go:generate moq -rm -out client_mock.go . CapiClient
@@ -27,14 +29,20 @@ type CAPIClient struct {
 	capiBaseURL string
 }
 
-// NewCAPIClient creates a new CAPI client. Provide a token, the user's GitHub
-// host, the resolved Copilot API URL, and an HTTP client which will be used as
-// the base transport for CAPI requests.
+// authConfig resolves the active token for a GitHub host, refreshing a short-lived token when it is near expiry.
+// It is satisfied by gh's AuthConfig and lets the transport obtain a fresh token on each request.
+type authConfig interface {
+	ActiveTokenWithRefresh(hostname string) (gh.Credential, gh.RefreshStatus, error)
+}
+
+// NewCAPIClient creates a new CAPI client. Provide an auth source, the user's
+// GitHub host, the resolved Copilot API URL, and an HTTP client which will be
+// used as the base transport for CAPI requests.
 //
 // The provided HTTP client will be mutated for use with CAPI, so it should not
 // be reused elsewhere.
-func NewCAPIClient(httpClient *http.Client, token string, host string, capiBaseURL string) *CAPIClient {
-	httpClient.Transport = newCAPITransport(token, capiBaseURL, httpClient.Transport)
+func NewCAPIClient(httpClient *http.Client, authCfg authConfig, host string, capiBaseURL string) *CAPIClient {
+	httpClient.Transport = newCAPITransport(authCfg, host, capiBaseURL, httpClient.Transport)
 	return &CAPIClient{
 		httpClient:  httpClient,
 		host:        host,
@@ -45,24 +53,30 @@ func NewCAPIClient(httpClient *http.Client, token string, host string, capiBaseU
 // capiTransport adds the Copilot auth headers
 type capiTransport struct {
 	rp       http.RoundTripper
-	token    string
+	authCfg  authConfig
+	host     string
 	capiHost string
 }
 
-func newCAPITransport(token string, capiBaseURL string, rp http.RoundTripper) *capiTransport {
+func newCAPITransport(authCfg authConfig, host string, capiBaseURL string, rp http.RoundTripper) *capiTransport {
 	capiHost := ""
 	if u, err := url.Parse(capiBaseURL); err == nil {
 		capiHost = u.Host
 	}
 	return &capiTransport{
 		rp:       rp,
-		token:    token,
+		authCfg:  authCfg,
+		host:     host,
 		capiHost: capiHost,
 	}
 }
 
 func (ct *capiTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("Authorization", "Bearer "+ct.token)
+	// Resolve the token per request so a short-lived token is refreshed just before use. The base transport's own
+	// refresh is skipped once we set the Authorization header, so the CAPI transport must refresh here itself.
+	// Refresh is best effort: a failed refresh still yields the last stored token and the API decides its validity.
+	cred, _, _ := ct.authCfg.ActiveTokenWithRefresh(ct.host)
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
 
 	// Since this RoundTrip is reused for both Copilot API and
 	// GitHub API requests, we conditionally add the integration
