@@ -277,8 +277,7 @@ func (c *LiveClient) getBundle(url safeurl.SafeURL) (*bundle.Bundle, error) {
 }
 
 func shouldRetry(err error) bool {
-	var httpError api.HTTPError
-	if errors.As(err, &httpError) {
+	if httpError, ok := errors.AsType[api.HTTPError](err); ok {
 		if httpError.StatusCode >= 500 && httpError.StatusCode <= 599 {
 			return true
 		}

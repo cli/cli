@@ -128,8 +128,7 @@ func ConcurrentUpload(httpClient *http.Client, hostname string, uploadURL safeur
 }
 
 func shouldRetry(err error) bool {
-	var networkError errNetwork
-	if errors.As(err, &networkError) {
+	if _, ok := errors.AsType[errNetwork](err); ok {
 		return true
 	}
 	var httpError api.HTTPError

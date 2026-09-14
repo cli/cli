@@ -459,8 +459,8 @@ func skillNameFromSourcePath(sourcePath string) string {
 	}
 
 	parts := strings.Split(sourcePath, "/")
-	for i := len(parts) - 1; i >= 0; i-- {
-		if parts[i] != "skills" {
+	for i, part := range slices.Backward(parts) {
+		if part != "skills" {
 			continue
 		}
 

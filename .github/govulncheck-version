@@ -1,4 +1,4 @@
 # This pin lives outside .github/workflows so bump-go can update it with the
 # workflow GITHUB_TOKEN, which cannot push workflow-file changes. govulncheck
 # embeds x/tools and is refreshed on Go language bumps to support new syntax.
-v1.1.4
+v1.8.0

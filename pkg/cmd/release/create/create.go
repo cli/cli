@@ -513,8 +513,7 @@ func createRun(opts *CreateOptions) error {
 
 	newRelease, err := createRelease(httpClient, baseRepo, params)
 
-	var errMissingRequiredWorkflowScope *errMissingRequiredWorkflowScope
-	if errors.As(err, &errMissingRequiredWorkflowScope) {
+	if errMissingRequiredWorkflowScope, ok := errors.AsType[*errMissingRequiredWorkflowScope](err); ok {
 		host := errMissingRequiredWorkflowScope.Hostname
 		refreshInstructions := fmt.Sprintf("gh auth refresh -h %[1]s -s workflow", host)
 		cs := opts.IO.ColorScheme()
