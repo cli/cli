@@ -18,9 +18,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type token string
-type username string
-
 type RefreshOptions struct {
 	IO              *iostreams.IOStreams
 	Config          func() (gh.Config, error)
@@ -34,10 +31,11 @@ type RefreshOptions struct {
 	Scopes       []string
 	RemoveScopes []string
 	ResetScopes  bool
-	AuthFlow     func(*http.Client, *iostreams.IOStreams, string, []string, bool, bool) (token, username, error)
+	AuthFlow     func(*http.Client, *iostreams.IOStreams, string, []string, bool, bool, bool) (*authflow.AuthResult, error)
 
 	Interactive     bool
 	InsecureStorage bool
+	ShortLived      bool
 	Clipboard       *bool
 }
 
@@ -45,9 +43,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(httpClient *http.Client, io *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool) (token, username, error) {
-			t, u, err := authflow.AuthFlow(httpClient, hostname, io, "", scopes, interactive, f.Browser, clipboard)
-			return token(t), username(u), err
+		AuthFlow: func(httpClient *http.Client, io *iostreams.IOStreams, hostname string, scopes []string, interactive, clipboard, requestRefreshToken bool) (*authflow.AuthResult, error) {
+			return authflow.AuthFlow(httpClient, hostname, io, "", scopes, interactive, f.Browser, clipboard, requestRefreshToken)
 		},
 		PlainHttpClient: f.PlainHttpClient,
 		GitClient:       f.GitClient,
@@ -75,6 +72,14 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			If you have multiple accounts in %[1]sgh auth status%[1]s and want to refresh the credentials for an
 			inactive account, you will have to use %[1]sgh auth switch%[1]s to that account first before using
 			this command, and then switch back when you are done.
+
+			Use %[1]s--short-lived%[1]s to prefer short-lived credentials that gh refreshes automatically.
+			This is a preference, not a guarantee: whether short-lived tokens are issued depends on the
+			host and the OAuth app configuration. A host without support issues a non-expiring token
+			instead, and a host configured for them may issue short-lived tokens even without the flag.
+			When using short-lived credentials for git operations, git 2.46 or newer is recommended so
+			gh can mark the token as non-cacheable; with older git a credential caching helper may store
+			and reuse an expired token.
 
 			For more information on OAuth scopes, see
 			<https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps/>.
@@ -121,6 +126,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	_ = cmd.Flags().MarkHidden("secure-storage")
 
 	cmd.Flags().BoolVarP(&opts.InsecureStorage, "insecure-storage", "", false, "Save authentication credentials in plain text instead of credential store")
+	cmd.Flags().BoolVar(&opts.ShortLived, "short-lived", false, "Prefer short-lived credentials that gh refreshes automatically, if the host supports them")
 
 	return cmd
 }
@@ -164,6 +170,16 @@ func refreshRun(opts *RefreshOptions) error {
 		return cmdutil.SilentError
 	}
 
+	cs := opts.IO.ColorScheme()
+
+	// Capture whether the stored credential is refreshable before it is replaced. Warn up front (before the credential
+	// and browser prompts) so the user can abort rather than discover only afterwards that refreshing without
+	// --short-lived downgrades it to a non-expiring token.
+	wasRefreshable := authCfg.ActiveToken(hostname).IsRefreshable()
+	if wasRefreshable && !opts.ShortLived {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was short-lived; pass --short-lived to preserve it\n", cs.WarningIcon())
+	}
+
 	additionalScopes := set.NewStringSet()
 
 	if !opts.ResetScopes {
@@ -201,26 +217,50 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	authedToken, authedUser, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, copyToClipboard)
+	result, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, copyToClipboard, opts.ShortLived)
 	if err != nil {
 		return err
 	}
 	activeUser, _ := authCfg.ActiveUser(hostname)
-	if activeUser != "" && username(activeUser) != authedUser {
-		return fmt.Errorf("error refreshing credentials for %s, received credentials for %s, did you use the correct account in the browser?", activeUser, authedUser)
+	if activeUser != "" && activeUser != result.Username {
+		return fmt.Errorf("error refreshing credentials for %s, received credentials for %s, did you use the correct account in the browser?", activeUser, result.Username)
 	}
-	if _, err := authCfg.Login(hostname, string(authedUser), string(authedToken), "", !opts.InsecureStorage); err != nil {
-		return err
+	if result.Refreshable != nil {
+		if _, err := authCfg.LoginRefreshable(hostname, result.Username, *result.Refreshable, "", !opts.InsecureStorage); err != nil {
+			return err
+		}
+	} else {
+		if _, err := authCfg.Login(hostname, result.Username, result.Token, "", !opts.InsecureStorage); err != nil {
+			return err
+		}
 	}
 
-	cs := opts.IO.ColorScheme()
 	fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 
+	// Short-lived tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
+	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
+	switch {
+	case result.Refreshable != nil && !opts.ShortLived:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues short-lived refreshable token\n", cs.WarningIcon())
+	case result.Refreshable != nil:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Received short-lived refreshable token\n", cs.SuccessIcon())
+	case wasRefreshable && !opts.ShortLived:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was short-lived; pass --short-lived to preserve it\n", cs.WarningIcon())
+	case opts.ShortLived:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue a short-lived refreshable token\n", cs.WarningIcon())
+	}
+
 	if credentialFlow.ShouldSetup() {
+		// The active token was just minted by the auth flow above, so it cannot be expired here. We use
+		// ActiveToken rather than the WithRefresh variant to avoid a needless refresh round-trip.
 		username, _ := authCfg.ActiveUser(hostname)
 		password := authCfg.ActiveToken(hostname).Token
-		if err := credentialFlow.Setup(hostname, username, password); err != nil {
+		warning, err := credentialFlow.Setup(hostname, username, password, result.Refreshable != nil)
+		if err != nil {
 			return err
+		}
+		if warning != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "%s %s\n", cs.WarningIcon(), warning)
 		}
 	}
 
