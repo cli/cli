@@ -238,10 +238,8 @@ EOF
 REMOTE_BRANCH_SHA=$(git ls-remote --heads origin "refs/heads/$BRANCH" | cut -f1)
 if [[ -n "$REMOTE_BRANCH_SHA" ]]; then
   echo "Replacing existing remote branch $BRANCH"
-  git push --force-with-lease="refs/heads/$BRANCH:$REMOTE_BRANCH_SHA" -u origin "$BRANCH"
-else
-  git push -u origin "$BRANCH"
 fi
+git push --force-with-lease="refs/heads/$BRANCH:$REMOTE_BRANCH_SHA" -u origin "$BRANCH"
 
 gh pr create --title "$PR_TITLE" --body "$PR_BODY" --fill
 
