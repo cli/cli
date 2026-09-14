@@ -515,8 +515,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		%s
 	}
 	`, strings.Join(queries, "")), nil, &graphqlResult)
-	var graphqlError GraphQLError
-	if errors.As(err, &graphqlError) {
+	if graphqlError, ok := errors.AsType[GraphQLError](err); ok {
 		// If the only errors are that certain repositories are not found,
 		// continue processing this response instead of returning an error
 		tolerated := true
