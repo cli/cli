@@ -8,7 +8,10 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/authflow"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
@@ -24,6 +27,14 @@ type tinyConfig map[string]string
 func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt bool) (bool, error) {
 	c[fmt.Sprintf("%s:%s", host, "user")] = username
 	c[fmt.Sprintf("%s:%s", host, "oauth_token")] = token
+	c[fmt.Sprintf("%s:%s", host, "git_protocol")] = gitProtocol
+	return false, nil
+}
+
+func (c tinyConfig) LoginRefreshable(host, username string, credential gh.Credential, gitProtocol string, encrypt bool) (bool, error) {
+	c[fmt.Sprintf("%s:%s", host, "user")] = username
+	c[fmt.Sprintf("%s:%s", host, "oauth_token")] = credential.Token
+	c[fmt.Sprintf("%s:%s", host, "refresh_token")] = credential.RefreshToken
 	c[fmt.Sprintf("%s:%s", host, "git_protocol")] = gitProtocol
 	return false, nil
 }
@@ -286,6 +297,79 @@ func TestLogin(t *testing.T) {
 				✓ Configured git protocol
 				✓ Logged in as monalisa
 			`),
+		},
+		{
+			name: "web flow, host issues a refreshable credential",
+			opts: LoginOptions{
+				Hostname:   "example.com",
+				Web:        true,
+				ShortLived: true,
+				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
+					if !requestRefreshToken {
+						t.Error("expected requestRefreshToken to be true")
+					}
+					return &authflow.AuthResult{
+						Token:       "gho_access",
+						Username:    "monalisa",
+						Refreshable: &gh.Credential{Token: "gho_access", RefreshToken: "ghr_refresh"},
+					}, nil
+				},
+			},
+			wantsConfig: map[string]string{
+				"example.com:user":          "monalisa",
+				"example.com:oauth_token":   "gho_access",
+				"example.com:refresh_token": "ghr_refresh",
+				"example.com:git_protocol":  "",
+			},
+			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
+				assert.Contains(t, stderr, "Authentication complete.")
+				assert.Contains(t, stderr, "Received short-lived refreshable token\n")
+			},
+		},
+		{
+			name: "web flow, host issues a refreshable credential without being asked",
+			opts: LoginOptions{
+				Hostname: "example.com",
+				Web:      true,
+				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
+					if requestRefreshToken {
+						t.Error("expected requestRefreshToken to be false")
+					}
+					return &authflow.AuthResult{
+						Token:       "gho_access",
+						Username:    "monalisa",
+						Refreshable: &gh.Credential{Token: "gho_access", RefreshToken: "ghr_refresh"},
+					}, nil
+				},
+			},
+			wantsConfig: map[string]string{
+				"example.com:user":          "monalisa",
+				"example.com:oauth_token":   "gho_access",
+				"example.com:refresh_token": "ghr_refresh",
+				"example.com:git_protocol":  "",
+			},
+			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
+				assert.Contains(t, stderr, "Host issues short-lived refreshable token\n")
+			},
+		},
+		{
+			name: "web flow, short-lived requested but host issues a non-expiring token",
+			opts: LoginOptions{
+				Hostname:   "example.com",
+				Web:        true,
+				ShortLived: true,
+				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, _ bool) (*authflow.AuthResult, error) {
+					return &authflow.AuthResult{Token: "gho_plain", Username: "monalisa"}, nil
+				},
+			},
+			wantsConfig: map[string]string{
+				"example.com:user":         "monalisa",
+				"example.com:oauth_token":  "gho_plain",
+				"example.com:git_protocol": "",
+			},
+			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
+				assert.Contains(t, stderr, "Host did not issue a short-lived refreshable token\n")
+			},
 		},
 	}
 
