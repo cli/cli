@@ -2,6 +2,7 @@ package shared
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
@@ -76,13 +77,34 @@ func (flow *GitCredentialFlow) ShouldSetup() bool {
 	return flow.shouldSetup
 }
 
-func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error {
+// Setup configures git to use the newly obtained credential for the given hostname.
+//
+// If no credential helper is configured for the host, gh configures itself as the helper. Otherwise a non-gh helper
+// is already configured: for a non-refreshable credential the existing helper is updated with the new credential, but
+// for a refreshable credential the existing credential is rejected and nothing is stored, because an external helper
+// cannot refresh a short-lived token and would keep serving it after it expires. In that case a non-empty warning is
+// returned so the caller can advise the user to configure gh as the git credential helper. The warning is undecorated
+// so the caller controls presentation.
+func (flow *GitCredentialFlow) Setup(hostname, username, authToken string, refreshable bool) (string, error) {
 	// If there is no credential helper configured then we will set ourselves up as
 	// the credential helper for this host.
 	if !flow.helper.IsConfigured() {
-		return flow.HelperConfig.ConfigureOurs(hostname)
+		return "", flow.HelperConfig.ConfigureOurs(hostname)
+	}
+
+	// A non-gh helper is configured. It cannot refresh a short-lived token and would keep serving the token after it
+	// expires, so we do not store a refreshable credential in it. We clear any existing credential so the problem
+	// surfaces immediately rather than silently after expiry, and return a warning for the caller to show.
+	if refreshable {
+		if err := flow.Updater.RejectExisting(hostname); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf(
+			"The configured git credential helper for %[1]s cannot refresh short-lived tokens, so git operations will fail once the token expires. Run 'gh auth setup-git --hostname %[1]s' to let gh manage git authentication.",
+			hostname,
+		), nil
 	}
 
 	// Otherwise, we'll tell git to inform the existing credential helper of the new credentials.
-	return flow.Updater.Update(hostname, username, authToken)
+	return "", flow.Updater.Update(hostname, username, authToken)
 }
