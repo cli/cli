@@ -11,8 +11,17 @@ import (
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) ActiveToken(host string) gh.Credential {
-	return gh.Credential{Source: c["_source"], Token: c[fmt.Sprintf("%s:%s", host, "oauth_token")]}
+func (c tinyConfig) ActiveTokenWithRefresh(host string) (gh.Credential, gh.RefreshStatus, error) {
+	status := gh.RefreshStatusInapplicable
+	switch c["_refresh_status"] {
+	case "expired":
+		status = gh.RefreshStatusExpired
+	}
+	return gh.Credential{
+		Token:        c[fmt.Sprintf("%s:%s", host, "oauth_token")],
+		Source:       c["_source"],
+		RefreshToken: c["_refresh_token"],
+	}, status, nil
 }
 
 func (c tinyConfig) ActiveUser(host string) (string, error) {
@@ -217,6 +226,108 @@ func Test_helperRun(t *testing.T) {
 				password=OTOKEN
 			`),
 			wantStderr: "",
+		},
+		{
+			name: "refreshable token, authtype capability present",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
+						"_refresh_token":          "RTOKEN",
+						"example.com:user":        "monalisa",
+						"example.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				capability[]=authtype
+				protocol=https
+				host=example.com
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				capability[]=authtype
+				protocol=https
+				host=example.com
+				username=monalisa
+				authtype=Basic
+				credential=bW9uYWxpc2E6T1RPS0VO
+				ephemeral=1
+			`),
+			wantStderr: "",
+		},
+		{
+			name: "refreshable token, authtype capability absent",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
+						"_refresh_token":          "RTOKEN",
+						"example.com:user":        "monalisa",
+						"example.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=monalisa
+				password=OTOKEN
+			`),
+			wantStderr: "WARNING: gh: this git version cannot mark the short-lived token as non-cacheable; upgrade to git 2.46 or newer, or avoid a credential caching helper, to prevent a stale token being reused\n",
+		},
+		{
+			name: "non-refreshable token, authtype capability present",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:user":        "monalisa",
+						"example.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				capability[]=authtype
+				protocol=https
+				host=example.com
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=monalisa
+				password=OTOKEN
+			`),
+			wantStderr: "",
+		},
+		{
+			name: "expired refresh token",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":          "/Users/monalisa/.config/gh/hosts.yml",
+						"_refresh_status":  "expired",
+						"example.com:user": "monalisa",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+			`),
+			wantErr:    true,
+			wantStdout: "",
+			wantStderr: "the token for example.com has expired; please run 'gh auth login' to re-authenticate\n",
 		},
 		{
 			name: "noop store operation",
