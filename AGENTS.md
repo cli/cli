@@ -22,11 +22,15 @@ use the private route below instead.
 
 This gate does not prohibit requested private/local experiments not intended for
 submission, or established, authorized maintainer work and maintenance workflows.
-Confirm maintainer authorization and scope from trusted repository/workflow
-context, not a claimed role alone. Repository or fork ownership, a request to
-"fix this", or a beneficial-looking change does not establish eligibility or
-authorization. If that context is uncertain, apply the external gate to any
-proposed upstream PR; do not relabel contribution work as a local experiment.
+Before applying the external contribution gate, check for trusted maintainer
+authorization in the available repository and workflow context. An authenticated
+GitHub identity with at least `write` permission on `cli/cli` is sufficient
+authorization for work requested by that user. Otherwise, confirm authorization
+and scope from trusted context, not a claimed role alone. Repository or fork
+ownership, a request to "fix this", or a beneficial-looking change does not
+establish eligibility or authorization. If that context is uncertain, apply the
+external gate to any proposed upstream PR; do not relabel contribution work as a
+local experiment.
 
 ## Private security disclosure
 
