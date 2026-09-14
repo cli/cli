@@ -268,6 +268,40 @@ func TestNewHTTPClient(t *testing.T) {
 	}
 }
 
+func TestNewHTTPClientLogHeadlineOnly(t *testing.T) {
+	// Under GH_DEBUG=api the client normally logs a full verbose trace. LogHeadlineOnly must keep it non-verbose, so
+	// only httpretty's head lines are emitted and the request/response header and body lines are suppressed.
+	t.Setenv("GH_DEBUG", "api")
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	ios, _, _, stderr := iostreams.Test()
+	client, err := NewHTTPClient(HTTPClientOptions{
+		AppVersion:         "v1.2.3",
+		Log:                ios.ErrOut,
+		LogHeadlineOnly:    true,
+		SkipDefaultHeaders: true,
+	})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	require.NoError(t, err)
+	req.Host = "github.com"
+
+	res, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, 204, res.StatusCode)
+
+	assert.Equal(t, heredoc.Doc(`
+		* Request at <time>
+		* Request to http://<host>:<port>
+		* Request took <duration>
+	`), normalizeVerboseLog(stderr.String()))
+}
+
 func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 	// Two servers stand in for two different hosts. A dial map lets the test
 	// address them by hostname, so the auth layer compares real hostnames rather
@@ -528,8 +562,8 @@ func (f *fakeTelemetryDisabler) Disable() {
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) ActiveToken(host string) gh.Credential {
-	return gh.Credential{Source: "oauth_token", Token: c[fmt.Sprintf("%s:%s", host, "oauth_token")]}
+func (c tinyConfig) ActiveTokenWithRefresh(host string) (gh.Credential, gh.RefreshStatus, error) {
+	return gh.Credential{Token: c[fmt.Sprintf("%s:%s", host, "oauth_token")]}, gh.RefreshStatusUnnecessary, nil
 }
 
 // HostForAPIHost resolves via an "api_host:<apiHost>" key holding the host that
