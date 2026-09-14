@@ -3,8 +3,6 @@ package git
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -244,19 +242,17 @@ func TestClientSetRemoteResolutionAddsResolution(t *testing.T) {
 }
 
 func TestClientSetRemoteResolutionPropagatesGitError(t *testing.T) {
-	// Given Git will fail while setting a remote resolution
-	_, cmdCtx := createCommandContext(t, 2, "", "git error message")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+	// Given a client whose repository directory does not exist
+	client := Client{RepoDir: filepath.Join(t.TempDir(), "missing")}
 
 	// When a remote resolution is set
 	err := client.SetRemoteResolution(t.Context(), "origin", "base")
 
 	// Then the Git error is returned
 	require.Error(t, err)
-	assert.EqualError(t, err, "failed to run git: git error message")
+	var gitErr *GitError
+	require.ErrorAs(t, err, &gitErr)
+	assert.NotZero(t, gitErr.ExitCode)
 }
 
 func TestClientCurrentBranchReturnsCurrentBranch(t *testing.T) {
@@ -332,19 +328,17 @@ func TestClientConfigReportsUnknownKey(t *testing.T) {
 }
 
 func TestClientConfigPropagatesGitError(t *testing.T) {
-	// Given Git will fail with an unexpected exit status
-	_, cmdCtx := createCommandContext(t, 2, "", "git error message")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+	// Given a client whose repository directory does not exist
+	client := Client{RepoDir: filepath.Join(t.TempDir(), "missing")}
 
 	// When configuration is read
 	value, err := client.Config(t.Context(), "credential.helper")
 
 	// Then the Git error is returned unchanged
 	require.Error(t, err)
-	assert.EqualError(t, err, "failed to run git: git error message")
+	var gitErr *GitError
+	require.ErrorAs(t, err, &gitErr)
+	assert.NotZero(t, gitErr.ExitCode)
 	assert.Empty(t, value)
 }
 
@@ -795,15 +789,12 @@ func TestClientPushRevisionReportsUnresolvedBranch(t *testing.T) {
 	assert.Empty(t, trackingRef)
 }
 
-func TestClientPushRevisionReportsMalformedSymbolicRef(t *testing.T) {
+func TestParsePushRevisionReportsMalformedSymbolicRef(t *testing.T) {
 	// Given Git returns a symbolic push ref outside refs/remotes
-	cmdCtx := createMockedCommandContext(t, mockedCommands{
-		`path/to/git rev-parse --symbolic-full-name trunk@{push}`: {Stdout: "not/a/valid/remote/ref"},
-	})
-	client := Client{GitPath: "path/to/git", commandContext: cmdCtx}
+	output := []byte("not/a/valid/remote/ref")
 
 	// When the push revision is parsed
-	trackingRef, err := client.PushRevision(t.Context(), "trunk")
+	trackingRef, err := parsePushRevision(output)
 
 	// Then the malformed ref is reported with context
 	require.EqualError(t, err, "could not parse push revision: remote tracking branch must have format refs/remotes/<remote>/<branch> but was: not/a/valid/remote/ref")
@@ -1123,19 +1114,17 @@ func TestClientUnsetRemoteResolutionRemovesResolution(t *testing.T) {
 }
 
 func TestClientUnsetRemoteResolutionPropagatesGitError(t *testing.T) {
-	// Given Git will fail while unsetting a remote resolution
-	_, cmdCtx := createCommandContext(t, 2, "", "git error message")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+	// Given a client whose repository directory does not exist
+	client := Client{RepoDir: filepath.Join(t.TempDir(), "missing")}
 
 	// When a remote resolution is unset
 	err := client.UnsetRemoteResolution(t.Context(), "origin")
 
 	// Then the Git error is returned
 	require.Error(t, err)
-	assert.EqualError(t, err, "failed to run git: git error message")
+	var gitErr *GitError
+	require.ErrorAs(t, err, &gitErr)
+	assert.NotZero(t, gitErr.ExitCode)
 }
 
 func TestClientSetRemoteBranchesLimitsTrackedBranches(t *testing.T) {
@@ -1201,18 +1190,15 @@ func TestClientFetchReportsMissingRef(t *testing.T) {
 
 func TestClientFetchUsesAuthenticatedCommand(t *testing.T) {
 	// Given a client that records the Git command
-	cmd, cmdCtx := createCommandContext(t, 0, "", "")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+	var gotArgs []string
+	client := Client{GitPath: "path/to/git"}
 
 	// When a remote branch is fetched
-	err := client.Fetch(t.Context(), "origin", "trunk")
+	err := client.Fetch(t.Context(), "origin", "trunk", recordCommandArgs(t, &gotArgs))
 
 	// Then Git clears existing helpers and scopes gh credentials to all hosts
 	require.NoError(t, err)
-	assert.Equal(t, []string{"path/to/git", "-c", "credential.helper=", "-c", `credential.helper=!"gh" auth git-credential`, "fetch", "origin", "trunk"}, cmd.Args[3:])
+	assert.Equal(t, []string{"path/to/git", "-c", "credential.helper=", "-c", `credential.helper=!"gh" auth git-credential`, "fetch", "origin", "trunk"}, gotArgs)
 }
 
 func TestClientPullFastForwardsCurrentBranch(t *testing.T) {
@@ -1268,18 +1254,15 @@ func TestClientPullRejectsNonFastForwardUpdate(t *testing.T) {
 
 func TestClientPullUsesAuthenticatedFastForwardOnlyCommand(t *testing.T) {
 	// Given a client that records the Git command
-	cmd, cmdCtx := createCommandContext(t, 0, "", "")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+	var gotArgs []string
+	client := Client{GitPath: "path/to/git"}
 
 	// When a remote branch is pulled
-	err := client.Pull(t.Context(), "origin", "trunk")
+	err := client.Pull(t.Context(), "origin", "trunk", recordCommandArgs(t, &gotArgs))
 
 	// Then Git clears existing helpers, scopes gh credentials, and requires a fast-forward
 	require.NoError(t, err)
-	assert.Equal(t, []string{"path/to/git", "-c", "credential.helper=", "-c", `credential.helper=!"gh" auth git-credential`, "pull", "--ff-only", "origin", "trunk"}, cmd.Args[3:])
+	assert.Equal(t, []string{"path/to/git", "-c", "credential.helper=", "-c", `credential.helper=!"gh" auth git-credential`, "pull", "--ff-only", "origin", "trunk"}, gotArgs)
 }
 
 func TestClientPushCreatesRemoteBranchAndUpstream(t *testing.T) {
@@ -1315,18 +1298,15 @@ func TestClientPushReportsMissingRemote(t *testing.T) {
 
 func TestClientPushUsesAuthenticatedUpstreamCommand(t *testing.T) {
 	// Given a client that records the Git command
-	cmd, cmdCtx := createCommandContext(t, 0, "", "")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+	var gotArgs []string
+	client := Client{GitPath: "path/to/git"}
 
 	// When a branch is pushed
-	err := client.Push(t.Context(), "origin", "trunk")
+	err := client.Push(t.Context(), "origin", "trunk", recordCommandArgs(t, &gotArgs))
 
 	// Then Git clears existing helpers, scopes gh credentials, and sets the upstream
 	require.NoError(t, err)
-	assert.Equal(t, []string{"path/to/git", "-c", "credential.helper=", "-c", `credential.helper=!"gh" auth git-credential`, "push", "--set-upstream", "origin", "trunk"}, cmd.Args[3:])
+	assert.Equal(t, []string{"path/to/git", "-c", "credential.helper=", "-c", `credential.helper=!"gh" auth git-credential`, "push", "--set-upstream", "origin", "trunk"}, gotArgs)
 }
 
 func TestClientCloneCreatesWorkingRepositoryInModifiedRepoDir(t *testing.T) {
@@ -1410,18 +1390,15 @@ func TestClientCloneReportsMissingRepository(t *testing.T) {
 
 func TestClientCloneUsesHostScopedAuthenticatedCommand(t *testing.T) {
 	// Given a client that records the Git command
-	cmd, cmdCtx := createCommandContext(t, 0, "", "")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+	var gotArgs []string
+	client := Client{GitPath: "path/to/git"}
 
 	// When an HTTPS repository is cloned
-	_, err := client.Clone(t.Context(), "https://github.com/cli/cli", nil)
+	_, err := client.Clone(t.Context(), "https://github.com/cli/cli", nil, recordCommandArgs(t, &gotArgs))
 
 	// Then Git clears existing helpers and scopes gh credentials to the repository host
 	require.NoError(t, err)
-	assert.Equal(t, []string{"path/to/git", "-c", "credential.https://github.com.helper=", "-c", `credential.https://github.com.helper=!"gh" auth git-credential`, "clone", "https://github.com/cli/cli"}, cmd.Args[3:])
+	assert.Equal(t, []string{"path/to/git", "-c", "credential.https://github.com.helper=", "-c", `credential.https://github.com.helper=!"gh" auth git-credential`, "clone", "https://github.com/cli/cli"}, gotArgs)
 }
 
 func TestParseCloneArgs(t *testing.T) {
@@ -1589,81 +1566,21 @@ func runGitAt(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(output))
 }
 
-type args string
-
-type commandResult struct {
-	ExitStatus int    `json:"exitStatus"`
-	Stdout     string `json:"out"`
-	Stderr     string `json:"err"`
-}
-
-type mockedCommands map[args]commandResult
-
-// TestCommandMocking is an invoked test helper that emulates expected behavior for predefined shell commands, erroring when unexpected conditions are encountered.
-func TestCommandMocking(t *testing.T) {
-	if os.Getenv("GH_WANT_HELPER_PROCESS_RICH") != "1" {
+func TestGitCommandHelperProcess(t *testing.T) {
+	if len(os.Args) != 7 || os.Args[3] != "git-command-helper" {
 		return
 	}
 
-	jsonVar, ok := os.LookupEnv("GH_HELPER_PROCESS_RICH_COMMANDS")
-	if !ok {
-		fmt.Fprint(os.Stderr, "missing GH_HELPER_PROCESS_RICH_COMMANDS")
-		// Exit 1 is used for empty key values in the git config. This is non-breaking in those use cases,
-		// so this is returning a non-zero exit code to avoid suppressing this error for those use cases.
-		os.Exit(16)
+	exitStatus, err := strconv.Atoi(os.Args[4])
+	if err != nil {
+		fmt.Fprint(os.Stderr, "invalid helper process exit status")
+		os.Exit(1)
 	}
-
-	var commands mockedCommands
-	if err := json.Unmarshal([]byte(jsonVar), &commands); err != nil {
-		fmt.Fprint(os.Stderr, "failed to unmarshal GH_HELPER_PROCESS_RICH_COMMANDS")
-		// Exit 1 is used for empty key values in the git config. This is non-breaking in those use cases,
-		// so this is returning a non-zero exit code to avoid suppressing this error for those use cases.
-		os.Exit(16)
+	fmt.Fprint(os.Stdout, os.Args[5])
+	if exitStatus != 0 {
+		fmt.Fprint(os.Stderr, os.Args[6])
 	}
-
-	// The discarded args are those for the go test binary itself, e.g. `-test.run=TestHelperProcessRich`
-	realArgs := os.Args[3:]
-
-	commandResult, ok := commands[args(strings.Join(realArgs, " "))]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "unexpected command: %s\n", strings.Join(realArgs, " "))
-		// Exit 1 is used for empty key values in the git config. This is non-breaking in those use cases,
-		// so this is returning a non-zero exit code to avoid suppressing this error for those use cases.
-		os.Exit(16)
-	}
-
-	if commandResult.Stdout != "" {
-		fmt.Fprint(os.Stdout, commandResult.Stdout)
-	}
-
-	if commandResult.Stderr != "" {
-		fmt.Fprint(os.Stderr, commandResult.Stderr)
-	}
-
-	os.Exit(commandResult.ExitStatus)
-}
-
-func TestHelperProcess(t *testing.T) {
-	if os.Getenv("GH_WANT_HELPER_PROCESS") != "1" {
-		return
-	}
-	if err := func(args []string) error {
-		fmt.Fprint(os.Stdout, os.Getenv("GH_HELPER_PROCESS_STDOUT"))
-		exitStatus := os.Getenv("GH_HELPER_PROCESS_EXIT_STATUS")
-		if exitStatus != "0" {
-			return errors.New("error")
-		}
-		return nil
-	}(os.Args[3:]); err != nil {
-		fmt.Fprint(os.Stderr, os.Getenv("GH_HELPER_PROCESS_STDERR"))
-		exitStatus := os.Getenv("GH_HELPER_PROCESS_EXIT_STATUS")
-		i, err := strconv.Atoi(exitStatus)
-		if err != nil {
-			os.Exit(1)
-		}
-		os.Exit(i)
-	}
-	os.Exit(0)
+	os.Exit(exitStatus)
 }
 
 func TestCredentialPatternFromGitURL(t *testing.T) {
@@ -1741,37 +1658,25 @@ func TestParsePushDefaultReportsUnknownValue(t *testing.T) {
 	assert.Empty(t, pushDefault)
 }
 
-func createCommandContext(t *testing.T, exitStatus int, stdout, stderr string) (*exec.Cmd, commandCtx) {
+func createCommand(t *testing.T, exitStatus int, stdout, stderr string) *exec.Cmd {
 	t.Helper()
-	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperProcess", "--")
-	cmd.Env = append(os.Environ(),
-		"GH_WANT_HELPER_PROCESS=1",
-		fmt.Sprintf("GH_HELPER_PROCESS_STDOUT=%s", stdout),
-		fmt.Sprintf("GH_HELPER_PROCESS_STDERR=%s", stderr),
-		fmt.Sprintf("GH_HELPER_PROCESS_EXIT_STATUS=%v", exitStatus),
+	return exec.CommandContext(
+		context.Background(),
+		os.Args[0],
+		"-test.run=^TestGitCommandHelperProcess$",
+		"--",
+		"git-command-helper",
+		strconv.Itoa(exitStatus),
+		stdout,
+		stderr,
 	)
-	return cmd, func(ctx context.Context, exe string, args ...string) *exec.Cmd {
-		cmd.Args = append(cmd.Args, exe)
-		cmd.Args = append(cmd.Args, args...)
-		return cmd
-	}
 }
 
-func createMockedCommandContext(t *testing.T, commands mockedCommands) commandCtx {
-	marshaledCommands, err := json.Marshal(commands)
-	require.NoError(t, err)
-
-	// invokes helper within current test binary, emulating desired behavior
-	return func(ctx context.Context, exe string, args ...string) *exec.Cmd {
-		cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestCommandMocking", "--")
-		cmd.Env = append(os.Environ(),
-			"GH_WANT_HELPER_PROCESS_RICH=1",
-			fmt.Sprintf("GH_HELPER_PROCESS_RICH_COMMANDS=%s", string(marshaledCommands)),
-		)
-
-		cmd.Args = append(cmd.Args, exe)
-		cmd.Args = append(cmd.Args, args...)
-		return cmd
+func recordCommandArgs(t *testing.T, gotArgs *[]string) CommandModifier {
+	t.Helper()
+	return func(cmd *Command) {
+		*gotArgs = append([]string(nil), cmd.Args...)
+		cmd.Cmd = createCommand(t, 0, "", "")
 	}
 }
 
@@ -1803,19 +1708,16 @@ func TestClientRemoteURLReportsMissingRemote(t *testing.T) {
 }
 
 func TestClientRemoteURLSeparatesRemoteNameFromOptions(t *testing.T) {
-	// Given a remote name that resembles a Git option
-	cmd, cmdCtx := createCommandContext(t, 0, "https://example.com/repo.git\n", "")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+	// Given a configured remote whose name resembles a Git option
+	repo := newTestRepo(t)
+	repo.run(t, "config", "remote.--upload-pack=malicious.url", "https://example.com/repo.git")
 
 	// When the remote URL is requested
-	_, err := client.RemoteURL(t.Context(), "--upload-pack=malicious")
+	remoteURL, err := repo.client.RemoteURL(t.Context(), "--upload-pack=malicious")
 
 	// Then an option separator protects the remote name
 	require.NoError(t, err)
-	assert.Equal(t, "path/to/git remote get-url -- --upload-pack=malicious", strings.Join(cmd.Args[3:], " "))
+	assert.Equal(t, "https://example.com/repo.git", remoteURL)
 }
 
 func TestClientRemoteURLReportsMissingGitExecutable(t *testing.T) {
@@ -1871,20 +1773,17 @@ func TestClientIsIgnoredReportsFatalGitError(t *testing.T) {
 }
 
 func TestClientIsIgnoredSeparatesPathFromOptions(t *testing.T) {
-	// Given a path that resembles a Git option
-	cmd, cmdCtx := createCommandContext(t, 0, "", "")
-	client := Client{
-		GitPath:        "path/to/git",
-		commandContext: cmdCtx,
-	}
+	// Given an ignored path that resembles a Git option
+	repo := newTestRepo(t)
+	require.NoError(t, os.WriteFile(filepath.Join(repo.dir, ".gitignore"), []byte("--no-index\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(repo.dir, "--no-index"), nil, 0600))
 
 	// When the path is checked
-	ignored, err := client.IsIgnored(t.Context(), "--no-index")
+	ignored, err := repo.client.IsIgnored(t.Context(), "--no-index")
 
 	// Then an option separator protects the path
 	require.NoError(t, err)
-	assert.True(t, ignored, "the successful Git result should report the path as ignored")
-	assert.Equal(t, "path/to/git check-ignore -q -- --no-index", strings.Join(cmd.Args[3:], " "))
+	assert.True(t, ignored, "expected option-like path to match its ignore rule")
 }
 
 func TestClientIsIgnoredReportsMissingGitExecutable(t *testing.T) {
