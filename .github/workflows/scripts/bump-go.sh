@@ -209,7 +209,7 @@ fi
 if [[ $APPLY -eq 0 ]]; then
   echo -e "\n=== DRY-RUN DIFF (commit $COMMIT_HASH):\n"
   git --no-pager show --color "$COMMIT_HASH"
-  echo -e "\nIf --apply were provided, script would continue with:\n  git push -u origin $BRANCH\n  gh pr create --title \"$PR_TITLE\" --body <body>\n"
+  echo -e "\nIf --apply were provided, script would continue with:\n  push $BRANCH to origin\n  gh pr create --title \"$PR_TITLE\" --body <body>\n"
   exit 0
 fi
 
@@ -235,7 +235,11 @@ $TC_LINE
 EOF
 )
 
-git push -u origin "$BRANCH"
+REMOTE_BRANCH_SHA=$(git ls-remote --heads origin "refs/heads/$BRANCH" | cut -f1)
+if [[ -n "$REMOTE_BRANCH_SHA" ]]; then
+  echo "Replacing existing remote branch $BRANCH"
+fi
+git push --force-with-lease="refs/heads/$BRANCH:$REMOTE_BRANCH_SHA" -u origin "$BRANCH"
 
 gh pr create --title "$PR_TITLE" --body "$PR_BODY" --fill
 
