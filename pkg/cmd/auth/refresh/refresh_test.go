@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -40,6 +41,15 @@ func Test_NewCmdRefresh(t *testing.T) {
 			wants: RefreshOptions{
 				Hostname:  "",
 				Clipboard: new(true),
+			},
+		},
+		{
+			name: "tty short-lived",
+			tty:  true,
+			cli:  "--short-lived",
+			wants: RefreshOptions{
+				Hostname:   "",
+				ShortLived: true,
 			},
 		},
 		{
@@ -202,6 +212,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			require.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
 			require.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
 			require.Equal(t, tt.wants.Clipboard, gotOpts.Clipboard)
+			require.Equal(t, tt.wants.ShortLived, gotOpts.ShortLived)
 		})
 	}
 }
@@ -212,26 +223,31 @@ type authArgs struct {
 	interactive   bool
 	clipboard     bool
 	secureStorage bool
+	shortLived    bool
 }
-
 type authOut struct {
-	username string
-	token    string
-	err      error
+	username    string
+	token       string
+	refreshable *gh.Credential
+	err         error
 }
 
 func Test_refreshRun(t *testing.T) {
 	tests := []struct {
-		name          string
-		opts          *RefreshOptions
-		prompterStubs func(*prompter.PrompterMock)
-		cfgHosts      []string
-		authOut       authOut
-		oldScopes     string
-		clipboard     string
-		wantErr       string
-		nontty        bool
-		wantAuthArgs  authArgs
+		name                   string
+		opts                   *RefreshOptions
+		prompterStubs          func(*prompter.PrompterMock)
+		cfgHosts               []string
+		cfgRefreshable         bool
+		authOut                authOut
+		oldScopes              string
+		clipboard              string
+		wantErr                string
+		nontty                 bool
+		wantAuthArgs           authArgs
+		wantStoredToken        string
+		wantStoredRefreshToken string
+		wantStderrContains     string
 	}{
 		{
 			name:    "no hosts configured",
@@ -511,6 +527,48 @@ func Test_refreshRun(t *testing.T) {
 			},
 		},
 		{
+			name: "short-lived requested, host issues a refreshable credential",
+			cfgHosts: []string{
+				"github.com",
+			},
+			opts: &RefreshOptions{
+				Hostname:   "github.com",
+				ShortLived: true,
+			},
+			authOut: authOut{
+				username:    "test-user",
+				token:       "gho_access",
+				refreshable: &gh.Credential{Token: "gho_access", RefreshToken: "ghr_refresh"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     true,
+				shortLived:    true,
+			},
+			wantStoredToken:        "gho_access",
+			wantStoredRefreshToken: "ghr_refresh",
+		},
+		{
+			name: "existing refreshable credential without --short-lived warns about downgrade",
+			cfgHosts: []string{
+				"github.com",
+			},
+			cfgRefreshable: true,
+			opts:           &RefreshOptions{},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     true,
+				shortLived:    false,
+			},
+			wantStoredToken:        "xyz456",
+			wantStoredRefreshToken: "",
+			wantStderrContains:     "Original token was short-lived; pass --short-lived to preserve it\n",
+		},
+		{
 			name: "errors when active user does not match user returned by auth flow",
 			cfgHosts: []string{
 				"github.com",
@@ -526,15 +584,23 @@ func Test_refreshRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ *http.Client, _ *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool) (token, username, error) {
+			tt.opts.AuthFlow = func(_ *http.Client, _ *iostreams.IOStreams, hostname string, scopes []string, interactive, clipboard, requestRefreshToken bool) (*authflow.AuthResult, error) {
 				aa.hostname = hostname
 				aa.scopes = scopes
 				aa.interactive = interactive
 				aa.clipboard = clipboard
+				aa.shortLived = requestRefreshToken
 				if tt.authOut != (authOut{}) {
-					return token(tt.authOut.token), username(tt.authOut.username), tt.authOut.err
+					if tt.authOut.err != nil {
+						return nil, tt.authOut.err
+					}
+					return &authflow.AuthResult{
+						Token:       tt.authOut.token,
+						Username:    tt.authOut.username,
+						Refreshable: tt.authOut.refreshable,
+					}, nil
 				}
-				return token("xyz456"), username("test-user"), nil
+				return &authflow.AuthResult{Token: "xyz456", Username: "test-user"}, nil
 			}
 
 			cfg, _ := config.NewIsolatedTestConfig(t, "")
@@ -542,14 +608,19 @@ func Test_refreshRun(t *testing.T) {
 				cfg.Set("", "clipboard", tt.clipboard)
 			}
 			for _, hostname := range tt.cfgHosts {
-				_, err := cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
-				require.NoError(t, err)
+				if tt.cfgRefreshable {
+					_, err := cfg.Authentication().LoginRefreshable(hostname, "test-user", gh.Credential{Token: "abc123", RefreshToken: "ghr_old"}, "https", false)
+					require.NoError(t, err)
+				} else {
+					_, err := cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
+					require.NoError(t, err)
+				}
 			}
 			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
 			}
 
-			ios, _, _, _ := iostreams.Test()
+			ios, _, _, stderr := iostreams.Test()
 			ios.SetStdinTTY(!tt.nontty)
 			ios.SetStdoutTTY(!tt.nontty)
 			tt.opts.IO = ios
@@ -594,12 +665,22 @@ func Test_refreshRun(t *testing.T) {
 			require.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
 			require.Equal(t, tt.wantAuthArgs.interactive, aa.interactive)
 			require.Equal(t, tt.wantAuthArgs.clipboard, aa.clipboard)
+			require.Equal(t, tt.wantAuthArgs.shortLived, aa.shortLived)
 
 			authCfg := cfg.Authentication()
 			activeUser, _ := authCfg.ActiveUser(aa.hostname)
 			activeToken := authCfg.ActiveToken(aa.hostname).Token
 			require.Equal(t, "test-user", activeUser)
-			require.Equal(t, "xyz456", activeToken)
+			wantStoredToken := tt.wantStoredToken
+			if wantStoredToken == "" {
+				wantStoredToken = "xyz456"
+			}
+			require.Equal(t, wantStoredToken, activeToken)
+			require.Equal(t, tt.wantStoredRefreshToken, authCfg.ActiveToken(aa.hostname).RefreshToken)
+
+			if tt.wantStderrContains != "" {
+				require.Contains(t, stderr.String(), tt.wantStderrContains)
+			}
 		})
 	}
 }
