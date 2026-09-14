@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/set"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -1701,41 +1699,43 @@ func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) error {
 	return c.Mutate("UnlinkProjectV2FromTeam", &mutation, variables)
 }
 
-func handleError(err error) error {
-	var gerr api.GraphQLError
-	if errors.As(err, &gerr) {
-		missing := set.NewStringSet()
-		for _, e := range gerr.Errors {
-			if e.Type != "INSUFFICIENT_SCOPES" {
-				continue
-			}
-			missing.AddValues(requiredScopesFromServerMessage(e.Message))
-		}
-		if missing.Len() > 0 {
-			s := missing.ToSlice()
-			// TODO: this duplicates parts of generateScopesSuggestion
-			return fmt.Errorf(
-				"error: your authentication token is missing required scopes %v\n"+
-					"To request it, run:  gh auth refresh -s %s",
-				s,
-				strings.Join(s, ","))
-		}
-	}
-	return err
+type projectMissingScopesError struct {
+	api.MissingScopesError
 }
 
-var scopesRE = regexp.MustCompile(`one of the following scopes: \[(.+?)]`)
+func (err projectMissingScopesError) Error() string {
+	requirements := make([]string, 0, len(err.Requirements))
+	requestedScopes := make([]string, 0, len(err.Requirements))
+	for _, requirement := range err.Requirements {
+		formattedRequirement := strings.Join(requirement.Scopes, " or ")
+		if len(err.Requirements) > 1 && len(requirement.Scopes) > 1 {
+			formattedRequirement = fmt.Sprintf("(%s)", formattedRequirement)
+		}
+		requirements = append(requirements, formattedRequirement)
+		requestedScopes = append(requestedScopes, requirement.Scopes[0])
+	}
+	requestMessage := "To request one valid set, run:"
+	if len(err.Requirements) == 1 && len(err.Requirements[0].Scopes) == 1 {
+		requestMessage = "To request it, run:"
+	}
+	return fmt.Sprintf(
+		"error: your authentication token is missing required scopes [%s]\n"+
+			"%s  gh auth refresh -s %s",
+		strings.Join(requirements, ", "),
+		requestMessage,
+		strings.Join(requestedScopes, ","))
+}
 
-func requiredScopesFromServerMessage(msg string) []string {
-	m := scopesRE.FindStringSubmatch(msg)
-	if m == nil {
-		return nil
+func (err projectMissingScopesError) Unwrap() error {
+	return err.MissingScopesError
+}
+
+func handleError(err error) error {
+	requirements := api.GraphQLScopeRequirements(err)
+	if len(requirements) > 0 {
+		return projectMissingScopesError{MissingScopesError: api.MissingScopesError{Requirements: requirements}}
 	}
-	var scopes []string
-	for mm := range strings.SplitSeq(m[1], ",") {
-		scopes = append(scopes, strings.Trim(mm, "' "))
-	}
-	return scopes
+	return err
 }
 
 func projectFieldValueData(v FieldValueNodes) any {
