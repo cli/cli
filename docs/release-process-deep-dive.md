@@ -147,7 +147,7 @@ There is no signing of linux artifacts in this job. See the [release job](#relea
           rm $RUNNER_TEMP/cert.p12
       - name: Add App Store Connect API key to keychain
         if: inputs.environment == 'production'
-        uses: github/setup-apple-codesign@9ba41e90aff70dea04ae487b776f98ee5efd610f
+        uses: nodeselector/setup-apple-codesign@ab275d0f6fb63ef9e20b12b42ea0d567f935723c
         id: setup-apple-codesign
         with:
           asset-type: "app-store-connect-api-key"
@@ -235,7 +235,7 @@ Signing of MacOS artifacts uses `codesign` and notarization uses `xcrun notaryto
 Signing and notarization are set up across three steps that run only when `inputs.environment == 'production'`:
 
 1. **Install code signing certificate** creates a dedicated keychain and imports the Developer ID Application certificate used by `codesign`.
-2. **Add App Store Connect API key to keychain** uses the internal `github/setup-apple-codesign` action to materialise the App Store Connect API key (`.p8`) that `notarytool` authenticates with, exposing its key path, key id and issuer id as step outputs.
+2. **Add App Store Connect API key to keychain** uses the [`nodeselector/setup-apple-codesign`](https://github.com/nodeselector/setup-apple-codesign) action to materialise the App Store Connect API key (`.p8`) that `notarytool` authenticates with, exposing its key path, key id and issuer id as step outputs.
 3. **Configure notarization credentials** runs `xcrun notarytool store-credentials` to persist those API key details into the keychain under the profile name `notarytool-password`, so later `notarytool submit` calls can reference the profile instead of passing credentials directly.
 
 In order to perform signing, a keychain must be configured with the signing certificate. Comments have been added to provide clarity to the script:
