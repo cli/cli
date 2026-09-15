@@ -1,7 +1,13 @@
 package codespaces
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -66,6 +72,21 @@ func TestParseSSHArgs(t *testing.T) {
 			Command:    []string{"echo", "-b", "test"},
 		},
 		{
+			Args:       []string{"-v", "--", "echo", "hi"},
+			ParsedArgs: []string{"-v"},
+			Command:    []string{"echo", "hi"},
+		},
+		{
+			Args:       []string{"--", "-Fconfig", "arg"},
+			ParsedArgs: []string{},
+			Command:    []string{"-Fconfig", "arg"},
+		},
+		{
+			Args:       []string{"-v", "--"},
+			ParsedArgs: []string{"-v"},
+			Command:    nil,
+		},
+		{
 			Args:       []string{"-b"},
 			ParsedArgs: nil,
 			Command:    nil,
@@ -109,6 +130,11 @@ func TestParseSCPArgs(t *testing.T) {
 			Command:    []string{"local/file", "remote:file"},
 		},
 		{
+			Args:       []string{"--", "-Fconfig", "remote:file"},
+			ParsedArgs: []string{},
+			Command:    []string{"-Fconfig", "remote:file"},
+		},
+		{
 			Args:       []string{"-c"},
 			ParsedArgs: nil,
 			Command:    nil,
@@ -150,4 +176,83 @@ func checkParseResult(t *testing.T, tcase parseTestCase, gotArgs, gotCmd []strin
 	if commandStr != parsedCommandStr {
 		t.Errorf("command does not match parsed command. got: '%s', expected: '%s'", commandStr, parsedCommandStr)
 	}
+}
+
+// TestNewSSHCommandUsesEndOfOptionsSeparator asserts that "--" is placed
+// immediately before the destination in the ssh argv.
+func TestNewSSHCommandUsesEndOfOptionsSeparator(t *testing.T) {
+	stubExecutablesOnPath(t, "ssh")
+
+	cmd, _, err := newSSHCommand(context.Background(), 1234, "user@localhost", []string{"-v"}, []string{"echo", "hello"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// cmd.Args[0] is the ssh executable path; the rest are arguments.
+	args := cmd.Args[1:]
+
+	dashDashIdx := slices.Index(args, "--")
+	if dashDashIdx == -1 {
+		t.Fatalf("expected ssh args to contain a \"--\" separator, got: %v", args)
+	}
+
+	dstIdx := slices.Index(args, "user@localhost")
+	if dstIdx == -1 {
+		t.Fatalf("expected destination in ssh args, got: %v", args)
+	}
+
+	if dashDashIdx+1 != dstIdx {
+		t.Errorf("expected \"--\" to immediately precede destination, got args: %v", args)
+	}
+}
+
+// TestNewSCPCommandUsesEndOfOptionsSeparator asserts that "--" precedes
+// the file arguments in the scp argv.
+func TestNewSCPCommandUsesEndOfOptionsSeparator(t *testing.T) {
+	stubExecutablesOnPath(t, "scp")
+
+	cmd, err := newSCPCommand(context.Background(), 1234, "user@localhost", []string{"local/file", "remote:file"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	args := cmd.Args[1:]
+
+	dashDashIdx := slices.Index(args, "--")
+	if dashDashIdx == -1 {
+		t.Fatalf("expected scp args to contain a \"--\" separator, got: %v", args)
+	}
+
+	localIdx := slices.Index(args, "local/file")
+	if localIdx == -1 {
+		t.Fatalf("expected file arg in scp args, got: %v", args)
+	}
+
+	if dashDashIdx+1 != localIdx {
+		t.Errorf("expected \"--\" to immediately precede file arguments, got args: %v", args)
+	}
+}
+
+// stubExecutablesOnPath creates empty executable files for names in a temp
+// dir and prepends it to PATH for the test, so safeexec.LookPath resolves
+// without requiring the real binaries on the host.
+func stubExecutablesOnPath(t *testing.T, names ...string) {
+	t.Helper()
+
+	dir := t.TempDir()
+	for _, name := range names {
+		if runtime.GOOS == "windows" {
+			name += ".exe"
+		}
+		path := filepath.Join(dir, name)
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0755)
+		if err != nil {
+			t.Fatalf("failed to create stub %s: %v", name, err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatalf("failed to close stub %s: %v", name, err)
+		}
+	}
+
+	t.Setenv("PATH", strings.Join([]string{dir, os.Getenv("PATH")}, string(os.PathListSeparator)))
 }
