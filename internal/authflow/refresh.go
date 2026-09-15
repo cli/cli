@@ -99,3 +99,19 @@ func refreshableCredentialFromAccessToken(token *oauthapi.AccessToken, requested
 	}
 	return credential
 }
+
+// credentialFromAccessToken projects an OAuth access token onto gh.Credential, reusing
+// refreshableCredentialFromAccessToken so the expiry mapping lives in one place. requestedAt is the instant the
+// exchange was initiated, used to anchor the token lifetime. The runtime-only Source is left unset; the storage layer
+// drops it regardless.
+func credentialFromAccessToken(token *oauthapi.AccessToken, requestedAt time.Time) gh.Credential {
+	rc := refreshableCredentialFromAccessToken(token, requestedAt)
+	return gh.Credential{
+		Token:                 rc.AccessToken,
+		RefreshToken:          rc.RefreshToken,
+		ExpiresIn:             rc.ExpiresIn,
+		RefreshTokenExpiresIn: rc.RefreshTokenExpiresIn,
+		ExpiresAt:             rc.ExpiresAt,
+		RefreshTokenExpiresAt: rc.RefreshTokenExpiresAt,
+	}
+}
