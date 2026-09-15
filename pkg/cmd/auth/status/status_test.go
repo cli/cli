@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -53,6 +55,13 @@ func Test_NewCmdStatus(t *testing.T) {
 				Active: true,
 			},
 		},
+		{
+			name: "no refresh",
+			cli:  "--no-refresh",
+			wants: StatusOptions{
+				NoRefresh: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -82,6 +91,7 @@ func Test_NewCmdStatus(t *testing.T) {
 			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
 			assert.Equal(t, tt.wants.ShowToken, gotOpts.ShowToken)
 			assert.Equal(t, tt.wants.Active, gotOpts.Active)
+			assert.Equal(t, tt.wants.NoRefresh, gotOpts.NoRefresh)
 		})
 	}
 }
@@ -264,6 +274,69 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: ssh
 				  - Token: gho_******
 				  - Token scopes: none
+			`),
+		},
+		{
+			name: "refreshes an expiring short-lived token",
+			opts: StatusOptions{},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past)
+				future := time.Date(2099, 1, 2, 3, 4, 5, 0, time.UTC)
+				setRefresher(t, c, &ghmock.TokenRefresherMock{
+					RefreshFunc: func(string, string) (gh.RefreshableCredential, error) {
+						return gh.RefreshableCredential{
+							AccessToken:  "gho_fresh",
+							RefreshToken: "ghr_abc",
+							ExpiresAt:    &future,
+						}, nil
+					},
+				})
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", ""),
+					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", "repo, read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_*****
+				  - Short-lived token that gh refreshes automatically
+				  - Token expires: 2099-01-02T03:04:05Z
+				  - Token refreshed just now
+				  - Token scopes: 'repo', 'read:org'
+			`),
+		},
+		{
+			name: "no-refresh leaves an expiring short-lived token untouched",
+			opts: StatusOptions{NoRefresh: true},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past)
+				setRefresher(t, c, &ghmock.TokenRefresherMock{
+					RefreshFunc: func(string, string) (gh.RefreshableCredential, error) {
+						t.Error("refresher must not be called when --no-refresh is set")
+						return gh.RefreshableCredential{}, nil
+					},
+				})
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", ""),
+					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", "repo, read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_*****
+				  - Short-lived token that gh refreshes automatically
+				  - Token expires: 2000-01-01T00:00:00Z
+				  - Token scopes: 'repo', 'read:org'
 			`),
 		},
 		{
@@ -586,6 +659,29 @@ func Test_statusRun(t *testing.T) {
 			wantOut: `{"hosts":{"ghe.io":[{"state":"success","active":true,"host":"ghe.io","login":"monalisa-ghe","tokenSource":"GH_CONFIG_DIR/hosts.yml","scopes":"repo, read:org","gitProtocol":"https"}],"github.com":[{"state":"success","active":true,"host":"github.com","login":"monalisa2","tokenSource":"GH_CONFIG_DIR/hosts.yml","scopes":"repo, read:org","gitProtocol":"https"},{"state":"success","active":false,"host":"github.com","login":"monalisa","tokenSource":"GH_CONFIG_DIR/hosts.yml","scopes":"repo, read:org","gitProtocol":"https"}]}}` + "\n",
 		},
 		{
+			name:       "json, refreshable token",
+			opts:       StatusOptions{},
+			jsonFields: []string{"hosts"},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				future := time.Date(2099, 1, 2, 3, 4, 5, 0, time.UTC)
+				rtFuture := time.Date(2099, 6, 7, 8, 9, 10, 0, time.UTC)
+				authCfg := c.Authentication().(*config.AuthConfig)
+				_, err := authCfg.LoginRefreshable("github.com", "monalisa", gh.Credential{
+					Token:                 "gho_abc123",
+					RefreshToken:          "ghr_abc",
+					ExpiresAt:             &future,
+					RefreshTokenExpiresAt: &rtFuture,
+				}, "https", false)
+				require.NoError(t, err)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", ""),
+					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", "repo, read:org"))
+			},
+			wantOut: `{"hosts":{"github.com":[{"state":"success","active":true,"host":"github.com","login":"monalisa","tokenSource":"GH_CONFIG_DIR/hosts.yml","scopes":"repo, read:org","gitProtocol":"https","refreshable":true,"tokenExpiresAt":"2099-01-02T03:04:05Z","refreshTokenExpiresAt":"2099-06-07T08:09:10Z"}]}}` + "\n",
+		},
+		{
 			name: "json, all valid tokens with hostname",
 			opts: StatusOptions{
 				Hostname: "github.com",
@@ -765,6 +861,22 @@ func login(t *testing.T, c gh.Config, hostname, username, token, protocol string
 	t.Helper()
 	_, err := c.Authentication().Login(hostname, username, token, protocol, false)
 	require.NoError(t, err)
+}
+
+func loginRefreshable(t *testing.T, c gh.Config, hostname, username, accessToken, refreshToken string, expiresAt *time.Time) {
+	t.Helper()
+	authCfg := c.Authentication().(*config.AuthConfig)
+	_, err := authCfg.LoginRefreshable(hostname, username, gh.Credential{
+		Token:        accessToken,
+		RefreshToken: refreshToken,
+		ExpiresAt:    expiresAt,
+	}, "https", false)
+	require.NoError(t, err)
+}
+
+func setRefresher(t *testing.T, c gh.Config, r gh.TokenRefresher) {
+	t.Helper()
+	c.Authentication().(*config.AuthConfig).SetTokenRefresher(r)
 }
 
 // replaceAll replaces all instances of old with new in s, as well as all instances
