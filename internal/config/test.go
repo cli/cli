@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -30,7 +31,7 @@ func NewMockConfig() *ghmock.ConfigMock {
 // since none of those go through the mock.
 func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	c := ghConfig.ReadFromString(cfgString)
-	cfg := cfg{c}
+	cfg := cfg{cfg: c}
 	mock := &ghmock.ConfigMock{}
 	mock.GetOrDefaultFunc = func(host, key string) o.Option[gh.ConfigEntry] {
 		return cfg.GetOrDefault(host, key)
@@ -50,6 +51,14 @@ func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	mock.AuthenticationFunc = func() gh.AuthConfig {
 		return &AuthConfig{
 			cfg: c,
+			// Neutralize the cross-process lock and disk reload so tests never take a real filesystem lock or read
+			// from disk.
+			acquireRefreshLock: func(ctx context.Context, path string) (func(), error) {
+				return func() {}, nil
+			},
+			reloadConfig: func() error {
+				return nil
+			},
 			defaultHostOverride: func() (string, string) {
 				return "github.com", "default"
 			},
@@ -144,7 +153,20 @@ func NewIsolatedTestConfig(t *testing.T, cfgString string) (*cfg, func(io.Writer
 	}
 
 	c := ghConfig.ReadFromString(cfgString)
-	cfg := cfg{c}
+	cfg := cfg{cfg: c}
+	cfg.auth = &AuthConfig{
+		cfg: c,
+		// Neutralize the cross-process lock so tests never take a real filesystem lock.
+		acquireRefreshLock: func(ctx context.Context, path string) (func(), error) {
+			return func() {}, nil
+		},
+		// Neutralize the disk reload. This fixture stubs ghConfig.Read to return the string-parsed config c, but the
+		// real ghConfig.Reload bypasses that stub and reads the config files from the empty temp dir, which would
+		// replace c's contents and discard the config the test set up. A no-op keeps the in-memory config authoritative.
+		reloadConfig: func() error {
+			return nil
+		},
+	}
 
 	// The real implementation of config.Read uses a sync.Once
 	// to read config files and initialise package level variables
@@ -152,9 +174,13 @@ func NewIsolatedTestConfig(t *testing.T, cfgString string) (*cfg, func(io.Writer
 	//
 	// This means that tests can't be isolated from each other, so
 	// we swap out the function here to return a new config each time.
+	prev := ghConfig.Read
 	ghConfig.Read = func(_ *ghConfig.Config) (*ghConfig.Config, error) {
 		return c, nil
 	}
+	t.Cleanup(func() {
+		ghConfig.Read = prev
+	})
 
 	// The config.Write method isn't defined in the same way as Read to allow
 	// the function to be swapped out and it does try to write to disk.

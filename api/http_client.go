@@ -16,19 +16,23 @@ import (
 )
 
 type config interface {
-	ActiveToken(string) gh.Credential
+	ActiveTokenWithRefresh(string) (gh.Credential, gh.RefreshStatus, error)
 	HostForAPIHost(string) (string, bool)
 }
 
 type HTTPClientOptions struct {
-	AppVersion         string
-	InvokingAgent      string
-	CacheTTL           time.Duration
-	Config             config
-	EnableCache        bool
-	Log                io.Writer
-	LogColorize        bool
-	LogVerboseHTTP     bool
+	AppVersion     string
+	InvokingAgent  string
+	CacheTTL       time.Duration
+	Config         config
+	EnableCache    bool
+	Log            io.Writer
+	LogColorize    bool
+	LogVerboseHTTP bool
+	// LogHeadlineOnly keeps logging non-verbose even when GH_DEBUG requests api tracing, so only httpretty's head
+	// lines (timing and URL) are emitted, not request/response headers and bodies. It is used by the token refresher
+	// client so a refresh triggered mid request does not dump a full trace into the middle of the user's request log.
+	LogHeadlineOnly    bool
 	SkipDefaultHeaders bool
 	TelemetryDisabler  ghtelemetry.Disabler
 }
@@ -44,7 +48,7 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	}
 
 	debugEnabled, debugValue := utils.IsDebugEnabled()
-	if strings.Contains(debugValue, "api") {
+	if strings.Contains(debugValue, "api") && !opts.LogHeadlineOnly {
 		opts.LogVerboseHTTP = true
 	}
 
@@ -169,9 +173,11 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
 		if redirectHostnameChange {
 			return rt.RoundTrip(req)
 		}
-
 		hostnameInRequest := ghauth.NormalizeHostname(getHostname(req))
-		token := cfg.ActiveToken(hostnameInRequest).Token
+		// Refreshing is best effort because it happens before actual expiry, and expiry checks can be unreliable due to
+		// clock skew. Continue with the returned token and let the API determine whether it is valid.
+		cred, _, _ := cfg.ActiveTokenWithRefresh(hostnameInRequest)
+		token := cred.Token
 		if token == "" {
 			// The request may be aimed at a host's api_host, which gh is
 			// not logged in to and so has no token of its own. Fall back
@@ -179,7 +185,8 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
 			// adds a token where there would have been none, so hosts we
 			// already authenticate keep resolving exactly as before.
 			if canonicalHost, ok := cfg.HostForAPIHost(hostnameInRequest); ok {
-				token = cfg.ActiveToken(canonicalHost).Token
+				cred, _, _ = cfg.ActiveTokenWithRefresh(canonicalHost)
+				token = cred.Token
 			}
 		}
 		if token != "" {

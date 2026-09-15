@@ -10,6 +10,7 @@
 package gh
 
 import (
+	"errors"
 	"time"
 
 	o "github.com/cli/cli/v2/pkg/option"
@@ -134,6 +135,39 @@ var TokenTypes = []TokenType{
 	TokenTypeRefresh,
 }
 
+// RefreshStatus describes the outcome of attempting to refresh an authentication token.
+type RefreshStatus string
+
+const (
+	// RefreshStatusDone indicates that the token was refreshed.
+	RefreshStatusDone RefreshStatus = "refresh-done"
+	// RefreshStatusInapplicable indicates that the token cannot be refreshed.
+	RefreshStatusInapplicable RefreshStatus = "refresh-inapplicable"
+	// RefreshStatusFailed indicates that the token refresh failed for a transient reason, such as a network or
+	// storage error, so a later retry may succeed.
+	RefreshStatusFailed RefreshStatus = "refresh-failed"
+	// RefreshStatusExpired indicates that the refresh token itself was rejected by the server, so refreshing cannot
+	// succeed and the user must re-authenticate.
+	RefreshStatusExpired RefreshStatus = "refresh-expired"
+	// RefreshStatusUnnecessary indicates that the token does not need to be refreshed.
+	RefreshStatusUnnecessary RefreshStatus = "refresh-unnecessary"
+)
+
+// RefreshableCredential is an OAuth token pair that gh can renew, together with the expiration metadata returned by its
+// issuer. The expiration fields are optional because a server may issue a non-expiring credential. The ExpiresIn fields
+// carry the raw lifetime in seconds as returned by the issuer, alongside the absolute expiry times computed from them.
+//
+// It is an in-memory value passed across the TokenRefresher boundary; persistence and wire encoding are owned by the
+// storage layer, so it deliberately carries no json tags.
+type RefreshableCredential struct {
+	AccessToken           string
+	RefreshToken          string
+	ExpiresIn             int
+	RefreshTokenExpiresIn int
+	ExpiresAt             *time.Time
+	RefreshTokenExpiresAt *time.Time
+}
+
 // Credential is a resolved authentication token together with its source and, when the token is refreshable, the OAuth
 // refresh metadata. It is a single universal shape so a caller can inspect a resolved token without needing to know in
 // advance whether it is refreshable: Token and Source are always meaningful, while the refresh fields are zero for a
@@ -175,12 +209,32 @@ const (
 	TokenSourceDefault = "default"
 )
 
+// ErrRefreshTokenInvalid is returned by a TokenRefresher when the OAuth server rejects the refresh token because it is
+// invalid, expired, or already used. Callers can test for it with errors.Is to distinguish an unusable refresh token,
+// which requires re-authenticating with 'gh auth login', from a transient failure that may succeed on a later retry.
+var ErrRefreshTokenInvalid = errors.New("refresh token is invalid or expired")
+
+// TokenRefresher performs the OAuth token refresh request. It knows nothing about when a refresh should happen or about
+// in-process or cross-process locking; those concerns belong to the caller. Its only job is to make the refresh request
+// for the given refresh token and hostname and parse the response, or the error, back to the caller.
+//
+//go:generate moq -rm -pkg ghmock -out mock/token_refresher.go . TokenRefresher
+type TokenRefresher interface {
+	// Refresh exchanges the given refresh token for a renewed credential on the given hostname.
+	Refresh(refreshToken string, hostname string) (RefreshableCredential, error)
+}
+
 // AuthConfig is used for interacting with some persistent configuration for gh,
 // with knowledge on how to access encrypted storage when necessary.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig interface {
 	// HasActiveToken returns true when a token for the hostname is present.
 	HasActiveToken(hostname string) bool
+
+	// ActiveTokenWithRefresh retrieves the active credential for the given hostname and, when it is refreshable and
+	// its access token is expiring, renews and persists it. It may return a non-empty credential with an error, such
+	// as when refreshing fails. The caller decides whether to use the returned credential.
+	ActiveTokenWithRefresh(hostname string) (credential Credential, refreshResult RefreshStatus, err error)
 
 	// ActiveToken retrieves the active credential for the given hostname, searching environment variables, general
 	// configuration, and finally encrypted storage. It returns the last stored token as-is, including the current
@@ -231,6 +285,12 @@ type AuthConfig interface {
 	// in encrypted storage and will fall back to the general insecure configuration.
 	Login(hostname, username, token, gitProtocol string, secureStorage bool) (insecureStorageUsed bool, err error)
 
+	// LoginRefreshable stores a refreshable credential for the given user, sets the git protocol, and marks the user
+	// active for the hostname. Like Login it prefers encrypted storage and falls back to the insecure configuration,
+	// reporting the fallback via the returned bool. Any non-expiring token stored for the same user is removed so it
+	// cannot outrank the refreshable record.
+	LoginRefreshable(hostname, username string, credential Credential, gitProtocol string, secureStorage bool) (insecureStorageUsed bool, err error)
+
 	// SwitchUser switches the active user for a given hostname.
 	SwitchUser(hostname, user string) error
 
@@ -241,10 +301,20 @@ type AuthConfig interface {
 	// UsersForHost retrieves a list of users configured for a specific host.
 	UsersForHost(hostname string) []string
 
+	// TokenForUserWithRefresh retrieves the credential for a specified user and hostname and, when it is refreshable
+	// and its access token is expiring, renews and persists it. It may return a non-empty credential with an error,
+	// such as when refreshing fails. The caller decides whether to use the returned credential.
+	TokenForUserWithRefresh(hostname, username string) (credential Credential, refreshResult RefreshStatus, err error)
+
 	// TokenForUser retrieves the credential for a specified user and hostname. Like ActiveToken it returns the last
 	// stored token as-is, including the current access token of a refreshable credential, and never refreshes it; use
 	// TokenForUserWithRefresh when the token must be valid for API calls.
 	TokenForUser(hostname, user string) (credential Credential, err error)
+
+	// SetTokenRefresher supplies the refresher used to renew tokens. It is provided after construction because the
+	// refresher depends on the plain HTTP client, which is only available once the command factory has assembled its
+	// dependencies.
+	SetTokenRefresher(refresher TokenRefresher)
 
 	// The following methods are only for testing and that is a design smell we should consider fixing.
 
