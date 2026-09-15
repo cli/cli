@@ -175,6 +175,33 @@ func TestPublishRun_UnsupportedHost(t *testing.T) {
 	require.ErrorContains(t, err, "does not currently support GitHub Enterprise Server")
 }
 
+func TestPublishRun_ExplainsSkillDirectoryWithinRepository(t *testing.T) {
+	repoDir := t.TempDir()
+	writeSkill(t, repoDir, "reskill", heredoc.Doc(`
+		---
+		name: reskill
+		description: A test skill
+		license: MIT
+		---
+		Body.
+	`))
+	skillDir := filepath.Join(repoDir, "skills", "reskill")
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git( .+)? rev-parse --show-prefix`, 0, "skills/reskill/\n")
+
+	ios, _, _, _ := iostreams.Test()
+	err := publishRun(&PublishOptions{
+		IO:        ios,
+		Dir:       skillDir,
+		GitClient: newTestGitClient(),
+	})
+
+	require.ErrorContains(t, err, "is a skill directory within a repository; gh skill publish must target the repository root")
+	assert.NotContains(t, err.Error(), `does not match directory name "."`)
+}
+
 func TestPublishRun(t *testing.T) {
 	tests := []struct {
 		name       string
