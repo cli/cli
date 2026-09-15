@@ -1,9 +1,11 @@
 package flock_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/internal/flock"
 	"github.com/stretchr/testify/assert"
@@ -96,4 +98,63 @@ func TestTryLock(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLockAcquiresWhenFree(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "free.lock")
+
+	f, unlock, err := flock.Lock(t.Context(), lockPath)
+	require.NoError(t, err)
+	require.NotNil(t, f)
+	unlock()
+}
+
+func TestLockBlocksUntilUnlocked(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "contended.lock")
+
+	_, unlock, err := flock.TryLock(lockPath)
+	require.NoError(t, err)
+
+	acquired := make(chan struct{})
+	go func() {
+		_, unlock2, err := flock.Lock(t.Context(), lockPath)
+		assert.NoError(t, err)
+		close(acquired)
+		unlock2()
+	}()
+
+	select {
+	case <-acquired:
+		t.Fatal("Lock returned while the lock was still held")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	unlock()
+
+	select {
+	case <-acquired:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Lock did not acquire after the holder released it")
+	}
+}
+
+func TestLockReturnsNonContentionError(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "no", "such", "dir", "test.lock")
+
+	_, _, err := flock.Lock(t.Context(), lockPath)
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestLockTimesOutUnderContention(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "held.lock")
+
+	_, unlock, err := flock.TryLock(lockPath)
+	require.NoError(t, err)
+	defer unlock()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond) // duration is not important
+	defer cancel()
+
+	_, _, err = flock.Lock(ctx, lockPath)
+	require.ErrorIs(t, err, flock.ErrTimeout)
 }

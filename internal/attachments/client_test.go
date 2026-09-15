@@ -52,8 +52,8 @@ func newTestUploader(t *testing.T, reg *httpmock.Registry, host string, targetRe
 
 type staticTokenConfig map[string]string
 
-func (c staticTokenConfig) ActiveToken(host string) (string, string) {
-	return c[host], "oauth_token"
+func (c staticTokenConfig) ActiveToken(host string) gh.Credential {
+	return gh.Credential{Source: "oauth_token", Token: c[host]}
 }
 
 func (c staticTokenConfig) HostForAPIHost(apiHost string) (string, bool) {

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/utils"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
@@ -15,7 +16,7 @@ import (
 )
 
 type config interface {
-	ActiveToken(string) (string, string)
+	ActiveToken(string) gh.Credential
 	HostForAPIHost(string) (string, bool)
 }
 
@@ -170,7 +171,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
 		}
 
 		hostnameInRequest := ghauth.NormalizeHostname(getHostname(req))
-		token, _ := cfg.ActiveToken(hostnameInRequest)
+		token := cfg.ActiveToken(hostnameInRequest).Token
 		if token == "" {
 			// The request may be aimed at a host's api_host, which gh is
 			// not logged in to and so has no token of its own. Fall back
@@ -178,7 +179,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
 			// adds a token where there would have been none, so hosts we
 			// already authenticate keep resolving exactly as before.
 			if canonicalHost, ok := cfg.HostForAPIHost(hostnameInRequest); ok {
-				token, _ = cfg.ActiveToken(canonicalHost)
+				token = cfg.ActiveToken(canonicalHost).Token
 			}
 		}
 		if token != "" {

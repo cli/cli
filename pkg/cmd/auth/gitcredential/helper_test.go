@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) ActiveToken(host string) (string, string) {
-	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], c["_source"]
+func (c tinyConfig) ActiveToken(host string) gh.Credential {
+	return gh.Credential{Source: c["_source"], Token: c[fmt.Sprintf("%s:%s", host, "oauth_token")]}
 }
 
 func (c tinyConfig) ActiveUser(host string) (string, error) {
