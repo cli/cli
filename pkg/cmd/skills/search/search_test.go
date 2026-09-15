@@ -3,6 +3,8 @@ package search
 import (
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -432,6 +434,22 @@ func TestDeduplicateResults_Namespaced(t *testing.T) {
 	assert.Equal(t, "", results[2].Namespace)
 }
 
+func TestDeduplicateResults_PreservesSameNameAtDifferentPaths(t *testing.T) {
+	items := []codeSearchItem{
+		{Path: "category-a/lint/SKILL.md", Repository: codeSearchRepository{FullName: "org/repo"}},
+		{Path: "category-b/lint/SKILL.md", Repository: codeSearchRepository{FullName: "org/repo"}},
+		{Path: "category-a/lint/SKILL.md", Repository: codeSearchRepository{FullName: "org/repo"}},
+	}
+
+	results := deduplicateResults(items)
+
+	require.Len(t, results, 2)
+	assert.Equal(t, "lint", results[0].SkillName)
+	assert.Equal(t, "category-a/lint/SKILL.md", results[0].Path)
+	assert.Equal(t, "lint", results[1].SkillName)
+	assert.Equal(t, "category-b/lint/SKILL.md", results[1].Path)
+}
+
 func TestExtractSkillInfo(t *testing.T) {
 	tests := []struct {
 		path          string
@@ -446,8 +464,9 @@ func TestExtractSkillInfo(t *testing.T) {
 		{"my-skill/SKILL.md", "my-skill", ""},
 		// Plugins convention
 		{"plugins/openai/skills/chat/SKILL.md", "chat", "openai"},
-		// Non-matching paths should be filtered out
-		{"random/nested/deep/SKILL.md", "", ""},
+		// Skills may be nested without a skills/ directory
+		{"random/nested/deep/SKILL.md", "deep", ""},
+		// Hidden paths should be filtered out
 		{".hidden/SKILL.md", "", ""},
 		// Same-name skills with different namespaces
 		{"skills/kynan/commit/SKILL.md", "commit", "kynan"},
@@ -580,6 +599,27 @@ func TestDeduplicateByName_Namespaced(t *testing.T) {
 	}
 }
 
+func TestPromptInstall_DisambiguatesSameNamePaths(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	var options []string
+	pm := &prompter.PrompterMock{
+		MultiSelectFunc: func(_ string, _ []string, got []string) ([]int, error) {
+			options = got
+			return nil, nil
+		},
+	}
+
+	err := promptInstall(&SearchOptions{IO: ios, Prompter: pm}, []skillResult{
+		{Repo: "org/repo", SkillName: "lint", Path: "category-a/lint/SKILL.md"},
+		{Repo: "org/repo", SkillName: "lint", Path: "category-b/lint/SKILL.md"},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, options, 2)
+	assert.Contains(t, options[0], "category-a/lint")
+	assert.Contains(t, options[1], "category-b/lint")
+}
+
 // TestSearchRun_TelemetryRecordsInstallFromResults verifies that when a
 // user searches, picks one or more results interactively, and proceeds to
 // install them, the search command records a telemetry event capturing
@@ -588,7 +628,7 @@ func TestDeduplicateByName_Namespaced(t *testing.T) {
 // many converted to an install?
 func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 	codeResponse := `{"total_count": 1, "incomplete_results": false, "items": [
-		{"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "sha": "abc123",
+		{"name": "SKILL.md", "path": "category/terraform/SKILL.md", "sha": "abc123",
 		 "repository": {"full_name": "org/repo"}}
 	]}`
 
@@ -619,6 +659,8 @@ func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 	}
 
 	recorder := &telemetry.EventRecorderSpy{}
+	var executable string
+	var installArgs []string
 
 	err := searchRun(&SearchOptions{
 		IO:             ios,
@@ -626,12 +668,22 @@ func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 		Config:         func() (gh.Config, error) { return config.NewMockConfig(), nil },
 		Prompter:       pm,
 		Telemetry:      recorder,
-		ExecutablePath: "/nonexistent/gh", // install subprocess will fail; failures are logged, not fatal.
-		Query:          "terraform",
-		Page:           1,
-		Limit:          defaultLimit,
+		ExecutablePath: "/path/to/gh",
+		newCommand: func(name string, args ...string) *exec.Cmd {
+			executable = name
+			installArgs = append([]string(nil), args...)
+			return exec.Command(os.Args[0], "-test.run=^$")
+		},
+		Query: "terraform",
+		Page:  1,
+		Limit: defaultLimit,
 	})
 	require.NoError(t, err)
+	assert.Equal(t, "/path/to/gh", executable)
+	assert.Equal(t, []string{
+		"skills", "install", "org/repo", "category/terraform/SKILL.md",
+		"--agent", "github-copilot", "--scope", "project",
+	}, installArgs)
 
 	// The search command no longer records a separate skill_search event;
 	// only the follow-up skill_search_install event fires when the user
