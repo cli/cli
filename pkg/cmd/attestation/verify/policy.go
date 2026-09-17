@@ -15,6 +15,18 @@ import (
 
 const hostRegex = `^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+.*$`
 
+// signerWorkflowSANSuffix terminates the pattern built for --signer-workflow.
+//
+// A certificate issued to a GitHub Actions workflow carries a SubjectAlternativeName
+// of the form "<workflow URI>@<ref>", where the ref is either a git ref or a commit
+// SHA. sigstore-go matches SAN patterns with regexp.MatchString, which is unanchored,
+// so a pattern anchored only at the start is a prefix match: a workflow named
+// release.yml.attacker.yml would satisfy a pin on release.yml. Requiring the pinned
+// value to run to the end of the SAN, optionally followed by a single "@<ref>", makes
+// the pin an identity match. The ref may not itself contain "@", so that an "@" in a
+// workflow file name cannot be passed off as the separator.
+const signerWorkflowSANSuffix = `(@[^@]*)?$`
+
 func expandToGitHubURL(tenant, ownerOrRepo string) string {
 	if tenant == "" {
 		return fmt.Sprintf("https://github.com/%s", ownerOrRepo)
@@ -155,7 +167,7 @@ func validateSignerWorkflow(hostname, signerWorkflow string) (string, error) {
 	}
 
 	if match {
-		return "^" + regexp.QuoteMeta(fmt.Sprintf("https://%s", signerWorkflow)), nil
+		return "^" + regexp.QuoteMeta(fmt.Sprintf("https://%s", signerWorkflow)) + signerWorkflowSANSuffix, nil
 	}
 
 	// if the provided workflow did not match the expect format
@@ -164,5 +176,5 @@ func validateSignerWorkflow(hostname, signerWorkflow string) (string, error) {
 		return "", errors.New("unknown signer workflow host")
 	}
 
-	return "^" + regexp.QuoteMeta(fmt.Sprintf("https://%s/%s", hostname, signerWorkflow)), nil
+	return "^" + regexp.QuoteMeta(fmt.Sprintf("https://%s/%s", hostname, signerWorkflow)) + signerWorkflowSANSuffix, nil
 }
