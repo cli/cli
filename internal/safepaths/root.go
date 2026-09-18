@@ -478,7 +478,7 @@ func (r *Root) openDirectories(name string, perm os.FileMode, create bool) (*os.
 		return root, nil
 	}
 
-	for _, component := range strings.Split(name, string(filepath.Separator)) {
+	for component := range strings.SplitSeq(name, string(filepath.Separator)) {
 		if component == "" || component == "." {
 			continue
 		}
