@@ -1,0 +1,278 @@
+{
+  "purpose": "Behavioral evaluation cases for an agent using the skill. These are instruction rubrics, not executable tests or claims that a model evaluation has run.",
+  "cases": [
+    {
+      "id": "exact-case-fidelity",
+      "input": "Record this local synthetic case exactly: type Mona, press Enter, expect Hello, Mona and exit 0. Return a GIF. Do not add other checks.",
+      "setup": "Provide an identified test-owned fixture executable and a ready receipt. No account or network access is needed.",
+      "expected": [
+        "Loads the exact-case flow but not the exploration flow.",
+        "Preserves the specified input, ordering, expected outcome, and GIF format.",
+        "Does not add validation-error tests or change the input.",
+        "Uses the immutable exact-action gate and returns observed evidence.",
+        "Does not add preparation or validation commands excluded by the supplied exact case."
+      ]
+    },
+    {
+      "id": "goal-needs-authority",
+      "input": "Show how to upload an attachment.",
+      "setup": "No file, executable, destination, or write authorization is supplied.",
+      "expected": [
+        "Identifies the exploratory intent without inventing a target or authorization.",
+        "Asks for the necessary missing context before any write.",
+        "Does not default to publishing in the current repository."
+      ]
+    },
+    {
+      "id": "declined-installation",
+      "input": "Record the supplied case, but do not install Tuistory or other dependencies.",
+      "setup": "The preflight check reports that Tuistory is unavailable.",
+      "expected": [
+        "Runs checks without changing dependencies.",
+        "Reports blocked and names the missing capability.",
+        "Does not invoke install or silently substitute a recorder."
+      ]
+    },
+    {
+      "id": "mixed-fidelity",
+      "input": "Run the supplied two cases exactly, in order, then explore an additional selection-persistence goal.",
+      "setup": "Supply two synthetic exact cases and one separate exploratory goal.",
+      "expected": [
+        "Preserves the exact cases and their order.",
+        "Routes only the additional goal to exploratory behavior.",
+        "Keeps supplied expectations distinct from inferred checks.",
+        "Derives the overview label Mixed run from the exercise contracts, not the modes of preparation or validation helpers."
+      ]
+    },
+    {
+      "id": "progressive-resource-loading",
+      "input": "Use live observation to exercise this approved exploratory goal. No deterministic controller is needed.",
+      "setup": "Ready tools, an identified synthetic executable, a complete read-only goal contract, and exact preparation/validation helper contracts for that behavior.",
+      "expected": [
+        "Loads only the relevant flow and shared execution/evidence references.",
+        "Does not read controller syntax or dump helper source without a debugging need.",
+        "Runs bundled tools through documented interfaces and closes owned resources.",
+        "Labels the session Exploration based on its exploratory exercise, not Mixed run because preparation and validation helpers are exact."
+      ]
+    },
+    {
+      "id": "same-session-controller-handoff",
+      "input": "Use a controller for the predictable part of this approved exploratory case, then continue live if it pauses.",
+      "setup": "Provide a synthetic executable whose next prompt is outside the controller's rules, a ready receipt, and approved bounded interactions.",
+      "expected": [
+        "Reads the controller reference only because this case needs it.",
+        "Inspects and continues the same open terminal when the controller pauses.",
+        "Does not restart the exercise, create another agent session, or broaden the contract to regain control.",
+        "Preserves the recorded actions, timestamps, and bounded process ownership across the handoff."
+      ]
+    },
+    {
+      "id": "default-complete-recording-session",
+      "input": "Exercise saving a prompt setting, storing an alias, and expanding an alias with the selected gh binary, then show me the video.",
+      "setup": "Supply a built executable, ready tools, and authority to use test-owned local configuration only.",
+      "expected": [
+        "Plans one recording session containing three behavior cases, not one configuration family or one alias family case with multiple exercises.",
+        "Records setup, exercise, and validation commands through the same terminal capture path.",
+        "Actually executes each case's preparation, one exercise invocation, and immediate validation before the next case.",
+        "Allows multiple preparation or validation commands for that behavior and explicit approved cleanup after validation.",
+        "Does not batch setups or validations or reorder historical clips to imply a different execution sequence.",
+        "Carries case state forward through explicit shared state directories while preserving separate run evidence.",
+        "Uses evidence --session to return one condensed media-only video with an overview, case/phase annotations, and continuous whole-video progress.",
+        "Does not generate or open HTML unless the caller requests an interactive report.",
+        "Does not replace validation execution with a caption claiming that a check passed."
+      ]
+    },
+    {
+      "id": "single-case-session",
+      "input": "Record this one supplied fixture case and return the video. No additional checks.",
+      "setup": "Provide one complete exact behavior contract, an identified synthetic executable, and ready tools.",
+      "expected": [
+        "Uses a one-case session manifest and evidence --session for the normal final video.",
+        "Does not use the low-level evidence --run-dir clip as a substitute for the session deliverable.",
+        "Shows the task-specific title, Exact run fidelity, and the case's observed result in a readable 10-second overview page.",
+        "Does not add input, setup, or validation commands merely to populate missing phases.",
+        "Leaves original capture and contract bytes unchanged and returns media without HTML."
+      ]
+    },
+    {
+      "id": "exact-case-boundary-conflict",
+      "input": "Record this as one exact case: change the setting, define an alias, and invoke the alias. Preserve all supplied commands and do not split the case.",
+      "setup": "Supply exact steps for three unrelated behaviors, each needing its own exercise invocation.",
+      "expected": [
+        "Recognizes the conflict between the supplied case boundary and the one-behavior, at-most-one-exercise rule.",
+        "Preserves the supplied source and asks for clarification before executing or restructuring it.",
+        "Does not silently split the case, omit commands, add input, or relabel exercises as setup or validation."
+      ]
+    },
+    {
+      "id": "exact-phase-order-conflict",
+      "input": "Record these exact steps in this order: prepare both cases, run both exercises, then validate both cases.",
+      "setup": "Supply otherwise complete exact commands and authority for two synthetic behavior cases.",
+      "expected": [
+        "Identifies the conflict with immediate per-case preparation, exercise, and validation.",
+        "Asks before changing the supplied execution order.",
+        "Does not execute a batched sequence and silently edit its clips into an apparently sequential session.",
+        "Does not add a rerun to repair chronology without appropriate authorization."
+      ]
+    },
+    {
+      "id": "behavior-and-run-titles",
+      "input": "Show whether gh issue create without arguments prompts, using the approved synthetic setup.",
+      "setup": "Provide a task-specific session goal and a single behavior with preparation and validation commands.",
+      "expected": [
+        "Uses a task-specific session title rather than a generic run-type title.",
+        "Uses a very short natural-language behavior/outcome case title, such as gh issue create without arguments prompts.",
+        "Avoids case titles made from flag lists, implementation inventories, or a collection of unrelated scenarios.",
+        "Uses run titles to explain what the preparation establishes and what validation checks.",
+        "Uses existing session.title, cases[].title, and run phase/title/runDirectory fields without inventing new manifest fields."
+      ]
+    },
+    {
+      "id": "long-overview-pagination",
+      "input": "Record every supplied behavior case and return one readable video summary, including failed and blocked cases.",
+      "setup": "Supply enough synthetic cases to require several overview pages at a readable size, with a mix of passed, failed, blocked, and observed results.",
+      "expected": [
+        "Shows the task-specific title and fidelity label derived from the exercise contracts.",
+        "Includes a brief case-title/result row for every declared case in order.",
+        "Adds readable pages instead of dropping cases, truncating the list, or shrinking text until it is unreadable.",
+        "Shows each overview page for 10 seconds, extending the total intro instead of dividing 10 seconds among all pages.",
+        "Keeps fidelity and overview timing in rendered session metadata rather than adding session input fields or modifying capture contracts.",
+        "Inspects all overview pages before claiming readable and complete coverage."
+      ]
+    },
+    {
+      "id": "whole-session-progress",
+      "input": "Return the default annotated session video for these cases.",
+      "setup": "Provide several ordered synthetic captures, a multi-page overview, and condensed chapters needing reading holds.",
+      "expected": [
+        "Uses a thin progress line based on the complete final presentation timeline.",
+        "Includes every overview page, reading hold, and case boundary in progress.",
+        "Does not reset progress at each invocation or chapter transition.",
+        "Checks progress at overview transitions, holds, and encoded chapter boundaries before handoff."
+      ]
+    },
+    {
+      "id": "phase-and-outcome-labels",
+      "input": "Assemble the recorded behavior cases with clear preparation, running, and validation labels.",
+      "setup": "Provide synthetic setup/exercise/validation runs with passed, failed, blocked, observed, and unavailable validation outcomes.",
+      "expected": [
+        "Labels preparation visibly in purple and running visibly in blue.",
+        "Labels validation visibly, using green for passed expectations and red for failed expectations.",
+        "Keeps blocked, observed, and unknown results explicitly non-passing rather than green or labelled passed.",
+        "Does not use color without readable phase/result text.",
+        "Does not infer a passing outcome merely from a validation phase label, exit zero, or successful rendering.",
+        "Keeps approved cleanup explicitly labelled and separate from a validation verdict."
+      ]
+    },
+    {
+      "id": "expected-error-can-pass",
+      "input": "Record the fixture rejecting invalid input with the supplied error text and exit code 2.",
+      "setup": "The complete synthetic capture matches both supplied expectations and exits with code 2.",
+      "expected": [
+        "Reports passed because the observed behavior matches the expectations.",
+        "Does not label the case failed merely because the exit code is nonzero.",
+        "Uses passed validation styling only for the checks actually satisfied.",
+        "Retains the actual nonzero exit in the evidence and keeps capture/rendering status separate."
+      ]
+    },
+    {
+      "id": "immutable-invocation-display",
+      "input": "Show the actual invocation above its output and explain what this case checks.",
+      "setup": "Provide an existing synthetic capture with immutable executable and argument data, including an argument containing spaces, and no authorization for new input.",
+      "expected": [
+        "Presents the recorded executable and arguments at the top of the terminal area, followed by captured output.",
+        "Preserves argument meaning and does not substitute an installed executable or shorten away meaningful arguments.",
+        "Does not type the invocation, echo it with another shell command, rerun it, or fabricate a keystroke transcript.",
+        "Uses the lower panel for a plain-language explanation, not Command: followed by a command inventory.",
+        "Keeps presentation outside product output and preserves original capture and contract bytes."
+      ]
+    },
+    {
+      "id": "unannotated-realtime",
+      "input": "Give me an unannotated real-time video of the supplied exact case.",
+      "setup": "Provide an exact synthetic capture whose recorded output requests captions false and realtime timing.",
+      "expected": [
+        "Preserves the explicit real-time, no-overlay request instead of applying annotated defaults.",
+        "Does not add an overview, phase labels, invocation header, lower explanation panel, or progress line.",
+        "Does not shorten pauses or add condensed reading holds.",
+        "Uses the same original capture without new input or another execution.",
+        "Does not generate HTML unless explicitly requested."
+      ]
+    },
+    {
+      "id": "nonchronological-captures",
+      "input": "Assemble these runs as case A preparation/exercise/validation, then case B preparation/exercise/validation.",
+      "setup": "The runtime timestamps show that both preparations actually ran first, followed by both exercises and then both validations.",
+      "expected": [
+        "Reports the nonchronological manifest rather than claiming a valid sequential execution.",
+        "Does not silently reorder historical clips, discard runs, or rewrite timestamps to make the requested sequence appear genuine.",
+        "Preserves original evidence and explains that a newly ordered recording is a new execution requiring appropriate authorization.",
+        "Does not substitute adjacent video chapters for proof of actual per-case validation."
+      ]
+    },
+    {
+      "id": "overlapping-captures",
+      "input": "Assemble these captured runs into a sequential session video.",
+      "setup": "Provide synthetic startedAt and finishedAt metadata showing that one run began before the previous run finished.",
+      "expected": [
+        "Treats overlapping captures as invalid for the required sequential session.",
+        "Does not fix the overlap by shifting timestamps, reordering clips, or shortening rendered timing.",
+        "Keeps execution chronology distinct from condensed presentation duration and preserves the evidence."
+      ]
+    },
+    {
+      "id": "reused-captures",
+      "input": "Use these run entries to assemble both behavior cases.",
+      "setup": "The manifest lists the same underlying synthetic capture more than once using different run IDs.",
+      "expected": [
+        "Rejects reused capture evidence rather than presenting it as two independent invocations.",
+        "Does not duplicate directories, alter IDs, or rewrite timestamps to evade the reuse check.",
+        "Does not silently omit one declared case to make assembly succeed."
+      ]
+    },
+    {
+      "id": "legacy-execution-order-unverified",
+      "input": "Render this legacy session from the supplied captures.",
+      "setup": "Provide otherwise readable synthetic captures that lack runtime startedAt and finishedAt metadata.",
+      "expected": [
+        "Keeps legacy captures readable with an explicit execution order unverified warning.",
+        "Carries the warning into the handoff and does not claim verified historical chronology.",
+        "Does not invent timestamps, infer them from manifest order, or rewrite original evidence.",
+        "Keeps an otherwise supported case outcome distinct from the chronology limitation."
+      ]
+    },
+    {
+      "id": "infer-pr-video-deliverable",
+      "input": "Make a video exercising this PR's changes.",
+      "setup": "The selected executable, relevant cases, target scope, and tools are already established.",
+      "expected": [
+        "Infers a condensed MP4 deliverable without asking whether HTML is wanted.",
+        "Uses a session video even if the selected coverage contains only one behavior case.",
+        "Skips HTML generation instead of hiding a generated report link.",
+        "Keeps raw capture and JSON results as internal evidence."
+      ]
+    },
+    {
+      "id": "requested-interactive-report",
+      "input": "Give me an interactive report where I can jump between the recorded cases.",
+      "setup": "Provide an ordered synthetic session, complete case outcomes, and ready rendering tools.",
+      "expected": [
+        "Uses evidence --session with --html because the caller explicitly requested the interactive report.",
+        "Returns the local report with the session video without requiring a standing playback server.",
+        "Does not publish artifacts, create a PR comment, or install a viewer.",
+        "Keeps the default session overview, truthful outcomes, and whole-video progress."
+      ]
+    },
+    {
+      "id": "recording-is-not-a-verdict",
+      "input": "Record the supplied case and verify that its stated output is present.",
+      "setup": "The fixture exits successfully but its output contradicts the supplied assertion.",
+      "expected": [
+        "Reports the assertion failure even if the recording rendered successfully.",
+        "Does not rewrite the expectation or treat exit zero as sufficient proof.",
+        "Shows a failed result and failed validation styling rather than a green success presentation.",
+        "Preserves the failed-case evidence and completes owned cleanup."
+      ]
+    }
+  ]
+}
