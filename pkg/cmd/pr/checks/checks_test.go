@@ -1014,6 +1014,122 @@ func TestEliminateDuplicates(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "re-queued CheckRun supersedes completed run",
+			checkContexts: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
+				},
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "QUEUED",
+					Conclusion:  "",
+					StartedAt:   time.Time{},
+					CompletedAt: time.Time{},
+					DetailsURL:  "https://github.com/cli/cli/runs/2",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
+				},
+			},
+			want: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "QUEUED",
+					Conclusion:  "",
+					StartedAt:   time.Time{},
+					CompletedAt: time.Time{},
+					DetailsURL:  "https://github.com/cli/cli/runs/2",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "re-queued CheckRun appearing first supersedes completed run",
+			checkContexts: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "QUEUED",
+					Conclusion:  "",
+					StartedAt:   time.Time{},
+					CompletedAt: time.Time{},
+					DetailsURL:  "https://github.com/cli/cli/runs/2",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
+				},
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
+				},
+			},
+			want: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "QUEUED",
+					Conclusion:  "",
+					StartedAt:   time.Time{},
+					CompletedAt: time.Time{},
+					DetailsURL:  "https://github.com/cli/cli/runs/2",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

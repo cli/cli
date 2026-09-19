@@ -92,9 +92,33 @@ func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (che
 	return
 }
 
+func checkStartTime(c api.CheckContext) time.Time {
+	if !c.StartedAt.IsZero() {
+		return c.StartedAt
+	}
+	if c.Context != "" {
+		return c.CreatedAt
+	}
+	return time.Time{}
+}
+
 // eliminateDuplicates filters a set of checks to only the most recent ones if the set includes repeated runs
 func eliminateDuplicates(checkContexts []api.CheckContext) []api.CheckContext {
-	sort.Slice(checkContexts, func(i, j int) bool { return checkContexts[i].StartedAt.After(checkContexts[j].StartedAt) })
+	sort.SliceStable(checkContexts, func(i, j int) bool {
+		ti := checkStartTime(checkContexts[i])
+		tj := checkStartTime(checkContexts[j])
+
+		iZero := ti.IsZero()
+		jZero := tj.IsZero()
+
+		if iZero && !jZero {
+			return true
+		}
+		if !iZero && jZero {
+			return false
+		}
+		return ti.After(tj)
+	})
 
 	mapChecks := make(map[string]struct{})
 	mapContexts := make(map[string]struct{})
