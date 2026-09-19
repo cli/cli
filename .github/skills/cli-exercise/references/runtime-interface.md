@@ -247,6 +247,12 @@ exhausting it is an explicit capture failure.
 The adapter also bounds its unread event backlog to 64 events. Overflow reports
 an incomplete capture while keeping response delivery available for cleanup;
 it does not silently discard output and report success.
+The Node bridge separately limits pending protocol output to 64 MiB, reserving
+4 KiB for failure and cleanup messages. A stalled consumer cannot grow that
+queue indefinitely. Overflow stops capture and the owned target without waiting
+for the consumer, and exits unsuccessfully. Already queued output can drain;
+after a capture failure, a final flush has a 3.5-second limit before the adapter
+exits with an error. The byte budget applies to pending data, not lifetime output.
 
 Case statuses are `passed`, `failed`, `blocked`, and `observed`. Missing required evidence,
 unsupported expectations, and unfinished exact steps cannot pass.
@@ -376,8 +382,14 @@ still provides sampled coverage; deduplication does not turn it into an
 exhaustive review.
 
 `encodedSamples` identifies first, middle, and final frames decoded from each
-actual output under `inspection/encoded/<format>/`. Inspect those too rather
-than judging codec quality from source images alone.
+actual output. Inspect those images too rather than judging codec quality from
+source images alone.
+
+Final session inspection honors the same `sampled`/`all` choice and records it
+as `mode`. `decodedFrames[format]` maps selected final-video frame numbers to
+decoded images. See [session inspection](recording-sessions.md#assemble-the-video)
+for coverage; the existing chapter reports retain source-state details.
+
 Rendering rejects frames above 64 megapixels, font sizes above 512 points, and
 timelines above one million frames rather than allocating unbounded resources.
 This leaves the original case result and capture intact.

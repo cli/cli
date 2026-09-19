@@ -322,7 +322,7 @@ func presentationNativeCase(t *testing.T) {
 		path := filepath.Join(root, "plain.json")
 		require.NoError(t, cliutil.WriteJSON(path, plain))
 		var output bytes.Buffer
-		code, err := runSession(ctx, t.TempDir(), options{sessionManifest: path, preflight: receiptPath},
+		code, err := runSession(ctx, t.TempDir(), options{sessionManifest: path, preflight: receiptPath, inspection: "sampled"},
 			cliutil.Streams{Out: &output}, render)
 		require.NoError(t, err)
 		require.Equal(t, 1, code)

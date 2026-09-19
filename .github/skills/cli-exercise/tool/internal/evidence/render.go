@@ -66,6 +66,7 @@ type rendering struct {
 	Font                    *fontutil.Info       `json:"font,omitempty"`
 	Inspection              *inspectionInfo      `json:"inspection,omitempty"`
 	Warnings                []string             `json:"warnings,omitempty"`
+	inspectionFrames        []int
 }
 
 type tailBuffer struct{ data []byte }
@@ -508,6 +509,10 @@ func render(ctx context.Context, contract contract, result result, states []stat
 		value := max(0, timelineDuration-result.DurationSeconds)
 		hold = &value
 	}
+	var inspectionFrames []int
+	if inspectionMode == "all" {
+		inspectionFrames = renderedInspectionFrames(renderedOccurrences, count, additionalFrames)
+	}
 	return rendering{
 		Status: "complete", Media: media, MediaDetails: details, Width: width, Height: height,
 		DurationSeconds: timelineDuration, CaptureDurationSeconds: result.DurationSeconds, EndHoldSeconds: hold,
@@ -519,6 +524,7 @@ func render(ctx context.Context, contract contract, result result, states []stat
 			EncodedSamples: encoded, VisualReview: "pending",
 			UniqueImages: len(store.images), RenderedCount: len(renderedOccurrences), SourceCount: len(sourceOccurrences),
 		},
-		Warnings: raster.fonts.Warnings(),
+		Warnings:         raster.fonts.Warnings(),
+		inspectionFrames: inspectionFrames,
 	}, nil
 }

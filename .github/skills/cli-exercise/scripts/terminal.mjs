@@ -3,6 +3,9 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import path from "node:path";
 
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const outputLimit = 64 * 1024 * 1024;
+// Keep failure and cleanup messages deliverable when terminal snapshots fill the queue.
+const controlReserve = 4096;
 
 // The adapter only translates mechanical requests to the selected Tuistory API.
 export async function serve(launchTerminal, input, output) {
@@ -13,9 +16,12 @@ export async function serve(launchTerminal, input, output) {
   let groupExited = false;
   let queue = Promise.resolve();
   let failed = false;
+  let captureFailed = false;
   const send = (value) => {
     const line = JSON.stringify(value) + "\n";
-    if (Buffer.byteLength(line) > 64 * 1024 * 1024) throw new Error("adapter_message_limit");
+    const bytes = Buffer.byteLength(line);
+    const limit = value.type === "data" ? outputLimit - controlReserve : outputLimit;
+    if (bytes > limit || output.writableLength + bytes > limit) throw new Error("adapter_output_limit");
     output.write(line);
   };
   const snapshot = (raw = "") => send({ type: "data", raw, data: session.getTerminalData() });
@@ -29,7 +35,6 @@ export async function serve(launchTerminal, input, output) {
       if (error.code === "EPERM") return true;
       if (error.code !== "ESRCH") throw error;
       groupExited = true;
-      send({ type: "process_group", pid: 0 });
       return false;
     }
   };
@@ -40,13 +45,37 @@ export async function serve(launchTerminal, input, output) {
       session.close();
       throw new Error("unsupported_terminal_lifecycle");
     }
-    // Session.close skips an exited leader; the pinned PTY handle still owns its group.
-    if (groupAlive()) session.pty.kill();
-    const deadline = Date.now() + 3500;
-    while ((groupAlive() || !session.isDead) && Date.now() < deadline) await pause(10);
-    if (groupAlive() || !session.isDead) throw new Error("adapter_cleanup_failed");
-    session.close();
+    try {
+      // Session.close skips an exited leader; the pinned PTY handle still owns its group.
+      if (groupAlive()) session.pty.kill();
+      const deadline = Date.now() + 3500;
+      while ((groupAlive() || !session.isDead) && Date.now() < deadline) await pause(10);
+      if (groupAlive() || !session.isDead) throw new Error("adapter_cleanup_failed");
+    } finally {
+      session.close();
+    }
+    if (!output.destroyed) send({ type: "process_group", pid: 0 });
   })();
+  const failCapture = (code, announce = true) => {
+    if (captureFailed) return;
+    captureFailed = true;
+    failed = true;
+    unsubscribe?.();
+    if (announce && !output.destroyed) {
+      try { send({ type: "error", code }); }
+      catch { process.stderr.write("The owned Tuistory adapter could not report capture failure.\n"); }
+    }
+    lines.close();
+    // Awaited again below; handle rejection while an in-flight request unwinds.
+    close().catch(() => { failed = true; });
+  };
+  const capture = (raw = "") => {
+    if (closing || captureFailed) return;
+    try { snapshot(raw); }
+    catch (error) {
+      failCapture(error.message === "adapter_output_limit" ? error.message : "adapter_capture_failed");
+    }
+  };
   const handle = async (request) => {
     if (!request || typeof request.id !== "string") throw new Error("invalid_adapter_request");
     if (request.op === "open") {
@@ -66,20 +95,19 @@ export async function serve(launchTerminal, input, output) {
       }
       processGroup = session.pty.pid;
       send({ type: "process_group", pid: processGroup });
-      unsubscribe = session.subscribe((raw) => {
-        if (!closing) {
-          try { snapshot(raw); }
-          catch { failed = true; send({ type: "error", code: "adapter_capture_failed" }); }
-        }
-      });
-      snapshot(session.getRawOutput());
+      unsubscribe = session.subscribe(capture);
+      capture(session.getRawOutput());
       session.onExit((info) => {
-        if (!closing) {
-          snapshot();
-          send({ type: "exit", exitCode: info.signal ? null : info.exitCode, signal: info.signal || null });
+        if (!closing && !captureFailed) {
+          try {
+            snapshot();
+            send({ type: "exit", exitCode: info.signal ? null : info.exitCode, signal: info.signal || null });
+          } catch (error) {
+            failCapture(error.message === "adapter_output_limit" ? error.message : "adapter_capture_failed");
+          }
         }
       });
-      if (session.isDead) {
+      if (session.isDead && !captureFailed) {
         const info = session.exitInfo;
         send({ type: "exit", exitCode: info?.signal ? null : info?.exitCode ?? null, signal: info?.signal || null });
       }
@@ -103,28 +131,51 @@ export async function serve(launchTerminal, input, output) {
         else throw new Error("unsupported_adapter_input");
       } else throw new Error("unsupported_adapter_operation");
     }
-    send({ type: "response", id: request.id, ok: true });
+    if (!captureFailed) send({ type: "response", id: request.id, ok: true });
   };
   const lines = createInterface({ input, crlfDelay: Infinity });
-  for await (const line of lines) {
-    if (Buffer.byteLength(line) > 1024 * 1024) {
-      failed = true;
-      break;
-    }
-    queue = queue.then(async () => {
-      let request;
-      try {
-        request = JSON.parse(line);
-        await handle(request);
-      } catch {
+  output.on("error", () => failCapture("adapter_output_failed", false));
+  try {
+    for await (const line of lines) {
+      if (Buffer.byteLength(line) > 1024 * 1024) {
         failed = true;
-        send({ type: "response", id: request?.id ?? "", ok: false, error: { code: "adapter_operation_failed" } });
+        break;
       }
-    });
-    await queue;
-    if (closing) break;
+      queue = queue.then(async () => {
+        let request;
+        try {
+          request = JSON.parse(line);
+          await handle(request);
+        } catch (error) {
+          failed = true;
+          if (error.message === "adapter_output_limit") {
+            failCapture(error.message);
+          } else if (!captureFailed) {
+            try { send({ type: "response", id: request?.id ?? "", ok: false, error: { code: "adapter_operation_failed" } }); }
+            catch { failCapture("adapter_output_limit"); }
+          }
+        }
+      });
+      await queue;
+      if (closing || captureFailed) break;
+      if (output.writableNeedDrain) await new Promise((resolve) => setImmediate(resolve));
+    }
+  } finally {
+    lines.close();
+    await close();
   }
-  await close();
+  if (output.writableLength > 0 && !output.destroyed) {
+    await new Promise((resolve, reject) => {
+      const timer = captureFailed ? setTimeout(() => {
+        reject(new Error("adapter_output_stalled"));
+      }, 3500) : null;
+      output.write("", (error) => {
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
   return failed ? 1 : 0;
 }
 
@@ -137,6 +188,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     process.exitCode = await serve(library.launchTerminal, process.stdin, process.stdout);
   } catch {
     process.stderr.write("The owned Tuistory adapter failed.\n");
-    process.exitCode = 2;
+    // Owned cleanup has finished or failed; a blocked stdout pipe must not keep this process alive.
+    process.exit(2);
   }
 }

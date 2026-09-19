@@ -188,6 +188,13 @@ that also creates per-run HTML reports and clickable MP4 chapter navigation.
 Without this flag, no HTML is generated. GIF has no native chapter seeking.
 No standing playback server is needed.
 
+`--inspection sampled` saves first/middle/last images from the final video.
+`--inspection all` also uses the existing chapter frame mappings to cover
+terminal and caption changes, overview pages, reading holds, and chapter
+boundaries. Images are decoded from the assembled video and deduplicated;
+`decodedFrames[format]` maps zero-based frame numbers to their image paths.
+This does not change the video or sample every progress-bar tick.
+
 ## Present the session
 
 For annotated output, open with a summary using the manifest's task-specific

@@ -241,8 +241,11 @@ func checkSessionMediaChapters(data []byte, chapters []sessionChapter, fps int) 
 	return observed.Chapters, nil
 }
 
-func assembleSession(ctx context.Context, directory string, receipt recording.Receipt, chapters []sessionChapter, formats []string, progress bool) (rendering, []sessionChapter, error) {
+func assembleSession(ctx context.Context, directory string, receipt recording.Receipt, chapters []sessionChapter, formats []string, progress bool, inspectionMode string) (rendering, []sessionChapter, error) {
 	empty := rendering{}
+	if !slices.Contains([]string{"sampled", "all"}, inspectionMode) {
+		return empty, nil, fmt.Errorf("--inspection must be sampled or all")
+	}
 	planned, timeline, err := planSessionMedia(chapters)
 	if err != nil {
 		return empty, nil, err
@@ -343,6 +346,10 @@ func assembleSession(ctx context.Context, directory string, receipt recording.Re
 			"caseId": chapter.CaseID, "runId": chapter.RunID, "source": original, "normalized": padded,
 		})
 	}
+	selected, err := sessionInspectionFrames(timeline, inspectionMode)
+	if err != nil {
+		return empty, nil, err
+	}
 	list := filepath.Join(staging, "clips.ffconcat")
 	metadata := filepath.Join(staging, "chapters.ffmetadata")
 	for path, data := range map[string]string{
@@ -405,38 +412,66 @@ func assembleSession(ctx context.Context, directory string, receipt recording.Re
 	if err := os.Mkdir(inspection, 0o700); err != nil {
 		return empty, nil, err
 	}
+	store, err := newImageStore(inspection)
+	if err != nil {
+		return empty, nil, err
+	}
 	encoded, images, unique := map[string][]string{}, map[string]string{}, map[string]bool{}
+	decoded := map[string]map[int]string{}
 	for _, kind := range []string{"mp4", "gif"} {
 		filename, exists := planned.Media[kind]
 		if !exists {
 			continue
 		}
-		encoded[kind], err = decodedSamples(bounded, filename, kind, receipt.Tools, environment, planned.Width, planned.Height, planned.Frames, inspection)
+		paths := map[int]string{}
+		if inspectionMode == "all" {
+			paths, err = decodeSessionInspection(bounded, filename, receipt.Tools, environment,
+				planned.Width, planned.Height, planned.Frames, selected, store)
+		} else {
+			var samples []string
+			samples, err = decodedSamples(bounded, filename, kind, receipt.Tools, environment,
+				planned.Width, planned.Height, planned.Frames, inspection)
+			for index, path := range samples {
+				paths[selected[index]] = path
+			}
+		}
 		if err != nil {
 			return empty, nil, err
 		}
-		for _, relative := range encoded[kind] {
-			hash, err := cliutil.SHA256File(filepath.Join(inspection, filepath.FromSlash(relative)))
+		decoded[kind] = paths
+		for _, frame := range inspectionRangeSamples(0, planned.Frames-1) {
+			encoded[kind] = append(encoded[kind], paths[frame])
+		}
+		for _, path := range paths {
+			if _, exists := images[path]; exists {
+				continue
+			}
+			hash, err := cliutil.SHA256File(filepath.Join(inspection, filepath.FromSlash(path)))
 			if err != nil {
 				return empty, nil, err
 			}
-			images[relative], unique[hash] = hash, true
+			images[path], unique[hash] = hash, true
 		}
 	}
 	manifest := filepath.Join(inspection, "manifest.json")
 	if err := cliutil.WriteJSON(manifest, map[string]any{
-		"frames": images, "media": planned.MediaDetails, "fps": planned.FPS, "timing": planned.Timing,
-		"timelineDurationSeconds": planned.DurationSeconds, "encodedSamples": encoded,
+		"mode": inspectionMode, "frames": images, "media": planned.MediaDetails, "fps": planned.FPS, "timing": planned.Timing,
+		"timelineDurationSeconds": planned.DurationSeconds, "encodedSamples": encoded, "decodedFrames": decoded,
 		"assembledMP4": mp4Info, "embeddedChapters": embedded, "clips": clips, "visualReview": "pending",
 		"continuousProgress": progress,
 	}); err != nil {
 		return empty, nil, err
 	}
-
 	hash, err := cliutil.SHA256File(manifest)
 	if err != nil {
 		return empty, nil, err
 	}
+	imageCount := len(unique)
+	if inspectionMode == "all" {
+		imageCount = len(store.images)
+	}
+	planned.Inspection = &inspectionInfo{Mode: inspectionMode, Directory: inspection, Manifest: manifest, ManifestSHA256: hash,
+		EncodedSamples: encoded, VisualReview: "pending", UniqueImages: imageCount}
 	if err := bounded.Err(); err != nil {
 		return empty, nil, err
 	}
@@ -446,10 +481,6 @@ func assembleSession(ctx context.Context, directory string, receipt recording.Re
 			return empty, nil, fmt.Errorf("remove known session MP4 intermediate: %w", err)
 		}
 		planned.DurationSeconds = planned.MediaDetails["gif"].DurationSeconds
-	}
-	planned.Inspection = &inspectionInfo{
-		Mode: "sampled", Directory: inspection, Manifest: manifest, ManifestSHA256: hash,
-		EncodedSamples: encoded, VisualReview: "pending", UniqueImages: len(unique),
 	}
 	planned.Status = "complete"
 	return planned, timeline, nil

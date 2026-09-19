@@ -26,6 +26,8 @@ func TestMain(tests *testing.M) {
 		err = rawFixture()
 	} else if mode := os.Getenv("CLI_EXERCISE_TEST_FIXTURE"); mode == "descendants" || mode == "descendant-child" {
 		err = descendantFixture(mode)
+	} else if os.Getenv("CLI_EXERCISE_TEST_FIXTURE") == "output-grid" {
+		err = outputGridFixture()
 	} else {
 		os.Exit(tests.Run())
 	}

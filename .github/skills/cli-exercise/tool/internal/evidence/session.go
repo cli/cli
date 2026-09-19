@@ -247,7 +247,7 @@ func runSession(ctx context.Context, skillRoot string, opts options, streams cli
 		var assembled rendering
 		var chapters []sessionChapter
 		if err == nil {
-			assembled, chapters, err = assembleSession(ctx, output, receipt, result.Chapters, formats, annotated)
+			assembled, chapters, err = assembleSession(ctx, output, receipt, result.Chapters, formats, annotated, opts.inspection)
 		}
 		if err != nil {
 			result.Rendering = rendering{Status: "failed", Error: err.Error(), Media: map[string]string{}}

@@ -30,6 +30,8 @@ func TestParseOptions(t *testing.T) {
 	}{
 		{name: "defaults", args: []string{"--run-dir", "run", "--preflight", "receipt"}},
 		{name: "recording session", args: []string{"--session", "session.json", "--preflight", "receipt"}},
+		{name: "recording session all inspection", args: []string{"--session", "session.json", "--preflight", "receipt", "--inspection", "all"}},
+		{name: "recording session sampled inspection", args: []string{"--session", "session.json", "--preflight", "receipt", "--inspection", "sampled"}},
 		{name: "HTML report", args: []string{"--run-dir", "run", "--preflight", "receipt", "--html"}, html: true},
 		{name: "HTML explicitly disabled", args: []string{"--run-dir", "run", "--preflight", "receipt", "--html=false"}},
 		{name: "recording session with HTML", args: []string{"--session", "session.json", "--preflight", "receipt", "--html"}, html: true},
@@ -47,6 +49,8 @@ func TestParseOptions(t *testing.T) {
 		{name: "missing run", args: []string{"--preflight", "receipt"}, err: "requires --run-dir"},
 		{name: "missing preflight", args: []string{"--run-dir", "run"}, err: "requires --run-dir"},
 		{name: "invalid inspection", args: []string{"--run-dir", "run", "--preflight", "receipt", "--inspection", "none"}, err: "sampled or all"},
+		{name: "recording session invalid inspection", args: []string{"--session", "session.json", "--preflight", "receipt", "--inspection", "frames"}, err: "sampled or all"},
+		{name: "recording session blank inspection", args: []string{"--session", "session.json", "--preflight", "receipt", "--inspection", ""}, err: "sampled or all"},
 		{name: "extra argument", args: []string{"--run-dir", "run", "--preflight", "receipt", "extra"}, err: "no positional"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -63,9 +67,11 @@ func TestParseOptions(t *testing.T) {
 			} else {
 				require.Equal(t, "run", opts.runDir)
 			}
-			if tc.name == "all and manual" {
+			if tc.name == "all and manual" || tc.name == "recording session all inspection" {
 				require.Equal(t, "all", opts.inspection)
-				require.Equal(t, "manual", opts.verification)
+				if tc.name == "all and manual" {
+					require.Equal(t, "manual", opts.verification)
+				}
 			} else {
 				require.Equal(t, "sampled", opts.inspection)
 			}
@@ -124,6 +130,7 @@ func TestRun(t *testing.T) {
 	t.Run("case sequencing", sessionOrderCases)
 	t.Run("recording presentation", presentationCases)
 	t.Run("session media", sessionMediaCases)
+	t.Run("session inspection", sessionInspectionCases)
 	for _, tc := range []struct {
 		name            string
 		expected        string

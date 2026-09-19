@@ -262,4 +262,5 @@ func TestRun(t *testing.T) {
 	t.Run("owned process group metadata", processGroupProtocolCases)
 	t.Run("native mechanical adapter", nativeAdapterCases)
 	t.Run("native process cleanup", nativeCleanupCases)
+	t.Run("native output buffering", nativeOutputBudgetCases)
 }
