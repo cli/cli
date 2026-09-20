@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -49,7 +48,7 @@ func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName str
 			} `graphql:"ref(qualifiedName: $tagName)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":   githubv4.String(repo.RepoOwner()),
 		"name":    githubv4.String(repo.RepoName()),
 		"tagName": githubv4.String(qualifiedTagName),
@@ -74,7 +73,7 @@ func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, 
 }
 
 func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagName, target, previousTagName string) (*releaseNotes, error) {
-	params := map[string]interface{}{
+	params := map[string]any{
 		"tag_name": tagName,
 	}
 	if target != "" {
@@ -100,8 +99,7 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
 	err = api.NewClientFromHTTP(httpClient).REST(repo.RepoHost(), http.MethodPost, path.String(), bytes.NewBuffer(bodyBytes), &rn)
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
 			return nil, notImplementedError
 		}
 		return nil, err
@@ -110,35 +108,36 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 }
 
 func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
-	if err != nil {
-		return false, err
-	}
-	req, err := http.NewRequest("HEAD", url.String(), nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return false, err
 	}
 
+	// A HEAD response has no body, so Request is used rather than REST, which would try to
+	// decode one.
 	// TODO(api-client-rollout)
-	// This has been deferred from moving to api.Client due to HEAD responses having no body while REST decodes non-204/205 2xx responses as JSON.
-	resp, err := httpClient.Do(req)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).Request(repo.RepoHost(), http.MethodHead, path.String(), nil)
 	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 	if resp.Body != nil {
 		defer resp.Body.Close()
 	}
 
-	if resp.StatusCode == 200 {
-		return true, nil
-	} else if resp.StatusCode == 404 {
-		return false, nil
-	} else {
-		return false, api.HandleHTTPError(resp)
+	if resp.StatusCode != http.StatusOK {
+		return false, api.UnexpectedStatusError(resp)
 	}
+
+	return true, nil
 }
 
-func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*shared.Release, error) {
+func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]any) (*shared.Release, error) {
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -181,7 +180,7 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 }
 
 func publishRelease(httpClient *http.Client, host string, releaseURL safeurl.SafeURL, discussionCategory string, isLatest *bool) (*shared.Release, error) {
-	params := map[string]interface{}{"draft": false}
+	params := map[string]any{"draft": false}
 	if discussionCategory != "" {
 		params["discussion_category_name"] = discussionCategory
 	}
@@ -227,7 +226,7 @@ func tokenHasWorkflowScope(headers http.Header) bool {
 
 	// The API returns scopes separated by a comma and a space, so each element
 	// must be trimmed before comparison.
-	for _, s := range strings.Split(scopes, ",") {
+	for s := range strings.SplitSeq(scopes, ",") {
 		if strings.TrimSpace(s) == "workflow" {
 			return true
 		}

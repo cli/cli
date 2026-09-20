@@ -11,6 +11,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSearcherCode(t *testing.T) {
@@ -49,11 +50,11 @@ func TestSearcherCode(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "search/code", values),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"incomplete_results": false,
 						"total_count":        1,
-						"items": []interface{}{
-							map[string]interface{}{
+						"items": []any{
+							map[string]any{
 								"name": "file.go",
 							},
 						},
@@ -73,11 +74,11 @@ func TestSearcherCode(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "api/v3/search/code", values),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"incomplete_results": false,
 						"total_count":        1,
-						"items": []interface{}{
-							map[string]interface{}{
+						"items": []any{
+							map[string]any{
 								"name": "file.go",
 							},
 						},
@@ -95,11 +96,11 @@ func TestSearcherCode(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				firstReq := httpmock.QueryMatcher("GET", "search/code", values)
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"name": "file.go",
 						},
 					},
@@ -110,11 +111,11 @@ func TestSearcherCode(t *testing.T) {
 					"per_page": []string{"30"},
 					"q":        []string{"keyword language:go"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"name": "file2.go",
 						},
 					},
@@ -144,11 +145,11 @@ func TestSearcherCode(t *testing.T) {
 					"per_page": []string{"30"},
 					"q":        []string{"\"keyword with whitespace\" language:go"},
 				})
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"name": "file.go",
 						},
 					},
@@ -159,11 +160,11 @@ func TestSearcherCode(t *testing.T) {
 					"per_page": []string{"30"},
 					"q":        []string{"\"keyword with whitespace\" language:go"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"name": "file2.go",
 						},
 					},
@@ -197,11 +198,11 @@ func TestSearcherCode(t *testing.T) {
 					"per_page": []string{"100"},
 					"q":        []string{"keyword language:go"},
 				})
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        287,
-					"items": initialize(0, 100, func(i int) interface{} {
-						return map[string]interface{}{
+					"items": initialize(0, 100, func(i int) any {
+						return map[string]any{
 							"name": fmt.Sprintf("name%d.go", i),
 						}
 					}),
@@ -212,11 +213,11 @@ func TestSearcherCode(t *testing.T) {
 					"per_page": []string{"100"},
 					"q":        []string{"keyword language:go"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        287,
-					"items": initialize(100, 200, func(i int) interface{} {
-						return map[string]interface{}{
+					"items": initialize(100, 200, func(i int) any {
+						return map[string]any{
 							"name": fmt.Sprintf("name%d.go", i),
 						}
 					}),
@@ -319,11 +320,11 @@ func TestSearcherCommits(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "search/commits", values),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"incomplete_results": false,
 						"total_count":        1,
-						"items": []interface{}{
-							map[string]interface{}{
+						"items": []any{
+							map[string]any{
 								"sha": "abc",
 							},
 						},
@@ -343,11 +344,11 @@ func TestSearcherCommits(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "api/v3/search/commits", values),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"incomplete_results": false,
 						"total_count":        1,
-						"items": []interface{}{
-							map[string]interface{}{
+						"items": []any{
+							map[string]any{
 								"sha": "abc",
 							},
 						},
@@ -381,11 +382,11 @@ func TestSearcherCommits(t *testing.T) {
 					"sort":     []string{"committer-date"},
 					"q":        []string{"\"keyword with whitespace\" author:foobar committer-date:>2021-02-28"},
 				})
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"sha": "abc",
 						},
 					},
@@ -398,11 +399,11 @@ func TestSearcherCommits(t *testing.T) {
 					"sort":     []string{"committer-date"},
 					"q":        []string{"\"keyword with whitespace\" author:foobar committer-date:>2021-02-28"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"sha": "def",
 						},
 					},
@@ -421,11 +422,11 @@ func TestSearcherCommits(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				firstReq := httpmock.QueryMatcher("GET", "search/commits", values)
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"sha": "abc",
 						},
 					},
@@ -438,11 +439,11 @@ func TestSearcherCommits(t *testing.T) {
 					"sort":     []string{"committer-date"},
 					"q":        []string{"keyword author:foobar committer-date:>2021-02-28"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"sha": "def",
 						},
 					},
@@ -481,11 +482,11 @@ func TestSearcherCommits(t *testing.T) {
 					"sort":     []string{"committer-date"},
 					"q":        []string{"keyword author:foobar committer-date:>2021-02-28"},
 				})
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        287,
-					"items": initialize(0, 100, func(i int) map[string]interface{} {
-						return map[string]interface{}{
+					"items": initialize(0, 100, func(i int) map[string]any {
+						return map[string]any{
 							"sha": strconv.Itoa(i),
 						}
 					}),
@@ -498,11 +499,11 @@ func TestSearcherCommits(t *testing.T) {
 					"sort":     []string{"committer-date"},
 					"q":        []string{"keyword author:foobar committer-date:>2021-02-28"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        287,
-					"items": initialize(100, 200, func(i int) map[string]interface{} {
-						return map[string]interface{}{
+					"items": initialize(100, 200, func(i int) map[string]any {
+						return map[string]any{
 							"sha": strconv.Itoa(i),
 						}
 					}),
@@ -605,11 +606,11 @@ func TestSearcherRepositories(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "search/repositories", values),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"incomplete_results": false,
 						"total_count":        1,
-						"items": []interface{}{
-							map[string]interface{}{
+						"items": []any{
+							map[string]any{
 								"name": "test",
 							},
 						},
@@ -629,11 +630,11 @@ func TestSearcherRepositories(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "api/v3/search/repositories", values),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"incomplete_results": false,
 						"total_count":        1,
-						"items": []interface{}{
-							map[string]interface{}{
+						"items": []any{
+							map[string]any{
 								"name": "test",
 							},
 						},
@@ -651,11 +652,11 @@ func TestSearcherRepositories(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				firstReq := httpmock.QueryMatcher("GET", "search/repositories", values)
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"name": "test",
 						},
 					},
@@ -668,11 +669,11 @@ func TestSearcherRepositories(t *testing.T) {
 					"sort":     []string{"stars"},
 					"q":        []string{"keyword stars:>=5 topic:topic"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"name": "cli",
 						},
 					},
@@ -707,11 +708,11 @@ func TestSearcherRepositories(t *testing.T) {
 					"sort":     []string{"stars"},
 					"q":        []string{"\"keyword with whitespace\" stars:>=5 topic:topic"},
 				})
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"name": "test",
 						},
 					},
@@ -724,11 +725,11 @@ func TestSearcherRepositories(t *testing.T) {
 					"sort":     []string{"stars"},
 					"q":        []string{"\"keyword with whitespace\" stars:>=5 topic:topic"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"name": "cli",
 						},
 					},
@@ -767,11 +768,11 @@ func TestSearcherRepositories(t *testing.T) {
 					"sort":     []string{"stars"},
 					"q":        []string{"keyword stars:>=5 topic:topic"},
 				})
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        287,
-					"items": initialize(0, 100, func(i int) interface{} {
-						return map[string]interface{}{
+					"items": initialize(0, 100, func(i int) any {
+						return map[string]any{
 							"name": fmt.Sprintf("name%d", i),
 						}
 					}),
@@ -784,11 +785,11 @@ func TestSearcherRepositories(t *testing.T) {
 					"sort":     []string{"stars"},
 					"q":        []string{"keyword stars:>=5 topic:topic"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        287,
-					"items": initialize(100, 200, func(i int) interface{} {
-						return map[string]interface{}{
+					"items": initialize(100, 200, func(i int) any {
+						return map[string]any{
 							"name": fmt.Sprintf("name%d", i),
 						}
 					}),
@@ -891,11 +892,11 @@ func TestSearcherIssues(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "search/issues", values),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"incomplete_results": false,
 						"total_count":        1,
-						"items": []interface{}{
-							map[string]interface{}{
+						"items": []any{
+							map[string]any{
 								"number": 1234,
 							},
 						},
@@ -915,11 +916,11 @@ func TestSearcherIssues(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "api/v3/search/issues", values),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"incomplete_results": false,
 						"total_count":        1,
-						"items": []interface{}{
-							map[string]interface{}{
+						"items": []any{
+							map[string]any{
 								"number": 1234,
 							},
 						},
@@ -937,11 +938,11 @@ func TestSearcherIssues(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				firstReq := httpmock.QueryMatcher("GET", "search/issues", values)
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"number": 1234,
 						},
 					},
@@ -954,11 +955,11 @@ func TestSearcherIssues(t *testing.T) {
 					"sort":     []string{"comments"},
 					"q":        []string{"keyword is:locked is:public language:go"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"number": 5678,
 						},
 					},
@@ -993,11 +994,11 @@ func TestSearcherIssues(t *testing.T) {
 					"sort":     []string{"comments"},
 					"q":        []string{"\"keyword with whitespace\" is:locked is:public language:go"},
 				})
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"number": 1234,
 						},
 					},
@@ -1010,11 +1011,11 @@ func TestSearcherIssues(t *testing.T) {
 					"sort":     []string{"comments"},
 					"q":        []string{"\"keyword with whitespace\" is:locked is:public language:go"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        2,
-					"items": []interface{}{
-						map[string]interface{}{
+					"items": []any{
+						map[string]any{
 							"number": 5678,
 						},
 					},
@@ -1053,11 +1054,11 @@ func TestSearcherIssues(t *testing.T) {
 					"sort":     []string{"comments"},
 					"q":        []string{"keyword is:locked is:public language:go"},
 				})
-				firstRes := httpmock.JSONResponse(map[string]interface{}{
+				firstRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        287,
-					"items": initialize(0, 100, func(i int) interface{} {
-						return map[string]interface{}{
+					"items": initialize(0, 100, func(i int) any {
+						return map[string]any{
 							"number": i,
 						}
 					}),
@@ -1070,11 +1071,11 @@ func TestSearcherIssues(t *testing.T) {
 					"sort":     []string{"comments"},
 					"q":        []string{"keyword is:locked is:public language:go"},
 				})
-				secondRes := httpmock.JSONResponse(map[string]interface{}{
+				secondRes := httpmock.JSONResponse(map[string]any{
 					"incomplete_results": false,
 					"total_count":        287,
-					"items": initialize(100, 200, func(i int) interface{} {
-						return map[string]interface{}{
+					"items": initialize(100, 200, func(i int) any {
+						return map[string]any{
 							"number": i,
 						}
 					}),
@@ -1216,6 +1217,113 @@ func TestSearcherIssuesAdvancedSyntax(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSearcherIssuesSemanticSearch(t *testing.T) {
+	tests := []struct {
+		name       string
+		searchType string
+		detector   fd.Detector
+		wantValues url.Values
+		wantErr    string
+	}{
+		{
+			name:       "semantic search sends search_type=semantic",
+			searchType: "semantic",
+			detector:   fd.SemanticSearchSupported(),
+			wantValues: url.Values{"search_type": []string{"semantic"}},
+		},
+		{
+			name:       "hybrid search sends search_type=hybrid",
+			searchType: "hybrid",
+			detector:   fd.SemanticSearchSupported(),
+			wantValues: url.Values{"search_type": []string{"hybrid"}},
+		},
+		{
+			name:       "lexical search sends no search_type param",
+			searchType: "",
+			detector:   fd.SemanticSearchSupported(),
+			wantValues: url.Values{"search_type": nil}, // assert absence
+		},
+		{
+			name:       "semantic search not supported on host",
+			searchType: "semantic",
+			detector:   fd.SemanticSearchUnsupported(),
+			wantErr:    "semantic search is not supported on this host: github.com",
+		},
+		{
+			name:       "hybrid search not supported on host",
+			searchType: "hybrid",
+			detector:   fd.SemanticSearchUnsupported(),
+			wantErr:    "hybrid search is not supported on this host: github.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			if tt.wantErr == "" {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/issues", tt.wantValues),
+					httpmock.JSONResponse(IssuesResult{}),
+				)
+			}
+
+			query := Query{
+				Kind:            KindIssues,
+				Limit:           30,
+				Keywords:        []string{"keyword"},
+				IssueSearchType: tt.searchType,
+			}
+
+			client := &http.Client{Transport: reg}
+			searcher := NewSearcher(client, "github.com", tt.detector)
+
+			_, err := searcher.Issues(query)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSearcherIssuesSemanticSearchIsBoundedToSinglePage(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	// The response advertises a next page via the Link header. Only the first
+	// page is registered, so if fetching were to paginate it would request an
+	// unregistered second page and fail.
+	firstRes := httpmock.JSONResponse(map[string]any{
+		"incomplete_results": false,
+		"total_count":        2,
+		"items": []any{
+			map[string]any{"number": 1234},
+		},
+	})
+	firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/issues?page=2&per_page=30&q=org%3Agithub>; rel="next"`)
+	reg.Register(
+		httpmock.QueryMatcher("GET", "search/issues", url.Values{"search_type": []string{"semantic"}}),
+		firstRes,
+	)
+
+	query := Query{
+		Kind:            KindIssues,
+		Limit:           100,
+		Keywords:        []string{"keyword"},
+		IssueSearchType: "semantic",
+	}
+
+	client := &http.Client{Transport: reg}
+	searcher := NewSearcher(client, "github.com", fd.SemanticSearchSupported())
+
+	result, err := searcher.Issues(query)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(result.Items))
 }
 
 func TestSearcherURL(t *testing.T) {

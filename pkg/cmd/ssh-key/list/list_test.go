@@ -234,7 +234,7 @@ func TestListRun(t *testing.T) {
 
 			opts := tt.opts
 			opts.IO = ios
-			opts.Config = func() (gh.Config, error) { return config.NewBlankConfig(), nil }
+			opts.Config = func() (gh.Config, error) { return config.NewMockConfig(), nil }
 
 			err := listRun(&opts)
 			if (err != nil) != tt.wantErr {

@@ -195,7 +195,7 @@ type InputAnswer struct {
 	providedInputs map[string]string
 }
 
-func (ia *InputAnswer) WriteAnswer(name string, value interface{}) error {
+func (ia *InputAnswer) WriteAnswer(name string, value any) error {
 	if s, ok := value.(string); ok {
 		ia.providedInputs[name] = s
 		return nil
@@ -285,8 +285,7 @@ func runRun(opts *RunOptions) error {
 	workflow, err := shared.ResolveWorkflow(opts.Prompter,
 		opts.IO, client, repo, opts.Prompt, opts.Selector, states)
 	if err != nil {
-		var fae shared.FilteredAllError
-		if errors.As(err, &fae) {
+		if _, ok := errors.AsType[shared.FilteredAllError](err); ok {
 			return errors.New("no workflows are enabled on this repository")
 		}
 		return err
@@ -325,7 +324,7 @@ func runRun(opts *RunOptions) error {
 		return err
 	}
 
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"ref":    ref,
 		"inputs": providedInputs,
 	}

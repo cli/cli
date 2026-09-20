@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Set up env vars
 env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
 

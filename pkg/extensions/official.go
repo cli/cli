@@ -25,6 +25,7 @@ func (e *OfficialExtension) Repository() ghrepo.Interface {
 var OfficialExtensions = []OfficialExtension{
 	{Name: "aw", Owner: "github", Repo: "gh-aw"},
 	{Name: "stack", Owner: "github", Repo: "gh-stack"},
+	{Name: "webhook", Owner: "cli", Repo: "gh-webhook"},
 }
 
 // IsOfficial reports whether the given extension command name and owner

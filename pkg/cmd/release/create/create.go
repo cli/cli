@@ -445,7 +445,7 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"tag_name":   opts.TagName,
 		"draft":      opts.Draft,
 		"prerelease": opts.Prerelease,
@@ -513,8 +513,7 @@ func createRun(opts *CreateOptions) error {
 
 	newRelease, err := createRelease(httpClient, baseRepo, params)
 
-	var errMissingRequiredWorkflowScope *errMissingRequiredWorkflowScope
-	if errors.As(err, &errMissingRequiredWorkflowScope) {
+	if errMissingRequiredWorkflowScope, ok := errors.AsType[*errMissingRequiredWorkflowScope](err); ok {
 		host := errMissingRequiredWorkflowScope.Hostname
 		refreshInstructions := fmt.Sprintf("gh auth refresh -h %[1]s -s workflow", host)
 		cs := opts.IO.ColorScheme()
@@ -548,7 +547,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		err = shared.ConcurrentUpload(httpClient, safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
+		err = shared.ConcurrentUpload(httpClient, baseRepo.RepoHost(), safeurl.NewImmutableSafeURL(uploadURL), opts.Concurrency, opts.Assets)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return cleanupDraftRelease(err)
@@ -628,7 +627,7 @@ func changelogForRange(client *git.Client, refRange string) ([]logEntry, error) 
 	}
 
 	var entries []logEntry
-	for _, cb := range bytes.Split(b, []byte{'\000'}) {
+	for cb := range bytes.SplitSeq(b, []byte{'\000'}) {
 		c := strings.ReplaceAll(string(cb), "\r\n", "\n")
 		c = strings.TrimPrefix(c, "\n")
 		if len(c) == 0 {

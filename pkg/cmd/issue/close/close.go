@@ -195,7 +195,7 @@ func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue, 
 		} `graphql:"closeIssue(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": CloseIssueInput{
 			IssueID:          issue.ID,
 			StateReason:      reason,

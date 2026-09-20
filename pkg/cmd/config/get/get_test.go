@@ -44,7 +44,7 @@ func TestNewCmdConfigGet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 			}
 
@@ -88,7 +88,7 @@ func Test_getRun(t *testing.T) {
 			input: &GetOptions{
 				Key: "editor",
 				Config: func() gh.Config {
-					cfg := config.NewBlankConfig()
+					cfg := config.NewMockConfig()
 					cfg.Set("", "editor", "ed")
 					return cfg
 				}(),
@@ -101,7 +101,7 @@ func Test_getRun(t *testing.T) {
 				Hostname: "github.com",
 				Key:      "editor",
 				Config: func() gh.Config {
-					cfg := config.NewBlankConfig()
+					cfg := config.NewMockConfig()
 					cfg.Set("", "editor", "ed")
 					cfg.Set("github.com", "editor", "vim")
 					return cfg
@@ -113,7 +113,7 @@ func Test_getRun(t *testing.T) {
 			name: "non-existent key",
 			input: &GetOptions{
 				Key:    "non-existent",
-				Config: config.NewBlankConfig(),
+				Config: config.NewMockConfig(),
 			},
 			err: nonExistentKeyError{key: "non-existent"},
 		},

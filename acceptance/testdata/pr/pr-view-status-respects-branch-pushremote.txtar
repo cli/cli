@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Setup environment variables used for testscript
 env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
 env FORK=${REPO}-fork

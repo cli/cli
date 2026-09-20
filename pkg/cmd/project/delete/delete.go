@@ -103,8 +103,8 @@ func runDelete(config deleteConfig) error {
 
 }
 
-func deleteItemArgs(config deleteConfig) (*deleteProjectMutation, map[string]interface{}) {
-	return &deleteProjectMutation{}, map[string]interface{}{
+func deleteItemArgs(config deleteConfig) (*deleteProjectMutation, map[string]any) {
+	return &deleteProjectMutation{}, map[string]any{
 		"input": githubv4.DeleteProjectV2Input{
 			ProjectID: githubv4.ID(config.opts.projectID),
 		},

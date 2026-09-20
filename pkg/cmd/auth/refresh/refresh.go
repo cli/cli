@@ -3,6 +3,7 @@ package refresh
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -37,7 +38,7 @@ type RefreshOptions struct {
 
 	Interactive     bool
 	InsecureStorage bool
-	Clipboard       bool
+	Clipboard       *bool
 }
 
 func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
@@ -113,7 +114,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
 	cmd.Flags().StringSliceVarP(&opts.RemoveScopes, "remove-scopes", "r", nil, "Authentication scopes to remove from gh")
 	cmd.Flags().BoolVar(&opts.ResetScopes, "reset-scopes", false, "Reset authentication scopes to the default minimum set of scopes")
-	cmd.Flags().BoolVarP(&opts.Clipboard, "clipboard", "c", false, "Copy one-time OAuth device code to clipboard")
+	cmdutil.NilBoolFlag(cmd, &opts.Clipboard, "clipboard", "c", "Copy one-time OAuth device code to clipboard")
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
 	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
@@ -135,6 +136,7 @@ func refreshRun(opts *RefreshOptions) error {
 		return err
 	}
 	authCfg := cfg.Authentication()
+	copyToClipboard := shared.ShouldCopyToClipboard(cfg, opts.Clipboard)
 
 	candidates := authCfg.Hosts()
 	if len(candidates) == 0 {
@@ -152,18 +154,8 @@ func refreshRun(opts *RefreshOptions) error {
 			}
 			hostname = candidates[selected]
 		}
-	} else {
-		var found bool
-		for _, c := range candidates {
-			if c == hostname {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
-		}
+	} else if !slices.Contains(candidates, hostname) {
+		return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
 	}
 
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
@@ -177,7 +169,7 @@ func refreshRun(opts *RefreshOptions) error {
 	if !opts.ResetScopes {
 		if oldToken, _ := authCfg.ActiveToken(hostname); oldToken != "" {
 			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken); err == nil {
-				for _, s := range strings.Split(oldScopes, ",") {
+				for s := range strings.SplitSeq(oldScopes, ",") {
 					s = strings.TrimSpace(s)
 					if s != "" {
 						additionalScopes.Add(s)
@@ -209,7 +201,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	authedToken, authedUser, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, opts.Clipboard)
+	authedToken, authedUser, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, copyToClipboard)
 	if err != nil {
 		return err
 	}

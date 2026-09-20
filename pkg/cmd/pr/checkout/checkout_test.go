@@ -5,8 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -205,7 +203,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -215,7 +213,7 @@ func Test_checkoutRun(t *testing.T) {
 				"origin": "OWNER/REPO",
 			},
 			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+				cs.Register(`git rev-parse --verify refs/heads/feature`, 1, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git checkout -b feature --track origin/feature`, 0, "")
 			},
@@ -233,7 +231,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -263,7 +261,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -273,7 +271,7 @@ func Test_checkoutRun(t *testing.T) {
 				"origin": "OWNER/REPO",
 			},
 			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git show-ref --verify -- refs/heads/foobar`, 1, "")
+				cs.Register(`git rev-parse --verify refs/heads/foobar`, 1, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git checkout -b foobar --track origin/feature`, 0, "")
 			},
@@ -291,7 +289,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -321,7 +319,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -334,7 +332,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+path.to.wt rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
-				cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+				cs.Register(`git rev-parse --verify refs/heads/feature`, 1, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git worktree add --track -b feature -- /path/to/wt origin/feature`, 0, "")
 			},
@@ -353,7 +351,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -366,7 +364,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+path.to.wt rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
-				cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+				cs.Register(`git rev-parse --verify refs/heads/feature`, 1, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git worktree add --track -b feature -- /path/to/wt origin/feature`, 0, "")
 				cs.Register(`git submodule sync --recursive`, 0, "")
@@ -386,7 +384,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -398,7 +396,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+path.to.wt rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
-				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git worktree add -- /path/to/wt feature`, 0, "")
 				cs.Register(`git -C /path/to/wt merge --ff-only refs/remotes/origin/feature`, 0, "")
@@ -417,7 +415,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -429,7 +427,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+path.to.wt rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
-				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git worktree add -- /path/to/wt feature`, 0, "")
 				cs.Register(`git -C /path/to/wt reset --hard refs/remotes/origin/feature`, 0, "")
@@ -448,7 +446,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -477,7 +475,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -506,7 +504,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -538,7 +536,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -550,7 +548,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+path.to.wt rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
-				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git -C /path/to/wt checkout feature`, 0, "")
 				cs.Register(`git -C /path/to/wt merge --ff-only refs/remotes/origin/feature`, 0, "")
@@ -569,7 +567,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -582,7 +580,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+path.to.wt rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
-				cs.Register(`git show-ref --verify -- refs/heads/my-custom-name`, 1, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-custom-name`, 1, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
 				cs.Register(`git -C /path/to/wt checkout -b my-custom-name --track origin/feature`, 0, "")
 			},
@@ -601,7 +599,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -613,7 +611,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+path.to.wt rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
-				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
 				cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature")
 				cs.Register(`git fetch origin refs/pull/123/head --no-tags`, 0, "")
 				cs.Register(`git -C /path/to/wt checkout feature`, 0, "")
@@ -634,7 +632,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -646,7 +644,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+path.to.wt rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
-				cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
 				cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature")
 				cs.Register(`git fetch origin refs/pull/123/head --no-tags`, 0, "")
 				cs.Register(`git -C /path/to/wt checkout feature`, 0, "")
@@ -666,7 +664,7 @@ func Test_checkoutRun(t *testing.T) {
 					}
 				}(),
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Branch: func() (string, error) {
 					return "main", nil
@@ -678,7 +676,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
 				cs.Register(`git -C .+path.to.wt rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
-				cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+				cs.Register(`git rev-parse --verify refs/heads/feature`, 1, "")
 				cs.Register(`git config branch\.feature\.merge`, 1, "")
 				cs.Register(`git fetch origin refs/pull/123/head --no-tags`, 0, "")
 				cs.Register(`git -C /path/to/wt checkout -b feature FETCH_HEAD`, 0, "")
@@ -864,7 +862,7 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cl
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Remotes: func() (context.Remotes, error) {
 			if remotes == nil {
@@ -920,7 +918,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
-	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+	cs.Register(`git rev-parse --verify refs/heads/feature`, 1, "")
 	cs.Register(`git checkout -b feature --track origin/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`, baseRepo)
@@ -939,7 +937,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
-	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
 	cs.Register(`git checkout feature`, 0, "")
 	cs.Register(`git merge --ff-only refs/remotes/origin/feature`, 0, "")
 
@@ -971,7 +969,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 	cs.Register(`git fetch robot-fork \+refs/heads/feature:refs/remotes/robot-fork/feature --no-tags`, 0, "")
-	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+	cs.Register(`git rev-parse --verify refs/heads/feature`, 1, "")
 	cs.Register(`git checkout -b feature --track robot-fork/feature`, 0, "")
 
 	output, err := runCommand(http, remotes, "master", `123`, baseRepo)
@@ -1132,7 +1130,7 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
-	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
 	cs.Register(`git checkout feature`, 0, "")
 	cs.Register(`git merge --ff-only refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git submodule sync --recursive`, 0, "")
@@ -1153,7 +1151,7 @@ func TestPRCheckout_force(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature --no-tags`, 0, "")
-	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
 	cs.Register(`git checkout feature`, 0, "")
 	cs.Register(`git reset --hard refs/remotes/origin/feature`, 0, "")
 
@@ -1223,141 +1221,6 @@ func Test_authenticatedCommand_stripsWorktreePrefix(t *testing.T) {
 			require.GreaterOrEqual(t, len(cmd.Args), len(tt.wantArgs))
 			assert.Equal(t, tt.wantArgs, cmd.Args[len(cmd.Args)-len(tt.wantArgs):])
 			assert.NotContains(t, cmd.Args, "-C")
-		})
-	}
-}
-
-func Test_resolveWorktreeTarget(t *testing.T) {
-	dir := t.TempDir()
-
-	tests := []struct {
-		name      string
-		stubs     func(*run.CommandStubber)
-		wantReuse bool
-		wantErr   string
-	}{
-		{
-			name: "path is the current worktree",
-			stubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
-				cs.Register(`git -C .+rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/repo/main\n\n/repo/.git\n")
-			},
-			wantErr: "--worktree path points to the repository you're already in; omit --worktree to check out here",
-		},
-		{
-			name: "path is a subdirectory of the current worktree",
-			stubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
-				cs.Register(`git -C .+ rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/repo/main\nsub/\n/repo/.git\n")
-			},
-			wantErr: "--worktree path points to the repository you're already in; omit --worktree to check out here",
-		},
-		{
-			name: "path is a different worktree of this repo",
-			stubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
-				cs.Register(`git -C .+ rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\n\n/repo/.git\n")
-			},
-			wantReuse: true,
-		},
-		{
-			name: "path is a subdirectory of another worktree",
-			stubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
-				cs.Register(`git -C .+ rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/path/to/wt\nsub/\n/repo/.git\n")
-			},
-			wantErr: "--worktree path is inside an existing worktree",
-		},
-		{
-			name: "path is inside a different repository",
-			stubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
-				cs.Register(`git -C .+ rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 0, "/other/wt\n\n/other/.git\n")
-			},
-			wantErr: "--worktree path is inside a different repository",
-		},
-		{
-			name: "target is non-git or non-existent",
-			stubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 0, "/repo/main\n/repo/.git\n")
-				cs.Register(`git -C .+ rev-parse --path-format=absolute --show-toplevel --show-prefix --git-common-dir`, 128, "")
-			},
-			wantReuse: false,
-		},
-		{
-			name: "current worktree cannot be determined",
-			stubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --path-format=absolute --show-toplevel --git-common-dir`, 128, "")
-			},
-			wantReuse: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cs, teardown := run.Stub()
-			defer teardown(t)
-			tt.stubs(cs)
-
-			client := &git.Client{
-				GhPath:  "/some/path/gh",
-				GitPath: "/some/path/git",
-			}
-			reuse, err := resolveWorktreeTarget(client, dir)
-			if tt.wantErr != "" {
-				require.EqualError(t, err, tt.wantErr)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantReuse, reuse)
-		})
-	}
-}
-
-func Test_ensureWorktreePathSafe(t *testing.T) {
-	base := t.TempDir()
-
-	existingDir := filepath.Join(base, "dir")
-	require.NoError(t, os.Mkdir(existingDir, 0o755))
-
-	regularFile := filepath.Join(base, "file")
-	require.NoError(t, os.WriteFile(regularFile, []byte("x"), 0o644))
-
-	symlink := filepath.Join(base, "link")
-	require.NoError(t, os.Symlink(existingDir, symlink))
-
-	tests := []struct {
-		name    string
-		path    string
-		wantErr string
-	}{
-		{
-			name: "non-existent path is allowed",
-			path: filepath.Join(base, "does-not-exist"),
-		},
-		{
-			name: "existing directory is allowed",
-			path: existingDir,
-		},
-		{
-			name:    "leaf symlink is rejected",
-			path:    symlink,
-			wantErr: "--worktree path must not be a symlink",
-		},
-		{
-			name:    "existing non-directory is rejected",
-			path:    regularFile,
-			wantErr: "--worktree path must be a directory",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ensureWorktreePathSafe(tt.path)
-			if tt.wantErr == "" {
-				require.NoError(t, err)
-				return
-			}
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErr)
 		})
 	}
 }

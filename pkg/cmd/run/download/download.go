@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/safepaths"
@@ -180,8 +181,7 @@ func runDownload(opts *DownloadOptions) error {
 		if isolateArtifacts {
 			destDir, err = absoluteDestinationDir.Join(a.Name)
 			if err != nil {
-				var pathTraversalError safepaths.PathTraversalError
-				if errors.As(err, &pathTraversalError) {
+				if _, ok := errors.AsType[safepaths.PathTraversalError](err); ok {
 					return fmt.Errorf("error downloading %s: would result in path traversal", a.Name)
 				}
 				return err
@@ -222,12 +222,7 @@ func isolateArtifacts(wantNames []string, wantPatterns []string) bool {
 }
 
 func matchAnyName(names []string, name string) bool {
-	for _, n := range names {
-		if name == n {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(names, name)
 }
 
 func matchAnyPattern(patterns []string, name string) bool {

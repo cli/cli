@@ -125,7 +125,7 @@ func apiDelete(httpClient *http.Client, repo ghrepo.Interface, issueID string) e
 		} `graphql:"deleteIssue(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.DeleteIssueInput{
 			IssueID: issueID,
 		},

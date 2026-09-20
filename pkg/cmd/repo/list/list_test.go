@@ -357,7 +357,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 	}
 
@@ -400,7 +400,7 @@ func TestRepoList_nontty(t *testing.T) {
 			return &http.Client{Transport: httpReg}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Now: func() time.Time {
 			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")
@@ -441,7 +441,7 @@ func TestRepoList_tty(t *testing.T) {
 			return &http.Client{Transport: httpReg}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Now: func() time.Time {
 			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")
@@ -472,7 +472,7 @@ func TestRepoList_filtering(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`query RepositoryList\b`),
-		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]any) {
 			assert.Equal(t, "PRIVATE", params["privacy"])
 			assert.Equal(t, float64(2), params["perPage"])
 		}),
@@ -499,7 +499,7 @@ func TestRepoList_noVisibilityField(t *testing.T) {
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryList\b`),
 		httpmock.GraphQLQuery(`{"data":{"repositoryOwner":{"login":"octocat","repositories":{"totalCount":0}}}}`,
-			func(query string, params map[string]interface{}) {
+			func(query string, params map[string]any) {
 				assert.False(t, strings.Contains(query, "visibility"))
 			},
 		),
@@ -511,7 +511,7 @@ func TestRepoList_noVisibilityField(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Now: func() time.Time {
 			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")
@@ -549,7 +549,7 @@ func TestRepoList_invalidOwner(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Now: func() time.Time {
 			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")

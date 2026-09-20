@@ -36,7 +36,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
@@ -77,7 +77,7 @@ func TestIssueReopen(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation IssueReopen\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["issueId"], "THE-ID")
 			}),
 	)
@@ -170,7 +170,7 @@ func TestIssueReopen_withComment(t *testing.T) {
 		{ "data": { "addComment": { "commentEdge": { "node": {
 			"url": "https://github.com/OWNER/REPO/issues/123#issuecomment-456"
 		} } } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, "THE-ID", inputs["subjectId"])
 				assert.Equal(t, "reopening comment", inputs["body"])
 			}),
@@ -178,7 +178,7 @@ func TestIssueReopen_withComment(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation IssueReopen\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["issueId"], "THE-ID")
 			}),
 	)

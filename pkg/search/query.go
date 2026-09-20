@@ -36,7 +36,14 @@ type Query struct {
 	Order      string
 	Page       int
 	Qualifiers Qualifiers
-	Sort       string
+	// IssueSearchType selects the issue search backend ("semantic" or "hybrid");
+	// empty uses the default lexical search. Maps to the REST search_type
+	// parameter, not the q string.
+	//
+	// Note that search type (semantic/hybrid) is independent of advanced issue
+	// search (which is more about query parsing).
+	IssueSearchType string
+	Sort            string
 }
 
 type Qualifiers struct {
@@ -242,7 +249,7 @@ func groupWithOR(qualifier string, vs []string) string {
 func (q Qualifiers) Map() map[string][]string {
 	m := map[string][]string{}
 	v := reflect.ValueOf(q)
-	t := reflect.TypeOf(q)
+	t := reflect.TypeFor[Qualifiers]()
 	for i := 0; i < v.NumField(); i++ {
 		field := t.Field(i)
 		key := field.Tag.Get("qualifier")

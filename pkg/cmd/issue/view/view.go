@@ -57,6 +57,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		`, "`"),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive("specify only one of --comments or --json",
+				opts.Comments, opts.Exporter != nil); err != nil {
+				return err
+			}
+
 			issueNumber, baseRepo, err := issueShared.ParseIssueFromArg(args[0])
 			if err != nil {
 				return err

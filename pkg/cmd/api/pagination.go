@@ -91,7 +91,7 @@ loop:
 	return ""
 }
 
-func addPerPage(p string, perPage int, params map[string]interface{}) string {
+func addPerPage(p string, perPage int, params map[string]any) string {
 	if _, hasPerPage := params["per_page"]; hasPerPage {
 		return p
 	}

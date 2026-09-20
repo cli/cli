@@ -205,6 +205,11 @@ func TestNewCmdView(t *testing.T) {
 			wantErr: "specify only one of --comments or --web",
 		},
 		{
+			name:    "comments and JSON are mutually exclusive",
+			args:    "123 --comments --json number",
+			wantErr: "specify only one of --comments or --json",
+		},
+		{
 			name:    "order requires comments or comment arg",
 			args:    "123 --order newest",
 			wantErr: "--order requires --comments or a comment argument",

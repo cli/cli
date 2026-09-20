@@ -25,28 +25,23 @@ func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
 }
 
 func (p *apiPlatform) Download(url safeurl.SafeURL, dir safepaths.Absolute) error {
-	return downloadArtifact(p.client, url, dir)
+	return downloadArtifact(p.client, p.repo.RepoHost(), url, dir)
 }
 
-func downloadArtifact(httpClient *http.Client, url safeurl.SafeURL, destDir safepaths.Absolute) error {
-	// TODO(api-client-rollout)
-	// This has been deferred from moving to api.Client due to streaming the artifact ZIP response body to disk instead of decoding JSON.
-	req, err := http.NewRequest("GET", url.String(), nil)
-	if err != nil {
-		return err
-	}
+func downloadArtifact(httpClient *http.Client, hostname string, url safeurl.SafeURL, destDir safepaths.Absolute) error {
 	// The server rejects this :(
-	//req.Header.Set("Accept", "application/zip")
-
-	resp, err := httpClient.Do(req)
+	//api.WithHeader("Accept", "application/zip")
+	//
+	// The artifact download URL is supplied by the API, so it is absolute and is requested as
+	// given rather than being resolved against the host's REST endpoint.
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).Request(hostname, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
 
 	tmpfile, err := os.CreateTemp("", "gh-artifact.*.zip")
 	if err != nil {

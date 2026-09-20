@@ -14,7 +14,7 @@ const (
 
 type T interface {
 	Helper()
-	Errorf(string, ...interface{})
+	Errorf(string, ...any)
 }
 
 // Stub installs a catch-all for all external commands invoked from gh. It returns a restore func that, when

@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -217,8 +218,7 @@ func ResolveRef(client *api.Client, host, owner, repo, version string) (*Resolve
 	// API error (403, 500, network failure, …) is surfaced immediately
 	// so it cannot silently mask problems and cause an unexpected ref to
 	// be used.
-	var nre *noReleasesError
-	if !errors.As(err, &nre) {
+	if _, ok := errors.AsType[*noReleasesError](err); !ok {
 		return nil, err
 	}
 	return resolveDefaultBranch(client, host, owner, repo)
@@ -1098,7 +1098,7 @@ func validateName(name string) bool {
 
 // hasHiddenSegment reports whether any path component starts with a dot.
 func hasHiddenSegment(p string) bool {
-	for _, seg := range strings.Split(p, "/") {
+	for seg := range strings.SplitSeq(p, "/") {
 		if strings.HasPrefix(seg, ".") {
 			return true
 		}
@@ -1108,12 +1108,7 @@ func hasHiddenSegment(p string) bool {
 
 // hasPluginsAncestor reports whether any path component is "plugins".
 func hasPluginsAncestor(p string) bool {
-	for _, seg := range strings.Split(p, "/") {
-		if seg == "plugins" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(p, "/"), "plugins")
 }
 
 // IsSpecCompliant checks if a skill name matches the strict agentskills.io spec.

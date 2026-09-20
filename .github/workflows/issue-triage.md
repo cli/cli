@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  discussions: read
   issues: read
   copilot-requests: write
 
@@ -47,7 +48,7 @@ engine: copilot
 
 tools:
   github:
-    toolsets: [repos, issues]
+    toolsets: [repos, issues, discussions]
     allowed-repos: ["desktop/gh-cli-and-desktop-shared-workflows", "cli/cli"]
     min-integrity: none
 
@@ -71,8 +72,63 @@ safe-outputs:
       - off-topic
       - no-help-wanted-issue
       - invalid
-      - suspected-spam
       - duplicate
+      - gh-agent-task
+      - gh-alias
+      - gh-api
+      - gh-attestation
+      - gh-auth
+      - gh-browse
+      - gh-cache
+      - gh-codespace
+      - gh-completion
+      - gh-config
+      - gh-copilot
+      - gh-discussion
+      - gh-extension
+      - gh-gist
+      - gh-gpg-key
+      - gh-help
+      - gh-issue
+      - gh-label
+      - gh-licenses
+      - gh-org
+      - gh-pr
+      - gh-project
+      - gh-reference
+      - gh-release
+      - gh-repo
+      - gh-ruleset
+      - gh-run
+      - gh-search
+      - gh-secret
+      - gh-skill
+      - gh-ssh-key
+      - gh-status
+      - gh-variable
+      - gh-workflow
+  jobs:
+    apply-suspected-spam:
+      description: Apply suspected-spam to the triggering issue
+      runs-on: ubuntu-latest
+      permissions:
+        contents: read
+      steps:
+        - name: Create GitHub App token
+          id: app-token
+          uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+          with:
+            client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
+            private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
+            owner: ${{ github.repository_owner }}
+            repositories: ${{ github.event.repository.name }}
+            permission-issues: write
+        - name: Apply suspected-spam
+          env:
+            GH_TOKEN: ${{ steps.app-token.outputs.token }}
+            GH_REPO: ${{ github.repository }}
+            ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          run: gh issue edit "$ISSUE_NUMBER" --repo "$GH_REPO" --add-label suspected-spam
   add-comment:
     max: 1
   noop:
@@ -92,7 +148,10 @@ repository (main branch) using the GitHub file tools:
 2. `skills/issue-classifier/SKILL.md`
 3. `skills/issue-classifier/references/label-taxonomy.md`
 
-These are your primary triage instructions. Follow them exactly.
+These are your primary triage instructions. Follow them exactly for issue
+classification. For command labels, the local `gh-*` entries in the `add-labels`
+allowlist above are complete and authoritative; use them even when the shared taxonomy
+does not list them.
 
 ## Step 2: Read the issue
 
@@ -111,33 +170,66 @@ potential duplicates of this issue. Note your findings for the next step.
 ## Step 4: Classify the issue
 
 Follow the `issue-classifier` skill instructions. Use the `label-taxonomy` reference for
-valid labels. Incorporate your duplicate detection findings.
+issue type, priority, and status labels, and the local allowlist for command labels.
+Incorporate your duplicate detection findings.
+
+Assess the report independently. Treat the reporter's diagnosis, causal claims, and
+expected behavior as hypotheses rather than established facts. Separate direct
+observations from interpretations, check assumptions against available logs, command
+output, reproduction details, documentation, and source, and consider plausible
+alternative explanations before choosing a classification. An expected-vs-actual
+statement alone does not establish a product bug. Do not repeat the reporter's framing
+as your conclusion unless the evidence supports it.
 
 ## Step 5: Check for spam
 
 Judge the issue against the spam criteria included at the top of this prompt.
 
-If, and only if, the issue meets those criteria, emit `suspected-spam` **without**
-`suggest`, so that it is applied directly rather than proposed. Applying the label is
-what triggers the shared `close-suspected-spam` job, which posts the standard comment
-and closes the issue. Nothing happens if the label is merely suggested.
+If, and only if, the issue meets those criteria, call `apply_suspected_spam`. This
+directly applies the label instead of proposing it. Applying the label triggers the
+shared `close-suspected-spam` job, which removes `needs-triage`, posts the standard
+comment, and closes the issue.
 
 When you apply `suspected-spam`:
 
-- Emit it as the only label. Do not pair it with `invalid`, which routes to a different
-  job that closes with no comment at all.
+- Do not call any other label output. In particular, do not pair it with `invalid`,
+  which routes to a different job that closes with no comment at all.
 - Do **not** post a comment. `close-suspected-spam` writes the closure message, and a
   second comment from you would duplicate it.
-- Still attach a rationale and confidence, so the decision is auditable.
 
 Be conservative. A false positive closes a real user's issue, so when the evidence is
 mixed, suggest `more-info-needed` instead and let a human decide.
 
-## Step 6: Suggest the remaining labels via safe outputs
+## Step 6: Investigate the likely cause
+
+For a non-spam bug report, perform a first-pass technical investigation before writing
+the comment. Trace the relevant behavior through the current `cli/cli` source and inspect
+recent changes when useful. Form a concise hypothesis that explains how the reported
+symptom could arise, grounded in issue evidence and specific code.
+
+When source evidence will appear in the comment, obtain the exact commit SHA from a
+GitHub tool response. Never invent, infer, abbreviate, or manually alter a SHA. Before
+constructing each permalink, fetch the cited file at that exact SHA and verify that the
+referenced code and line range exist in that revision. If you cannot obtain and verify
+the SHA and cited lines with the available tools, do not include that source-code claim
+or permalink.
+
+Include this hypothesis in the comment so the first responder has a concrete starting
+point. If available evidence cannot support a useful hypothesis, say what remains unknown
+and name the specific diagnostic evidence needed next; do not invent a cause.
+
+## Step 7: Suggest the remaining labels via safe outputs
 
 If the issue is not spam, use `add-labels` to suggest the appropriate labels (max 3,
 only from the allowlist above). **Emit these labels as suggestions requiring maintainer
-approval - never apply them directly.** Attach a clear rationale to each suggestion.
+approval - never apply them directly.** Emit each label as an object with `name`,
+`rationale`, `confidence`, and `suggest: true`.
+
+When an issue concerns a specific `gh` command or command family, include the most
+specific matching `gh-*` command label as one of the suggestions. Suggest at most one
+command label, choosing the primary affected command when several are mentioned. The
+command label counts toward the existing three-label maximum; do not omit it merely to
+leave an unused slot.
 
 ## Required comment
 
@@ -149,6 +241,12 @@ explaining which label(s) you are suggesting (if any) and why, in plain language
 duplicate, name the likely original. If you are suggesting no label, say so and state what
 information would help a first responder finish triage.
 
+When referring to source code, link every file, symbol, or line claim to an immutable
+GitHub permalink pinned to a verified full commit SHA and exact line range. Use only a
+SHA returned by a GitHub tool and verify the cited file and lines at that SHA before
+posting the link. Do not invent or guess a SHA, and do not use branch links, bare file
+paths, or unlinked code references.
+
 When calling `add-comment`, explicitly set `item_number` to
 ${{ github.event.issue.number || inputs.issue_number }}.
 
@@ -157,7 +255,7 @@ ${{ github.event.issue.number || inputs.issue_number }}.
 - Apply at most 3 labels from the allowlist. Do not invent labels.
 - `suspected-spam` is the only label you may apply directly. Everything else is a
   suggestion.
-- Do not add or remove `needs-triage` - it is not in your allowlist.
+- Do not add or remove `needs-triage` - the shared triage workflows own that label.
 - Be conservative: when unsure, prefer fewer labels or none.
 - Do not classify into more than one branch at once (e.g., not both bug and enhancement).
 - For duplicates: suggest `duplicate` and link the original issue in your comment.

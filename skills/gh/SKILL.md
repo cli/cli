@@ -61,6 +61,10 @@ Pass `--repo OWNER/REPO` (`-R`) to override the resolved CWD repo.
 - Bots author as GitHub Apps, so `--author dependabot` matches nothing. Use
   `--app dependabot` (on `pr`/`issue list` and `search prs|issues`; expands
   to `author:app/<slug>`) or `--author "dependabot[bot]"`.
+- `gh search issues` also takes `--search-type <lexical|semantic|hybrid>`
+  (github.com/GHEC only, issues only): use `semantic` when the user describes a
+  problem in natural language rather than exact terms, and `hybrid` to blend
+  keyword and semantic ranking; `lexical` (default) is exact matching.
 
 ## Issue types, sub-issues, and relationships
 
@@ -88,6 +92,44 @@ blocked-by/blocking relationships.
   against `totalCount` to detect truncation.
 - GHES: issue types and sub-issues need 3.17+; blocked-by/blocking
   relationships need 3.19+.
+
+## Attaching images and videos
+
+`--attach <path>` is available on `gh issue create`, `gh issue edit`,
+`gh issue comment`, `gh pr create`, `gh pr edit`, and `gh pr comment`.
+
+- Repeat `--attach` to upload multiple files:
+  `gh issue comment 12 --attach ./before.png --attach ./after.png`.
+- Each command invocation accepts at most 50 `--attach` values total across
+  images and videos.
+- Supported files are `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `mp4`,
+  `mov`, and `webm`.
+- For an image, append alt text to the path after `#`. Quote the value so the
+  shell does not treat `#` as a comment:
+  `gh pr create --attach './login.png#The login error state'`. Without alt
+  text, the filename is used.
+- `--attach` paths and local Markdown destinations may be absolute or relative
+  to the directory where `gh` runs.
+- If the body references an attached path, `gh` rewrites that Markdown
+  reference to the uploaded URL. The reference keeps its existing alt text.
+  Otherwise, `gh` appends the attachment to the body. For example:
+  `gh pr edit 23 --body '![error](./login.png)' --attach ./login.png`.
+- Videos cannot take alt text. A standalone `![recording](./repro.mp4)` becomes
+  a bare player URL, while an inline video image becomes a link. A
+  reference-style video image such as `![recording][clip]` with
+  `[clip]: ./repro.mp4` is rejected; use a reference-style link instead.
+- `gh issue create` and `gh pr create`: `--attach` cannot be used with
+  `--web`. `gh pr create --attach` also cannot be used with `--dry-run`.
+- `gh issue edit`: `--attach` can edit only one issue at a time.
+- `gh issue comment` and `gh pr comment`: `--attach` cannot be used with
+  `--web` or `--delete-last`. It works alone, with `--edit-last`, or with one
+  of `--body`, `--body-file`, or `--editor`.
+- Uploads require GitHub.com or a GHE.com tenant, an OAuth token, classic PAT,
+  or fine-grained PAT, and `WRITE`, `MAINTAIN`, or `ADMIN` repository
+  permission. GitHub Enterprise Server and GitHub App tokens are unsupported.
+- Uploads stop at the first failure. If earlier files uploaded, `gh` still
+  writes those attachments and exits non-zero. Create and edit commands also
+  print the issue or pull request URL.
 
 ## Discussions (`gh discussion`)
 
@@ -162,6 +204,11 @@ Sometimes useful data isn't on the typed commands. Examples:
   `gh pr view <n>` if you only need to read.
 - `gh pr checkout <n> --worktree <path>` checks the PR out into a git worktree
   at `<path>` instead of switching the current branch.
+- `gh issue develop <n> --checkout` creates a linked branch for the issue and
+  checks it out. Add `--worktree <path>` to check that branch out into a git
+  worktree at `<path>` instead of switching the current branch;
+  `--worktree` requires `--checkout`, cannot be blank, and cannot be combined
+  with `--list`.
 - `NO_COLOR`, `CLICOLOR_FORCE`, and `GH_FORCE_TTY` are honored. Set
   `GH_FORCE_TTY=1` if you want TTY-style output (colors, tables, the
   pager, interactivity) inside an agent harness; leave it unset unless needed.

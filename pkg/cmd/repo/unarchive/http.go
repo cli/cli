@@ -16,7 +16,7 @@ func unarchiveRepo(client *http.Client, repo *api.Repository) error {
 		} `graphql:"unarchiveRepository(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.UnarchiveRepositoryInput{
 			RepositoryID: repo.ID,
 		},

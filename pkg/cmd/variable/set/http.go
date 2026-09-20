@@ -84,7 +84,7 @@ func setVariable(client *api.Client, host string, opts setOptions) setResult {
 	return result
 }
 
-func postVariable(client *api.Client, host string, path safeurl.SafeURL, payload interface{}) error {
+func postVariable(client *api.Client, host string, path safeurl.SafeURL, payload any) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)
@@ -131,7 +131,7 @@ func postRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, v
 	return postVariable(client, repo.RepoHost(), path, payload)
 }
 
-func patchVariable(client *api.Client, host string, path safeurl.SafeURL, payload interface{}) error {
+func patchVariable(client *api.Client, host string, path safeurl.SafeURL, payload any) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)

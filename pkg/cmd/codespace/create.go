@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -244,12 +245,12 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		if len(devcontainers) > 0 {
 
 			// if there is only one devcontainer.json file and it is one of the default paths we can auto-select it
-			if len(devcontainers) == 1 && stringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+			if len(devcontainers) == 1 && slices.Contains(DEFAULT_DEVCONTAINER_DEFINITIONS, devcontainers[0].Path) {
 				devContainerPath = devcontainers[0].Path
 			} else {
 				promptOptions := []string{}
 
-				if !stringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+				if !slices.Contains(DEFAULT_DEVCONTAINER_DEFINITIONS, devcontainers[0].Path) {
 					promptOptions = []string{DEVCONTAINER_PROMPT_DEFAULT}
 				}
 
@@ -532,7 +533,7 @@ func getMachineName(ctx context.Context, apiClient apiClient, prompter SurveyPro
 		}
 
 		availableMachines := make([]string, len(machines))
-		for i := 0; i < len(machines); i++ {
+		for i := range machines {
 			availableMachines[i] = machines[i].Name
 		}
 
@@ -602,13 +603,4 @@ func buildDisplayName(displayName string, prebuildAvailability string) string {
 	default:
 		return displayName
 	}
-}
-
-func stringInSlice(a string, slice []string) bool {
-	for _, b := range slice {
-		if b == a {
-			return true
-		}
-	}
-	return false
 }

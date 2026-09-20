@@ -327,7 +327,7 @@ func TestCodeRun(t *testing.T) {
 		{
 			name: "converts filename and extension qualifiers for github.com web search",
 			opts: &CodeOptions{
-				Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+				Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 				Query: search.Query{
 					Keywords: []string{"map"},
 					Kind:     "code",
@@ -345,7 +345,7 @@ func TestCodeRun(t *testing.T) {
 		{
 			name: "properly handles extension with dot prefix when converting to path qualifier",
 			opts: &CodeOptions{
-				Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+				Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
 				Query: search.Query{
 					Keywords: []string{"map"},
 					Kind:     "code",

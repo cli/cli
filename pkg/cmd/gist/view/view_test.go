@@ -593,7 +593,7 @@ func Test_viewRun(t *testing.T) {
 		}
 
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		ios, _, stdout, _ := iostreams.Test()

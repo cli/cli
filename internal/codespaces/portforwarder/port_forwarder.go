@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"strings"
 
 	"github.com/cli/cli/v2/internal/codespaces/connection"
@@ -158,13 +159,7 @@ func (fwd *CodespacesPortForwarder) createTunnelPort(ctx context.Context, port u
 	// If no visibility is provided, Dev Tunnels will use the default (private)
 	if opts.Visibility != "" {
 		// Check if the requested visibility is allowed
-		allowed := false
-		for _, allowedVisibility := range fwd.connection.AllowedPortPrivacySettings {
-			if allowedVisibility == opts.Visibility {
-				allowed = true
-				break
-			}
-		}
+		allowed := slices.Contains(fwd.connection.AllowedPortPrivacySettings, opts.Visibility)
 
 		// If the requested visibility is not allowed, return an error
 		if !allowed {

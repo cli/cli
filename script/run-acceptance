@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly repository="cli/cli"
+readonly workflow="acceptance.yml"
+readonly operating_systems="all ubuntu-latest windows-latest macos-latest"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly repo_root
+readonly testdata_dir="$repo_root/acceptance/testdata"
+
+usage() {
+  cat <<EOF
+Usage: script/run-acceptance [REF] [COMMAND] [OS]
+
+Dispatch acceptance tests using the workflow from a branch or tag. REF defaults
+to the current branch. COMMAND and OS default to "all".
+
+List available command groups:
+  script/run-acceptance groups
+EOF
+}
+
+contains() {
+  local expected="$1"
+  shift
+
+  local candidate
+  for candidate in "$@"; do
+    if [[ "$candidate" == "$expected" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+test_groups() {
+  echo "all"
+
+  local directory
+  for directory in "$testdata_dir"/*; do
+    if [[ -d "$directory" ]]; then
+      basename "$directory"
+    fi
+  done
+}
+
+if [[ "${1:-}" == "groups" ]]; then
+  test_groups
+  exit
+fi
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit
+fi
+
+ref="${1:-}"
+command="${2:-all}"
+operating_system="${3:-all}"
+
+read -r -a operating_system_values <<<"$operating_systems"
+if ! contains "$operating_system" "${operating_system_values[@]}"; then
+  echo "invalid operating system: $operating_system" >&2
+  exit 1
+fi
+
+if [[ -z "$ref" ]]; then
+  ref="$(git branch --show-current)"
+  if [[ -z "$ref" ]]; then
+    echo "ref is required when HEAD is detached" >&2
+    exit 1
+  fi
+fi
+
+active_runs="$(gh run list \
+  --repo "$repository" \
+  --workflow "$workflow" \
+  --limit 100 \
+  --json databaseId,headBranch,status,url \
+  --jq '.[] | select(.status != "completed") | "\(.databaseId)\t\(.status)\t\(.headBranch)\t\(.url)"')"
+if [[ -n "$active_runs" ]]; then
+  echo "warning: acceptance test workflows are already in flight; another run might be rate limited" >&2
+  printf '%s\n' "$active_runs" >&2
+
+  if [[ -t 0 ]]; then
+    read -r -p "Dispatch another acceptance test run? [y/N] " response
+    case "$response" in
+      y | Y | yes | YES | Yes) ;;
+      *) exit 1 ;;
+    esac
+  fi
+fi
+
+gh workflow run "$workflow" \
+  --repo "$repository" \
+  --ref "$ref" \
+  --raw-field "command=$command" \
+  --raw-field "os=$operating_system"
+
+printf 'Dispatched acceptance tests for %s\n' "$ref"

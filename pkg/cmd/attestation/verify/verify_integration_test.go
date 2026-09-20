@@ -32,7 +32,7 @@ func TestVerifyIntegration(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	hc, err := factory.HttpClientFunc(
-		func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+		func() (gh.Config, error) { return config.NewMockConfig(), nil },
 		ios,
 		"test",
 		"",
@@ -152,7 +152,7 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	hc, err := factory.HttpClientFunc(
-		func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+		func() (gh.Config, error) { return config.NewMockConfig(), nil },
 		ios,
 		"test",
 		"",
@@ -227,7 +227,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
-	cfg := config.NewBlankConfig()
+	cfg := config.NewMockConfig()
 	ios, _, _, _ := iostreams.Test()
 	hc, err := factory.HttpClientFunc(
 		func() (gh.Config, error) { return cfg, nil },
@@ -324,7 +324,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
-	cfg := config.NewBlankConfig()
+	cfg := config.NewMockConfig()
 	ios, _, _, _ := iostreams.Test()
 	hc, err := factory.HttpClientFunc(
 		func() (gh.Config, error) { return cfg, nil },

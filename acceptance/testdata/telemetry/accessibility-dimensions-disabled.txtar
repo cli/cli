@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Telemetry log mode records accessibility features as disabled by default
 env GH_TELEMETRY=log
 env GH_TELEMETRY_SAMPLE_RATE=100

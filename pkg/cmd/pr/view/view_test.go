@@ -127,6 +127,11 @@ func Test_NewCmdView(t *testing.T) {
 				Comments:    true,
 			},
 		},
+		{
+			name:    "comments and JSON are mutually exclusive",
+			args:    "123 --comments --json number",
+			wantErr: "specify only one of --comments or --json",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

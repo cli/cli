@@ -45,7 +45,7 @@ var VariableJSONFields = []string{
 	"selectedReposURL",
 }
 
-func (v *Variable) ExportData(fields []string) map[string]interface{} {
+func (v *Variable) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(v, fields)
 }
 

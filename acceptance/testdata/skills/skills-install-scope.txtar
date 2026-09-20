@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Install with --scope project writes to the git repo's .agents/skills/
 exec git init --initial-branch=main $WORK/myrepo
 cd $WORK/myrepo

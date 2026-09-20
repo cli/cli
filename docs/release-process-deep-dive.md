@@ -38,18 +38,20 @@ Although this workflow is used to do our production releases for Linux, MacOS an
     runs-on: ubuntu-latest
     steps:
       - name: Validate tag name format
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
         run: |
-          if [[ ! "${{ inputs.tag_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag name format. Must be in the form v1.2.3"
+          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Invalid tag name format. Must be in the form v1.2.3 or v1.2.3-rc.1"
             exit 1
           fi
 ```
 </details>
 
-The purpose of this job is to [prevent incorrectly tagged releases](https://github.com/cli/cli/pull/10121), by ensuring they conform to the `major.minor.patch` form of semantic versioning, preceded by a `v`.
+The purpose of this job is to [prevent incorrectly tagged releases](https://github.com/cli/cli/pull/10121), by ensuring they conform to the `major.minor.patch` form of semantic versioning, preceded by a `v`. An optional pre-release suffix such as `-rc.1` is allowed. Build metadata after a `+` is not, because the rest of the workflow identifies a pre-release by looking for a hyphen.
 
-> [!WARNING]
-> The `release` job can [create the GitHub release as a pre-release based on the existence of a hyphen in the tag name](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L362-L364), but the later addition of `validate-tag-name` disallows this.
+> [!NOTE]
+> A hyphen in the tag name changes three things: the `release` job [creates the GitHub release as a pre-release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L362-L364), the site is not published, and the Windows MSI drops the suffix so its `ProductVersion` stays numeric.
 
 ## <a id="os-builds">[OS Builds](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L40-L248)</a>
 
@@ -535,16 +537,16 @@ release:
       - name: Set up GPG
         if: inputs.environment == 'production'
         env:
-          GPG_PUBKEY: ${{ secrets.GPG_PUBKEY }}
-          GPG_KEY: ${{ secrets.GPG_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          GPG_KEYGRIP: ${{ secrets.GPG_KEYGRIP }}
+          GPG_PUBKEY_2026: ${{ secrets.GPG_PUBKEY_2026 }}
+          GPG_KEY_2026: ${{ secrets.GPG_KEY_2026 }}
+          GPG_PASSPHRASE_2026: ${{ secrets.GPG_PASSPHRASE_2026 }}
+          GPG_KEYGRIP_2026: ${{ secrets.GPG_KEYGRIP_2026 }}
         run: |
-          base64 -d <<<"$GPG_PUBKEY" | gpg --import --no-tty --batch --yes
-          base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
+          base64 -d <<<"$GPG_PUBKEY_2026" | gpg --import --no-tty --batch --yes
+          base64 -d <<<"$GPG_KEY_2026" | gpg --import --no-tty --batch --yes
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
           gpg-connect-agent RELOADAGENT /bye
-          /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP" <<<"$GPG_PASSPHRASE"
+          base64 -d <<<"$GPG_PASSPHRASE_2026" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP_2026"
       - name: Sign RPMs
         if: inputs.environment == 'production'
         run: |
@@ -563,7 +565,7 @@ release:
           ./script/createrepo.sh
           cp -r dist/repodata site/packages/rpm/
           pushd site/packages/rpm
-          gpg --yes --detach-sign --armor repodata/repomd.xml
+          gpg --yes --detach-sign --armor --default-key 7F38BBB59D064DBCB3D84D725612B36462313325 repodata/repomd.xml
           popd
       - name: Run reprepro
         if: ${{ inputs.environment == 'production' }}
@@ -641,20 +643,23 @@ The `cli.github.com` website hosts RPM and Debian package repositories to suppor
 
 ```sh
 # Import the public and private keys into gpg non-interactively
-base64 -d <<<"$GPG_PUBKEY" | gpg --import --no-tty --batch --yes
-base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
+base64 -d <<<"$GPG_PUBKEY_2026" | gpg --import --no-tty --batch --yes
+base64 -d <<<"$GPG_KEY_2026" | gpg --import --no-tty --batch --yes
 # Configure gpg so that passphrases can be preset, so that they don't
 # have to be provided on every future operation.
 echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
 # Inform gpg that it should reload the configuration to apply the previous step
 gpg-connect-agent RELOADAGENT /bye
 # Store the passphrase for a specific key (referenced by keygrip) in memory.
-/usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP" <<<"$GPG_PASSPHRASE"
+base64 -d <<<"$GPG_PASSPHRASE_2026" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP_2026"
 ```
+
+> [!NOTE]
+> The `_2026` secrets hold the current signing key, `7F38BBB59D064DBCB3D84D725612B36462313325`, which replaced the expired `2C6106201985B60E6C7AC87323F3D4EA75716059` key. The published keyring still contains the expired key so that previously released artifacts can be verified.
 
 #### RPM
 
-The `.rpm` files uploaded by the [`linux`](#linux) job are signed using [`rpmsign`](https://man7.org/linux/man-pages/man8/rpmsign.8.html). The [`createrepo`](https://linux.die.net/man/8/createrepo) tool is used to generate a `repomd.xml` metadata file which describes the contents of a Red Hat repository. The artifacts and `repomd.xml` file are then copied into the site repository, and the `repomd.xml` is signed using `gpg --yes --detach-sign --armor repodata/repomd.xml`, producing a signature file. Since there is only one private key imported into `gpg`, that key is used for the signing.
+The `.rpm` files uploaded by the [`linux`](#linux) job are signed using [`rpmsign`](https://man7.org/linux/man-pages/man8/rpmsign.8.html), with the key named by `%_gpg_name` in [`./script/rpmmacros`](https://github.com/cli/cli/blob/trunk/script/rpmmacros). The [`createrepo`](https://linux.die.net/man/8/createrepo) tool is used to generate a `repomd.xml` metadata file which describes the contents of a Red Hat repository. The artifacts and `repomd.xml` file are then copied into the site repository, and the `repomd.xml` is signed using `gpg --yes --detach-sign --armor --default-key <fingerprint> repodata/repomd.xml`, producing a signature file.
 
 > [!WARNING]
 > The `createrepo` tool is executed inside a [Docker container](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/script/createrepo.sh) for [package management reasons](https://github.com/cli/cli/pull/2856) that may no longer be true.

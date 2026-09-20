@@ -18,19 +18,23 @@ background they need before the problem makes sense, and avoid jargon.
 ### How did you test this change?
 
 <!--
-Show how you exercised the change yourself, as a user of `gh` would.
+Report only actions you actually performed and results you actually observed, using factual
+first-person language (for example, "I ran..." and "I saw..."). Do not present planned,
+hypothetical, inferred, or merely expected scenarios as testing.
 
 Automated test results do not belong here. Passing unit tests, `go test ./...` output, and
 coverage numbers tell a reviewer nothing they cannot see from CI, so do not paste them.
+
+If you did not exercise the changed behavior, write `Not tested` and explain why.
 
 Use one or more of these, whichever communicates best:
 
 1. Screenshots or GIFs of the real command running. Preferred whenever the change is visible
    in terminal output. If output changed, show it before and after.
-2. Given/When/Then scenarios. For example:
-   Given I am in a repo with no open pull requests
-   When I run `gh pr list`
-   Then I see "no open pull requests in cli/cli"
+2. Given/When/Then scenarios, but only when you actually executed the steps. For example:
+   Given I was in a repo with no open pull requests
+   When I ran `gh pr list`
+   Then I saw "no open pull requests in cli/cli"
 3. A natural language walkthrough of what you did by hand, the states you covered, and what
    you saw, including error and edge cases.
 

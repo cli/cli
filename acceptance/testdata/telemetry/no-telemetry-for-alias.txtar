@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Aliases should not leak their user-defined names via telemetry, but the
 # resolved inner command should still record normally — its path is a core
 # gh command and conveys no user-authored identifier.

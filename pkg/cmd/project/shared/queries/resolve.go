@@ -156,7 +156,7 @@ func (c *Client) ProjectItemIDByURL(rawURL, projectID string, projectNumber int3
 		return "", err
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"url":        githubv4.URI{URL: uri},
 		"firstItems": githubv4.Int(LimitMax),
 	}

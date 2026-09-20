@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -21,8 +22,10 @@ const (
 	accessiblePrompterKey = "accessible_prompter"
 	aliasesKey            = "aliases"
 	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
+	clipboardKey          = "clipboard"
 	colorLabelsKey        = "color_labels"
-	editorKey             = "editor" // used by cli/go-gh to open interactive text editor
+	apiHostKey            = "api_host" // used by cli/go-gh to redirect API requests for a host
+	editorKey             = "editor"   // used by cli/go-gh to open interactive text editor
 	gitProtocolKey        = "git_protocol"
 	hostsKey              = "hosts" // used by cli/go-gh to locate authenticated host tokens
 	httpUnixSocketKey     = "http_unix_socket"
@@ -130,6 +133,11 @@ func (c *cfg) Browser(hostname string) gh.ConfigEntry {
 	return c.GetOrDefault(hostname, browserKey).Unwrap()
 }
 
+func (c *cfg) Clipboard() gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault("", clipboardKey).Unwrap()
+}
+
 func (c *cfg) ColorLabels(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, colorLabelsKey).Unwrap()
@@ -231,6 +239,18 @@ type AuthConfig struct {
 	tokenOverride       func(string) (string, string)
 }
 
+// ActiveTokenType reports what kind of credential the active token is, so a
+// caller that only needs to know that can avoid handling the token.
+func (c *AuthConfig) ActiveTokenType(hostname string) gh.TokenType {
+	token, _ := c.ActiveToken(hostname)
+	for _, tokenType := range gh.TokenTypes {
+		if strings.HasPrefix(token, string(tokenType)) {
+			return tokenType
+		}
+	}
+	return gh.TokenTypeUnknown
+}
+
 // ActiveToken will retrieve the active auth token for the given hostname,
 // searching environment variables, plain text config, and
 // lastly encrypted storage.
@@ -325,6 +345,49 @@ func (c *AuthConfig) Hosts() []string {
 		return c.hostsOverride()
 	}
 	return ghauth.KnownHosts()
+}
+
+// APIHostForHost returns the api_host configured for host, reporting false when
+// the host has no api_host set. It is the inverse of HostForAPIHost.
+func (c *AuthConfig) APIHostForHost(host string) (string, bool) {
+	if host == "" || c.cfg == nil {
+		return "", false
+	}
+	configured, err := c.cfg.Get([]string{hostsKey, host, apiHostKey})
+	if err != nil || configured == "" {
+		return "", false
+	}
+	return configured, true
+}
+
+// HostForAPIHost returns the configured host whose api_host points at apiHost,
+// reporting false when no host claims it.
+//
+// go-gh sends API requests for a host to that host's api_host, which is a
+// hostname gh is not otherwise logged in to. Callers that resolve credentials
+// from a request URL need this to get back to the host the request is really
+// for. It answers only the mapping question; deciding whether a given lookup
+// should honour api_host at all is the caller's business, since api_host covers
+// API traffic and not, say, git operations.
+//
+// A misconfiguration where several hosts share one api_host resolves to the
+// first match in lexical Hosts order.
+func (c *AuthConfig) HostForAPIHost(apiHost string) (string, bool) {
+	if apiHost == "" {
+		return "", false
+	}
+	hosts := slices.Clone(c.Hosts())
+	slices.Sort(hosts)
+	for _, host := range hosts {
+		configured, err := c.cfg.Get([]string{hostsKey, host, apiHostKey})
+		if err != nil || configured == "" {
+			continue
+		}
+		if strings.EqualFold(configured, apiHost) {
+			return host, true
+		}
+	}
+	return "", false
 }
 
 // SetHosts will override any hosts resolution and return the given
@@ -574,6 +637,8 @@ aliases:
 http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
 browser:
+# Whether to copy one-time OAuth device codes to the clipboard. Supported values: enabled, disabled
+clipboard: enabled
 # Whether to display labels using their RGB hex color codes in terminals that support truecolor. Supported values: enabled, disabled
 color_labels: disabled
 # Whether customizable, 4-bit accessible colors should be used. Supported values: enabled, disabled
@@ -584,15 +649,39 @@ accessible_prompter: disabled
 spinner: enabled
 `
 
+// ConfigScope controls whether a configuration option can be set globally, per host, or both.
+type ConfigScope int
+
+const (
+	// ConfigScopeGlobalOrHost allows an option to be set globally or for a specific host.
+	ConfigScopeGlobalOrHost ConfigScope = iota
+	// ConfigScopeGlobalOnly allows an option to be set only at the global level.
+	ConfigScopeGlobalOnly
+	// ConfigScopeHostOnly requires an option to be set for a specific host.
+	ConfigScopeHostOnly
+)
+
+// ConfigOption describes a supported configuration key.
 type ConfigOption struct {
 	Key           string
 	Description   string
 	DefaultValue  string
 	AllowedValues []string
+	Scope         ConfigScope
 	CurrentValue  func(c gh.Config, hostname string) string
 }
 
 var Options = []ConfigOption{
+	{
+		Key:          apiHostKey,
+		Description:  "experimental: the hostname to use when making API requests for a GitHub host. Note: this is not a security boundary and requests to the canonical host will remain authenticated",
+		DefaultValue: "",
+		Scope:        ConfigScopeHostOnly,
+		CurrentValue: func(c gh.Config, hostname string) string {
+			apiHost, _ := c.Authentication().APIHostForHost(hostname)
+			return apiHost
+		},
+	},
 	{
 		Key:           gitProtocolKey,
 		Description:   "the protocol to use for git clone and push operations",
@@ -650,6 +739,16 @@ var Options = []ConfigOption{
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Browser(hostname).Value
+		},
+	},
+	{
+		Key:           clipboardKey,
+		Description:   "whether to copy one-time OAuth device codes to the clipboard",
+		DefaultValue:  "enabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		Scope:         ConfigScopeGlobalOnly,
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Clipboard().Value
 		},
 	},
 	{

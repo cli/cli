@@ -327,7 +327,7 @@ func resolveItemEditNames(config editItemConfig) (editItemConfig, error) {
 
 func fetchDraftIssueByID(config editItemConfig, draftIssueID string) (*queries.DraftIssue, error) {
 	var query DraftIssueQuery
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"id": githubv4.ID(draftIssueID),
 	}
 
@@ -339,55 +339,55 @@ func fetchDraftIssueByID(config editItemConfig, draftIssueID string) (*queries.D
 	return &query.DraftIssueNode.DraftIssue, nil
 }
 
-func buildEditDraftIssue(config editItemConfig, currentDraftIssue *queries.DraftIssue) (*EditProjectDraftIssue, map[string]interface{}) {
+func buildEditDraftIssue(config editItemConfig, currentDraftIssue *queries.DraftIssue) (*EditProjectDraftIssue, map[string]any) {
 	input := githubv4.UpdateProjectV2DraftIssueInput{
 		DraftIssueID: githubv4.ID(config.opts.itemID),
 	}
 
 	if config.opts.titleChanged {
-		input.Title = githubv4.NewString(githubv4.String(config.opts.title))
+		input.Title = new(githubv4.String(config.opts.title))
 	} else if currentDraftIssue != nil {
 		// Preserve existing if title is not provided
-		input.Title = githubv4.NewString(githubv4.String(currentDraftIssue.Title))
+		input.Title = new(githubv4.String(currentDraftIssue.Title))
 	}
 
 	if config.opts.bodyChanged {
-		input.Body = githubv4.NewString(githubv4.String(config.opts.body))
+		input.Body = new(githubv4.String(config.opts.body))
 	} else if currentDraftIssue != nil {
 		// Preserve existing if body is not provided
-		input.Body = githubv4.NewString(githubv4.String(currentDraftIssue.Body))
+		input.Body = new(githubv4.String(currentDraftIssue.Body))
 	}
 
-	return &EditProjectDraftIssue{}, map[string]interface{}{
+	return &EditProjectDraftIssue{}, map[string]any{
 		"input": input,
 	}
 }
 
-func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2FieldValue, map[string]interface{}) {
+func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2FieldValue, map[string]any) {
 	var value githubv4.ProjectV2FieldValue
 	if config.opts.text != "" {
 		value = githubv4.ProjectV2FieldValue{
-			Text: githubv4.NewString(githubv4.String(config.opts.text)),
+			Text: new(githubv4.String(config.opts.text)),
 		}
 	} else if config.opts.numberChanged {
 		value = githubv4.ProjectV2FieldValue{
-			Number: githubv4.NewFloat(githubv4.Float(config.opts.number)),
+			Number: new(githubv4.Float(config.opts.number)),
 		}
 	} else if config.opts.date != "" {
 		value = githubv4.ProjectV2FieldValue{
-			Date: githubv4.NewDate(githubv4.Date{Time: date}),
+			Date: new(githubv4.Date{Time: date}),
 		}
 	} else if config.opts.singleSelectOptionID != "" {
 		value = githubv4.ProjectV2FieldValue{
-			SingleSelectOptionID: githubv4.NewString(githubv4.String(config.opts.singleSelectOptionID)),
+			SingleSelectOptionID: new(githubv4.String(config.opts.singleSelectOptionID)),
 		}
 	} else if config.opts.iterationID != "" {
 		value = githubv4.ProjectV2FieldValue{
-			IterationID: githubv4.NewString(githubv4.String(config.opts.iterationID)),
+			IterationID: new(githubv4.String(config.opts.iterationID)),
 		}
 	}
 
-	return &UpdateProjectV2FieldValue{}, map[string]interface{}{
+	return &UpdateProjectV2FieldValue{}, map[string]any{
 		"input": githubv4.UpdateProjectV2ItemFieldValueInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
 			ItemID:    githubv4.ID(config.opts.itemID),
@@ -397,8 +397,8 @@ func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2Fie
 	}
 }
 
-func buildClearItem(config editItemConfig) (*ClearProjectV2FieldValue, map[string]interface{}) {
-	return &ClearProjectV2FieldValue{}, map[string]interface{}{
+func buildClearItem(config editItemConfig) (*ClearProjectV2FieldValue, map[string]any) {
+	return &ClearProjectV2FieldValue{}, map[string]any{
 		"input": githubv4.ClearProjectV2ItemFieldValueInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
 			ItemID:    githubv4.ID(config.opts.itemID),

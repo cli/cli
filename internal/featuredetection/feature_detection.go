@@ -109,6 +109,13 @@ type SearchFeatures struct {
 	// API calls.
 	AdvancedIssueSearchAPIOptIn bool
 
+	// SemanticSearch indicates whether the host supports semantic issue search
+	// (search_type=semantic). Dotcom-only; absent on single-tenant GHES.
+	SemanticSearch bool
+	// HybridSearch indicates whether the host supports hybrid issue search
+	// (search_type=hybrid). Dotcom-only; absent on single-tenant GHES.
+	HybridSearch bool
+
 	// TODO advancedSearchFuture
 	// When advanced issue search is supported in Pull Requests tab, or in
 	// global search we can introduce more fields to reflect the support status.
@@ -135,6 +142,22 @@ var advancedIssueSearchSupportedAsOptIn = SearchFeatures{
 var advancedIssueSearchSupportedAsOnlyBackend = SearchFeatures{
 	AdvancedIssueSearchAPI:      true,
 	AdvancedIssueSearchAPIOptIn: false,
+}
+
+// semanticSearchSupported mimics a Dotcom host (github.com or ghe.com data
+// residency) where semantic and hybrid issue search are available.
+var semanticSearchSupported = SearchFeatures{
+	AdvancedIssueSearchAPI: true,
+	SemanticSearch:         true,
+	HybridSearch:           true,
+}
+
+// semanticSearchUnsupported mimics a single-tenant GHES host where advanced
+// issue search is available but semantic and hybrid search are not.
+var semanticSearchUnsupported = SearchFeatures{
+	AdvancedIssueSearchAPI: true,
+	SemanticSearch:         false,
+	HybridSearch:           false,
 }
 
 type ReleaseFeatures struct {
@@ -447,11 +470,19 @@ func (d *detector) SearchFeatures() (SearchFeatures, error) {
 	}
 
 	for _, enumValue := range searchTypeFeatureDetection.SearchType.EnumValues {
-		if enumValue.Name == "ISSUE_ADVANCED" {
+		switch enumValue.Name {
+		case "ISSUE_ADVANCED":
 			// As long as ISSUE_ADVANCED is present on the schema, we should
 			// explicitly opt-in when making API calls.
 			feature.AdvancedIssueSearchAPIOptIn = true
-			break
+		case "ISSUE_SEMANTIC":
+			// ISSUE_SEMANTIC is gated to Dotcom (github.com and ghe.com data
+			// residency) and absent on single-tenant GHES.
+			feature.SemanticSearch = true
+		case "ISSUE_HYBRID":
+			// ISSUE_HYBRID is gated to Dotcom (github.com and ghe.com data
+			// residency) and absent on single-tenant GHES.
+			feature.HybridSearch = true
 		}
 	}
 

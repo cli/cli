@@ -6,25 +6,40 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_printError(t *testing.T) {
-	cmd := &cobra.Command{}
+	rootCmd := &cobra.Command{Use: "gh"}
+	cmd := &cobra.Command{
+		Use:   "spend",
+		Short: "Spend money",
+		Example: heredoc.Doc(`
+			$ gh spend --amount 1
+		`),
+	}
+	cmd.Flags().Int("amount", 0, "How much to spend")
+	rootCmd.AddCommand(cmd)
 
 	type args struct {
-		err   error
-		cmd   *cobra.Command
-		debug bool
+		err      error
+		cmd      *cobra.Command
+		debug    bool
+		fullHelp bool
 	}
 	tests := []struct {
 		name    string
@@ -60,7 +75,7 @@ check your internet connection or https://githubstatus.com
 				cmd:   cmd,
 				debug: false,
 			},
-			wantOut: "unknown flag --foo\n\nUsage:\n\n",
+			wantOut: "unknown flag --foo\n\n" + cmd.UsageString() + "\n",
 		},
 		{
 			name: "unknown Cobra command error",
@@ -69,17 +84,86 @@ check your internet connection or https://githubstatus.com
 				cmd:   cmd,
 				debug: false,
 			},
-			wantOut: "unknown command foo\n\nUsage:\n\n",
+			wantOut: "unknown command foo\n\n" + cmd.UsageString() + "\n",
+		},
+		{
+			name: "Cobra flag error with full help",
+			args: args{
+				err:      cmdutil.FlagErrorf("unknown flag --foo"),
+				cmd:      cmd,
+				debug:    false,
+				fullHelp: true,
+			},
+			wantOut: heredoc.Doc(`
+				unknown flag --foo
+
+				Spend money
+
+				USAGE
+				  gh spend [flags]
+
+				FLAGS
+				  --amount int   How much to spend
+
+				EXAMPLES
+				  $ gh spend --amount 1
+
+				LEARN MORE
+				  Use ` + "`gh <command> <subcommand> --help`" + ` for more information about a command.
+				  Read the manual at https://cli.github.com/manual
+				  Learn about exit codes using ` + "`gh help exit-codes`" + `
+				  Learn about accessibility experiences using ` + "`gh help accessibility`" + `
+
+			`),
+		},
+		{
+			name: "unknown Cobra command error with full help",
+			args: args{
+				err:      errors.New("unknown command foo"),
+				cmd:      cmd,
+				debug:    false,
+				fullHelp: true,
+			},
+			wantOut: heredoc.Doc(`
+				unknown command foo
+
+				Spend money
+
+				USAGE
+				  gh spend [flags]
+
+				FLAGS
+				  --amount int   How much to spend
+
+				EXAMPLES
+				  $ gh spend --amount 1
+
+				LEARN MORE
+				  Use ` + "`gh <command> <subcommand> --help`" + ` for more information about a command.
+				  Read the manual at https://cli.github.com/manual
+				  Learn about exit codes using ` + "`gh help exit-codes`" + `
+				  Learn about accessibility experiences using ` + "`gh help accessibility`" + `
+
+			`),
+		},
+		{
+			name: "generic error is unaffected by full help",
+			args: args{
+				err:      errors.New("the app exploded"),
+				cmd:      cmd,
+				debug:    false,
+				fullHelp: true,
+			},
+			wantOut: "the app exploded\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
 			out := &bytes.Buffer{}
-			printError(out, tt.args.err, tt.args.cmd, tt.args.debug)
-			if gotOut := out.String(); gotOut != tt.wantOut {
-				t.Errorf("printError() = %q, want %q", gotOut, tt.wantOut)
-			}
+			printError(out, ios.ColorScheme(), tt.args.err, tt.args.cmd, tt.args.debug, tt.args.fullHelp)
+			assert.Equal(t, tt.wantOut, out.String())
 		})
 	}
 }
@@ -142,9 +226,9 @@ func Test_newIOStreams_pager(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, "")
 			assert.Equal(t, tt.wantPager, io.GetPager())
 		})
 	}
@@ -183,9 +267,9 @@ func Test_newIOStreams_prompt(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, "")
 			assert.Equal(t, tt.promptDisabled, io.GetNeverPrompt())
 		})
 	}
@@ -195,12 +279,18 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 	tests := []struct {
 		name            string
 		config          gh.Config
+		invokingAgent   agents.AgentName
 		spinnerDisabled bool
 		env             map[string]string
 	}{
 		{
 			name:            "default config",
 			spinnerDisabled: false,
+		},
+		{
+			name:            "agent detected",
+			invokingAgent:   "some-agent",
+			spinnerDisabled: true,
 		},
 		{
 			name:            "config with spinner disabled",
@@ -213,12 +303,30 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 			spinnerDisabled: false,
 		},
 		{
+			name:            "agent overrides config enabled",
+			config:          enableSpinnersConfig(),
+			invokingAgent:   "some-agent",
+			spinnerDisabled: true,
+		},
+		{
+			name:            "config disabled with agent",
+			config:          disableSpinnersConfig(),
+			invokingAgent:   "some-agent",
+			spinnerDisabled: true,
+		},
+		{
 			name:            "spinner disabled via GH_SPINNER_DISABLED env var = 0",
 			env:             map[string]string{"GH_SPINNER_DISABLED": "0"},
 			spinnerDisabled: false,
 		},
 		{
 			name:            "spinner disabled via GH_SPINNER_DISABLED env var = false",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "false"},
+			spinnerDisabled: false,
+		},
+		{
+			name:            "GH_SPINNER_DISABLED false overrides agent",
+			invokingAgent:   "some-agent",
 			env:             map[string]string{"GH_SPINNER_DISABLED": "false"},
 			spinnerDisabled: false,
 		},
@@ -252,6 +360,12 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// t.Setenv registers the cleanup that restores the caller's environment;
+			// os.Unsetenv then clears the variable outright. Both are needed because
+			// newIOStreams branches on os.LookupEnv, so leaving GH_SPINNER_DISABLED
+			// set-but-empty would take the env branch and never reach agent or config.
+			t.Setenv("GH_SPINNER_DISABLED", "")
+			require.NoError(t, os.Unsetenv("GH_SPINNER_DISABLED"))
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
@@ -259,9 +373,9 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, tt.invokingAgent)
 			assert.Equal(t, tt.spinnerDisabled, io.GetSpinnerDisabled())
 		})
 	}
@@ -325,9 +439,9 @@ func Test_newIOStreams_accessiblePrompterEnabled(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, "")
 			assert.Equal(t, tt.accessiblePrompterEnabled, io.AccessiblePrompterEnabled())
 		})
 	}
@@ -401,9 +515,9 @@ func Test_newIOStreams_colorLabels(t *testing.T) {
 			if tt.config != nil {
 				cfg = tt.config
 			} else {
-				cfg = config.NewBlankConfig()
+				cfg = config.NewMockConfig()
 			}
-			io := newIOStreams(cfg)
+			io := newIOStreams(cfg, "")
 			assert.Equal(t, tt.colorLabelsEnabled, io.ColorLabels())
 		})
 	}
@@ -411,109 +525,107 @@ func Test_newIOStreams_colorLabels(t *testing.T) {
 
 func Test_mightBeGHESUser(t *testing.T) {
 	tests := []struct {
-		name   string
-		env    map[string]string
-		config gh.Config
-		want   bool
+		name      string
+		env       map[string]string
+		cfgString string
+		want      bool
 	}{
 		{
-			name:   "GH_ENTERPRISE_TOKEN set",
-			env:    map[string]string{"GH_ENTERPRISE_TOKEN": "some-token"},
-			config: config.NewBlankConfig(),
-			want:   true,
+			name: "GH_ENTERPRISE_TOKEN set",
+			env:  map[string]string{"GH_ENTERPRISE_TOKEN": "some-token"},
+			want: true,
 		},
 		{
-			name:   "GITHUB_ENTERPRISE_TOKEN set",
-			env:    map[string]string{"GITHUB_ENTERPRISE_TOKEN": "some-token"},
-			config: config.NewBlankConfig(),
-			want:   true,
+			name: "GITHUB_ENTERPRISE_TOKEN set",
+			env:  map[string]string{"GITHUB_ENTERPRISE_TOKEN": "some-token"},
+			want: true,
 		},
 		{
-			name:   "no env vars, config has enterprise host",
-			config: config.NewFromString("hosts:\n  ghes.example.com:\n    oauth_token: abc123\n"),
-			want:   true,
+			name:      "no env vars, config has enterprise host",
+			cfgString: "hosts:\n  ghes.example.com:\n    oauth_token: abc123\n",
+			want:      true,
 		},
 		{
-			name:   "no env vars, config has only github.com",
-			config: config.NewFromString("hosts:\n  github.com:\n    oauth_token: abc123\n"),
-			want:   false,
+			name:      "no env vars, config has only github.com",
+			cfgString: "hosts:\n  github.com:\n    oauth_token: abc123\n",
+			want:      false,
 		},
 		{
-			name:   "no env vars, config has no hosts",
-			config: config.NewBlankConfig(),
-			want:   false,
+			name: "no env vars, config has no hosts",
+			want: false,
 		},
 		{
-			name:   "no env vars, config has github.com and enterprise host",
-			config: config.NewFromString("hosts:\n  github.com:\n    oauth_token: abc123\n  ghes.example.com:\n    oauth_token: def456\n"),
-			want:   true,
+			name:      "no env vars, config has github.com and enterprise host",
+			cfgString: "hosts:\n  github.com:\n    oauth_token: abc123\n  ghes.example.com:\n    oauth_token: def456\n",
+			want:      true,
 		},
 		{
-			name:   "no env vars, config has tenancy host",
-			config: config.NewFromString("hosts:\n  my-company.ghe.com:\n    oauth_token: abc123\n"),
-			want:   false,
+			name:      "no env vars, config has tenancy host",
+			cfgString: "hosts:\n  my-company.ghe.com:\n    oauth_token: abc123\n",
+			want:      false,
 		},
 		{
-			name:   "GH_HOST set to enterprise host",
-			env:    map[string]string{"GH_HOST": "ghes.example.com"},
-			config: config.NewBlankConfig(),
-			want:   true,
+			name: "GH_HOST set to enterprise host",
+			env:  map[string]string{"GH_HOST": "ghes.example.com"},
+			want: true,
 		},
 		{
-			name:   "GH_HOST set to github.com",
-			env:    map[string]string{"GH_HOST": "github.com"},
-			config: config.NewBlankConfig(),
-			want:   false,
+			name: "GH_HOST set to github.com",
+			env:  map[string]string{"GH_HOST": "github.com"},
+			want: false,
 		},
 		{
-			name:   "GH_HOST set to tenancy host",
-			env:    map[string]string{"GH_HOST": "my-company.ghe.com"},
-			config: config.NewBlankConfig(),
-			want:   false,
+			name: "GH_HOST set to tenancy host",
+			env:  map[string]string{"GH_HOST": "my-company.ghe.com"},
+			want: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			cfg, _ := config.NewIsolatedTestConfig(t, tt.cfgString)
+
+			// Set after isolating the config, which clears the auth env vars.
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
-			got := mightBeGHESUser(tt.config)
+
+			got := mightBeGHESUser(cfg)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
 func pagerConfig() gh.Config {
-	return config.NewFromString("pager: CONFIG_PAGER")
+	return config.NewMockConfigFromString("pager: CONFIG_PAGER")
 }
 
 func disablePromptConfig() gh.Config {
-	return config.NewFromString("prompt: disabled")
+	return config.NewMockConfigFromString("prompt: disabled")
 }
 
 func enableAccessiblePrompterConfig() gh.Config {
-	return config.NewFromString("accessible_prompter: enabled")
+	return config.NewMockConfigFromString("accessible_prompter: enabled")
 }
 
 func disableAccessiblePrompterConfig() gh.Config {
-	return config.NewFromString("accessible_prompter: disabled")
+	return config.NewMockConfigFromString("accessible_prompter: disabled")
 }
 
 func disableSpinnersConfig() gh.Config {
-	return config.NewFromString("spinner: disabled")
+	return config.NewMockConfigFromString("spinner: disabled")
 }
 
 func enableSpinnersConfig() gh.Config {
-	return config.NewFromString("spinner: enabled")
+	return config.NewMockConfigFromString("spinner: enabled")
 }
 
 func disableColorLabelsConfig() gh.Config {
-	return config.NewFromString("color_labels: disabled")
+	return config.NewMockConfigFromString("color_labels: disabled")
 }
 
 func enableColorLabelsConfig() gh.Config {
-	return config.NewFromString("color_labels: enabled")
+	return config.NewMockConfigFromString("color_labels: enabled")
 }
 
 func Test_authRecoveryCommand(t *testing.T) {
@@ -555,7 +667,7 @@ func Test_authRecoveryCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			authCfg := config.NewBlankConfig().Authentication()
+			authCfg := config.NewMockConfig().Authentication()
 			authCfg.SetActiveToken(tt.token, tt.source)
 			cfg := &ghmock.ConfigMock{
 				AuthenticationFunc: func() gh.AuthConfig {

@@ -195,22 +195,22 @@ func TestInstallSkill(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree123"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"sha": "tree123", "truncated": false,
-						"tree": []map[string]interface{}{
+						"tree": []map[string]any{
 							{"path": "SKILL.md", "type": "blob", "sha": "skill-sha", "size": 10},
 							{"path": "prompt.txt", "type": "blob", "sha": "prompt-sha", "size": 5},
 						},
 					}))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/skill-sha"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"sha": "skill-sha", "encoding": "base64",
 						"content": base64.StdEncoding.EncodeToString([]byte("# Code Review")),
 					}))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/prompt-sha"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"sha": "prompt-sha", "encoding": "base64",
 						"content": base64.StdEncoding.EncodeToString([]byte("review this PR")),
 					}))
@@ -231,15 +231,15 @@ func TestInstallSkill(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree456"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"sha": "tree456", "truncated": false,
-						"tree": []map[string]interface{}{
+						"tree": []map[string]any{
 							{"path": "SKILL.md", "type": "blob", "sha": "md-sha", "size": 20},
 						},
 					}))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/md-sha"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"sha": "md-sha", "encoding": "base64",
 						"content": base64.StdEncoding.EncodeToString([]byte("# PR Summary\nSummarize pull requests")),
 					}))
@@ -258,22 +258,22 @@ func TestInstallSkill(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree123"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"sha": "tree123", "truncated": false,
-						"tree": []map[string]interface{}{
+						"tree": []map[string]any{
 							{"path": "SKILL.md", "type": "blob", "sha": "safe-sha", "size": 10},
 							{"path": "../../etc/passwd", "type": "blob", "sha": "evil-sha", "size": 100},
 						},
 					}))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/safe-sha"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"sha": "safe-sha", "encoding": "base64",
 						"content": base64.StdEncoding.EncodeToString([]byte("# Safe Skill")),
 					}))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/evil-sha"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"sha": "evil-sha", "encoding": "base64",
 						"content": base64.StdEncoding.EncodeToString([]byte("malicious content")),
 					}))
@@ -316,15 +316,15 @@ func TestInstallSkill(t *testing.T) {
 func stubTreeAndBlob(reg *httpmock.Registry, treeSHA string) {
 	reg.Register(
 		httpmock.REST("GET", fmt.Sprintf("repos/monalisa/octocat-skills/git/trees/%s", treeSHA)),
-		httpmock.JSONResponse(map[string]interface{}{
+		httpmock.JSONResponse(map[string]any{
 			"sha": treeSHA, "truncated": false,
-			"tree": []map[string]interface{}{
+			"tree": []map[string]any{
 				{"path": "SKILL.md", "type": "blob", "sha": treeSHA + "-blob", "size": 10},
 			},
 		}))
 	reg.Register(
 		httpmock.REST("GET", fmt.Sprintf("repos/monalisa/octocat-skills/git/blobs/%s-blob", treeSHA)),
-		httpmock.JSONResponse(map[string]interface{}{
+		httpmock.JSONResponse(map[string]any{
 			"sha": treeSHA + "-blob", "encoding": "base64",
 			"content": base64.StdEncoding.EncodeToString([]byte("# Skill")),
 		}))

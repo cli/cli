@@ -302,7 +302,7 @@ func Test_deleteRun(t *testing.T) {
 		}
 
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 		ios, _, stdout, stderr := iostreams.Test()
 		ios.SetStdoutTTY(true)

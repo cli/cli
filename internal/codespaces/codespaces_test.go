@@ -2,13 +2,51 @@ package codespaces
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/stretchr/testify/require"
 )
+
+func TestListenTCPInterfaces(t *testing.T) {
+	tests := []struct {
+		name          string
+		allInterfaces bool
+		checkIP       func(net.IP) bool
+	}{
+		{
+			name:          "loopback by default",
+			allInterfaces: false,
+			checkIP: func(ip net.IP) bool {
+				return ip.String() == "127.0.0.1"
+			},
+		},
+		{
+			name:          "all interfaces when enabled",
+			allInterfaces: true,
+			checkIP: func(ip net.IP) bool {
+				return len(ip) == 0 || ip.IsUnspecified()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			listener, _, err := ListenTCP(0, tt.allInterfaces)
+			require.NoError(t, err)
+			defer listener.Close()
+
+			address := listener.Addr().(*net.TCPAddr)
+			if !tt.checkIP(address.IP) {
+				t.Fatalf("ListenTCP() address = %s", address.IP)
+			}
+		})
+	}
+}
 
 func init() {
 	// Set the backoff to 0 for testing so that they run quickly

@@ -157,7 +157,7 @@ func TestNewCmdInstall(t *testing.T) {
 			}
 
 			var gotOpts *InstallOptions
-			cmd := NewCmdInstall(f, &telemetry.NoOpService{}, func(opts *InstallOptions) error {
+			cmd := NewCmdInstall(f, &telemetry.EventRecorderSpy{}, func(opts *InstallOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -198,7 +198,7 @@ func TestNewCmdInstall(t *testing.T) {
 	t.Run("command metadata", func(t *testing.T) {
 		ios, _, _, _ := iostreams.Test()
 		f := &cmdutil.Factory{IOStreams: ios, Prompter: &prompter.PrompterMock{}, GitClient: &git.Client{}}
-		cmd := NewCmdInstall(f, &telemetry.NoOpService{}, nil)
+		cmd := NewCmdInstall(f, &telemetry.EventRecorderSpy{}, nil)
 
 		assert.Equal(t, "install <repository> [<skill[@version]>] [flags]", cmd.Use)
 		assert.NotEmpty(t, cmd.Short)
@@ -1589,6 +1589,37 @@ func TestInstallRun(t *testing.T) {
 			},
 			wantStdout: "Installed git-commit",
 		},
+		{
+			name: "respect pi coding agent dir env var for user scope",
+			setup: func(t *testing.T) {
+				t.Setenv("PI_CODING_AGENT_DIR", t.TempDir())
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "git-commit",
+					Agent:        "pi",
+					Scope:        "user",
+					ScopeChanged: true,
+					Telemetry:    &telemetry.NoOpService{},
+				}
+			},
+			assert: func(t *testing.T) {
+				assert.FileExists(t, filepath.Join(os.Getenv("PI_CODING_AGENT_DIR"), "skills", "git-commit", "SKILL.md"))
+				assert.NoFileExists(t, filepath.Join(os.Getenv("HOME"), ".pi", "agent", "skills", "git-commit", "SKILL.md"))
+			},
+			wantStdout: "Installed git-commit",
+		},
 	}
 
 	for _, tt := range tests {
@@ -2565,7 +2596,7 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			} else {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"visibility": tt.visibility,
 					}),
 				)
@@ -2593,8 +2624,9 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Len(t, recorder.Events, 1)
-			event := recorder.Events[0]
+			events := recorder.Events()
+			require.Len(t, events, 1)
+			event := events[0]
 			assert.Equal(t, "skill_install", event.Type)
 			assert.NotEmpty(t, event.Dimensions["agent_hosts"], "agent_hosts should always be present")
 
@@ -2658,7 +2690,7 @@ func TestInstallRun_TelemetryMultipleSkills(t *testing.T) {
 
 	reg.Register(
 		httpmock.REST("GET", "repos/monalisa/octocat-skills"),
-		httpmock.JSONResponse(map[string]interface{}{
+		httpmock.JSONResponse(map[string]any{
 			"visibility": "public",
 		}),
 	)
@@ -2689,8 +2721,9 @@ func TestInstallRun_TelemetryMultipleSkills(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Len(t, recorder.Events, 1)
-	event := recorder.Events[0]
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	event := events[0]
 	assert.Equal(t, "skill_install", event.Type)
 	assert.Equal(t, "public", event.Dimensions["repo_visibility"])
 

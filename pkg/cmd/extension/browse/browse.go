@@ -254,10 +254,7 @@ func (el *extList) PageDown() {
 }
 
 func (el *extList) PageUp() {
-	i := el.ui.List.GetCurrentItem() - pagingOffset
-	if i < 0 {
-		i = 0
-	}
+	i := max(el.ui.List.GetCurrentItem()-pagingOffset, 0)
 	el.ui.List.SetCurrentItem(i)
 }
 
@@ -266,10 +263,7 @@ func (el *extList) ScrollDown() {
 }
 
 func (el *extList) ScrollUp() {
-	i := el.ui.List.GetCurrentItem() - 1
-	if i < 0 {
-		i = 0
-	}
+	i := max(el.ui.List.GetCurrentItem()-1, 0)
 	el.ui.List.SetCurrentItem(i)
 }
 

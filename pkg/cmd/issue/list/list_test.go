@@ -85,7 +85,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
@@ -174,11 +174,11 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 		{ "data": {	"repository": {
 			"hasIssuesEnabled": true,
 			"issues": { "nodes": [] }
-		} } }`, func(_ string, params map[string]interface{}) {
+		} } }`, func(_ string, params map[string]any) {
 			assert.Equal(t, "probablyCher", params["assignee"].(string))
 			assert.Equal(t, "foo", params["author"].(string))
 			assert.Equal(t, "me", params["mention"].(string))
-			assert.Equal(t, []interface{}{"OPEN"}, params["states"].([]interface{}))
+			assert.Equal(t, []any{"OPEN"}, params["states"].([]any))
 		}))
 
 	output, err := runCommand(http, true, "-a probablyCher -s open -A foo --mention me")
@@ -198,7 +198,7 @@ func TestIssueList_tty_withAppFlag(t *testing.T) {
 		{ "data": {	"repository": {
 			"hasIssuesEnabled": true,
 			"issues": { "nodes": [] }
-		} } }`, func(_ string, params map[string]interface{}) {
+		} } }`, func(_ string, params map[string]any) {
 			assert.Equal(t, "app/dependabot", params["author"].(string))
 		}))
 
@@ -336,12 +336,12 @@ func Test_issueList(t *testing.T) {
 					{ "data": {	"repository": {
 						"hasIssuesEnabled": true,
 						"issues": { "nodes": [] }
-					} } }`, func(_ string, params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					} } }`, func(_ string, params map[string]any) {
+						assert.Equal(t, map[string]any{
 							"owner":  "OWNER",
 							"repo":   "REPO",
 							"limit":  float64(30),
-							"states": []interface{}{"OPEN"},
+							"states": []any{"OPEN"},
 						}, params)
 					}))
 			},
@@ -377,8 +377,8 @@ func Test_issueList(t *testing.T) {
 							"issueCount": 0,
 							"nodes": []
 						}
-					} }`, func(_ string, params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					} }`, func(_ string, params map[string]any) {
+						assert.Equal(t, map[string]any{
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
@@ -412,8 +412,8 @@ func Test_issueList(t *testing.T) {
 							"issueCount": 0,
 							"nodes": []
 						}
-					} }`, func(_ string, params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					} }`, func(_ string, params map[string]any) {
+						assert.Equal(t, map[string]any{
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
@@ -446,12 +446,12 @@ func Test_issueList(t *testing.T) {
 					{ "data": {	"repository": {
 						"hasIssuesEnabled": true,
 						"issues": { "nodes": [] }
-					} } }`, func(_ string, params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					} } }`, func(_ string, params map[string]any) {
+						assert.Equal(t, map[string]any{
 							"owner":    "OWNER",
 							"repo":     "REPO",
 							"limit":    float64(30),
-							"states":   []interface{}{"OPEN"},
+							"states":   []any{"OPEN"},
 							"assignee": "monalisa",
 							"author":   "monalisa",
 							"mention":  "monalisa",
@@ -486,8 +486,8 @@ func Test_issueList(t *testing.T) {
 							"issueCount": 0,
 							"nodes": []
 						}
-					} }`, func(_ string, params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					} }`, func(_ string, params map[string]any) {
+						assert.Equal(t, map[string]any{
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
@@ -521,8 +521,8 @@ func Test_issueList(t *testing.T) {
 							"issueCount": 0,
 							"nodes": []
 						}
-					} }`, func(_ string, params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					} }`, func(_ string, params map[string]any) {
+						assert.Equal(t, map[string]any{
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
@@ -556,8 +556,8 @@ func Test_issueList(t *testing.T) {
 							"issueCount": 0,
 							"nodes": []
 						}
-					} }`, func(_ string, params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					} }`, func(_ string, params map[string]any) {
+						assert.Equal(t, map[string]any{
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
@@ -621,12 +621,12 @@ func TestIssueList_withProjectItems(t *testing.T) {
 				}
 			  }
 			}
-		  }`, func(_ string, params map[string]interface{}) {
-			require.Equal(t, map[string]interface{}{
+		  }`, func(_ string, params map[string]any) {
+			require.Equal(t, map[string]any{
 				"owner":  "OWNER",
 				"repo":   "REPO",
 				"limit":  float64(30),
-				"states": []interface{}{"OPEN"},
+				"states": []any{"OPEN"},
 			}, params)
 		}))
 
@@ -695,8 +695,8 @@ func TestIssueList_Search_withProjectItems(t *testing.T) {
 				]
 			  }
 			}
-		  }`, func(_ string, params map[string]interface{}) {
-			require.Equal(t, map[string]interface{}{
+		  }`, func(_ string, params map[string]any) {
+			require.Equal(t, map[string]any{
 				"owner": "OWNER",
 				"repo":  "REPO",
 				"type":  "ISSUE_ADVANCED",

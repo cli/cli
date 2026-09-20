@@ -26,8 +26,8 @@ type Job struct {
 	Status            string          `json:"status,omitempty"`
 	Result            string          `json:"result,omitempty"`
 	Actor             *JobActor       `json:"actor,omitempty"`
-	CreatedAt         time.Time       `json:"created_at,omitempty"`
-	UpdatedAt         time.Time       `json:"updated_at,omitempty"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
 	PullRequest       *JobPullRequest `json:"pull_request,omitempty"`
 	WorkflowRun       *struct {
 		ID string `json:"id"`

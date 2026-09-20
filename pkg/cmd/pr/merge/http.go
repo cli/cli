@@ -79,7 +79,7 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 		input.ExpectedHeadOid = &expectedHeadOid
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": input,
 	}
 
@@ -110,7 +110,7 @@ func disableAutoMerge(client *http.Client, repo ghrepo.Interface, prID string) e
 		} `graphql:"disablePullRequestAutoMerge(input: {pullRequestId: $prID})"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"prID": githubv4.ID(prID),
 	}
 
@@ -138,7 +138,7 @@ func getMergeText(client *http.Client, repo ghrepo.Interface, prID string, merge
 		} `graphql:"node(id: $prID)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"prID":   githubv4.ID(prID),
 		"method": method,
 	}

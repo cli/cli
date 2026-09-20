@@ -82,7 +82,7 @@ func (l *lister) List(opts ListOptions) (*api.PullRequestAndTotalCount, error) {
 		}`
 
 	pageLimit := min(limit, 100)
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": opts.BaseRepo.RepoOwner(),
 		"repo":  opts.BaseRepo.RepoName(),
 	}

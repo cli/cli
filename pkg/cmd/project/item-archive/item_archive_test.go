@@ -117,21 +117,21 @@ func TestRunArchive_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -142,9 +142,9 @@ func TestRunArchive_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -154,10 +154,10 @@ func TestRunArchive_User(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -169,10 +169,10 @@ func TestRunArchive_User(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation ArchiveProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"archiveProjectV2Item": map[string]interface{}{
-					"item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"archiveProjectV2Item": map[string]any{
+					"item": map[string]any{
 						"id": "item ID",
 					},
 				},
@@ -208,21 +208,21 @@ func TestRunArchive_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -233,9 +233,9 @@ func TestRunArchive_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query OrgProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "github",
 				"number":      1,
 				"firstItems":  0,
@@ -245,10 +245,10 @@ func TestRunArchive_Org(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -260,10 +260,10 @@ func TestRunArchive_Org(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation ArchiveProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"archiveProjectV2Item": map[string]interface{}{
-					"item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"archiveProjectV2Item": map[string]any{
+					"item": map[string]any{
 						"id": "item ID",
 					},
 				},
@@ -299,13 +299,13 @@ func TestRunArchive_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"id": "an ID",
 				},
 			},
@@ -315,9 +315,9 @@ func TestRunArchive_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"number":      1,
 				"firstItems":  0,
 				"afterItems":  nil,
@@ -326,10 +326,10 @@ func TestRunArchive_Me(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -341,10 +341,10 @@ func TestRunArchive_Me(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation ArchiveProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"archiveProjectV2Item": map[string]interface{}{
-					"item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"archiveProjectV2Item": map[string]any{
+					"item": map[string]any{
 						"id": "item ID",
 					},
 				},
@@ -380,21 +380,21 @@ func TestRunArchive_User_Undo(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -405,9 +405,9 @@ func TestRunArchive_User_Undo(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -417,10 +417,10 @@ func TestRunArchive_User_Undo(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -432,10 +432,10 @@ func TestRunArchive_User_Undo(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UnarchiveProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"unarchiveProjectV2Item": map[string]interface{}{
-					"item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"unarchiveProjectV2Item": map[string]any{
+					"item": map[string]any{
 						"id": "item ID",
 					},
 				},
@@ -471,21 +471,21 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -496,9 +496,9 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query OrgProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "github",
 				"number":      1,
 				"firstItems":  0,
@@ -508,10 +508,10 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -523,10 +523,10 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UnarchiveProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"unarchiveProjectV2Item": map[string]interface{}{
-					"item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"unarchiveProjectV2Item": map[string]any{
+					"item": map[string]any{
 						"id": "item ID",
 					},
 				},
@@ -563,13 +563,13 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"id": "an ID",
 				},
 			},
@@ -579,9 +579,9 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"number":      1,
 				"firstItems":  0,
 				"afterItems":  nil,
@@ -590,10 +590,10 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -605,10 +605,10 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UnarchiveProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"unarchiveProjectV2Item": map[string]interface{}{
-					"item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"unarchiveProjectV2Item": map[string]any{
+					"item": map[string]any{
 						"id": "item ID",
 					},
 				},
@@ -645,21 +645,21 @@ func TestRunArchive_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -670,9 +670,9 @@ func TestRunArchive_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -682,10 +682,10 @@ func TestRunArchive_JSON(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -697,12 +697,12 @@ func TestRunArchive_JSON(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation ArchiveProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"archiveProjectV2Item": map[string]interface{}{
-					"item": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"archiveProjectV2Item": map[string]any{
+					"item": map[string]any{
 						"id": "item ID",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Issue",
 							"title":      "a title",
 						},

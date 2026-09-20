@@ -1,15 +1,10 @@
+# requires-user-capability: false
+
 # Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+fixture-repo shared REPO
 
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
-
-# Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
-cd $SCRIPT_NAME-$RANDOM_STRING
-
-# Enable discussions
-exec gh api repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING -X PATCH -F has_discussions=true
+# Target the fixture repository
+env GH_REPO=$ORG/$REPO
 
 # Create a discussion to comment on
 exec gh discussion create --title 'Comment Test' --body 'Discussion for comment tests' --category 'General'
@@ -24,7 +19,7 @@ exec gh discussion comment $DISCUSSION_URL --body-file $WORK/comment-body.txt
 stdout 'discussioncomment'
 
 # Verify comments appear in view
-exec gh discussion view $DISCUSSION_URL --comments --order oldest --json comments
+exec gh discussion view $DISCUSSION_URL --order oldest --json comments
 stdout2env COMMENTS_JSON
 jq-assert COMMENTS_JSON '.comments.nodes | length' '^2$'
 jq-assert COMMENTS_JSON '.comments.nodes[0].body' 'Comment from flag'
@@ -72,7 +67,7 @@ exec gh discussion comment $SECOND_REPLY_ID --edit --body-file $WORK/edit-reply-
 stdout 'discussioncomment'
 
 # Verify edits appear
-exec gh discussion view $DISCUSSION_URL --comments --order oldest --json comments
+exec gh discussion view $DISCUSSION_URL --order oldest --json comments
 stdout2env EDITED_COMMENTS_JSON
 jq-assert EDITED_COMMENTS_JSON '.comments.nodes[0].body' 'Edited first comment'
 jq-assert EDITED_COMMENTS_JSON '.comments.nodes[0].replies.nodes[0].body' 'Edited first reply'
@@ -91,7 +86,7 @@ exec gh discussion comment $SECOND_COMMENT_ID --delete --yes
 exec gh discussion comment $SECOND_REPLY_ID --delete --yes
 
 # Verify deletion
-exec gh discussion view $DISCUSSION_URL --comments --order oldest --json comments
+exec gh discussion view $DISCUSSION_URL --order oldest --json comments
 stdout2env DELETED_COMMENTS_JSON
 jq-assert DELETED_COMMENTS_JSON '.comments.nodes | length' '^1$'
 jq-assert DELETED_COMMENTS_JSON '.comments.nodes[0].body' 'Edited first comment'

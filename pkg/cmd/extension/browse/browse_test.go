@@ -76,7 +76,7 @@ func Test_getExtensionRepos(t *testing.T) {
 		"per_page": []string{"100"},
 		"q":        []string{"topic:gh-extension"},
 	}
-	cfg := config.NewBlankConfig()
+	cfg := config.NewMockConfig()
 
 	cfg.AuthenticationFunc = func() gh.AuthConfig {
 		authCfg := &config.AuthConfig{}
@@ -86,39 +86,39 @@ func Test_getExtensionRepos(t *testing.T) {
 
 	reg.Register(
 		httpmock.QueryMatcher("GET", "search/repositories", values),
-		httpmock.JSONResponse(map[string]interface{}{
+		httpmock.JSONResponse(map[string]any{
 			"incomplete_results": false,
 			"total_count":        4,
-			"items": []interface{}{
-				map[string]interface{}{
+			"items": []any{
+				map[string]any{
 					"name":        "gh-screensaver",
 					"full_name":   "vilmibm/gh-screensaver",
 					"description": "terminal animations",
-					"owner": map[string]interface{}{
+					"owner": map[string]any{
 						"login": "vilmibm",
 					},
 				},
-				map[string]interface{}{
+				map[string]any{
 					"name":        "gh-cool",
 					"full_name":   "cli/gh-cool",
 					"description": "it's just cool ok",
-					"owner": map[string]interface{}{
+					"owner": map[string]any{
 						"login": "cli",
 					},
 				},
-				map[string]interface{}{
+				map[string]any{
 					"name":        "gh-triage",
 					"full_name":   "samcoe/gh-triage",
 					"description": "helps with triage",
-					"owner": map[string]interface{}{
+					"owner": map[string]any{
 						"login": "samcoe",
 					},
 				},
-				map[string]interface{}{
+				map[string]any{
 					"name":        "gh-gei",
 					"full_name":   "github/gh-gei",
 					"description": "something something enterprise",
-					"owner": map[string]interface{}{
+					"owner": map[string]any{
 						"login": "github",
 					},
 				},

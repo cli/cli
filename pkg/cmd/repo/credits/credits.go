@@ -250,26 +250,26 @@ func creditsRun(opts *CreditsOptions) error {
 }
 
 func starLine(r *rand.Rand, width int) string {
-	line := ""
+	var line strings.Builder
 	starChance := 0.1
-	for y := 0; y < width; y++ {
+	for range width {
 		chance := r.Float64()
 		if chance <= starChance {
 			charRoll := r.Float64()
 			switch {
 			case charRoll < 0.3:
-				line += "."
+				line.WriteString(".")
 			case charRoll > 0.3 && charRoll < 0.6:
-				line += "+"
+				line.WriteString("+")
 			default:
-				line += "*"
+				line.WriteString("*")
 			}
 		} else {
-			line += " "
+			line.WriteString(" ")
 		}
 	}
 
-	return line
+	return line.String()
 }
 
 func twinkle(starLine string) string {

@@ -276,10 +276,10 @@ var TestWorkflow workflowShared.Workflow = workflowShared.Workflow{
 
 type TestExporter struct {
 	fields       []string
-	writeHandler func(io *iostreams.IOStreams, data interface{}) error
+	writeHandler func(io *iostreams.IOStreams, data any) error
 }
 
-func MakeTestExporter(fields []string, wh func(io *iostreams.IOStreams, data interface{}) error) *TestExporter {
+func MakeTestExporter(fields []string, wh func(io *iostreams.IOStreams, data any) error) *TestExporter {
 	return &TestExporter{fields: fields, writeHandler: wh}
 }
 
@@ -287,6 +287,6 @@ func (t *TestExporter) Fields() []string {
 	return t.fields
 }
 
-func (t *TestExporter) Write(io *iostreams.IOStreams, data interface{}) error {
+func (t *TestExporter) Write(io *iostreams.IOStreams, data any) error {
 	return t.writeHandler(io, data)
 }

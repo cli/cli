@@ -138,21 +138,21 @@ func TestRunUpdate_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -163,9 +163,9 @@ func TestRunUpdate_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -175,9 +175,9 @@ func TestRunUpdate_User(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"projectV2": map[string]string{
 						"id": "an ID",
 					},
@@ -190,10 +190,10 @@ func TestRunUpdate_User(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID","title":"a new title","shortDescription":"a new description","readme":"a new readme","public":true}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2": map[string]any{
+					"projectV2": map[string]any{
 						"title": "a title",
 						"url":   "http://a-url.com",
 						"owner": map[string]string{
@@ -236,21 +236,21 @@ func TestRunUpdate_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -261,9 +261,9 @@ func TestRunUpdate_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query OrgProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "github",
 				"number":      1,
 				"firstItems":  0,
@@ -273,9 +273,9 @@ func TestRunUpdate_Org(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"projectV2": map[string]string{
 						"id": "an ID",
 					},
@@ -288,10 +288,10 @@ func TestRunUpdate_Org(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID","title":"a new title","shortDescription":"a new description","readme":"a new readme","public":true}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2": map[string]any{
+					"projectV2": map[string]any{
 						"title": "a title",
 						"url":   "http://a-url.com",
 						"owner": map[string]string{
@@ -333,13 +333,13 @@ func TestRunUpdate_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"id": "an ID",
 				},
 			},
@@ -350,9 +350,9 @@ func TestRunUpdate_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"number":      1,
 				"firstItems":  0,
 				"afterItems":  nil,
@@ -361,9 +361,9 @@ func TestRunUpdate_Me(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"projectV2": map[string]string{
 						"id": "an ID",
 					},
@@ -376,10 +376,10 @@ func TestRunUpdate_Me(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID","title":"a new title","shortDescription":"a new description","readme":"a new readme","public":false}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2": map[string]any{
+					"projectV2": map[string]any{
 						"title": "a title",
 						"url":   "http://a-url.com",
 						"owner": map[string]string{
@@ -422,21 +422,21 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -447,9 +447,9 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -459,9 +459,9 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"projectV2": map[string]string{
 						"id": "an ID",
 					},
@@ -474,10 +474,10 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID","title":"another title"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2": map[string]any{
+					"projectV2": map[string]any{
 						"title": "a title",
 						"url":   "http://a-url.com",
 						"owner": map[string]string{
@@ -518,21 +518,21 @@ func TestRunUpdate_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -543,9 +543,9 @@ func TestRunUpdate_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -555,9 +555,9 @@ func TestRunUpdate_JSON(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"projectV2": map[string]string{
 						"id": "an ID",
 					},
@@ -570,10 +570,10 @@ func TestRunUpdate_JSON(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation UpdateProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID","title":"a new title","shortDescription":"a new description","readme":"a new readme","public":true}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"updateProjectV2": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2": map[string]any{
+					"projectV2": map[string]any{
 						"number": 1,
 						"title":  "a title",
 						"url":    "http://a-url.com",

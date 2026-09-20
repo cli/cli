@@ -38,7 +38,7 @@ func Test_parseFields(t *testing.T) {
 		t.Fatalf("parseFields error: %v", err)
 	}
 
-	expect := map[string]interface{}{
+	expect := map[string]any{
 		"robot":     "Hubot",
 		"destroyer": "false",
 		"helper":    "true",
@@ -239,7 +239,7 @@ func Test_magicFieldValue(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    interface{}
+		want    any
 		wantErr bool
 	}{
 		{

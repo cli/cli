@@ -61,7 +61,7 @@ func (ae *AuthError) Error() string {
 	return ae.err.Error()
 }
 
-func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, version, buildDate string) (*cobra.Command, error) {
+func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, version, buildDate string) (*cobra.Command, error) {
 	io := f.IOStreams
 	cfg, err := f.Config()
 	if err != nil {
@@ -166,9 +166,9 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, versi
 	cmd.AddCommand(agentTaskCmd.NewCmdAgentTask(&repoResolvingCmdFactory))
 	cmd.AddCommand(browseCmd.NewCmdBrowse(&repoResolvingCmdFactory, nil))
 	cmd.AddCommand(discussionCmd.NewCmdDiscussion(&repoResolvingCmdFactory))
-	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
+	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory, telemetry))
 	cmd.AddCommand(orgCmd.NewCmdOrg(&repoResolvingCmdFactory))
-	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
+	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory, telemetry))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 	cmd.AddCommand(rulesetCmd.NewCmdRuleset(&repoResolvingCmdFactory))

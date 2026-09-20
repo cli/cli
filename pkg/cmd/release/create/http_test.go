@@ -60,7 +60,7 @@ func TestCreateReleaseMissingWorkflowScope(t *testing.T) {
 		httpmock.StatusScopesResponder(http.StatusNotFound, "repo,read:org"),
 	)
 
-	_, err := createRelease(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), map[string]interface{}{"tag_name": "v1.2.3"})
+	_, err := createRelease(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), map[string]any{"tag_name": "v1.2.3"})
 
 	var scopeErr *errMissingRequiredWorkflowScope
 	require.ErrorAs(t, err, &scopeErr)
@@ -76,7 +76,7 @@ func TestCreateReleaseHTTPErrorWithoutScopesHeader(t *testing.T) {
 		httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
 	)
 
-	_, err := createRelease(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), map[string]interface{}{"tag_name": "v1.2.3"})
+	_, err := createRelease(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), map[string]any{"tag_name": "v1.2.3"})
 
 	requireAPIHTTPError(t, err, http.StatusNotFound)
 }

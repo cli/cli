@@ -82,7 +82,7 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 	ctx := context.Background()
 
 	tries := 0
-	client := funcClient(func(req *http.Request) (*http.Response, error) {
+	client := &http.Client{Transport: funcTripper(func(req *http.Request) (*http.Response, error) {
 		tries++
 		if tries == 1 {
 			return nil, errors.New("made up exception")
@@ -98,8 +98,8 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
 		}, nil
-	})
-	err := uploadWithDelete(ctx, client, safeurl.NewImmutableSafeURL("http://example.com/upload"), AssetForUpload{
+	})}
+	err := uploadWithDelete(ctx, client, "github.com", safeurl.NewImmutableSafeURL("http://example.com/upload"), AssetForUpload{
 		Name:  "asset",
 		Label: "",
 		Size:  8,
@@ -116,8 +116,10 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 	}
 }
 
-type funcClient func(*http.Request) (*http.Response, error)
+// funcTripper drives uploadWithDelete from a plain function. It is a RoundTripper rather than
+// a Do-er because the upload path takes a concrete *http.Client, which is what api.Client needs.
+type funcTripper func(*http.Request) (*http.Response, error)
 
-func (f funcClient) Do(req *http.Request) (*http.Response, error) {
+func (f funcTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }

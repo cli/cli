@@ -70,7 +70,7 @@ func searchPullRequests(httpClient *http.Client, detector fd.Detector, repo ghre
 			}
 		}`
 
-	variables := map[string]interface{}{}
+	variables := map[string]any{}
 
 	filters.Repo = ghrepo.FullName(repo)
 	filters.Entity = "pr"
@@ -127,11 +127,4 @@ loop:
 	}
 
 	return &res, nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

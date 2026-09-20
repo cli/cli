@@ -14,7 +14,7 @@ import (
 // setupMockOAuthConfig configures a blank config with a default host and optional token behavior.
 func setupMockOAuthConfig(t *testing.T, tokenSource string) gh.Config {
 	t.Helper()
-	c := config.NewBlankConfig()
+	c := config.NewMockConfig()
 	switch tokenSource {
 	case "oauth_token":
 		// valid OAuth device flow token stored in config
@@ -67,7 +67,7 @@ func TestNewCmdAgentTask(t *testing.T) {
 		{
 			name: "github.com oauth is accepted and enterprise token ignored",
 			customConfig: func() (gh.Config, error) {
-				c := config.NewBlankConfig()
+				c := config.NewMockConfig()
 				c.Set("something.ghes.com", "oauth_token", "ghe_ENTERPRISE123")
 				c.Set("github.com", "oauth_token", "gho_OAUTH123")
 				return c, nil

@@ -2,10 +2,13 @@ package create
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,13 +16,16 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -35,14 +41,32 @@ func TestNewCmdCreate(t *testing.T) {
 	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
+	tmpImage := filepath.Join(t.TempDir(), "shot.png")
+	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
+
+	attachmentEvent := []ghtelemetry.Event{{
+		Type:       "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "create"},
+		Measures: ghtelemetry.Measures{
+			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
+		},
+	}}
+
 	tests := []struct {
-		name      string
-		tty       bool
-		stdin     string
-		cli       string
-		config    string
-		wantsErr  bool
-		wantsOpts CreateOptions
+		name        string
+		tty         bool
+		stdin       string
+		cli         string
+		config      string
+		wantsErr    bool
+		wantsErrMsg string
+		// wantErrIsNotExist covers an error whose text the operating system
+		// words differently, so the assertion cannot be on the message.
+		wantErrIsNotExist bool
+		wantAssetPaths    []string
+		wantsOpts         CreateOptions
+		wantEvents        []ghtelemetry.Event
+		wantSampleRate    int
 	}{
 		{
 			name:     "empty non-tty",
@@ -270,9 +294,50 @@ func TestNewCmdCreate(t *testing.T) {
 				MaintainerCanModify: true,
 			},
 		},
+		{
+			name: "attach resolves the file it names",
+			cli:  fmt.Sprintf("--title mytitle --body mybody --attach '%s'", tmpImage),
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "mybody",
+				BodyProvided:        true,
+				MaintainerCanModify: true,
+			},
+			wantAssetPaths: []string{tmpImage},
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+		},
+		{
+			name:     "argument validation skips attachment telemetry",
+			cli:      fmt.Sprintf("unexpected --attach '%s'", tmpImage),
+			wantsErr: true,
+		},
+		{
+			name:              "attach rejects a missing file",
+			cli:               "--title mytitle --body mybody --attach ./nope.png",
+			wantsErr:          true,
+			wantsErrMsg:       "./nope.png: ",
+			wantErrIsNotExist: true,
+			wantEvents:        attachmentEvent,
+			wantSampleRate:    ghtelemetry.SAMPLE_ALL,
+		},
+		{
+			name:        "attach conflict is reported before a missing file",
+			cli:         "--web --attach ./nope.png",
+			wantsErr:    true,
+			wantsErrMsg: "`--attach` is not supported when using `--web`",
+		},
+		{
+			name:        "attach is not supported with dry-run",
+			cli:         fmt.Sprintf("--title mytitle --body mybody --dry-run --attach '%s'", tmpImage),
+			wantsErr:    true,
+			wantsErrMsg: "`--attach` is not supported when using `--dry-run`",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given command inputs and an invocation recorder
 			ios, stdin, stdout, stderr := iostreams.Test()
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
@@ -285,14 +350,15 @@ func TestNewCmdCreate(t *testing.T) {
 				IOStreams: ios,
 				Config: func() (gh.Config, error) {
 					if tt.config != "" {
-						return config.NewFromString(tt.config), nil
+						return config.NewMockConfigFromString(tt.config), nil
 					}
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 			}
 
 			var opts *CreateOptions
-			cmd := NewCmdCreate(f, func(o *CreateOptions) error {
+			recorder := &telemetry.InvocationRecorderSpy{}
+			cmd := NewCmdCreate(f, recorder, func(o *CreateOptions) error {
 				opts = o
 				return nil
 			})
@@ -302,9 +368,22 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetArgs(args)
 			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
+			// When the command executes
 			_, err = cmd.ExecuteC()
+			// Then telemetry starts only if execution reaches attachment validation
+			assert.Equal(t, tt.wantEvents, recorder.Events())
+			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
-				assert.Error(t, err)
+				if tt.wantsErrMsg != "" {
+					if tt.wantErrIsNotExist {
+						require.ErrorIs(t, err, fs.ErrNotExist)
+						require.ErrorContains(t, err, tt.wantsErrMsg)
+					} else {
+						require.EqualError(t, err, tt.wantsErrMsg)
+					}
+				} else {
+					require.Error(t, err)
+				}
 				return
 			} else {
 				require.NoError(t, err)
@@ -326,6 +405,12 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.BaseBranch, opts.BaseBranch)
 			assert.Equal(t, tt.wantsOpts.HeadBranch, opts.HeadBranch)
 			assert.Equal(t, tt.wantsOpts.Template, opts.Template)
+
+			var assetPaths []string
+			for _, a := range opts.Assets {
+				assetPaths = append(assetPaths, a.Path())
+			}
+			assert.Equal(t, tt.wantAssetPaths, assetPaths)
 		})
 	}
 }
@@ -344,6 +429,9 @@ func Test_createRun(t *testing.T) {
 		wantErr            string
 		tty                bool
 		customBranchConfig bool
+		// Defaults to WRITE, which can upload.
+		repoPermission string
+		wantOperations *attachments.UploadResult
 	}{
 		{
 			name: "nontty web",
@@ -366,7 +454,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "REPOID", input["repositoryId"])
 							assert.Equal(t, "my title", input["title"])
 							assert.Equal(t, "my body", input["body"])
@@ -513,7 +601,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
-							} } } }`, func(input map[string]interface{}) {
+							} } } }`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "my body", input["body"].(string))
@@ -560,7 +648,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
-							} } } }`, func(input map[string]interface{}) {
+							} } } }`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "my body", input["body"].(string))
@@ -610,7 +698,7 @@ func Test_createRun(t *testing.T) {
 								"id": "PullRequest#1",
 								"URL": "https://github.com/OWNER/REPO/pull/12"
 							} } } }
-							`, func(input map[string]interface{}) {
+							`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "my body", input["body"].(string))
@@ -624,7 +712,7 @@ func Test_createRun(t *testing.T) {
 							{ "data": { "add_000": { "item": {
 								"id": "1"
 							} } } }
-							`, func(mutations string, inputs map[string]interface{}) {
+							`, func(mutations string, inputs map[string]any) {
 						variables, err := json.Marshal(inputs)
 						assert.NoError(t, err)
 						expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"
@@ -672,7 +760,7 @@ func Test_createRun(t *testing.T) {
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
 							} } } }
-							`, func(input map[string]interface{}) {
+							`, func(input map[string]any) {
 						assert.Equal(t, false, input["maintainerCanModify"].(bool))
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
@@ -720,7 +808,7 @@ func Test_createRun(t *testing.T) {
 							{ "node_id": "NODEID",
 							  "name": "REPO",
 							  "owner": {"login": "monalisa"}
-							}`, func(payload map[string]interface{}) {
+							}`, func(payload map[string]any) {
 						assert.Equal(t, true, payload["default_branch_only"])
 					}))
 				reg.Register(
@@ -728,7 +816,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
-							}}}}`, func(input map[string]interface{}) {
+							}}}}`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "master", input["baseRefName"].(string))
 						assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
@@ -790,7 +878,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
-							} } } }`, func(input map[string]interface{}) {
+							} } } }`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "master", input["baseRefName"].(string))
 						assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
@@ -822,7 +910,7 @@ func Test_createRun(t *testing.T) {
 			{ "data": { "createPullRequest": { "pullRequest": {
 				"URL": "https://github.com/OWNER/REPO/pull/12"
 			} } } }
-			`, func(input map[string]interface{}) {
+			`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "master", input["baseRefName"].(string))
 						assert.Equal(t, "my-feat2", input["headRefName"].(string))
@@ -869,7 +957,7 @@ func Test_createRun(t *testing.T) {
 				{ "data": { "createPullRequest": { "pullRequest": {
 					"URL": "https://github.com/OWNER/REPO/pull/12"
 				} } } }
-				`, func(input map[string]interface{}) {
+				`, func(input map[string]any) {
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "- **commit 1**\n- **commit 0**\n\nthis is a bug", input["body"].(string))
 					}))
@@ -946,7 +1034,7 @@ func Test_createRun(t *testing.T) {
 						"id": "NEWPULLID",
 						"URL": "https://github.com/OWNER/REPO/pull/12"
 					} } } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "TITLE", inputs["title"])
 						assert.Equal(t, "BODY", inputs["body"])
 						if v, ok := inputs["assigneeIds"]; ok {
@@ -962,22 +1050,22 @@ func Test_createRun(t *testing.T) {
 					{ "data": { "updatePullRequest": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
 						if _, ok := inputs["assigneeIds"]; ok {
 							t.Error("did not expect assigneeIds in updatePullRequest when ApiActorsSupported is true")
 						}
-						assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
-						assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
+						assert.Equal(t, []any{"BUGID", "TODOID"}, inputs["labelIds"])
+						assert.Equal(t, []any{"ROADMAPID"}, inputs["projectIds"])
 						assert.Equal(t, "BIGONEID", inputs["milestoneId"])
 					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["assignableId"])
-						assert.Equal(t, []interface{}{"monalisa"}, inputs["actorLogins"])
+						assert.Equal(t, []any{"monalisa"}, inputs["actorLogins"])
 					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
@@ -985,10 +1073,10 @@ func Test_createRun(t *testing.T) {
 					{ "data": { "requestReviewsByLogin": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"hubot", "monalisa"}, inputs["userLogins"])
-						assert.Equal(t, []interface{}{"OWNER/core", "OWNER/robots"}, inputs["teamSlugs"])
+						assert.Equal(t, []any{"hubot", "monalisa"}, inputs["userLogins"])
+						assert.Equal(t, []any{"OWNER/core", "OWNER/robots"}, inputs["teamSlugs"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -1101,7 +1189,7 @@ func Test_createRun(t *testing.T) {
 			{ "data": { "createPullRequest": { "pullRequest": {
 				"URL": "https://github.com/OWNER/REPO/pull/12"
 			} } } }
-			`, func(input map[string]interface{}) {
+			`, func(input map[string]any) {
 						assert.Equal(t, true, input["draft"].(bool))
 					}))
 			},
@@ -1154,8 +1242,8 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "requestReviews": {
 							"clientMutationId": ""
 						} } }
-					`, func(inputs map[string]interface{}) {
-						assert.Equal(t, []interface{}{"JILLID"}, inputs["userIds"])
+					`, func(inputs map[string]any) {
+						assert.Equal(t, []any{"JILLID"}, inputs["userIds"])
 					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
@@ -1163,7 +1251,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }
-					`, func(input map[string]interface{}) {
+					`, func(input map[string]any) {
 						assert.Equal(t, "recovered title", input["title"].(string))
 						assert.Equal(t, "recovered body", input["body"].(string))
 					}))
@@ -1293,7 +1381,7 @@ func Test_createRun(t *testing.T) {
 							} } }
 						}
 						`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "first commit of pr", input["title"], "pr title should be first commit message")
 							assert.Equal(t, "first commit description", input["body"], "pr body should be first commit description")
 						},
@@ -1329,7 +1417,7 @@ func Test_createRun(t *testing.T) {
 							} } }
 						}
 						`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "first commit of pr", input["title"], "pr title should be first commit message")
 							assert.Equal(t, "first commit description", input["body"], "pr body should be first commit description")
 						},
@@ -1365,7 +1453,7 @@ func Test_createRun(t *testing.T) {
 							} } }
 						}
 						`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "feature", input["title"], "pr title should be branch name")
 							assert.Equal(t, "- **first commit of pr**\n  first commit with super long description, with super long description, with super long description, with super long description.\n\n- **second commit of pr**\n  second commit description", input["body"], "pr body should be commits msg+body")
 						},
@@ -1386,7 +1474,7 @@ func Test_createRun(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 							} } }
 						}
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "title", inputs["title"])
 						assert.Equal(t, "body", inputs["body"])
 					}))
@@ -1439,7 +1527,7 @@ func Test_createRun(t *testing.T) {
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"URL": "https://github.com/OWNER/REPO/pull/12"
 							} } } }
-							`, func(input map[string]interface{}) {
+							`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
 						assert.Equal(t, "my body", input["body"].(string))
@@ -1470,7 +1558,7 @@ func Test_createRun(t *testing.T) {
 						{ "data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
-						func(input map[string]interface{}) {
+						func(input map[string]any) {
 							assert.Equal(t, "REPOID", input["repositoryId"])
 							assert.Equal(t, "my title", input["title"])
 							assert.Equal(t, "my body", input["body"])
@@ -1507,17 +1595,17 @@ func Test_createRun(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12",
 							"id": "NEWPULLID"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 				reg.Register(
 					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "requestReviewsByLogin": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"hubot", "monalisa"}, inputs["userLogins"])
-						assert.Equal(t, []interface{}{"org/core", "org/robots"}, inputs["teamSlugs"])
+						assert.Equal(t, []any{"hubot", "monalisa"}, inputs["userLogins"])
+						assert.Equal(t, []any{"org/core", "org/robots"}, inputs["teamSlugs"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -1543,29 +1631,369 @@ func Test_createRun(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12",
 							"id": "NEWPULLID"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 				reg.Register(
 					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
 					httpmock.GraphQLMutation(`
 					{ "data": { "requestReviewsByLogin": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"hubot"}, inputs["userLogins"])
-						assert.Equal(t, []interface{}{"copilot-pull-request-reviewer[bot]"}, inputs["botLogins"])
+						assert.Equal(t, []any{"hubot"}, inputs["userLogins"])
+						assert.Equal(t, []any{"copilot-pull-request-reviewer[bot]"}, inputs["botLogins"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
 			expectedErrOut: "",
 		},
+		{
+			name: "the preview action is not offered when a file is attached",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "shot.png")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+				cs.Register(`git rev-parse --show-toplevel`, 0, "")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.InputFunc = func(p, d string) (string, error) {
+					if p == "Title (required)" {
+						return "my title", nil
+					}
+					return "", prompter.NoSuchPromptErr(p)
+				}
+				pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
+					if p == "Body" {
+						return "my body", nil
+					}
+					return "", prompter.NoSuchPromptErr(p)
+				}
+				pm.SelectFunc = func(p, _ string, options []string) (int, error) {
+					if p != "What's next?" {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+					if slices.Contains(options, "Continue in browser") {
+						return -1, errors.New("the menu offered the browser")
+					}
+					return prompter.IndexFor(options, "Submit")
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestTemplates\b`),
+					httpmock.StringResponse(`{ "data": { "repository": { "pullRequestTemplates": [] } } }`))
+				attachments.StubUpload(reg, 1234, "shot.png", 201, `{"url": "https://github.com/user-attachments/assets/ASSET"}`)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]any) {}))
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
+			// The second confirmation builds its own preview condition.
+			name: "the preview action is not offered after the metadata survey when a file is attached",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "shot.png")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+				cs.Register(`git rev-parse --show-toplevel`, 0, "")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				askedForMetadata := false
+				pm.InputFunc = func(p, d string) (string, error) {
+					if p == "Title (required)" {
+						return "my title", nil
+					}
+					return "", prompter.NoSuchPromptErr(p)
+				}
+				pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
+					if p == "Body" {
+						return "my body", nil
+					}
+					return "", prompter.NoSuchPromptErr(p)
+				}
+				pm.MultiSelectFunc = func(p string, _, _ []string) ([]int, error) {
+					if p == "What would you like to add?" {
+						return []int{}, nil
+					}
+					return nil, prompter.NoSuchPromptErr(p)
+				}
+				pm.SelectFunc = func(p, _ string, options []string) (int, error) {
+					if p != "What's next?" {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+					if !askedForMetadata {
+						askedForMetadata = true
+						return prompter.IndexFor(options, "Add metadata")
+					}
+					if slices.Contains(options, "Continue in browser") {
+						return -1, errors.New("the menu offered the browser")
+					}
+					return prompter.IndexFor(options, "Submit")
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestTemplates\b`),
+					httpmock.StringResponse(`{ "data": { "repository": { "pullRequestTemplates": [] } } }`))
+				attachments.StubUpload(reg, 1234, "shot.png", 201, `{"url": "https://github.com/user-attachments/assets/ASSET"}`)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]any) {}))
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "attaching uploads the file and creates the pull request with the rewritten body",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "before ![the shot](./shot.png) after"
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "shot.png")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				attachments.StubUpload(reg, 1234, "shot.png", 201, `{"url": "https://github.com/user-attachments/assets/ASSET"}`)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]any) {
+							assert.Equal(t, "before ![the shot](https://github.com/user-attachments/assets/ASSET) after", input["body"])
+						}))
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
+		},
+		{
+
+			name: "the token comes from the host the base repository resolves to",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "shot.png")
+				// github.com must keep a token class that cannot upload: make
+				// both usable and this row passes against a command that reads
+				// the wrong host.
+				opts.Config = uploadTokenConfigForHosts(map[string]string{
+					"github.com":   "ghs_anactionstoken",
+					"acme.ghe.com": "gho_atenanttoken",
+				})
+				opts.Remotes = func() (context.Remotes, error) {
+					return context.Remotes{
+						{
+							Remote: &git.Remote{Name: "origin", Resolved: "base"},
+							Repo:   ghrepo.NewWithHost("OWNER", "REPO", "acme.ghe.com"),
+						},
+					}, nil
+				}
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				attachments.StubUploadToHost(t, reg, "uploads.acme.ghe.com", 1234, "shot.png", 201, `{"url": "https://acme.ghe.com/user-attachments/assets/ASSET"}`)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://acme.ghe.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]any) {
+							assert.Equal(t, "my body\n\n![shot](https://acme.ghe.com/user-attachments/assets/ASSET)", input["body"])
+						}))
+			},
+			expectedOut: "https://acme.ghe.com/OWNER/REPO/pull/12\n",
+		},
+		{
+			name: "a token that cannot upload stops the command before it prompts",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "shot.png")
+				opts.Config = uploadTokenConfig("not_a_token_that_can_upload")
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.InputFunc = func(p, d string) (string, error) {
+					return "", errors.New("the command prompted before it checked the token")
+				}
+				pm.SelectFunc = func(p, _ string, options []string) (int, error) {
+					return -1, errors.New("the command prompted before it checked the token")
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
+				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestCreate\b`))
+			},
+			wantErr: "unsupported authentication type",
+		},
+		{
+			name: "an upload that partly succeeded still creates the pull request and reports the failure",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "good.png", "bad.png")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				attachments.StubUpload(reg, 1234, "good.png", 201, `{"url": "https://github.com/user-attachments/assets/ASSET"}`)
+				attachments.StubUpload(reg, 1234, "bad.png", 404, `{}`)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]any) {
+							assert.Equal(t, "my body\n\n![good](https://github.com/user-attachments/assets/ASSET)", input["body"])
+						}))
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			wantErr:        "could not upload ./bad.png: attaching files requires write access to the repository",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
+		},
+		{
+			name: "the only upload failing creates no pull request",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "See the screenshot below"
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "shot.png")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				attachments.StubUpload(reg, 1234, "shot.png", 404, `{}`)
+				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestCreate\b`))
+			},
+			wantErr: "could not upload ./shot.png: attaching files requires write access to the repository\nno pull request was created",
+		},
+		{
+			name: "a body the attachment cannot be written into creates no pull request",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "![clip][ref]\n\n[ref]: ./clip.mp4"
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "clip.mp4")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
+				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestCreate\b`))
+			},
+			wantErr: "cannot embed a video as a reference-style image: ./clip.mp4\nno pull request was created",
+		},
+		{
+			name: "a create that fails after an upload failed reports both",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "good.png", "bad.png")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				attachments.StubUpload(reg, 1234, "good.png", 201, `{"url": "https://github.com/user-attachments/assets/ASSET"}`)
+				attachments.StubUpload(reg, 1234, "bad.png", 404, `{}`)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.StringResponse(`{"errors":[{"message":"the create failed"}]}`))
+			},
+			wantErr:        "could not upload ./bad.png: attaching files requires write access to the repository\npull request create failed: GraphQL: the create failed",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
+		},
+		{
+			name: "a permission that cannot upload stops the command before it prompts",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "shot.png")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			repoPermission: "READ",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
+				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestCreate\b`))
+			},
+			wantErr: "attaching files requires write access to the repository",
+		},
+		{
+			// Triage is the highest permission the endpoint still refuses.
+			name: "a triage permission cannot upload",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "shot.png")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			repoPermission: "TRIAGE",
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
+				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestCreate\b`))
+			},
+			wantErr: "attaching files requires write access to the repository",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			branch := "feature"
 			reg := &httpmock.Registry{}
-			reg.StubRepoInfoResponse("OWNER", "REPO", "master")
+			repoPermission := tt.repoPermission
+			if repoPermission == "" {
+				repoPermission = "WRITE"
+			}
+			reg.StubRepoInfoResponseWithPermission("OWNER", "REPO", "master", repoPermission)
 			defer reg.Verify(t)
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg, t)
@@ -1603,7 +2031,7 @@ func Test_createRun(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			opts.Remotes = func() (context.Remotes, error) {
 				return context.Remotes{
@@ -1629,6 +2057,11 @@ func Test_createRun(t *testing.T) {
 				cleanSetup = tt.setup(&opts, t)
 			}
 			defer cleanSetup()
+			// Given a pending event when operation counts are under test
+			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
+			if tt.wantOperations != nil {
+				opts.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(opts.Assets))
+			}
 
 			// All tests in this function use github.com behavior
 			opts.Detector = &fd.EnabledDetectorMock{}
@@ -1637,7 +2070,12 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git status --porcelain`, 0, "")
 			}
 
+			// When pull request creation runs
 			err := createRun(&opts)
+			if tt.wantOperations != nil {
+				// Then telemetry retains completed operations, including partial results
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(opts.Assets), *tt.wantOperations)
+			}
 			output := &test.CmdOut{
 				OutBuf:     stdout,
 				ErrBuf:     stderr,
@@ -1645,6 +2083,9 @@ func Test_createRun(t *testing.T) {
 			}
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
+				if tt.expectedOut != "" {
+					assert.Equal(t, tt.expectedOut, output.String())
+				}
 			} else {
 				assert.NoError(t, err)
 				if tt.expectedOut != "" {
@@ -1657,6 +2098,26 @@ func Test_createRun(t *testing.T) {
 				assert.Equal(t, tt.expectedBrowse, output.BrowsedURL)
 			}
 		})
+	}
+}
+
+// The token's prefix decides whether the uploader accepts it, so a row varies
+// the prefix.
+func uploadTokenConfig(token string) func() (gh.Config, error) {
+	return uploadTokenConfigForHosts(map[string]string{"github.com": token})
+}
+
+// A row can give the default host a different token from the host its base
+// repository resolves to.
+func uploadTokenConfigForHosts(tokens map[string]string) func() (gh.Config, error) {
+	var b strings.Builder
+	b.WriteString("hosts:\n")
+	for host, token := range tokens {
+		fmt.Fprintf(&b, "  %s:\n    user: monalisa\n    oauth_token: %s\n", host, token)
+	}
+
+	return func() (gh.Config, error) {
+		return config.NewMockConfigFromString(b.String()), nil
 	}
 }
 
@@ -1864,7 +2325,7 @@ func Test_createRun_GHES(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12",
 							"id": "NEWPULLID"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 					httpmock.StringResponse(`
@@ -1898,10 +2359,10 @@ func Test_createRun_GHES(t *testing.T) {
 					{ "data": { "requestReviews": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["userIds"])
-						assert.Equal(t, []interface{}{"COREID", "ROBOTID"}, inputs["teamIds"])
+						assert.Equal(t, []any{"HUBOTID", "MONAID"}, inputs["userIds"])
+						assert.Equal(t, []any{"COREID", "ROBOTID"}, inputs["teamIds"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -1927,7 +2388,7 @@ func Test_createRun_GHES(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12",
 							"id": "NEWPULLID"
 						} } } }`,
-						func(input map[string]interface{}) {}))
+						func(input map[string]any) {}))
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 					httpmock.StringResponse(`
@@ -1954,10 +2415,10 @@ func Test_createRun_GHES(t *testing.T) {
 					{ "data": { "requestReviews": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["userIds"])
-						assert.NotEqual(t, []interface{}{"COREID", "ROBOTID"}, inputs["teamIds"])
+						assert.Equal(t, []any{"HUBOTID", "MONAID"}, inputs["userIds"])
+						assert.NotEqual(t, []any{"COREID", "ROBOTID"}, inputs["teamIds"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -2062,7 +2523,7 @@ func Test_createRun_GHES(t *testing.T) {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }
 						`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "TITLE", inputs["title"])
 							assert.Equal(t, "BODY", inputs["body"])
 							if v, ok := inputs["assigneeIds"]; ok {
@@ -2078,10 +2539,10 @@ func Test_createRun_GHES(t *testing.T) {
 					{ "data": { "requestReviews": {
 						"clientMutationId": ""
 					} } }
-				`, func(inputs map[string]interface{}) {
+				`, func(inputs map[string]any) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"COREID"}, inputs["teamIds"])
-						assert.Equal(t, []interface{}{"MONAID"}, inputs["userIds"])
+						assert.Equal(t, []any{"COREID"}, inputs["teamIds"])
+						assert.Equal(t, []any{"MONAID"}, inputs["userIds"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
@@ -2131,7 +2592,7 @@ func Test_createRun_GHES(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 			opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+				return config.NewMockConfig(), nil
 			}
 			opts.Remotes = func() (context.Remotes, error) {
 				return context.Remotes{
@@ -2206,7 +2667,7 @@ func TestRemoteGuessing(t *testing.T) {
 		httpmock.GraphQLMutation(`
 				{ "data": { "createPullRequest": { "pullRequest": {
 					"URL": "https://github.com/OWNER/REPO/pull/12"
-				} } } }`, func(input map[string]interface{}) {
+				} } } }`, func(input map[string]any) {
 			assert.Equal(t, "REPOID", input["repositoryId"].(string))
 			assert.Equal(t, "master", input["baseRefName"].(string))
 			assert.Equal(t, "OTHEROWNER:feature", input["headRefName"].(string))
@@ -2219,7 +2680,7 @@ func TestRemoteGuessing(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Browser:  &browser.Stub{},
 		IO:       ios,
@@ -2294,7 +2755,7 @@ func TestNoRepoCanBeDetermined(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Browser:  &browser.Stub{},
 		IO:       ios,
@@ -2356,10 +2817,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "main",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "main",
 				},
 			},
 			want:    "https://github.com/OWNER/REPO/compare/main...feature?body=&expand=1",
@@ -2370,10 +2829,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("b"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "a",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "a",
 				},
 			},
 			state: shared.IssueMetadataState{
@@ -2387,10 +2844,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: mustParseQualifiedHeadRef("ORIGINOWNER:feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "UPSTREAMOWNER"}}, "github.com"),
-						baseBranchName: "main/trunk",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "UPSTREAMOWNER"}}, "github.com"),
+					baseBranchName:   "main/trunk",
 				},
 			},
 			want:    "https://github.com/UPSTREAMOWNER/REPO/compare/main%2Ftrunk...ORIGINOWNER:feature?body=&expand=1",
@@ -2407,10 +2862,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: mustParseQualifiedHeadRef("ORIGINOWNER:!$&'()+,;=@"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "UPSTREAMOWNER"}}, "github.com"),
-						baseBranchName: "main/trunk",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "UPSTREAMOWNER"}}, "github.com"),
+					baseBranchName:   "main/trunk",
 				},
 			},
 			want:    "https://github.com/UPSTREAMOWNER/REPO/compare/main%2Ftrunk...ORIGINOWNER:%21$&%27%28%29+%2C%3B=@?body=&expand=1",
@@ -2421,10 +2874,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "main",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "main",
 				},
 			},
 			state: shared.IssueMetadataState{
@@ -2440,10 +2891,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "main",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "main",
 				},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -2489,10 +2938,8 @@ func Test_generateCompareURL(t *testing.T) {
 			ctx: CreateContext{
 				PRRefs: &skipPushRefs{
 					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
-					baseRefs: baseRefs{
-						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
-						baseBranchName: "main",
-					},
+					baseRepo:         api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName:   "main",
 				},
 			},
 			state: shared.IssueMetadataState{
@@ -2816,7 +3263,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Browser:  &browser.Stub{},
 				IO:       ios,
@@ -2911,7 +3358,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Browser:  &browser.Stub{},
 				IO:       ios,

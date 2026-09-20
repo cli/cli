@@ -31,7 +31,8 @@ const (
 
 	DefaultAgentID = "github-copilot"
 
-	claudeConfigDirEnv = "CLAUDE_CONFIG_DIR"
+	claudeConfigDirEnv  = "CLAUDE_CONFIG_DIR"
+	piCodingAgentDirEnv = "PI_CODING_AGENT_DIR"
 
 	sharedProjectSkillsDir = ".agents/skills"
 )
@@ -69,7 +70,7 @@ var Agents = []AgentHost{
 		ID:         "codex",
 		Name:       "Codex",
 		ProjectDir: sharedProjectSkillsDir,
-		UserDir:    ".codex/skills",
+		UserDir:    sharedProjectSkillsDir,
 	},
 	{
 		ID:         "gemini-cli",
@@ -415,8 +416,15 @@ func (h *AgentHost) InstallDir(scope Scope, gitRoot, homeDir string) (string, er
 		}
 		return filepath.Join(gitRoot, h.ProjectDir), nil
 	case ScopeUser:
-		if h.ID == "claude-code" {
-			if configDir := os.Getenv(claudeConfigDirEnv); configDir != "" {
+		var configDirEnv string
+		switch h.ID {
+		case "claude-code":
+			configDirEnv = claudeConfigDirEnv
+		case "pi":
+			configDirEnv = piCodingAgentDirEnv
+		}
+		if configDirEnv != "" {
+			if configDir := os.Getenv(configDirEnv); configDir != "" {
 				return filepath.Join(configDir, "skills"), nil
 			}
 		}

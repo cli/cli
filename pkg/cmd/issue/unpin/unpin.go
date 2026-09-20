@@ -122,7 +122,7 @@ func unpinIssue(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue
 		} `graphql:"unpinIssue(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.UnpinIssueInput{
 			IssueID: issue.ID,
 		},

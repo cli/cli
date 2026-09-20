@@ -96,6 +96,6 @@ pagination:
 	return result, nil
 }
 
-func (c *Cache) ExportData(fields []string) map[string]interface{} {
+func (c *Cache) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(c, fields)
 }

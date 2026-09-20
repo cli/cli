@@ -100,3 +100,15 @@ func AdvancedIssueSearchSupportedAsOnlyBackend() *AdvancedIssueSearchDetectorMoc
 		searchFeatures: advancedIssueSearchSupportedAsOnlyBackend,
 	}
 }
+
+func SemanticSearchSupported() *AdvancedIssueSearchDetectorMock {
+	return &AdvancedIssueSearchDetectorMock{
+		searchFeatures: semanticSearchSupported,
+	}
+}
+
+func SemanticSearchUnsupported() *AdvancedIssueSearchDetectorMock {
+	return &AdvancedIssueSearchDetectorMock{
+		searchFeatures: semanticSearchUnsupported,
+	}
+}

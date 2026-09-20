@@ -64,7 +64,7 @@ func CommentCreate(client *Client, repoHost string, params CommentCreateInput) (
 		} `graphql:"addComment(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.AddCommentInput{
 			Body:      githubv4.String(params.Body),
 			SubjectID: githubv4.ID(params.SubjectId),
@@ -88,7 +88,7 @@ func CommentUpdate(client *Client, repoHost string, params CommentUpdateInput) (
 		} `graphql:"updateIssueComment(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.UpdateIssueCommentInput{
 			Body: githubv4.String(params.Body),
 			ID:   githubv4.ID(params.CommentId),
@@ -110,7 +110,7 @@ func CommentDelete(client *Client, repoHost string, params CommentDeleteInput) e
 		} `graphql:"deleteIssueComment(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.DeleteIssueCommentInput{
 			ID: githubv4.ID(params.CommentId),
 		},

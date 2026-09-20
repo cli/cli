@@ -65,7 +65,7 @@ func listIssueTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]Templ
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),
 	}
@@ -93,7 +93,7 @@ func listPullRequestTemplates(httpClient *http.Client, repo ghrepo.Interface) ([
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),
 	}

@@ -161,7 +161,7 @@ func addLabels(httpClient *http.Client, id string, repo ghrepo.Interface, labels
 		} `graphql:"addLabelsToLabelable(input: $input)"`
 	}
 
-	variables := map[string]interface{}{"input": params}
+	variables := map[string]any{"input": params}
 	gql := api.NewClientFromHTTP(httpClient)
 	return gql.Mutate(repo.RepoHost(), "LabelAdd", &mutation, variables)
 }
@@ -178,7 +178,7 @@ func removeLabels(httpClient *http.Client, id string, repo ghrepo.Interface, lab
 		} `graphql:"removeLabelsFromLabelable(input: $input)"`
 	}
 
-	variables := map[string]interface{}{"input": params}
+	variables := map[string]any{"input": params}
 	gql := api.NewClientFromHTTP(httpClient)
 	return gql.Mutate(repo.RepoHost(), "LabelRemove", &mutation, variables)
 }
@@ -189,7 +189,7 @@ func updateIssue(httpClient *http.Client, repo ghrepo.Interface, params githubv4
 			Typename string `graphql:"__typename"`
 		} `graphql:"updateIssue(input: $input)"`
 	}
-	variables := map[string]interface{}{"input": params}
+	variables := map[string]any{"input": params}
 	gql := api.NewClientFromHTTP(httpClient)
 	return gql.Mutate(repo.RepoHost(), "IssueUpdate", &mutation, variables)
 }
@@ -200,7 +200,7 @@ func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, params gi
 			Typename string `graphql:"__typename"`
 		} `graphql:"updatePullRequest(input: $input)"`
 	}
-	variables := map[string]interface{}{"input": params}
+	variables := map[string]any{"input": params}
 	gql := api.NewClientFromHTTP(httpClient)
 	err := gql.Mutate(repo.RepoHost(), "PullRequestUpdate", &mutation, variables)
 	return err

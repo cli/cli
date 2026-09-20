@@ -255,7 +255,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/meta.md"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":         "file",
 						"name":         "meta.md",
 						"path":         "meta.md",
@@ -305,7 +305,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/src"),
-					httpmock.JSONResponse(map[string]interface{}{"type": "dir", "path": "src"}),
+					httpmock.JSONResponse(map[string]any{"type": "dir", "path": "src"}),
 				)
 			},
 			opts:       ReadFileOptions{Path: "src"},
@@ -317,7 +317,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/link"),
-					httpmock.JSONResponse(map[string]interface{}{"type": "symlink", "path": "link", "target": "missing.txt"}),
+					httpmock.JSONResponse(map[string]any{"type": "symlink", "path": "link", "target": "missing.txt"}),
 				)
 			},
 			opts:       ReadFileOptions{Path: "link"},
@@ -329,7 +329,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/sub"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":              "submodule",
 						"path":              "sub",
 						"submodule_git_url": "https://github.com/OWNER/sub",
@@ -418,7 +418,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/big.txt"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":     "file",
 						"name":     "big.txt",
 						"path":     "big.txt",
@@ -444,7 +444,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/big.txt"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":     "file",
 						"name":     "big.txt",
 						"path":     "big.txt",
@@ -480,7 +480,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/big.txt"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":     "file",
 						"name":     "big.txt",
 						"path":     "big.txt",
@@ -500,7 +500,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/big.txt"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":     "file",
 						"name":     "big.txt",
 						"path":     "big.txt",
@@ -683,12 +683,12 @@ func Test_writeToOutput(t *testing.T) {
 
 // fileContentResponse builds a Contents API object response for a regular file
 // with base64-encoded inline content.
-func fileContentResponse(name, content string) map[string]interface{} {
+func fileContentResponse(name, content string) map[string]any {
 	return fileContentResponseBytes(name, []byte(content))
 }
 
-func fileContentResponseBytes(name string, content []byte) map[string]interface{} {
-	return map[string]interface{}{
+func fileContentResponseBytes(name string, content []byte) map[string]any {
+	return map[string]any{
 		"type":         "file",
 		"name":         name,
 		"path":         name,
@@ -700,7 +700,7 @@ func fileContentResponseBytes(name string, content []byte) map[string]interface{
 		"git_url":      "https://api.github.com/repos/OWNER/REPO/git/blobs/deadbeef",
 		"html_url":     "https://github.com/OWNER/REPO/blob/main/" + name,
 		"download_url": "https://raw.githubusercontent.com/OWNER/REPO/main/" + name,
-		"_links": map[string]interface{}{
+		"_links": map[string]any{
 			"self": "https://api.github.com/repos/OWNER/REPO/contents/" + name,
 			"git":  "https://api.github.com/repos/OWNER/REPO/git/blobs/deadbeef",
 			"html": "https://github.com/OWNER/REPO/blob/main/" + name,
@@ -724,28 +724,28 @@ func Test_contentsAPIPath(t *testing.T) {
 		{
 			name:     "simple path",
 			filePath: "README.md",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+			want:     "repos/OWNER/REPO/contents/README.md",
 		},
 		{
 			name:     "leading slash trimmed",
 			filePath: "/README.md",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+			want:     "repos/OWNER/REPO/contents/README.md",
 		},
 		{
 			name:     "nested path encodes separators",
 			filePath: "pkg/cmd/create.go",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/pkg%2Fcmd%2Fcreate.go",
+			want:     "repos/OWNER/REPO/contents/pkg%2Fcmd%2Fcreate.go",
 		},
 		{
 			name:     "spaces are encoded",
 			filePath: "dir with spaces/file.txt",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/dir%20with%20spaces%2Ffile.txt",
+			want:     "repos/OWNER/REPO/contents/dir%20with%20spaces%2Ffile.txt",
 		},
 		{
 			name:     "ref is appended",
 			filePath: "README.md",
 			ref:      "feature/branch",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md?ref=feature%2Fbranch",
+			want:     "repos/OWNER/REPO/contents/README.md?ref=feature%2Fbranch",
 		},
 	}
 

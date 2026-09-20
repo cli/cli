@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Use gh as a credential helper
 exec gh auth setup-git
 

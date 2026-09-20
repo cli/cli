@@ -29,7 +29,7 @@ type checkCounts struct {
 	Canceled int
 }
 
-func (ch *check) ExportData(fields []string) map[string]interface{} {
+func (ch *check) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(ch, fields)
 }
 

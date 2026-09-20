@@ -14,7 +14,7 @@ import (
 )
 
 // NewCmdSkills returns the top-level "skill" command.
-func NewCmdSkills(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder) *cobra.Command {
+func NewCmdSkills(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "skill <command>",
 		Short: "Install and manage agent skills (preview)",

@@ -120,7 +120,7 @@ func issueTransfer(httpClient *http.Client, issueID string, destRepo ghrepo.Inte
 		} `graphql:"transferIssue(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.TransferIssueInput{
 			IssueID:      issueID,
 			RepositoryID: destinationRepoID,

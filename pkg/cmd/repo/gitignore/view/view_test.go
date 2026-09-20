@@ -95,7 +95,7 @@ func TestViewRun(t *testing.T) {
 			tt.httpStubs(t, reg)
 		}
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 		tt.opts.HTTPClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil

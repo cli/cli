@@ -2,16 +2,16 @@ package search
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
@@ -24,7 +24,6 @@ const (
 
 var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
 var pageRE = regexp.MustCompile(`(\?|&)page=(\d*)`)
-var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 
 //go:generate moq -rm -out searcher_mock.go . Searcher
 type Searcher interface {
@@ -162,6 +161,10 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 func (s searcher) Issues(query Query) (IssuesResult, error) {
 	result := IssuesResult{}
 
+	// Semantic and hybrid searches use a separate, smaller rate-limit bucket and
+	// are relevance-ranked, so bound fetching to a single page.
+	singlePage := query.IssueSearchType == "semantic" || query.IssueSearchType == "hybrid"
+
 	numItemsToRetrieve := query.Limit
 	query.Limit = min(numItemsToRetrieve, maxPerPage)
 	query.Page = 1
@@ -177,6 +180,10 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
 		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
+
+		if singlePage {
+			break
+		}
 
 		query.Page = nextPage(link)
 		if query.Page == 0 {
@@ -197,8 +204,8 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 // - Items: the actual matching search results, up to 100 max items per page
 //
 // For more information, see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28.
-func (s searcher) search(query Query, result interface{}) (string, error) {
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(s.host), "search", string(query.Kind))
+func (s searcher) search(query Query, result any) (string, error) {
+	u, err := safeurl.JoinPath("search", string(query.Kind))
 	if err != nil {
 		return "", err
 	}
@@ -226,6 +233,19 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 				u.SetQuery("advanced_search", "true")
 			}
 		}
+
+		switch query.IssueSearchType {
+		case "semantic":
+			if !features.SemanticSearch {
+				return "", fmt.Errorf("semantic search is not supported on this host: %s", s.host)
+			}
+			u.SetQuery("search_type", query.IssueSearchType)
+		case "hybrid":
+			if !features.HybridSearch {
+				return "", fmt.Errorf("hybrid search is not supported on this host: %s", s.host)
+			}
+			u.SetQuery("search_type", query.IssueSearchType)
+		}
 	} else {
 		u.SetQuery("q", query.StandardSearchString())
 	}
@@ -236,28 +256,28 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 	if query.Sort != "" {
 		u.SetQuery(sortKey, query.Sort)
 	}
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	accept := "application/vnd.github.v3+json"
 	if query.Kind == KindCode {
-		req.Header.Set("Accept", "application/vnd.github.text-match+json")
+		accept = "application/vnd.github.text-match+json"
 	}
 
-	resp, err := s.client.Do(req)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(s.client).Request(s.host, http.MethodGet, u.String(), nil,
+		api.WithHeader("Accept", accept))
 	if err != nil {
+		// Search reports query errors in a shape of its own, so the generic API error is
+		// translated back rather than surfaced directly.
+		if apiErr, ok := errors.AsType[api.HTTPError](err); ok {
+			return apiErr.Headers.Get("Link"), asSearchError(apiErr)
+		}
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	link := resp.Header.Get("Link")
 
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return link, handleHTTPError(resp)
-	}
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(result)
 	if err != nil {
@@ -297,23 +317,27 @@ func (err httpError) Error() string {
 	return fmt.Sprintf("Invalid search query %q.\n%s", query, err.Errors[0].Message)
 }
 
-func handleHTTPError(resp *http.Response) error {
-	httpError := httpError{
-		RequestURL: resp.Request.URL,
-		StatusCode: resp.StatusCode,
+// asSearchError converts an api.HTTPError into search's own error type, which formats
+// invalid queries differently from the rest of the CLI.
+func asSearchError(apiErr api.HTTPError) error {
+	searchErr := httpError{
+		Message:    apiErr.Message,
+		RequestURL: apiErr.RequestURL,
+		StatusCode: apiErr.StatusCode,
 	}
-	if !jsonTypeRE.MatchString(resp.Header.Get("Content-Type")) {
-		httpError.Message = resp.Status
-		return httpError
+	// A non-JSON response leaves Message empty, where this package used to report the status line.
+	if searchErr.Message == "" {
+		searchErr.Message = fmt.Sprintf("%d %s", apiErr.StatusCode, http.StatusText(apiErr.StatusCode))
 	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
+	for _, item := range apiErr.Errors {
+		searchErr.Errors = append(searchErr.Errors, httpErrorItem{
+			Code:     item.Code,
+			Field:    item.Field,
+			Message:  item.Message,
+			Resource: item.Resource,
+		})
 	}
-	if err := json.Unmarshal(body, &httpError); err != nil {
-		return err
-	}
-	return httpError
+	return searchErr
 }
 
 // nextPage extracts the next page number from an API response's link header. if
@@ -339,11 +363,4 @@ func nextPage(link string) (page int) {
 		}
 	}
 	return 0
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

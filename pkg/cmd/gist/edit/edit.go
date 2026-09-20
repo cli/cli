@@ -288,7 +288,7 @@ func editRun(opts *EditOptions) error {
 		file := gist.Files[filename]
 		if file.Truncated {
 			if _, alreadyEdited := filesToUpdate[filename]; !alreadyEdited {
-				fullContent, err := shared.GetRawGistFile(client, safeurl.NewImmutableSafeURL(file.RawURL))
+				fullContent, err := shared.GetRawGistFile(client, host, safeurl.NewImmutableSafeURL(file.RawURL))
 				if err != nil {
 					return err
 				}

@@ -158,7 +158,7 @@ func WithAdditionalCommonDimensions(dimensions ghtelemetry.Dimensions) telemetry
 	}
 }
 
-// WithSampleRate allows setting a sample rate (0-100) for telemetry events. Events recorded with the Unsampled option will be sent regardless of the sample rate.
+// WithSampleRate allows setting a sample rate (0-100) for telemetry events. Rates 0 and 100 retain all events.
 // Sampling is based on invocation ID, so an entire invocation will be included or excluded as a whole. This ensures that related events are not split between sampled and unsampled,
 // which could lead to incomplete data and incorrect assumptions.
 func WithSampleRate(rate int) telemetryServiceOption {
@@ -252,19 +252,21 @@ type recordedEvent struct {
 }
 
 type service struct {
-	mu               sync.RWMutex
-	flush            func(payload SendTelemetryPayload)
-	previouslyCalled bool
+	mu       sync.RWMutex
+	flush    func(payload SendTelemetryPayload)
+	finished bool
 
 	commonDimensions ghtelemetry.Dimensions
 	sampleRate       int
 	sampleBucket     byte
 
-	events []recordedEvent
+	events []*recordedEvent
 
 	disabled bool
 }
 
+// Disable suppresses all events in the invocation, including already recorded
+// events. It must be called before Finish.
 func (s *service) Disable() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -272,32 +274,61 @@ func (s *service) Disable() {
 	s.disabled = true
 }
 
+// Record copies a complete event into the service.
+// Recording after Finish has no effect.
 func (s *service) Record(event ghtelemetry.Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.events = append(s.events, recordedEvent{event: event, recordedAt: time.Now()})
+	if s.finished {
+		return
+	}
+	s.events = append(s.events, &recordedEvent{event: cloneEvent(event), recordedAt: time.Now()})
 }
 
+// Begin copies an event's initial facts and returns a handle for adding
+// facts until Finish. Events begun after Finish are not recorded.
+func (s *service) Begin(event ghtelemetry.Event) ghtelemetry.PendingEvent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.finished {
+		return noOpPendingEvent{}
+	}
+	recorded := &recordedEvent{
+		event:      cloneEvent(event),
+		recordedAt: time.Now(),
+	}
+	s.events = append(s.events, recorded)
+	return &pendingEvent{service: s, recorded: recorded}
+}
+
+// SetSampleRate selects the sampling policy for the whole invocation.
+// Changes after Finish have no effect.
 func (s *service) SetSampleRate(rate int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.finished {
+		return
+	}
 	s.sampleRate = rate
 	s.commonDimensions["sample_rate"] = strconv.Itoa(rate)
 }
 
-func (s *service) Flush() {
-	// This shouldn't really be required since flush should only be called once, but just in case...
+// Finish snapshots the recorded events once and sends their payload after releasing the lock.
+// Sampling and telemetry eligibility apply to immediate and pending events alike.
+func (s *service) Finish() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
-	if s.previouslyCalled {
+	if s.finished {
+		s.mu.Unlock()
 		return
 	}
-	s.previouslyCalled = true
+	s.finished = true
 
 	if s.sampleRate > 0 && s.sampleRate < 100 && int(s.sampleBucket) >= s.sampleRate {
+		s.mu.Unlock()
 		return
 	}
 
@@ -315,20 +346,62 @@ func (s *service) Flush() {
 	}
 
 	for i, recorded := range events {
+		event := recorded.event
+
 		dimensions := map[string]string{
 			"timestamp": recorded.recordedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
 		}
 		maps.Copy(dimensions, s.commonDimensions)
-		maps.Copy(dimensions, recorded.event.Dimensions)
+		maps.Copy(dimensions, event.Dimensions)
 
 		payload.Events[i] = PayloadEvent{
-			Type:       recorded.event.Type,
+			Type:       event.Type,
 			Dimensions: dimensions,
-			Measures:   recorded.event.Measures,
+			Measures:   maps.Clone(event.Measures),
 		}
 	}
+	s.mu.Unlock()
 
 	s.flush(payload)
+}
+
+type pendingEvent struct {
+	service  *service
+	recorded *recordedEvent
+}
+
+func (p *pendingEvent) UpsertDimensions(dimensions ghtelemetry.Dimensions) {
+	p.service.mu.Lock()
+	defer p.service.mu.Unlock()
+
+	if p.service.finished {
+		return
+	}
+	if p.recorded.event.Dimensions == nil {
+		p.recorded.event.Dimensions = make(ghtelemetry.Dimensions)
+	}
+	maps.Copy(p.recorded.event.Dimensions, dimensions)
+}
+
+func (p *pendingEvent) UpsertMeasures(measures ghtelemetry.Measures) {
+	p.service.mu.Lock()
+	defer p.service.mu.Unlock()
+
+	if p.service.finished {
+		return
+	}
+	if p.recorded.event.Measures == nil {
+		p.recorded.event.Measures = make(ghtelemetry.Measures)
+	}
+	maps.Copy(p.recorded.event.Measures, measures)
+}
+
+func cloneEvent(event ghtelemetry.Event) ghtelemetry.Event {
+	return ghtelemetry.Event{
+		Type:       event.Type,
+		Dimensions: maps.Clone(event.Dimensions),
+		Measures:   maps.Clone(event.Measures),
+	}
 }
 
 // maxPayloadSize is a safety limit for the telemetry payload written to the
@@ -414,12 +487,27 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 	_ = cmd.Process.Release()
 }
 
+type noOpPendingEvent struct{}
+
+func (noOpPendingEvent) UpsertDimensions(ghtelemetry.Dimensions) {}
+func (noOpPendingEvent) UpsertMeasures(ghtelemetry.Measures)     {}
+
+// NoOpService discards telemetry when collection is disabled.
 type NoOpService struct{}
 
+// Record discards the event.
 func (s *NoOpService) Record(event ghtelemetry.Event) {}
 
+// Begin returns an inert handle without retaining the event.
+func (s *NoOpService) Begin(event ghtelemetry.Event) ghtelemetry.PendingEvent {
+	return noOpPendingEvent{}
+}
+
+// Disable leaves telemetry disabled.
 func (s *NoOpService) Disable() {}
 
+// SetSampleRate leaves telemetry disabled.
 func (s *NoOpService) SetSampleRate(rate int) {}
 
-func (s *NoOpService) Flush() {}
+// Finish has no payload to complete.
+func (s *NoOpService) Finish() {}

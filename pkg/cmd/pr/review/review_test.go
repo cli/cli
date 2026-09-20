@@ -178,7 +178,7 @@ func runCommand(rt http.RoundTripper, prompter prompter.Prompter, isTTY bool, cl
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		},
 		Prompter: prompter,
 	}
@@ -240,8 +240,8 @@ func TestPRReview(t *testing.T) {
 			http.Register(
 				httpmock.GraphQL(`mutation PullRequestReviewAdd\b`),
 				httpmock.GraphQLMutation(`{"data": {} }`,
-					func(inputs map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
+					func(inputs map[string]any) {
+						assert.Equal(t, map[string]any{
 							"pullRequestId": "THE-ID",
 							"event":         tt.wantEvent,
 							"body":          tt.wantBody,
@@ -266,7 +266,7 @@ func TestPRReview_interactive(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestReviewAdd\b`),
 		httpmock.GraphQLMutation(`{"data": {} }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["event"], "APPROVE")
 				assert.Equal(t, inputs["body"], "cool story")
 			}),
@@ -313,7 +313,7 @@ func TestPRReview_interactive_blank_approve(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestReviewAdd\b`),
 		httpmock.GraphQLMutation(`{"data": {} }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, inputs["event"], "APPROVE")
 				assert.Equal(t, inputs["body"], "")
 			}),

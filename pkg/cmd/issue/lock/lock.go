@@ -314,7 +314,7 @@ func lockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.
 		} `graphql:"lockLockable(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.LockLockableInput{
 			LockableID: lockable.ID,
 			LockReason: reasonsMap[opts.Reason],
@@ -336,7 +336,7 @@ func unlockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *ap
 		} `graphql:"unlockLockable(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.UnlockLockableInput{
 			LockableID: lockable.ID,
 		},

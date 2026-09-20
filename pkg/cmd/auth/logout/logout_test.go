@@ -311,7 +311,7 @@ func Test_logoutRun_tty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, readConfigs := config.NewIsolatedTestConfig(t)
+			cfg, readConfigs := config.NewIsolatedTestConfig(t, "")
 
 			for _, hostUsers := range tt.cfgHosts {
 				for _, user := range hostUsers.users {
@@ -506,7 +506,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, readConfigs := config.NewIsolatedTestConfig(t)
+			cfg, readConfigs := config.NewIsolatedTestConfig(t, "")
 
 			for _, hostUsers := range tt.cfgHosts {
 				for _, user := range hostUsers.users {

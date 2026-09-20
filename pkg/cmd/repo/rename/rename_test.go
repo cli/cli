@@ -244,7 +244,7 @@ func TestRenameRun(t *testing.T) {
 		}
 
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		tt.opts.Remotes = func() (context.Remotes, error) {

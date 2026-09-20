@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -121,11 +122,12 @@ func getLatestReleaseInfo(ctx context.Context, client *http.Client, repo string)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := client.Do(req)
+	// The URL stays absolute on purpose: CLI releases live on github.com regardless of the
+	// host the user has configured, so this must not be rewritten to their API host.
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	res, err := api.NewClientFromHTTP(client).RequestWithContext(ctx, "github.com", http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +136,7 @@ func getLatestReleaseInfo(ctx context.Context, client *http.Client, repo string)
 		res.Body.Close()
 	}()
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("unexpected HTTP %d", res.StatusCode)
+		return nil, api.UnexpectedStatusError(res)
 	}
 	dec := json.NewDecoder(res.Body)
 	var latestRelease ReleaseInfo

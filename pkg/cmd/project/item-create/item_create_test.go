@@ -115,21 +115,21 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -140,9 +140,9 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -152,10 +152,10 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -167,10 +167,10 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation CreateDraftItem.*","variables":{"input":{"projectId":"an ID","title":"a title","body":""}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"addProjectV2DraftIssue": map[string]interface{}{
-					"projectItem": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"addProjectV2DraftIssue": map[string]any{
+					"projectItem": map[string]any{
 						"id": "item ID",
 					},
 				},
@@ -206,21 +206,21 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -231,9 +231,9 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query OrgProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "github",
 				"number":      1,
 				"firstItems":  0,
@@ -243,10 +243,10 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -258,10 +258,10 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation CreateDraftItem.*","variables":{"input":{"projectId":"an ID","title":"a title","body":""}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"addProjectV2DraftIssue": map[string]interface{}{
-					"projectItem": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"addProjectV2DraftIssue": map[string]any{
+					"projectItem": map[string]any{
 						"id": "item ID",
 					},
 				},
@@ -297,13 +297,13 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"id": "an ID",
 				},
 			},
@@ -313,9 +313,9 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"number":      1,
 				"firstItems":  0,
 				"afterItems":  nil,
@@ -324,10 +324,10 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -339,10 +339,10 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation CreateDraftItem.*","variables":{"input":{"projectId":"an ID","title":"a title","body":"a body"}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"addProjectV2DraftIssue": map[string]interface{}{
-					"projectItem": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"addProjectV2DraftIssue": map[string]any{
+					"projectItem": map[string]any{
 						"id": "item ID",
 					},
 				},
@@ -379,21 +379,21 @@ func TestRunCreateItem_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -404,9 +404,9 @@ func TestRunCreateItem_JSON(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserProject.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login":       "monalisa",
 				"number":      1,
 				"firstItems":  0,
@@ -416,10 +416,10 @@ func TestRunCreateItem_JSON(t *testing.T) {
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
+					"projectV2": map[string]any{
 						"id": "an ID",
 					},
 				},
@@ -431,12 +431,12 @@ func TestRunCreateItem_JSON(t *testing.T) {
 		Post("/graphql").
 		BodyString(`{"query":"mutation CreateDraftItem.*","variables":{"input":{"projectId":"an ID","title":"a title","body":""}}}`).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"addProjectV2DraftIssue": map[string]interface{}{
-					"projectItem": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"addProjectV2DraftIssue": map[string]any{
+					"projectItem": map[string]any{
 						"id": "item ID",
-						"content": map[string]interface{}{
+						"content": map[string]any{
 							"__typename": "Draft",
 							"title":      "a title",
 						},

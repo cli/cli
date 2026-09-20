@@ -41,6 +41,8 @@ type Config interface {
 	AccessiblePrompter(hostname string) ConfigEntry
 	// Browser returns the configured browser, optionally scoped by host.
 	Browser(hostname string) ConfigEntry
+	// Clipboard returns the configured clipboard setting, ignoring host scoping since clipboard is a global setting.
+	Clipboard() ConfigEntry
 	// ColorLabels returns the configured color_label setting, optionally scoped by host.
 	ColorLabels(hostname string) ConfigEntry
 	// Editor returns the configured editor, optionally scoped by host.
@@ -99,6 +101,37 @@ type Migration interface {
 	Do(*ghConfig.Config) error
 }
 
+// TokenType is the kind of credential a token is, and its value is the prefix
+// that identifies it. The zero value covers a token gh does not recognise,
+// including an empty one.
+//
+// See the [token formats] GitHub documents.
+//
+// [token formats]: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github#githubs-token-formats
+type TokenType string
+
+const (
+	TokenTypeUnknown        TokenType = ""
+	TokenTypeOAuth          TokenType = "gho_"
+	TokenTypePersonalAccess TokenType = "ghp_"
+	TokenTypeFineGrainedPAT TokenType = "github_pat_"
+	TokenTypeUserToServer   TokenType = "ghu_"
+	TokenTypeServerToServer TokenType = "ghs_"
+	TokenTypeRefresh        TokenType = "ghr_"
+)
+
+// TokenTypes lists every recognised credential. TokenTypeUnknown is absent
+// because its empty value prefixes every string, so matching against it would
+// claim any token.
+var TokenTypes = []TokenType{
+	TokenTypeOAuth,
+	TokenTypePersonalAccess,
+	TokenTypeFineGrainedPAT,
+	TokenTypeUserToServer,
+	TokenTypeServerToServer,
+	TokenTypeRefresh,
+}
+
 // AuthConfig is used for interacting with some persistent configuration for gh,
 // with knowledge on how to access encrypted storage when necessary.
 // Behavior is scoped to authentication specific tasks.
@@ -109,6 +142,11 @@ type AuthConfig interface {
 	// ActiveToken will retrieve the active auth token for the given hostname, searching environment variables,
 	// general configuration, and finally encrypted storage.
 	ActiveToken(hostname string) (token string, source string)
+
+	// ActiveTokenType reports what kind of credential the active token for the
+	// hostname is, so a caller can decide whether it will do without handling
+	// the token itself.
+	ActiveTokenType(hostname string) TokenType
 
 	// HasEnvToken returns true when a token has been specified in an environment variable, else returns false.
 	HasEnvToken() bool
@@ -130,6 +168,14 @@ type AuthConfig interface {
 
 	// Hosts retrieves a list of known hosts.
 	Hosts() []string
+
+	// APIHostForHost returns the api_host configured for host, reporting false
+	// when the host has no api_host set. See config.AuthConfig.APIHostForHost.
+	APIHostForHost(host string) (apiHost string, found bool)
+
+	// HostForAPIHost returns the known host whose api_host is the given hostname,
+	// reporting false when no host claims it. See config.AuthConfig.HostForAPIHost.
+	HostForAPIHost(apiHost string) (host string, found bool)
 
 	// DefaultHost retrieves the default host.
 	DefaultHost() (host string, source string)

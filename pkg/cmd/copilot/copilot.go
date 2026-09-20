@@ -39,7 +39,7 @@ type CopilotOptions struct {
 	Remove      bool
 }
 
-func NewCmdCopilot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*CopilotOptions) error) *cobra.Command {
+func NewCmdCopilot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CopilotOptions) error) *cobra.Command {
 	opts := &CopilotOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
@@ -152,7 +152,7 @@ func runCopilot(opts *CopilotOptions) error {
 				return err
 			}
 			if !confirmed {
-				fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI was not installed", opts.IO.ColorScheme().WarningIcon())
+				fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI was not installed\n", opts.IO.ColorScheme().WarningIcon())
 				return cmdutil.SilentError
 			}
 		} else if !ci.IsCI() {

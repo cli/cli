@@ -51,7 +51,7 @@ func run(args []string) error {
 		IOStreams: ios,
 		Browser:   &browser{},
 		Config: func() (gh.Config, error) {
-			return config.NewFromString(""), nil
+			return config.NewMockConfigFromString(""), nil
 		},
 		ExtensionManager: &em{},
 	}, &telemetry.NoOpService{}, "", "")

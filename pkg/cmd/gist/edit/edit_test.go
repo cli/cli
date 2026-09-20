@@ -152,7 +152,7 @@ func Test_editRun(t *testing.T) {
 		isTTY                     bool
 		stdin                     string
 		wantErr                   string
-		wantLastRequestParameters map[string]interface{}
+		wantLastRequestParameters map[string]any
 	}{
 		{
 			name:    "no such gist",
@@ -182,10 +182,10 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
-					"cicada.txt": map[string]interface{}{
+				"files": map[string]any{
+					"cicada.txt": map[string]any{
 						"content":  "new file content",
 						"filename": "cicada.txt",
 					},
@@ -227,10 +227,10 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "catbug",
-				"files": map[string]interface{}{
-					"unix.md": map[string]interface{}{
+				"files": map[string]any{
+					"unix.md": map[string]any{
 						"content":  "new file content",
 						"filename": "unix.md",
 					},
@@ -254,10 +254,10 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "gists/1234"), httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
-					"unix.md": map[string]interface{}{
+				"files": map[string]any{
+					"unix.md": map[string]any{
 						"content":  "new file content",
 						"filename": "unix.md",
 					},
@@ -378,10 +378,10 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "my new description",
-				"files": map[string]interface{}{
-					"sample.txt": map[string]interface{}{
+				"files": map[string]any{
+					"sample.txt": map[string]any{
 						"content":  "new file content",
 						"filename": "sample.txt",
 					},
@@ -410,10 +410,10 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
-					"from_source.txt": map[string]interface{}{
+				"files": map[string]any{
+					"from_source.txt": map[string]any{
 						"content":  "hello",
 						"filename": "from_source.txt",
 					},
@@ -443,10 +443,10 @@ func Test_editRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"))
 			},
 			stdin: "data from stdin",
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
-					"from_source.txt": map[string]interface{}{
+				"files": map[string]any{
+					"from_source.txt": map[string]any{
 						"content":  "data from stdin",
 						"filename": "from_source.txt",
 					},
@@ -498,9 +498,9 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
+				"files": map[string]any{
 					"sample2.txt": nil,
 				},
 			},
@@ -526,10 +526,10 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
-					"sample.txt": map[string]interface{}{
+				"files": map[string]any{
+					"sample.txt": map[string]any{
 						"content":  "hello",
 						"filename": "sample.txt",
 					},
@@ -558,10 +558,10 @@ func Test_editRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"))
 			},
 			stdin: "data from stdin",
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
-					"sample.txt": map[string]interface{}{
+				"files": map[string]any{
+					"sample.txt": map[string]any{
 						"content":  "data from stdin",
 						"filename": "sample.txt",
 					},
@@ -622,10 +622,10 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
-					"large.txt": map[string]interface{}{
+				"files": map[string]any{
+					"large.txt": map[string]any{
 						"content":  "new file content",
 						"filename": "large.txt",
 					},
@@ -662,10 +662,10 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
-					"large.txt": map[string]interface{}{
+				"files": map[string]any{
+					"large.txt": map[string]any{
 						"content":  "new file content",
 						"filename": "large.txt",
 					},
@@ -704,10 +704,10 @@ func Test_editRun(t *testing.T) {
 				// Explicity exclude also-truncated.txt raw URL to ensure it is not fetched since we did not select it.
 				reg.Exclude(t, httpmock.REST("GET", "user/1234/raw/also-truncated.txt"))
 			},
-			wantLastRequestParameters: map[string]interface{}{
+			wantLastRequestParameters: map[string]any{
 				"description": "",
-				"files": map[string]interface{}{
-					"large.txt": map[string]interface{}{
+				"files": map[string]any{
+					"large.txt": map[string]any{
 						"content":  "new file content",
 						"filename": "large.txt",
 					},
@@ -801,7 +801,7 @@ func Test_editRun(t *testing.T) {
 		tt.opts.IO = ios
 
 		tt.opts.Config = func() (gh.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewMockConfig(), nil
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
@@ -827,7 +827,7 @@ func Test_editRun(t *testing.T) {
 				// has the desired parameters.
 				lastRequest := reg.Requests[len(reg.Requests)-1]
 				bodyBytes, _ := io.ReadAll(lastRequest.Body)
-				reqBody := make(map[string]interface{})
+				reqBody := make(map[string]any)
 				err = json.Unmarshal(bodyBytes, &reqBody)
 				if err != nil {
 					t.Fatalf("error decoding JSON: %v", err)

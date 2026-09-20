@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,12 +12,17 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,13 +32,32 @@ func TestNewCmdComment(t *testing.T) {
 	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
+	tmpImage := filepath.Join(t.TempDir(), "login.png")
+	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
+
+	attachmentEvent := []ghtelemetry.Event{{
+		Type:       "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "comment"},
+		Measures: ghtelemetry.Measures{
+			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
+		},
+	}}
+
 	tests := []struct {
-		name     string
-		input    string
-		stdin    string
-		output   shared.CommentableOptions
-		wantsErr bool
-		isTTY    bool
+		name             string
+		input            string
+		stdin            string
+		output           shared.CommentableOptions
+		wantsErr         bool
+		wantsErrContains string
+		isTTY            bool
+		wantEvents       []ghtelemetry.Event
+		wantSampleRate   int
+
+		// Which fields the lookup asks for is decided at construction, so it
+		// can only be proved here.
+		queryWants string
+		queryOmits string
 	}{
 		{
 			name:     "no arguments",
@@ -67,9 +92,10 @@ func TestNewCmdComment(t *testing.T) {
 			name:  "body flag",
 			input: "1 --body test",
 			output: shared.CommentableOptions{
-				Interactive: false,
-				InputType:   shared.InputTypeInline,
-				Body:        "test",
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "test",
+				BodyProvided: true,
 			},
 			isTTY:    true,
 			wantsErr: false,
@@ -79,9 +105,10 @@ func TestNewCmdComment(t *testing.T) {
 			input: "1 --body-file -",
 			stdin: "this is on standard input",
 			output: shared.CommentableOptions{
-				Interactive: false,
-				InputType:   shared.InputTypeInline,
-				Body:        "this is on standard input",
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "this is on standard input",
+				BodyProvided: true,
 			},
 			isTTY:    true,
 			wantsErr: false,
@@ -90,9 +117,10 @@ func TestNewCmdComment(t *testing.T) {
 			name:  "body from file",
 			input: fmt.Sprintf("1 --body-file '%s'", tmpFile),
 			output: shared.CommentableOptions{
-				Interactive: false,
-				InputType:   shared.InputTypeInline,
-				Body:        "a body from file",
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "a body from file",
+				BodyProvided: true,
 			},
 			isTTY:    true,
 			wantsErr: false,
@@ -247,10 +275,122 @@ func TestNewCmdComment(t *testing.T) {
 			isTTY:    true,
 			wantsErr: true,
 		},
+		{
+			name:           "--attach alone is enough of a body to post without prompting",
+			input:          fmt.Sprintf("1 --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+			output: shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "",
+			},
+			isTTY:    false,
+			wantsErr: false,
+		},
+		{
+			name:     "argument validation skips attachment telemetry",
+			input:    fmt.Sprintf("--attach '%s'", tmpImage),
+			isTTY:    false,
+			wantsErr: true,
+		},
+		{
+			name:           "--attach with --body keeps the body and records that one was given",
+			input:          fmt.Sprintf("1 --body test --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+			output: shared.CommentableOptions{
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "test",
+				BodyProvided: true,
+			},
+			isTTY:    true,
+			wantsErr: false,
+		},
+		{
+			name:           "--attach with --edit-last is accepted and needs no body",
+			input:          fmt.Sprintf("1 --edit-last --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+			output: shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "",
+			},
+			isTTY:    true,
+			wantsErr: false,
+		},
+		{
+			// KeepExistingBody is set either way. BodyProvided is what decides
+			// that this one replaces the comment rather than keeping it.
+			name:           "--attach with --edit-last and --body records the body that replaces the comment",
+			input:          fmt.Sprintf("1 --edit-last --body 'a new body' --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+			output: shared.CommentableOptions{
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "a new body",
+				BodyProvided: true,
+			},
+			isTTY:    true,
+			wantsErr: false,
+		},
+		{
+			name:             "--attach is rejected with --web",
+			input:            fmt.Sprintf("1 --web --attach '%s'", tmpImage),
+			isTTY:            true,
+			wantsErr:         true,
+			wantsErrContains: "`--attach` is not supported when using `--web`",
+		},
+		{
+			name:             "--attach is rejected with --delete-last",
+			input:            fmt.Sprintf("1 --delete-last --attach '%s'", tmpImage),
+			isTTY:            true,
+			wantsErr:         true,
+			wantsErrContains: "`--attach` is not supported when using `--delete-last`",
+		},
+		{
+			// Only the prefix, since the rest comes from the operating system.
+			name:             "--attach rejects a missing file",
+			input:            "1 --attach ./nope.png",
+			isTTY:            true,
+			wantsErr:         true,
+			wantsErrContains: "./nope.png: ",
+			wantEvents:       attachmentEvent,
+			wantSampleRate:   ghtelemetry.SAMPLE_ALL,
+		},
+		{
+			name:           "--attach asks the issue lookup for the repository id",
+			input:          fmt.Sprintf("1 --attach '%s'", tmpImage),
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+			output: shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "",
+			},
+			isTTY:      true,
+			queryWants: "databaseId",
+		},
+		{
+			name:  "the issue lookup does not ask for the repository id without --attach",
+			input: "1 --body test",
+			output: shared.CommentableOptions{
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "test",
+				BodyProvided: true,
+			},
+			isTTY:      true,
+			queryOmits: "databaseId",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given command inputs and an invocation recorder
 			ios, stdin, _, _ := iostreams.Test()
 			isTTY := tt.isTTY
 			ios.SetStdoutTTY(isTTY)
@@ -261,16 +401,47 @@ func TestNewCmdComment(t *testing.T) {
 				_, _ = stdin.WriteString(tt.stdin)
 			}
 
+			checksQuery := tt.queryWants != "" || tt.queryOmits != ""
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			var lookupQuery string
+			if checksQuery {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					func(req *http.Request) (*http.Response, error) {
+						body, err := io.ReadAll(req.Body)
+						require.NoError(t, err)
+						lookupQuery = string(body)
+						return httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{
+							"id": "ISSUE-ID",
+							"number": 1,
+							"url": "https://github.com/OWNER/REPO/issues/1",
+							"repository": {
+								"id": "R_kgDOAA",
+								"name": "REPO",
+								"nameWithOwner": "OWNER/REPO",
+								"databaseId": 42
+							}
+						}}}}`)(req)
+					},
+				)
+			}
+
 			f := &cmdutil.Factory{
-				IOStreams: ios,
-				Browser:   &browser.Stub{},
+				IOStreams:  ios,
+				Browser:    &browser.Stub{},
+				HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+				BaseRepo:   func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil },
+				Config:     testConfig(),
 			}
 
 			argv, err := shlex.Split(tt.input)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var gotOpts *shared.CommentableOptions
-			cmd := NewCmdComment(f, func(opts *shared.CommentableOptions) error {
+			recorder := &telemetry.InvocationRecorderSpy{}
+			cmd := NewCmdComment(f, recorder, func(opts *shared.CommentableOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -281,20 +452,119 @@ func TestNewCmdComment(t *testing.T) {
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
 
+			// When the command executes
 			_, err = cmd.ExecuteC()
+			// Then telemetry starts only if execution reaches attachment validation
+			assert.Equal(t, tt.wantEvents, recorder.Events())
+			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
+				if tt.wantsErrContains != "" {
+					require.ErrorContains(t, err, tt.wantsErrContains)
+				}
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.InputType, gotOpts.InputType)
 			assert.Equal(t, tt.output.Body, gotOpts.Body)
 			assert.Equal(t, tt.output.DeleteLast, gotOpts.DeleteLast)
 			assert.Equal(t, tt.output.DeleteLastConfirmed, gotOpts.DeleteLastConfirmed)
+			assert.Equal(t, tt.output.BodyProvided, gotOpts.BodyProvided)
+
+			assert.NotNil(t, gotOpts.Config)
+			// Asserted here rather than per row, because no input changes it.
+			assert.True(t, gotOpts.KeepExistingBody)
+
+			if checksQuery {
+				_, _, err := gotOpts.RetrieveCommentable()
+				require.NoError(t, err)
+				if tt.queryWants != "" {
+					assert.Contains(t, lookupQuery, tt.queryWants)
+				}
+				if tt.queryOmits != "" {
+					assert.NotContains(t, lookupQuery, tt.queryOmits)
+				}
+			}
 		})
 	}
+}
+
+func TestNewCmdCommentRecordsRejectedAttachmentCount(t *testing.T) {
+	// Given 51 attachment values and a normally sampled telemetry service
+	// NewService reads or creates a device-id file, so isolate it from the user's state.
+	// An injectable device-ID lookup could avoid this process-wide override and allow parallel tests.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	ios, _, _, _ := iostreams.Test()
+	f := &cmdutil.Factory{
+		IOStreams: ios,
+		Browser:   &browser.Stub{},
+	}
+	var payload telemetry.SendTelemetryPayload
+	service := telemetry.NewService(func(p telemetry.SendTelemetryPayload) {
+		payload = p
+	}, telemetry.WithSampleRate(1))
+	cmd := NewCmdComment(f, service, func(*shared.CommentableOptions) error {
+		return errors.New("run should not be called")
+	})
+	args := []string{"1"}
+	for i := range 51 {
+		args = append(args, "--attach", fmt.Sprintf("./shot-%d.png", i))
+	}
+	cmd.SetArgs(args)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	// When attachment validation rejects the limit and telemetry is completed
+	err := cmd.Execute()
+	service.Finish()
+
+	// Then the payload preserves the rejected count without any completed operations
+	require.EqualError(t, err, "`--attach` accepts at most 50 values per command")
+	require.Len(t, payload.Events, 1)
+	event := payload.Events[0]
+	assert.Equal(t, "attachment_invocation", event.Type)
+	assert.Equal(t, "comment", event.Dimensions["command"])
+	assert.Equal(t, "100", event.Dimensions["sample_rate"])
+	assert.Equal(t, map[string]int64{
+		"attach_count":      51,
+		"append_ops_count":  0,
+		"replace_ops_count": 0,
+	}, event.Measures)
+}
+
+func TestNewCmdCommentSkipsAttachmentsOnPersistentPreRunError(t *testing.T) {
+	t.Parallel()
+
+	// Given an attachment command whose parent rejects execution before PreRunE
+	ios, _, _, _ := iostreams.Test()
+	f := &cmdutil.Factory{
+		IOStreams: ios,
+		Browser:   &browser.Stub{},
+	}
+	recorder := &telemetry.InvocationRecorderSpy{}
+	cmd := NewCmdComment(f, recorder, func(*shared.CommentableOptions) error {
+		return errors.New("run should not be called")
+	})
+	root := &cobra.Command{
+		Use:           "gh",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return errors.New("authentication failed")
+		},
+	}
+	root.AddCommand(cmd)
+	root.SetArgs([]string{"comment", "1", "--attach", "./shot.png"})
+
+	// When authentication fails
+	_, err := root.ExecuteC()
+
+	// Then attachment validation has not begun, so no event or sampling promotion occurs
+	require.EqualError(t, err, "authentication failed")
+	assert.Empty(t, recorder.Events())
+	assert.Zero(t, recorder.LastSampleRate)
 }
 
 func Test_commentRun(t *testing.T) {
@@ -681,6 +951,11 @@ func Test_commentRun(t *testing.T) {
 	}
 }
 
+func testConfig() func() (gh.Config, error) {
+	cfg := config.NewMockConfigFromString("hosts:\n  github.com:\n    oauth_token: gho_a_token_that_can_upload\n")
+	return func() (gh.Config, error) { return cfg, nil }
+}
+
 func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation CommentCreate\b`),
@@ -688,7 +963,7 @@ func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {
 		{ "data": { "addComment": { "commentEdge": { "node": {
 			"url": "https://github.com/OWNER/REPO/issues/123#issuecomment-456"
 		} } } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, "ISSUE-ID", inputs["subjectId"])
 				assert.Equal(t, "comment body", inputs["body"])
 			}),
@@ -702,7 +977,7 @@ func mockCommentUpdate(t *testing.T, reg *httpmock.Registry) {
 		{ "data": { "updateIssueComment": { "issueComment": {
 			"url": "https://github.com/OWNER/REPO/issues/123#issuecomment-111"
 		} } } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, "id1", inputs["id"])
 				assert.Equal(t, "comment body", inputs["body"])
 			}),
@@ -714,7 +989,7 @@ func mockCommentDelete(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation CommentDelete\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "deleteIssueComment": {} } }`,
-			func(inputs map[string]interface{}) {
+			func(inputs map[string]any) {
 				assert.Equal(t, "id1", inputs["id"])
 			},
 		),

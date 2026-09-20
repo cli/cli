@@ -72,7 +72,7 @@ func TestNewCmdRoot_ExtensionRegistration(t *testing.T) {
 			f := &cmdutil.Factory{
 				IOStreams: ios,
 				Config: func() (gh.Config, error) {
-					return config.NewBlankConfig(), nil
+					return config.NewMockConfig(), nil
 				},
 				Browser:          &browser.Stub{},
 				ExtensionManager: em,

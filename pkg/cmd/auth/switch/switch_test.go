@@ -373,7 +373,7 @@ func TestSwitchRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, readConfigs := config.NewIsolatedTestConfig(t)
+			cfg, readConfigs := config.NewIsolatedTestConfig(t, "")
 
 			for k, v := range tt.env {
 				t.Setenv(k, v)

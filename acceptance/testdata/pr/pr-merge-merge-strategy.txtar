@@ -1,45 +1,82 @@
+# requires-user-capability: false
+
 # Use gh as a credential helper
 exec gh auth setup-git
 
-# Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
-
-# Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+# Multiple coordinated ref updates and merges need repository-level isolation
+fixture-repo isolated REPO
+env BRANCH_NAME=${SCRIPT_NAME}-${RANDOM_STRING}
+env PR_TITLE=${SCRIPT_NAME}-${RANDOM_STRING}
+env BASE_BRANCH=${SCRIPT_NAME}-${RANDOM_STRING}-base
+env REBASE_BRANCH_NAME=${SCRIPT_NAME}-${RANDOM_STRING}-rebase
+env REBASE_PR_TITLE=${SCRIPT_NAME}-${RANDOM_STRING}-rebase
+env REBASE_BASE_BRANCH=${SCRIPT_NAME}-${RANDOM_STRING}-rebase-base
 
 # Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+exec gh repo clone $ORG/$REPO
 
-# Prepare a branch to PR with a single file
-cd $SCRIPT_NAME-$RANDOM_STRING
-exec git checkout -b feature-branch
+# Prepare a unique base branch and a branch to PR with a single file
+cd $REPO
+exec git checkout -b $BASE_BRANCH
+exec git push -u origin $BASE_BRANCH
+exec git checkout -b $BRANCH_NAME
 mv ../file.txt file.txt
 exec git add .
-exec git commit -m 'Add file.txt'
-exec git push -u origin feature-branch
+exec git commit -m 'Add file.txt' -m $BRANCH_NAME
+exec git push -u origin $BRANCH_NAME
 
 # Create the PR
-exec gh pr create --title 'Feature Title' --body 'Feature Body'
+exec gh pr create --base $BASE_BRANCH --title $PR_TITLE --body 'Feature Body'
 stdout2env PR_URL
 
-# Check that the file doesn't exist on the main branch
-exec git checkout main
+# Check that the file doesn't exist on the base branch
+exec git checkout $BASE_BRANCH
 ! exists file.txt
 
-# Merge the PR
-exec gh pr merge $PR_URL --merge
+# Merge the PR and delete its local and remote branches
+exec git show-ref --verify refs/heads/$BRANCH_NAME
+exec git ls-remote --exit-code origin refs/heads/$BRANCH_NAME
+exec gh pr merge $PR_URL --merge --delete-branch
+! exec git show-ref --verify refs/heads/$BRANCH_NAME
+! exec git ls-remote --exit-code origin refs/heads/$BRANCH_NAME
 
 # Check that the state of the PR is now merged
 exec gh pr view $PR_URL
 stdout 'state:\tMERGED$'
 
-# Pull and check the file exists on the main branch
-exec git pull -r
+# Pull and check the file exists on the unique base branch
+exec git pull -r origin $BASE_BRANCH
 exists file.txt
 
 # And check we had a merge commit
 exec git show HEAD
-stdout 'Merge pull request #1'
+stdout 'Merge pull request #[0-9]+'
+
+# Prepare unique branches for a rebase merge
+exec git checkout -b $REBASE_BASE_BRANCH origin/main
+exec git push -u origin $REBASE_BASE_BRANCH
+exec git checkout -b $REBASE_BRANCH_NAME
+mv ../rebase-file.txt rebase-file.txt
+exec git add .
+exec git commit -m 'Add rebase-file.txt' -m $REBASE_BRANCH_NAME
+exec git push -u origin $REBASE_BRANCH_NAME
+
+# Create and merge the PR with the rebase strategy
+exec gh pr create --base $REBASE_BASE_BRANCH --title $REBASE_PR_TITLE --body 'Feature Body'
+stdout2env REBASE_PR_URL
+exec git checkout $REBASE_BASE_BRANCH
+! exists rebase-file.txt
+exec gh pr merge $REBASE_PR_URL --rebase
+
+# Check the rebased commit landed on the unique base branch
+exec gh pr view $REBASE_PR_URL
+stdout 'state:\tMERGED$'
+exec git pull -r origin $REBASE_BASE_BRANCH
+exists rebase-file.txt
+exec git show HEAD
+stdout 'Add rebase-file.txt'
 
 -- file.txt --
 Unimportant contents
+-- rebase-file.txt --
+Unimportant rebase contents

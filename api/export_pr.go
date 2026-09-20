@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-func (issue *Issue) ExportData(fields []string) map[string]interface{} {
+func (issue *Issue) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(issue).Elem()
-	data := map[string]interface{}{}
+	data := map[string]any{}
 
 	for _, f := range fields {
 		switch f {
@@ -20,25 +20,25 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 		case "projectCards":
 			data[f] = issue.ProjectCards.Nodes
 		case "projectItems":
-			items := make([]map[string]interface{}, 0, len(issue.ProjectItems.Nodes))
+			items := make([]map[string]any, 0, len(issue.ProjectItems.Nodes))
 			for _, n := range issue.ProjectItems.Nodes {
-				items = append(items, map[string]interface{}{
+				items = append(items, map[string]any{
 					"status": n.Status,
 					"title":  n.Project.Title,
 				})
 			}
 			data[f] = items
 		case "closedByPullRequestsReferences":
-			items := make([]map[string]interface{}, 0, len(issue.ClosedByPullRequestsReferences.Nodes))
+			items := make([]map[string]any, 0, len(issue.ClosedByPullRequestsReferences.Nodes))
 			for _, n := range issue.ClosedByPullRequestsReferences.Nodes {
-				items = append(items, map[string]interface{}{
+				items = append(items, map[string]any{
 					"id":     n.ID,
 					"number": n.Number,
 					"url":    n.URL,
-					"repository": map[string]interface{}{
+					"repository": map[string]any{
 						"id":   n.Repository.ID,
 						"name": n.Repository.Name,
-						"owner": map[string]interface{}{
+						"owner": map[string]any{
 							"id":    n.Repository.Owner.ID,
 							"login": n.Repository.Owner.Login,
 						},
@@ -50,7 +50,7 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 			data[f] = issue.IssueType
 		case "parent":
 			if issue.Parent != nil {
-				data[f] = map[string]interface{}{
+				data[f] = map[string]any{
 					"id":     issue.Parent.ID,
 					"number": issue.Parent.Number,
 					"title":  issue.Parent.Title,
@@ -61,9 +61,9 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 				data[f] = nil
 			}
 		case "subIssues":
-			items := make([]map[string]interface{}, 0, len(issue.SubIssues.Nodes))
+			items := make([]map[string]any, 0, len(issue.SubIssues.Nodes))
 			for _, n := range issue.SubIssues.Nodes {
-				items = append(items, map[string]interface{}{
+				items = append(items, map[string]any{
 					"id":     n.ID,
 					"number": n.Number,
 					"title":  n.Title,
@@ -71,20 +71,20 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 					"state":  n.State,
 				})
 			}
-			data[f] = map[string]interface{}{
+			data[f] = map[string]any{
 				"nodes":      items,
 				"totalCount": issue.SubIssues.TotalCount,
 			}
 		case "subIssuesSummary":
-			data[f] = map[string]interface{}{
+			data[f] = map[string]any{
 				"total":            issue.SubIssuesSummary.Total,
 				"completed":        issue.SubIssuesSummary.Completed,
 				"percentCompleted": issue.SubIssuesSummary.PercentCompleted,
 			}
 		case "blockedBy":
-			items := make([]map[string]interface{}, 0, len(issue.BlockedBy.Nodes))
+			items := make([]map[string]any, 0, len(issue.BlockedBy.Nodes))
 			for _, n := range issue.BlockedBy.Nodes {
-				items = append(items, map[string]interface{}{
+				items = append(items, map[string]any{
 					"id":     n.ID,
 					"number": n.Number,
 					"title":  n.Title,
@@ -92,14 +92,14 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 					"state":  n.State,
 				})
 			}
-			data[f] = map[string]interface{}{
+			data[f] = map[string]any{
 				"nodes":      items,
 				"totalCount": issue.BlockedBy.TotalCount,
 			}
 		case "blocking":
-			items := make([]map[string]interface{}, 0, len(issue.Blocking.Nodes))
+			items := make([]map[string]any, 0, len(issue.Blocking.Nodes))
 			for _, n := range issue.Blocking.Nodes {
-				items = append(items, map[string]interface{}{
+				items = append(items, map[string]any{
 					"id":     n.ID,
 					"number": n.Number,
 					"title":  n.Title,
@@ -107,7 +107,7 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 					"state":  n.State,
 				})
 			}
-			data[f] = map[string]interface{}{
+			data[f] = map[string]any{
 				"nodes":      items,
 				"totalCount": issue.Blocking.TotalCount,
 			}
@@ -120,9 +120,9 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 	return data
 }
 
-func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
+func (pr *PullRequest) ExportData(fields []string) map[string]any {
 	v := reflect.ValueOf(pr).Elem()
-	data := map[string]interface{}{}
+	data := map[string]any{}
 
 	for _, f := range fields {
 		switch f {
@@ -130,10 +130,10 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 			data[f] = pr.HeadRepository
 		case "statusCheckRollup":
 			if n := pr.StatusCheckRollup.Nodes; len(n) > 0 {
-				checks := make([]interface{}, 0, len(n[0].Commit.StatusCheckRollup.Contexts.Nodes))
+				checks := make([]any, 0, len(n[0].Commit.StatusCheckRollup.Contexts.Nodes))
 				for _, c := range n[0].Commit.StatusCheckRollup.Contexts.Nodes {
 					if c.TypeName == "CheckRun" {
-						checks = append(checks, map[string]interface{}{
+						checks = append(checks, map[string]any{
 							"__typename":   c.TypeName,
 							"name":         c.Name,
 							"workflowName": c.CheckSuite.WorkflowRun.Workflow.Name,
@@ -144,7 +144,7 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 							"detailsUrl":   c.DetailsURL,
 						})
 					} else {
-						checks = append(checks, map[string]interface{}{
+						checks = append(checks, map[string]any{
 							"__typename": c.TypeName,
 							"context":    c.Context,
 							"state":      c.State,
@@ -158,19 +158,19 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 				data[f] = nil
 			}
 		case "commits":
-			commits := make([]interface{}, 0, len(pr.Commits.Nodes))
+			commits := make([]any, 0, len(pr.Commits.Nodes))
 			for _, c := range pr.Commits.Nodes {
 				commit := c.Commit
-				authors := make([]interface{}, 0, len(commit.Authors.Nodes))
+				authors := make([]any, 0, len(commit.Authors.Nodes))
 				for _, author := range commit.Authors.Nodes {
-					authors = append(authors, map[string]interface{}{
+					authors = append(authors, map[string]any{
 						"name":  author.Name,
 						"email": author.Email,
 						"id":    author.User.ID,
 						"login": author.User.Login,
 					})
 				}
-				commits = append(commits, map[string]interface{}{
+				commits = append(commits, map[string]any{
 					"oid":             commit.OID,
 					"messageHeadline": commit.MessageHeadline,
 					"messageBody":     commit.MessageBody,
@@ -189,9 +189,9 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 		case "projectCards":
 			data[f] = pr.ProjectCards.Nodes
 		case "projectItems":
-			items := make([]map[string]interface{}, 0, len(pr.ProjectItems.Nodes))
+			items := make([]map[string]any, 0, len(pr.ProjectItems.Nodes))
 			for _, n := range pr.ProjectItems.Nodes {
-				items = append(items, map[string]interface{}{
+				items = append(items, map[string]any{
 					"status": n.Status,
 					"title":  n.Project.Title,
 				})
@@ -204,7 +204,7 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 		case "files":
 			data[f] = pr.Files.Nodes
 		case "reviewRequests":
-			requests := make([]interface{}, 0, len(pr.ReviewRequests.Nodes))
+			requests := make([]any, 0, len(pr.ReviewRequests.Nodes))
 			for _, req := range pr.ReviewRequests.Nodes {
 				r := req.RequestedReviewer
 				switch r.TypeName {
@@ -223,16 +223,16 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 			}
 			data[f] = &requests
 		case "closingIssuesReferences":
-			items := make([]map[string]interface{}, 0, len(pr.ClosingIssuesReferences.Nodes))
+			items := make([]map[string]any, 0, len(pr.ClosingIssuesReferences.Nodes))
 			for _, n := range pr.ClosingIssuesReferences.Nodes {
-				items = append(items, map[string]interface{}{
+				items = append(items, map[string]any{
 					"id":     n.ID,
 					"number": n.Number,
 					"url":    n.URL,
-					"repository": map[string]interface{}{
+					"repository": map[string]any{
 						"id":   n.Repository.ID,
 						"name": n.Repository.Name,
-						"owner": map[string]interface{}{
+						"owner": map[string]any{
 							"id":    n.Repository.Owner.ID,
 							"login": n.Repository.Owner.Login,
 						},

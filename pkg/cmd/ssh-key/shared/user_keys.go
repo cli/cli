@@ -40,7 +40,7 @@ func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error
 		return nil, err
 	}
 
-	for i := 0; i < len(keys); i++ {
+	for i := range keys {
 		keys[i].Type = AuthenticationKey
 	}
 
@@ -66,7 +66,7 @@ func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey
 		return nil, err
 	}
 
-	for i := 0; i < len(keys); i++ {
+	for i := range keys {
 		keys[i].Type = SigningKey
 	}
 
