@@ -24,24 +24,20 @@ const maxConcurrency = 5
 
 // Options configures an installation.
 type Options struct {
-	Host            string // GitHub API hostname
-	Owner           string
-	Repo            string
-	Ref             string // resolved ref name
-	SHA             string // resolved commit SHA
-	PinnedRef       string // user-supplied --pin value (empty if unpinned)
-	Skills          []discovery.Skill
-	AgentHost       *registry.AgentHost
-	Scope           registry.Scope
-	Dir             string // explicit target directory (overrides AgentHost+Scope)
-	RootDir         string // trusted root containing Dir
-	GitRoot         string // git repository root (for project scope)
-	HomeDir         string // user home directory (for user scope)
-	Client          *api.Client
-	TargetRoot      *safepaths.Root // optional pre-opened root for Dir
-	DirectRoot      bool            // write skill contents directly into TargetRoot
-	ReplaceExisting map[string]bool
-	OnProgress      func(done, total int) // called after each skill is installed
+	Host       string // GitHub API hostname
+	Owner      string
+	Repo       string
+	Ref        string // resolved ref name
+	SHA        string // resolved commit SHA
+	PinnedRef  string // user-supplied --pin value (empty if unpinned)
+	Skills     []discovery.Skill
+	AgentHost  *registry.AgentHost
+	Scope      registry.Scope
+	Dir        string // explicit target directory (overrides AgentHost+Scope)
+	GitRoot    string // git repository root (for project scope)
+	HomeDir    string // user home directory (for user scope)
+	Client     *api.Client
+	OnProgress func(done, total int) // called after each skill is installed
 }
 
 // Result tracks what was installed.
@@ -147,15 +143,13 @@ func Install(opts *Options) (*Result, error) {
 
 // LocalOptions configures a local directory installation.
 type LocalOptions struct {
-	SourceDir       string
-	Skills          []discovery.Skill
-	AgentHost       *registry.AgentHost
-	Scope           registry.Scope
-	Dir             string
-	RootDir         string
-	GitRoot         string
-	HomeDir         string
-	ReplaceExisting map[string]bool
+	SourceDir string
+	Skills    []discovery.Skill
+	AgentHost *registry.AgentHost
+	Scope     registry.Scope
+	Dir       string
+	GitRoot   string
+	HomeDir   string
 }
 
 // InstallLocal copies skills from a local directory to the target install location.
@@ -174,7 +168,7 @@ func InstallLocal(opts *LocalOptions) (*Result, error) {
 
 	var installed []string
 	for _, skill := range opts.Skills {
-		if err := installLocalSkill(opts, skill, targetDir); err != nil {
+		if err := installLocalSkill(opts.SourceDir, skill, targetDir); err != nil {
 			return nil, fmt.Errorf("failed to install skill %q: %w", skill.InstallName(), err)
 		}
 		installed = append(installed, skill.InstallName())
@@ -183,26 +177,24 @@ func InstallLocal(opts *LocalOptions) (*Result, error) {
 	return &Result{Installed: installed, Dir: targetDir}, nil
 }
 
-func installLocalSkill(opts *LocalOptions, skill discovery.Skill, baseDir string) error {
+func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string) error {
 	// Use skill.Name (not InstallName) so skills are always installed flat.
 	// Most agent clients only discover immediate subdirectories of their
 	// skills folder and do not find skills nested under namespace directories.
 	skillDir := filepath.Join(baseDir, skill.Name)
-	targetRoot, err := openInstallRoot(opts.RootDir, baseDir)
-	if err != nil {
-		return fmt.Errorf("could not open install directory %s: %w", baseDir, err)
-	}
-	defer targetRoot.Close()
-	skillRoot, err := targetRoot.Sub(skill.Name, 0o755)
-	if err != nil {
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		return fmt.Errorf("could not create directory %s: %w", skillDir, err)
 	}
-	defer skillRoot.Close()
 
-	srcDir := filepath.Join(opts.SourceDir, filepath.FromSlash(skill.Path))
+	srcDir := filepath.Join(sourceRoot, filepath.FromSlash(skill.Path))
 	absSource, err := filepath.Abs(srcDir)
 	if err != nil {
 		return fmt.Errorf("could not resolve source path: %w", err)
+	}
+
+	safeSkillDir, err := safepaths.ParseAbsolute(skillDir)
+	if err != nil {
+		return fmt.Errorf("could not resolve target path: %w", err)
 	}
 
 	return filepath.WalkDir(srcDir, func(p string, d os.DirEntry, walkErr error) error {
@@ -221,6 +213,24 @@ func installLocalSkill(opts *LocalOptions, skill discovery.Skill, baseDir string
 			return err
 		}
 
+		// Defensive: filepath.WalkDir cannot produce traversal paths, but we
+		// guard against it in case the walk input is ever changed.
+		safeDest, err := safeSkillDir.Join(relPath)
+		if err != nil {
+			var traversalErr safepaths.PathTraversalError
+			if errors.As(err, &traversalErr) {
+				return fmt.Errorf("blocked path traversal in %q", relPath)
+			}
+			return fmt.Errorf("could not resolve destination path: %w", err)
+		}
+		destPath := safeDest.String()
+
+		if dir := filepath.Dir(destPath); dir != skillDir {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return fmt.Errorf("could not create directory: %w", err)
+			}
+		}
+
 		content, err := os.ReadFile(p)
 		if err != nil {
 			return fmt.Errorf("could not read %s: %w", p, err)
@@ -234,49 +244,25 @@ func installLocalSkill(opts *LocalOptions, skill discovery.Skill, baseDir string
 			content = []byte(injected)
 		}
 
-		if err := skillRoot.WriteFile(relPath, content, 0o644, opts.ReplaceExisting[skill.Name]); err != nil {
-			var traversalErr safepaths.PathTraversalError
-			if errors.As(err, &traversalErr) {
-				return fmt.Errorf("blocked path traversal in %q", relPath)
-			}
-			return fmt.Errorf("could not write %s: %w", filepath.Join(skillDir, relPath), err)
-		}
-		return nil
+		return os.WriteFile(destPath, content, 0o644)
 	})
 }
 
 func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 	// Use skill.Name (not InstallName) for a flat directory layout.
 	skillDir := filepath.Join(baseDir, skill.Name)
-	targetRoot := opts.TargetRoot
-	ownsTargetRoot := false
-	if targetRoot == nil {
-		var err error
-		targetRoot, err = openInstallRoot(opts.RootDir, baseDir)
-		if err != nil {
-			return fmt.Errorf("could not open install directory %s: %w", baseDir, err)
-		}
-		ownsTargetRoot = true
-	}
-	if ownsTargetRoot {
-		defer targetRoot.Close()
-	}
-
-	skillRoot := targetRoot
-	if !opts.DirectRoot {
-		var err error
-		skillRoot, err = targetRoot.Sub(skill.Name, 0o755)
-		if err != nil {
-			return fmt.Errorf("could not create directory %s: %w", skillDir, err)
-		}
-		defer skillRoot.Close()
-	} else {
-		skillDir = baseDir
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		return fmt.Errorf("could not create directory %s: %w", skillDir, err)
 	}
 
 	files, err := discovery.DiscoverSkillFiles(opts.Client, opts.Host, opts.Owner, opts.Repo, skill.TreeSHA, skill.Path)
 	if err != nil {
 		return fmt.Errorf("could not list skill files: %w", err)
+	}
+
+	safeSkillDir, err := safepaths.ParseAbsolute(skillDir)
+	if err != nil {
+		return fmt.Errorf("could not resolve skill directory path: %w", err)
 	}
 
 	for _, file := range files {
@@ -291,6 +277,22 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 
 		relPath := strings.TrimPrefix(file.Path, skill.Path+"/")
 
+		safeDest, err := safeSkillDir.Join(relPath)
+		if err != nil {
+			var traversalErr safepaths.PathTraversalError
+			if errors.As(err, &traversalErr) {
+				return fmt.Errorf("blocked path traversal in %q", relPath)
+			}
+			return fmt.Errorf("could not resolve destination path: %w", err)
+		}
+		destPath := safeDest.String()
+
+		if dir := filepath.Dir(destPath); dir != skillDir {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return fmt.Errorf("could not create directory: %w", err)
+			}
+		}
+
 		if filepath.Base(relPath) == "SKILL.md" {
 			content, err = frontmatter.InjectGitHubMetadata(content, opts.Host, opts.Owner, opts.Repo, opts.Ref, skill.TreeSHA, opts.PinnedRef, skill.Path)
 			if err != nil {
@@ -298,32 +300,12 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 			}
 		}
 
-		if err := skillRoot.WriteFile(relPath, []byte(content), 0o644, opts.ReplaceExisting[skill.Name]); err != nil {
-			var traversalErr safepaths.PathTraversalError
-			if errors.As(err, &traversalErr) {
-				return fmt.Errorf("blocked path traversal in %q", relPath)
-			}
-			return fmt.Errorf("could not write %s: %w", filepath.Join(skillDir, relPath), err)
+		if err := os.WriteFile(destPath, []byte(content), 0o644); err != nil {
+			return fmt.Errorf("could not write %s: %w", destPath, err)
 		}
 	}
 
 	return nil
-}
-
-func openInstallRoot(rootDir, targetDir string) (*safepaths.Root, error) {
-	if rootDir == "" {
-		rootDir = targetDir
-	}
-	root, targetRoot, err := safepaths.OpenRootWithin(rootDir, targetDir, 0o755)
-	if err != nil {
-		return nil, err
-	}
-	closeErr := root.Close()
-	if closeErr != nil {
-		_ = targetRoot.Close()
-		return nil, closeErr
-	}
-	return targetRoot, nil
 }
 
 // ResolveGitRoot returns the git repository root using the provided client,

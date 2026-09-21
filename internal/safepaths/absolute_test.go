@@ -81,12 +81,6 @@ func TestJoin(t *testing.T) {
 			elems: []string{""},
 			want:  mustParseAbsolute("/base"),
 		},
-		{
-			name:  "child beginning with two dots",
-			base:  mustParseAbsolute("/base"),
-			elems: []string{"..child"},
-			want:  mustParseAbsolute("/base/..child"),
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -32,6 +32,11 @@ func TestRootCreate(t *testing.T) {
 			},
 		},
 		{
+			name:    "rejects root directory as file",
+			path:    ".",
+			wantErr: "root directory",
+		},
+		{
 			name:    "rejects lexical escape",
 			path:    "../file.txt",
 			wantErr: "not a local child path",
@@ -196,16 +201,6 @@ func TestRootCreate(t *testing.T) {
 	}
 }
 
-func TestOpenRootWithinRejectsOutsideTarget(t *testing.T) {
-	rootDir := t.TempDir()
-	outside := t.TempDir()
-
-	root, target, err := safepaths.OpenRootWithin(rootDir, outside, 0o755)
-	require.ErrorContains(t, err, "outside root")
-	assert.Nil(t, root)
-	assert.Nil(t, target)
-}
-
 func TestValidateChild(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -225,44 +220,6 @@ func TestValidateChild(t *testing.T) {
 				require.NoError(t, err)
 			}
 		})
-	}
-}
-
-func TestRootRejectsDotFileOperations(t *testing.T) {
-	root, err := safepaths.OpenRoot(t.TempDir())
-	require.NoError(t, err)
-	defer root.Close()
-
-	file, err := root.Create(".", 0o644, false)
-	assert.Nil(t, file)
-	require.ErrorContains(t, err, "root directory")
-	file, err = root.Open(".")
-	assert.Nil(t, file)
-	require.ErrorContains(t, err, "root directory")
-	require.ErrorContains(t, root.RemoveAll("."), "root directory")
-}
-
-func TestRootOpenRejectsNonregularFile(t *testing.T) {
-	root, err := safepaths.OpenRoot(t.TempDir())
-	require.NoError(t, err)
-	defer root.Close()
-	require.NoError(t, root.MkdirAll("directory", 0o755))
-
-	file, err := root.Open("directory")
-	assert.Nil(t, file)
-	require.ErrorContains(t, err, "not a regular file")
-}
-
-func TestTempDirRejectsInvalidPrefix(t *testing.T) {
-	root, err := safepaths.OpenRoot(t.TempDir())
-	require.NoError(t, err)
-	defer root.Close()
-
-	for _, prefix := range []string{"", "../prefix", "nested/prefix"} {
-		name, tempRoot, err := root.TempDir(prefix)
-		assert.Empty(t, name)
-		assert.Nil(t, tempRoot)
-		require.ErrorContains(t, err, "invalid temporary directory prefix")
 	}
 }
 

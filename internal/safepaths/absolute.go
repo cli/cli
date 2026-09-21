@@ -61,7 +61,7 @@ func (a Absolute) isSubpathOf(dir Absolute) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return relativePath != ".." && !strings.HasPrefix(relativePath, ".."+string(filepath.Separator)), nil
+	return !strings.HasPrefix(relativePath, ".."), nil
 }
 
 type PathTraversalError struct {

@@ -10,75 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTempDirFailurePaths(t *testing.T) {
-	tests := []struct {
-		name      string
-		configure func(root *Root)
-		wantErr   string
-		verify    func(t *testing.T, root *Root)
-	}{
-		{
-			name: "random source error",
-			configure: func(root *Root) {
-				root.random = func([]byte) (int, error) {
-					return 0, errors.New("random failed")
-				}
-			},
-			wantErr: "random failed",
-		},
-		{
-			name: "mkdir error",
-			configure: func(root *Root) {
-				root.mkdir = func(*os.Root, string, os.FileMode) error {
-					return errors.New("mkdir failed")
-				}
-			},
-			wantErr: "mkdir failed",
-		},
-		{
-			name: "name exhaustion",
-			configure: func(root *Root) {
-				root.mkdir = func(*os.Root, string, os.FileMode) error {
-					return os.ErrExist
-				}
-			},
-			wantErr: "could not create a unique temporary directory",
-		},
-		{
-			name: "opening created directory fails",
-			configure: func(root *Root) {
-				root.openRoot = func(*os.Root, string) (*os.Root, error) {
-					return nil, errors.New("open failed")
-				}
-			},
-			wantErr: "open failed",
-			verify: func(t *testing.T, root *Root) {
-				t.Helper()
-				entries, err := os.ReadDir(root.String())
-				require.NoError(t, err)
-				assert.Empty(t, entries)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			root, err := OpenRoot(t.TempDir())
-			require.NoError(t, err)
-			defer root.Close()
-			tt.configure(root)
-
-			name, tempRoot, err := root.TempDir(".temp-")
-			assert.Empty(t, name)
-			assert.Nil(t, tempRoot)
-			require.ErrorContains(t, err, tt.wantErr)
-			if tt.verify != nil {
-				tt.verify(t, root)
-			}
-		})
-	}
-}
-
 func TestDirectoryIdentityMismatch(t *testing.T) {
 	rootDir := t.TempDir()
 	require.NoError(t, os.Mkdir(filepath.Join(rootDir, "expected"), 0o755))
@@ -116,9 +47,12 @@ func TestFileIdentityMismatch(t *testing.T) {
 		return defaultOpenFile(parent, name, flag, perm)
 	}
 
-	file, err := root.Open("expected")
+	file, err := root.Create("expected", 0o644, true)
 	assert.Nil(t, file)
 	require.ErrorContains(t, err, "changed while opening")
+	content, err := os.ReadFile(filepath.Join(rootDir, "other"))
+	require.NoError(t, err)
+	assert.Equal(t, "other", string(content))
 }
 
 func TestRedirectTargetClassificationError(t *testing.T) {
