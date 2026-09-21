@@ -154,7 +154,7 @@ func (r *Root) MkdirAll(name string, perm os.FileMode) error {
 	return root.Close()
 }
 
-// Validate reports whether name is lexically contained beneath the root.
+// Validate checks name using the same lexical rules as [ValidateChild].
 func (r *Root) Validate(name string) error {
 	_, err := r.localPath(name)
 	return err
@@ -269,14 +269,19 @@ func (r *Root) localPath(name string) (string, error) {
 	return validateChildPath(name)
 }
 
-// ValidateChild reports whether name is a lexically contained child path.
+// ValidateChild reports whether the cleaned name is a lexically contained path,
+// using the host operating system's path rules. Joining it to a root stays
+// lexically within that root. Nested paths and names that clean to "." are allowed.
+//
+// This check does not consult the filesystem or the current working directory,
+// and does not account for symbolic links.
 func ValidateChild(name string) error {
 	_, err := validateChildPath(name)
 	return err
 }
 
 func validateChildPath(name string) (string, error) {
-	local := filepath.Clean(filepath.FromSlash(name))
+	local := filepath.Clean(name)
 	if !filepath.IsLocal(local) {
 		return "", PathTraversalError{Elems: []string{name}}
 	}

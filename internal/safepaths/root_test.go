@@ -3,6 +3,7 @@ package safepaths_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/safepaths"
@@ -202,22 +203,51 @@ func TestRootCreate(t *testing.T) {
 }
 
 func TestValidateChild(t *testing.T) {
+	root, err := safepaths.OpenRoot(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, root.Close()) })
+
+	validators := []struct {
+		name     string
+		validate func(string) error
+	}{
+		{name: "ValidateChild", validate: safepaths.ValidateChild},
+		{name: "Root.Validate", validate: root.Validate},
+	}
 	tests := []struct {
 		name    string
 		path    string
 		wantErr bool
 	}{
+		{name: "empty path cleans to root", path: ""},
+		{name: "root", path: "."},
 		{name: "local child", path: "nested/file.txt"},
+		{name: "contained parent component", path: "nested/../file.txt"},
+		{name: "trailing separator", path: "nested/"},
 		{name: "parent escape", path: "../file.txt", wantErr: true},
+		{name: "nested parent escape", path: "nested/../../file.txt", wantErr: true},
 		{name: "absolute", path: filepath.Join(string(os.PathSeparator), "file.txt"), wantErr: true},
+		{name: "backslash child", path: `nested\file.txt`},
+		{name: "backslash parent escape", path: `..\..\file.txt`, wantErr: runtime.GOOS == "windows"},
+		{name: "mixed separator escape", path: `nested/..\..\file.txt`, wantErr: runtime.GOOS == "windows"},
+		{name: "drive relative path", path: `C:file.txt`, wantErr: runtime.GOOS == "windows"},
+		{name: "drive absolute path", path: `C:\file.txt`, wantErr: runtime.GOOS == "windows"},
+		{name: "UNC path", path: `\\server\share\file.txt`, wantErr: runtime.GOOS == "windows"},
+		{name: "reserved Windows name", path: "NUL", wantErr: runtime.GOOS == "windows"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := safepaths.ValidateChild(tt.path)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+			for _, validator := range validators {
+				t.Run(validator.name, func(t *testing.T) {
+					err := validator.validate(tt.path)
+					if tt.wantErr {
+						var traversalErr safepaths.PathTraversalError
+						require.ErrorAs(t, err, &traversalErr)
+						assert.Equal(t, []string{tt.path}, traversalErr.Elems)
+					} else {
+						require.NoError(t, err)
+					}
+				})
 			}
 		})
 	}
