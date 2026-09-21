@@ -207,7 +207,7 @@ func (f *fakePlatform) Download(url safeurl.SafeURL, openDestination func() (*sa
 		for _, testArtifact := range run.testArtifacts {
 			if testArtifact.artifact.DownloadURL == url.String() {
 				for _, file := range testArtifact.files {
-					return dir.WriteFile(file, []byte{}, 0o600, false)
+					return dir.WriteFile(file, []byte{}, 0o600, 0o755, false)
 				}
 			}
 		}

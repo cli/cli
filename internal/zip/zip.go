@@ -46,7 +46,7 @@ func extractZipFile(zf *zip.File, dest *safepaths.Root) (extractErr error) {
 	defer f.Close()
 
 	var df *os.File
-	if df, extractErr = dest.Create(zf.Name, getPerm(zm), false); extractErr != nil {
+	if df, extractErr = dest.Create(zf.Name, getPerm(zm), dirMode, false); extractErr != nil {
 		return
 	}
 

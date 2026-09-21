@@ -47,7 +47,7 @@ func TestFileIdentityMismatch(t *testing.T) {
 		return defaultOpenFile(parent, name, flag, perm)
 	}
 
-	file, err := root.Create("expected", 0o644, true)
+	file, err := root.Create("expected", 0o644, 0o755, true)
 	assert.Nil(t, file)
 	require.ErrorContains(t, err, "changed while opening")
 	content, err := os.ReadFile(filepath.Join(rootDir, "other"))
@@ -67,7 +67,7 @@ func TestRedirectTargetClassificationError(t *testing.T) {
 		return nil, errors.New("stat failed")
 	}
 
-	file, err := root.Create("link", 0o644, true)
+	file, err := root.Create("link", 0o644, 0o755, true)
 	assert.Nil(t, file)
 	require.ErrorContains(t, err, "could not safely classify redirect target")
 	info, err := os.Lstat(filepath.Join(rootDir, "link"))

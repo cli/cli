@@ -320,7 +320,7 @@ func trimTrailingPathSeparators(path string) string {
 
 func rootedWriteOutputFile(dir, name string, data []byte, perm os.FileMode, replace bool) error {
 	if dir == "" {
-		return safepaths.WriteFile(name, data, perm, replace)
+		return safepaths.WriteFile(name, data, perm, 0o755, replace)
 	}
 
 	root, err := safepaths.OpenRootDir(dir, 0o755)
@@ -328,5 +328,5 @@ func rootedWriteOutputFile(dir, name string, data []byte, perm os.FileMode, repl
 		return err
 	}
 	defer root.Close()
-	return root.WriteFile(name, data, perm, replace)
+	return root.WriteFile(name, data, perm, 0o755, replace)
 }

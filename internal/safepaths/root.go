@@ -70,19 +70,20 @@ func OpenRootDir(path string, perm os.FileMode) (*Root, error) {
 
 // OpenFile creates a file without traversing symbolic links below its rooted
 // parent. Creation is always exclusive, including when replace is false.
-func OpenFile(path string, perm os.FileMode, replace bool) (*os.File, error) {
+// filePerm and dirPerm specify creation modes before applying the umask.
+func OpenFile(path string, filePerm, dirPerm os.FileMode, replace bool) (*os.File, error) {
 	if hasTrailingPathSeparator(path) {
 		return nil, trailingPathSeparatorError(path)
 	}
 	parent := filepath.Dir(path)
-	if err := os.MkdirAll(parent, 0o755); err != nil {
+	if err := os.MkdirAll(parent, dirPerm); err != nil {
 		return nil, err
 	}
 	root, err := OpenRoot(parent)
 	if err != nil {
 		return nil, err
 	}
-	file, createErr := root.Create(filepath.Base(path), perm, replace)
+	file, createErr := root.Create(filepath.Base(path), filePerm, dirPerm, replace)
 	closeErr := root.Close()
 	if createErr != nil {
 		return nil, createErr
@@ -95,8 +96,9 @@ func OpenFile(path string, perm os.FileMode, replace bool) (*os.File, error) {
 }
 
 // WriteFile writes a complete file without traversing symbolic links.
-func WriteFile(path string, data []byte, perm os.FileMode, replace bool) (err error) {
-	file, err := OpenFile(path, perm, replace)
+// Creation permissions follow [OpenFile].
+func WriteFile(path string, data []byte, filePerm, dirPerm os.FileMode, replace bool) (err error) {
+	file, err := OpenFile(path, filePerm, dirPerm, replace)
 	if err != nil {
 		return err
 	}
@@ -160,7 +162,9 @@ func (r *Root) Validate(name string) error {
 
 // Create creates a new file beneath the root. Creation is exclusive unless an
 // existing regular file is safely opened and truncated for replacement.
-func (r *Root) Create(name string, perm os.FileMode, replace bool) (*os.File, error) {
+// filePerm and dirPerm specify creation modes before applying the umask.
+// Existing regular files and directories retain their permissions.
+func (r *Root) Create(name string, filePerm, dirPerm os.FileMode, replace bool) (*os.File, error) {
 	if hasTrailingPathSeparator(name) {
 		return nil, trailingPathSeparatorError(name)
 	}
@@ -171,7 +175,7 @@ func (r *Root) Create(name string, perm os.FileMode, replace bool) (*os.File, er
 	if local == "." {
 		return nil, fmt.Errorf("cannot create root directory as a file")
 	}
-	parent, err := r.openDirectories(filepath.Dir(local), 0o755)
+	parent, err := r.openDirectories(filepath.Dir(local), dirPerm)
 	if err != nil {
 		return nil, err
 	}
@@ -224,12 +228,13 @@ func (r *Root) Create(name string, perm os.FileMode, replace bool) (*os.File, er
 		}
 	}
 
-	return parent.OpenFile(base, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+	return parent.OpenFile(base, os.O_WRONLY|os.O_CREATE|os.O_EXCL, filePerm)
 }
 
 // WriteFile writes a complete file beneath the root.
-func (r *Root) WriteFile(name string, data []byte, perm os.FileMode, replace bool) (err error) {
-	file, err := r.Create(name, perm, replace)
+// Creation permissions follow [Root.Create].
+func (r *Root) WriteFile(name string, data []byte, filePerm, dirPerm os.FileMode, replace bool) (err error) {
+	file, err := r.Create(name, filePerm, dirPerm, replace)
 	if err != nil {
 		return err
 	}
@@ -244,8 +249,9 @@ func (r *Root) WriteFile(name string, data []byte, perm os.FileMode, replace boo
 }
 
 // CopyFile copies content into a file beneath the root.
-func (r *Root) CopyFile(name string, src io.Reader, perm os.FileMode, replace bool) (err error) {
-	file, err := r.Create(name, perm, replace)
+// Creation permissions follow [Root.Create].
+func (r *Root) CopyFile(name string, src io.Reader, filePerm, dirPerm os.FileMode, replace bool) (err error) {
+	file, err := r.Create(name, filePerm, dirPerm, replace)
 	if err != nil {
 		return err
 	}

@@ -34,7 +34,7 @@ func TestRootRejectsDirectorySwapDuringOpen(t *testing.T) {
 		return defaultOpenRoot(parent, name)
 	}
 
-	err = root.WriteFile(filepath.Join("nested", "file.txt"), []byte("content"), 0o644, false)
+	err = root.WriteFile(filepath.Join("nested", "file.txt"), []byte("content"), 0o644, 0o755, false)
 	require.Error(t, err)
 	assert.NoFileExists(t, filepath.Join(redirectedDir, "file.txt"))
 	assert.NoFileExists(t, filepath.Join(rootDir, "moved", "file.txt"))

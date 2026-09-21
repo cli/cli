@@ -437,7 +437,7 @@ func extractTarGz(r io.Reader, destDir string) error {
 		}
 
 		if header.Typeflag == tar.TypeReg {
-			if err := root.CopyFile(header.Name, tr, os.FileMode(header.Mode)&0o777, true); err != nil {
+			if err := root.CopyFile(header.Name, tr, os.FileMode(header.Mode)&0o777, 0o755, true); err != nil {
 				return fmt.Errorf("failed to extract file: %w", err)
 			}
 		}

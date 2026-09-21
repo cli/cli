@@ -22,7 +22,7 @@ func TestCreateReplacePreservesDevice(t *testing.T) {
 	root, err := OpenRoot("/dev")
 	require.NoError(t, err)
 	defer root.Close()
-	file, err := root.Create("null", 0o644, true)
+	file, err := root.Create("null", 0o644, 0o755, true)
 	require.NoError(t, err)
 	_, err = file.Write([]byte("content"))
 	require.NoError(t, err)
@@ -47,7 +47,7 @@ func TestCreateReplaceDoesNotUnlinkFIFO(t *testing.T) {
 
 	result := make(chan error, 1)
 	go func() {
-		file, err := root.Create("fifo", 0o644, true)
+		file, err := root.Create("fifo", 0o644, 0o755, true)
 		if file != nil {
 			_ = file.Close()
 		}
@@ -86,7 +86,7 @@ func TestCreateReplaceDoesNotBlockOnFIFOSwap(t *testing.T) {
 	}
 
 	start := time.Now()
-	file, err := root.Create("target", 0o644, true)
+	file, err := root.Create("target", 0o644, 0o755, true)
 	assert.Nil(t, file)
 	require.Error(t, err)
 	assert.Less(t, time.Since(start), time.Second)

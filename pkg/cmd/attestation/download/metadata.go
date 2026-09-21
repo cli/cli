@@ -52,7 +52,7 @@ func (s *LiveStore) createMetadataFile(artifactDigest string, attestationsResp [
 	}
 	defer root.Close()
 
-	f, err := root.Create(s.createJSONLinesFileName(artifactDigest), 0o666, true)
+	f, err := root.Create(s.createJSONLinesFileName(artifactDigest), 0o666, 0o755, true)
 	if err != nil {
 		return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to create file: %v", err))
 	}

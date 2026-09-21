@@ -188,7 +188,7 @@ func TestRootCreate(t *testing.T) {
 			require.NoError(t, err)
 			defer root.Close()
 
-			err = root.WriteFile(tt.path, []byte("new"), 0o644, tt.replace)
+			err = root.WriteFile(tt.path, []byte("new"), 0o644, 0o755, tt.replace)
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 			} else {
@@ -248,7 +248,7 @@ func TestOpenFileRejectsTrailingSeparator(t *testing.T) {
 			t.Chdir(root)
 			path := tt.path(root)
 
-			file, err := safepaths.OpenFile(path, 0o644, false)
+			file, err := safepaths.OpenFile(path, 0o644, 0o755, false)
 			if file != nil {
 				_ = file.Close()
 			}
@@ -299,7 +299,7 @@ func TestOpenFileAllowsTrustedParentSymlinks(t *testing.T) {
 				t.Chdir(sandbox)
 			}
 
-			file, err := safepaths.OpenFile(tt.path(sandbox), 0o644, false)
+			file, err := safepaths.OpenFile(tt.path(sandbox), 0o644, 0o755, false)
 			require.NoError(t, err)
 			_, err = file.Write([]byte("content"))
 			require.NoError(t, err)
@@ -352,7 +352,7 @@ func TestOpenRootDirAllowsTrustedPathSymlinks(t *testing.T) {
 
 			root, err := safepaths.OpenRootDir(tt.path(sandbox), 0o755)
 			require.NoError(t, err)
-			require.NoError(t, root.WriteFile("file.txt", []byte("content"), 0o644, false))
+			require.NoError(t, root.WriteFile("file.txt", []byte("content"), 0o644, 0o755, false))
 			require.NoError(t, root.Close())
 			content, err := os.ReadFile(filepath.Join(target, "selected", "file.txt"))
 			require.NoError(t, err)

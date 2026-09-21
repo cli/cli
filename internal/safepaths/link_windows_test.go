@@ -75,7 +75,7 @@ func TestCreateReplaceFailsClosedForNonLinkReparse(t *testing.T) {
 		return "", os.ErrNotExist
 	}
 
-	file, err := root.Create("entry", 0o644, true)
+	file, err := root.Create("entry", 0o644, 0o755, true)
 	assert.Nil(t, file)
 	require.ErrorIs(t, err, errUnsupportedNonLinkReparse)
 	after, err := os.Stat(path)
@@ -98,11 +98,11 @@ func TestRootRejectsJunction(t *testing.T) {
 	require.NoError(t, err)
 	defer root.Close()
 
-	err = root.WriteFile(filepath.Join("junction", "file.txt"), []byte("content"), 0o644, false)
+	err = root.WriteFile(filepath.Join("junction", "file.txt"), []byte("content"), 0o644, 0o755, false)
 	require.ErrorContains(t, err, "symbolic link")
 	assert.NoFileExists(t, filepath.Join(target, "file.txt"))
 
-	err = root.WriteFile("junction", []byte("content"), 0o644, true)
+	err = root.WriteFile("junction", []byte("content"), 0o644, 0o755, true)
 	require.Error(t, err)
 	info, err := os.Lstat(junction)
 	require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestOpenFileRejectsWindowsTrailingSeparator(t *testing.T) {
 			root := t.TempDir()
 			path := filepath.Join(root, "output") + tt.separator
 
-			file, err := OpenFile(path, 0o644, false)
+			file, err := OpenFile(path, 0o644, 0o755, false)
 			if file != nil {
 				_ = file.Close()
 			}
@@ -148,7 +148,7 @@ func TestRootCreateRejectsWindowsTrailingSeparator(t *testing.T) {
 			require.NoError(t, err)
 			defer root.Close()
 
-			err = root.WriteFile("output"+tt.separator, []byte("content"), 0o644, false)
+			err = root.WriteFile("output"+tt.separator, []byte("content"), 0o644, 0o755, false)
 			require.ErrorContains(t, err, "ends in a separator")
 			_, statErr := os.Lstat(filepath.Join(rootDir, "output"))
 			require.True(t, os.IsNotExist(statErr))

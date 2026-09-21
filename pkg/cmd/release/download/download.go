@@ -476,9 +476,9 @@ func (w *destinationWriter) Copy(name string, r io.Reader) (copyErr error) {
 		if copyErr = w.ensureRoot(); copyErr != nil {
 			return
 		}
-		f, copyErr = w.root.Create(name, 0o644, w.overwrite)
+		f, copyErr = w.root.Create(name, 0o644, 0o755, w.overwrite)
 	} else {
-		f, copyErr = safepaths.OpenFile(fp, 0o644, w.overwrite)
+		f, copyErr = safepaths.OpenFile(fp, 0o644, 0o755, w.overwrite)
 	}
 	if copyErr != nil {
 		if os.IsExist(copyErr) {
