@@ -62,6 +62,19 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	return cmd
 }
 
+func postCloseComment(opts *CloseOptions, pr *api.PullRequest, baseRepo ghrepo.Interface) error {
+	commentOpts := &shared.CommentableOptions{
+		Body:       opts.Comment,
+		HttpClient: opts.HttpClient,
+		InputType:  shared.InputTypeInline,
+		Quiet:      true,
+		RetrieveCommentable: func() (shared.Commentable, ghrepo.Interface, error) {
+			return pr, baseRepo, nil
+		},
+	}
+	return shared.CommentableRun(commentOpts)
+}
+
 func closeRun(opts *CloseOptions) error {
 	cs := opts.IO.ColorScheme()
 
@@ -76,9 +89,19 @@ func closeRun(opts *CloseOptions) error {
 
 	if pr.State == "MERGED" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request %s#%d (%s) can't be closed because it was already merged\n", cs.FailureIcon(), ghrepo.FullName(baseRepo), pr.Number, pr.Title)
+		if opts.Comment != "" {
+			if err := postCloseComment(opts, pr, baseRepo); err != nil {
+				return err
+			}
+		}
 		return cmdutil.SilentError
 	} else if !pr.IsOpen() {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request %s#%d (%s) is already closed\n", cs.WarningIcon(), ghrepo.FullName(baseRepo), pr.Number, pr.Title)
+		if opts.Comment != "" {
+			if err := postCloseComment(opts, pr, baseRepo); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 
@@ -88,17 +111,7 @@ func closeRun(opts *CloseOptions) error {
 	}
 
 	if opts.Comment != "" {
-		commentOpts := &shared.CommentableOptions{
-			Body:       opts.Comment,
-			HttpClient: opts.HttpClient,
-			InputType:  shared.InputTypeInline,
-			Quiet:      true,
-			RetrieveCommentable: func() (shared.Commentable, ghrepo.Interface, error) {
-				return pr, baseRepo, nil
-			},
-		}
-		err := shared.CommentableRun(commentOpts)
-		if err != nil {
+		if err := postCloseComment(opts, pr, baseRepo); err != nil {
 			return err
 		}
 	}
