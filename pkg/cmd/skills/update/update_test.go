@@ -1646,7 +1646,7 @@ func TestSwapRootDirectoryContents_RetainsBackupOnRollbackFailure(t *testing.T) 
 	require.NoError(t, stagingRoot.WriteFile("SKILL.md", []byte("replacement"), 0o644, false))
 
 	originalRename := renameRootEntry
-	defer func() { renameRootEntry = originalRename }()
+	t.Cleanup(func() { renameRootEntry = originalRename })
 	renameRootEntry = func(root *safepaths.Root, oldName, newName string) error {
 		if strings.HasPrefix(oldName, stagingName+".publish-") {
 			return fmt.Errorf("publish blocked")
@@ -1691,7 +1691,7 @@ func TestSwapRootDirectoryContents_DoesNotExposePartialFiles(t *testing.T) {
 	require.NoError(t, stagingRoot.WriteFile("SKILL.md", []byte("replacement"), 0o644, false))
 
 	originalCopy := copyRootFile
-	defer func() { copyRootFile = originalCopy }()
+	t.Cleanup(func() { copyRootFile = originalCopy })
 	copyRootFile = func(dst io.Writer, src io.Reader) (int64, error) {
 		buffer := make([]byte, 3)
 		n, readErr := src.Read(buffer)
@@ -1733,7 +1733,7 @@ func TestSwapRootDirectoryContents_CleansPreparedEntriesOnSecondNameFailure(t *t
 	require.NoError(t, root.WriteFile(collision, []byte("existing"), 0o644, false))
 
 	originalRemove := removeRootHidden
-	defer func() { removeRootHidden = originalRemove }()
+	t.Cleanup(func() { removeRootHidden = originalRemove })
 	removeRootHidden = func(_ *safepaths.Root, name string) error {
 		if name == stagingName+".publish-0" {
 			return fmt.Errorf("cleanup blocked for %s", name)
@@ -1805,7 +1805,7 @@ func TestSwapRootDirectoryContents_RestoresAfterDestructiveFailure(t *testing.T)
 			require.NoError(t, stagingRoot.WriteFile("c.txt", []byte("new-c"), 0o644, false))
 
 			originalRename := renameRootEntry
-			defer func() { renameRootEntry = originalRename }()
+			t.Cleanup(func() { renameRootEntry = originalRename })
 			tt.configure(stagingName)
 
 			err = swapRootDirectoryContents(root, stagingRoot, stagingName)

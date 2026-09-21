@@ -388,6 +388,12 @@ func extractZip(path, destDir string) error {
 	}
 	defer root.Close()
 
+	// As of the time of writing, ghzip.ExtractZip will safely skip files that
+	// would result in path traversal. This is an issue for our use-case because
+	// we want to error out before extracting if there's any such file.
+	// To avoid breaking the shared ghzip.ExtractZip code that expects unsafe
+	// paths to be ignored and no error produced, we pre-validate here,
+	// producing an error if any such file is found.
 	for _, file := range zipReader.File {
 		if err := root.Validate(file.Name); err != nil {
 			return err
