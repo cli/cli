@@ -11,6 +11,9 @@ import (
 
 // Root restricts filesystem operations to a directory tree and refuses to
 // traverse symbolic links below that directory.
+//
+// The caller owns each returned Root and must call Close when it is
+// no longer needed.
 type Root struct {
 	root     *os.Root
 	openRoot func(*os.Root, string) (*os.Root, error)
