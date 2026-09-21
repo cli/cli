@@ -32,6 +32,10 @@ import (
 
 const (
 	ttyIndent = "  "
+
+	errorBodyStdout = "stdout"
+	errorBodyStderr = "stderr"
+	errorBodyNone   = "none"
 )
 
 type ApiOptions struct {
@@ -61,6 +65,7 @@ type ApiOptions struct {
 	CacheTTL            time.Duration
 	FilterOutput        string
 	Verbose             bool
+	ErrorBody           string
 
 	AllowEscapeSequences bool
 }
@@ -137,6 +142,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection. Each page is a separate
 			JSON array or object. Pass %[1]s--slurp%[1]s to wrap all pages of JSON arrays or objects
 			into an outer JSON array.
+
+			The %[1]s--error-body%[1]s flag controls where HTTP error response bodies are written:
+			%[1]sstdout%[1]s, %[1]sstderr%[1]s, or %[1]snone%[1]s. The default is %[1]sstdout%[1]s. When %[1]s--jq%[1]s or
+			%[1]s--template%[1]s is used, the default is %[1]sstderr%[1]s so command substitution does not
+			capture error JSON. Use %[1]s--error-body=stdout%[1]s to keep extracting error JSON from
+			standard output.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# List releases in the current repository
@@ -162,6 +173,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			# Print only specific fields from the response
 			$ gh api repos/{owner}/{repo}/issues --jq '.[].title'
+
+			# Avoid capturing HTTP error JSON when querying a field
+			$ mention_slug=$(gh api orgs/MYORG/teams/my-team -q .slug || true)
+
+			# Write HTTP error JSON to stdout for parsing
+			$ gh api repos/OWNER/MISSING --jq .id --error-body=stdout
 
 			# Use a template for the output
 			$ gh api repos/{owner}/{repo}/issues --template \
@@ -305,6 +322,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 	cmd.Flags().BoolVar(&opts.AllowEscapeSequences, "allow-escape-sequences", false, "Allow printing terminal escape sequences")
+	cmdutil.StringEnumFlag(cmd, &opts.ErrorBody, "error-body", "", "", []string{errorBodyStdout, errorBodyStderr, errorBodyNone}, "Where to write HTTP error response bodies")
 	return cmd
 }
 
@@ -506,6 +524,17 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
+	isErrorResponse := serverError != "" || resp.StatusCode > 299
+	destWriter := bodyWriter
+	var newlineW *trailingByteWriter
+	if isErrorResponse {
+		destWriter = errorBodyWriter(opts, bodyWriter)
+		if destWriter == opts.IO.ErrOut {
+			newlineW = &trailingByteWriter{w: destWriter}
+			destWriter = newlineW
+		}
+	}
+
 	if opts.FilterOutput != "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
 		indent := ""
@@ -522,7 +551,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 			return
 		}
 	} else if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(bodyWriter, responseBody, ttyIndent)
+		err = jsoncolor.Write(destWriter, responseBody, ttyIndent)
 	} else {
 		if isJSON && opts.Paginate && !opts.Slurp && !isGraphQLPaginate && !opts.ShowResponseHeaders {
 			responseBody = &paginatedArrayReader{
@@ -535,19 +564,25 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 		// It is faithful byte output, so binary bound for a terminal and text
 		// carrying escape sequences are refused; the opt-out flag and discarded
 		// output stream verbatim.
-		if !isJSON && !opts.AllowEscapeSequences && bodyWriter != io.Discard {
-			err = iostreams.CopyGuardedContent(bodyWriter, responseBody, opts.IO.IsStdoutTTY())
+		if !isJSON && !opts.AllowEscapeSequences && destWriter != io.Discard {
+			err = iostreams.CopyGuardedContent(destWriter, responseBody, opts.IO.IsStdoutTTY())
 			if binErr, ok := errors.AsType[iostreams.BinaryTerminalError](err); ok {
 				err = fmt.Errorf("%w; redirect or pipe stdout to save it, or pass --allow-escape-sequences to output it anyway", binErr)
 			} else if errors.Is(err, iostreams.ErrEscapeSequence) {
 				err = errors.New("the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway")
 			}
 		} else {
-			_, err = io.Copy(bodyWriter, responseBody)
+			_, err = io.Copy(destWriter, responseBody)
 		}
 	}
 	if err != nil {
 		return
+	}
+	if newlineW != nil {
+		err = newlineW.EnsureNewline()
+		if err != nil {
+			return
+		}
 	}
 
 	if serverError == "" && resp.StatusCode > 299 {
@@ -731,4 +766,52 @@ func previewNamesToMIMETypes(names []string) string {
 		types = append(types, fmt.Sprintf("application/vnd.github.%s-preview", p))
 	}
 	return strings.Join(types, ", ")
+}
+
+func errorBodyDestination(opts *ApiOptions) string {
+	switch strings.ToLower(opts.ErrorBody) {
+	case errorBodyStdout, errorBodyStderr, errorBodyNone:
+		return strings.ToLower(opts.ErrorBody)
+	}
+	if opts.FilterOutput != "" || opts.Template != "" {
+		return errorBodyStderr
+	}
+	return errorBodyStdout
+}
+
+func errorBodyWriter(opts *ApiOptions, bodyWriter io.Writer) io.Writer {
+	if opts.Silent {
+		return io.Discard
+	}
+	switch errorBodyDestination(opts) {
+	case errorBodyStderr:
+		return opts.IO.ErrOut
+	case errorBodyNone:
+		return io.Discard
+	default:
+		return bodyWriter
+	}
+}
+
+type trailingByteWriter struct {
+	w    io.Writer
+	last byte
+	n    int
+}
+
+func (w *trailingByteWriter) Write(p []byte) (int, error) {
+	n, err := w.w.Write(p)
+	if n > 0 {
+		w.last = p[n-1]
+		w.n += n
+	}
+	return n, err
+}
+
+func (w *trailingByteWriter) EnsureNewline() error {
+	if w.n > 0 && w.last != '\n' {
+		_, err := w.w.Write([]byte{'\n'})
+		return err
+	}
+	return nil
 }

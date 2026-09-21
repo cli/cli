@@ -370,6 +370,80 @@ func Test_NewCmdApi(t *testing.T) {
 			},
 			wantsErr: false,
 		},
+		{
+			name: "with error-body stdout",
+			cli:  "user --error-body stdout",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+				Verbose:             false,
+				ErrorBody:           "stdout",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "with error-body stderr",
+			cli:  "user --error-body=stderr",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+				Verbose:             false,
+				ErrorBody:           "stderr",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "with error-body none",
+			cli:  "user --error-body none",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+				Verbose:             false,
+				ErrorBody:           "none",
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "invalid error-body",
+			cli:      "user --error-body disk",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -407,6 +481,7 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.Template, opts.Template)
 			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
 			assert.Equal(t, tt.wants.Verbose, opts.Verbose)
+			assert.Equal(t, tt.wants.ErrorBody, opts.ErrorBody)
 		})
 	}
 }
@@ -640,8 +715,8 @@ func Test_apiRun(t *testing.T) {
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
 			err:    cmdutil.SilentError,
-			stdout: `{"message": "THIS IS FINE"}`,
-			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+			stdout: ``,
+			stderr: "{\"message\": \"THIS IS FINE\"}\ngh: THIS IS FINE (HTTP 400)\n",
 			isatty: false,
 		},
 		{
@@ -670,8 +745,118 @@ func Test_apiRun(t *testing.T) {
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
 			err:    cmdutil.SilentError,
+			stdout: ``,
+			stderr: "{\"message\": \"THIS IS FINE\"}\ngh: THIS IS FINE (HTTP 400)\n",
+			isatty: false,
+		},
+		{
+			name: "jq filter when REST error with error-body stdout",
+			options: ApiOptions{
+				FilterOutput: `.[].name`,
+				ErrorBody:    "stdout",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
 			stdout: `{"message": "THIS IS FINE"}`,
 			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+			isatty: false,
+		},
+		{
+			name: "REST error with error-body stderr",
+			options: ApiOptions{
+				ErrorBody: "stderr",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: ``,
+			stderr: "{\"message\": \"THIS IS FINE\"}\ngh: THIS IS FINE (HTTP 400)\n",
+			isatty: false,
+		},
+		{
+			name: "REST error with error-body none",
+			options: ApiOptions{
+				ErrorBody: "none",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: ``,
+			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+			isatty: false,
+		},
+		{
+			name: "silent REST error omits error body even with error-body stderr",
+			options: ApiOptions{
+				Silent:    true,
+				ErrorBody: "stderr",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: ``,
+			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+			isatty: false,
+		},
+		{
+			name: "jq filter when REST error with error-body none",
+			options: ApiOptions{
+				FilterOutput: `.slug`,
+				ErrorBody:    "none",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 404,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "Not Found"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: ``,
+			stderr: "gh: Not Found (HTTP 404)\n",
+			isatty: false,
+		},
+		{
+			name: "jq filter when GraphQL error",
+			options: ApiOptions{
+				RequestPath:  "graphql",
+				FilterOutput: `.data.slug`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: ``,
+			stderr: "{\"errors\": [{\"message\":\"AGAIN\"}, {\"message\":\"FINE\"}]}\ngh: AGAIN\nFINE\n",
+			isatty: false,
+		},
+		{
+			name: "success with jq is not affected by error-body stderr",
+			options: ApiOptions{
+				FilterOutput: `.name`,
+				ErrorBody:    "stderr",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"name":"Mona"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: "Mona\n",
+			stderr: ``,
 			isatty: false,
 		},
 		{
@@ -1755,6 +1940,49 @@ func Test_previewNamesToMIMETypes(t *testing.T) {
 			if got := previewNamesToMIMETypes(tt.previews); got != tt.want {
 				t.Errorf("previewNamesToMIMETypes() = %q, want %q", got, tt.want)
 			}
+		})
+	}
+}
+
+func Test_errorBodyDestination(t *testing.T) {
+	tests := []struct {
+		name string
+		opts ApiOptions
+		want string
+	}{
+		{
+			name: "default without filters",
+			want: "stdout",
+		},
+		{
+			name: "jq defaults to stderr",
+			opts: ApiOptions{FilterOutput: ".slug"},
+			want: "stderr",
+		},
+		{
+			name: "template defaults to stderr",
+			opts: ApiOptions{Template: "{{.slug}}"},
+			want: "stderr",
+		},
+		{
+			name: "explicit stdout with jq",
+			opts: ApiOptions{FilterOutput: ".slug", ErrorBody: "stdout"},
+			want: "stdout",
+		},
+		{
+			name: "explicit stderr without filters",
+			opts: ApiOptions{ErrorBody: "stderr"},
+			want: "stderr",
+		},
+		{
+			name: "explicit none with jq",
+			opts: ApiOptions{FilterOutput: ".slug", ErrorBody: "none"},
+			want: "none",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, errorBodyDestination(&tt.opts))
 		})
 	}
 }
