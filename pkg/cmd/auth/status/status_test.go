@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -176,7 +177,7 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(401, "no bueno"))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
@@ -186,6 +187,46 @@ func Test_statusRun(t *testing.T) {
 				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth refresh -h ghe.io
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+			`),
+		},
+		{
+			name: "rate limited",
+			opts: StatusOptions{},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.WithHeader(
+					httpmock.StatusStringResponse(403, `{"message":"API rate limit exceeded for user ID 123"}`),
+					"X-RateLimit-Remaining", "0",
+				))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Failed to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Could not verify token in GH_CONFIG_DIR/hosts.yml: GitHub API rate limit exceeded
+				  - HTTP 403 (https://api.github.com/)
+			`),
+		},
+		{
+			name: "transport error",
+			opts: StatusOptions{},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), func(req *http.Request) (*http.Response, error) {
+					return nil, &net.DNSError{Err: "no such host", Name: "api.github.com", IsNotFound: true}
+				})
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Failed to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Could not verify token in GH_CONFIG_DIR/hosts.yml: Get "https://api.github.com/": lookup api.github.com: no such host
 			`),
 		},
 		{
@@ -221,7 +262,7 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(401, "no bueno"))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
@@ -446,9 +487,7 @@ func Test_statusRun(t *testing.T) {
 
 				  X Failed to log in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: false
-				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
-				  - To re-authenticate, run: gh auth refresh -h ghe.io
-				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+				  - Could not verify token in GH_CONFIG_DIR/hosts.yml: HTTP 404 (https://ghe.io/api/v3/)
 			`),
 		},
 		{
@@ -534,9 +573,7 @@ func Test_statusRun(t *testing.T) {
 				ghe.io
 				  X Failed to log in to ghe.io account monalisa-ghe-2 (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
-				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
-				  - To re-authenticate, run: gh auth refresh -h ghe.io
-				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe-2
+				  - Could not verify token in GH_CONFIG_DIR/hosts.yml: HTTP 404 (https://ghe.io/api/v3/)
 			`),
 		},
 		{
@@ -653,9 +690,9 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(401, "no bueno"))
 			},
-			wantOut: `{"hosts":{"ghe.io":[{"state":"error","error":"HTTP 400 (https://ghe.io/api/v3/)","active":true,"host":"ghe.io","login":"monalisa-ghe","tokenSource":"GH_CONFIG_DIR/hosts.yml","gitProtocol":"https"}]}}` + "\n",
+			wantOut: `{"hosts":{"ghe.io":[{"state":"error","error":"HTTP 401 (https://ghe.io/api/v3/)","statusCode":401,"active":true,"host":"ghe.io","login":"monalisa-ghe","tokenSource":"GH_CONFIG_DIR/hosts.yml","gitProtocol":"https"}]}}` + "\n",
 			wantErr: nil, // should not return error in machine-readable mode
 		},
 		{
@@ -667,7 +704,7 @@ func Test_statusRun(t *testing.T) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StatusStringResponse(400, `no bueno`))
+					httpmock.StatusStringResponse(401, `no bueno`))
 			},
 			wantOut: `{"hosts":{"github.com":[{"state":"error","error":"non-200 OK status code:  body: \"no bueno\"","active":true,"host":"github.com","login":"","tokenSource":"GH_TOKEN","gitProtocol":"https"}]}}` + "\n",
 			wantErr: nil, // should not return error in machine-readable mode

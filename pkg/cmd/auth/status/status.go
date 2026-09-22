@@ -30,6 +30,8 @@ const (
 type authEntry struct {
 	State       authEntryState `json:"state"`
 	Error       string         `json:"error,omitempty"`
+	StatusCode  int            `json:"statusCode,omitempty"`
+	RateLimited bool           `json:"rateLimited,omitempty"`
 	Active      bool           `json:"active"`
 	Host        string         `json:"host"`
 	Login       string         `json:"login"`
@@ -92,15 +94,29 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		}
 		activeStr := fmt.Sprintf("%v", e.Active)
 		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
-		sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.TokenSource))
-		if authTokenWriteable(e.TokenSource) {
-			loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
-			if shared.AuthTokenRefreshable(e.Token, e.TokenSource) {
-				loginInstructions = fmt.Sprintf("gh auth refresh -h %s", e.Host)
+		switch {
+		case e.StatusCode == http.StatusUnauthorized:
+			sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.TokenSource))
+			if authTokenWriteable(e.TokenSource) {
+				loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
+				if shared.AuthTokenRefreshable(e.Token, e.TokenSource) {
+					loginInstructions = fmt.Sprintf("gh auth refresh -h %s", e.Host)
+				}
+				logoutInstructions := fmt.Sprintf("gh auth logout -h %s -u %s", e.Host, e.Login)
+				sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
+				sb.WriteString(fmt.Sprintf("  - To forget about this account, run: %s\n", cs.Bold(logoutInstructions)))
 			}
-			logoutInstructions := fmt.Sprintf("gh auth logout -h %s -u %s", e.Host, e.Login)
-			sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
-			sb.WriteString(fmt.Sprintf("  - To forget about this account, run: %s\n", cs.Bold(logoutInstructions)))
+		case e.isRateLimited():
+			sb.WriteString(fmt.Sprintf("  - Could not verify token in %s: GitHub API rate limit exceeded\n", e.TokenSource))
+			if e.Error != "" {
+				sb.WriteString(fmt.Sprintf("  - %s\n", e.Error))
+			}
+		case e.StatusCode == 0 && e.Error != "":
+			sb.WriteString(fmt.Sprintf("  - Could not verify token in %s: %s\n", e.TokenSource, e.Error))
+		case e.Error != "":
+			sb.WriteString(fmt.Sprintf("  - Could not verify token in %s: %s\n", e.TokenSource, e.Error))
+		default:
+			sb.WriteString(fmt.Sprintf("  - Could not verify token in %s.\n", e.TokenSource))
 		}
 
 	case authEntryStateTimeout:
@@ -399,6 +415,11 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 		if err != nil {
 			entry.State = authEntryStateError
 			entry.Error = err.Error()
+			var httpErr api.HTTPError
+			if errors.As(err, &httpErr) {
+				entry.StatusCode = httpErr.StatusCode
+				entry.RateLimited = isHTTPRateLimit(httpErr)
+			}
 			return entry
 		}
 	}
@@ -415,6 +436,11 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 
 		entry.State = authEntryStateError
 		entry.Error = err.Error()
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) {
+			entry.StatusCode = httpErr.StatusCode
+			entry.RateLimited = isHTTPRateLimit(httpErr)
+		}
 		return entry
 	}
 	entry.Scopes = scopesHeader
@@ -425,4 +451,41 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 
 func authTokenWriteable(src string) bool {
 	return !strings.HasSuffix(src, "_TOKEN")
+}
+
+// isHTTPRateLimit reports whether err is a GitHub API rate-limit response.
+// Per GitHub docs: HTTP 429 is always a rate limit; HTTP 403 with
+// x-ratelimit-remaining: 0 or retry-after is also a rate limit.
+func isHTTPRateLimit(httpErr api.HTTPError) bool {
+	if httpErr.StatusCode == http.StatusTooManyRequests {
+		return true
+	}
+	if httpErr.StatusCode != http.StatusForbidden {
+		return false
+	}
+	if httpErr.Headers != nil {
+		if httpErr.Headers.Get("x-ratelimit-remaining") == "0" {
+			return true
+		}
+		if httpErr.Headers.Get("retry-after") != "" {
+			return true
+		}
+	}
+	// Fall back to message text when headers are unavailable.
+	lower := strings.ToLower(httpErr.Error())
+	return strings.Contains(lower, "rate limit") || strings.Contains(lower, "rate_limit")
+}
+
+func (e authEntry) isRateLimited() bool {
+	if e.RateLimited {
+		return true
+	}
+	if e.StatusCode == http.StatusTooManyRequests {
+		return true
+	}
+	if e.StatusCode != http.StatusForbidden {
+		return false
+	}
+	lower := strings.ToLower(e.Error)
+	return strings.Contains(lower, "rate limit") || strings.Contains(lower, "rate_limit")
 }
