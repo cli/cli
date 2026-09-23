@@ -121,7 +121,7 @@ func newFixture(t *testing.T) *fixture {
 		"command":       document{"executable": executable, "args": []any{}, "sha256": hex.EncodeToString(hash[:]), "version": "fixture 1", "cwd": "work"},
 		"environment":   document{"values": document{}, "pass": []any{}},
 		"authorization": document{"status": "approved", "basis": "The caller approved this local fixture.", "effects": []any{}},
-		"terminal": document{"columns": 80, "rows": 24, "fontPath": filepath.Join(root, "mono.ttf"), "fontSize": 18,
+		"terminal": document{"columns": 80, "rows": 24, "fontSize": 18,
 			"fps": 30, "background": "#0d1117", "foreground": "#e6edf3"},
 		"limits": document{"maxActions": 100, "maxDurationSeconds": 10, "idleTimeoutSeconds": 5},
 		"steps":  []any{}, "constraints": document{"deny": []any{}}, "expectations": []any{},

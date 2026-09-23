@@ -113,7 +113,7 @@ func TestRun(t *testing.T) {
 						"sha256": fixtureHash, "version": "synthetic Go test fixture", "cwd": "work"},
 					"environment":   map[string]any{"values": map[string]string{"CLI_EXERCISE_TEST_FIXTURE": "workflow", "GORACE": "atexit_sleep_ms=0"}, "pass": []any{}},
 					"authorization": map[string]any{"status": "approved", "basis": "The caller selected this local isolated test.", "effects": []any{}},
-					"terminal": map[string]any{"columns": 80, "rows": 18, "fontPath": receipt.Tools.Font.Path, "fontSize": 18, "fps": 30,
+					"terminal": map[string]any{"columns": 80, "rows": 18, "fontSize": 18, "fps": 30,
 						"background": "#0d1117", "foreground": "#e6edf3"},
 					"limits": map[string]any{"maxActions": 20, "maxDurationSeconds": 30, "idleTimeoutSeconds": 10},
 					"steps":  steps, "constraints": map[string]any{"deny": []any{map[string]any{

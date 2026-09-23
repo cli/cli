@@ -24,9 +24,7 @@ func fontCapture(t *testing.T) (string, string, map[string][]byte) {
 	source := contract{
 		CaseID: "font-fixture", Mode: "exact", Goal: "Read the captured output",
 		Terminal: terminalConfig{
-			Columns: 40, Rows: 2, FontPath: filepath.Join(root, "unavailable-original.ttf"),
-			FontFallbacks: []string{filepath.Join(root, "unavailable-fallback.ttf")},
-			FontSize:      18, FPS: 10, Background: "#0d1117", Foreground: "#e6edf3",
+			Columns: 40, Rows: 2, FontSize: 18, FPS: 10, Background: "#0d1117", Foreground: "#e6edf3",
 		},
 		Output:       recording.OutputOptions{Formats: []string{"mp4"}, Timing: "realtime"},
 		Expectations: []expectation{{ID: "output", Type: "screen_contains", Value: json.RawMessage(`"hello"`)}},
@@ -34,6 +32,8 @@ func fontCapture(t *testing.T) (string, string, map[string][]byte) {
 	source.Command.Executable = filepath.Join(root, "never-executed")
 	raw, err := json.Marshal(source)
 	require.NoError(t, err)
+	require.NotContains(t, string(raw), "fontPath")
+	require.NotContains(t, string(raw), "fontFallbacks")
 	require.NoError(t, os.WriteFile(filepath.Join(root, "contract.json"), raw, 0o400))
 	sum := sha256.Sum256(raw)
 	zero := 0
@@ -47,8 +47,11 @@ func fontCapture(t *testing.T) (string, string, map[string][]byte) {
 	require.NoError(t, os.WriteFile(filepath.Join(root, "capture/states.jsonl"), append(state, '\n'), 0o400))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "capture/events.jsonl"), nil, 0o400))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "capture/raw.jsonl"), []byte("{\"t\":0,\"type\":\"output\",\"data\":\"hello\"}\n"), 0o400))
+	defaultFont := filepath.Join(root, "receipt-font.ttf")
+	require.NoError(t, os.WriteFile(defaultFont, gomono.TTF, 0o600))
 	receipt := filepath.Join(root, "preflight.json")
 	require.NoError(t, cliutil.WriteJSON(receipt, recording.Receipt{Status: "ready",
+		Tools:  recording.Tools{Font: &recording.Font{Path: defaultFont}},
 		Checks: recording.CapabilityChecks{Formats: map[string]bool{"mp4": true}}}))
 	originals := map[string][]byte{}
 	for _, name := range []string{"contract.json", "result.json", "capture/states.jsonl", "capture/events.jsonl", "capture/raw.jsonl"} {
@@ -189,42 +192,48 @@ func TestUnavailableRenderingFallbackPreservesCaseOutcome(t *testing.T) {
 	}
 }
 
-func TestRenderingRetainsUnspecifiedFonts(t *testing.T) {
+func TestRenderingUsesReceiptFontByDefault(t *testing.T) {
 	t.Parallel()
 
-	// Given usable recorded primary and fallback fonts.
+	// Given an execution capture without presentation font paths.
 	root, receipt, _ := fontCapture(t)
-	primary := filepath.Join(root, "unavailable-original.ttf")
-	fallback := filepath.Join(root, "unavailable-fallback.ttf")
 	replacement := filepath.Join(root, "replacement.ttf")
-	for _, path := range []string{primary, fallback, replacement} {
-		require.NoError(t, os.WriteFile(path, gomono.TTF, 0o600))
-	}
+	require.NoError(t, os.WriteFile(replacement, gomono.TTF, 0o600))
 	for _, tc := range []struct {
-		name              string
-		flags             []string
-		primary, fallback string
+		name      string
+		flags     []string
+		primary   string
+		fallbacks []string
 	}{
-		{name: "recorded fonts", primary: primary, fallback: fallback},
-		{name: "primary only", flags: []string{"--font", replacement}, primary: replacement, fallback: fallback},
-		{name: "fallback only", flags: []string{"--font-fallback", replacement}, primary: primary, fallback: replacement},
+		{name: "receipt font"},
+		{name: "selected primary", flags: []string{"--font", replacement}, primary: replacement},
+		{name: "selected fallback", flags: []string{"--font-fallback", replacement}, fallbacks: []string{replacement}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			// When only the selected rendering font option is supplied.
+			// When rendering uses the receipt default or an explicit presentation choice.
 			args := append([]string{"--run-dir", root, "--preflight", receipt}, tc.flags...)
 			opts, err := parseOptions(args)
 			require.NoError(t, err)
-			report, err := buildReport(t.Context(), t.TempDir(), opts, func(_ context.Context, c contract, _ result, _ []state, _ []event, _ recording.Receipt, _, _ string) (rendering, error) {
+			report, err := buildReport(t.Context(), t.TempDir(), opts, func(_ context.Context, c contract, _ result, _ []state, _ []event, r recording.Receipt, _, _ string) (rendering, error) {
 				assert.Equal(t, tc.primary, c.Terminal.FontPath)
-				assert.Equal(t, []string{tc.fallback}, c.Terminal.FontFallbacks)
-				return rendering{Status: "complete"}, nil
+				assert.Equal(t, tc.fallbacks, c.Terminal.FontFallbacks)
+				raster, err := newRasterizer(c.Terminal, r)
+				require.NoError(t, err)
+				defer func() { require.NoError(t, raster.fonts.Close()) }()
+				return rendering{Status: "complete", Font: &raster.fonts.Info, FontFallbacks: raster.fonts.Fallbacks}, nil
 			})
 
-			// Then unspecified font choices retain their recorded values.
+			// Then no font path is added to the execution artifact and the rendering records what it used.
 			require.NoError(t, err)
 			assert.Equal(t, "complete", report.Rendering.Status)
 			assert.Equal(t, tc.primary, report.terminal.FontPath)
-			assert.Equal(t, []string{tc.fallback}, report.terminal.FontFallbacks)
+			assert.Equal(t, tc.fallbacks, report.terminal.FontFallbacks)
+			require.NotNil(t, report.Rendering.Font)
+			if tc.primary != "" {
+				assert.Equal(t, tc.primary, report.Rendering.Font.Path)
+			} else {
+				assert.Equal(t, filepath.Join(root, "receipt-font.ttf"), report.Rendering.Font.Path)
+			}
 		})
 	}
 }

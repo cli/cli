@@ -321,11 +321,12 @@ condensed timing only when that field is omitted. `--timing-authorization` may
 optionally record the caller's request for a condensed companion.
 
 Rendering can also select `--font FILE` and repeated `--font-fallback FILE`
-options. `--font` replaces only the primary font; supplying any `--font-fallback`
-replaces the recorded fallback list with the supplied files in order. Omitted
-choices retain the contract's values. Relative paths resolve from the helper's
-working directory. Unusable fonts fail rendering explicitly, not the recorded
-case's outcome.
+options. Without `--font`, rendering uses the font selected by the ready
+preflight receipt. Supplying `--font-fallback` adds the explicit fallback chain
+in the supplied order. Relative paths resolve from the helper's working
+directory. Unusable fonts fail rendering explicitly, not the recorded case's
+outcome. Legacy contracts containing font paths remain readable, but new
+execution contracts do not record presentation font paths.
 
 These options work with both `--run-dir` and `--session`, including the session
 overview. They are saved in `presentation.fontPath` and

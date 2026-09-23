@@ -331,9 +331,8 @@ func parseContract(options Options) (*runContract, error) {
 		stateDirectory = str(value)
 	}
 	terminal, ok := object(source["terminal"])
-	if !ok || !filepath.IsAbs(str(terminal["fontPath"])) || !hexColor.MatchString(str(terminal["background"])) ||
-		!hexColor.MatchString(str(terminal["foreground"])) {
-		return fail("Terminal dimensions, an explicit font, and colors are required.")
+	if !ok || !hexColor.MatchString(str(terminal["background"])) || !hexColor.MatchString(str(terminal["foreground"])) {
+		return fail("Terminal dimensions and colors are required.")
 	}
 	for _, key := range []string{"columns", "rows"} {
 		value, ok := integer(terminal[key])
@@ -345,6 +344,9 @@ func parseContract(options Options) (*runContract, error) {
 	fps, fpsOK := integer(terminal["fps"])
 	if !sizeOK || size <= 0 || size > 512 || !fpsOK || fps < 1 || fps > 60 {
 		return fail("The font size and integer recording cadence must be supported.")
+	}
+	if value, exists := terminal["fontPath"]; exists && (!nonempty(value) || !filepath.IsAbs(str(value))) {
+		return fail("A legacy font path must be absolute.")
 	}
 	if value, exists := terminal["fontFallbacks"]; exists {
 		paths, ok := stringList(value)
