@@ -17,7 +17,9 @@ instructions loaded into the current agent context, not separate worker agents.
 Build the Go helper using [the offline-first prerequisite flow](prerequisites.md).
 `<helper> --skill-root <package-root> preflight check --output <receipt.json>`
 performs checks only. It must never install or update a dependency. Optional
-`--module-root`, `--node`, and `--font` select caller-approved existing tools.
+`--module-root` and `--node` select caller-approved existing runtime tools.
+`--font` may validate a font intended for a later rendering, but does not select
+or save a rendering default.
 
 A ready receipt has this shape:
 
@@ -30,8 +32,7 @@ A ready receipt has this shape:
     "node": {"path":"/absolute/node","version":"..."},
     "tuistory": {"moduleRoot":"/absolute/node_modules","version":"..."},
     "ffmpeg": {"path":"/absolute/ffmpeg","version":"..."},
-    "ffprobe": {"path":"/absolute/ffprobe","version":"..."},
-    "font": {"path":"/absolute/font.ttf","family":"..."}
+    "ffprobe": {"path":"/absolute/ffprobe","version":"..."}
   }
 }
 ```
@@ -321,12 +322,11 @@ condensed timing only when that field is omitted. `--timing-authorization` may
 optionally record the caller's request for a condensed companion.
 
 Rendering can also select `--font FILE` and repeated `--font-fallback FILE`
-options. Without `--font`, rendering uses the font selected by the ready
-preflight receipt. Supplying `--font-fallback` adds the explicit fallback chain
-in the supplied order. Relative paths resolve from the helper's working
-directory. Unusable fonts fail rendering explicitly, not the recorded case's
-outcome. Legacy contracts containing font paths remain readable, but new
-execution contracts do not record presentation font paths.
+options. Every new rendering requires `--font`; supplying `--font-fallback`
+adds the explicit fallback chain in the supplied order. Relative paths resolve
+from the helper's working directory. Unusable fonts fail rendering explicitly,
+not the recorded case's outcome. Legacy contracts containing font paths remain
+readable, but new execution contracts do not record presentation font paths.
 
 These options work with both `--run-dir` and `--session`, including the session
 overview. They are saved in `presentation.fontPath` and
@@ -338,6 +338,7 @@ fallback and rerun only evidence rendering:
 ```sh
 <helper> --skill-root <package-root> evidence \
   --session <manifest.json> --preflight <receipt.json> \
+  --font /absolute/fonts/monospace.ttf \
   --font-fallback /absolute/fonts/symbols.ttf
 ```
 

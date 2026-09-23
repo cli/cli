@@ -45,8 +45,8 @@ and ready receipt. Honor the requested GIF/MP4 formats and size constraints.
 Condensed presentation is the default when timing is unspecified. Honor explicit real-time requests.
 Retain source timing and record shortened pauses and reading holds in the
 rendering metadata. Do not add repeated timing labels to the video.
-Go loads and rasterizes the font from the ready receipt or explicit rendering
-options; FFmpeg encodes the resulting frames.
+Select an existing compatible primary font, pass it with `--font FILE`, and let
+Go rasterize it; FFmpeg encodes the resulting frames.
 Do not add an interpreter, browser, or font service as an unapproved fallback.
 
 For another output from an existing capture, use `--format` and/or `--timing`
@@ -55,10 +55,9 @@ Each invocation writes a new rendering and records its presentation options
 separately. Do not rewrite
 the execution contract or rerun a command merely to change its presentation.
 
-If rendering reports a missing glyph or an unavailable receipt font, use
-`--font FILE` to select the primary font and/or repeat `--font-fallback FILE`
-to supply an ordered fallback chain. Without `--font`, use the font selected by
-the ready preflight receipt. These options apply to session chapters and the overview too.
+Every rendering requires `--font FILE`. If it reports a missing glyph, repeat
+`--font-fallback FILE` to supply an ordered fallback chain. These options apply
+to session chapters and the overview too.
 Select existing compatible fonts, then rerun only `evidence`; the new report
 records the rendering choices and font hashes without changing the capture.
 

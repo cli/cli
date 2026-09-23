@@ -282,7 +282,7 @@ func render(ctx context.Context, contract contract, result result, states []stat
 			}
 		}
 	}
-	raster, err := newRasterizer(contract.Terminal, receipt)
+	raster, err := newRasterizer(contract.Terminal)
 	if err != nil {
 		return empty, err
 	}

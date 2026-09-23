@@ -212,7 +212,7 @@ func renderOverview(ctx context.Context, directory string, receipt recording.Rec
 	if fps < 1 || fps > 60 || width <= 0 || height <= 0 || width%2 != 0 || height%2 != 0 || width > 64_000_000/height {
 		return nil, nil, fmt.Errorf("overview requires bounded even geometry and a supported frame rate")
 	}
-	raster, err := newRasterizer(config, receipt)
+	raster, err := newRasterizer(config)
 	if err != nil {
 		return nil, nil, err
 	}

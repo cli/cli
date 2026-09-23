@@ -353,7 +353,7 @@ func TestRun(t *testing.T) {
 		require.NoError(t, os.WriteFile(font, gomono.TTF, 0o600))
 		require.NoError(t, os.WriteFile(filepath.Join(root, "Mono-Bold.ttf"), gomonobold.TTF, 0o600))
 		config := terminalConfig{FontPath: font, FontSize: 18, FPS: 30, Background: "#0d1117", Foreground: "#e6edf3"}
-		raster, err := newRasterizer(config, recording.Receipt{})
+		raster, err := newRasterizer(config)
 		require.NoError(t, err)
 		defer func() { require.NoError(t, raster.fonts.Close()) }()
 		data := testState("Mona", 0).Data

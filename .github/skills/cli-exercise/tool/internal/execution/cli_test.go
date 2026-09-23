@@ -88,7 +88,6 @@ func TestRun(t *testing.T) {
 		var receipt recording.Receipt
 		_, err = cliutil.ReadJSON(receiptPath, 4<<20, &receipt)
 		require.NoError(t, err)
-		require.NotNil(t, receipt.Tools.Font)
 		fixture, err := os.Executable()
 		require.NoError(t, err)
 		fixtureHash, err := cliutil.SHA256File(fixture)

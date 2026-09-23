@@ -113,7 +113,7 @@ func parseColor(value string) (color.RGBA, error) {
 	return color.RGBA{R: uint8(rgb >> 16), G: uint8(rgb >> 8), B: uint8(rgb), A: 255}, nil
 }
 
-func newRasterizer(config terminalConfig, receipt recording.Receipt) (*rasterizer, error) {
+func newRasterizer(config terminalConfig) (*rasterizer, error) {
 	background, err := parseColor(config.Background)
 	if err != nil {
 		return nil, err
@@ -124,10 +124,7 @@ func newRasterizer(config terminalConfig, receipt recording.Receipt) (*rasterize
 	}
 	path := config.FontPath
 	if path == "" {
-		if receipt.Tools.Font == nil {
-			return nil, fmt.Errorf("an explicit font selection is required")
-		}
-		path = receipt.Tools.Font.Path
+		return nil, fmt.Errorf("rendering requires an explicit font selection")
 	}
 	fonts, err := fontutil.Open(path, config.FontSize, config.FontFallbacks)
 	if err != nil {

@@ -29,7 +29,7 @@ func presentationRaster(t *testing.T) (*rasterizer, terminalConfig) {
 	path := filepath.Join(t.TempDir(), "Mono.ttf")
 	require.NoError(t, os.WriteFile(path, gomono.TTF, 0o600))
 	config := terminalConfig{FontPath: path, FontSize: 18, FPS: 10, Background: "#0d1117", Foreground: "#e6edf3"}
-	raster, err := newRasterizer(config, recording.Receipt{})
+	raster, err := newRasterizer(config)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, raster.fonts.Close()) })
 	return raster, config

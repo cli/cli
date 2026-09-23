@@ -119,7 +119,7 @@ type Tuistory struct {
 	PackageSHA256 string `json:"packageSha256,omitempty"`
 }
 
-// Font identifies the selected render-capable font.
+// Font preserves a legacy preflight font selection for receipt compatibility.
 type Font struct {
 	Path   string `json:"path"`
 	Family string `json:"family"`

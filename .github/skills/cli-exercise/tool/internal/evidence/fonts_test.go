@@ -47,11 +47,8 @@ func fontCapture(t *testing.T) (string, string, map[string][]byte) {
 	require.NoError(t, os.WriteFile(filepath.Join(root, "capture/states.jsonl"), append(state, '\n'), 0o400))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "capture/events.jsonl"), nil, 0o400))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "capture/raw.jsonl"), []byte("{\"t\":0,\"type\":\"output\",\"data\":\"hello\"}\n"), 0o400))
-	defaultFont := filepath.Join(root, "receipt-font.ttf")
-	require.NoError(t, os.WriteFile(defaultFont, gomono.TTF, 0o600))
 	receipt := filepath.Join(root, "preflight.json")
 	require.NoError(t, cliutil.WriteJSON(receipt, recording.Receipt{Status: "ready",
-		Tools:  recording.Tools{Font: &recording.Font{Path: defaultFont}},
 		Checks: recording.CapabilityChecks{Formats: map[string]bool{"mp4": true}}}))
 	originals := map[string][]byte{}
 	for _, name := range []string{"contract.json", "result.json", "capture/states.jsonl", "capture/events.jsonl", "capture/raw.jsonl"} {
@@ -79,7 +76,7 @@ func TestRenderFontOverridesPreserveCapture(t *testing.T) {
 	report, err := buildReport(t.Context(), t.TempDir(), opts, func(_ context.Context, c contract, _ result, states []state, _ []event, r recording.Receipt, _, _ string) (rendering, error) {
 		assert.Equal(t, font, c.Terminal.FontPath)
 		assert.Equal(t, []string{fallback}, c.Terminal.FontFallbacks)
-		raster, err := newRasterizer(c.Terminal, r)
+		raster, err := newRasterizer(c.Terminal)
 		require.NoError(t, err)
 		defer func() { require.NoError(t, raster.fonts.Close()) }()
 		_, err = raster.draw(states[0].Data)
@@ -169,7 +166,7 @@ func TestUnavailableRenderingFallbackPreservesCaseOutcome(t *testing.T) {
 
 	// When the renderer attempts to open the requested fonts.
 	report, err := buildReport(t.Context(), t.TempDir(), opts, func(_ context.Context, c contract, _ result, _ []state, _ []event, r recording.Receipt, _, _ string) (rendering, error) {
-		raster, err := newRasterizer(c.Terminal, r)
+		raster, err := newRasterizer(c.Terminal)
 		if err != nil {
 			return rendering{}, err
 		}
@@ -192,7 +189,7 @@ func TestUnavailableRenderingFallbackPreservesCaseOutcome(t *testing.T) {
 	}
 }
 
-func TestRenderingUsesReceiptFontByDefault(t *testing.T) {
+func TestRenderingRequiresExplicitFont(t *testing.T) {
 	t.Parallel()
 
 	// Given an execution capture without presentation font paths.
@@ -204,35 +201,39 @@ func TestRenderingUsesReceiptFontByDefault(t *testing.T) {
 		flags     []string
 		primary   string
 		fallbacks []string
+		status    string
 	}{
-		{name: "receipt font"},
-		{name: "selected primary", flags: []string{"--font", replacement}, primary: replacement},
-		{name: "selected fallback", flags: []string{"--font-fallback", replacement}, fallbacks: []string{replacement}},
+		{name: "missing primary", status: "failed"},
+		{name: "selected primary", flags: []string{"--font", replacement}, primary: replacement, status: "complete"},
+		{name: "fallback still needs primary", flags: []string{"--font-fallback", replacement},
+			fallbacks: []string{replacement}, status: "failed"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			// When rendering uses the receipt default or an explicit presentation choice.
+			// When rendering uses only the explicit presentation choices.
 			args := append([]string{"--run-dir", root, "--preflight", receipt}, tc.flags...)
 			opts, err := parseOptions(args)
 			require.NoError(t, err)
-			report, err := buildReport(t.Context(), t.TempDir(), opts, func(_ context.Context, c contract, _ result, _ []state, _ []event, r recording.Receipt, _, _ string) (rendering, error) {
+			report, err := buildReport(t.Context(), t.TempDir(), opts, func(_ context.Context, c contract, _ result, _ []state, _ []event, _ recording.Receipt, _, _ string) (rendering, error) {
 				assert.Equal(t, tc.primary, c.Terminal.FontPath)
 				assert.Equal(t, tc.fallbacks, c.Terminal.FontFallbacks)
-				raster, err := newRasterizer(c.Terminal, r)
-				require.NoError(t, err)
+				raster, err := newRasterizer(c.Terminal)
+				if err != nil {
+					return rendering{}, err
+				}
 				defer func() { require.NoError(t, raster.fonts.Close()) }()
 				return rendering{Status: "complete", Font: &raster.fonts.Info, FontFallbacks: raster.fonts.Fallbacks}, nil
 			})
 
-			// Then no font path is added to the execution artifact and the rendering records what it used.
+			// Then no font path is inherited from execution or preflight.
 			require.NoError(t, err)
-			assert.Equal(t, "complete", report.Rendering.Status)
+			assert.Equal(t, tc.status, report.Rendering.Status)
 			assert.Equal(t, tc.primary, report.terminal.FontPath)
 			assert.Equal(t, tc.fallbacks, report.terminal.FontFallbacks)
-			require.NotNil(t, report.Rendering.Font)
-			if tc.primary != "" {
+			if tc.status == "complete" {
+				require.NotNil(t, report.Rendering.Font)
 				assert.Equal(t, tc.primary, report.Rendering.Font.Path)
 			} else {
-				assert.Equal(t, filepath.Join(root, "receipt-font.ttf"), report.Rendering.Font.Path)
+				assert.Contains(t, report.Rendering.Error, "explicit font selection")
 			}
 		})
 	}

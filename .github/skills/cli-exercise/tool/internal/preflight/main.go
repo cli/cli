@@ -42,7 +42,7 @@ func parseOptions(args []string) (cliOptions, error) {
 	flags.StringVar(&result.selections.Node, "node", "", "Selected Node executable")
 	flags.StringVar(&result.selections.FFmpeg, "ffmpeg", "", "Selected FFmpeg executable")
 	flags.StringVar(&result.selections.FFprobe, "ffprobe", "", "Selected ffprobe executable")
-	flags.StringVar(&result.selections.Font, "font", "", "Selected monospaced font")
+	flags.StringVar(&result.selections.Font, "font", "", "Optional rendering font to validate")
 	flags.Float64Var(&result.selections.ProbeTimeout, "probe-timeout", 20, "Per-process timeout in seconds")
 	var formats formats
 	flags.Var(&formats, "format", "Requested gif or mp4 output; repeat as needed")

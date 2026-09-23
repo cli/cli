@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -172,21 +171,6 @@ func isolatedEnvironment(workspace, node string) (map[string]string, error) {
 	return values, nil
 }
 
-func fontCandidates() []string {
-	switch runtime.GOOS {
-	case "darwin":
-		return []string{"/System/Library/Fonts/Menlo.ttc", "/System/Library/Fonts/Monaco.ttf"}
-	case "windows":
-		root := filepath.Join(os.Getenv("SystemRoot"), "Fonts")
-		return []string{filepath.Join(root, "consola.ttf"), filepath.Join(root, "cour.ttf"), filepath.Join(root, "lucon.ttf")}
-	default:
-		return []string{"/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-			"/usr/share/fonts/truetype/liberation2/LiberationMono-Regular.ttf",
-			"/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-			"/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"}
-	}
-}
-
 func (service *service) check(ctx context.Context) (result report, err error) {
 	result = report{SchemaVersion: 1, Manifest: service.manifest, Issues: []issue{}}
 	result.Checks.Formats, result.Checks.FontAttempts = map[string]bool{}, []map[string]any{}
@@ -294,22 +278,14 @@ func (service *service) check(ctx context.Context) (result report, err error) {
 			}
 		}
 	}
-	candidates := fontCandidates()
 	if service.options.Font != "" {
-		candidates = []string{service.options.Font}
-	}
-	for _, path := range candidates {
-		info, err := service.fontProbe(path)
+		_, err := service.fontProbe(service.options.Font)
 		if err != nil {
-			result.Checks.FontAttempts = append(result.Checks.FontAttempts, map[string]any{"path": path, "status": "unusable", "detail": err.Error()})
-			continue
+			result.Checks.FontAttempts = append(result.Checks.FontAttempts, map[string]any{"path": service.options.Font, "status": "unusable", "detail": err.Error()})
+			problem("font", "unusable", "The selected rendering font did not pass Go loading and monospaced rasterization.", false)
+		} else {
+			result.Checks.FontAttempts = append(result.Checks.FontAttempts, map[string]any{"path": service.options.Font, "status": "usable"})
 		}
-		result.Tools.Font = &recording.Font{Path: info.Path, Family: info.Family}
-		result.Checks.FontAttempts = append(result.Checks.FontAttempts, map[string]any{"path": path, "status": "usable"})
-		break
-	}
-	if result.Tools.Font == nil {
-		problem("font", "unusable", "No selected installed font passed Go loading and monospaced rasterization.", false)
 	}
 	if result.Tools.FFmpeg != nil && result.Tools.FFprobe != nil {
 		raw := filepath.Join(work, "frames.rgb")
