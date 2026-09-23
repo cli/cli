@@ -257,8 +257,8 @@ var (
 
 // writeToOutput writes file content to a local path and returns the final destination.
 // Symlink output paths are refused. A directory target receives the file under
-// its remote basename, and existing regular files are only replaced when
-// clobber is true.
+// its remote basename using the local operating system's path rules, and existing
+// regular files are only replaced when clobber is true.
 func writeToOutput(file *repoFile, output string, clobber bool) (string, error) {
 	dest := output
 	outputDir := ""
@@ -277,9 +277,14 @@ func writeToOutput(file *repoFile, output string, clobber bool) (string, error) 
 		return "", err
 	}
 
+	name := dest
 	if asDir {
+		name = filepath.Base(file.Name)
+		if name == "." || !filepath.IsLocal(name) {
+			return "", fmt.Errorf("invalid output filename %q", file.Name)
+		}
 		outputDir = dest
-		dest = filepath.Join(dest, file.Name)
+		dest = filepath.Join(dest, name)
 	}
 
 	if lr, err := lstatF(dest); err == nil {
@@ -293,10 +298,6 @@ func writeToOutput(file *repoFile, output string, clobber bool) (string, error) 
 		return "", err
 	}
 
-	name := dest
-	if outputDir != "" {
-		name = file.Name
-	}
 	if err := writeOutputFile(outputDir, name, file.Content, 0o644, clobber); err != nil {
 		if os.IsExist(err) && !clobber {
 			return "", fmt.Errorf("output path already exists: %q (use --clobber to overwrite)", dest)
