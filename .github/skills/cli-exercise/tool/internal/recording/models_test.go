@@ -35,7 +35,7 @@ func TestDecode(t *testing.T) {
 			"tuistory":{"moduleRoot":"/modules","version":"0.11.0","packageSha256":"package"},
 			"ffmpeg":{"path":"/ffmpeg","version":"v1","sha256":"ffmpeg"},
 			"ffprobe":{"path":"/ffprobe","version":"v1","sha256":"ffprobe"},
-			"font":{"path":"/font","family":"Mono","sha256":"font"}},
+			"font":{"path":"/font","family":"Mono"}},
 			"checks":{"formats":{"gif":true},"nativePty":true,"fontAttempts":[]}}`
 		var receipt Receipt
 		require.NoError(t, json.Unmarshal([]byte(source), &receipt))

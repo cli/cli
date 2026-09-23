@@ -304,7 +304,7 @@ func (service *service) check(ctx context.Context) (result report, err error) {
 			result.Checks.FontAttempts = append(result.Checks.FontAttempts, map[string]any{"path": path, "status": "unusable", "detail": err.Error()})
 			continue
 		}
-		result.Tools.Font = &recording.Font{Path: info.Path, Family: info.Family, SHA256: info.SHA256}
+		result.Tools.Font = &recording.Font{Path: info.Path, Family: info.Family}
 		result.Checks.FontAttempts = append(result.Checks.FontAttempts, map[string]any{"path": path, "status": "usable"})
 		break
 	}
