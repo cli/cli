@@ -1,0 +1,4 @@
+node_modules/
+/tool/cli-exercise
+/tool/cli-exercise.exe
+/tool/bin/

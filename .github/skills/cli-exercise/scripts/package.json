@@ -1,0 +1,9 @@
+{
+  "name": "cli-exercise-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned terminal prerequisites for the cli-exercise skill",
+  "dependencies": {
+    "tuistory": "0.11.0"
+  }
+}
