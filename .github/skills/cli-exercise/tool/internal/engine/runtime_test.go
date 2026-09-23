@@ -121,7 +121,7 @@ func newFixture(t *testing.T) *fixture {
 		"command":       document{"executable": executable, "args": []any{}, "sha256": hex.EncodeToString(hash[:]), "version": "fixture 1", "cwd": "work"},
 		"environment":   document{"values": document{}, "pass": []any{}},
 		"authorization": document{"status": "approved", "basis": "The caller approved this local fixture.", "effects": []any{}},
-		"terminal": document{"columns": 80, "rows": 24, "fontPath": filepath.Join(root, "mono.ttf"), "fontSize": 18,
+		"terminal": document{"columns": 80, "rows": 24, "fontSize": 18,
 			"fps": 30, "background": "#0d1117", "foreground": "#e6edf3"},
 		"limits": document{"maxActions": 100, "maxDurationSeconds": 10, "idleTimeoutSeconds": 5},
 		"steps":  []any{}, "constraints": document{"deny": []any{}}, "expectations": []any{},
@@ -228,6 +228,12 @@ func TestContractAndActionValidation(t *testing.T) {
 		}, code: "private_contract"},
 		{name: "reserved environment", change: func(f *fixture) { f.contract["environment"].(document)["values"] = document{"HOME": "/elsewhere"} }, code: "invalid_contract"},
 		{name: "unsupported cadence", change: func(f *fixture) { f.contract["terminal"].(document)["fps"] = 120 }, code: "invalid_contract"},
+		{name: "font path belongs to rendering", change: func(f *fixture) {
+			f.contract["terminal"].(document)["fontPath"] = filepath.Join(f.root, "mono.ttf")
+		}, code: "invalid_contract"},
+		{name: "font fallbacks belong to rendering", change: func(f *fixture) {
+			f.contract["terminal"].(document)["fontFallbacks"] = []any{filepath.Join(f.root, "symbols.ttf")}
+		}, code: "invalid_contract"},
 		{name: "unspecified timing defaults to condensed", change: func(f *fixture) { delete(f.contract["output"].(document), "timing") }},
 		{name: "condensed needs no separate approval", change: func(f *fixture) { f.contract["output"].(document)["timing"] = "condensed" }},
 		{name: "explicit realtime permits unannotated output", change: func(f *fixture) { f.contract["output"].(document)["captions"] = false }},

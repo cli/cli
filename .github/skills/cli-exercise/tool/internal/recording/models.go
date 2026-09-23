@@ -119,20 +119,12 @@ type Tuistory struct {
 	PackageSHA256 string `json:"packageSha256,omitempty"`
 }
 
-// Font identifies the selected font and its actual bytes.
-type Font struct {
-	Path   string `json:"path"`
-	Family string `json:"family"`
-	SHA256 string `json:"sha256"`
-}
-
 // Tools distinguishes an unavailable tool from a selected one.
 type Tools struct {
 	Node     *Executable `json:"node,omitempty"`
 	FFmpeg   *Executable `json:"ffmpeg,omitempty"`
 	FFprobe  *Executable `json:"ffprobe,omitempty"`
 	Tuistory *Tuistory   `json:"tuistory,omitempty"`
-	Font     *Font       `json:"font,omitempty"`
 }
 
 // Executable returns one of the known executable selections.
@@ -151,9 +143,8 @@ func (tools Tools) Executable(name string) *Executable {
 
 // CapabilityChecks records observed readiness rather than presumed compatibility.
 type CapabilityChecks struct {
-	Formats      map[string]bool  `json:"formats"`
-	NativePTY    bool             `json:"nativePty"`
-	FontAttempts []map[string]any `json:"fontAttempts"`
+	Formats   map[string]bool `json:"formats"`
+	NativePTY bool            `json:"nativePty"`
 }
 
 // Receipt is the common prerequisite identity and capability record.

@@ -76,7 +76,6 @@ Optional selections:
 | `--node PATH` | Existing Node executable; defaults to PATH discovery |
 | `--ffmpeg PATH` | Existing ffmpeg executable |
 | `--ffprobe PATH` | Existing ffprobe executable |
-| `--font PATH` | Existing monospaced TTF, OTF, or TTC file; never silently replaced if unusable |
 | `--format gif` / `--format mp4` | Repeat for requested formats; both are checked by default |
 | `--probe-timeout SECONDS` | Per-process bound, 5-120 seconds; default 20 |
 
@@ -85,7 +84,6 @@ For example, to check explicitly supplied dependencies without modifying them:
 ```sh
 <helper> --skill-root <package-root> preflight check \
   --module-root /absolute/dependencies/node_modules \
-  --font /absolute/fonts/monospace.ttf \
   --output /absolute/workspace/preflight.json
 ```
 
@@ -138,8 +136,7 @@ and these `tools` entries:
   "node": {"path": "/absolute/node", "version": "observed version"},
   "tuistory": {"moduleRoot": "/absolute/node_modules", "version": "0.11.0"},
   "ffmpeg": {"path": "/absolute/ffmpeg", "version": "observed version"},
-  "ffprobe": {"path": "/absolute/ffprobe", "version": "observed version"},
-  "font": {"path": "/absolute/font.ttf", "family": "observed family"}
+  "ffprobe": {"path": "/absolute/ffprobe", "version": "observed version"}
 }
 ```
 
@@ -153,8 +150,8 @@ and 2 for blocked or invalid input.
 `manifestSha256` hashes `scripts/package.json` then `scripts/package-lock.json`.
 For each, the hash input is its base
 UTF-8 filename, a zero byte, its byte length as an eight-byte big-endian integer,
-and its exact contents. Executable/font hashes are additional provenance, not an
-OS trust or permission mechanism.
+and its exact contents. Executable hashes are additional provenance, not an OS
+trust or permission mechanism.
 
 ## Agent-led setup
 

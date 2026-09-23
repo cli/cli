@@ -192,7 +192,8 @@ func TestRun(t *testing.T) {
 			receiptPath := filepath.Join(root, "preflight.json")
 			require.NoError(t, cliutil.WriteJSON(receiptPath, map[string]string{"status": "ready"}))
 			var output bytes.Buffer
-			opts := options{runDir: root, preflight: receiptPath, inspection: "sampled", html: tc.html}
+			opts := options{runDir: root, preflight: receiptPath, inspection: "sampled", html: tc.html,
+				fontPath: filepath.Join(root, "selected.ttf")}
 			wantTiming := tc.recordedTiming
 			if wantTiming == "" {
 				wantTiming = "condensed"
@@ -229,12 +230,11 @@ func TestRun(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, raw, unchanged)
 			require.Equal(t, tc.recordedTiming, source.Output.Timing)
+			require.NotNil(t, report.Presentation)
+			require.Equal(t, opts.fontPath, report.Presentation.FontPath)
 			if tc.companion {
-				require.NotNil(t, report.Presentation)
 				require.Equal(t, wantTiming, report.Presentation.Timing)
 				require.Equal(t, opts.timingAuthorization, report.Presentation.TimingAuthorization)
-			} else {
-				require.Nil(t, report.Presentation)
 			}
 			if !tc.renderError {
 				require.Equal(t, wantTiming, report.Rendering.Timing)
@@ -353,7 +353,7 @@ func TestRun(t *testing.T) {
 		require.NoError(t, os.WriteFile(font, gomono.TTF, 0o600))
 		require.NoError(t, os.WriteFile(filepath.Join(root, "Mono-Bold.ttf"), gomonobold.TTF, 0o600))
 		config := terminalConfig{FontPath: font, FontSize: 18, FPS: 30, Background: "#0d1117", Foreground: "#e6edf3"}
-		raster, err := newRasterizer(config, recording.Receipt{})
+		raster, err := newRasterizer(config)
 		require.NoError(t, err)
 		defer func() { require.NoError(t, raster.fonts.Close()) }()
 		data := testState("Mona", 0).Data
@@ -367,7 +367,7 @@ func TestRun(t *testing.T) {
 		source.Output.Timing = "realtime"
 		canvas, err := raster.compose(top, source, frame{}, top.Bounds().Dx(), 6*raster.fonts.CellHeight, 2*raster.fonts.CellHeight)
 		require.NoError(t, err)
-		require.Equal(t, 6*raster.fonts.CellHeight, canvas.Bounds().Dy())
+		require.Equal(t, 6*raster.fonts.CellHeight+2*presentationMargin, canvas.Bounds().Dy())
 		store, err := newImageStore(t.TempDir())
 		require.NoError(t, err)
 		original, err := store.save(top)
@@ -411,8 +411,12 @@ func TestRun(t *testing.T) {
 		skillRoot, err := filepath.Abs("../../..")
 		require.NoError(t, err)
 		var output bytes.Buffer
+		fontPath := os.Getenv("CLI_EXERCISE_RENDER_FONT")
+		if fontPath == "" {
+			t.Skip("Supply an explicit font for native rendering.")
+		}
 		code, err := run(context.Background(), skillRoot, options{
-			runDir: root, preflight: preflight, inspection: "all",
+			runDir: root, preflight: preflight, inspection: "all", fontPath: fontPath,
 		}, cliutil.Streams{Out: &output, ErrOut: io.Discard}, render)
 		require.NoError(t, err)
 		require.Zero(t, code, output.String())

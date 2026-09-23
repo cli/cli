@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/cli-exercise/internal/cliutil"
-	"github.com/cli/cli/v2/cli-exercise/internal/fontutil"
 	"github.com/cli/cli/v2/cli-exercise/internal/terminal"
 	"github.com/stretchr/testify/require"
 )
@@ -101,9 +100,7 @@ func setup(t *testing.T) testSetup {
 	packagePath := filepath.Join(modules, "tuistory/package.json")
 	require.NoError(t, cliutil.WriteJSON(packagePath, map[string]string{"name": "tuistory", "version": version, "main": "entry"}))
 	require.NoError(t, os.WriteFile(filepath.Join(modules, "tuistory/entry"), []byte("fixture entry"), 0o600))
-	font := filepath.Join(root, "mono.ttf")
-	require.NoError(t, os.WriteFile(font, []byte("font fixture"), 0o600))
-	settings := options{ModuleRoot: modules, Font: font,
+	settings := options{ModuleRoot: modules,
 		Node: binaries["node"], FFmpeg: binaries["ffmpeg"], FFprobe: binaries["ffprobe"],
 		Formats: []string{"gif", "mp4"}, ProbeTimeout: 5}
 	runner := &fakeRunner{}
@@ -134,10 +131,6 @@ func setup(t *testing.T) testSetup {
 			}
 			return path, nil
 		}
-		service.fontProbe = func(path string) (fontutil.Info, error) {
-			hash, err := cliutil.SHA256File(path)
-			return fontutil.Info{Path: path, Family: "Fixture Mono", SHA256: hash}, err
-		}
 		return service, nil
 	}
 	return testSetup{root, skill, packagePath, settings, runner, factory}
@@ -160,6 +153,7 @@ func TestParseOptions(t *testing.T) {
 		{name: "missing plan", args: []string{"install"}, fail: true},
 		{name: "unknown format", args: []string{"check", "--output", "receipt", "--format", "webm"}, fail: true},
 		{name: "blank explicit selection", args: []string{"check", "--output", "receipt", "--node", ""}, fail: true},
+		{name: "font selection belongs to rendering", args: []string{"check", "--output", "receipt", "--font", "mono.ttf"}, fail: true},
 		{name: "nonfinite timeout", args: []string{"check", "--output", "receipt", "--probe-timeout", "NaN"}, fail: true},
 		{name: "old interpreter flag rejected", args: []string{"check", "--output", "receipt", "--python", "not-used"}, fail: true},
 	} {
@@ -185,7 +179,7 @@ func TestRun(t *testing.T) {
 		require.Contains(t, diagnostic.String(), "probe_fixture_failed")
 	})
 	for _, name := range []string{
-		"ready", "missing", "incompatible", "native failure", "missing raw", "font failure", "encoder failure", "presentation filter failure",
+		"ready", "missing", "incompatible", "native failure", "missing raw", "encoder failure", "presentation filter failure",
 		"no installation selected", "unsupported runtime", "stdout is not a file", "read only",
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -196,8 +190,6 @@ func TestRun(t *testing.T) {
 				fixture.runner.nativeFailure = true
 			case "missing raw":
 				fixture.runner.missingRaw = true
-			case "font failure":
-				require.NoError(t, os.Remove(options.Font))
 			case "encoder failure":
 				fixture.runner.encoderFailure = true
 			case "presentation filter failure":

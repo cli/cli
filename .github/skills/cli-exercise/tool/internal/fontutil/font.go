@@ -25,7 +25,7 @@ import (
 	"golang.org/x/text/width"
 )
 
-// Info identifies the actual font bytes used by a capability probe.
+// Info identifies the actual font bytes used by a capability probe or rendering.
 type Info struct {
 	Path   string `json:"path"`
 	Family string `json:"family"`
@@ -40,6 +40,8 @@ type face struct {
 // Set holds explicit font faces and the terminal's fixed cell metrics.
 type Set struct {
 	Info       Info
+	Styles     []Info
+	Fallbacks  []Info
 	CellWidth  int
 	CellHeight int
 	Ascent     int
@@ -163,21 +165,23 @@ func Open(filename string, size float64, fallbacks []string) (_ *Set, err error)
 			} else if err != nil {
 				return nil, err
 			}
-			extra, _, _, err := load(path, size)
+			extra, _, info, err := load(path, size)
 			if err != nil {
 				return nil, err
 			}
 			set.faces = append(set.faces, extra...)
 			set.styles[flags] = extra[0]
+			set.Styles = append(set.Styles, info)
 		}
 	}
 	for _, path := range fallbacks {
-		extra, _, _, err := load(path, size)
+		extra, _, info, err := load(path, size)
 		if err != nil {
 			return nil, fmt.Errorf("load explicit fallback: %w", err)
 		}
 		set.faces = append(set.faces, extra...)
 		set.fallbacks = append(set.fallbacks, extra[0])
+		set.Fallbacks = append(set.Fallbacks, info)
 	}
 	base := set.styles[0]
 	scale := fixed.Int26_6(math.Round(size * 64))

@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/cli-exercise/internal/cliutil"
 	"github.com/cli/cli/v2/cli-exercise/internal/fontutil"
 	"github.com/cli/cli/v2/cli-exercise/internal/recording"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/image/font/gofont/gomono"
 )
@@ -28,13 +29,32 @@ func presentationRaster(t *testing.T) (*rasterizer, terminalConfig) {
 	path := filepath.Join(t.TempDir(), "Mono.ttf")
 	require.NoError(t, os.WriteFile(path, gomono.TTF, 0o600))
 	config := terminalConfig{FontPath: path, FontSize: 18, FPS: 10, Background: "#0d1117", Foreground: "#e6edf3"}
-	raster, err := newRasterizer(config, recording.Receipt{})
+	raster, err := newRasterizer(config)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, raster.fonts.Close()) })
 	return raster, config
 }
 
 func presentationCases(t *testing.T) {
+	t.Run("terminal presentation keeps content inside a framed safe area", func(t *testing.T) {
+		raster, config := presentationRaster(t)
+
+		// Given a terminal frame whose first cell starts at the source image edge.
+		top, err := raster.draw(testState("edge content", 0).Data)
+		require.NoError(t, err)
+		source := contract{CaseID: "case", Goal: "Keep playback controls clear of terminal content", Terminal: config}
+		contentHeight := top.Bounds().Dy() + 4*raster.fonts.CellHeight
+
+		// When the terminal presentation is composed.
+		canvas, err := raster.compose(top, source, frame{}, top.Bounds().Dx(), contentHeight, top.Bounds().Dy())
+		require.NoError(t, err)
+
+		// Then the frame provides a 48px safe area and a visible panel boundary.
+		assert.Equal(t, image.Rect(0, 0, top.Bounds().Dx()+96, contentHeight+96), canvas.Bounds())
+		assert.Equal(t, color.RGBA{0x01, 0x04, 0x09, 0xff}, canvas.RGBAAt(0, 0))
+		assert.Equal(t, color.RGBA{0x30, 0x36, 0x3d, 0xff}, canvas.RGBAAt(47, 47))
+		assert.Equal(t, raster.background, canvas.RGBAAt(48, 48))
+	})
 	t.Run("phase colors and readable result labels", func(t *testing.T) {
 		raster, config := presentationRaster(t)
 		for _, tc := range []struct {
@@ -68,7 +88,8 @@ func presentationCases(t *testing.T) {
 				canvas, err := raster.compose(top, source, frame{Note: &notes[0]}, top.Bounds().Dx(),
 					height+4*raster.fonts.CellHeight, height)
 				require.NoError(t, err)
-				require.Equal(t, tc.ink, canvas.RGBAAt(5, height+1), "the phase accent must be in the actual raster")
+				require.Equal(t, tc.ink, canvas.RGBAAt(presentationMargin+5, presentationMargin+height+1),
+					"the phase accent must be in the actual raster")
 				require.Contains(t, *notes[0].Chapter, tc.label)
 				require.Equal(t, "Check the requested behavior", *notes[0].Text)
 			})
@@ -93,7 +114,7 @@ func presentationCases(t *testing.T) {
 		canvas, err := raster.compose(top, source, frame{}, top.Bounds().Dx(), height+4*raster.fonts.CellHeight, height)
 		require.NoError(t, err)
 		captured := image.NewRGBA(top.Bounds())
-		draw.Draw(captured, captured.Bounds(), canvas, image.Pt(0, offset), draw.Src)
+		draw.Draw(captured, captured.Bounds(), canvas, image.Pt(presentationMargin, presentationMargin+offset), draw.Src)
 		require.Equal(t, before, pixelHash(captured), "the terminal must retain every original output cell below the invocation")
 		require.Equal(t, before, pixelHash(top), "raw source images remain unchanged")
 		off := false
@@ -103,7 +124,9 @@ func presentationCases(t *testing.T) {
 		require.Empty(t, lines)
 		plain, err := raster.compose(top, source, frame{}, top.Bounds().Dx(), top.Bounds().Dy(), top.Bounds().Dy())
 		require.NoError(t, err)
-		require.Equal(t, before, pixelHash(plain), "an explicit unannotated capture must not gain an artificial prompt")
+		captured = image.NewRGBA(top.Bounds())
+		draw.Draw(captured, captured.Bounds(), plain, image.Pt(presentationMargin, presentationMargin), draw.Src)
+		require.Equal(t, before, pixelHash(captured), "an explicit unannotated capture must not gain an artificial prompt")
 	})
 	t.Run("timing adjustments do not add a footer", func(t *testing.T) {
 		raster, config := presentationRaster(t)
@@ -116,8 +139,8 @@ func presentationCases(t *testing.T) {
 			source.Output.Timing = timing
 			canvas, err := raster.compose(top, source, frame{}, top.Bounds().Dx(), height, top.Bounds().Dy())
 			require.NoError(t, err)
-			for y := height - raster.fonts.CellHeight; y < height; y++ {
-				for x := range canvas.Bounds().Dx() {
+			for y := presentationMargin + height - raster.fonts.CellHeight; y < presentationMargin+height; y++ {
+				for x := presentationMargin; x < presentationMargin+top.Bounds().Dx(); x++ {
 					require.Equal(t, raster.background, canvas.RGBAAt(x, y), "bottom padding must not contain a repeated timing label")
 				}
 			}
@@ -148,6 +171,8 @@ func presentationCases(t *testing.T) {
 		heading, err := fontutil.Open(config.FontPath, config.FontSize*1.4, nil)
 		require.NoError(t, err)
 		defer func() { require.NoError(t, heading.Close()) }()
+
+		// Given an overview rendered into the same video geometry as terminal chapters.
 		for _, count := range []int{1, 4, 31} {
 			cases := make([]sessionCaseResult, count)
 			for index := range cases {
@@ -158,9 +183,15 @@ func presentationCases(t *testing.T) {
 			require.NoError(t, err)
 			shown := []sessionCaseResult{}
 			for page, rows := range layout.pages {
+				// When an overview page is drawn.
 				canvas, err := drawOverview(raster, heading, layout, page, 1000, 440, "exact")
 				require.NoError(t, err)
+
+				// Then its content uses the same framed 48px safe area.
 				require.Equal(t, image.Rect(0, 0, 1000, 440), canvas.Bounds())
+				require.Equal(t, presentationInk, canvas.RGBAAt(0, 0))
+				require.Equal(t, panelBorderInk, canvas.RGBAAt(47, 47))
+				require.Equal(t, raster.background, canvas.RGBAAt(48, 48))
 				for _, row := range rows {
 					shown = append(shown, row.result)
 				}
@@ -190,10 +221,15 @@ func presentationNativeCase(t *testing.T) {
 	var receipt recording.Receipt
 	_, err := cliutil.ReadJSON(receiptPath, 4<<20, &receipt)
 	require.NoError(t, err)
-	require.NotNil(t, receipt.Tools.Font)
+	fontPath := os.Getenv("CLI_EXERCISE_RENDER_FONT")
+	if fontPath == "" {
+		t.Skip("Select an explicit font for native presentation checks.")
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), 120*time.Second)
 	defer cancel()
 	root := t.TempDir()
+	fallback := filepath.Join(root, "fallback.ttf")
+	require.NoError(t, os.WriteFile(fallback, gomono.TTF, 0o600))
 	manifest := sessionManifest{SchemaVersion: 1, ID: "presentation", Title: "Focused CLI checks",
 		Source: "Record independent synthetic cases with immediate validation.", Workspace: root}
 	manifest.Output.Formats = []string{"mp4"}
@@ -206,7 +242,8 @@ func presentationNativeCase(t *testing.T) {
 			directory := filepath.Join(root, item.ID, phase)
 			require.NoError(t, os.MkdirAll(filepath.Join(directory, "capture"), 0o700))
 			recorded := contract{CaseID: item.ID + "-" + phase, Mode: mode, Goal: "Inspect only the synthetic fixture",
-				Terminal: terminalConfig{Columns: 90, Rows: 10, FontPath: receipt.Tools.Font.Path, FontSize: 18,
+				Terminal: terminalConfig{Columns: 90, Rows: 10, FontPath: filepath.Join(root, "unavailable-original.ttf"),
+					FontFallbacks: []string{filepath.Join(root, "unavailable-fallback.ttf")}, FontSize: 18,
 					FPS: 10, Background: "#0d1117", Foreground: "#e6edf3"},
 				Output:       recording.OutputOptions{Formats: []string{"mp4"}, Timing: "condensed"},
 				Expectations: []expectation{{ID: "exit", Type: "exit_code", Value: json.RawMessage("0")}},
@@ -246,19 +283,29 @@ func presentationNativeCase(t *testing.T) {
 	path := filepath.Join(root, "session.json")
 	require.NoError(t, cliutil.WriteJSON(path, manifest))
 	var output bytes.Buffer
-	code, err := runSession(ctx, t.TempDir(), options{sessionManifest: path, preflight: receiptPath, inspection: "all"},
+	// Given recorded chapters whose original font files are unavailable.
+	opts, err := parseOptions([]string{"--session", path, "--preflight", receiptPath, "--inspection", "all",
+		"--font", fontPath, "--font-fallback", fallback})
+	require.NoError(t, err)
+
+	// When a session is rendered with replacement fonts.
+	code, err := runSession(ctx, t.TempDir(), opts,
 		cliutil.Streams{Out: &output}, render)
 	require.NoError(t, err)
+
+	// Then every chapter and the overview render without rewriting the recorded contracts.
 	var report sessionReport
 	require.NoError(t, json.Unmarshal(output.Bytes(), &report))
 	require.Equal(t, 1, code, output.String())
 	require.Equal(t, "failed", report.SessionStatus)
 	require.Equal(t, "complete", report.Rendering.Status, report.Rendering.Error)
-	fonts, err := fontutil.Open(receipt.Tools.Font.Path, 18, nil)
+	fonts, err := fontutil.Open(fontPath, 18, nil)
 	require.NoError(t, err)
 	expectedHeight := 15 * fonts.CellHeight
+	expectedWidth := 90 * fonts.CellWidth
 	require.NoError(t, fonts.Close())
-	require.Equal(t, expectedHeight+expectedHeight%2, report.Rendering.Height, "the removed timing footer must not leave an extra row")
+	require.Equal(t, expectedHeight+expectedHeight%2+96, report.Rendering.Height, "the framed terminal keeps a 48px vertical safe area")
+	require.Equal(t, expectedWidth+expectedWidth%2+96, report.Rendering.Width, "the framed terminal keeps a 48px horizontal safe area")
 	require.True(t, report.OrderVerified)
 	require.Equal(t, "mixed", report.Mode)
 	require.NotNil(t, report.Overview)
@@ -275,6 +322,13 @@ func presentationNativeCase(t *testing.T) {
 		if chapter.Kind == "overview" {
 			kind = "overview"
 		} else {
+			require.NotNil(t, chapter.Evidence.Presentation)
+			assert.Equal(t, fontPath, chapter.Evidence.Presentation.FontPath)
+			assert.Equal(t, []string{fallback}, chapter.Evidence.Presentation.FontFallbacks)
+			require.Len(t, chapter.Evidence.Rendering.FontFallbacks, 1)
+			sum := sha256.Sum256(gomono.TTF)
+			assert.Equal(t, fallback, chapter.Evidence.Rendering.FontFallbacks[0].Path)
+			assert.Equal(t, hex.EncodeToString(sum[:]), chapter.Evidence.Rendering.FontFallbacks[0].SHA256)
 			require.Equal(t, "condensed", chapter.Evidence.Rendering.Timing)
 			require.Positive(t, chapter.Evidence.Rendering.PresentationHoldSeconds, "reading holds remain recorded in metadata")
 		}
@@ -296,7 +350,7 @@ func presentationNativeCase(t *testing.T) {
 			cases[index] = sessionCaseResult{ID: fmt.Sprint(index), Title: "A brief independent behavior", Status: "passed", Mode: "exact"}
 		}
 		directory := t.TempDir()
-		config := terminalConfig{FontPath: receipt.Tools.Font.Path, FontSize: 18, FPS: 10, Background: "#0d1117", Foreground: "#e6edf3"}
+		config := terminalConfig{FontPath: fontPath, FontSize: 18, FPS: 10, Background: "#0d1117", Foreground: "#e6edf3"}
 		pages, overview, err := renderOverview(ctx, directory, receipt, config, "Exact CLI checks", "exact", cases,
 			report.Rendering.Width, report.Rendering.Height, report.Rendering.FPS)
 		require.NoError(t, err)
@@ -322,7 +376,9 @@ func presentationNativeCase(t *testing.T) {
 		path := filepath.Join(root, "plain.json")
 		require.NoError(t, cliutil.WriteJSON(path, plain))
 		var output bytes.Buffer
-		code, err := runSession(ctx, t.TempDir(), options{sessionManifest: path, preflight: receiptPath, inspection: "sampled"},
+		plainOptions := opts
+		plainOptions.sessionManifest, plainOptions.inspection = path, "sampled"
+		code, err := runSession(ctx, t.TempDir(), plainOptions,
 			cliutil.Streams{Out: &output}, render)
 		require.NoError(t, err)
 		require.Equal(t, 1, code)
@@ -346,7 +402,8 @@ func presentationNativeCase(t *testing.T) {
 		path := filepath.Join(root, "reordered.json")
 		require.NoError(t, cliutil.WriteJSON(path, reordered))
 		var output bytes.Buffer
-		code, err := runSession(ctx, t.TempDir(), options{sessionManifest: path, preflight: receiptPath},
+		code, err := runSession(ctx, t.TempDir(), options{sessionManifest: path, preflight: receiptPath,
+			fontPath: fontPath},
 			cliutil.Streams{Out: &output}, func(context.Context, contract, result, []state, []event, recording.Receipt, string, string) (rendering, error) {
 				return rendering{Status: "complete"}, nil
 			})

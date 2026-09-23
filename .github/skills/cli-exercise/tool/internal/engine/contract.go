@@ -331,9 +331,8 @@ func parseContract(options Options) (*runContract, error) {
 		stateDirectory = str(value)
 	}
 	terminal, ok := object(source["terminal"])
-	if !ok || !filepath.IsAbs(str(terminal["fontPath"])) || !hexColor.MatchString(str(terminal["background"])) ||
-		!hexColor.MatchString(str(terminal["foreground"])) {
-		return fail("Terminal dimensions, an explicit font, and colors are required.")
+	if !ok || !hexColor.MatchString(str(terminal["background"])) || !hexColor.MatchString(str(terminal["foreground"])) {
+		return fail("Terminal dimensions and colors are required.")
 	}
 	for _, key := range []string{"columns", "rows"} {
 		value, ok := integer(terminal[key])
@@ -346,16 +345,11 @@ func parseContract(options Options) (*runContract, error) {
 	if !sizeOK || size <= 0 || size > 512 || !fpsOK || fps < 1 || fps > 60 {
 		return fail("The font size and integer recording cadence must be supported.")
 	}
-	if value, exists := terminal["fontFallbacks"]; exists {
-		paths, ok := stringList(value)
-		if !ok {
-			return fail("Font fallbacks must be explicit paths.")
-		}
-		for _, path := range paths {
-			if !filepath.IsAbs(path) {
-				return fail("Font fallbacks must be absolute.")
-			}
-		}
+	if _, exists := terminal["fontPath"]; exists {
+		return fail("Terminal font choices belong to evidence rendering, not the execution contract.")
+	}
+	if _, exists := terminal["fontFallbacks"]; exists {
+		return fail("Terminal font choices belong to evidence rendering, not the execution contract.")
 	}
 	limits, ok := object(source["limits"])
 	actions, actionsOK := integer(limits["maxActions"])

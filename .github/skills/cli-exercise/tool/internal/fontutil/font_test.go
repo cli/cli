@@ -1,6 +1,8 @@
 package fontutil
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"image"
 	"image/color"
 	"os"
@@ -76,6 +78,18 @@ func TestDraw(t *testing.T) {
 			require.NoError(t, err)
 			require.Greater(t, advance, float64(0))
 		})
+	}
+	set, err := Open(filepath.Join(root, "Mono-Regular.ttf"), 18, nil)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, set.Close()) }()
+	require.Len(t, set.Styles, 3)
+	for index, name := range []string{"Mono-Bold.ttf", "Mono-Italic.ttf", "Mono-BoldItalic.ttf"} {
+		data, err := os.ReadFile(filepath.Join(root, name))
+		require.NoError(t, err)
+		sum := sha256.Sum256(data)
+		require.Equal(t, filepath.Join(root, name), set.Styles[index].Path)
+		require.NotEmpty(t, set.Styles[index].Family)
+		require.Equal(t, hex.EncodeToString(sum[:]), set.Styles[index].SHA256)
 	}
 	require.Equal(t, 0, Cells('\u0301'))
 	require.Equal(t, 2, Cells('\u754c'))

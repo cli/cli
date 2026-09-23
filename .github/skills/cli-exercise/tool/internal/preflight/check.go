@@ -15,13 +15,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/cli-exercise/internal/cliutil"
-	"github.com/cli/cli/v2/cli-exercise/internal/fontutil"
 	"github.com/cli/cli/v2/cli-exercise/internal/recording"
 	"github.com/cli/cli/v2/cli-exercise/internal/terminal"
 )
@@ -33,7 +31,6 @@ type options struct {
 	Node         string   `json:"node,omitempty"`
 	FFmpeg       string   `json:"ffmpeg,omitempty"`
 	FFprobe      string   `json:"ffprobe,omitempty"`
-	Font         string   `json:"font,omitempty"`
 	Formats      []string `json:"formats"`
 	ProbeTimeout float64  `json:"probe_timeout"`
 }
@@ -85,7 +82,6 @@ type service struct {
 	root, manifest string
 	helper         string
 	runner         runner
-	fontProbe      func(string) (fontutil.Info, error)
 	lookup         func(string, string) (string, error)
 	managed        bool
 	nativeProbe    func(context.Context, terminal.Session, terminal.LaunchOptions) error
@@ -119,7 +115,7 @@ func newService(root string, selected options) (*service, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, value := range []*string{&selected.ModuleRoot, &selected.Font} {
+	for _, value := range []*string{&selected.ModuleRoot} {
 		if *value != "" {
 			absolute, err := filepath.Abs(*value)
 			if err != nil {
@@ -146,7 +142,7 @@ func newService(root string, selected options) (*service, error) {
 		return nil, fmt.Errorf("the skill manifest does not pin the supported Tuistory version")
 	}
 	return &service{options: selected, root: root, manifest: manifest, helper: helper,
-		runner: processRunner{}, fontProbe: fontutil.Probe, lookup: executable, managed: cliutil.ManagedProcesses(),
+		runner: processRunner{}, lookup: executable, managed: cliutil.ManagedProcesses(),
 		nativeProbe: checkTerminal}, nil
 }
 
@@ -172,24 +168,9 @@ func isolatedEnvironment(workspace, node string) (map[string]string, error) {
 	return values, nil
 }
 
-func fontCandidates() []string {
-	switch runtime.GOOS {
-	case "darwin":
-		return []string{"/System/Library/Fonts/Menlo.ttc", "/System/Library/Fonts/Monaco.ttf"}
-	case "windows":
-		root := filepath.Join(os.Getenv("SystemRoot"), "Fonts")
-		return []string{filepath.Join(root, "consola.ttf"), filepath.Join(root, "cour.ttf"), filepath.Join(root, "lucon.ttf")}
-	default:
-		return []string{"/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-			"/usr/share/fonts/truetype/liberation2/LiberationMono-Regular.ttf",
-			"/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-			"/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"}
-	}
-}
-
 func (service *service) check(ctx context.Context) (result report, err error) {
 	result = report{SchemaVersion: 1, Manifest: service.manifest, Issues: []issue{}}
-	result.Checks.Formats, result.Checks.FontAttempts = map[string]bool{}, []map[string]any{}
+	result.Checks.Formats = map[string]bool{}
 	problem := func(item, kind, detail string, needsInstall bool) {
 		remedy := "Select a working existing capability and rerun check; system installation is a separate user decision."
 		if needsInstall {
@@ -293,23 +274,6 @@ func (service *service) check(ctx context.Context) (result report, err error) {
 				result.Checks.NativePTY = true
 			}
 		}
-	}
-	candidates := fontCandidates()
-	if service.options.Font != "" {
-		candidates = []string{service.options.Font}
-	}
-	for _, path := range candidates {
-		info, err := service.fontProbe(path)
-		if err != nil {
-			result.Checks.FontAttempts = append(result.Checks.FontAttempts, map[string]any{"path": path, "status": "unusable", "detail": err.Error()})
-			continue
-		}
-		result.Tools.Font = &recording.Font{Path: info.Path, Family: info.Family, SHA256: info.SHA256}
-		result.Checks.FontAttempts = append(result.Checks.FontAttempts, map[string]any{"path": path, "status": "usable"})
-		break
-	}
-	if result.Tools.Font == nil {
-		problem("font", "unusable", "No selected installed font passed Go loading and monospaced rasterization.", false)
 	}
 	if result.Tools.FFmpeg != nil && result.Tools.FFprobe != nil {
 		raw := filepath.Join(work, "frames.rgb")

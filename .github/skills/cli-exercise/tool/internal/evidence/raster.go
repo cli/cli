@@ -20,13 +20,17 @@ type rasterizer struct {
 }
 
 var (
-	preparationInk = color.RGBA{0xd2, 0xa8, 0xff, 0xff}
-	runningInk     = color.RGBA{0x79, 0xc0, 0xff, 0xff}
-	passedInk      = color.RGBA{0x7e, 0xe7, 0x87, 0xff}
-	failedInk      = color.RGBA{0xff, 0x7b, 0x72, 0xff}
-	blockedInk     = color.RGBA{0xe3, 0xb3, 0x41, 0xff}
-	mutedInk       = color.RGBA{0x91, 0x98, 0xa1, 0xff}
+	preparationInk  = color.RGBA{0xd2, 0xa8, 0xff, 0xff}
+	runningInk      = color.RGBA{0x79, 0xc0, 0xff, 0xff}
+	passedInk       = color.RGBA{0x7e, 0xe7, 0x87, 0xff}
+	failedInk       = color.RGBA{0xff, 0x7b, 0x72, 0xff}
+	blockedInk      = color.RGBA{0xe3, 0xb3, 0x41, 0xff}
+	mutedInk        = color.RGBA{0x91, 0x98, 0xa1, 0xff}
+	presentationInk = color.RGBA{0x01, 0x04, 0x09, 0xff}
+	panelBorderInk  = color.RGBA{0x30, 0x36, 0x3d, 0xff}
 )
+
+const presentationMargin = 48
 
 func outcomeAppearance(status string) (string, color.RGBA) {
 	switch status {
@@ -109,7 +113,7 @@ func parseColor(value string) (color.RGBA, error) {
 	return color.RGBA{R: uint8(rgb >> 16), G: uint8(rgb >> 8), B: uint8(rgb), A: 255}, nil
 }
 
-func newRasterizer(config terminalConfig, receipt recording.Receipt) (*rasterizer, error) {
+func newRasterizer(config terminalConfig) (*rasterizer, error) {
 	background, err := parseColor(config.Background)
 	if err != nil {
 		return nil, err
@@ -120,10 +124,7 @@ func newRasterizer(config terminalConfig, receipt recording.Receipt) (*rasterize
 	}
 	path := config.FontPath
 	if path == "" {
-		if receipt.Tools.Font == nil {
-			return nil, fmt.Errorf("an explicit font selection is required")
-		}
-		path = receipt.Tools.Font.Path
+		return nil, fmt.Errorf("rendering requires an explicit font selection")
 	}
 	fonts, err := fontutil.Open(path, config.FontSize, config.FontFallbacks)
 	if err != nil {
@@ -235,8 +236,13 @@ func (raster *rasterizer) draw(data recording.TerminalData) (*image.RGBA, error)
 }
 
 func (raster *rasterizer) compose(top *image.RGBA, contract contract, entry frame, width, height, terminalHeight int) (*image.RGBA, error) {
-	canvas := image.NewRGBA(image.Rect(0, 0, width, height))
-	fill(canvas, canvas.Bounds(), raster.background)
+	canvas := image.NewRGBA(image.Rect(0, 0, width+2*presentationMargin, height+2*presentationMargin))
+	fill(canvas, canvas.Bounds(), presentationInk)
+	panel := image.Rect(presentationMargin-1, presentationMargin-1,
+		presentationMargin+width+1, presentationMargin+height+1)
+	fill(canvas, panel, panelBorderInk)
+	fill(canvas, image.Rect(presentationMargin, presentationMargin,
+		presentationMargin+width, presentationMargin+height), raster.background)
 	command, err := raster.commandLines(contract, width)
 	if err != nil {
 		return nil, err
@@ -244,11 +250,12 @@ func (raster *rasterizer) compose(top *image.RGBA, contract contract, entry fram
 	offset := len(command) * raster.fonts.CellHeight
 	// The invocation is recorded launch metadata, not invented terminal keystrokes.
 	for row, line := range command {
-		if err := raster.fonts.DrawText(canvas, 0, row*raster.fonts.CellHeight+raster.fonts.Ascent, line, raster.foreground); err != nil {
+		if err := raster.fonts.DrawText(canvas, presentationMargin,
+			presentationMargin+row*raster.fonts.CellHeight+raster.fonts.Ascent, line, raster.foreground); err != nil {
 			return nil, err
 		}
 	}
-	draw.Draw(canvas, top.Bounds().Add(image.Pt(0, offset)), top, image.Point{}, draw.Src)
+	draw.Draw(canvas, top.Bounds().Add(image.Pt(presentationMargin, presentationMargin+offset)), top, image.Point{}, draw.Src)
 	if contract.Output.Captions != nil && !*contract.Output.Captions {
 		return canvas, nil
 	}
@@ -257,8 +264,9 @@ func (raster *rasterizer) compose(top *image.RGBA, contract contract, entry fram
 	if contract.Chapter != nil {
 		_, accent = phaseAppearance(contract.Chapter.Phase, contract.Chapter.Status)
 	}
-	fill(canvas, image.Rect(0, terminalHeight, width, terminalHeight+1), border)
-	fill(canvas, image.Rect(0, terminalHeight, width, terminalHeight+3), accent)
+	terminalBottom := presentationMargin + terminalHeight
+	fill(canvas, image.Rect(presentationMargin, terminalBottom, presentationMargin+width, terminalBottom+1), border)
+	fill(canvas, image.Rect(presentationMargin, terminalBottom, presentationMargin+width, terminalBottom+3), accent)
 	chapter, text := contract.CaseID, contract.Goal
 	if entry.Note != nil {
 		if entry.Note.Chapter != nil {
@@ -299,12 +307,12 @@ func (raster *rasterizer) compose(top *image.RGBA, contract contract, entry fram
 	if len(lines) > 2 {
 		return nil, fmt.Errorf("annotation exceeds two lines; revise it rather than truncate it")
 	}
-	if err := raster.fonts.DrawText(canvas, 12, terminalHeight+8+raster.fonts.Ascent, chapter, accent); err != nil {
+	if err := raster.fonts.DrawText(canvas, presentationMargin+12, terminalBottom+8+raster.fonts.Ascent, chapter, accent); err != nil {
 		return nil, err
 	}
 	for index, line := range lines {
-		baseline := terminalHeight + raster.fonts.CellHeight*(index+1) + 8 + raster.fonts.Ascent
-		if err := raster.fonts.DrawText(canvas, 12, baseline, line, raster.foreground); err != nil {
+		baseline := terminalBottom + raster.fonts.CellHeight*(index+1) + 8 + raster.fonts.Ascent
+		if err := raster.fonts.DrawText(canvas, presentationMargin+12, baseline, line, raster.foreground); err != nil {
 			return nil, err
 		}
 	}
