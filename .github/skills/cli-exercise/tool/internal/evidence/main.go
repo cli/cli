@@ -34,6 +34,8 @@ type options struct {
 	chapter             *chapterPresentation
 	captions            *bool
 	html                bool
+	fontPath            string
+	fontFallbacks       []string
 }
 
 func parseOptions(args []string) (options, error) {
@@ -46,6 +48,26 @@ func parseOptions(args []string) (options, error) {
 	flags.StringVar(&opts.verification, "verification", "", "Evidence-backed manual expectations")
 	flags.StringVar(&opts.inspection, "inspection", "sampled", "sampled or all")
 	flags.BoolVar(&opts.html, "html", false, "Also generate an interactive HTML report")
+	fontPath := func(value string) (string, error) {
+		if strings.TrimSpace(value) == "" {
+			return "", fmt.Errorf("font path must not be empty")
+		}
+		return filepath.Abs(value)
+	}
+	flags.Func("font", "Primary rendering font; leaves the recorded contract unchanged", func(value string) error {
+		path, err := fontPath(value)
+		if err == nil {
+			opts.fontPath = path
+		}
+		return err
+	})
+	flags.Func("font-fallback", "Rendering fallback font; repeat to replace the recorded fallback chain in order", func(value string) error {
+		path, err := fontPath(value)
+		if err == nil {
+			opts.fontFallbacks = append(opts.fontFallbacks, path)
+		}
+		return err
+	})
 	flags.Func("format", "Additional presentation format: gif or mp4; repeat for both", func(value string) error {
 		if !slices.Contains([]string{"gif", "mp4"}, value) {
 			return fmt.Errorf("--format must be gif or mp4")
@@ -177,20 +199,29 @@ func readRecords[T any](path string) ([]T, error) {
 	return values, nil
 }
 
+// Presentation output is already resolved, so it must not inherit the contract's input unmarshaler.
+type presentationOutput recording.OutputOptions
+
+type presentationOptions struct {
+	presentationOutput
+	FontPath      string   `json:"fontPath,omitempty"`
+	FontFallbacks []string `json:"fontFallbacks,omitempty"`
+}
+
 type report struct {
-	SchemaVersion  int                      `json:"schemaVersion"`
-	CaseID         string                   `json:"caseId"`
-	Mode           string                   `json:"mode"`
-	StartedAt      string                   `json:"startedAt,omitempty"`
-	FinishedAt     string                   `json:"finishedAt,omitempty"`
-	CaseStatus     string                   `json:"caseStatus"`
-	CaptureStatus  string                   `json:"captureStatus"`
-	ContractSHA256 string                   `json:"contractSha256"`
-	Expectations   []check                  `json:"expectations"`
-	Rendering      rendering                `json:"rendering"`
-	Presentation   *recording.OutputOptions `json:"presentation,omitempty"`
-	Report         string                   `json:"report,omitempty"`
-	Chapter        *chapterPresentation     `json:"chapter,omitempty"`
+	SchemaVersion  int                  `json:"schemaVersion"`
+	CaseID         string               `json:"caseId"`
+	Mode           string               `json:"mode"`
+	StartedAt      string               `json:"startedAt,omitempty"`
+	FinishedAt     string               `json:"finishedAt,omitempty"`
+	CaseStatus     string               `json:"caseStatus"`
+	CaptureStatus  string               `json:"captureStatus"`
+	ContractSHA256 string               `json:"contractSha256"`
+	Expectations   []check              `json:"expectations"`
+	Rendering      rendering            `json:"rendering"`
+	Presentation   *presentationOptions `json:"presentation,omitempty"`
+	Report         string               `json:"report,omitempty"`
+	Chapter        *chapterPresentation `json:"chapter,omitempty"`
 	terminal       terminalConfig
 }
 
@@ -287,7 +318,7 @@ func buildReport(ctx context.Context, skillRoot string, opts options, renderMedi
 		chapter.Status = outcome
 		presentation.Chapter = &chapter
 	}
-	var requestedOutput *recording.OutputOptions
+	var requestedOutput *presentationOptions
 	if len(opts.formats) > 0 || opts.timing != "" || opts.captions != nil {
 		if len(opts.formats) > 0 {
 			presentation.Output.Formats = slices.Clone(opts.formats)
@@ -302,7 +333,20 @@ func buildReport(ctx context.Context, skillRoot string, opts options, renderMedi
 		if presentation.Output.Timing == "condensed" && presentation.Output.Captions != nil && !*presentation.Output.Captions {
 			return report{}, fmt.Errorf("unannotated output preserves real timing; use realtime instead of condensed")
 		}
-		requestedOutput = &presentation.Output
+		requestedOutput = &presentationOptions{presentationOutput: presentationOutput(presentation.Output)}
+	}
+	if opts.fontPath != "" || len(opts.fontFallbacks) > 0 {
+		if opts.fontPath != "" {
+			presentation.Terminal.FontPath = opts.fontPath
+		}
+		if len(opts.fontFallbacks) > 0 {
+			presentation.Terminal.FontFallbacks = slices.Clone(opts.fontFallbacks)
+		}
+		if requestedOutput == nil {
+			requestedOutput = &presentationOptions{presentationOutput: presentationOutput(presentation.Output)}
+		}
+		requestedOutput.FontPath = presentation.Terminal.FontPath
+		requestedOutput.FontFallbacks = slices.Clone(presentation.Terminal.FontFallbacks)
 	}
 	artifacts := filepath.Join(workspace, "artifacts")
 	if info, err := os.Lstat(artifacts); err == nil && (!info.IsDir() || info.Mode()&os.ModeSymlink != 0) {
@@ -323,7 +367,7 @@ func buildReport(ctx context.Context, skillRoot string, opts options, renderMedi
 	}
 	resultReport := report{
 		SchemaVersion: 1, CaseID: contract.CaseID, CaseStatus: outcome, CaptureStatus: result.CaptureStatus,
-		Mode: contract.Mode, StartedAt: result.StartedAt, FinishedAt: result.FinishedAt, terminal: contract.Terminal,
+		Mode: contract.Mode, StartedAt: result.StartedAt, FinishedAt: result.FinishedAt, terminal: presentation.Terminal,
 		ContractSHA256: hash, Expectations: checks, Rendering: rendered,
 		Presentation: requestedOutput,
 		Chapter:      presentation.Chapter,
@@ -426,7 +470,7 @@ func Main(ctx context.Context, skillRoot string, args []string, streams cliutil.
 	opts, err := parseOptions(args)
 	if errors.Is(err, flag.ErrHelp) {
 		if _, err := fmt.Fprintln(streams.Out,
-			"Usage: cli-exercise --skill-root PATH evidence {--run-dir PATH|--session FILE} --preflight FILE [--html] [--verification FILE] [--inspection sampled|all] [--format gif|mp4] [--timing realtime|condensed] [--timing-authorization TEXT]"); err != nil {
+			"Usage: cli-exercise --skill-root PATH evidence {--run-dir PATH|--session FILE} --preflight FILE [--html] [--verification FILE] [--inspection sampled|all] [--format gif|mp4] [--timing realtime|condensed] [--timing-authorization TEXT] [--font FILE] [--font-fallback FILE ...]"); err != nil {
 			return 1
 		}
 		return 0

@@ -93,20 +93,25 @@ func wrapOverviewText(fonts *fontutil.Set, text string, width, limit int) ([]str
 
 func planOverview(fonts, heading *fontutil.Set, title string, cases []sessionCaseResult, width, height int) (overviewLayout, error) {
 	layout := overviewLayout{}
+	contentWidth := width - 2*presentationMargin
+	contentHeight := height - 2*presentationMargin
+	if contentWidth <= 64 || contentHeight <= 0 {
+		return layout, fmt.Errorf("overview needs room for the framed presentation")
+	}
 	var err error
-	layout.title, err = wrapOverviewText(heading, title, width-64, 2)
+	layout.title, err = wrapOverviewText(heading, title, contentWidth-64, 2)
 	if err != nil {
 		return layout, err
 	}
 	layout.top = 40 + fonts.CellHeight + len(layout.title)*heading.CellHeight + 28
-	layout.footer = height - 2*fonts.CellHeight - 28
+	layout.footer = contentHeight - 2*fonts.CellHeight - 28
 	available := layout.footer - layout.top
 	if available < fonts.CellHeight+20 || len(cases) == 0 {
 		return layout, fmt.Errorf("overview needs room for at least one readable result row")
 	}
 	page, used := []overviewRow{}, 0
 	for _, item := range cases {
-		lines, err := wrapOverviewText(fonts, item.Title, width-224, 2)
+		lines, err := wrapOverviewText(fonts, item.Title, contentWidth-224, 2)
 		if err != nil {
 			return layout, fmt.Errorf("case %s: %w", item.ID, err)
 		}
@@ -149,24 +154,33 @@ func statusMark(canvas *image.RGBA, x, y, size int, status string, ink color.RGB
 
 func drawOverview(raster *rasterizer, heading *fontutil.Set, layout overviewLayout, page, width, height int, mode string) (*image.RGBA, error) {
 	canvas := image.NewRGBA(image.Rect(0, 0, width, height))
-	fill(canvas, canvas.Bounds(), raster.background)
-	if err := raster.fonts.DrawText(canvas, 32, 24+raster.fonts.Ascent, fidelityLabel(mode), runningInk); err != nil {
+	fill(canvas, canvas.Bounds(), presentationInk)
+	contentWidth := width - 2*presentationMargin
+	contentHeight := height - 2*presentationMargin
+	panel := image.Rect(presentationMargin-1, presentationMargin-1,
+		presentationMargin+contentWidth+1, presentationMargin+contentHeight+1)
+	fill(canvas, panel, panelBorderInk)
+	fill(canvas, image.Rect(presentationMargin, presentationMargin,
+		presentationMargin+contentWidth, presentationMargin+contentHeight), raster.background)
+	if err := raster.fonts.DrawText(canvas, presentationMargin+32,
+		presentationMargin+24+raster.fonts.Ascent, fidelityLabel(mode), runningInk); err != nil {
 		return nil, err
 	}
-	y := 40 + raster.fonts.CellHeight
+	y := presentationMargin + 40 + raster.fonts.CellHeight
 	for _, line := range layout.title {
-		if err := heading.DrawText(canvas, 32, y+heading.Ascent, line, raster.foreground); err != nil {
+		if err := heading.DrawText(canvas, presentationMargin+32, y+heading.Ascent, line, raster.foreground); err != nil {
 			return nil, err
 		}
 		y += heading.CellHeight
 	}
-	y = layout.top
+	y = presentationMargin + layout.top
 	border := color.RGBA{0x30, 0x36, 0x3d, 0xff}
 	for _, row := range layout.pages[page] {
 		label, ink := outcomeAppearance(row.result.Status)
-		statusMark(canvas, 34, y+5, max(10, raster.fonts.CellHeight-10), row.result.Status, ink)
+		statusMark(canvas, presentationMargin+34, y+5, max(10, raster.fonts.CellHeight-10), row.result.Status, ink)
 		for index, line := range row.lines {
-			if err := raster.fonts.DrawText(canvas, 64, y+index*raster.fonts.CellHeight+raster.fonts.Ascent, line, raster.foreground); err != nil {
+			if err := raster.fonts.DrawText(canvas, presentationMargin+64,
+				y+index*raster.fonts.CellHeight+raster.fonts.Ascent, line, raster.foreground); err != nil {
 				return nil, err
 			}
 		}
@@ -174,17 +188,20 @@ func drawOverview(raster *rasterizer, heading *fontutil.Set, layout overviewLayo
 		if err != nil {
 			return nil, err
 		}
-		if err := raster.fonts.DrawText(canvas, width-32-int(labelWidth), y+raster.fonts.Ascent, label, ink); err != nil {
+		if err := raster.fonts.DrawText(canvas, presentationMargin+contentWidth-32-int(labelWidth),
+			y+raster.fonts.Ascent, label, ink); err != nil {
 			return nil, err
 		}
 		y += row.height
-		fill(canvas, image.Rect(32, y-8, width-32, y-7), border)
+		fill(canvas, image.Rect(presentationMargin+32, y-8,
+			presentationMargin+contentWidth-32, y-7), border)
 	}
 	footer := "Recorded outcomes"
 	if len(layout.pages) > 1 {
 		footer += fmt.Sprintf(" | Page %d of %d", page+1, len(layout.pages))
 	}
-	if err := raster.fonts.DrawText(canvas, 32, height-24-raster.fonts.CellHeight+raster.fonts.Ascent, footer, mutedInk); err != nil {
+	if err := raster.fonts.DrawText(canvas, presentationMargin+32,
+		presentationMargin+contentHeight-24-raster.fonts.CellHeight+raster.fonts.Ascent, footer, mutedInk); err != nil {
 		return nil, err
 	}
 	return canvas, nil
@@ -243,6 +260,7 @@ func renderOverview(ctx context.Context, directory string, receipt recording.Rec
 				Status: "complete", Media: map[string]string{"mp4": videoPath},
 				Width: width, Height: height, Frames: overviewPageSeconds * fps, FPS: fps,
 				DurationSeconds: overviewPageSeconds,
+				Font:            &raster.fonts.Info, FontFallbacks: raster.fonts.Fallbacks,
 			}}})
 	}
 	return chapters, &sessionOverview{Mode: mode, Title: title, Pages: len(layout.pages),

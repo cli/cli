@@ -174,6 +174,9 @@ but it does not provide the session overview or whole-session progress.
 An explicit session `output.timing` overrides chapter presentation timing;
 otherwise each recorded contract's timing is retained, including the condensed
 default. `--format` and `--timing` can select another final presentation.
+`--font` and repeated `--font-fallback` select rendering fonts for every chapter
+and the overview without modifying the recorded contracts. See
+[render-time font selection](runtime-interface.md#offline-evidence-rendering).
 Use a consistent frame rate across runs. Different dimensions can be padded
 without cropping or scaling terminal text.
 

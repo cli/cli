@@ -64,6 +64,7 @@ type rendering struct {
 	CapturedStates          int                  `json:"capturedStates,omitempty"`
 	VideoStates             int                  `json:"videoStates,omitempty"`
 	Font                    *fontutil.Info       `json:"font,omitempty"`
+	FontFallbacks           []fontutil.Info      `json:"fontFallbacks,omitempty"`
 	Inspection              *inspectionInfo      `json:"inspection,omitempty"`
 	Warnings                []string             `json:"warnings,omitempty"`
 	inspectionFrames        []int
@@ -324,7 +325,9 @@ func render(ctx context.Context, contract contract, result result, states []stat
 	}
 	width += width % 2
 	height += height % 2
-	if width <= 0 || height <= 0 || int64(width)*int64(height) > 64_000_000 {
+	mediaWidth := width + 2*presentationMargin
+	mediaHeight := height + 2*presentationMargin
+	if width <= 0 || height <= 0 || int64(mediaWidth)*int64(mediaHeight) > 64_000_000 {
 		return empty, fmt.Errorf("recorded geometry exceeds the bounded raster dimensions")
 	}
 	environment, err := rendererEnvironment(directory, receipt.Tools)
@@ -346,7 +349,7 @@ func render(ctx context.Context, contract contract, result result, states []stat
 		primaryKind = "mp4"
 	}
 	primary := filepath.Join(directory, "terminal."+primaryKind)
-	arguments, err := encodingArguments(receipt.Tools.FFmpeg.Path, primary, width, height, contract.Terminal.FPS, primaryKind)
+	arguments, err := encodingArguments(receipt.Tools.FFmpeg.Path, primary, mediaWidth, mediaHeight, contract.Terminal.FPS, primaryKind)
 	if err != nil {
 		return empty, err
 	}
@@ -462,11 +465,11 @@ func render(ctx context.Context, contract contract, result result, states []stat
 		if !exists {
 			continue
 		}
-		details[kind], err = inspectMedia(bounded, filename, kind, receipt.Tools, environment, width, height, count)
+		details[kind], err = inspectMedia(bounded, filename, kind, receipt.Tools, environment, mediaWidth, mediaHeight, count)
 		if err != nil {
 			return empty, err
 		}
-		encoded[kind], err = decodedSamples(bounded, filename, kind, receipt.Tools, environment, width, height, count, inspection)
+		encoded[kind], err = decodedSamples(bounded, filename, kind, receipt.Tools, environment, mediaWidth, mediaHeight, count, inspection)
 		if err != nil {
 			return empty, err
 		}
@@ -514,11 +517,12 @@ func render(ctx context.Context, contract contract, result result, states []stat
 		inspectionFrames = renderedInspectionFrames(renderedOccurrences, count, additionalFrames)
 	}
 	return rendering{
-		Status: "complete", Media: media, MediaDetails: details, Width: width, Height: height,
+		Status: "complete", Media: media, MediaDetails: details, Width: mediaWidth, Height: mediaHeight,
 		DurationSeconds: timelineDuration, CaptureDurationSeconds: result.DurationSeconds, EndHoldSeconds: hold,
 		PresentationHoldSeconds: float64(additionalFrames) / float64(contract.Terminal.FPS),
 		Frames:                  count, FPS: contract.Terminal.FPS, Timing: contract.Output.Timing,
 		CapturedStates: len(states), VideoStates: len(videoStates), Font: &raster.fonts.Info,
+		FontFallbacks: raster.fonts.Fallbacks,
 		Inspection: &inspectionInfo{
 			Mode: inspectionMode, Directory: inspection, Manifest: manifest, ManifestSHA256: hash,
 			EncodedSamples: encoded, VisualReview: "pending",

@@ -367,7 +367,7 @@ func TestRun(t *testing.T) {
 		source.Output.Timing = "realtime"
 		canvas, err := raster.compose(top, source, frame{}, top.Bounds().Dx(), 6*raster.fonts.CellHeight, 2*raster.fonts.CellHeight)
 		require.NoError(t, err)
-		require.Equal(t, 6*raster.fonts.CellHeight, canvas.Bounds().Dy())
+		require.Equal(t, 6*raster.fonts.CellHeight+2*presentationMargin, canvas.Bounds().Dy())
 		store, err := newImageStore(t.TempDir())
 		require.NoError(t, err)
 		original, err := store.save(top)

@@ -189,6 +189,7 @@ func runSession(ctx context.Context, skillRoot string, opts options, streams cli
 			}
 			settings := options{runDir: directory, preflight: opts.preflight, inspection: opts.inspection, html: opts.html,
 				formats: []string{"mp4"}, timing: manifest.Output.Timing, captions: manifest.Output.Captions,
+				fontPath: opts.fontPath, fontFallbacks: opts.fontFallbacks,
 				chapter: &chapterPresentation{Label: item.Title, Phase: run.Phase, Title: run.Title, MinimumDurationSeconds: minimum}}
 			if opts.timing != "" {
 				settings.timing, settings.timingAuthorization = opts.timing, opts.timingAuthorization

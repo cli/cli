@@ -200,6 +200,9 @@ nonzero exit may pass, while exit zero does not excuse a contradicted assertion.
 GIF and MP4 are supported output requests. `output.captions` defaults to true;
 set it to false when the caller requires an unannotated recording. Optional
 `terminal.fontFallbacks` lists explicit additional font paths for missing glyphs.
+These fonts are the rendering defaults. The evidence command can select other
+fonts for a new rendering without editing this contract; see
+[render-time font selection](runtime-interface.md#offline-evidence-rendering).
 `terminal.fps` must be a whole number from 1 through 60.
 `output.timing` defaults to `condensed` when omitted. Use `realtime` when the
 caller requests full timing; an existing contract's explicit timing is preserved.

@@ -289,9 +289,11 @@ The low-level form
 remains available for per-invocation clips. It is not the normal path to a final
 session video with overview and whole-session progress.
 Go rasterizes the recorded terminal cells and captions from the explicit
-OpenType fonts, then streams frames to FFmpeg. It writes a new private rendering directory
-rather than replacing prior evidence. Only media is delivered by default; raw
-capture, JSON reports, and inspection files remain internal evidence.
+OpenType fonts, places terminal and overview content inside a framed 48-pixel
+safe area so common playback controls do not obscure the first row, then streams
+frames to FFmpeg. It writes a new private rendering directory rather than
+replacing prior evidence. Only media is delivered by default; raw capture, JSON
+reports, and inspection files remain internal evidence.
 Add `--html` to also generate a self-contained HTML report. Without it, neither
 standalone nor session renders create HTML, including per-chapter reports.
 Use `--inspection all` when the claim
@@ -317,6 +319,30 @@ The report records a separate `presentation` object and retains the original
 contract hash. Without overrides, output follows the recorded contract, using
 condensed timing only when that field is omitted. `--timing-authorization` may
 optionally record the caller's request for a condensed companion.
+
+Rendering can also select `--font FILE` and repeated `--font-fallback FILE`
+options. `--font` replaces only the primary font; supplying any `--font-fallback`
+replaces the recorded fallback list with the supplied files in order. Omitted
+choices retain the contract's values. Relative paths resolve from the helper's
+working directory. Unusable fonts fail rendering explicitly, not the recorded
+case's outcome.
+
+These options work with both `--run-dir` and `--session`, including the session
+overview. They are saved in `presentation.fontPath` and
+`presentation.fontFallbacks`; successful renderings also identify the actual
+font files and SHA-256 hashes in `rendering.font` and `rendering.fontFallbacks`.
+To recover an existing capture with a missing glyph, select a compatible
+fallback and rerun only evidence rendering:
+
+```sh
+<helper> --skill-root <package-root> evidence \
+  --session <manifest.json> --preflight <receipt.json> \
+  --font-fallback /absolute/fonts/symbols.ttf
+```
+
+Neither the immutable execution contract nor any captured output is rewritten.
+No subject command is rerun, and no new execution preflight receipt is needed
+solely to select rendering fonts.
 
 Annotated session output labels preparation in purple and running in blue.
 Validation has visible result text, green for passed expectations and red for
