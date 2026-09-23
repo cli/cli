@@ -18,8 +18,6 @@ Build the Go helper using [the offline-first prerequisite flow](prerequisites.md
 `<helper> --skill-root <package-root> preflight check --output <receipt.json>`
 performs checks only. It must never install or update a dependency. Optional
 `--module-root` and `--node` select caller-approved existing runtime tools.
-`--font` may validate a font intended for a later rendering, but does not select
-or save a rendering default.
 
 A ready receipt has this shape:
 

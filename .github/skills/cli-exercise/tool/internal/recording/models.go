@@ -150,9 +150,8 @@ func (tools Tools) Executable(name string) *Executable {
 
 // CapabilityChecks records observed readiness rather than presumed compatibility.
 type CapabilityChecks struct {
-	Formats      map[string]bool  `json:"formats"`
-	NativePTY    bool             `json:"nativePty"`
-	FontAttempts []map[string]any `json:"fontAttempts"`
+	Formats   map[string]bool `json:"formats"`
+	NativePTY bool            `json:"nativePty"`
 }
 
 // Receipt is the common prerequisite identity and capability record.

@@ -76,7 +76,6 @@ Optional selections:
 | `--node PATH` | Existing Node executable; defaults to PATH discovery |
 | `--ffmpeg PATH` | Existing ffmpeg executable |
 | `--ffprobe PATH` | Existing ffprobe executable |
-| `--font PATH` | Optionally validate an existing monospaced TTF, OTF, or TTC file planned for rendering |
 | `--format gif` / `--format mp4` | Repeat for requested formats; both are checked by default |
 | `--probe-timeout SECONDS` | Per-process bound, 5-120 seconds; default 20 |
 
@@ -85,7 +84,6 @@ For example, to check explicitly supplied dependencies without modifying them:
 ```sh
 <helper> --skill-root <package-root> preflight check \
   --module-root /absolute/dependencies/node_modules \
-  --font /absolute/fonts/monospace.ttf \
   --output /absolute/workspace/preflight.json
 ```
 

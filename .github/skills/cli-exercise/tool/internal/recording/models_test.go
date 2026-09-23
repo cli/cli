@@ -36,7 +36,7 @@ func TestDecode(t *testing.T) {
 			"ffmpeg":{"path":"/ffmpeg","version":"v1","sha256":"ffmpeg"},
 			"ffprobe":{"path":"/ffprobe","version":"v1","sha256":"ffprobe"},
 			"font":{"path":"/font","family":"Mono"}},
-			"checks":{"formats":{"gif":true},"nativePty":true,"fontAttempts":[]}}`
+			"checks":{"formats":{"gif":true},"nativePty":true}}`
 		var receipt Receipt
 		require.NoError(t, json.Unmarshal([]byte(source), &receipt))
 		data, err := json.Marshal(receipt)
