@@ -221,7 +221,10 @@ func presentationNativeCase(t *testing.T) {
 	var receipt recording.Receipt
 	_, err := cliutil.ReadJSON(receiptPath, 4<<20, &receipt)
 	require.NoError(t, err)
-	require.NotNil(t, receipt.Tools.Font)
+	fontPath := os.Getenv("CLI_EXERCISE_RENDER_FONT")
+	if fontPath == "" {
+		t.Skip("Select an explicit font for native presentation checks.")
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), 120*time.Second)
 	defer cancel()
 	root := t.TempDir()
@@ -282,7 +285,7 @@ func presentationNativeCase(t *testing.T) {
 	var output bytes.Buffer
 	// Given recorded chapters whose original font files are unavailable.
 	opts, err := parseOptions([]string{"--session", path, "--preflight", receiptPath, "--inspection", "all",
-		"--font", receipt.Tools.Font.Path, "--font-fallback", fallback})
+		"--font", fontPath, "--font-fallback", fallback})
 	require.NoError(t, err)
 
 	// When a session is rendered with replacement fonts.
@@ -296,7 +299,7 @@ func presentationNativeCase(t *testing.T) {
 	require.Equal(t, 1, code, output.String())
 	require.Equal(t, "failed", report.SessionStatus)
 	require.Equal(t, "complete", report.Rendering.Status, report.Rendering.Error)
-	fonts, err := fontutil.Open(receipt.Tools.Font.Path, 18, nil)
+	fonts, err := fontutil.Open(fontPath, 18, nil)
 	require.NoError(t, err)
 	expectedHeight := 15 * fonts.CellHeight
 	expectedWidth := 90 * fonts.CellWidth
@@ -320,7 +323,7 @@ func presentationNativeCase(t *testing.T) {
 			kind = "overview"
 		} else {
 			require.NotNil(t, chapter.Evidence.Presentation)
-			assert.Equal(t, receipt.Tools.Font.Path, chapter.Evidence.Presentation.FontPath)
+			assert.Equal(t, fontPath, chapter.Evidence.Presentation.FontPath)
 			assert.Equal(t, []string{fallback}, chapter.Evidence.Presentation.FontFallbacks)
 			require.Len(t, chapter.Evidence.Rendering.FontFallbacks, 1)
 			sum := sha256.Sum256(gomono.TTF)
@@ -347,7 +350,7 @@ func presentationNativeCase(t *testing.T) {
 			cases[index] = sessionCaseResult{ID: fmt.Sprint(index), Title: "A brief independent behavior", Status: "passed", Mode: "exact"}
 		}
 		directory := t.TempDir()
-		config := terminalConfig{FontPath: receipt.Tools.Font.Path, FontSize: 18, FPS: 10, Background: "#0d1117", Foreground: "#e6edf3"}
+		config := terminalConfig{FontPath: fontPath, FontSize: 18, FPS: 10, Background: "#0d1117", Foreground: "#e6edf3"}
 		pages, overview, err := renderOverview(ctx, directory, receipt, config, "Exact CLI checks", "exact", cases,
 			report.Rendering.Width, report.Rendering.Height, report.Rendering.FPS)
 		require.NoError(t, err)
@@ -399,7 +402,8 @@ func presentationNativeCase(t *testing.T) {
 		path := filepath.Join(root, "reordered.json")
 		require.NoError(t, cliutil.WriteJSON(path, reordered))
 		var output bytes.Buffer
-		code, err := runSession(ctx, t.TempDir(), options{sessionManifest: path, preflight: receiptPath},
+		code, err := runSession(ctx, t.TempDir(), options{sessionManifest: path, preflight: receiptPath,
+			fontPath: fontPath},
 			cliutil.Streams{Out: &output}, func(context.Context, contract, result, []state, []event, recording.Receipt, string, string) (rendering, error) {
 				return rendering{Status: "complete"}, nil
 			})

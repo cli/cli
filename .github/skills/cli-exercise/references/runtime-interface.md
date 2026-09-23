@@ -321,15 +321,17 @@ optionally record the caller's request for a condensed companion.
 
 Rendering can also select `--font FILE` and repeated `--font-fallback FILE`
 options. Every new rendering requires `--font`; supplying `--font-fallback`
-adds the explicit fallback chain in the supplied order. Relative paths resolve
-from the helper's working directory. Unusable fonts fail rendering explicitly,
-not the recorded case's outcome. Legacy contracts containing font paths remain
-readable, but new execution contracts do not record presentation font paths.
+defines the complete explicit fallback chain in the supplied order. Relative
+paths resolve from the helper's working directory. Unusable fonts fail rendering
+explicitly, not the recorded case's outcome. Execution contracts and preflight
+receipts contain no font selection.
 
 These options work with both `--run-dir` and `--session`, including the session
 overview. They are saved in `presentation.fontPath` and
 `presentation.fontFallbacks`; successful renderings also identify the actual
-font files and SHA-256 hashes in `rendering.font` and `rendering.fontFallbacks`.
+font files and SHA-256 hashes in `rendering.font`, `rendering.fontStyles`, and
+`rendering.fontFallbacks`. Style companions are recorded separately from glyph
+fallbacks.
 To recover an existing capture with a missing glyph, select a compatible
 fallback and rerun only evidence rendering:
 

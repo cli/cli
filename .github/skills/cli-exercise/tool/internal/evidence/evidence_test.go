@@ -192,7 +192,8 @@ func TestRun(t *testing.T) {
 			receiptPath := filepath.Join(root, "preflight.json")
 			require.NoError(t, cliutil.WriteJSON(receiptPath, map[string]string{"status": "ready"}))
 			var output bytes.Buffer
-			opts := options{runDir: root, preflight: receiptPath, inspection: "sampled", html: tc.html}
+			opts := options{runDir: root, preflight: receiptPath, inspection: "sampled", html: tc.html,
+				fontPath: filepath.Join(root, "selected.ttf")}
 			wantTiming := tc.recordedTiming
 			if wantTiming == "" {
 				wantTiming = "condensed"
@@ -229,12 +230,11 @@ func TestRun(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, raw, unchanged)
 			require.Equal(t, tc.recordedTiming, source.Output.Timing)
+			require.NotNil(t, report.Presentation)
+			require.Equal(t, opts.fontPath, report.Presentation.FontPath)
 			if tc.companion {
-				require.NotNil(t, report.Presentation)
 				require.Equal(t, wantTiming, report.Presentation.Timing)
 				require.Equal(t, opts.timingAuthorization, report.Presentation.TimingAuthorization)
-			} else {
-				require.Nil(t, report.Presentation)
 			}
 			if !tc.renderError {
 				require.Equal(t, wantTiming, report.Rendering.Timing)
@@ -411,8 +411,12 @@ func TestRun(t *testing.T) {
 		skillRoot, err := filepath.Abs("../../..")
 		require.NoError(t, err)
 		var output bytes.Buffer
+		fontPath := os.Getenv("CLI_EXERCISE_RENDER_FONT")
+		if fontPath == "" {
+			t.Skip("Supply an explicit font for native rendering.")
+		}
 		code, err := run(context.Background(), skillRoot, options{
-			runDir: root, preflight: preflight, inspection: "all",
+			runDir: root, preflight: preflight, inspection: "all", fontPath: fontPath,
 		}, cliutil.Streams{Out: &output, ErrOut: io.Discard}, render)
 		require.NoError(t, err)
 		require.Zero(t, code, output.String())

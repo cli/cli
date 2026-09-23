@@ -14,6 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/image/font/gofont/gomono"
+	"golang.org/x/image/font/gofont/gomonobold"
+	"golang.org/x/image/font/gofont/gomonobolditalic"
+	"golang.org/x/image/font/gofont/gomonoitalic"
 	"golang.org/x/image/font/gofont/goregular"
 )
 
@@ -68,6 +71,12 @@ func TestRenderFontOverridesPreserveCapture(t *testing.T) {
 	font := filepath.Join(root, "replacement.ttf")
 	fallback := filepath.Join(root, "symbols.ttf")
 	require.NoError(t, os.WriteFile(font, gomono.TTF, 0o600))
+	for name, data := range map[string][]byte{
+		"replacement-Bold.ttf": gomonobold.TTF, "replacement-Italic.ttf": gomonoitalic.TTF,
+		"replacement-BoldItalic.ttf": gomonobolditalic.TTF,
+	} {
+		require.NoError(t, os.WriteFile(filepath.Join(root, name), data, 0o600))
+	}
 	require.NoError(t, os.WriteFile(fallback, goregular.TTF, 0o600))
 
 	// When rendering requests a different primary font and fallback chain.
@@ -81,7 +90,10 @@ func TestRenderFontOverridesPreserveCapture(t *testing.T) {
 		defer func() { require.NoError(t, raster.fonts.Close()) }()
 		_, err = raster.draw(states[0].Data)
 		require.NoError(t, err)
-		return rendering{Status: "complete", Font: &raster.fonts.Info}, nil
+		return rendering{
+			Status: "complete", Font: &raster.fonts.Info,
+			FontStyles: raster.fonts.Styles, FontFallbacks: raster.fonts.Fallbacks,
+		}, nil
 	})
 
 	// Then rendering succeeds with separately recorded choices and unchanged evidence.
@@ -90,6 +102,17 @@ func TestRenderFontOverridesPreserveCapture(t *testing.T) {
 	assert.Equal(t, "passed", report.CaseStatus)
 	require.NotNil(t, report.Rendering.Font)
 	assert.Equal(t, font, report.Rendering.Font.Path)
+	require.Len(t, report.Rendering.FontStyles, 3)
+	for index, name := range []string{"replacement-Bold.ttf", "replacement-Italic.ttf", "replacement-BoldItalic.ttf"} {
+		data, err := os.ReadFile(filepath.Join(root, name))
+		require.NoError(t, err)
+		sum := sha256.Sum256(data)
+		assert.Equal(t, filepath.Join(root, name), report.Rendering.FontStyles[index].Path)
+		assert.NotEmpty(t, report.Rendering.FontStyles[index].Family)
+		assert.Equal(t, hex.EncodeToString(sum[:]), report.Rendering.FontStyles[index].SHA256)
+	}
+	require.Len(t, report.Rendering.FontFallbacks, 1)
+	assert.Equal(t, fallback, report.Rendering.FontFallbacks[0].Path)
 	assert.Equal(t, font, report.terminal.FontPath, "session overview must use the rendering font too")
 	assert.Equal(t, []string{fallback}, report.terminal.FontFallbacks)
 	require.NotNil(t, report.Presentation)
@@ -116,7 +139,7 @@ func TestParseRenderingFonts(t *testing.T) {
 		primary   string
 		fallbacks []string
 	}{
-		{name: "omitted choices retain the contract"},
+		{name: "omitted choices remain empty"},
 		{name: "primary font only", flags: []string{"--font", "primary.ttf"}, primary: primary},
 		{name: "ordered fallbacks only", flags: []string{"--font-fallback", "first.ttf", "--font-fallback", "second.ttf"},
 			fallbacks: []string{first, second}},
@@ -225,16 +248,16 @@ func TestRenderingRequiresExplicitFont(t *testing.T) {
 			})
 
 			// Then no font path is inherited from execution or preflight.
+			if tc.status == "failed" {
+				require.ErrorContains(t, err, "--font")
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.status, report.Rendering.Status)
 			assert.Equal(t, tc.primary, report.terminal.FontPath)
 			assert.Equal(t, tc.fallbacks, report.terminal.FontFallbacks)
-			if tc.status == "complete" {
-				require.NotNil(t, report.Rendering.Font)
-				assert.Equal(t, tc.primary, report.Rendering.Font.Path)
-			} else {
-				assert.Contains(t, report.Rendering.Error, "explicit font selection")
-			}
+			require.NotNil(t, report.Rendering.Font)
+			assert.Equal(t, tc.primary, report.Rendering.Font.Path)
 		})
 	}
 }

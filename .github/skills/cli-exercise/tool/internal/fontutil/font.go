@@ -40,6 +40,7 @@ type face struct {
 // Set holds explicit font faces and the terminal's fixed cell metrics.
 type Set struct {
 	Info       Info
+	Styles     []Info
 	Fallbacks  []Info
 	CellWidth  int
 	CellHeight int
@@ -164,12 +165,13 @@ func Open(filename string, size float64, fallbacks []string) (_ *Set, err error)
 			} else if err != nil {
 				return nil, err
 			}
-			extra, _, _, err := load(path, size)
+			extra, _, info, err := load(path, size)
 			if err != nil {
 				return nil, err
 			}
 			set.faces = append(set.faces, extra...)
 			set.styles[flags] = extra[0]
+			set.Styles = append(set.Styles, info)
 		}
 	}
 	for _, path := range fallbacks {

@@ -64,6 +64,7 @@ type rendering struct {
 	CapturedStates          int                  `json:"capturedStates,omitempty"`
 	VideoStates             int                  `json:"videoStates,omitempty"`
 	Font                    *fontutil.Info       `json:"font,omitempty"`
+	FontStyles              []fontutil.Info      `json:"fontStyles,omitempty"`
 	FontFallbacks           []fontutil.Info      `json:"fontFallbacks,omitempty"`
 	Inspection              *inspectionInfo      `json:"inspection,omitempty"`
 	Warnings                []string             `json:"warnings,omitempty"`
@@ -522,7 +523,7 @@ func render(ctx context.Context, contract contract, result result, states []stat
 		PresentationHoldSeconds: float64(additionalFrames) / float64(contract.Terminal.FPS),
 		Frames:                  count, FPS: contract.Terminal.FPS, Timing: contract.Output.Timing,
 		CapturedStates: len(states), VideoStates: len(videoStates), Font: &raster.fonts.Info,
-		FontFallbacks: raster.fonts.Fallbacks,
+		FontStyles: raster.fonts.Styles, FontFallbacks: raster.fonts.Fallbacks,
 		Inspection: &inspectionInfo{
 			Mode: inspectionMode, Directory: inspection, Manifest: manifest, ManifestSHA256: hash,
 			EncodedSamples: encoded, VisualReview: "pending",

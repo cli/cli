@@ -29,7 +29,10 @@ func sessionInspectionNativeCase(t *testing.T) {
 	var receipt recording.Receipt
 	_, err := cliutil.ReadJSON(preflight, 4<<20, &receipt)
 	require.NoError(t, err)
-	require.NotNil(t, receipt.Tools.Font)
+	fontPath := os.Getenv("CLI_EXERCISE_RENDER_FONT")
+	if fontPath == "" {
+		t.Skip("Select an explicit font for native rendering.")
+	}
 	require.True(t, receipt.Checks.Formats["mp4"] && receipt.Checks.Formats["gif"])
 	ctx, cancel := context.WithTimeout(t.Context(), 180*time.Second)
 	defer cancel()
@@ -45,7 +48,7 @@ func sessionInspectionNativeCase(t *testing.T) {
 		directory := filepath.Join(root, fmt.Sprintf("case-%d", index))
 		require.NoError(t, os.MkdirAll(filepath.Join(directory, "capture"), 0o700))
 		source := contract{CaseID: fmt.Sprintf("case-%d", index), Mode: "exact", Goal: "Inspect synthetic output",
-			Terminal: terminalConfig{Columns: 80, Rows: 12, FontPath: receipt.Tools.Font.Path, FontSize: 14,
+			Terminal: terminalConfig{Columns: 80, Rows: 12, FontPath: fontPath, FontSize: 14,
 				FPS: 10, Background: "#0d1117", Foreground: "#e6edf3"},
 			Output:       recording.OutputOptions{Formats: []string{"mp4"}, Timing: "condensed"},
 			Expectations: []expectation{{ID: "exit", Type: "exit_code", Value: json.RawMessage("0")}},
@@ -87,7 +90,8 @@ func sessionInspectionNativeCase(t *testing.T) {
 	require.NoError(t, cliutil.WriteJSON(path, manifest))
 	reports := map[string]sessionReport{}
 	for _, mode := range []string{"sampled", "all"} {
-		opts, err := parseOptions([]string{"--session", path, "--preflight", preflight, "--inspection", mode})
+		opts, err := parseOptions([]string{"--session", path, "--preflight", preflight, "--inspection", mode,
+			"--font", fontPath})
 		require.NoError(t, err)
 		var output bytes.Buffer
 		code, err := runSession(ctx, skillRoot, opts, cliutil.Streams{Out: &output}, render)
@@ -148,7 +152,7 @@ func sessionInspectionNativeCase(t *testing.T) {
 	t.Run("GIF-only repeated images share storage", func(t *testing.T) {
 		off := false
 		source := contract{CaseID: "repeated", Goal: "Repeated state",
-			Terminal: terminalConfig{FontPath: receipt.Tools.Font.Path, FontSize: 14, FPS: 30, Background: "#0d1117", Foreground: "#e6edf3"},
+			Terminal: terminalConfig{FontPath: fontPath, FontSize: 14, FPS: 30, Background: "#0d1117", Foreground: "#e6edf3"},
 			Output:   recording.OutputOptions{Formats: []string{"mp4"}, Timing: "realtime", Captions: &off}}
 		captured := testState("", 0)
 		captured.Data.Columns = 4

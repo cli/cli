@@ -228,6 +228,12 @@ func TestContractAndActionValidation(t *testing.T) {
 		}, code: "private_contract"},
 		{name: "reserved environment", change: func(f *fixture) { f.contract["environment"].(document)["values"] = document{"HOME": "/elsewhere"} }, code: "invalid_contract"},
 		{name: "unsupported cadence", change: func(f *fixture) { f.contract["terminal"].(document)["fps"] = 120 }, code: "invalid_contract"},
+		{name: "font path belongs to rendering", change: func(f *fixture) {
+			f.contract["terminal"].(document)["fontPath"] = filepath.Join(f.root, "mono.ttf")
+		}, code: "invalid_contract"},
+		{name: "font fallbacks belong to rendering", change: func(f *fixture) {
+			f.contract["terminal"].(document)["fontFallbacks"] = []any{filepath.Join(f.root, "symbols.ttf")}
+		}, code: "invalid_contract"},
 		{name: "unspecified timing defaults to condensed", change: func(f *fixture) { delete(f.contract["output"].(document), "timing") }},
 		{name: "condensed needs no separate approval", change: func(f *fixture) { f.contract["output"].(document)["timing"] = "condensed" }},
 		{name: "explicit realtime permits unannotated output", change: func(f *fixture) { f.contract["output"].(document)["captions"] = false }},

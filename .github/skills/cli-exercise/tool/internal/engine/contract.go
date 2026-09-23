@@ -345,19 +345,11 @@ func parseContract(options Options) (*runContract, error) {
 	if !sizeOK || size <= 0 || size > 512 || !fpsOK || fps < 1 || fps > 60 {
 		return fail("The font size and integer recording cadence must be supported.")
 	}
-	if value, exists := terminal["fontPath"]; exists && (!nonempty(value) || !filepath.IsAbs(str(value))) {
-		return fail("A legacy font path must be absolute.")
+	if _, exists := terminal["fontPath"]; exists {
+		return fail("Terminal font choices belong to evidence rendering, not the execution contract.")
 	}
-	if value, exists := terminal["fontFallbacks"]; exists {
-		paths, ok := stringList(value)
-		if !ok {
-			return fail("Font fallbacks must be explicit paths.")
-		}
-		for _, path := range paths {
-			if !filepath.IsAbs(path) {
-				return fail("Font fallbacks must be absolute.")
-			}
-		}
+	if _, exists := terminal["fontFallbacks"]; exists {
+		return fail("Terminal font choices belong to evidence rendering, not the execution contract.")
 	}
 	limits, ok := object(source["limits"])
 	actions, actionsOK := integer(limits["maxActions"])

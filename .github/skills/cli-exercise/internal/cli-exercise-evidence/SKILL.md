@@ -56,8 +56,8 @@ separately. Do not rewrite
 the execution contract or rerun a command merely to change its presentation.
 
 Every rendering requires `--font FILE`. If it reports a missing glyph, repeat
-`--font-fallback FILE` to supply an ordered fallback chain. These options apply
-to session chapters and the overview too.
+`--font-fallback FILE` to define the complete ordered fallback chain. These
+options apply to session chapters and the overview too.
 Select existing compatible fonts, then rerun only `evidence`; the new report
 records the rendering choices and font hashes without changing the capture.
 

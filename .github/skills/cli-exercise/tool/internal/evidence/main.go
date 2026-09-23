@@ -281,6 +281,9 @@ func buildReport(ctx context.Context, skillRoot string, opts options, renderMedi
 	if receipt.Status != "ready" {
 		return report{}, fmt.Errorf("a ready preflight receipt is required")
 	}
+	if opts.fontPath == "" {
+		return report{}, fmt.Errorf("evidence rendering requires --font")
+	}
 	statePath, err := containedFile(workspace, "capture/states.jsonl")
 	if err != nil {
 		return report{}, err
@@ -309,6 +312,8 @@ func buildReport(ctx context.Context, skillRoot string, opts options, renderMedi
 		return report{}, err
 	}
 	presentation := contract
+	presentation.Terminal.FontPath = ""
+	presentation.Terminal.FontFallbacks = nil
 	if opts.chapter != nil {
 		if !filepath.IsAbs(contract.Command.Executable) {
 			return report{}, fmt.Errorf("session chapters require the recorded command identity")
@@ -335,19 +340,13 @@ func buildReport(ctx context.Context, skillRoot string, opts options, renderMedi
 		}
 		requestedOutput = &presentationOptions{presentationOutput: presentationOutput(presentation.Output)}
 	}
-	if opts.fontPath != "" || len(opts.fontFallbacks) > 0 {
-		if opts.fontPath != "" {
-			presentation.Terminal.FontPath = opts.fontPath
-		}
-		if len(opts.fontFallbacks) > 0 {
-			presentation.Terminal.FontFallbacks = slices.Clone(opts.fontFallbacks)
-		}
-		if requestedOutput == nil {
-			requestedOutput = &presentationOptions{presentationOutput: presentationOutput(presentation.Output)}
-		}
-		requestedOutput.FontPath = presentation.Terminal.FontPath
-		requestedOutput.FontFallbacks = slices.Clone(presentation.Terminal.FontFallbacks)
+	presentation.Terminal.FontPath = opts.fontPath
+	presentation.Terminal.FontFallbacks = slices.Clone(opts.fontFallbacks)
+	if requestedOutput == nil {
+		requestedOutput = &presentationOptions{presentationOutput: presentationOutput(presentation.Output)}
 	}
+	requestedOutput.FontPath = presentation.Terminal.FontPath
+	requestedOutput.FontFallbacks = slices.Clone(presentation.Terminal.FontFallbacks)
 	artifacts := filepath.Join(workspace, "artifacts")
 	if info, err := os.Lstat(artifacts); err == nil && (!info.IsDir() || info.Mode()&os.ModeSymlink != 0) {
 		return report{}, fmt.Errorf("artifact directory must be a real directory, not a symlink")

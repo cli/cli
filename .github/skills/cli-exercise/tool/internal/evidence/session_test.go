@@ -47,7 +47,8 @@ func sessionCases(t *testing.T) {
 			require.NoError(t, cliutil.WriteJSON(receiptPath, recording.Receipt{Status: "ready",
 				Checks: recording.CapabilityChecks{Formats: map[string]bool{"mp4": true}}}))
 			var output bytes.Buffer
-			code, err := runSession(context.Background(), t.TempDir(), options{sessionManifest: path, preflight: receiptPath, inspection: "all", html: withHTML},
+			code, err := runSession(context.Background(), t.TempDir(), options{sessionManifest: path, preflight: receiptPath,
+				inspection: "all", html: withHTML, fontPath: filepath.Join(root, "selected.ttf")},
 				cliutil.Streams{Out: &output}, func(context.Context, contract, result, []state, []event, recording.Receipt, string, string) (rendering, error) {
 					return rendering{Status: "failed", Error: "This fixture does not encode media."}, nil
 				})
@@ -145,7 +146,8 @@ func sessionCases(t *testing.T) {
 		receipt := recording.Receipt{Status: "ready", Checks: recording.CapabilityChecks{Formats: map[string]bool{"mp4": true}}}
 		require.NoError(t, cliutil.WriteJSON(receiptPath, receipt))
 		var output bytes.Buffer
-		code, err := runSession(context.Background(), t.TempDir(), options{sessionManifest: path, preflight: receiptPath, inspection: "all"},
+		code, err := runSession(context.Background(), t.TempDir(), options{sessionManifest: path, preflight: receiptPath,
+			inspection: "all", fontPath: filepath.Join(root, "selected.ttf")},
 			cliutil.Streams{Out: &output}, render)
 		require.NoError(t, err)
 		require.Equal(t, 1, code)

@@ -260,7 +260,7 @@ func renderOverview(ctx context.Context, directory string, receipt recording.Rec
 				Status: "complete", Media: map[string]string{"mp4": videoPath},
 				Width: width, Height: height, Frames: overviewPageSeconds * fps, FPS: fps,
 				DurationSeconds: overviewPageSeconds,
-				Font:            &raster.fonts.Info, FontFallbacks: raster.fonts.Fallbacks,
+				Font:            &raster.fonts.Info, FontStyles: raster.fonts.Styles, FontFallbacks: raster.fonts.Fallbacks,
 			}}})
 	}
 	return chapters, &sessionOverview{Mode: mode, Title: title, Pages: len(layout.pages),

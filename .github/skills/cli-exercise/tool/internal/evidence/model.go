@@ -17,8 +17,8 @@ import (
 type terminalConfig struct {
 	Columns       int      `json:"columns"`
 	Rows          int      `json:"rows"`
-	FontPath      string   `json:"fontPath,omitempty"`
-	FontFallbacks []string `json:"fontFallbacks,omitempty"`
+	FontPath      string   `json:"-"`
+	FontFallbacks []string `json:"-"`
 	FontSize      float64  `json:"fontSize"`
 	FPS           int      `json:"fps"`
 	Background    string   `json:"background"`
