@@ -1,5 +1,5 @@
 name: Triage Scheduled Tasks
-on:
+off:
   workflow_dispatch:
   issue_comment:
     types: [created]
