@@ -73,7 +73,7 @@ func TestNewEnforcementCriteria(t *testing.T) {
 
 		c, err := newEnforcementCriteria(opts)
 		require.NoError(t, err)
-		require.Equal(t, `^https://github\.com/foo/bar/\.github/workflows/attest\.yml(@[^@]*)?$`, c.SANRegex)
+		require.Equal(t, `^https://github\.com/foo/bar/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`, c.SANRegex)
 		require.Zero(t, c.SAN)
 	})
 
@@ -299,25 +299,25 @@ func TestValidateSignerWorkflow(t *testing.T) {
 		{
 			name:                   "workflow with default host",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@[^@]*)?$`,
+			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`,
 			host:                   "github.com",
 		},
 		{
 			name:                   "workflow with workflow URL included",
 			providedSignerWorkflow: "github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@[^@]*)?$`,
+			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`,
 			host:                   "github.com",
 		},
 		{
 			name:                   "workflow with GH_HOST set",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  `^https://myhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@[^@]*)?$`,
+			expectedWorkflowRegex:  `^https://myhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`,
 			host:                   "myhost.github.com",
 		},
 		{
 			name:                   "workflow with authenticated host",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  `^https://authedhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@[^@]*)?$`,
+			expectedWorkflowRegex:  `^https://authedhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`,
 			host:                   "authedhost.github.com",
 		},
 	}
@@ -357,6 +357,16 @@ func TestSignerWorkflowSANMatching(t *testing.T) {
 		{
 			name:        "pinned workflow at a commit SHA",
 			san:         workflowDir + "release.yml@09b495c3f12c7881b3cc17209a327792065c1a1d",
+			expectMatch: true,
+		},
+		{
+			name:        "pinned workflow at a tag containing @",
+			san:         workflowDir + "release.yml@refs/tags/pkg@1.2.3",
+			expectMatch: true,
+		},
+		{
+			name:        "pinned workflow at a branch containing @",
+			san:         workflowDir + "release.yml@refs/heads/feature@v2",
 			expectMatch: true,
 		},
 		{
@@ -402,6 +412,23 @@ func TestSignerWorkflowSANMatching(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSignerWorkflowSANMatchingObservedCertificate uses the SubjectAlternativeName from
+// a certificate Fulcio actually issued for a workflow stored at
+// .github/workflows/provenance-image.yml@evil.yml. Actions loads a workflow file whose
+// name contains "@", and neither the OIDC claim nor Fulcio escapes it, so the separator
+// really can appear more than once in a SAN.
+func TestSignerWorkflowSANMatchingObservedCertificate(t *testing.T) {
+	const observedSAN = "https://github.com/bdehamer/attest-demo/.github/workflows/provenance-image.yml@evil.yml@refs/heads/main"
+
+	sanRegex, err := validateSignerWorkflow("github.com", "bdehamer/attest-demo/.github/workflows/provenance-image.yml")
+	require.NoError(t, err)
+
+	matcher, err := verify.NewSANMatcher("", sanRegex)
+	require.NoError(t, err)
+
+	require.Error(t, matcher.Verify(certificate.Summary{SubjectAlternativeName: observedSAN}))
 }
 
 // TestSignerWorkflowSANMatchingRepositoryValue covers a --signer-workflow value that

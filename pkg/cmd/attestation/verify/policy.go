@@ -18,14 +18,20 @@ const hostRegex = `^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+.*$`
 // signerWorkflowSANSuffix terminates the pattern built for --signer-workflow.
 //
 // A certificate issued to a GitHub Actions workflow carries a SubjectAlternativeName
-// of the form "<workflow URI>@<ref>", where the ref is either a git ref or a commit
-// SHA. sigstore-go matches SAN patterns with regexp.MatchString, which is unanchored,
-// so a pattern anchored only at the start is a prefix match: a workflow named
-// release.yml.attacker.yml would satisfy a pin on release.yml. Requiring the pinned
-// value to run to the end of the SAN, optionally followed by a single "@<ref>", makes
-// the pin an identity match. The ref may not itself contain "@", so that an "@" in a
-// workflow file name cannot be passed off as the separator.
-const signerWorkflowSANSuffix = `(@[^@]*)?$`
+// of the form "<workflow URI>@<ref>". sigstore-go matches SAN patterns with
+// regexp.MatchString, which is unanchored, so a pattern anchored only at the start is
+// a prefix match: a workflow named release.yml.attacker.yml satisfies a pin on
+// release.yml. Requiring the pinned value to run to the end of the SAN makes the pin
+// an identity match.
+//
+// The separator cannot be located by splitting on "@", because both sides may contain
+// one. A git ref may contain "@", as in the refs/tags/pkg@1.2.3 convention used by
+// JavaScript monorepos, and so may a workflow file name. What separates them is shape:
+// a ref is either a "refs/"-prefixed path or a bare object ID, and a workflow file name
+// can be neither. It cannot contain "/", since Actions only loads workflows stored
+// directly in .github/workflows, and it cannot be a bare object ID, since it must carry
+// a .yml or .yaml extension.
+const signerWorkflowSANSuffix = `(@(refs/.*|[0-9a-fA-F]+))?$`
 
 func expandToGitHubURL(tenant, ownerOrRepo string) string {
 	if tenant == "" {
