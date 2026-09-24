@@ -410,6 +410,13 @@ func TestNewUploader(t *testing.T) {
 			viewerPermission: "WRITE",
 		},
 		{
+			name:             "App user-to-server token",
+			tokenType:        gh.TokenTypeUserToServer,
+			host:             "github.com",
+			targetRepository: 42,
+			viewerPermission: "WRITE",
+		},
+		{
 			name:             "rejects an enterprise server host",
 			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.example.com",
@@ -427,14 +434,6 @@ func TestNewUploader(t *testing.T) {
 			targetRepository: 42,
 			viewerPermission: "WRITE",
 			wantErr:          "attaching files is not supported on GitHub Enterprise Server",
-		},
-		{
-			name:             "rejects an App user-to-server token",
-			tokenType:        gh.TokenTypeUserToServer,
-			host:             "github.com",
-			targetRepository: 42,
-			viewerPermission: "WRITE",
-			wantErr:          badTokenErr,
 		},
 		{
 			name:             "rejects an App server-to-server token",
