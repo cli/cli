@@ -406,7 +406,7 @@ func Test_editRun_interactive(t *testing.T) {
 			},
 		},
 		{
-			name: "skipping visibility without confirmation",
+			name: "skipping visibility without matching repository confirmation",
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
@@ -420,8 +420,8 @@ func Test_editRun_interactive(t *testing.T) {
 					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "private")
 					})
-				pm.RegisterConfirm("Do you want to change visibility to private?", func(_ string, _ bool) (bool, error) {
-					return false, nil
+				pm.RegisterInput("Type OWNER/REPO to confirm changing visibility to private", func(_, _ string) (string, error) {
+					return "OWNER/OTHER", nil
 				})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -454,7 +454,7 @@ func Test_editRun_interactive(t *testing.T) {
 			wantsStderr: "Changing the repository visibility to private will cause permanent loss of 10 stars and 0 watchers.",
 		},
 		{
-			name: "changing visibility with confirmation",
+			name: "changing visibility with matching repository confirmation",
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
@@ -468,8 +468,8 @@ func Test_editRun_interactive(t *testing.T) {
 					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "private")
 					})
-				pm.RegisterConfirm("Do you want to change visibility to private?", func(_ string, _ bool) (bool, error) {
-					return true, nil
+				pm.RegisterInput("Type OWNER/REPO to confirm changing visibility to private", func(_, _ string) (string, error) {
+					return "OWNER/REPO", nil
 				})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
