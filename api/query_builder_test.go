@@ -26,7 +26,12 @@ func TestPullRequestGraphQL(t *testing.T) {
 		{
 			name:   "compressed query",
 			fields: []string{"files"},
-			want:   "files(first: 100) {nodes {additions,deletions,path,changeType}}",
+			want:   "files(first: 100) {nodes {additions,deletions,path,changeType},pageInfo{hasNextPage,endCursor}}",
+		},
+		{
+			name:   "commits includes pageInfo",
+			fields: []string{"commits"},
+			want:   "commits(first: 100) {nodes {commit {authors(first:100) {nodes {name,email,user{id,login}}},messageHeadline,messageBody,oid,committedDate,authoredDate}},pageInfo{hasNextPage,endCursor}}",
 		},
 		{
 			name:   "invalid fields",
@@ -86,7 +91,7 @@ func TestIssueGraphQL(t *testing.T) {
 		{
 			name:   "compressed query",
 			fields: []string{"files"},
-			want:   "files(first: 100) {nodes {additions,deletions,path,changeType}}",
+			want:   "files(first: 100) {nodes {additions,deletions,path,changeType},pageInfo{hasNextPage,endCursor}}",
 		},
 		{
 			name:   "projectItems",
