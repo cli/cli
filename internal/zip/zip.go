@@ -21,8 +21,7 @@ const (
 func ExtractZip(zr *zip.Reader, destDir *safepaths.Root) error {
 	for _, zf := range zr.File {
 		if err := extractZipFile(zf, destDir); err != nil {
-			var traversalError safepaths.PathTraversalError
-			if errors.As(err, &traversalError) {
+			if _, ok := errors.AsType[safepaths.PathTraversalError](err); ok {
 				continue
 			}
 			return fmt.Errorf("error extracting %q: %w", zf.Name, err)

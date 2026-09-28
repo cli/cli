@@ -112,6 +112,10 @@ func TestNewCmdClone(t *testing.T) {
 }
 
 func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
+	return runCloneCommandWithConfig(httpClient, config.NewMockConfig(), cli)
+}
+
+func runCloneCommandWithConfig(httpClient *http.Client, cfg gh.Config, cli string) (*test.CmdOut, error) {
 	ios, stdin, stdout, stderr := iostreams.Test()
 	fac := &cmdutil.Factory{
 		IOStreams: ios,
@@ -119,7 +123,7 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 			return httpClient, nil
 		},
 		Config: func() (gh.Config, error) {
-			return config.NewMockConfig(), nil
+			return cfg, nil
 		},
 		GitClient: &git.Client{
 			GhPath:  "some/path/gh",
@@ -151,9 +155,11 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 
 func Test_RepoClone(t *testing.T) {
 	tests := []struct {
-		name string
-		args string
-		want string
+		name        string
+		args        string
+		sshURL      string
+		gitProtocol string
+		want        string
 	}{
 		{
 			name: "shorthand",
@@ -186,9 +192,23 @@ func Test_RepoClone(t *testing.T) {
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
-			name: "SSH URL",
-			args: "git@github.com:OWNER/REPO.git",
-			want: "git clone git@github.com:OWNER/REPO.git",
+			name:   "SSH URL",
+			args:   "git@github.com:OWNER/REPO.git",
+			sshURL: "git@github.com:OWNER/REPO.git",
+			want:   "git clone git@github.com:OWNER/REPO.git",
+		},
+		{
+			name:        "GitHub.com SSH certificate authority URL",
+			args:        "OWNER/REPO",
+			sshURL:      "org-1234@github.com:OWNER/REPO.git",
+			gitProtocol: "ssh",
+			want:        "git clone org-1234@github.com:OWNER/REPO.git",
+		},
+		{
+			name:   "GHE.com SSH certificate authority URL",
+			args:   "test-prodweu01@test-prodweu01.ghe.com:OWNER/REPO.git",
+			sshURL: "test-prodweu01_1234@test-prodweu01.ghe.com:OWNER/REPO.git",
+			want:   "git clone test-prodweu01_1234@test-prodweu01.ghe.com:OWNER/REPO.git",
 		},
 		{
 			name: "Non-canonical capitalization",
@@ -199,6 +219,13 @@ func Test_RepoClone(t *testing.T) {
 			name: "clone wiki",
 			args: "Owner/Repo.wiki",
 			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
+		{
+			name:        "clone wiki with SSH certificate authority URL",
+			args:        "Owner/Repo.wiki",
+			sshURL:      "org-1234@github.com:OWNER/REPO.git",
+			gitProtocol: "ssh",
+			want:        "git clone org-1234@github.com:OWNER/REPO.wiki.git",
 		},
 		{
 			name: "wiki URL",
@@ -223,6 +250,7 @@ func Test_RepoClone(t *testing.T) {
 					"owner": {
 						"login": "OWNER"
 					},
+					"sshUrl": "`+tt.sshURL+`",
 					"hasWikiEnabled": true
 				} } }
 				`))
@@ -233,7 +261,11 @@ func Test_RepoClone(t *testing.T) {
 			defer restore(t)
 			cs.Register(tt.want, 0, "")
 
-			output, err := runCloneCommand(httpClient, tt.args)
+			cfg := config.NewMockConfig()
+			if tt.gitProtocol != "" {
+				cfg.Set("", "git_protocol", tt.gitProtocol)
+			}
+			output, err := runCloneCommandWithConfig(httpClient, cfg, tt.args)
 			if err != nil {
 				t.Fatalf("error running command `repo clone`: %v", err)
 			}
@@ -242,6 +274,25 @@ func Test_RepoClone(t *testing.T) {
 			assert.Equal(t, "", output.Stderr())
 		})
 	}
+}
+
+func Test_RepoClone_missingSSHURL(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"name": "REPO",
+				"owner": {"login": "OWNER"}
+			} } }
+		`))
+
+	cfg := config.NewMockConfig()
+	cfg.Set("", "git_protocol", "ssh")
+
+	_, err := runCloneCommandWithConfig(&http.Client{Transport: reg}, cfg, "OWNER/REPO")
+	require.EqualError(t, err, "invalid API response: repository OWNER/REPO is missing sshUrl")
 }
 
 func Test_RepoClone_hasParent(t *testing.T) {
@@ -282,6 +333,41 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error running command `repo clone`: %v", err)
 	}
+}
+
+func Test_RepoClone_hasParentWithSSHCertificateAuthorityURLs(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"name": "REPO",
+				"owner": {"login": "OWNER"},
+				"sshUrl": "org-1234@github.com:OWNER/REPO.git",
+				"parent": {
+					"name": "ORIG",
+					"owner": {"login": "hubot"},
+					"sshUrl": "org-5678@github.com:hubot/ORIG.git",
+					"defaultBranchRef": {"name": "trunk"}
+				}
+			} } }
+		`))
+
+	cfg := config.NewMockConfig()
+	cfg.Set("", "git_protocol", "ssh")
+	httpClient := &http.Client{Transport: reg}
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git clone org-1234@github.com:OWNER/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk upstream org-5678@github.com:hubot/ORIG.git`, 0, "")
+	cs.Register(`git -C REPO fetch upstream`, 0, "")
+	cs.Register(`git -C REPO remote set-branches upstream *`, 0, "")
+	cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
+
+	_, err := runCloneCommandWithConfig(httpClient, cfg, "OWNER/REPO")
+	require.NoError(t, err)
 }
 
 func Test_RepoClone_hasParent_upstreamRemoteName(t *testing.T) {

@@ -9,12 +9,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -22,12 +24,22 @@ import (
 )
 
 func Test_printError(t *testing.T) {
-	cmd := &cobra.Command{}
+	rootCmd := &cobra.Command{Use: "gh"}
+	cmd := &cobra.Command{
+		Use:   "spend",
+		Short: "Spend money",
+		Example: heredoc.Doc(`
+			$ gh spend --amount 1
+		`),
+	}
+	cmd.Flags().Int("amount", 0, "How much to spend")
+	rootCmd.AddCommand(cmd)
 
 	type args struct {
-		err   error
-		cmd   *cobra.Command
-		debug bool
+		err      error
+		cmd      *cobra.Command
+		debug    bool
+		fullHelp bool
 	}
 	tests := []struct {
 		name    string
@@ -63,7 +75,7 @@ check your internet connection or https://githubstatus.com
 				cmd:   cmd,
 				debug: false,
 			},
-			wantOut: "unknown flag --foo\n\nUsage:\n\n",
+			wantOut: "unknown flag --foo\n\n" + cmd.UsageString() + "\n",
 		},
 		{
 			name: "unknown Cobra command error",
@@ -72,17 +84,86 @@ check your internet connection or https://githubstatus.com
 				cmd:   cmd,
 				debug: false,
 			},
-			wantOut: "unknown command foo\n\nUsage:\n\n",
+			wantOut: "unknown command foo\n\n" + cmd.UsageString() + "\n",
+		},
+		{
+			name: "Cobra flag error with full help",
+			args: args{
+				err:      cmdutil.FlagErrorf("unknown flag --foo"),
+				cmd:      cmd,
+				debug:    false,
+				fullHelp: true,
+			},
+			wantOut: heredoc.Doc(`
+				unknown flag --foo
+
+				Spend money
+
+				USAGE
+				  gh spend [flags]
+
+				FLAGS
+				  --amount int   How much to spend
+
+				EXAMPLES
+				  $ gh spend --amount 1
+
+				LEARN MORE
+				  Use ` + "`gh <command> <subcommand> --help`" + ` for more information about a command.
+				  Read the manual at https://cli.github.com/manual
+				  Learn about exit codes using ` + "`gh help exit-codes`" + `
+				  Learn about accessibility experiences using ` + "`gh help accessibility`" + `
+
+			`),
+		},
+		{
+			name: "unknown Cobra command error with full help",
+			args: args{
+				err:      errors.New("unknown command foo"),
+				cmd:      cmd,
+				debug:    false,
+				fullHelp: true,
+			},
+			wantOut: heredoc.Doc(`
+				unknown command foo
+
+				Spend money
+
+				USAGE
+				  gh spend [flags]
+
+				FLAGS
+				  --amount int   How much to spend
+
+				EXAMPLES
+				  $ gh spend --amount 1
+
+				LEARN MORE
+				  Use ` + "`gh <command> <subcommand> --help`" + ` for more information about a command.
+				  Read the manual at https://cli.github.com/manual
+				  Learn about exit codes using ` + "`gh help exit-codes`" + `
+				  Learn about accessibility experiences using ` + "`gh help accessibility`" + `
+
+			`),
+		},
+		{
+			name: "generic error is unaffected by full help",
+			args: args{
+				err:      errors.New("the app exploded"),
+				cmd:      cmd,
+				debug:    false,
+				fullHelp: true,
+			},
+			wantOut: "the app exploded\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
 			out := &bytes.Buffer{}
-			printError(out, tt.args.err, tt.args.cmd, tt.args.debug)
-			if gotOut := out.String(); gotOut != tt.wantOut {
-				t.Errorf("printError() = %q, want %q", gotOut, tt.wantOut)
-			}
+			printError(out, ios.ColorScheme(), tt.args.err, tt.args.cmd, tt.args.debug, tt.args.fullHelp)
+			assert.Equal(t, tt.wantOut, out.String())
 		})
 	}
 }

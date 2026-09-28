@@ -126,7 +126,8 @@ blocked-by/blocking relationships.
   of `--body`, `--body-file`, or `--editor`.
 - Uploads require GitHub.com or a GHE.com tenant, an OAuth token, classic PAT,
   or fine-grained PAT, and `WRITE`, `MAINTAIN`, or `ADMIN` repository
-  permission. GitHub Enterprise Server and GitHub App tokens are unsupported.
+  permission. GitHub Enterprise Server and most GitHub App tokens are
+  unsupported.
 - Uploads stop at the first failure. If earlier files uploaded, `gh` still
   writes those attachments and exits non-zero. Create and edit commands also
   print the issue or pull request URL.

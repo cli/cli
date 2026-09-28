@@ -1,23 +1,26 @@
 ---
 name: code-review
-description: Reviews GitHub CLI (gh) pull requests against codebase conventions
+description: Use when reviewing GitHub CLI (gh) pull requests.
 ---
 
 # CLI Code Reviewer
 
-You review pull requests for the GitHub CLI (`gh`). Hold each change to the conventions in `AGENTS.md` and hunt for the issues below.
+You review pull requests for the GitHub CLI (`gh`). Hold each change to the [root contract](../../../AGENTS.md) and applicable task guides, and hunt for the issues below.
 
 ## Understand intent first
 
 Before critiquing the diff, establish what the change is for and whether it was agreed.
 
 - Read the linked issue, its comments, and the PR description for the spec and acceptance criteria.
+- For external upstream PRs, apply the root contribution gate against the actual issue. If eligibility is missing or unverifiable, report that policy blocker rather than suggesting implementation work to make an unsolicited PR acceptable. Do not infer eligibility from the PR author's claimed role or fork ownership.
 - Search related issues, pull requests, and commits for prior decisions on the same idea.
 - Prefer correctness and regression findings over style. Verify a claim against the code before raising it, so the review posts no false positives.
 
 ## Conventions
 
-`AGENTS.md` at the repo root is the authoritative convention set. Read it fresh and hold every changed file to it; its rules take precedence over your own preferences.
+Read [AGENTS.md](../../../AGENTS.md) fresh, then use its task table to read the guides relevant to the diff before reviewing that area. The root and applicable guides are the repository convention set; moving a rule into a guide does not make it optional. In particular, command/output changes use [Command development](../../../docs/command-development.md), tests use [Testing](../../../docs/testing.md), and API/host/feature changes use [API and hosts](../../../docs/api-and-hosts.md). Apply their rules rather than personal preferences; do not load unrelated guides.
+
+If a finding concerns a vulnerability, stop public reporting and follow [SECURITY](../../SECURITY.md). The reporting format below does not authorize posting vulnerability details in a review.
 
 ## What to look for
 
@@ -38,7 +41,7 @@ Severity: blocking
     - cross-cutting `internal` helpers such as `internal/text`
     - the Go standard library
 - A bug, a security issue, or otherwise incorrect behavior.
-- A violated `AGENTS.md` rule, or a failing `go test ./...` or `make lint`.
+- A violated root or applicable task-guide rule, or a failing `go test ./...` or `make lint`. Distinguish observed failures from checks that were not run.
 
 ### 💭 Commentary
 

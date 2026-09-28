@@ -79,8 +79,7 @@ func runDisable(opts *DisableOptions) error {
 	workflow, err := shared.ResolveWorkflow(
 		opts.Prompter, opts.IO, client, repo, opts.Prompt, opts.Selector, states)
 	if err != nil {
-		var fae shared.FilteredAllError
-		if errors.As(err, &fae) {
+		if _, ok := errors.AsType[shared.FilteredAllError](err); ok {
 			return errors.New("there are no enabled workflows to disable")
 		}
 		return err

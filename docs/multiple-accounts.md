@@ -1,5 +1,10 @@
 # Multiple Accounts with the CLI - v2.40.0
 
+> [!NOTE]
+> This document describes multi-account support as it was introduced in v2.40.0
+> and is retained for historical context. Some implementation details, including
+> automatic configuration migration, are outdated.
+
 Since its creation, `gh` has enforced a mapping of one account per host. Functionally, this meant that when targeting a
 single host (e.g. github.com) each `auth login` would replace the token being used for API requests, and for git
 operations when `gh` was configured as a git credential manager. Removing this limitation has been a [long requested

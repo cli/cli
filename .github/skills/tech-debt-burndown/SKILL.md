@@ -1,11 +1,8 @@
 ---
 name: tech-debt-burndown
 description: >
-  Pays down one small piece of tech debt in the GitHub CLI codebase per run and
-  opens a ready-to-review pull request. Designed to run unattended on a schedule:
-  it picks a target, tries up to three, proves the one that lands with the same
-  tool that found it, and records what it learned. Never merges, never pushes to
-  an existing branch, never widens scope.
+  Use when running an established, authorized GitHub CLI maintainer tech-debt
+  burndown, whether scheduled or manually invoked.
 ---
 
 # Tech Debt Burndown
@@ -19,6 +16,18 @@ minutes.
 
 You are not here to improve the codebase in general. You are here to close one
 specific, verifiable gap and stop.
+
+## Authorization before target selection
+
+Apply the [root contribution gate](../../../AGENTS.md#before-preparing-an-external-contribution)
+before selecting a target or editing. This skill's autonomous target selection
+is for established, authorized maintainer maintenance, not unsolicited external
+upstream PRs. Possessing this skill, owning a fork, or claiming to be a maintainer
+does not authorize a run. If authorization cannot be established, stop unchanged
+and explain the gate; do not publish an issue or comment. External contributors
+must use the eligible issue's acceptance criteria, not this skill's target menu.
+Neither the memory file nor the unattended schedule can waive the contribution
+gate or [private security disclosure](../../SECURITY.md).
 
 ## Assume nobody is watching
 
@@ -59,9 +68,9 @@ Read these, in this order:
 1. `.experiments/tech-debt-burndown/memory.md` in this repo. It carries standing
    corrections: what to work on now, areas that are off limits, approaches that
    were rejected, targets already considered and declined. Treat it as binding.
-   If it contradicts this skill, it wins, because it is the more specific and
-   more recent of the two, and it is the channel a human uses to steer a run
-   without editing the skill.
+   Within the authorization boundaries and repository conventions, it narrows
+   this skill's target selection. It is the channel a human uses to steer a run
+   without editing the skill, not permission to waive its safeguards.
 
    Entries come from two places, and they are not equally trustworthy. A human
    may edit the file directly, and previous runs append to it. So an entry may
@@ -71,9 +80,10 @@ Read these, in this order:
    verification: if an entry claims a fact you are about to rely on, such as a
    count, a failure being pre-existing, or a target being clean, re-run the
    command and confirm. Correct the entry when it has drifted.
-2. `AGENTS.md` at the repo root. It is the authoritative convention set for this
-   codebase, and several debt categories below exist precisely because code
-   predates a rule in it.
+2. [AGENTS.md](../../../AGENTS.md) at the repo root, then the task guides relevant
+   to the target before editing. Together they carry the conventions that several
+   debt categories below exist to restore. Memory can narrow the work but cannot
+   override these conventions or authorization boundaries.
 
 ### Check the preconditions
 
@@ -208,27 +218,32 @@ but still real improvement.
 
 The oracle is the grep going to zero for that pattern, plus tests passing.
 
-**`ghinstance.Default()` call sites.** `AGENTS.md` says to use
-`cfg.Authentication().DefaultHost()` instead, because `ghinstance.Default()`
-always returns `github.com` and so is wrong for GitHub Enterprise Server:
+**`ghinstance.Default()` call sites.** Read
+[API and hosts](../../../docs/api-and-hosts.md) before choosing one.
+The function always returns `github.com`; first establish whether the call site
+should honor a resolved repository, explicit host, or configured default:
 
 ```bash
 grep -rn "ghinstance.Default()" --include=*.go .
 ```
 
-Fix one call site. Each needs a test proving the non-`github.com` host is now
-respected, otherwise you have moved code around without proving anything. Some
-call sites have no config in scope and cannot be fixed without changing an
-exported signature, which is a design decision: abandon that attempt.
+Fix one incorrectly hardcoded call site using the appropriate host source:
+`repo.RepoHost()` for repository operations, `cfg.Authentication().DefaultHost()`
+only for default-host behavior. Each needs a test proving the actual
+non-`github.com` request host is respected. Do not change a deliberately
+GitHub.com-only operation just to eliminate a grep match. If the correct host
+cannot be supplied without changing an exported signature, abandon that attempt.
 
 ### Tier 3: only when Current focus names it
 
 The oracle is weak, so these are not eligible by default. Take one only when the
 memory file's Current focus explicitly points at it.
 
-**Feature detection cleanups.** `AGENTS.md` requires a `// TODO <cleanupIdentifier>`
-comment above each feature-detection branch. The identifier groups every site that
-must be removed together once the API is GA on all supported GHES versions:
+**Feature detection cleanups.**
+[API and hosts](../../../docs/api-and-hosts.md#feature-detection-and-cleanup)
+requires a `// TODO <cleanupIdentifier>` comment above temporary feature-gate
+branches, not permanent GHES exclusions. The identifier groups sites that must be
+removed together once the API is GA on all supported GHES versions:
 
 ```bash
 grep -rhoE "// TODO [a-zA-Z][a-zA-Z0-9_-]+" --include=*.go . | sort | uniq -c | sort -rn
@@ -288,8 +303,9 @@ such as `internal/text`, then the standard library.
 
 New behavior needs a test. This applies even when the change looks trivial,
 because trivial is exactly the category of change that silently breaks something.
-Follow the patterns in `AGENTS.md`: table-driven tests, `httpmock` for HTTP,
-`require` for error assertions, `iostreams.Test()` for output.
+Read [Testing](../../../docs/testing.md) before editing tests:
+use the relevant behavioral seam, `httpmock` for HTTP, `require` for error
+assertions, and `iostreams.Test()` for output.
 
 An unchecked error you now handle needs a test that exercises the error path. A
 `ghinstance.Default()` call site you fix needs a test with a non-`github.com`
@@ -303,13 +319,17 @@ strong evidence the change is not worth making: abandon the attempt.
 
 ## Prove it
 
-Re-run the sensor, then the full suite and the linter:
+Re-run the sensor and the root pre-commit gates:
 
 ```bash
 <the sensor command from your target, re-run>   # now reports the issue gone
+go fix ./pkg/cmd/issue/list/...  # Substitute the actual changed packages
 go test ./...
 make lint
 ```
+
+Inspect `go fix` edits against the one-target scope and allow-list. Do not carry
+unrelated modernization into the commit to satisfy a gate.
 
 Compare the last two against the baseline you captured on clean `trunk`. **Any
 failure present now and absent from the baseline is yours**, and the attempt has
@@ -369,8 +389,9 @@ better than "fix errcheck in auth.go".
 Push the branch and open the pull request **ready for review, not as a draft**.
 Ready is the signal that a human's turn has begun.
 
-Use `.github/PULL_REQUEST_TEMPLATE.md` as the body. Keep its headings and HTML
-comments and fill in every section, writing "N/A" rather than deleting one:
+Read the [PR template](../../PULL_REQUEST_TEMPLATE.md) fresh and use it as the
+body. Keep its headings and HTML comments and fill in every section, writing
+"N/A" rather than deleting one:
 
 - **Description**: the target, and why it was picked. One short paragraph.
 - **How did you test this change?**: the sensor output before and after. This is

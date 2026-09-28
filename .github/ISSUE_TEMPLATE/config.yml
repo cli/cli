@@ -1,5 +1,11 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Report a security vulnerability
+    about: Report vulnerabilities first through GitHub's bug bounty program on HackerOne.
+    url: https://hackerone.com/github
+  - name: Other security concerns or questions
+    about: Use this repository's private GitHub Security Advisory reporting flow.
+    url: https://github.com/cli/cli/security/advisories
   - name: Ask a question on how to use GitHub CLI
     about: For general-purpose questions and answers, see the Discussions section.
     url: https://github.com/cli/cli/discussions

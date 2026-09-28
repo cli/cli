@@ -3,6 +3,7 @@ package comment
 import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/attachments"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -11,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) error) *cobra.Command {
+func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*prShared.CommentableOptions) error) *cobra.Command {
 	opts := &prShared.CommentableOptions{
 		IO:                        f.IOStreams,
 		HttpClient:                f.HttpClient,
@@ -98,7 +99,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 
 				return issue, baseRepo, nil
 			}
-			if err := prShared.CommentablePreRun(cmd, opts); err != nil {
+			if err := prShared.CommentablePreRun(cmd, opts, telemetry); err != nil {
 				return err
 			}
 

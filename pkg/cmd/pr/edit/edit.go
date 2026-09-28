@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/attachments"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -39,14 +40,15 @@ type EditOptions struct {
 	SelectorArg string
 	Interactive bool
 
-	AttachFlag *attachments.Flag
-	Assets     []attachments.UserAsset
-	Config     func() (gh.Config, error)
+	AttachFlag  *attachments.Flag
+	AttachEvent *attachments.TelemetryEvent
+	Assets      []attachments.UserAsset
+	Config      func() (gh.Config, error)
 
 	shared.Editable
 }
 
-func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
+func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
 		IO:              f.IOStreams,
 		HttpClient:      f.HttpClient,
@@ -218,11 +220,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				// see the `Editable.MilestoneId` method.
 			}
 
-			resolved, err := opts.AttachFlag.UserAssets()
+			var err error
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
+			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
 			}
-			opts.Assets = resolved
 
 			if !opts.Editable.Dirty() && len(opts.Assets) == 0 {
 				opts.Interactive = true
@@ -420,14 +423,15 @@ func editRun(opts *EditOptions) error {
 		}
 
 		// Nothing that can prompt or cancel may follow this.
-		var uploaded int
-		body, uploaded, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		var uploadResult attachments.UploadResult
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		opts.AttachEvent.RecordOperations(uploadResult)
 
 		// With nothing uploaded, even a body the caller typed goes unwritten:
 		// its references are still local paths, which render broken. The other
 		// fields are innocent of the upload, so they proceed either way.
-		editable.Body.Edited = uploaded > 0
-		if uploaded > 0 {
+		editable.Body.Edited = uploadResult.Uploaded > 0
+		if uploadResult.Uploaded > 0 {
 			editable.Body.Value = body
 		}
 

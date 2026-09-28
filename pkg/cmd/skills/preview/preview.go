@@ -41,7 +41,7 @@ type PreviewOptions struct {
 }
 
 // NewCmdPreview creates the "skills preview" command.
-func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*PreviewOptions) error) *cobra.Command {
+func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.EventRecorder, runF func(*PreviewOptions) error) *cobra.Command {
 	opts := &PreviewOptions{
 		IO:             f.IOStreams,
 		Telemetry:      telemetry,

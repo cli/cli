@@ -39,7 +39,7 @@ type LoginOptions struct {
 	GitProtocol      string
 	InsecureStorage  bool
 	SkipSSHKeyPrompt bool
-	Clipboard        bool
+	Clipboard        *bool
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -151,7 +151,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes to request")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
-	cmd.Flags().BoolVarP(&opts.Clipboard, "clipboard", "c", false, "Copy one-time OAuth device code to clipboard")
+	cmdutil.NilBoolFlag(cmd, &opts.Clipboard, "clipboard", "c", "Copy one-time OAuth device code to clipboard")
 	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations on this host")
 
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
@@ -171,6 +171,7 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 	authCfg := cfg.Authentication()
+	copyToClipboard := shared.ShouldCopyToClipboard(cfg, opts.Clipboard)
 
 	hostname := opts.Hostname
 	if opts.Interactive && hostname == "" {
@@ -240,7 +241,7 @@ func loginRun(opts *LoginOptions) error {
 		},
 		SecureStorage:    !opts.InsecureStorage,
 		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
-		CopyToClipboard:  opts.Clipboard,
+		CopyToClipboard:  copyToClipboard,
 	})
 }
 

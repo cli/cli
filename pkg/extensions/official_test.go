@@ -28,6 +28,12 @@ func TestIsOfficial(t *testing.T) {
 			want:     true,
 		},
 		{
+			name:     "known official extension owned by cli matches",
+			extName:  "webhook",
+			extOwner: "cli",
+			want:     true,
+		},
+		{
 			name:     "official name with different owner is not official",
 			extName:  "stack",
 			extOwner: "williammartin",

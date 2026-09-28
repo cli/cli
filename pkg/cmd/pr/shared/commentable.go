@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -61,11 +62,12 @@ type CommentableOptions struct {
 	BodyProvided     bool
 	KeepExistingBody bool
 	AttachFlag       *attachments.Flag
+	AttachEvent      *attachments.TelemetryEvent
 	Assets           []attachments.UserAsset
 	Config           func() (gh.Config, error)
 }
 
-func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
+func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions, telemetry ghtelemetry.InvocationRecorder) error {
 	inputFlags := 0
 	if cmd.Flags().Changed("body") {
 		opts.InputType = InputTypeInline
@@ -103,11 +105,12 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 		return err
 	}
 
-	resolved, err := opts.AttachFlag.UserAssets()
+	var err error
+	opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
+	opts.Assets, err = opts.AttachFlag.UserAssets()
 	if err != nil {
 		return err
 	}
-	opts.Assets = resolved
 
 	// An asset is a body input on its own, so `--attach shot.png` alone
 	// posts an image with no text. It is not part of the mutually exclusive
@@ -353,8 +356,9 @@ func bodyForWrite(opts *CommentableOptions, uploader *attachments.Uploader) (bod
 	if uploader == nil {
 		return opts.Body, true, nil
 	}
-	body, uploaded, err := uploader.UploadAndAttach(context.Background(), opts.Body, opts.Assets)
-	if err != nil && uploaded == 0 {
+	body, uploadResult, err := uploader.UploadAndAttach(context.Background(), opts.Body, opts.Assets)
+	opts.AttachEvent.RecordOperations(uploadResult)
+	if err != nil && uploadResult.Uploaded == 0 {
 		return "", false, err
 	}
 	return body, true, err

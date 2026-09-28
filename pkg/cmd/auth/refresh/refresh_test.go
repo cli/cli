@@ -39,7 +39,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-c",
 			wants: RefreshOptions{
 				Hostname:  "",
-				Clipboard: true,
+				Clipboard: new(true),
 			},
 		},
 		{
@@ -51,7 +51,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-h aline.cedrac -c",
 			wants: RefreshOptions{
 				Hostname:  "aline.cedrac",
-				Clipboard: true,
+				Clipboard: new(true),
 			},
 		},
 		{
@@ -67,7 +67,16 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-h aline.cedrac -c",
 			wants: RefreshOptions{
 				Hostname:  "aline.cedrac",
-				Clipboard: true,
+				Clipboard: new(true),
+			},
+		},
+		{
+			name: "tty hostname and clipboard disabled",
+			tty:  true,
+			cli:  "-h aline.cedrac --clipboard=false",
+			wants: RefreshOptions{
+				Hostname:  "aline.cedrac",
+				Clipboard: new(false),
 			},
 		},
 		{
@@ -219,6 +228,7 @@ func Test_refreshRun(t *testing.T) {
 		cfgHosts      []string
 		authOut       authOut
 		oldScopes     string
+		clipboard     string
 		wantErr       string
 		nontty        bool
 		wantAuthArgs  authArgs
@@ -252,6 +262,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "obed.morton",
 				scopes:        []string{},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -261,13 +272,45 @@ func Test_refreshRun(t *testing.T) {
 			},
 			opts: &RefreshOptions{
 				Hostname:  "",
-				Clipboard: true,
+				Clipboard: new(true),
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
 				scopes:        []string{},
 				secureStorage: true,
 				clipboard:     true,
+			},
+		},
+		{
+			name: "clipboard disabled by configuration",
+			cfgHosts: []string{
+				"github.com",
+			},
+			clipboard: "disabled",
+			opts: &RefreshOptions{
+				Hostname: "github.com",
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     false,
+			},
+		},
+		{
+			name: "clipboard flag overrides enabled default",
+			cfgHosts: []string{
+				"github.com",
+			},
+			opts: &RefreshOptions{
+				Hostname:  "github.com",
+				Clipboard: new(false),
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     false,
 			},
 		},
 		{
@@ -282,6 +325,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -302,6 +346,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -316,6 +361,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{"repo:invite", "public_key:read"},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -331,6 +377,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{"delete_repo", "codespace", "repo:invite", "public_key:read"},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -345,6 +392,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "obed.morton",
 				scopes:        []string{},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -357,8 +405,9 @@ func Test_refreshRun(t *testing.T) {
 				InsecureStorage: true,
 			},
 			wantAuthArgs: authArgs{
-				hostname: "obed.morton",
-				scopes:   []string{},
+				hostname:  "obed.morton",
+				scopes:    []string{},
+				clipboard: true,
 			},
 		},
 		{
@@ -375,6 +424,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -391,6 +441,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{"public_key:read", "workflow"},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -407,6 +458,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{"codespace", "public_key:read"},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -422,6 +474,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -438,6 +491,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{"delete_repo", "public_key:read"},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -453,6 +507,7 @@ func Test_refreshRun(t *testing.T) {
 				hostname:      "github.com",
 				scopes:        []string{"delete_repo"},
 				secureStorage: true,
+				clipboard:     true,
 			},
 		},
 		{
@@ -483,6 +538,9 @@ func Test_refreshRun(t *testing.T) {
 			}
 
 			cfg, _ := config.NewIsolatedTestConfig(t, "")
+			if tt.clipboard != "" {
+				cfg.Set("", "clipboard", tt.clipboard)
+			}
 			for _, hostname := range tt.cfgHosts {
 				_, err := cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
 				require.NoError(t, err)

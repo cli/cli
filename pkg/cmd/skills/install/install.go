@@ -73,7 +73,7 @@ type InstallOptions struct {
 }
 
 // NewCmdInstall creates the "skills install" command.
-func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*InstallOptions) error) *cobra.Command {
+func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.EventRecorder, runF func(*InstallOptions) error) *cobra.Command {
 	opts := &InstallOptions{
 		IO:         f.IOStreams,
 		Telemetry:  telemetry,
@@ -636,8 +636,7 @@ func discoverSkills(opts *InstallOptions, client *api.Client, hostname string, r
 	allSkills, err := discovery.DiscoverSkillsWithOptions(client, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA, discovery.DiscoverOptions{})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		var treeTooLarge *discovery.TreeTooLargeError
-		if errors.As(err, &treeTooLarge) {
+		if treeTooLarge, ok := errors.AsType[*discovery.TreeTooLargeError](err); ok {
 			fmt.Fprintf(opts.IO.ErrOut, "%s\n  Use path-based install instead: gh skill install %s/%s skills/<skill-name>\n",
 				err, treeTooLarge.Owner, treeTooLarge.Repo)
 			return nil, err

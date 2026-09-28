@@ -26,8 +26,7 @@ func (gc *Command) Run() error {
 	err := run.PrepareCmd(gc.Cmd).Run()
 	if err != nil {
 		ge := GitError{err: err, Stderr: stderr.String()}
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
+		if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 			ge.ExitCode = exitError.ExitCode()
 		}
 		return &ge
@@ -50,13 +49,11 @@ func (gc *Command) Output() ([]byte, error) {
 		// is not a method and so tests can't access it.
 		// THIS MEANS THAT TESTS WILL NOT CORRECTLY HAVE STDERR SET,
 		// but at least tests can get the exit code.
-		var exitErrorWithExitCode errWithExitCode
-		if errors.As(err, &exitErrorWithExitCode) {
+		if exitErrorWithExitCode, ok := errors.AsType[errWithExitCode](err); ok {
 			ge.ExitCode = exitErrorWithExitCode.ExitCode()
 		}
 
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
+		if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 			ge.Stderr = string(exitError.Stderr)
 		}
 		err = &ge

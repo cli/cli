@@ -2,7 +2,7 @@
 
 Hi! Thanks for your interest in contributing to the GitHub CLI!
 
-We accept pull requests for issues labelled `help wanted`. We encourage issues and discussion posts for all other contributions.
+We accept external pull requests only for issues labelled `help wanted` with explicit Acceptance Criteria. We encourage issues and discussion posts for all other contributions. For security concerns, follow our [private disclosure policy](SECURITY.md) instead.
 
 ### Please do:
 
@@ -12,7 +12,7 @@ We accept pull requests for issues labelled `help wanted`. We encourage issues a
 * Open an issue to propose a design for an issue labelled [`needs-design` and `help wanted`][needs design and help wanted], following the [proposing a design guidelines](#proposing-a-design) instructions below
 * Open an issue to propose a new community supported `gh` package with details about support and redistribution
 * Mention `@cli/code-reviewers` when an issue you want to work on does not have clear Acceptance Criteria
-* Open a pull request for any issue labelled [`help wanted`][hw] and [`good first issue`][gfi]
+* Open a pull request for an issue labelled [`help wanted`][hw] with explicit Acceptance Criteria. Issues labelled [`good first issue`][gfi] must also meet these requirements
 
 ### Please _do NOT_:
 
@@ -36,7 +36,7 @@ Run the new binary as:
 
 Run tests with: `go test ./...`
 
-See [project layout documentation](../docs/project-layout.md) for information on where to find specific source files.
+See the [development guides](../docs/README.md) for project layout, command conventions, testing, and API/host behavior.
 
 ## Submitting a pull request
 

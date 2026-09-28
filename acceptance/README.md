@@ -24,6 +24,66 @@ The token to use for authenticating with the `GH_ACCEPTANCE_HOST`. This must alr
 
 It's recommended to create and use a Legacy PAT for this; Fine-Grained PATs do not offer all the necessary privileges required. You can use an OAuth token provided via `gh auth login --web` and can provide it to the acceptance tests via `GH_ACCEPTANCE_TOKEN=$(gh auth token --hostname <host>)` but this can be a bit confusing and annoying if you `gh auth login` again without `-s` and lose the required scopes.
 
+The test harness infers whether a token authenticates a user from GitHub's documented token prefixes. OAuth (`gho_`), classic PAT (`ghp_`), fine-grained PAT (`github_pat_`), and GitHub App user (`ghu_`) tokens provide user capabilities. GitHub App installation (`ghs_`) tokens do not, so scripts marked `requires-user-capability: true` are omitted from unfiltered runs. Explicitly selecting an incompatible script with `GH_ACCEPTANCE_SCRIPT` fails with an error instead.
+
+Users with write access can manually run the acceptance test workflow from a specified branch or tag in `cli/cli`. A run can target Linux, Windows, macOS, or all three, and can run either the complete suite or the tests for one command. The tests use a GitHub App installed for all repositories in the `gh-acceptance-testing` organization. The workflow uses the `gh-acceptance-testing` environment, where the App credentials are stored as the `GH_ACCEPTANCE_TESTING_APP_CLIENT_ID` and `GH_ACCEPTANCE_TESTING_APP_PRIVATE_KEY` secrets. Tests that require user authentication, including account key management and forks owned by a personal account, are excluded from this workflow based on each script's `requires-user-capability` declaration.
+
+Managed fixture repositories reduce repository creation by sharing state where
+tests can safely coexist. Every job uses the same GitHub App installation
+rate-limit buckets. The dispatch helper warns when another acceptance workflow
+is already in flight and asks interactive users to confirm another run.
+
+After the workflow exists on the default branch, use
+`script/run-acceptance [REF] [COMMAND] [OS]` to dispatch the version of the
+workflow on a branch or tag in `cli/cli`. The ref defaults to the current branch,
+while the command and operating system default to `all`. List the available
+command groups with:
+
+```sh
+script/run-acceptance groups
+```
+
+Acceptance test groups are discovered from the directories under `testdata`, so
+adding a group does not require updating the workflow or dispatch helper.
+
+#### How the Acceptance Test GitHub App Was Created
+
+The GitHub App is owned by `gh-acceptance-testing` and restricted to installation on that
+account. The organization is dedicated to acceptance testing, so the App was intentionally
+granted broad installation permissions to let the suite exercise repository and
+organization administration without repeatedly changing the App registration.
+
+1. In the `gh-acceptance-testing` organization settings, **Developer settings**,
+   **GitHub Apps**, then **New GitHub App** were selected. See
+   [Registering a GitHub App](https://docs.github.com/apps/creating-github-apps/registering-a-github-app/registering-a-github-app).
+2. The App was given a globally unique name and `https://github.com/cli/cli` as its
+   homepage. No callback or redirect URI was configured, **Expire user authorization
+   tokens**, **Request user authorization (OAuth) during installation**, and
+   **Enable Device Flow** were disabled. No post-installation **Setup URL** was
+   configured and **Redirect on update** was disabled. Webhooks were also disabled,
+   and **Only on this account** was selected under
+   **Where can this GitHub App be installed?**
+3. Every **Repository permission** and **Organization permission** was set to the highest
+   available access. **Account permissions** were not requested because an installation
+   token does not authenticate a user, and the harness skips tests that require user
+   capabilities.
+4. After the App was created, its **Client ID** was recorded and **Generate a private
+   key** was selected. The complete downloaded PEM file became the private-key secret;
+   GitHub stores only the public half of the generated key. See
+   [Managing private keys for GitHub Apps](https://docs.github.com/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps).
+5. From the App settings, **Install App** was selected, followed by
+   `gh-acceptance-testing` and **All repositories**. See
+   [Installing your own GitHub App](https://docs.github.com/apps/using-github-apps/installing-your-own-github-app).
+6. A `gh-acceptance-testing` environment was created in the `cli/cli` repository. Access
+   requires approval from `cli/code-reviewers`, with self-review and administrator bypass
+   disabled. It contains these environment secrets:
+   - `GH_ACCEPTANCE_TESTING_APP_CLIENT_ID`: the App's Client ID.
+   - `GH_ACCEPTANCE_TESTING_APP_PRIVATE_KEY`: the complete contents of the downloaded PEM file.
+
+Each operating-system job mints its own installation token. The token is scoped to the
+`gh-acceptance-testing` installation, covers all repositories in that installation, and
+expires after one hour.
+
 ---
 
 A full example invocation can be found below:
@@ -32,11 +92,18 @@ A full example invocation can be found below:
 GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance ./acceptance
 ```
 
-While writing a new test, it can be useful to target that specific script by providing the `GH_ACCEPTANCE_SCRIPT` env var in combination with the `-run` flag, for example:
+While writing a new test, target the smallest live surface that can reproduce
+the behavior. Provide one or more comma-separated script names with
+`GH_ACCEPTANCE_SCRIPT`, use `-run` to select their group, and use `-count=1` to
+bypass Go's test cache:
 
 ```
-GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -run ^TestPullRequests$ ./acceptance
+GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -count=1 -run '^TestAcceptance$/^pr$' ./acceptance
 ```
+
+Start with one script for a deterministic failure. If concurrency is part of
+the failure, select only the scripts that exercise the contended resource and
+repeat that focused set before widening to the complete group or suite.
 
 #### Code Coverage
 
@@ -61,9 +128,111 @@ The following custom environment variables are made available to the scripts:
  * `HOME`: Set to the initial working directory. Required for `git` operations
  * `GH_CONFIG_DIR`: Set to the initial working directory. Required for `gh` operations
 
+#### Script Metadata
+
+Every script must begin with a structured header comment declaring whether it
+needs a token that authenticates a user:
+
+```txtar
+# requires-user-capability: false
+```
+
+Every script must also declare exactly one repository fixture mode:
+
+```txtar
+fixture-repo shared REPO
+fixture-repo isolated REPO
+fixture-repo none
+```
+
+`shared` reuses one initialized private repository across all opting-in scripts
+in the test process. Shared scripts must tolerate concurrent and accumulated
+state: use unique resource names, paginate and filter list operations, capture
+resource IDs instead of selecting the first or latest result, and avoid
+repository-global or default-branch mutations. When scripts create the same
+tree from the same parent, include the script's `$RANDOM_STRING` in the commit
+contents or message; branch names do not affect commit IDs.
+
+`isolated` creates an initialized private repository exclusively for the script.
+Use it when clean state, repository-global mutation, or multiple coordinated Git
+ref updates are required. Consolidate related operations into one isolated
+script when they can share that repository sequentially.
+
+`none` creates no managed repository. Use it when no repository is needed or
+when a test needs multiple repositories, public visibility, special creation
+options, or direct coverage of repository lifecycle commands. In that mode, the
+script owns creation and cleanup.
+
+Scripts share token-wide API rate limits. Count requests across the whole test
+process and combine compatible live assertions. Keep coverage for a narrowly
+limited endpoint in one script so concurrent scripts cannot burst the limit.
+For Code Search's 10 requests/minute bucket, use at most five HTTP requests in
+the entire acceptance process even when they run sequentially. This leaves room
+for pagination, retries, and other token activity. Keep representative live
+coverage and use unit tests for remaining variants.
+
+Tests that cancel workflow runs should use a self-contained, deliberately
+long-running job so it cannot finish before the cancellation request, plus a
+short job timeout to bound a failed cancellation. Wait for the run to become
+`in_progress` before canceling, but do not wait for GitHub to finish processing
+an accepted cancellation request.
+
+After pushing a new workflow file, use `wait-for-workflow` instead of a fixed
+sleep before invoking or inspecting it. Use `wait-for-run` to allow up to one
+minute for a triggered run to appear. After `gh workflow run`, the helper uses
+the run URL returned by GitHub.com or a compatible GitHub Enterprise Server and
+only polls when no URL is available. If that deadline expires, the helper logs
+the run filters, local and remote refs, workflow files, recent runs, commit check
+suites, and an Actions API request ID before the repository is cleaned up.
+
 #### Custom Commands
 
 The following custom commands are defined within [`acceptance_test.go`](./acceptance_test.go) to help with writing tests:
+
+- `fixture-repo`: select the script's repository fixture mode. For `shared` and
+  `isolated`, the final argument names the environment variable that receives
+  the repository's bare name.
+
+  ```txtar
+  fixture-repo shared REPO
+  exec gh issue create --repo $ORG/$REPO --title $SCRIPT_NAME-$RANDOM_STRING --body Body
+  ```
+
+- `cleanup-repo`: idempotently delete an unmanaged repository during deferred
+  cleanup. Use this when a lifecycle test may have already deleted or renamed
+  the repository.
+
+  ```txtar
+  defer cleanup-repo $SCRIPT_NAME-$RANDOM_STRING
+  ```
+
+- `wait-for-workflow`: poll until GitHub registers a pushed workflow definition.
+
+  ```txtar
+  wait-for-workflow 'Test Workflow Name'
+  exec gh workflow run 'Test Workflow Name'
+  ```
+
+- `wait-for-repository-ready`: poll until an initialized repository's default
+  branch commit is available. Use it before repository-global operations that
+  can conflict with asynchronous repository initialization. Repository rename
+  is a narrow exception: GitHub can retain its creation-operation lock after
+  the commit becomes readable, so keep the `gh repo rename` command inline and
+  allow a 10-second stabilization delay after this check.
+
+  ```txtar
+  wait-for-repository-ready $ORG/$REPO
+  ```
+
+- `wait-for-run-status`: poll a registered workflow run until it reaches the
+  requested status. Use this before operations such as cancellation that can
+  race with run startup.
+
+  ```txtar
+  wait-for-run RUN_ID
+  wait-for-run-status $RUN_ID in_progress
+  exec gh run cancel $RUN_ID
+  ```
 
 - `defer`: register a command to run after the testscript completes
 
@@ -103,6 +272,14 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
   stdout2env PR_URL
   ```
 
+- `wait-for-run`: poll for a workflow run until it registers, then set an
+  environment variable to its database ID. Pass `gh run list` filter flags after
+  the variable name.
+
+  ```txtar
+  wait-for-run RUN_ID --branch $WORKFLOW_BRANCH --event push
+  ```
+
 - `jq-assert`: evaluate a jq expression on a JSON environment variable and assert the result matches a regexp
 
   ```txtar
@@ -136,8 +313,9 @@ When tests fail they fail like this:
 
 ```
 ➜ go test -tags=acceptance ./acceptance
---- FAIL: TestPullRequests (0.00s)
-    --- FAIL: TestPullRequests/pr-merge (11.07s)
+--- FAIL: TestAcceptance (0.00s)
+    --- FAIL: TestAcceptance/pr (0.00s)
+        --- FAIL: TestAcceptance/pr/pr-merge (11.07s)
         testscript.go:584: WORK=/private/var/folders/45/sdnm1hp10nj1s9q57dp3bc5h0000gn/T/go-test-script2778137936/script-pr-merge
             # Use gh as a credential helper (0.693s)
             # Create a repository with a file so it has a default branch (1.155s)

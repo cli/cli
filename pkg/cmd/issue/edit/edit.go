@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/attachments"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -50,14 +51,15 @@ type EditOptions struct {
 	AddBlocking     []string
 	RemoveBlocking  []string
 
-	AttachFlag *attachments.Flag
-	Assets     []attachments.UserAsset
-	Config     func() (gh.Config, error)
+	AttachFlag  *attachments.Flag
+	AttachEvent *attachments.TelemetryEvent
+	Assets      []attachments.UserAsset
+	Config      func() (gh.Config, error)
 
 	prShared.Editable
 }
 
-func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
+func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
 		IO:                 f.IOStreams,
 		HttpClient:         f.HttpClient,
@@ -210,11 +212,11 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				opts.Editable.IssueType.Edited = true
 			}
 
-			resolved, err := opts.AttachFlag.UserAssets()
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
+			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
 			}
-			opts.Assets = resolved
 
 			// An empty --parent resolves to no work, so it counts as an edit
 			// only here, where passing the flag at all suppresses the survey.
@@ -415,10 +417,11 @@ func editRun(opts *EditOptions) error {
 		// This sits outside the loop below so each file uploads once, and
 		// Clone carries the merged body into the issue. Nothing that can
 		// prompt or cancel may follow an upload.
-		var uploaded int
-		body, uploaded, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		var uploadResult attachments.UploadResult
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		opts.AttachEvent.RecordOperations(uploadResult)
 
-		if uploaded > 0 {
+		if uploadResult.Uploaded > 0 {
 			editable.Body.Value = body
 			editable.Body.Edited = true
 		} else {

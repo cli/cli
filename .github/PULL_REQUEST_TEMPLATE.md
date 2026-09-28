@@ -2,6 +2,12 @@
 Thank you for contributing to GitHub CLI!
 
 If you are proposing a fix for a security issue, STOP and follow .github/SECURITY.md instead.
+
+Keep the entire pull request self-contained, reviewer-facing, and diegetic: describe the
+change, rationale, and evidence within the context of the repository and pull request. Do not
+narrate how the pull request was produced or refer to private conversations, prior agent work,
+or other behind-the-scenes context. Omit those details unless they materially affect review;
+if they do, state the relevant fact and its significance directly.
 -->
 
 <!-- List related issues here. Use `fixes` or `closes` keywords to associate an issue number. -->

@@ -39,7 +39,7 @@ type CopilotOptions struct {
 	Remove      bool
 }
 
-func NewCmdCopilot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*CopilotOptions) error) *cobra.Command {
+func NewCmdCopilot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CopilotOptions) error) *cobra.Command {
 	opts := &CopilotOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,

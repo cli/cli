@@ -358,8 +358,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						}
 
 						err = m.InstallLocal(wd)
-						var ErrExtensionExecutableNotFound *ErrExtensionExecutableNotFound
-						if errors.As(err, &ErrExtensionExecutableNotFound) {
+						if ErrExtensionExecutableNotFound, ok := errors.AsType[*ErrExtensionExecutableNotFound](err); ok {
 							cs := io.ColorScheme()
 							if io.IsStdoutTTY() {
 								fmt.Fprintf(io.ErrOut, "%s %s", cs.WarningIcon(), ErrExtensionExecutableNotFound.Error())

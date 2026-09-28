@@ -6,21 +6,28 @@ import (
 	"strings"
 )
 
+// UploadResult reports the successful upload and markdown operation counts.
+type UploadResult struct {
+	Uploaded          int
+	AppendOperations  int
+	ReplaceOperations int
+}
+
 // UploadAndAttach uploads assets in order and stops at the first failure. It
 // points existing references at the URLs of successful uploads and appends only
 // successful uploads the markdown did not reference. Assets after a failure
 // are not attempted.
 //
-// The returned count reports how many assets reached the server. A caller must
-// write the returned markdown when that count is above zero, even when the
-// returned error is non-nil. An upload cannot be undone and there is no endpoint
-// to delete one, so discarding that markdown would orphan the successful assets.
-// A count of zero means nothing was uploaded and nothing is lost by writing
-// nothing.
+// The result reports how many assets reached the server and how those successful
+// uploads changed the markdown. A caller must write the returned markdown when
+// Uploaded is above zero, even when the returned error is non-nil. An upload
+// cannot be undone and there is no endpoint to delete one, so discarding that
+// markdown would orphan the successful assets. An Uploaded count of zero means
+// nothing was uploaded and nothing is lost by writing nothing.
 //
 // The markdown is returned unchanged when it could not be rewritten, so a
 // caller that assigns the result in place never destroys what it was given.
-func (u *Uploader) UploadAndAttach(ctx context.Context, md string, assets []UserAsset) (string, int, error) {
+func (u *Uploader) UploadAndAttach(ctx context.Context, md string, assets []UserAsset) (string, UploadResult, error) {
 	args := make([]attachmentArg, len(assets))
 	for i, a := range assets {
 		f := a.getAsset()
@@ -29,11 +36,11 @@ func (u *Uploader) UploadAndAttach(ctx context.Context, md string, assets []User
 
 	attachableMD, err := newAttachableMarkdown(md, args)
 	if err != nil {
-		return md, 0, err
+		return md, UploadResult{}, err
 	}
 
 	var failures []error
-	uploaded := 0
+	result := UploadResult{}
 	for i, a := range assets {
 		assetURL, err := u.upload(ctx, a)
 		if err != nil {
@@ -42,16 +49,18 @@ func (u *Uploader) UploadAndAttach(ctx context.Context, md string, assets []User
 			break
 		}
 		args[i].URL = assetURL
-		uploaded++
+		result.Uploaded++
 	}
 
 	attachedMD, err := attachAssetsToMarkdown(attachableMD)
 	if err != nil {
 		failures = append(failures, err)
-		return md, uploaded, errors.Join(failures...)
+		return md, result, errors.Join(failures...)
 	}
 
-	return appendUnreferenced(attachedMD, assets), uploaded, errors.Join(failures...)
+	result.AppendOperations = len(attachedMD.ToAppend)
+	result.ReplaceOperations = attachedMD.ReplaceOperations
+	return appendUnreferenced(attachedMD, assets), result, errors.Join(failures...)
 }
 
 // appendUnreferenced adds a paragraph for every attachment the author never

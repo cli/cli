@@ -7,9 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,6 +47,8 @@ func assetsFromArgs(t *testing.T, args ...string) ([]UserAsset, error) {
 }
 
 func TestAddFlag(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input string
@@ -75,17 +78,118 @@ func TestAddFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Given a command with the repeatable attachment flag
 			cmd, attachFlag := attachCmd(t, tt.input)
 
-			slice, ok := attachFlag.flag.Value.(pflag.SliceValue)
-			require.True(t, ok)
-			assert.Equal(t, tt.want, slice.GetSlice())
-			assert.Equal(t, tt.input != "", attachFlag.Changed())
-			assert.Empty(t, attachFlag.flag.Shorthand)
-			assert.Equal(t, "Attach an image or video `file`, in '<file>#<image alt text>' format", attachFlag.flag.Usage)
-			assert.Same(t, attachFlag.flag, cmd.Flags().Lookup(flagName))
+			// When the parsed flag values are read
+			values, err := cmd.Flags().GetStringArray("attach")
+
+			// Then values retain their spelling and order
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, values)
+			assert.Equal(t, tt.input != "", attachFlag.Changed(), "Changed reports whether --attach was supplied")
+			flag := cmd.Flags().Lookup("attach")
+			assert.Empty(t, flag.Shorthand)
+			assert.Equal(t, "Attach an image or video `file`, in '<file>#<image alt text>' format", flag.Usage)
 		})
 	}
+}
+
+func TestAttachmentTelemetry(t *testing.T) {
+	t.Parallel()
+
+	t.Run("flag not passed ignores operation updates", func(t *testing.T) {
+		t.Parallel()
+
+		// Given a command with no attachment flag
+		_, attachFlag := attachCmd(t, "")
+		recorder := &telemetry.InvocationRecorderSpy{}
+
+		// When an operation update is attempted without an attachment event
+		event := BeginTelemetry(recorder, "gh issue comment", attachFlag.Count())
+		event.RecordOperations(UploadResult{AppendOperations: 1, ReplaceOperations: 1})
+
+		// Then no event or sampling promotion occurs
+		assert.Nil(t, event)
+		assert.Empty(t, recorder.Events())
+		assert.Zero(t, recorder.LastSampleRate)
+	})
+
+	tests := []struct {
+		name      string
+		input     string
+		wantCount int64
+	}{
+		{
+			name:      "one attachment",
+			input:     "--attach ./first.png",
+			wantCount: 1,
+		},
+		{
+			name:      "several attachments before validation",
+			input:     "--attach ./first.png --attach ./second.png --attach ./third.png",
+			wantCount: 3,
+		},
+		{
+			name:      "empty path counts before validation",
+			input:     `--attach ""`,
+			wantCount: 1,
+		},
+		{
+			name:      "over limit counts before validation",
+			input:     strings.Repeat("--attach ./missing.png ", maxAttachments+1),
+			wantCount: maxAttachments + 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Given raw attachment inputs that have not been validated
+			_, attachFlag := attachCmd(t, tt.input)
+			recorder := &telemetry.InvocationRecorderSpy{}
+
+			// When an attachment event is recorded without any upload operations
+			BeginTelemetry(recorder, "gh issue comment", attachFlag.Count())
+
+			// Then the raw count is retained at full sampling with zero operations
+			assert.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
+			assert.Equal(t, []ghtelemetry.Event{{
+				Type: "attachment_invocation",
+				Dimensions: ghtelemetry.Dimensions{
+					"command": "gh issue comment",
+				},
+				Measures: ghtelemetry.Measures{
+					"attach_count":      tt.wantCount,
+					"append_ops_count":  0,
+					"replace_ops_count": 0,
+				},
+			}}, recorder.Events())
+		})
+	}
+
+	t.Run("completed markdown operations", func(t *testing.T) {
+		t.Parallel()
+
+		// Given a pending event for four attachments
+		recorder := &telemetry.InvocationRecorderSpy{}
+		event := BeginTelemetry(recorder, "gh issue comment", 4)
+
+		// When four uploads produce one append and three replacements
+		event.RecordOperations(UploadResult{Uploaded: 4, AppendOperations: 1, ReplaceOperations: 3})
+
+		// Then telemetry retains the attachment count and records one append and three replacements
+		events := recorder.Events()
+		require.Len(t, events, 1)
+		assert.Equal(t, ghtelemetry.Measures{
+			"attach_count":      4,
+			"append_ops_count":  1,
+			"replace_ops_count": 3,
+		}, events[0].Measures)
+	})
 }
 
 func TestFlagUserAssets(t *testing.T) {
@@ -134,11 +238,6 @@ func TestFlagUserAssets(t *testing.T) {
 			wantErrIs: fs.ErrNotExist,
 		},
 		{
-			name:      "several files, in the order written",
-			input:     "--attach ./b.png --attach ./a.png",
-			wantPaths: []string{"./b.png", "./a.png"},
-		},
-		{
 			name:    "too many attachments are rejected before filesystem validation",
 			input:   strings.Repeat("--attach ./missing.txt ", maxAttachments+1),
 			wantErr: "`--attach` accepts at most 50 values per command",
@@ -150,9 +249,7 @@ func TestFlagUserAssets(t *testing.T) {
 			wantErrIs: fs.ErrNotExist,
 		},
 		{
-			// pflag reads this flag back as holding nothing at all, so
-			// without the length check the command would post with no
-			// attachment and no error.
+			// An explicitly empty value is invalid, not an absent flag.
 			name:    "a lone empty value",
 			input:   `--attach ""`,
 			wantErr: "cannot attach an empty path; --attach needs a file path",
@@ -171,11 +268,6 @@ func TestFlagUserAssets(t *testing.T) {
 			name:      "a value holding a comma stays one path",
 			input:     `--attach ./before,after.png`,
 			wantPaths: []string{"./before,after.png"},
-		},
-		{
-			name:      "keeps the order the arguments were written in",
-			input:     "--attach './b.png#Second' --attach ./a.png --attach ./c.mp4",
-			wantPaths: []string{"./b.png", "./a.png", "./c.mp4"},
 		},
 		{
 			name:    "the same file twice",
@@ -209,12 +301,6 @@ func TestFlagUserAssets(t *testing.T) {
 			wantErr: "./a.png and ./hard.png are the same file; attached files must be unique",
 		},
 		{
-			// GitHub gives each its own asset URL.
-			name:      "two separate files with identical contents",
-			input:     "--attach ./a.png --attach ./b.png",
-			wantPaths: []string{"./a.png", "./b.png"},
-		},
-		{
 			name:    "reports the first invalid file",
 			input:   "--attach ./a.png --attach ./notes.txt",
 			wantErr: "./notes.txt is not a supported file type (supported: png, jpg, jpeg, gif, webp, svg, mp4, mov, webm)",
@@ -223,6 +309,7 @@ func TestFlagUserAssets(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given the named files and raw attachment arguments
 			t.Chdir(t.TempDir())
 			for _, name := range []string{
 				"shot.png",
@@ -230,8 +317,6 @@ func TestFlagUserAssets(t *testing.T) {
 				"shot#dark.png#first.png",
 				"caption.png",
 				"a.png",
-				"b.png",
-				"c.mp4",
 				"before,after.png",
 				"notes.txt",
 			} {
@@ -243,8 +328,10 @@ func TestFlagUserAssets(t *testing.T) {
 
 			_, attachFlag := attachCmd(t, tt.input)
 
+			// When the attachment files are resolved
 			resolved, err := attachFlag.UserAssets()
 
+			// Then invalid inputs fail or the resolved paths retain their order
 			if tt.wantErrIs != nil {
 				require.ErrorIs(t, err, tt.wantErrIs)
 				require.ErrorContains(t, err, tt.wantErr)
@@ -269,6 +356,36 @@ func TestFlagUserAssets(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("preserves input order", func(t *testing.T) {
+		// Given two files with different contents
+		t.Chdir(t.TempDir())
+		require.NoError(t, os.WriteFile("a.png", []byte("first"), 0o600))
+		require.NoError(t, os.WriteFile("b.png", []byte("second"), 0o600))
+
+		// When files are supplied in non-alphabetical order
+		resolved, err := assetsFromArgs(t, "./b.png", "./a.png")
+
+		// Then the resolved files retain that order
+		require.NoError(t, err)
+		require.Len(t, resolved, 2)
+		assert.Equal(t, []string{"./b.png", "./a.png"}, []string{resolved[0].Path(), resolved[1].Path()})
+	})
+
+	t.Run("allows distinct files with identical contents", func(t *testing.T) {
+		// Given two separate files containing the same bytes
+		t.Chdir(t.TempDir())
+		require.NoError(t, os.WriteFile("a.png", []byte("same contents"), 0o600))
+		require.NoError(t, os.WriteFile("b.png", []byte("same contents"), 0o600))
+
+		// When both files are supplied
+		resolved, err := assetsFromArgs(t, "./a.png", "./b.png")
+
+		// Then both files are accepted
+		require.NoError(t, err)
+		require.Len(t, resolved, 2)
+		assert.ElementsMatch(t, []string{"./a.png", "./b.png"}, []string{resolved[0].Path(), resolved[1].Path()})
+	})
 
 	t.Run("maximum number of attachments", func(t *testing.T) {
 		names := make([]string, maxAttachments)

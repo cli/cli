@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMigration(t *testing.T) {
+func TestMultiAccountDeprecatedMigration(t *testing.T) {
 	cfg := config.ReadFromString(`
 hosts:
   github.com:
@@ -25,7 +25,7 @@ hosts:
     git_protocol: https
 `)
 
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	require.NoError(t, m.Do(cfg))
 
 	// First we'll check that the oauth tokens have been moved to their new locations
@@ -60,7 +60,7 @@ hosts:
 	require.NoError(t, keyring.Set("gh:github.com", "", userOneToken))
 	require.NoError(t, keyring.Set("gh:enterprise.com", "", userTwoToken))
 
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	require.NoError(t, m.Do(cfg))
 
 	// Verify token gets stored with host and username
@@ -96,19 +96,19 @@ hosts:
 }
 
 func TestPreVersionIsEmptyString(t *testing.T) {
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	require.Equal(t, "", m.PreVersion())
 }
 
 func TestPostVersion(t *testing.T) {
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	require.Equal(t, "1", m.PostVersion())
 }
 
 func TestMigrationReturnsSuccessfullyWhenNoHostsEntry(t *testing.T) {
 	cfg := config.ReadFromString(``)
 
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	require.NoError(t, m.Do(cfg))
 }
 
@@ -117,7 +117,7 @@ func TestMigrationReturnsSuccessfullyWhenEmptyHosts(t *testing.T) {
 hosts:
 `)
 
-	var m migration.MultiAccount
+	var m migration.MultiAccountDeprecated
 	require.NoError(t, m.Do(cfg))
 }
 
@@ -142,7 +142,7 @@ hosts:
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`),
 	)
 
-	m := migration.MultiAccount{Transport: reg}
+	m := migration.MultiAccountDeprecated{Transport: reg}
 	require.NoError(t, m.Do(cfg))
 
 	require.Equal(t, fmt.Sprintf("token %s", token), reg.Requests[0].Header.Get("Authorization"))
@@ -182,7 +182,7 @@ hosts:
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`),
 	)
 
-	m := migration.MultiAccount{Transport: reg}
+	m := migration.MultiAccountDeprecated{Transport: reg}
 	require.NoError(t, m.Do(cfg))
 
 	require.Equal(t, "token test-token", reg.Requests[0].Header.Get("Authorization"))
@@ -201,7 +201,7 @@ hosts:
     git_protocol: ssh
 `)
 
-	m := migration.MultiAccount{}
+	m := migration.MultiAccountDeprecated{}
 	require.NoError(t, m.Do(cfg))
 
 	requireNoKey(t, cfg, []string{"hosts", "github.com"})
@@ -218,7 +218,7 @@ hosts:
     git_protocol: ssh
 `)
 
-	m := migration.MultiAccount{}
+	m := migration.MultiAccountDeprecated{}
 	err := m.Do(cfg)
 
 	require.ErrorContains(t, err, `couldn't find oauth token for "github.com": keyring test error`)

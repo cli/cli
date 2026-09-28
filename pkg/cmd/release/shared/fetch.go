@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -138,29 +136,22 @@ type fetchResult struct {
 }
 
 func FetchRefSHA(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (string, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "git", "ref", fmt.Sprintf("tags/%s", tagName))
-	if err != nil {
-		return "", err
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "git", "ref", fmt.Sprintf("tags/%s", tagName))
 	if err != nil {
 		return "", err
 	}
 
-	resp, err := httpClient.Do(req)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).RequestWithContext(ctx, repo.RepoHost(), http.MethodGet, path.String(), nil)
 	if err != nil {
+		if isNotFound(err) {
+			return "", ErrReleaseNotFound
+		}
 		return "", err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		return "", ErrReleaseNotFound
-	}
-
-	if resp.StatusCode > 299 {
-		return "", api.HandleHTTPError(resp)
-	}
 
 	var ref struct {
 		Object struct {
@@ -190,7 +181,7 @@ func DigestAlgForRef(digest string) string {
 
 // FetchRelease finds a published repository release by its tagName, or a draft release by its pending tag name.
 func FetchRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (*Release, error) {
-	publishedURL, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
+	publishedPath, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +191,7 @@ func FetchRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Inte
 
 	// published release lookup
 	go func() {
-		release, err := fetchReleasePath(cc, httpClient, publishedURL)
+		release, err := fetchReleasePath(cc, httpClient, repo.RepoHost(), publishedPath)
 		results <- fetchResult{release: release, error: err}
 	}()
 
@@ -235,11 +226,11 @@ func FetchRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Inte
 
 // FetchLatestRelease finds the latest published release for a repository.
 func FetchLatestRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) (*Release, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", "latest")
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", "latest")
 	if err != nil {
 		return nil, err
 	}
-	return fetchReleasePath(ctx, httpClient, url)
+	return fetchReleasePath(ctx, httpClient, repo.RepoHost(), path)
 }
 
 // fetchDraftRelease returns the first draft release that has tagName as its pending tag.
@@ -271,31 +262,25 @@ func fetchDraftRelease(ctx context.Context, httpClient *http.Client, repo ghrepo
 
 	// Then, use REST to get information about the draft release. In theory, we could have fetched
 	// all the necessary information via GraphQL, but REST is safer for backwards compatibility.
-	path, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "releases", strconv.FormatInt(query.Repository.Release.DatabaseID, 10))
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", strconv.FormatInt(query.Repository.Release.DatabaseID, 10))
 	if err != nil {
 		return nil, err
 	}
-	return fetchReleasePath(ctx, httpClient, path)
+	return fetchReleasePath(ctx, httpClient, repo.RepoHost(), path)
 }
 
-func fetchReleasePath(ctx context.Context, httpClient *http.Client, url safeurl.SafeURL) (*Release, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
+func fetchReleasePath(ctx context.Context, httpClient *http.Client, host string, path safeurl.SafeURL) (*Release, error) {
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).RequestWithContext(ctx, host, http.MethodGet, path.String(), nil)
 	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrReleaseNotFound
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		return nil, ErrReleaseNotFound
-	} else if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
 
 	var release Release
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
@@ -303,6 +288,14 @@ func fetchReleasePath(ctx context.Context, httpClient *http.Client, url safeurl.
 	}
 
 	return &release, nil
+}
+
+// isNotFound reports whether err is an API error carrying a 404 status. The release lookups
+// treat a missing release as a sentinel rather than an error, and the api client reports the
+// status through an HTTPError rather than through a response the call site can inspect.
+func isNotFound(err error) bool {
+	httpErr, ok := errors.AsType[api.HTTPError](err)
+	return ok && httpErr.StatusCode == http.StatusNotFound
 }
 
 func StubFetchRelease(t *testing.T, reg *httpmock.Registry, owner, repoName, tagName, responseBody string) {

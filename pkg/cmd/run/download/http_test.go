@@ -137,6 +137,7 @@ func Test_Download(t *testing.T) {
 
 			api := &apiPlatform{
 				client: &http.Client{Transport: reg},
+				repo:   ghrepo.New("OWNER", "REPO"),
 			}
 			err := api.Download(
 				safeurl.NewImmutableSafeURL("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip"),

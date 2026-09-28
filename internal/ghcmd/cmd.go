@@ -21,7 +21,6 @@ import (
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/telemetry"
@@ -128,17 +127,10 @@ func Main() exitCode {
 			return exitError
 		}
 	}
-	defer telemetryService.Flush()
+	// Complete and send events even when returning before Cobra reaches RunE.
+	defer telemetryService.Finish()
 
 	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
-
-	if cfgErr == nil {
-		var m migration.MultiAccount
-		if err := cfg.Migrate(m); err != nil {
-			fmt.Fprintln(stderr, err)
-			return exitError
-		}
-	}
 
 	ctx := context.Background()
 	updateCtx, updateCancel := context.WithCancel(ctx)
@@ -193,10 +185,6 @@ func Main() exitCode {
 	rootCmd.SetArgs(expandedArgs)
 
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
-		var pagerPipeError *iostreams.ErrClosedPagerPipe
-		var noResultsError cmdutil.NoResultsError
-		var extError *root.ExternalCommandExitError
-		var authError *root.AuthError
 		if err == cmdutil.SilentError {
 			return exitError
 		} else if err == cmdutil.PendingError {
@@ -207,23 +195,23 @@ func Main() exitCode {
 				fmt.Fprint(stderr, "\n")
 			}
 			return exitCancel
-		} else if errors.As(err, &authError) {
+		} else if _, ok := errors.AsType[*root.AuthError](err); ok {
 			return exitAuth
-		} else if errors.As(err, &pagerPipeError) {
+		} else if _, ok := errors.AsType[*iostreams.ErrClosedPagerPipe](err); ok {
 			// ignore the error raised when piping to a closed pager
 			return exitOK
-		} else if errors.As(err, &noResultsError) {
+		} else if noResultsError, ok := errors.AsType[cmdutil.NoResultsError](err); ok {
 			if cmdFactory.IOStreams.IsStdoutTTY() {
 				fmt.Fprintln(stderr, noResultsError.Error())
 			}
 			// no results is not a command failure
 			return exitOK
-		} else if errors.As(err, &extError) {
+		} else if extError, ok := errors.AsType[*root.ExternalCommandExitError](err); ok {
 			// pass on exit codes from extensions and shell aliases
 			return exitCode(extError.ExitCode())
 		}
 
-		printError(stderr, err, cmd, hasDebug)
+		printError(stderr, ioStreams.ColorScheme(), err, cmd, hasDebug, invokingAgent != "")
 
 		if strings.Contains(err.Error(), "Incorrect function") {
 			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
@@ -279,9 +267,13 @@ func isExtensionCommand(rootCmd *cobra.Command, args []string) bool {
 	return err == nil && c != nil && c.GroupID == "extension"
 }
 
-func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
-	var dnsError *net.DNSError
-	if errors.As(err, &dnsError) {
+// printError writes err to out, followed by usage information when the error
+// is the result of command misuse. When fullHelp is set the complete help text
+// is written instead of the terse usage string, giving AI agents the examples,
+// JSON fields and environment variables they need to correct themselves without
+// a second round trip.
+func printError(out io.Writer, cs *iostreams.ColorScheme, err error, cmd *cobra.Command, debug, fullHelp bool) {
+	if dnsError, ok := errors.AsType[*net.DNSError](err); ok {
 		fmt.Fprintf(out, "error connecting to %s\n", dnsError.Name)
 		if debug {
 			fmt.Fprintln(out, dnsError)
@@ -296,6 +288,13 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 	if errors.As(err, &flagError) || strings.HasPrefix(err.Error(), "unknown command ") {
 		if !strings.HasSuffix(err.Error(), "\n") {
 			fmt.Fprintln(out)
+		}
+		if fullHelp {
+			// Render into out rather than calling cmd.Help(), which would send
+			// the help text to stdout and split a single failure across two
+			// streams.
+			root.WriteHelp(out, cs, cmd)
+			return
 		}
 		fmt.Fprintln(out, cmd.UsageString())
 	}

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
@@ -76,8 +78,9 @@ type CreateOptions struct {
 
 	DryRun bool
 
-	AttachFlag *attachments.Flag
-	Assets     []attachments.UserAsset
+	AttachFlag  *attachments.Flag
+	AttachEvent *attachments.TelemetryEvent
+	Assets      []attachments.UserAsset
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
@@ -195,7 +198,7 @@ type CreateContext struct {
 	GitClient          *git.Client
 }
 
-func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:               f.IOStreams,
 		HttpClient:       f.HttpClient,
@@ -367,6 +370,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return err
 			}
 
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -714,10 +718,10 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 	} else {
 		state.Title = humanize(ctx.PRRefs.UnqualifiedHeadRef())
 		var body strings.Builder
-		for i := len(commits) - 1; i >= 0; i-- {
-			fmt.Fprintf(&body, "- **%s**\n", commits[i].Title)
+		for i, commit := range slices.Backward(commits) {
+			fmt.Fprintf(&body, "- **%s**\n", commit.Title)
 			if addBody {
-				x := regexPattern.ReplaceAllString(commits[i].Body, "  ")
+				x := regexPattern.ReplaceAllString(commit.Body, "  ")
 				fmt.Fprintf(&body, "%s", x)
 
 				if i > 0 {
@@ -856,10 +860,8 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 
 		return newCreateContext(skipPushRefs{
 			qualifiedHeadRef: qualifiedHeadRef,
-			baseRefs: baseRefs{
-				baseRepo:       baseRepo,
-				baseBranchName: baseBranch,
-			},
+			baseRepo:         baseRepo,
+			baseBranchName:   baseBranch,
 		}), nil
 	}
 
@@ -1124,12 +1126,13 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 
 	var uploadErr error
 	if uploader != nil {
-		body, uploaded, err := uploader.UploadAndAttach(context.Background(), state.Body, opts.Assets)
+		body, uploadResult, err := uploader.UploadAndAttach(context.Background(), state.Body, opts.Assets)
+		opts.AttachEvent.RecordOperations(uploadResult)
 		// With nothing uploaded, a body that lost the files it was written
 		// around is not what the caller asked to create. The branch is already
 		// pushed by now, so the message says what was not created rather than
 		// claiming the run had no effect.
-		if err != nil && uploaded == 0 {
+		if err != nil && uploadResult.Uploaded == 0 {
 			return fmt.Errorf("%w\nno pull request was created", err)
 		}
 		uploadErr = err
@@ -1251,10 +1254,8 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		refs = pushableRefs{
 			headRepo:       forkedRepo,
 			headBranchName: forkableRefs.qualifiedHeadRef.BranchName(),
-			baseRefs: baseRefs{
-				baseRepo:       forkableRefs.baseRepo,
-				baseBranchName: forkableRefs.baseBranchName,
-			},
+			baseRepo:       forkableRefs.baseRepo,
+			baseBranchName: forkableRefs.baseBranchName,
 		}
 	}
 

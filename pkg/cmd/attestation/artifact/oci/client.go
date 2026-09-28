@@ -56,8 +56,7 @@ func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, name.Reference, er
 	// user's configuration for the registry credentials
 	desc, err := c.get(name, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	if err != nil {
-		var transportErr *transport.Error
-		if errors.As(err, &transportErr) {
+		if transportErr, ok := errors.AsType[*transport.Error](err); ok {
 			if accessErr := checkForUnauthorizedOrDeniedErr(*transportErr); accessErr != nil {
 				return nil, nil, accessErr
 			}

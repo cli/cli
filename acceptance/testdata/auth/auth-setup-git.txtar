@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Check that the credential helper is unset for the host. This command is
 # expected to fail before gh auth setup-git is run.
 ! exec git config --get credential.https://${GH_HOST}.helper

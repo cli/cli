@@ -120,8 +120,7 @@ func truncateMiddle(maxWidth int, t string) string {
 
 func printError(w io.Writer, err error) {
 	fmt.Fprintln(w, "warning: ", err)
-	var httpErr api.HTTPError
-	if errors.As(err, &httpErr) {
+	if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
 		if msg := httpErr.ScopesSuggestion(); msg != "" {
 			fmt.Fprintln(w, msg)
 		}

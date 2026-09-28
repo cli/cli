@@ -104,7 +104,7 @@ func TestNewCmdSearch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{}
 			var gotOpts *SearchOptions
-			cmd := NewCmdSearch(f, &telemetry.NoOpService{}, func(opts *SearchOptions) error {
+			cmd := NewCmdSearch(f, &telemetry.EventRecorderSpy{}, func(opts *SearchOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -636,9 +636,10 @@ func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 	// The search command no longer records a separate skill_search event;
 	// only the follow-up skill_search_install event fires when the user
 	// proceeds to install from the results.
-	require.Len(t, recorder.Events, 1)
+	events := recorder.Events()
+	require.Len(t, events, 1)
 
-	installEvent := recorder.Events[0]
+	installEvent := events[0]
 	assert.Equal(t, "skill_search_install", installEvent.Type,
 		"an install triggered from search results should be recorded as a distinct event")
 	assert.Equal(t, int64(1), installEvent.Measures["install_count"],

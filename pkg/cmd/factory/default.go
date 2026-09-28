@@ -32,6 +32,7 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	}
 
 	f.IOStreams = ios
+	f.TelemetryDisabler = telemetryDisabler
 	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
 	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
@@ -270,7 +271,7 @@ func branchFunc(f *cmdutil.Factory) func() (string, error) {
 }
 
 func extensionManager(f *cmdutil.Factory) *extension.Manager {
-	em := extension.NewManager(f.IOStreams, f.GitClient)
+	em := extension.NewManager(f.IOStreams, f.GitClient, f.ExecutablePath)
 
 	cfg, err := f.Config()
 	if err != nil {

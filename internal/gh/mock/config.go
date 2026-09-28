@@ -4,10 +4,9 @@
 package ghmock
 
 import (
-	"sync"
-
 	"github.com/cli/cli/v2/internal/gh"
 	o "github.com/cli/cli/v2/pkg/option"
+	"sync"
 )
 
 // Ensure, that ConfigMock does implement gh.Config.
@@ -37,6 +36,9 @@ var _ gh.Config = &ConfigMock{}
 //			},
 //			CacheDirFunc: func() string {
 //				panic("mock out the CacheDir method")
+//			},
+//			ClipboardFunc: func() gh.ConfigEntry {
+//				panic("mock out the Clipboard method")
 //			},
 //			ColorLabelsFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the ColorLabels method")
@@ -105,6 +107,9 @@ type ConfigMock struct {
 	// CacheDirFunc mocks the CacheDir method.
 	CacheDirFunc func() string
 
+	// ClipboardFunc mocks the Clipboard method.
+	ClipboardFunc func() gh.ConfigEntry
+
 	// ColorLabelsFunc mocks the ColorLabels method.
 	ColorLabelsFunc func(hostname string) gh.ConfigEntry
 
@@ -172,6 +177,9 @@ type ConfigMock struct {
 		}
 		// CacheDir holds details about calls to the CacheDir method.
 		CacheDir []struct {
+		}
+		// Clipboard holds details about calls to the Clipboard method.
+		Clipboard []struct {
 		}
 		// ColorLabels holds details about calls to the ColorLabels method.
 		ColorLabels []struct {
@@ -250,6 +258,7 @@ type ConfigMock struct {
 	lockAuthentication     sync.RWMutex
 	lockBrowser            sync.RWMutex
 	lockCacheDir           sync.RWMutex
+	lockClipboard          sync.RWMutex
 	lockColorLabels        sync.RWMutex
 	lockEditor             sync.RWMutex
 	lockGetOrDefault       sync.RWMutex
@@ -440,6 +449,33 @@ func (mock *ConfigMock) CacheDirCalls() []struct {
 	mock.lockCacheDir.RLock()
 	calls = mock.calls.CacheDir
 	mock.lockCacheDir.RUnlock()
+	return calls
+}
+
+// Clipboard calls ClipboardFunc.
+func (mock *ConfigMock) Clipboard() gh.ConfigEntry {
+	if mock.ClipboardFunc == nil {
+		panic("ConfigMock.ClipboardFunc: method is nil but Config.Clipboard was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockClipboard.Lock()
+	mock.calls.Clipboard = append(mock.calls.Clipboard, callInfo)
+	mock.lockClipboard.Unlock()
+	return mock.ClipboardFunc()
+}
+
+// ClipboardCalls gets all the calls that were made to Clipboard.
+// Check the length with:
+//
+//	len(mockedConfig.ClipboardCalls())
+func (mock *ConfigMock) ClipboardCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockClipboard.RLock()
+	calls = mock.calls.Clipboard
+	mock.lockClipboard.RUnlock()
 	return calls
 }
 

@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Install a single skill from a public repo
 exec gh skill install github/awesome-copilot git-commit --scope user --force --agent github-copilot
 stdout 'Installed git-commit'

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
@@ -88,24 +87,18 @@ func fetchContent(httpClient *http.Client, repo ghrepo.Interface, filePath, ref 
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", apiPath.String(), nil)
-	if err != nil {
-		return nil, err
-	}
 	// We use the "application/vnd.github.object+json" media type to request a unified object
 	// representation from the Contents API. Without this, the API returns a JSON array for
 	// directories and a JSON object for files.
-	req.Header.Set("Accept", "application/vnd.github.object+json")
-
-	resp, err := httpClient.Do(req)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).Request(repo.RepoHost(), http.MethodGet, apiPath.String(), nil,
+		api.WithHeader("Accept", "application/vnd.github.object+json"))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -179,30 +172,25 @@ func fetchRawFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref 
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", apiPath.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github.raw")
-
-	resp, err := httpClient.Do(req)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).Request(repo.RepoHost(), http.MethodGet, apiPath.String(), nil,
+		api.WithHeader("Accept", "application/vnd.github.raw"))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
 	return io.ReadAll(resp.Body)
 }
 
-// contentsAPIPath builds the absolute Contents API URL for a path and optional ref.
+// contentsAPIPath builds the Contents API path for a path and optional ref, relative to the
+// host's REST endpoint.
 func contentsAPIPath(repo ghrepo.Interface, filePath, ref string) (safeurl.SafeURL, error) {
 	// The Contents API accepts a fully percent-encoded path, including path separators
 	// encoded as %2F, so spaces and other special characters are handled transparently.
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "contents", strings.TrimPrefix(filePath, "/"))
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "contents", strings.TrimPrefix(filePath, "/"))
 	if err != nil {
 		return nil, err
 	}
