@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -188,18 +189,23 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 
 // mergeContext contains state and dependencies to merge a pull request.
 type mergeContext struct {
-	pr                 *api.PullRequest
-	baseRepo           ghrepo.Interface
-	httpClient         *http.Client
-	opts               *MergeOptions
-	cs                 *iostreams.ColorScheme
-	isTerminal         bool
-	merged             bool
-	localBranchExists  bool
-	autoMerge          bool
-	crossRepoPR        bool
-	deleteBranch       bool
-	mergeQueueRequired bool
+	pr                *api.PullRequest
+	baseRepo          ghrepo.Interface
+	httpClient        *http.Client
+	opts              *MergeOptions
+	cs                *iostreams.ColorScheme
+	isTerminal        bool
+	merged            bool
+	localBranchExists bool
+	// Lines explaining why a local branch matching the pull request head was
+	// left alone, or nil when there was nothing to explain. deleteLocalBranch
+	// prints them so that a branch surviving a requested deletion is not
+	// silent.
+	localBranchSkipNotice []string
+	autoMerge             bool
+	crossRepoPR           bool
+	deleteBranch          bool
+	mergeQueueRequired    bool
 }
 
 // Attempt to disable auto merge on the pull request.
@@ -236,6 +242,103 @@ func (m *mergeContext) warnIfDiverged() {
 	}
 
 	_ = m.warnf("%s Pull request %s#%d (%s) has diverged from local branch\n", m.cs.Yellow("!"), ghrepo.FullName(m.baseRepo), m.pr.Number, m.pr.Title)
+}
+
+// Decide whether the pull request's head branch is a local branch that this
+// command is allowed to clean up, and produce the lines explaining it when it
+// is not.
+//
+// A pull request can be selected by URL, which does not set --repo and so
+// leaves local cleanup enabled, but that says nothing about which local
+// repository gh is standing in. Because the head branch is matched by name
+// alone, a same-named branch in an unrelated repository -- along with any
+// linked worktree that had it checked out -- used to be destroyed by a merge
+// belonging to a different pull request. Both guards here fail closed: unless
+// the answer is a clear yes, the local repository is left untouched.
+func (m *mergeContext) localBranchAvailable() (bool, []string) {
+	if !m.opts.CanDeleteLocalBranch {
+		return false, nil
+	}
+
+	ctx := context.Background()
+	if !m.opts.GitClient.HasLocalBranch(ctx, m.pr.HeadRefName) {
+		return false, nil
+	}
+
+	// The pull request has to belong to a repository this directory is a clone
+	// of, otherwise a same-named branch found here is somebody else's work.
+	// Remotes are compared by owner and name rather than by URL string: the
+	// same repository reaches git through many URL spellings, and matching on
+	// one of them would mistake a clone of the right repository for a clone of
+	// an unrelated one.
+	remotes, err := m.opts.Remotes()
+	if err != nil {
+		// Fail closed. Without knowing what this directory is a clone of, a
+		// branch of the right name here is as likely as not to be work that
+		// was never pushed anywhere.
+		return false, []string{fmt.Sprintf("%s Could not determine the repositories of the current directory; skipping local branch delete: %s\n",
+			m.cs.WarningIcon(), err)}
+	}
+
+	// Only the base repository counts. The head repository is deliberately not
+	// accepted: a fork whose name collides with the base repository's would make
+	// the check a name comparison again, which is the bug being fixed here.
+	if !remotesResolveTo(remotes, m.baseRepo) {
+		return false, []string{fmt.Sprintf("%s Skipping local branch delete: this directory is not a clone of the base or head repository of pull request %s#%d\n",
+			m.cs.WarningIcon(), ghrepo.FullName(m.baseRepo), m.pr.Number)}
+	}
+
+	// The branch can be in the right repository and still be work of its own:
+	// the local branch may hold commits that were never pushed. Cleanup removes
+	// a worktree and then force-deletes the branch with `git branch -D`, which
+	// skips the merged-check git would otherwise apply, so nothing downstream
+	// would stop those commits from surviving only in a reflog.
+	if m.pr.HeadRefOid == "" {
+		// headRefOid is a required field of the pull request query and is
+		// non-null for a real pull request, so an empty value means it was not
+		// populated rather than that there is nothing to compare against. Keep
+		// the pre-guard behaviour instead of guessing which way to err.
+		return true, nil
+	}
+
+	localTip, err := m.opts.GitClient.LocalBranchTip(ctx, m.pr.HeadRefName)
+	if err != nil {
+		return false, []string{fmt.Sprintf("%s Could not read the tip of local branch %s; skipping local branch delete: %s\n",
+			m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), err)}
+	}
+
+	// `git merge-base --is-ancestor` holds when the local tip is an ancestor of
+	// the pull request head, which includes the two being the same commit.
+	onPRHead, err := m.opts.GitClient.IsAncestor(ctx, localTip, m.pr.HeadRefOid)
+	if err != nil {
+		// Fail closed for the same reason as above: not knowing is not the same
+		// as knowing it is safe.
+		return false, []string{fmt.Sprintf("%s Could not compare local branch %s with the head of pull request %s#%d; skipping local branch delete: %s\n",
+			m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), ghrepo.FullName(m.baseRepo), m.pr.Number, err)}
+	}
+	if !onPRHead {
+		return false, []string{
+			fmt.Sprintf("%s Branch %s has commits that are not in pull request %s#%d; skipping local branch delete\n",
+				m.cs.WarningIcon(), m.cs.Cyan(m.pr.HeadRefName), ghrepo.FullName(m.baseRepo), m.pr.Number),
+			"  To see what would be lost, and to delete the branch anyway, run:\n",
+			fmt.Sprintf("  git log %s..%s && git branch -D %s\n",
+				m.cs.Cyan(m.pr.HeadRefOid), m.cs.Cyan(localTip), m.cs.Cyan(m.pr.HeadRefName)),
+		}
+	}
+
+	return true, nil
+}
+
+// remotesResolveTo reports whether any of the given remotes points at one of
+// the given repositories, compared by owner and name.
+func remotesResolveTo(remotes ghContext.Remotes, repo ghrepo.Interface) bool {
+	want := ghrepo.FullName(repo)
+	for _, remote := range remotes {
+		if strings.EqualFold(ghrepo.FullName(remote), want) {
+			return true
+		}
+	}
+	return false
 }
 
 // Check if the current state of the pull request allows for merging
@@ -396,6 +499,15 @@ func (m *mergeContext) deleteLocalBranch() error {
 	}
 
 	if !m.deleteBranch || !m.opts.CanDeleteLocalBranch || !m.localBranchExists {
+		// A branch matching the pull request head is here but is not ours to
+		// delete, so say why it survived. This is only reported when deleting
+		// was asked for, otherwise every merge run would complain about a
+		// branch the user never mentioned.
+		if m.deleteBranch {
+			for _, line := range m.localBranchSkipNotice {
+				_ = m.warnf("%s", line)
+			}
+		}
 		return nil
 	}
 
@@ -580,7 +692,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		return nil, err
 	}
 
-	return &mergeContext{
+	mc := &mergeContext{
 		opts:               opts,
 		pr:                 pr,
 		cs:                 opts.IO.ColorScheme(),
@@ -591,9 +703,14 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		deleteBranch:       opts.DeleteBranch,
 		crossRepoPR:        pr.IsCrossRepository,
 		autoMerge:          opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
-		localBranchExists:  opts.CanDeleteLocalBranch && opts.GitClient.HasLocalBranch(context.Background(), pr.HeadRefName),
 		mergeQueueRequired: pr.IsMergeQueueEnabled,
-	}, nil
+	}
+
+	// Resolved after construction so that a decision not to clean up can carry
+	// an explanation for the user.
+	mc.localBranchExists, mc.localBranchSkipNotice = mc.localBranchAvailable()
+
+	return mc, nil
 }
 
 // Run the merge command.

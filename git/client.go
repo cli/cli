@@ -705,9 +705,44 @@ func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch strin
 	return nil
 }
 
+// LocalBranchTip returns the commit that the given local branch points at. It
+// errors when there is no such branch, so callers that only care whether the
+// branch is there should use HasLocalBranch.
+func (c *Client) LocalBranchTip(ctx context.Context, branch string) (string, error) {
+	out, err := c.revParse(ctx, "--verify", "refs/heads/"+branch)
+	if err != nil {
+		return "", err
+	}
+	return firstLine(out), nil
+}
+
 func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
-	_, err := c.revParse(ctx, "--verify", "refs/heads/"+branch)
+	_, err := c.LocalBranchTip(ctx, branch)
 	return err == nil
+}
+
+// IsAncestor reports whether the commit at ancestor is an ancestor of the commit
+// at progeny, which includes the two being the same commit. It errors when the
+// relation could not be established at all, for example because one of the
+// commits is not present locally, so that callers can tell "no" apart from
+// "unknown".
+func (c *Client) IsAncestor(ctx context.Context, ancestor, progeny string) (bool, error) {
+	cmd, err := c.Command(ctx, "merge-base", "--is-ancestor", ancestor, progeny)
+	if err != nil {
+		return false, err
+	}
+	// `git merge-base --is-ancestor` is silent and reports through its exit
+	// status: 0 when the relation holds and 1 when it does not. Any other
+	// status means the comparison could not be made, which is an error rather
+	// than a negative answer.
+	if _, err := cmd.Output(); err != nil {
+		var gitErr *GitError
+		if errors.As(err, &gitErr) && gitErr.ExitCode == 1 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (c *Client) TrackingBranchNames(ctx context.Context, prefix string) []string {

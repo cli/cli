@@ -1347,6 +1347,95 @@ func TestClientHasLocalBranch(t *testing.T) {
 	}
 }
 
+func TestClientLocalBranchTip(t *testing.T) {
+	tests := []struct {
+		name          string
+		cmdExitStatus int
+		cmdStdout     string
+		wantCmdArgs   string
+		wantTip       string
+		wantErrorMsg  string
+	}{
+		{
+			name:        "reads the tip",
+			cmdStdout:   "deadbeef\n",
+			wantCmdArgs: `path/to/git rev-parse --verify refs/heads/trunk`,
+			wantTip:     "deadbeef",
+		},
+		{
+			name:          "no such branch",
+			cmdExitStatus: 1,
+			wantCmdArgs:   `path/to/git rev-parse --verify refs/heads/trunk`,
+			wantErrorMsg:  "failed to run git: fatal: ambiguous argument 'refs/heads/trunk'",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, "fatal: ambiguous argument 'refs/heads/trunk'")
+			client := Client{
+				GitPath:        "path/to/git",
+				commandContext: cmdCtx,
+			}
+			tip, err := client.LocalBranchTip(context.Background(), "trunk")
+			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			if tt.wantErrorMsg == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantTip, tip)
+			} else {
+				assert.EqualError(t, err, tt.wantErrorMsg)
+			}
+		})
+	}
+}
+
+func TestClientIsAncestor(t *testing.T) {
+	tests := []struct {
+		name          string
+		cmdExitStatus int
+		wantCmdArgs   string
+		wantOut       bool
+		wantErrorMsg  string
+	}{
+		{
+			name:        "is an ancestor",
+			wantCmdArgs: `path/to/git merge-base --is-ancestor abc123 def456`,
+			wantOut:     true,
+		},
+		{
+			// Exit status 1 is a negative answer, not a failure: the same commit
+			// counts as its own ancestor, and two unrelated commits neither
+			// contain the other.
+			name:          "is not an ancestor",
+			cmdExitStatus: 1,
+			wantCmdArgs:   `path/to/git merge-base --is-ancestor abc123 def456`,
+			wantOut:       false,
+		},
+		{
+			name:          "comparison could not be made",
+			cmdExitStatus: 128,
+			wantCmdArgs:   `path/to/git merge-base --is-ancestor abc123 def456`,
+			wantErrorMsg:  "failed to run git: fatal: Not a valid object name def456",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, "", "fatal: Not a valid object name def456")
+			client := Client{
+				GitPath:        "path/to/git",
+				commandContext: cmdCtx,
+			}
+			out, err := client.IsAncestor(context.Background(), "abc123", "def456")
+			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			if tt.wantErrorMsg == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantOut, out)
+			} else {
+				assert.EqualError(t, err, tt.wantErrorMsg)
+			}
+		})
+	}
+}
+
 func TestClientCheckoutBranch(t *testing.T) {
 	tests := []struct {
 		name          string
