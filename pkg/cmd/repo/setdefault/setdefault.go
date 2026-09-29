@@ -105,7 +105,7 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 				}
 			}
 
-			if !opts.ViewMode && !opts.IO.CanPrompt() && opts.Repo == nil {
+			if !opts.ViewMode && !opts.UnsetMode && !opts.IO.CanPrompt() && opts.Repo == nil {
 				return cmdutil.FlagErrorf("repository required when not running interactively")
 			}
 
