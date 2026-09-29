@@ -27,6 +27,9 @@ type ArtifactClient interface {
 	List(repo ghrepo.Interface, issueNumber int, artifactType string, limit int) ([]Artifact, error)
 	// Get returns one artifact on an issue, with its edit history.
 	Get(repo ghrepo.Interface, issueNumber int, number int) (*ArtifactWithVersions, error)
+	// Delete deletes one artifact from an issue. The API can't restore a
+	// deleted artifact.
+	Delete(repo ghrepo.Interface, issueNumber int, number int) error
 }
 
 // maxPageSize is the most artifacts one request asks for.
@@ -108,4 +111,12 @@ func (c *artifactClient) Get(repo ghrepo.Interface, issueNumber int, number int)
 		return nil, err
 	}
 	return &ArtifactWithVersions{Artifact: response.Artifact, Versions: response.Versions}, nil
+}
+
+func (c *artifactClient) Delete(repo ghrepo.Interface, issueNumber int, number int) error {
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "issues", strconv.Itoa(issueNumber), "artifacts", strconv.Itoa(number))
+	if err != nil {
+		return err
+	}
+	return c.apiClient.REST(repo.RepoHost(), "DELETE", u.String(), nil, nil)
 }
