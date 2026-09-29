@@ -1201,6 +1201,7 @@ func Test_downloadAsset_archiveAvoidsLegacyCodeload(t *testing.T) {
 
 	tempDir := t.TempDir()
 	dest := destinationWriter{dir: tempDir}
+	defer dest.Close()
 
 	err := downloadAsset(&dest, ts.Client(), safeurl.NewImmutableSafeURL(ts.URL+"/asset"), "", true)
 	require.NoError(t, err)
