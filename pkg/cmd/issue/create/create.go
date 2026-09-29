@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -58,6 +59,7 @@ type CreateOptions struct {
 	BlockedBy   []string
 	Blocking    []string
 
+	BodyDir     string
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
@@ -84,7 +86,8 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 
 			Use %[1]s--attach%[1]s to upload an image or video. The attachment is appended to the
 			body. If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
-			reference is rewritten to point at the uploaded asset instead.
+			reference is rewritten to point at the uploaded asset instead. Paths in a
+			%[1]s--body-file%[1]s are relative to its directory, falling back to the working directory.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -140,6 +143,9 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 					return err
 				}
 				opts.Body = string(b)
+				if bodyFile != "-" {
+					opts.BodyDir = filepath.Dir(bodyFile)
+				}
 				bodyProvided = true
 			}
 
@@ -466,7 +472,7 @@ func createRun(opts *CreateOptions) (err error) {
 		// not exist, so no issue is created. Once anything has uploaded the
 		// issue is created and the failures are reported.
 		if uploader != nil {
-			body, uploadResult, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.Assets)
+			body, uploadResult, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.BodyDir, opts.Assets)
 			opts.AttachEvent.RecordOperations(uploadResult)
 			if uploadErr != nil && uploadResult.Uploaded == 0 {
 				err = uploadErr

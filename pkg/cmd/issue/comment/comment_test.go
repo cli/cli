@@ -120,6 +120,7 @@ func TestNewCmdComment(t *testing.T) {
 				Interactive:  false,
 				InputType:    shared.InputTypeInline,
 				Body:         "a body from file",
+				BodyDir:      filepath.Dir(tmpFile),
 				BodyProvided: true,
 			},
 			isTTY:    true,
@@ -469,6 +470,7 @@ func TestNewCmdComment(t *testing.T) {
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.InputType, gotOpts.InputType)
 			assert.Equal(t, tt.output.Body, gotOpts.Body)
+			assert.Equal(t, tt.output.BodyDir, gotOpts.BodyDir)
 			assert.Equal(t, tt.output.DeleteLast, gotOpts.DeleteLast)
 			assert.Equal(t, tt.output.DeleteLastConfirmed, gotOpts.DeleteLastConfirmed)
 			assert.Equal(t, tt.output.BodyProvided, gotOpts.BodyProvided)

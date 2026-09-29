@@ -24,9 +24,15 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 	absPNG, err := filepath.Abs("./login.png")
 	require.NoError(t, err)
 
+	// The rows with a markdownDir read as though the markdown came from
+	// docs/plan.md, with the diagram beside it.
+	docsPNG := attachmentArg{Path: "docs/diagram.png", URL: pngURL, Alt: "diagram"}
+	workingDirPNG := attachmentArg{Path: "./diagram.png", URL: "https://example.com/working-dir", Alt: "diagram"}
+
 	tests := []struct {
 		name           string
 		markdown       string
+		markdownDir    string
 		attachmentArgs []attachmentArg
 		wantMarkdown   string
 		wantToAppend   []attachmentArg
@@ -370,6 +376,76 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 			markdown:       `[x](./login.png b) and [the login screen](./login.png)`,
 			attachmentArgs: []attachmentArg{pngArg()},
 			wantMarkdown:   `[x](./login.png b) and [the login screen](` + pngURL + `)`,
+		},
+
+		// Markdown read from a file.
+		{
+			name:           "a relative path resolves beside the markdown file",
+			markdown:       "![the diagram](./diagram.png)",
+			markdownDir:    "docs",
+			attachmentArgs: []attachmentArg{docsPNG},
+			wantMarkdown:   "![the diagram](" + pngURL + ")",
+		},
+		{
+			name:           "a parent directory path resolves beside the markdown file",
+			markdown:       "![the diagram](../diagram.png)",
+			markdownDir:    "docs/guides",
+			attachmentArgs: []attachmentArg{docsPNG},
+			wantMarkdown:   "![the diagram](" + pngURL + ")",
+		},
+		{
+			name:           "a path written from the working directory falls back to it",
+			markdown:       "![the diagram](./docs/diagram.png)",
+			markdownDir:    "docs",
+			attachmentArgs: []attachmentArg{docsPNG},
+			wantMarkdown:   "![the diagram](" + pngURL + ")",
+		},
+		{
+			name:           "the file beside the markdown wins over the one in the working directory",
+			markdown:       "![the diagram](./diagram.png)",
+			markdownDir:    "docs",
+			attachmentArgs: []attachmentArg{workingDirPNG, docsPNG},
+			wantMarkdown:   "![the diagram](" + pngURL + ")",
+			wantToAppend:   []attachmentArg{workingDirPNG},
+		},
+		{
+			name:           "markdown from no file resolves in the working directory alone",
+			markdown:       "![the diagram](./diagram.png)",
+			attachmentArgs: []attachmentArg{docsPNG},
+			wantMarkdown:   "![the diagram](./diagram.png)",
+			wantToAppend:   []attachmentArg{docsPNG},
+		},
+		{
+			name:           "an absolute path still matches when the markdown came from a file",
+			markdown:       "![the login screen](" + absPNG + ")",
+			markdownDir:    "docs",
+			attachmentArgs: []attachmentArg{pngArg()},
+			wantMarkdown:   "![the login screen](" + pngURL + ")",
+		},
+		{
+			// Placed beside the markdown it would name docs/login.png.
+			name:           "a path with a leading slash is not placed beside the markdown file",
+			markdown:       "![the login screen](/login.png)",
+			markdownDir:    "docs",
+			attachmentArgs: []attachmentArg{{Path: "docs/login.png", URL: pngURL, Alt: "login"}},
+			wantMarkdown:   "![the login screen](/login.png)",
+			wantToAppend:   []attachmentArg{{Path: "docs/login.png", URL: pngURL, Alt: "login"}},
+		},
+		{
+			name:           "a percent encoded path resolves beside the markdown file",
+			markdown:       "![the diagram](./my%20diagram.png)",
+			markdownDir:    "docs",
+			attachmentArgs: []attachmentArg{{Path: "docs/my diagram.png", URL: pngURL}},
+			wantMarkdown:   "![the diagram](" + pngURL + ")",
+		},
+		{
+			// Without the markdown's directory this reference matched nothing
+			// and the video was appended. A match follows the usual rules.
+			name:           "a video beside the markdown file written as a reference-style image is refused",
+			markdown:       "![the recording][clip]\n\n[clip]: ./repro.mp4",
+			markdownDir:    "docs",
+			attachmentArgs: []attachmentArg{{Path: "docs/repro.mp4", URL: mp4URL, Alt: "repro.mp4", RendersAsPlayer: true}},
+			wantErr:        "cannot embed a video as a reference-style image: docs/repro.mp4",
 		},
 
 		// Structure that could confuse the scan.
@@ -769,7 +845,7 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// The real flow: validate, then upload, then rewrite. Markdown that
 			// cannot work is refused here, before anything uploads.
-			v, err := newAttachableMarkdown(tt.markdown, tt.attachmentArgs)
+			v, err := newAttachableMarkdown(tt.markdown, tt.markdownDir, tt.attachmentArgs)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 				return
@@ -875,7 +951,7 @@ func TestNewAttachableMarkdown(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v, err := newAttachableMarkdown(tt.markdown, tt.attachmentArgs)
+			v, err := newAttachableMarkdown(tt.markdown, "", tt.attachmentArgs)
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 				require.Equal(t, tt.markdown, v.markdown)
