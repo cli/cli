@@ -1,6 +1,7 @@
 // Package shared holds what more than one gh issue artifact command needs: its
-// client, its arguments and the checks that refuse what artifacts or this
-// version of gh don't support.
+// client, its arguments, the result lines of commands that act on several
+// artifacts and the checks that refuse what artifacts or this version of gh
+// don't support.
 package shared
 
 import (
