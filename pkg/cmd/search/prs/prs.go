@@ -40,7 +40,10 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			<https://docs.github.com/search-github/searching-on-github/searching-issues-and-pull-requests>
 
 			On supported GitHub hosts, advanced issue search syntax can be used in the
-			%[1]s--search%[1]s query. For more information about advanced issue search, see:
+			%[1]s--search%[1]s query. Advanced search syntax, like boolean operators %[1]sOR%[1]s/%[1]sAND%[1]s,
+			and parentheses for nesting, must be passed as separate arguments, rather
+			than within a quoted multi-word string. This syntax is not supported with
+			%[1]s--web%[1]s. For more information about advanced issue search, see:
 			<https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/filtering-and-searching-issues-and-pull-requests#building-advanced-filters-for-issues>
 
 			For more information on handling search queries containing a hyphen, run %[1]sgh search --help%[1]s.
