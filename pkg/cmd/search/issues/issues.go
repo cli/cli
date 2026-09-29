@@ -35,7 +35,6 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			The command supports constructing queries using the GitHub search syntax,
 			using the parameter and qualifier flags, or a combination of the two.
 
-
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-issues-and-pull-requests>
 
