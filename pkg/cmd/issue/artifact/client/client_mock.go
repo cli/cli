@@ -18,6 +18,9 @@ var _ ArtifactClient = &ArtifactClientMock{}
 //
 //		// make and configure a mocked ArtifactClient
 //		mockedArtifactClient := &ArtifactClientMock{
+//			GetFunc: func(repo ghrepo.Interface, issueNumber int, number int) (*ArtifactWithVersions, error) {
+//				panic("mock out the Get method")
+//			},
 //			IsPullRequestFunc: func(repo ghrepo.Interface, number int) (bool, error) {
 //				panic("mock out the IsPullRequest method")
 //			},
@@ -31,6 +34,9 @@ var _ ArtifactClient = &ArtifactClientMock{}
 //
 //	}
 type ArtifactClientMock struct {
+	// GetFunc mocks the Get method.
+	GetFunc func(repo ghrepo.Interface, issueNumber int, number int) (*ArtifactWithVersions, error)
+
 	// IsPullRequestFunc mocks the IsPullRequest method.
 	IsPullRequestFunc func(repo ghrepo.Interface, number int) (bool, error)
 
@@ -39,6 +45,15 @@ type ArtifactClientMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// Get holds details about calls to the Get method.
+		Get []struct {
+			// Repo is the repo argument value.
+			Repo ghrepo.Interface
+			// IssueNumber is the issueNumber argument value.
+			IssueNumber int
+			// Number is the number argument value.
+			Number int
+		}
 		// IsPullRequest holds details about calls to the IsPullRequest method.
 		IsPullRequest []struct {
 			// Repo is the repo argument value.
@@ -58,8 +73,49 @@ type ArtifactClientMock struct {
 			Limit int
 		}
 	}
+	lockGet           sync.RWMutex
 	lockIsPullRequest sync.RWMutex
 	lockList          sync.RWMutex
+}
+
+// Get calls GetFunc.
+func (mock *ArtifactClientMock) Get(repo ghrepo.Interface, issueNumber int, number int) (*ArtifactWithVersions, error) {
+	if mock.GetFunc == nil {
+		panic("ArtifactClientMock.GetFunc: method is nil but ArtifactClient.Get was just called")
+	}
+	callInfo := struct {
+		Repo        ghrepo.Interface
+		IssueNumber int
+		Number      int
+	}{
+		Repo:        repo,
+		IssueNumber: issueNumber,
+		Number:      number,
+	}
+	mock.lockGet.Lock()
+	mock.calls.Get = append(mock.calls.Get, callInfo)
+	mock.lockGet.Unlock()
+	return mock.GetFunc(repo, issueNumber, number)
+}
+
+// GetCalls gets all the calls that were made to Get.
+// Check the length with:
+//
+//	len(mockedArtifactClient.GetCalls())
+func (mock *ArtifactClientMock) GetCalls() []struct {
+	Repo        ghrepo.Interface
+	IssueNumber int
+	Number      int
+} {
+	var calls []struct {
+		Repo        ghrepo.Interface
+		IssueNumber int
+		Number      int
+	}
+	mock.lockGet.RLock()
+	calls = mock.calls.Get
+	mock.lockGet.RUnlock()
+	return calls
 }
 
 // IsPullRequest calls IsPullRequestFunc.
