@@ -1,13 +1,14 @@
 // Package shared holds what more than one gh issue artifact command needs: its
-// client, its arguments, the result lines of commands that act on several
-// artifacts and the checks that refuse what artifacts or this version of gh
-// don't support.
+// client, its arguments, finding a version in an edit history, the result
+// lines of commands that act on several artifacts and the checks that refuse
+// what artifacts or this version of gh don't support.
 package shared
 
 import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -56,6 +57,24 @@ func ParseArtifactNumber(arg string) (int, error) {
 		return 0, fmt.Errorf("invalid artifact number: %q", arg)
 	}
 	return number, nil
+}
+
+// FindVersion returns the version numbered number from an artifact's edit
+// history, or nil for the current version. Versions come newest first, so the
+// newest version's number means the current version, like 0 does. A number
+// the API didn't return is an error.
+func FindVersion(a *client.ArtifactWithVersions, number int) (*client.Version, error) {
+	if number == 0 {
+		return nil, nil
+	}
+	i := slices.IndexFunc(a.Versions, func(v client.Version) bool { return v.Version == number })
+	switch {
+	case i < 0:
+		return nil, fmt.Errorf("version %d not found for artifact %d", number, a.Number)
+	case i == 0:
+		return nil, nil
+	}
+	return &a.Versions[i], nil
 }
 
 // CheckHost refuses GitHub Enterprise Server, which doesn't support issue

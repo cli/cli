@@ -3,7 +3,6 @@ package view
 import (
 	"fmt"
 	"io"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -133,7 +132,7 @@ func viewRun(opts *ViewOptions) error {
 	if err := shared.CheckType(artifact.Artifact); err != nil {
 		return err
 	}
-	viewing, err := findVersion(artifact, opts.Version)
+	viewing, err := shared.FindVersion(artifact, opts.Version)
 	if err != nil {
 		return err
 	}
@@ -158,23 +157,6 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	return printHumanArtifact(opts, repo, artifact, viewing)
-}
-
-// findVersion returns the version to show from the edit history, or nil for
-// the current version. Versions come newest first, so asking for the first
-// one shows the current version as usual.
-func findVersion(a *client.ArtifactWithVersions, number int) (*client.Version, error) {
-	if number == 0 {
-		return nil, nil
-	}
-	i := slices.IndexFunc(a.Versions, func(v client.Version) bool { return v.Version == number })
-	switch {
-	case i < 0:
-		return nil, fmt.Errorf("version %d not found for artifact %d", number, a.Number)
-	case i == 0:
-		return nil, nil
-	}
-	return &a.Versions[i], nil
 }
 
 // openLink opens a link artifact's URL. Artifacts have no web page of their

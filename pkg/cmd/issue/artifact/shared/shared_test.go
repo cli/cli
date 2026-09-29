@@ -167,6 +167,86 @@ func TestParseArtifactNumber(t *testing.T) {
 	}
 }
 
+func TestFindVersion(t *testing.T) {
+	// Artifact 2 on the spec's issue 142 keeps its versions newest first.
+	// Version 9 renamed it.
+	oauthPlan := &client.ArtifactWithVersions{
+		Number: 2, Type: "generic", Name: "OAuth callback plan", Body: "# OAuth callback plan",
+		Versions: []client.Version{
+			{Version: 12, Name: "OAuth callback plan", Body: "# OAuth callback plan"},
+			{Version: 9, Name: "OAuth callback plan", Body: "# OAuth callback plan"},
+			{Version: 5, Name: "OAuth plan", Body: "# OAuth plan\n\n1. Register the callback URL."},
+			{Version: 1, Name: "OAuth plan", Body: "# OAuth plan"},
+		},
+	}
+	// An artifact from a list, which has no edit history.
+	listed := &client.ArtifactWithVersions{
+		Number: 5, Type: "generic", Name: "Barista feedback notes",
+	}
+
+	tests := []struct {
+		name     string
+		artifact *client.ArtifactWithVersions
+		number   int
+		want     *client.Version
+		wantErr  string
+	}{
+		{
+			name:     "0 means the current version",
+			artifact: oauthPlan,
+			number:   0,
+		},
+		{
+			name:     "the current version's number means the current version",
+			artifact: oauthPlan,
+			number:   12,
+		},
+		{
+			name:     "an earlier version",
+			artifact: oauthPlan,
+			number:   5,
+			want:     &client.Version{Version: 5, Name: "OAuth plan", Body: "# OAuth plan\n\n1. Register the callback URL."},
+		},
+		{
+			name:     "the first version",
+			artifact: oauthPlan,
+			number:   1,
+			want:     &client.Version{Version: 1, Name: "OAuth plan", Body: "# OAuth plan"},
+		},
+		{
+			name:     "a version the API didn't return",
+			artifact: oauthPlan,
+			number:   99,
+			wantErr:  "version 99 not found for artifact 2",
+		},
+		{
+			name:     "0 without an edit history",
+			artifact: listed,
+			number:   0,
+		},
+		{
+			name:     "a version without an edit history",
+			artifact: listed,
+			number:   1,
+			wantErr:  "version 1 not found for artifact 5",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := FindVersion(tt.artifact, tt.number)
+
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestCheckHost(t *testing.T) {
 	tests := []struct {
 		name    string
