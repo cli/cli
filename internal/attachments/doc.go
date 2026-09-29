@@ -40,4 +40,11 @@
 // is above zero, including after a partial failure, because what did upload must
 // be referenced by something. At zero nothing is stranded and nothing is
 // written.
+//
+// UploadAndAttachDocuments attaches the same files to several documents at
+// once. Each file uploads once, and every document that references it gets its
+// URL. With several documents, a file that no document references is refused
+// before anything uploads, since no document is the place to append it. Each
+// document gets its own result, and the rule above applies to each one: a
+// document with anything in Uploaded must be written, even when its Err is set.
 package attachments
