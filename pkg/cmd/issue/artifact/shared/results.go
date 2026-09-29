@@ -12,8 +12,8 @@ import (
 )
 
 // Result identifies the artifact on a result line. A command that acts on
-// several artifacts reports one line for each, with PrintSuccess and
-// PrintFailure, so every such command shares one piped format.
+// several artifacts reports one line for each, with PrintSuccess, PrintSkip
+// and PrintFailure, so every such command shares one piped format.
 type Result struct {
 	// Number is the artifact's number. 0 leaves its column empty, for an
 	// artifact that has no number.
@@ -37,6 +37,19 @@ func PrintSuccess(ios *iostreams.IOStreams, status string, r Result, icon, messa
 		return
 	}
 	fmt.Fprintf(ios.Out, "%s %s\n", icon, message)
+}
+
+// PrintSkip prints the line for an artifact the command left alone as asked,
+// such as a download whose file already exists with --skip-existing. A skip
+// isn't a failure, so in a terminal it goes to stdout with the successes,
+// reading "- Skipped <subject>: <reason>" with a muted dash. Otherwise it is a
+// piped line on stdout whose status is "skipped".
+func PrintSkip(ios *iostreams.IOStreams, r Result, subject, reason string) {
+	if !ios.IsStdoutTTY() {
+		printResultLine(ios.Out, "skipped", r, reason)
+		return
+	}
+	fmt.Fprintf(ios.Out, "%s Skipped %s: %s\n", ios.ColorScheme().Muted("-"), subject, reason)
 }
 
 // PrintFailure prints the line for an artifact the command couldn't act on,
