@@ -24,11 +24,11 @@ func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
 	return shared.ListArtifacts(p.client, p.repo, runID)
 }
 
-func (p *apiPlatform) Download(url safeurl.SafeURL, dir safepaths.Absolute) error {
-	return downloadArtifact(p.client, p.repo.RepoHost(), url, dir)
+func (p *apiPlatform) Download(url safeurl.SafeURL, openDestination func() (*safepaths.Root, error)) error {
+	return downloadArtifact(p.client, p.repo.RepoHost(), url, openDestination)
 }
 
-func downloadArtifact(httpClient *http.Client, hostname string, url safeurl.SafeURL, destDir safepaths.Absolute) error {
+func downloadArtifact(httpClient *http.Client, hostname string, url safeurl.SafeURL, openDestination func() (*safepaths.Root, error)) (downloadErr error) {
 	// The server rejects this :(
 	//api.WithHeader("Accept", "application/zip")
 	//
@@ -61,6 +61,15 @@ func downloadArtifact(httpClient *http.Client, hostname string, url safeurl.Safe
 	if err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
+	destDir, err := openDestination()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := destDir.Close(); downloadErr == nil && err != nil {
+			downloadErr = err
+		}
+	}()
 	if err := ghzip.ExtractZip(zipfile, destDir); err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}

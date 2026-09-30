@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/cli/cli/v2/internal/safepaths"
 )
@@ -18,30 +17,23 @@ const (
 )
 
 // ExtractZip extracts the contents of a zip archive to destDir.
-// Files that would result in path traversal are silently skipped.
-// Files that would produce any other error cause the extraction to be aborted,
-// and the error is returned.
-func ExtractZip(zr *zip.Reader, destDir safepaths.Absolute) error {
+// Entries that would escape destDir lexically are skipped.
+func ExtractZip(zr *zip.Reader, destDir *safepaths.Root) error {
 	for _, zf := range zr.File {
-		fpath, err := destDir.Join(zf.Name)
-		if err != nil {
+		if err := extractZipFile(zf, destDir); err != nil {
 			if _, ok := errors.AsType[safepaths.PathTraversalError](err); ok {
 				continue
 			}
-			return err
-		}
-
-		if err := extractZipFile(zf, fpath); err != nil {
 			return fmt.Errorf("error extracting %q: %w", zf.Name, err)
 		}
 	}
 	return nil
 }
 
-func extractZipFile(zf *zip.File, dest safepaths.Absolute) (extractErr error) {
+func extractZipFile(zf *zip.File, dest *safepaths.Root) (extractErr error) {
 	zm := zf.Mode()
 	if zm.IsDir() {
-		extractErr = os.MkdirAll(dest.String(), dirMode)
+		extractErr = dest.MkdirAll(zf.Name, dirMode)
 		return
 	}
 
@@ -52,12 +44,8 @@ func extractZipFile(zf *zip.File, dest safepaths.Absolute) (extractErr error) {
 	}
 	defer f.Close()
 
-	if extractErr = os.MkdirAll(filepath.Dir(dest.String()), dirMode); extractErr != nil {
-		return
-	}
-
 	var df *os.File
-	if df, extractErr = os.OpenFile(dest.String(), os.O_WRONLY|os.O_CREATE|os.O_EXCL, getPerm(zm)); extractErr != nil {
+	if df, extractErr = dest.Create(zf.Name, getPerm(zm), dirMode, false); extractErr != nil {
 		return
 	}
 

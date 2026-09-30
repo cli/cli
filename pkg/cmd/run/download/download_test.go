@@ -158,7 +158,8 @@ type testArtifact struct {
 }
 
 type fakePlatform struct {
-	runs []run
+	runs        []run
+	downloadErr error
 }
 
 func (f *fakePlatform) List(runID string) ([]shared.Artifact, error) {
@@ -187,10 +188,16 @@ func (f *fakePlatform) List(runID string) ([]shared.Artifact, error) {
 	return artifacts, nil
 }
 
-func (f *fakePlatform) Download(url safeurl.SafeURL, dir safepaths.Absolute) error {
-	if err := os.MkdirAll(dir.String(), 0755); err != nil {
+func (f *fakePlatform) Download(url safeurl.SafeURL, openDestination func() (*safepaths.Root, error)) error {
+	if f.downloadErr != nil {
+		return f.downloadErr
+	}
+	dir, err := openDestination()
+	if err != nil {
 		return err
 	}
+	defer dir.Close()
+
 	// Now to be consistent, we find the artifact with the provided URL.
 	// It's a bit janky to iterate the runs, to find the right artifact
 	// rather than keying directly to it, but it allows the setup of the
@@ -200,8 +207,7 @@ func (f *fakePlatform) Download(url safeurl.SafeURL, dir safepaths.Absolute) err
 		for _, testArtifact := range run.testArtifacts {
 			if testArtifact.artifact.DownloadURL == url.String() {
 				for _, file := range testArtifact.files {
-					path := filepath.Join(dir.String(), file)
-					return os.WriteFile(path, []byte{}, 0600)
+					return dir.WriteFile(file, []byte{}, 0o600, 0o755, false)
 				}
 			}
 		}
@@ -212,12 +218,14 @@ func (f *fakePlatform) Download(url safeurl.SafeURL, dir safepaths.Absolute) err
 
 func Test_runDownload(t *testing.T) {
 	tests := []struct {
-		name          string
-		opts          DownloadOptions
-		platform      *fakePlatform
-		promptStubs   func(*prompter.MockPrompter)
-		expectedFiles []string
-		wantErr       string
+		name                   string
+		opts                   DownloadOptions
+		platform               *fakePlatform
+		promptStubs            func(*prompter.MockPrompter)
+		expectedFiles          []string
+		wantErr                string
+		wantDestinationMissing bool
+		useEmptyDestination    bool
 	}{
 		{
 			name: "download non-expired to relative directory",
@@ -268,6 +276,31 @@ func Test_runDownload(t *testing.T) {
 				filepath.Join("artifact-1", "artifact-1-file"),
 				filepath.Join("artifact-2", "artifact-2-file"),
 			},
+		},
+		{
+			name: "empty destination uses current directory",
+			opts: DownloadOptions{
+				RunID: "2345",
+				Names: []string{"artifact-1"},
+			},
+			platform: &fakePlatform{
+				runs: []run{
+					{
+						id: "2345",
+						testArtifacts: []testArtifact{
+							{
+								artifact: shared.Artifact{
+									Name:        "artifact-1",
+									DownloadURL: "http://download.com/artifact1.zip",
+								},
+								files: []string{"artifact-file"},
+							},
+						},
+					},
+				},
+			},
+			expectedFiles:       []string{"artifact-file"},
+			useEmptyDestination: true,
 		},
 		{
 			name: "download non-expired to absolute directory",
@@ -359,8 +392,9 @@ func Test_runDownload(t *testing.T) {
 		{
 			name: "no name matches",
 			opts: DownloadOptions{
-				RunID: "2345",
-				Names: []string{"artifact-3"},
+				RunID:          "2345",
+				Names:          []string{"artifact-3"},
+				DestinationDir: "missing",
 			},
 			platform: &fakePlatform{
 				runs: []run{
@@ -391,8 +425,34 @@ func Test_runDownload(t *testing.T) {
 					},
 				},
 			},
-			expectedFiles: []string{},
-			wantErr:       "no artifact matches any of the names or patterns provided",
+			expectedFiles:          []string{},
+			wantErr:                "no artifact matches any of the names or patterns provided",
+			wantDestinationMissing: true,
+		},
+		{
+			name: "download error does not create destination",
+			opts: DownloadOptions{
+				RunID:          "2345",
+				DestinationDir: "missing",
+			},
+			platform: &fakePlatform{
+				downloadErr: errors.New("transfer failed"),
+				runs: []run{
+					{
+						id: "2345",
+						testArtifacts: []testArtifact{
+							{
+								artifact: shared.Artifact{
+									Name:        "artifact-1",
+									DownloadURL: "http://download.com/artifact1.zip",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr:                "error downloading artifact-1: transfer failed",
+			wantDestinationMissing: true,
 		},
 		{
 			name: "pattern matches",
@@ -716,10 +776,16 @@ func Test_runDownload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := &tt.opts
-			if opts.DestinationDir == "" {
+			assertionDir := ""
+			if tt.useEmptyDestination {
+				t.Chdir(t.TempDir())
+				assertionDir = "."
+			} else if opts.DestinationDir == "" {
 				opts.DestinationDir = t.TempDir()
+				assertionDir = opts.DestinationDir
 			} else {
 				opts.DestinationDir = filepath.Join(t.TempDir(), opts.DestinationDir)
+				assertionDir = opts.DestinationDir
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
@@ -738,13 +804,17 @@ func Test_runDownload(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+			if tt.wantDestinationMissing {
+				assert.NoDirExists(t, opts.DestinationDir)
+				return
+			}
 
 			// Check that the exact number of files exist
-			require.Equal(t, len(tt.expectedFiles), countFilesInDirRecursively(t, opts.DestinationDir))
+			require.Equal(t, len(tt.expectedFiles), countFilesInDirRecursively(t, assertionDir))
 
 			// Then check that the exact files are correct
 			for _, name := range tt.expectedFiles {
-				require.FileExists(t, filepath.Join(opts.DestinationDir, name))
+				require.FileExists(t, filepath.Join(assertionDir, name))
 			}
 
 			assert.Equal(t, "", stdout.String())

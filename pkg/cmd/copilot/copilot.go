@@ -382,10 +382,11 @@ func extractZip(path, destDir string) error {
 	}
 	defer zipReader.Close()
 
-	absPath, err := safepaths.ParseAbsolute(destDir)
+	root, err := safepaths.OpenRoot(destDir)
 	if err != nil {
 		return err
 	}
+	defer root.Close()
 
 	// As of the time of writing, ghzip.ExtractZip will safely skip files that
 	// would result in path traversal. This is an issue for our use-case because
@@ -393,14 +394,13 @@ func extractZip(path, destDir string) error {
 	// To avoid breaking the shared ghzip.ExtractZip code that expects unsafe
 	// paths to be ignored and no error produced, we pre-validate here,
 	// producing an error if any such file is found.
-	for _, f := range zipReader.File {
-		_, err := absPath.Join(f.Name)
-		if err != nil {
+	for _, file := range zipReader.File {
+		if err := root.Validate(file.Name); err != nil {
 			return err
 		}
 	}
 
-	if err := ghzip.ExtractZip(&zipReader.Reader, absPath); err != nil {
+	if err := ghzip.ExtractZip(&zipReader.Reader, root); err != nil {
 		return err
 	}
 
@@ -417,10 +417,11 @@ func extractTarGz(r io.Reader, destDir string) error {
 	}
 	defer gzr.Close()
 
-	absDestDirPath, err := safepaths.ParseAbsolute(destDir)
+	root, err := safepaths.OpenRoot(destDir)
 	if err != nil {
 		return err
 	}
+	defer root.Close()
 
 	tr := tar.NewReader(gzr)
 	for {
@@ -431,38 +432,15 @@ func extractTarGz(r io.Reader, destDir string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read tar: %w", err)
 		}
-
-		absFilePath, err := absDestDirPath.Join(header.Name)
-		if err != nil {
+		if err := safepaths.ValidateChild(header.Name); err != nil {
 			return err
 		}
-		target := absFilePath.String()
 
 		if header.Typeflag == tar.TypeReg {
-			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-				return fmt.Errorf("failed to create parent directory: %w", err)
-			}
-			if err := extractFile(target, os.FileMode(header.Mode)&0777, tr); err != nil {
-				return err
+			if err := root.CopyFile(header.Name, tr, os.FileMode(header.Mode)&0o777, 0o755, true); err != nil {
+				return fmt.Errorf("failed to extract file: %w", err)
 			}
 		}
-	}
-	return nil
-}
-
-// extractFile creates a file at target with the given mode and copies content from r.
-func extractFile(target string, mode os.FileMode, r io.Reader) (err error) {
-	out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
-	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
-	}
-	defer func() {
-		if cerr := out.Close(); err == nil && cerr != nil {
-			err = fmt.Errorf("failed to close file: %w", cerr)
-		}
-	}()
-	if _, err := io.Copy(out, r); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
 	}
 	return nil
 }
