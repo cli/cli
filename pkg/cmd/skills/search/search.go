@@ -569,17 +569,8 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 		fmt.Fprintf(opts.IO.ErrOut, "\n%s Installing %s from %s...\n",
 			cs.Blue("::"), displayName, s.Repo)
 
-		// Use the repo-relative directory path (e.g. "skills/author/name")
-		// for disambiguation when installing namespaced skills, so the
-		// install command can resolve the exact skill without ambiguity.
-		installArg := s.SkillName
-		if s.Namespace != "" {
-			installArg = strings.TrimSuffix(s.Path, "/SKILL.md")
-		}
-
-		//nolint:gosec // arguments are from user-selected search results, not arbitrary input
-		cmd := exec.Command(opts.ExecutablePath, "skills", "install", s.Repo, installArg,
-			"--agent", host.ID, "--scope", scope)
+		//nolint:gosec // executable is the current gh binary
+		cmd := exec.Command(opts.ExecutablePath, installCommandArgs(s, host.ID, scope)...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = opts.IO.Out
 		cmd.Stderr = opts.IO.ErrOut
@@ -590,6 +581,26 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 	}
 
 	return nil
+}
+
+func installCommandArgs(skill skillResult, agent, scope string) []string {
+	// Use the repo-relative directory path (e.g. "skills/author/name")
+	// for disambiguation when installing namespaced skills, so the
+	// install command can resolve the exact skill without ambiguity.
+	installArg := skill.SkillName
+	if skill.Namespace != "" {
+		installArg = strings.TrimSuffix(skill.Path, "/SKILL.md")
+	}
+
+	return []string{
+		"skills", "install",
+		"--agent", agent,
+		"--scope", scope,
+		// Keep untrusted repository and skill-selector values after -- so
+		// they cannot be parsed as flags.
+		"--",
+		skill.Repo, installArg,
+	}
 }
 
 // relevanceScore computes a numeric ranking score for a search result.

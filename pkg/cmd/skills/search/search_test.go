@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/telemetry"
+	"github.com/cli/cli/v2/pkg/cmd/skills/install"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -459,6 +460,70 @@ func TestExtractSkillInfo(t *testing.T) {
 			gotName, gotNamespace := extractSkillInfo(tt.path)
 			assert.Equal(t, tt.wantName, gotName)
 			assert.Equal(t, tt.wantNamespace, gotNamespace)
+		})
+	}
+}
+
+func TestInstallCommandArgs(t *testing.T) {
+	tests := []struct {
+		name       string
+		resultPath string
+		wantSkill  string
+		want       []string
+	}{
+		{
+			name:       "namespaced skill",
+			resultPath: "skills/monalisa/code-review/SKILL.md",
+			wantSkill:  "skills/monalisa/code-review",
+			want: []string{
+				"skills", "install",
+				"--agent", "github-copilot",
+				"--scope", "project",
+				"--",
+				"org/repo", "skills/monalisa/code-review",
+			},
+		},
+		{
+			name:       "flag-like result path",
+			resultPath: "--option/skills/monalisa/code-review/SKILL.md",
+			wantSkill:  "--option/skills/monalisa/code-review",
+			want: []string{
+				"skills", "install",
+				"--agent", "github-copilot",
+				"--scope", "project",
+				"--",
+				"org/repo", "--option/skills/monalisa/code-review",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := deduplicateResults([]codeSearchItem{{
+				Path:       tt.resultPath,
+				Repository: codeSearchRepository{FullName: "org/repo"},
+			}})
+			require.Len(t, results, 1)
+
+			args := installCommandArgs(results[0], "github-copilot", "project")
+			assert.Equal(t, tt.want, args)
+
+			var installOpts *install.InstallOptions
+			cmd := install.NewCmdInstall(&cmdutil.Factory{}, &telemetry.NoOpService{}, func(opts *install.InstallOptions) error {
+				installOpts = opts
+				return nil
+			})
+			cmd.SetArgs(args[2:])
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+
+			_, err := cmd.ExecuteC()
+			require.NoError(t, err)
+			require.NotNil(t, installOpts)
+			assert.Equal(t, "org/repo", installOpts.SkillSource)
+			assert.Equal(t, tt.wantSkill, installOpts.SkillName)
+			assert.Equal(t, "github-copilot", installOpts.Agent)
+			assert.Equal(t, "project", installOpts.Scope)
 		})
 	}
 }
