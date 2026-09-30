@@ -1,7 +1,8 @@
 // Package shared holds what more than one gh issue artifact command needs: its
-// client, its arguments, finding a version in an edit history, the result
-// lines of commands that act on several artifacts and the checks that refuse
-// what artifacts or this version of gh don't support.
+// client, its arguments, reading new content from files, finding a version in
+// an edit history, the result lines of commands that act on several artifacts
+// and the checks that refuse what artifacts or this version of gh don't
+// support.
 package shared
 
 import (
@@ -95,9 +96,28 @@ func CheckIssue(c client.ArtifactClient, repo ghrepo.Interface, number int) erro
 		return err
 	}
 	if isPullRequest {
-		return fmt.Errorf("%s#%d is a pull request; artifacts are only supported on issues", ghrepo.FullName(repo), number)
+		return pullRequestError(repo, number)
 	}
 	return nil
+}
+
+// CheckUploadTarget is CheckIssue for a command that uploads files with
+// --attach. It refuses a pull request the same way, and its one lookup also
+// returns the repository ID and permission that attachments.NewUploader
+// checks.
+func CheckUploadTarget(c client.ArtifactClient, repo ghrepo.Interface, number int) (*client.UploadTarget, error) {
+	target, err := c.UploadTarget(repo, number)
+	if err != nil {
+		return nil, err
+	}
+	if target.IsPullRequest {
+		return nil, pullRequestError(repo, number)
+	}
+	return target, nil
+}
+
+func pullRequestError(repo ghrepo.Interface, number int) error {
+	return fmt.Errorf("%s#%d is a pull request; artifacts are only supported on issues", ghrepo.FullName(repo), number)
 }
 
 // CheckType refuses an artifact whose type this version of gh doesn't know. A
