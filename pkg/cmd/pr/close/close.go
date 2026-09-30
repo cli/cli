@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -19,6 +20,7 @@ type CloseOptions struct {
 	GitClient  *git.Client
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
+	Remotes    func() (ghContext.Remotes, error)
 
 	Finder shared.PRFinder
 
@@ -34,6 +36,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 		HttpClient: f.HttpClient,
 		GitClient:  f.GitClient,
 		Branch:     f.Branch,
+		Remotes:    f.Remotes,
 	}
 
 	cmd := &cobra.Command{
@@ -118,29 +121,37 @@ func closeRun(opts *CloseOptions) error {
 
 		if opts.DeleteLocalBranch {
 			if localBranchExists {
-				currentBranch, err := opts.Branch()
+				belongsToPR, err := localBranchBelongsToPR(opts, pr, baseRepo)
 				if err != nil {
 					return err
 				}
-
-				var branchToSwitchTo string
-				if currentBranch == pr.HeadRefName {
-					branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+				if !belongsToPR {
+					fmt.Fprintf(opts.IO.ErrOut, "%s Skipped deleting the local branch since it does not belong to the pull request repository\n", cs.WarningIcon())
+				} else {
+					currentBranch, err := opts.Branch()
 					if err != nil {
 						return err
 					}
-					err = opts.GitClient.CheckoutBranch(ctx, branchToSwitchTo)
-					if err != nil {
-						return err
+
+					var branchToSwitchTo string
+					if currentBranch == pr.HeadRefName {
+						branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+						if err != nil {
+							return err
+						}
+						err = opts.GitClient.CheckoutBranch(ctx, branchToSwitchTo)
+						if err != nil {
+							return err
+						}
 					}
-				}
 
-				if err := opts.GitClient.DeleteLocalBranch(ctx, pr.HeadRefName); err != nil {
-					return fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
-				}
+					if err := opts.GitClient.DeleteLocalBranch(ctx, pr.HeadRefName); err != nil {
+						return fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
+					}
 
-				if branchToSwitchTo != "" {
-					branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
+					if branchToSwitchTo != "" {
+						branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
+					}
 				}
 			} else {
 				fmt.Fprintf(opts.IO.ErrOut, "%s Skipped deleting the local branch since current directory is not a git repository\n", cs.WarningIcon())
@@ -161,4 +172,33 @@ func closeRun(opts *CloseOptions) error {
 	}
 
 	return nil
+}
+
+// localBranchBelongsToPR reports whether a git remote in the current repository
+// maps to the pull request's base or head repository. Name-only local branches
+// are not enough to prove ownership when closing by URL from an unrelated repo.
+func localBranchBelongsToPR(opts *CloseOptions, pr *api.PullRequest, baseRepo ghrepo.Interface) (bool, error) {
+	if opts.Remotes == nil {
+		return false, nil
+	}
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return false, nil
+	}
+	if _, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName()); err == nil {
+		return true, nil
+	}
+	headOwner := pr.HeadRepositoryOwner.Login
+	headName := ""
+	if pr.HeadRepository != nil {
+		headName = pr.HeadRepository.Name
+	} else if headOwner != "" {
+		headName = baseRepo.RepoName()
+	}
+	if headOwner != "" && headName != "" {
+		if _, err := remotes.FindByRepo(headOwner, headName); err == nil {
+			return true, nil
+		}
+	}
+	return false, nil
 }

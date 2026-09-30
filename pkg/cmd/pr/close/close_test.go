@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
@@ -19,6 +20,7 @@ import (
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // repo: either "baseOwner/baseRepo" or "baseOwner/baseRepo:defaultBranch"
@@ -60,6 +62,15 @@ func stubPR(repo, prHead string) (ghrepo.Interface, *api.PullRequest) {
 }
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithRemotes(rt, isTTY, cli, context.Remotes{
+		{
+			Remote: &git.Remote{Name: "origin"},
+			Repo:   ghrepo.New("OWNER", "REPO"),
+		},
+	})
+}
+
+func runCommandWithRemotes(rt http.RoundTripper, isTTY bool, cli string, remotes context.Remotes) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -72,6 +83,9 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		},
 		Branch: func() (string, error) {
 			return "trunk", nil
+		},
+		Remotes: func() (context.Remotes, error) {
+			return remotes, nil
 		},
 		GitClient: &git.Client{GitPath: "some/path/git"},
 	}
@@ -273,6 +287,47 @@ func TestPrClose_deleteBranch_notInGitRepo(t *testing.T) {
 		✓ Closed pull request OWNER/REPO#96 (The title of the PR)
 		! Skipped deleting the local branch since current directory is not a git repository
 		✓ Deleted branch trunk
+	`), output.Stderr())
+}
+
+func TestPrClose_deleteBranch_urlFromUnrelatedRepo(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	prURL := "https://github.com/OWNER/REPO/pull/96"
+	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:blueberries")
+	pr.Title = "The title of the PR"
+	shared.StubFinderForRunCommandStyleTests(t, prURL, pr, baseRepo)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestClose\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]any) {
+				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+			}),
+	)
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+
+	unrelatedRemotes := context.Remotes{
+		{
+			Remote: &git.Remote{Name: "origin"},
+			Repo:   ghrepo.New("OTHER", "UNRELATED"),
+		},
+	}
+	output, err := runCommandWithRemotes(http, true, prURL+` --delete-branch`, unrelatedRemotes)
+	require.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Closed pull request OWNER/REPO#96 (The title of the PR)
+		! Skipped deleting the local branch since it does not belong to the pull request repository
+		✓ Deleted branch blueberries
 	`), output.Stderr())
 }
 
