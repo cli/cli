@@ -39,6 +39,10 @@ type ArtifactClient interface {
 	// Create creates one artifact on an issue and returns it. The API doesn't
 	// return a new artifact's description.
 	Create(repo ghrepo.Interface, issueNumber int, artifactType, name, body string) (*Artifact, error)
+	// Update saves a new version of one artifact on an issue and returns the
+	// artifact. A nil name or body keeps the current one. The API can't change
+	// an artifact's type.
+	Update(repo ghrepo.Interface, issueNumber int, number int, name, body *string) (*Artifact, error)
 }
 
 // maxPageSize is the most artifacts one request asks for.
@@ -159,6 +163,33 @@ func (c *artifactClient) Create(repo ghrepo.Interface, issueNumber int, artifact
 
 	var artifact Artifact
 	if err := c.apiClient.REST(repo.RepoHost(), "POST", u.String(), bytes.NewReader(payload), &artifact); err != nil {
+		return nil, err
+	}
+	return &artifact, nil
+}
+
+// Update sends only the fields it changes, since the API keeps any field a
+// request leaves out.
+func (c *artifactClient) Update(repo ghrepo.Interface, issueNumber int, number int, name, body *string) (*Artifact, error) {
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "issues", strconv.Itoa(issueNumber), "artifacts", strconv.Itoa(number))
+	if err != nil {
+		return nil, err
+	}
+
+	fields := map[string]string{}
+	if name != nil {
+		fields["name"] = *name
+	}
+	if body != nil {
+		fields["body"] = *body
+	}
+	payload, err := json.Marshal(fields)
+	if err != nil {
+		return nil, err
+	}
+
+	var artifact Artifact
+	if err := c.apiClient.REST(repo.RepoHost(), "PATCH", u.String(), bytes.NewReader(payload), &artifact); err != nil {
 		return nil, err
 	}
 	return &artifact, nil
