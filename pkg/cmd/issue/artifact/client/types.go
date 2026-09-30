@@ -59,6 +59,19 @@ type Actor struct {
 	Login string `json:"login"`
 }
 
+// UploadTarget is what a command that uploads files with --attach learns
+// about an issue and its repository, from one lookup.
+type UploadTarget struct {
+	// IsPullRequest reports whether the number is a pull request rather than
+	// an issue.
+	IsPullRequest bool
+	// RepositoryID is the repository's REST ID, which uploads are made
+	// against, and ViewerPermission is the viewer's permission on it, such as
+	// WRITE. attachments.NewUploader checks both.
+	RepositoryID     int64
+	ViewerPermission string
+}
+
 // ArtifactWithVersions is one artifact with its edit history, as the API
 // returns a single artifact.
 type ArtifactWithVersions struct {

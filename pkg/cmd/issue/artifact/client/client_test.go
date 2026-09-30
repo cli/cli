@@ -80,6 +80,80 @@ func TestIsPullRequest(t *testing.T) {
 	}
 }
 
+func TestUploadTarget(t *testing.T) {
+	tests := []struct {
+		name     string
+		repo     ghrepo.Interface
+		response string
+		want     *UploadTarget
+		wantURL  string
+		wantErr  string
+	}{
+		{
+			name: "an issue",
+			repo: ghrepo.New("monalisa", "monas-cafe"),
+			response: `{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"__typename":"Issue","number":142,` +
+				`"repository":{"id":"R_1","name":"monas-cafe","nameWithOwner":"monalisa/monas-cafe","databaseId":1234,"viewerPermission":"WRITE"}}}}}`,
+			want:    &UploadTarget{RepositoryID: 1234, ViewerPermission: "WRITE"},
+			wantURL: "https://api.github.com/graphql",
+		},
+		{
+			name: "a pull request",
+			repo: ghrepo.New("monalisa", "monas-cafe"),
+			response: `{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"__typename":"PullRequest","number":142,` +
+				`"repository":{"id":"R_1","name":"monas-cafe","nameWithOwner":"monalisa/monas-cafe","databaseId":1234,"viewerPermission":"ADMIN"}}}}}`,
+			want:    &UploadTarget{IsPullRequest: true, RepositoryID: 1234, ViewerPermission: "ADMIN"},
+			wantURL: "https://api.github.com/graphql",
+		},
+		{
+			name: "a repository on a ghe.com host",
+			repo: ghrepo.NewWithHost("monalisa", "monas-cafe", "monas-cafe.ghe.com"),
+			response: `{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"__typename":"Issue","number":142,` +
+				`"repository":{"id":"R_1","name":"monas-cafe","nameWithOwner":"monalisa/monas-cafe","databaseId":1234,"viewerPermission":"READ"}}}}}`,
+			want:    &UploadTarget{RepositoryID: 1234, ViewerPermission: "READ"},
+			wantURL: "https://api.monas-cafe.ghe.com/graphql",
+		},
+		{
+			name: "a number that is neither",
+			repo: ghrepo.New("monalisa", "monas-cafe"),
+			response: `{"data":{"repository":{"hasIssuesEnabled":true,"issue":null}},"errors":[{"type":"NOT_FOUND",` +
+				`"message":"Could not resolve to an issue or pull request with the number of 142.","path":["repository","issue"]}]}`,
+			wantURL: "https://api.github.com/graphql",
+			wantErr: "GraphQL: Could not resolve to an issue or pull request with the number of 142. (repository.issue)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(
+				httpmock.GraphQL(`query IssueByNumber\b`),
+				httpmock.GraphQLQuery(tt.response, func(query string, vars map[string]any) {
+					assert.Contains(t, query, "databaseId")
+					assert.Contains(t, query, "viewerPermission")
+					assert.Equal(t, "monalisa", vars["owner"])
+					assert.Equal(t, "monas-cafe", vars["repo"])
+					assert.Equal(t, float64(142), vars["number"])
+				}),
+			)
+
+			c := NewArtifactClient(&http.Client{Transport: reg})
+			got, err := c.UploadTarget(tt.repo, 142)
+
+			require.Len(t, reg.Requests, 1)
+			assert.Equal(t, tt.wantURL, reg.Requests[0].URL.String())
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestList(t *testing.T) {
 	const listURL = "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts"
 	const tenancyListURL = "https://api.monas-cafe.ghe.com/repos/monalisa/monas-cafe/issues/142/artifacts"
@@ -491,6 +565,126 @@ func TestDelete(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCreate(t *testing.T) {
+	createdAt := time.Date(2026, 9, 24, 21, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name         string
+		repo         ghrepo.Interface
+		artifactType string
+		artifactName string
+		body         string
+		status       int
+		response     string
+		want         *Artifact
+		wantURL      string
+		wantErr      string
+	}{
+		{
+			name:         "creates a document and decodes the new artifact",
+			repo:         ghrepo.New("monalisa", "monas-cafe"),
+			artifactType: "generic",
+			artifactName: "signin-plan.md",
+			body:         "# Sign-in plan\n\n![Sign-in flow](./signin-flow.png)\n",
+			status:       201,
+			response: `{
+				"id": 6630,
+				"number": 6,
+				"type": "generic",
+				"name": "signin-plan.md",
+				"body": "# Sign-in plan\n\n![Sign-in flow](./signin-flow.png)\n",
+				"body_html": "<h1>Sign-in plan</h1>",
+				"creator": {"login": "monalisa", "id": 1},
+				"updated_by_actor": {"login": "monalisa", "id": 1},
+				"created_at": "2026-09-24T21:00:00Z",
+				"updated_at": "2026-09-24T21:00:00Z"
+			}`,
+			want: &Artifact{
+				ID:             6630,
+				Number:         6,
+				Type:           "generic",
+				Name:           "signin-plan.md",
+				Body:           "# Sign-in plan\n\n![Sign-in flow](./signin-flow.png)\n",
+				BodyHTML:       "<h1>Sign-in plan</h1>",
+				Creator:        &Actor{ID: 1, Login: "monalisa"},
+				UpdatedByActor: &Actor{ID: 1, Login: "monalisa"},
+				CreatedAt:      &createdAt,
+				UpdatedAt:      &createdAt,
+			},
+			wantURL: "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts",
+		},
+		{
+			name:         "creates a link",
+			repo:         ghrepo.New("monalisa", "monas-cafe"),
+			artifactType: "link",
+			artifactName: "Staging OAuth runbook",
+			body:         "https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook",
+			status:       201,
+			response:     `{"id": 6631, "number": 7, "type": "link", "name": "Staging OAuth runbook", "body": "https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook"}`,
+			want: &Artifact{
+				ID:     6631,
+				Number: 7,
+				Type:   "link",
+				Name:   "Staging OAuth runbook",
+				Body:   "https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook",
+			},
+			wantURL: "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts",
+		},
+		{
+			name:         "a repository on a ghe.com host",
+			repo:         ghrepo.NewWithHost("monalisa", "monas-cafe", "monas-cafe.ghe.com"),
+			artifactType: "plan",
+			artifactName: "Approved plan",
+			body:         "# Approved plan",
+			status:       201,
+			response:     `{"id": 6632, "number": 4, "type": "plan", "name": "Approved plan", "body": "# Approved plan"}`,
+			want:         &Artifact{ID: 6632, Number: 4, Type: "plan", Name: "Approved plan", Body: "# Approved plan"},
+			wantURL:      "https://api.monas-cafe.ghe.com/repos/monalisa/monas-cafe/issues/142/artifacts",
+		},
+		{
+			name:         "an API error is returned as the API gives it",
+			repo:         ghrepo.New("monalisa", "monas-cafe"),
+			artifactType: "generic",
+			artifactName: "Plan (1)",
+			body:         "# Sign-in plan",
+			status:       422,
+			response:     `{"message": "Validation Failed"}`,
+			wantURL:      "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts",
+			wantErr:      "HTTP 422: Validation Failed (https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(
+				httpmock.REST("POST", "repos/monalisa/monas-cafe/issues/142/artifacts"),
+				httpmock.RESTPayload(tt.status, tt.response, func(payload map[string]any) {
+					assert.Equal(t, map[string]any{
+						"type": tt.artifactType,
+						"name": tt.artifactName,
+						"body": tt.body,
+					}, payload)
+				}),
+			)
+
+			c := NewArtifactClient(&http.Client{Transport: reg})
+			got, err := c.Create(tt.repo, 142, tt.artifactType, tt.artifactName, tt.body)
+
+			require.Len(t, reg.Requests, 1)
+			assert.Equal(t, tt.wantURL, reg.Requests[0].URL.String())
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

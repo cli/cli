@@ -18,6 +18,9 @@ var _ ArtifactClient = &ArtifactClientMock{}
 //
 //		// make and configure a mocked ArtifactClient
 //		mockedArtifactClient := &ArtifactClientMock{
+//			CreateFunc: func(repo ghrepo.Interface, issueNumber int, artifactType string, name string, body string) (*Artifact, error) {
+//				panic("mock out the Create method")
+//			},
 //			DeleteFunc: func(repo ghrepo.Interface, issueNumber int, number int) error {
 //				panic("mock out the Delete method")
 //			},
@@ -30,6 +33,9 @@ var _ ArtifactClient = &ArtifactClientMock{}
 //			ListFunc: func(repo ghrepo.Interface, issueNumber int, artifactType string, limit int) ([]Artifact, error) {
 //				panic("mock out the List method")
 //			},
+//			UploadTargetFunc: func(repo ghrepo.Interface, number int) (*UploadTarget, error) {
+//				panic("mock out the UploadTarget method")
+//			},
 //		}
 //
 //		// use mockedArtifactClient in code that requires ArtifactClient
@@ -37,6 +43,9 @@ var _ ArtifactClient = &ArtifactClientMock{}
 //
 //	}
 type ArtifactClientMock struct {
+	// CreateFunc mocks the Create method.
+	CreateFunc func(repo ghrepo.Interface, issueNumber int, artifactType string, name string, body string) (*Artifact, error)
+
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(repo ghrepo.Interface, issueNumber int, number int) error
 
@@ -49,8 +58,24 @@ type ArtifactClientMock struct {
 	// ListFunc mocks the List method.
 	ListFunc func(repo ghrepo.Interface, issueNumber int, artifactType string, limit int) ([]Artifact, error)
 
+	// UploadTargetFunc mocks the UploadTarget method.
+	UploadTargetFunc func(repo ghrepo.Interface, number int) (*UploadTarget, error)
+
 	// calls tracks calls to the methods.
 	calls struct {
+		// Create holds details about calls to the Create method.
+		Create []struct {
+			// Repo is the repo argument value.
+			Repo ghrepo.Interface
+			// IssueNumber is the issueNumber argument value.
+			IssueNumber int
+			// ArtifactType is the artifactType argument value.
+			ArtifactType string
+			// Name is the name argument value.
+			Name string
+			// Body is the body argument value.
+			Body string
+		}
 		// Delete holds details about calls to the Delete method.
 		Delete []struct {
 			// Repo is the repo argument value.
@@ -87,11 +112,68 @@ type ArtifactClientMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
+		// UploadTarget holds details about calls to the UploadTarget method.
+		UploadTarget []struct {
+			// Repo is the repo argument value.
+			Repo ghrepo.Interface
+			// Number is the number argument value.
+			Number int
+		}
 	}
+	lockCreate        sync.RWMutex
 	lockDelete        sync.RWMutex
 	lockGet           sync.RWMutex
 	lockIsPullRequest sync.RWMutex
 	lockList          sync.RWMutex
+	lockUploadTarget  sync.RWMutex
+}
+
+// Create calls CreateFunc.
+func (mock *ArtifactClientMock) Create(repo ghrepo.Interface, issueNumber int, artifactType string, name string, body string) (*Artifact, error) {
+	if mock.CreateFunc == nil {
+		panic("ArtifactClientMock.CreateFunc: method is nil but ArtifactClient.Create was just called")
+	}
+	callInfo := struct {
+		Repo         ghrepo.Interface
+		IssueNumber  int
+		ArtifactType string
+		Name         string
+		Body         string
+	}{
+		Repo:         repo,
+		IssueNumber:  issueNumber,
+		ArtifactType: artifactType,
+		Name:         name,
+		Body:         body,
+	}
+	mock.lockCreate.Lock()
+	mock.calls.Create = append(mock.calls.Create, callInfo)
+	mock.lockCreate.Unlock()
+	return mock.CreateFunc(repo, issueNumber, artifactType, name, body)
+}
+
+// CreateCalls gets all the calls that were made to Create.
+// Check the length with:
+//
+//	len(mockedArtifactClient.CreateCalls())
+func (mock *ArtifactClientMock) CreateCalls() []struct {
+	Repo         ghrepo.Interface
+	IssueNumber  int
+	ArtifactType string
+	Name         string
+	Body         string
+} {
+	var calls []struct {
+		Repo         ghrepo.Interface
+		IssueNumber  int
+		ArtifactType string
+		Name         string
+		Body         string
+	}
+	mock.lockCreate.RLock()
+	calls = mock.calls.Create
+	mock.lockCreate.RUnlock()
+	return calls
 }
 
 // Delete calls DeleteFunc.
@@ -251,5 +333,41 @@ func (mock *ArtifactClientMock) ListCalls() []struct {
 	mock.lockList.RLock()
 	calls = mock.calls.List
 	mock.lockList.RUnlock()
+	return calls
+}
+
+// UploadTarget calls UploadTargetFunc.
+func (mock *ArtifactClientMock) UploadTarget(repo ghrepo.Interface, number int) (*UploadTarget, error) {
+	if mock.UploadTargetFunc == nil {
+		panic("ArtifactClientMock.UploadTargetFunc: method is nil but ArtifactClient.UploadTarget was just called")
+	}
+	callInfo := struct {
+		Repo   ghrepo.Interface
+		Number int
+	}{
+		Repo:   repo,
+		Number: number,
+	}
+	mock.lockUploadTarget.Lock()
+	mock.calls.UploadTarget = append(mock.calls.UploadTarget, callInfo)
+	mock.lockUploadTarget.Unlock()
+	return mock.UploadTargetFunc(repo, number)
+}
+
+// UploadTargetCalls gets all the calls that were made to UploadTarget.
+// Check the length with:
+//
+//	len(mockedArtifactClient.UploadTargetCalls())
+func (mock *ArtifactClientMock) UploadTargetCalls() []struct {
+	Repo   ghrepo.Interface
+	Number int
+} {
+	var calls []struct {
+		Repo   ghrepo.Interface
+		Number int
+	}
+	mock.lockUploadTarget.RLock()
+	calls = mock.calls.UploadTarget
+	mock.lockUploadTarget.RUnlock()
 	return calls
 }
