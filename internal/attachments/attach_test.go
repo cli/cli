@@ -2,6 +2,7 @@ package attachments
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -250,6 +251,255 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			require.Len(t, reg.Requests, len(tt.uploads))
 			for i := range reg.Requests {
 				assert.Equal(t, filepath.Base(tt.files[i]), reg.Requests[i].URL.Query().Get("name"))
+			}
+		})
+	}
+}
+
+func TestUploaderUploadAndAttachDocuments(t *testing.T) {
+	const (
+		url1 = "https://github.com/user-attachments/assets/1"
+		url2 = "https://github.com/user-attachments/assets/2"
+	)
+	okUpload := func(name, url string) UploadStub {
+		return UploadStub{Name: name, Status: 201, Body: `{"url":"` + url + `"}`}
+	}
+
+	type wantDocument struct {
+		markdown string
+		uploaded []string
+		appended int
+		replaced int
+		err      string
+	}
+
+	tests := []struct {
+		name  string
+		files []string
+		args  []string
+		docs  []Document
+		// Each file is stubbed by name and every stub answers once. Any other
+		// upload, such as a second one of the same file, fails the test.
+		uploads          []UploadStub
+		want             []wantDocument
+		wantErr          string
+		wantUnreferenced []string
+	}{
+		{
+			name:  "uploads a file once for every document that references it",
+			files: []string{"signin-flow.png"},
+			args:  []string{"./signin-flow.png"},
+			docs: []Document{
+				{Markdown: "# Sign-in plan\n\n![Sign-in flow](./signin-flow.png)"},
+				{Markdown: "# Barista notes\n\n![The new sign-in](./signin-flow.png)"},
+			},
+			uploads: []UploadStub{okUpload("signin-flow.png", url1)},
+			want: []wantDocument{
+				{markdown: "# Sign-in plan\n\n![Sign-in flow](" + url1 + ")", uploaded: []string{"./signin-flow.png"}, replaced: 1},
+				{markdown: "# Barista notes\n\n![The new sign-in](" + url1 + ")", uploaded: []string{"./signin-flow.png"}, replaced: 1},
+			},
+		},
+		{
+			name:  "resolves each document's references against its own directory",
+			files: []string{"plans/signin-flow.png", "notes/signin-flow.png"},
+			args:  []string{"./plans/signin-flow.png", "./notes/signin-flow.png"},
+			docs: []Document{
+				{Markdown: "![Sign-in flow](./signin-flow.png)", Dir: "plans"},
+				{Markdown: "![Sign-in flow](./signin-flow.png)", Dir: "notes"},
+			},
+			uploads: []UploadStub{okUpload("signin-flow.png", url1), okUpload("signin-flow.png", url2)},
+			want: []wantDocument{
+				{markdown: "![Sign-in flow](" + url1 + ")", uploaded: []string{"./plans/signin-flow.png"}, replaced: 1},
+				{markdown: "![Sign-in flow](" + url2 + ")", uploaded: []string{"./notes/signin-flow.png"}, replaced: 1},
+			},
+		},
+		{
+			name:  "falls back to the working directory when nothing beside a document matches",
+			files: []string{"plans/signin-flow.png", "menu-photo.png"},
+			args:  []string{"./plans/signin-flow.png", "./menu-photo.png"},
+			docs: []Document{
+				{Markdown: "![Sign-in flow](./signin-flow.png)\n\n![Menu](./menu-photo.png)", Dir: "plans"},
+				{Markdown: "![Menu](./menu-photo.png)", Dir: "notes"},
+			},
+			uploads: []UploadStub{okUpload("signin-flow.png", url1), okUpload("menu-photo.png", url2)},
+			want: []wantDocument{
+				{markdown: "![Sign-in flow](" + url1 + ")\n\n![Menu](" + url2 + ")", uploaded: []string{"./plans/signin-flow.png", "./menu-photo.png"}, replaced: 2},
+				{markdown: "![Menu](" + url2 + ")", uploaded: []string{"./menu-photo.png"}, replaced: 1},
+			},
+		},
+		{
+			name:  "refuses a file no document references before uploading anything",
+			files: []string{"signin-flow.png", "latte-art.png"},
+			args:  []string{"./signin-flow.png", "./latte-art.png"},
+			docs: []Document{
+				{Markdown: "![Sign-in flow](./signin-flow.png)"},
+				{Markdown: "![Sign-in flow](./signin-flow.png)"},
+			},
+			wantErr:          "no document references ./latte-art.png",
+			wantUnreferenced: []string{"./latte-art.png"},
+		},
+		{
+			name:  "names every file no document references, in the order they were attached",
+			files: []string{"latte-art.png", "signin-flow.png", "menu-photo.png"},
+			args:  []string{"./latte-art.png", "./signin-flow.png", "./menu-photo.png"},
+			docs: []Document{
+				{Markdown: "![Sign-in flow](./signin-flow.png)"},
+				{Markdown: "No pictures."},
+			},
+			wantErr:          "no document references ./latte-art.png, ./menu-photo.png",
+			wantUnreferenced: []string{"./latte-art.png", "./menu-photo.png"},
+		},
+		{
+			name:             "refuses every file when there is no document",
+			files:            []string{"signin-flow.png"},
+			args:             []string{"./signin-flow.png"},
+			wantErr:          "no document references ./signin-flow.png",
+			wantUnreferenced: []string{"./signin-flow.png"},
+		},
+		{
+			name:  "refuses a video embedded through a reference definition in any document",
+			files: []string{"signin-flow.png", "repro.mp4"},
+			args:  []string{"./signin-flow.png", "./repro.mp4"},
+			docs: []Document{
+				{Markdown: "![Sign-in flow](./signin-flow.png)"},
+				{Markdown: "![clip][c]\n\n[c]: ./repro.mp4"},
+			},
+			wantErr: "cannot embed a video as a reference-style image: ./repro.mp4",
+		},
+		{
+			// latte-art.png fails and menu-photo.png is never tried. Each
+			// document with either of them has the failure, and a document
+			// whose attachments all uploaded has none of its own.
+			name:  "stops at the first failure and reports it on each document it left without a URL",
+			files: []string{"signin-flow.png", "latte-art.png", "menu-photo.png"},
+			args:  []string{"./signin-flow.png", "./latte-art.png", "./menu-photo.png"},
+			docs: []Document{
+				{Markdown: "![Sign-in flow](./signin-flow.png)\n\n![Latte art](./latte-art.png)"},
+				{Markdown: "![Sign-in flow](./signin-flow.png)"},
+				{Markdown: "![Latte art](./latte-art.png)"},
+				{Markdown: "![Menu](./menu-photo.png)"},
+				{Markdown: "No pictures."},
+			},
+			uploads: []UploadStub{
+				okUpload("signin-flow.png", url1),
+				{Name: "latte-art.png", Status: 429, Body: `{"message":"Too Many Requests"}`},
+			},
+			want: []wantDocument{
+				{
+					markdown: "![Sign-in flow](" + url1 + ")\n\n![Latte art](./latte-art.png)",
+					uploaded: []string{"./signin-flow.png"},
+					replaced: 1,
+					err:      "could not upload ./latte-art.png: rate limited; wait and try again",
+				},
+				{markdown: "![Sign-in flow](" + url1 + ")", uploaded: []string{"./signin-flow.png"}, replaced: 1},
+				{markdown: "![Latte art](./latte-art.png)", err: "could not upload ./latte-art.png: rate limited; wait and try again"},
+				{markdown: "![Menu](./menu-photo.png)", err: "could not upload ./latte-art.png: rate limited; wait and try again"},
+				{markdown: "No pictures."},
+			},
+			wantErr: "could not upload ./latte-art.png: rate limited; wait and try again",
+		},
+		{
+			name:    "with one document, appends the files it does not reference",
+			files:   []string{"signin-flow.png", "landing-page.png"},
+			args:    []string{"./signin-flow.png", "./landing-page.png"},
+			docs:    []Document{{Markdown: "![Sign-in flow](./signin-flow.png)"}},
+			uploads: []UploadStub{okUpload("signin-flow.png", url1), okUpload("landing-page.png", url2)},
+			want: []wantDocument{
+				{
+					markdown: "![Sign-in flow](" + url1 + ")\n\n![landing-page](" + url2 + ")",
+					uploaded: []string{"./signin-flow.png", "./landing-page.png"},
+					appended: 1,
+					replaced: 1,
+				},
+			},
+		},
+		{
+			// A definition continued onto the next line of a blockquote is
+			// left as written, so the file is appended to the document that
+			// references it there rather than left out of every document.
+			name:  "appends a file to a document whose reference to it cannot be rewritten",
+			files: []string{"signin-flow.png"},
+			args:  []string{"./signin-flow.png"},
+			docs: []Document{
+				{Markdown: "> [flow]:\n> ./signin-flow.png\n\n![Sign-in flow][flow]"},
+				{Markdown: "![Sign-in flow](./signin-flow.png)"},
+			},
+			uploads: []UploadStub{okUpload("signin-flow.png", url1)},
+			want: []wantDocument{
+				{
+					markdown: "> [flow]:\n> ./signin-flow.png\n\n![Sign-in flow][flow]\n\n![signin-flow](" + url1 + ")",
+					uploaded: []string{"./signin-flow.png"},
+					appended: 1,
+				},
+				{markdown: "![Sign-in flow](" + url1 + ")", uploaded: []string{"./signin-flow.png"}, replaced: 1},
+			},
+		},
+		{
+			name: "leaves every document as given when nothing is attached",
+			docs: []Document{
+				{Markdown: "![Sign-in flow](./signin-flow.png)"},
+				{Markdown: "No pictures."},
+			},
+			want: []wantDocument{
+				{markdown: "![Sign-in flow](./signin-flow.png)"},
+				{markdown: "No pictures."},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			writeFiles(t, tt.files...)
+
+			assets, err := assetsFromArgs(t, tt.args...)
+			require.NoError(t, err)
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			for _, u := range tt.uploads {
+				StubUpload(reg, 1234, u.Name, u.Status, u.Body)
+			}
+			reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
+
+			results, err := testUploader(reg).UploadAndAttachDocuments(context.Background(), tt.docs, assets)
+
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tt.wantErr)
+			}
+			if tt.wantUnreferenced != nil {
+				unreferencedErr, ok := errors.AsType[*UnreferencedError](err)
+				require.True(t, ok, "want an *UnreferencedError")
+				assert.Equal(t, tt.wantUnreferenced, unreferencedErr.Paths)
+			}
+
+			// The files go up in the order they were attached.
+			require.Len(t, reg.Requests, len(tt.uploads))
+			for i, u := range tt.uploads {
+				assert.Equal(t, u.Name, reg.Requests[i].URL.Query().Get("name"))
+			}
+
+			if tt.want == nil {
+				require.Nil(t, results, "a refusal returns no results")
+				return
+			}
+			require.Len(t, results, len(tt.want))
+			for i, want := range tt.want {
+				got := results[i]
+				assert.Equal(t, want.markdown, got.Markdown)
+				var gotUploaded []string
+				for _, a := range got.Uploaded {
+					gotUploaded = append(gotUploaded, a.Path())
+				}
+				assert.Equal(t, want.uploaded, gotUploaded)
+				assert.Equal(t, want.appended, got.AppendOperations)
+				assert.Equal(t, want.replaced, got.ReplaceOperations)
+				if want.err == "" {
+					require.NoError(t, got.Err)
+				} else {
+					require.EqualError(t, got.Err, want.err)
+				}
 			}
 		})
 	}
