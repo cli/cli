@@ -25,6 +25,8 @@ type ArtifactClient interface {
 	// them, which is number order. An empty artifactType lists every type,
 	// and a limit of 0 lists every artifact.
 	List(repo ghrepo.Interface, issueNumber int, artifactType string, limit int) ([]Artifact, error)
+	// Get returns one artifact on an issue, with its edit history.
+	Get(repo ghrepo.Interface, issueNumber int, number int) (*ArtifactWithVersions, error)
 }
 
 // maxPageSize is the most artifacts one request asks for.
@@ -90,4 +92,20 @@ func (c *artifactClient) List(repo ghrepo.Interface, issueNumber int, artifactTy
 		artifacts = artifacts[:limit]
 	}
 	return artifacts, nil
+}
+
+func (c *artifactClient) Get(repo ghrepo.Interface, issueNumber int, number int) (*ArtifactWithVersions, error) {
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "issues", strconv.Itoa(issueNumber), "artifacts", strconv.Itoa(number))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Artifact Artifact  `json:"artifact"`
+		Versions []Version `json:"versions"`
+	}
+	if err := c.apiClient.REST(repo.RepoHost(), "GET", u.String(), nil, &response); err != nil {
+		return nil, err
+	}
+	return &ArtifactWithVersions{Artifact: response.Artifact, Versions: response.Versions}, nil
 }

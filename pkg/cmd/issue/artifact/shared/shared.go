@@ -1,11 +1,14 @@
-// Package shared holds what every gh issue artifact command needs before it
-// reaches an artifact: its client, its issue argument and the checks that
-// refuse what artifacts don't support.
+// Package shared holds what more than one gh issue artifact command needs: its
+// client, its arguments and the checks that refuse what artifacts or this
+// version of gh don't support.
 package shared
 
 import (
 	"errors"
 	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
@@ -44,6 +47,16 @@ func ParseIssueArg(arg string, baseRepo func() (ghrepo.Interface, error)) (int, 
 	return number, baseRepo, nil
 }
 
+// ParseArtifactNumber reads an <artifact-number> argument, which must be a
+// whole number of at least 1, so a mistyped number fails before any request.
+func ParseArtifactNumber(arg string) (int, error) {
+	number, err := strconv.Atoi(arg)
+	if err != nil || number < 1 {
+		return 0, fmt.Errorf("invalid artifact number: %q", arg)
+	}
+	return number, nil
+}
+
 // CheckHost refuses GitHub Enterprise Server, which doesn't support issue
 // artifacts. Callers run it before any request, so the user gets this reason
 // instead of an API error. ghe.com hosts pass.
@@ -65,4 +78,35 @@ func CheckIssue(c client.ArtifactClient, repo ghrepo.Interface, number int) erro
 		return fmt.Errorf("%s#%d is a pull request; artifacts are only supported on issues", ghrepo.FullName(repo), number)
 	}
 	return nil
+}
+
+// CheckType refuses an artifact whose type this version of gh doesn't know. A
+// new type can need handling gh doesn't have, so commands whose behavior
+// depends on the type refuse it instead of guessing. Commands that work the
+// same for every type, such as list, don't call it.
+func CheckType(a client.Artifact) error {
+	switch a.Type {
+	case client.TypeGeneric, client.TypePlan, client.TypeLink:
+		return nil
+	}
+	return fmt.Errorf("artifact %d has type %q, which this version of gh doesn't support; upgrade gh", a.Number, a.Type)
+}
+
+// HTTPURL returns value with surrounding whitespace trimmed, and whether it is
+// an http(s) URL: an absolute http or https URL with a host, in printable
+// ASCII with no spaces. Artifact commands use this one check wherever they read
+// or write a link. It is stricter than the server's because links are also
+// stored in Internet Shortcut files, whose URL= line can't hold anything else.
+func HTTPURL(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+	for i := 0; i < len(trimmed); i++ {
+		if trimmed[i] <= ' ' || trimmed[i] > '~' {
+			return "", false
+		}
+	}
+	u, err := url.Parse(trimmed)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		return "", false
+	}
+	return trimmed, true
 }
