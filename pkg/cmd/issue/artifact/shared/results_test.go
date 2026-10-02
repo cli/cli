@@ -120,6 +120,59 @@ func TestPrintSkip(t *testing.T) {
 	}
 }
 
+func TestPrintUnchanged(t *testing.T) {
+	tests := []struct {
+		name       string
+		tty        bool
+		color      bool
+		result     Result
+		message    string
+		reason     string
+		wantStdout string
+		wantStderr string
+	}{
+		{
+			name:       "in a terminal, the warning goes to stderr, and stdout stays empty",
+			tty:        true,
+			result:     Result{Number: 2, Name: "OAuth callback plan"},
+			message:    "Artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142 already matches version 12",
+			reason:     "already matches version 12",
+			wantStderr: "! Artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142 already matches version 12\n",
+		},
+		{
+			name:       "colors in a terminal",
+			tty:        true,
+			color:      true,
+			result:     Result{Number: 2, Name: "OAuth callback plan"},
+			message:    "Artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142 already matches version 12",
+			reason:     "already matches version 12",
+			wantStderr: "\x1b[0;33m!\x1b[0m Artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142 already matches version 12\n",
+		},
+		{
+			name:       "piped, a skipped line with the reason goes to stdout",
+			result:     Result{Number: 2, Name: "OAuth callback plan"},
+			message:    "Artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142 already matches version 12",
+			reason:     "already matches version 12",
+			wantStdout: "skipped\t2\tOAuth callback plan\t\talready matches version 12\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+			ios.SetColorEnabled(tt.color)
+
+			PrintUnchanged(ios, tt.result, tt.message, tt.reason)
+
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
+		})
+	}
+}
+
 func TestPrintFailure(t *testing.T) {
 	artifactURL := func(number string) *url.URL {
 		u, err := url.Parse("https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/" + number)
