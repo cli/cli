@@ -482,7 +482,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Long: heredoc.Docf(`
 					This command will take over your terminal and run a fully interactive
 					interface for browsing, adding, and removing gh extensions. A terminal
-					width greater than 100 columns is recommended.
+					width greater than 100 columns is recommended. Narrow terminals
+					automatically use a single-column layout.
 
 					To learn how to control this interface, press %[1]s?%[1]s after running to see
 					the help text.

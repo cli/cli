@@ -1,0 +1,617 @@
+package browse
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/extensions"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestBrowseModelMovesSelectionDown(t *testing.T) {
+	t.Parallel()
+
+	// Given a catalog with two extensions and the first extension selected
+	model := newBrowseModel(ExtBrowseOpts{}, []extEntry{
+		{FullName: "cli/gh-cool", description: "terminal tools"},
+		{FullName: "octo/gh-triage", description: "issue management"},
+	})
+
+	// When the user presses j
+	updated, _ := model.Update(keyPress('j'))
+
+	// Then the next extension is selected
+	got, ok := updated.(*browseModel)
+	require.True(t, ok, "expected the updated model to remain a browse model")
+	selected, ok := got.selectedEntry()
+	require.True(t, ok, "expected an extension to remain selected")
+	assert.Equal(t, "octo/gh-triage", selected.FullName)
+}
+
+func TestBrowseModelMovesSelectionDownOnePage(t *testing.T) {
+	t.Parallel()
+
+	// Given more extensions than fit in the visible list
+	entries := make([]extEntry, 10)
+	for i := range entries {
+		entries[i].FullName = "octo/gh-extension-" + string(rune('a'+i))
+	}
+	model := newBrowseModel(ExtBrowseOpts{}, entries)
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 120, Height: 10})
+
+	// When the user presses Space
+	updateBrowseModel(t, model, specialKey(tea.KeySpace, 0))
+
+	// Then the selection advances by one visible page
+	selected, ok := model.selectedEntry()
+	require.True(t, ok, "expected an extension to remain selected")
+	assert.Equal(t, "octo/gh-extension-d", selected.FullName)
+}
+
+func TestBrowseModelQuitsOnControlCWhileFiltering(t *testing.T) {
+	t.Parallel()
+
+	// Given the filter input has focus
+	model := newBrowseModel(ExtBrowseOpts{}, []extEntry{{FullName: "cli/gh-cool"}})
+	updateBrowseModel(t, model, keyPress('/'))
+
+	// When the user presses Ctrl+C
+	cmd := updateBrowseModel(t, model, specialKey('c', tea.ModCtrl))
+
+	// Then the Bubble Tea program receives a quit message
+	require.NotNil(t, cmd)
+	_, ok := cmd().(tea.QuitMsg)
+	assert.True(t, ok, "expected Ctrl+C to quit the extension browser")
+}
+
+func TestBrowseModelKeepsMainViewWithinTerminalHeight(t *testing.T) {
+	t.Parallel()
+
+	// Given extension descriptions and README lines are wider than their panes
+	model := newBrowseModel(ExtBrowseOpts{
+		Rg: readmeLoaderStub{
+			content: map[string]string{"cli/gh-cool": strings.Repeat("code", 80)},
+		},
+		renderReadme: func(markdown string, width int) (string, error) {
+			return markdown, nil
+		},
+	}, []extEntry{
+		{
+			FullName:    "cli/gh-cool",
+			description: strings.Repeat("description ", 30),
+		},
+	})
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 120, Height: 10})
+	cmd := model.Init()
+	require.NotNil(t, cmd)
+	updateBrowseModel(t, model, cmd())
+
+	// When the main view is rendered
+	view := model.View().Content
+
+	// Then wrapping does not push content beyond the terminal height
+	assert.LessOrEqual(t, strings.Count(view, "\n")+1, 10)
+}
+
+func TestBrowseModelKeepsFooterWithinTerminalWidth(t *testing.T) {
+	t.Parallel()
+
+	// Given the extension browser is displayed in a narrow terminal
+	model := newBrowseModel(ExtBrowseOpts{}, []extEntry{{FullName: "cli/gh-cool"}})
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 60, Height: 20})
+
+	// When the main view is rendered
+	view := model.View().Content
+
+	// Then every line fits within the terminal width
+	for line := range strings.SplitSeq(view, "\n") {
+		assert.LessOrEqual(t, lipgloss.Width(line), 60)
+	}
+}
+
+func TestBrowseModelFiltersExtensions(t *testing.T) {
+	t.Parallel()
+
+	// Given a catalog with extensions that have different names and descriptions
+	model := newBrowseModel(ExtBrowseOpts{}, []extEntry{
+		{FullName: "cli/gh-cool", description: "terminal tools"},
+		{FullName: "octo/gh-triage", description: "issue management"},
+	})
+
+	// When the user focuses the filter and enters cool
+	updateBrowseModel(t, model, keyPress('/'))
+	for _, r := range "cool" {
+		updateBrowseModel(t, model, keyPress(r))
+	}
+
+	// Then only the matching extension is displayed
+	view := model.View().Content
+	assert.Contains(t, view, "cli/gh-cool")
+	assert.NotContains(t, view, "octo/gh-triage")
+}
+
+func TestBrowseModelLoadsReadmeForFilteredSelection(t *testing.T) {
+	t.Parallel()
+
+	// Given the first extension README is displayed and another extension matches a filter
+	model := newBrowseModel(ExtBrowseOpts{
+		Rg: readmeLoaderStub{
+			content: map[string]string{
+				"cli/gh-cool":    "# Cool README",
+				"octo/gh-triage": "# Triage README",
+			},
+		},
+		renderReadme: func(markdown string, width int) (string, error) {
+			return markdown, nil
+		},
+	}, []extEntry{
+		{FullName: "cli/gh-cool", description: "terminal tools"},
+		{FullName: "octo/gh-triage", description: "issue management"},
+	})
+	initialLoad := model.Init()
+	require.NotNil(t, initialLoad)
+	updateBrowseModel(t, model, initialLoad())
+
+	// When the user filters the catalog by triage
+	updateBrowseModel(t, model, keyPress('/'))
+	var readmeLoad tea.Cmd
+	for _, r := range "triage" {
+		if cmd := updateBrowseModel(t, model, keyPress(r)); cmd != nil {
+			readmeLoad = cmd
+		}
+	}
+
+	// Then the newly selected extension README replaces the previous preview
+	require.NotNil(t, readmeLoad)
+	updateBrowseModel(t, model, readmeLoad())
+	view := model.View().Content
+	assert.Contains(t, view, "# Triage README")
+	assert.NotContains(t, view, "# Cool README")
+}
+
+func TestBrowseModelShowsKeyboardHelp(t *testing.T) {
+	t.Parallel()
+
+	// Given the main extension catalog is displayed
+	model := newBrowseModel(ExtBrowseOpts{}, []extEntry{
+		{FullName: "cli/gh-cool", description: "terminal tools"},
+	})
+
+	// When the user presses ?
+	updateBrowseModel(t, model, keyPress('?'))
+
+	// Then the interface displays the available control groups
+	view := model.View().Content
+	assert.Contains(t, view, "Application")
+	assert.Contains(t, view, "Navigation")
+	assert.Contains(t, view, "Extension Management")
+	assert.Contains(t, view, "Filtering")
+	assert.Contains(t, view, "Readmes")
+}
+
+func TestBrowseModelPreviewsSelectedReadme(t *testing.T) {
+	t.Parallel()
+
+	// Given a wide terminal and an extension with an available README
+	model := newBrowseModel(ExtBrowseOpts{
+		Rg: readmeLoaderStub{
+			content: map[string]string{"cli/gh-cool": "# Cool README"},
+		},
+		renderReadme: func(markdown string, width int) (string, error) {
+			return "rendered: " + markdown, nil
+		},
+	}, []extEntry{
+		{FullName: "cli/gh-cool", description: "terminal tools"},
+	})
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	// When the initial README load completes
+	cmd := model.Init()
+	require.NotNil(t, cmd)
+	updateBrowseModel(t, model, cmd())
+
+	// Then the rendered README is displayed beside the extension list
+	view := model.View().Content
+	assert.Contains(t, view, "cli/gh-cool")
+	assert.Contains(t, view, "rendered: # Cool README")
+}
+
+func TestBrowseModelIgnoresStaleReadmeResult(t *testing.T) {
+	t.Parallel()
+
+	// Given README loads are pending for two different selections
+	model := newBrowseModel(ExtBrowseOpts{
+		Rg: readmeLoaderStub{
+			content: map[string]string{
+				"cli/gh-cool":    "# Cool README",
+				"octo/gh-triage": "# Triage README",
+			},
+		},
+		renderReadme: func(markdown string, width int) (string, error) {
+			return markdown, nil
+		},
+	}, []extEntry{
+		{FullName: "cli/gh-cool"},
+		{FullName: "octo/gh-triage"},
+	})
+	firstLoad := model.Init()
+	require.NotNil(t, firstLoad)
+	secondLoad := updateBrowseModel(t, model, keyPress('j'))
+	require.NotNil(t, secondLoad)
+
+	// When the newer load completes before the older load
+	updateBrowseModel(t, model, secondLoad())
+	updateBrowseModel(t, model, firstLoad())
+
+	// Then the preview still displays the currently selected extension README
+	view := model.View().Content
+	assert.Contains(t, view, "# Triage README")
+	assert.NotContains(t, view, "# Cool README")
+}
+
+func TestBrowseModelRerendersReadmeLoadedDuringResize(t *testing.T) {
+	t.Parallel()
+
+	// Given the initial README load started before the terminal size was known
+	model := newBrowseModel(ExtBrowseOpts{
+		Rg: readmeLoaderStub{
+			content: map[string]string{"cli/gh-cool": "# Cool README"},
+		},
+		renderReadme: func(markdown string, width int) (string, error) {
+			return fmt.Sprintf("width:%d", width), nil
+		},
+	}, []extEntry{
+		{FullName: "cli/gh-cool"},
+	})
+	initialLoad := model.Init()
+	require.NotNil(t, initialLoad)
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 200, Height: 30})
+
+	// When the initial load completes with content rendered for the old width
+	rerender := updateBrowseModel(t, model, initialLoad())
+
+	// Then the README is rerendered for the current preview width
+	require.NotNil(t, rerender)
+	updateBrowseModel(t, model, rerender())
+	assert.Contains(t, model.View().Content, "width:99")
+}
+
+func TestBrowseModelRendersFullScreenReadmeAtTerminalWidth(t *testing.T) {
+	t.Parallel()
+
+	// Given the selected README is loaded in the two-column layout
+	model := newBrowseModel(ExtBrowseOpts{
+		Rg: readmeLoaderStub{
+			content: map[string]string{"cli/gh-cool": "# Cool README"},
+		},
+		renderReadme: func(markdown string, width int) (string, error) {
+			return fmt.Sprintf("width:%d", width), nil
+		},
+	}, []extEntry{{FullName: "cli/gh-cool"}})
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 120, Height: 30})
+	load := model.Init()
+	require.NotNil(t, load)
+	updateBrowseModel(t, model, load())
+
+	// When the user opens the README full screen
+	rerender := updateBrowseModel(t, model, specialKey(tea.KeyEnter, 0))
+
+	// Then the README is rerendered at the full terminal width
+	require.NotNil(t, rerender)
+	updateBrowseModel(t, model, rerender())
+	assert.Contains(t, model.View().Content, "width:120")
+}
+
+func TestBrowseModelUsesSingleColumnInNarrowTerminal(t *testing.T) {
+	t.Parallel()
+
+	// Given a loaded README and a terminal too narrow for two useful columns
+	model := newBrowseModel(ExtBrowseOpts{
+		Rg: readmeLoaderStub{
+			content: map[string]string{"cli/gh-cool": "# Cool README"},
+		},
+		renderReadme: func(markdown string, width int) (string, error) {
+			return markdown, nil
+		},
+	}, []extEntry{
+		{FullName: "cli/gh-cool"},
+	})
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	// When the initial README load completes
+	cmd := model.Init()
+	require.NotNil(t, cmd)
+	updateBrowseModel(t, model, cmd())
+
+	// Then the main view displays the extension list without a side-by-side README
+	view := model.View().Content
+	assert.Contains(t, view, "cli/gh-cool")
+	assert.NotContains(t, view, "# Cool README")
+}
+
+func TestBrowseModelOpensReadmeFromSingleColumn(t *testing.T) {
+	t.Parallel()
+
+	// Given the single-column catalog has loaded the selected extension README
+	model := newBrowseModel(ExtBrowseOpts{
+		SingleColumn: true,
+		Rg: readmeLoaderStub{
+			content: map[string]string{"cli/gh-cool": "# Cool README"},
+		},
+		renderReadme: func(markdown string, width int) (string, error) {
+			return markdown, nil
+		},
+	}, []extEntry{
+		{FullName: "cli/gh-cool"},
+	})
+	cmd := model.Init()
+	require.NotNil(t, cmd)
+	updateBrowseModel(t, model, cmd())
+
+	// When the user presses Enter
+	updateBrowseModel(t, model, specialKey(tea.KeyEnter, 0))
+
+	// Then the selected README is displayed full screen
+	assert.Contains(t, model.View().Content, "# Cool README")
+}
+
+func TestBrowseModelShowsReadmeFailure(t *testing.T) {
+	t.Parallel()
+
+	// Given the selected extension README is unavailable
+	model := newBrowseModel(ExtBrowseOpts{
+		Rg: readmeLoaderStub{
+			errs: map[string]error{"cli/gh-cool": errors.New("not found")},
+		},
+	}, []extEntry{
+		{FullName: "cli/gh-cool", description: "terminal tools"},
+	})
+
+	// When the initial README load fails
+	cmd := model.Init()
+	require.NotNil(t, cmd)
+	updateBrowseModel(t, model, cmd())
+
+	// Then the interface displays a visible README error
+	assert.Contains(t, model.View().Content, "unable to fetch readme :(")
+}
+
+func TestBrowseModelShowsBrowserFailure(t *testing.T) {
+	t.Parallel()
+
+	// Given the selected extension repository cannot be opened in a browser
+	browser := &browserStub{err: errors.New("browser unavailable")}
+	model := newBrowseModel(ExtBrowseOpts{
+		Browser: browser,
+	}, []extEntry{
+		{
+			FullName: "cli/gh-cool",
+			URL:      "https://github.com/cli/gh-cool",
+		},
+	})
+
+	// When the user presses w and the browser command completes
+	cmd := updateBrowseModel(t, model, keyPress('w'))
+	require.NotNil(t, cmd)
+	updateBrowseModel(t, model, cmd())
+
+	// Then the attempted URL and visible failure identify the selected extension
+	assert.Equal(t, "https://github.com/cli/gh-cool", browser.url)
+	assert.Contains(t, model.View().Content, "could not open browser for 'https://github.com/cli/gh-cool'")
+}
+
+func TestBrowseModelClearsTransientStatusOnNextInteraction(t *testing.T) {
+	t.Parallel()
+
+	// Given a completed browser action is displayed in the status line
+	model := newBrowseModel(ExtBrowseOpts{
+		Browser: &browserStub{},
+	}, []extEntry{
+		{FullName: "cli/gh-cool", URL: "https://github.com/cli/gh-cool"},
+		{FullName: "octo/gh-triage", URL: "https://github.com/octo/gh-triage"},
+	})
+	open := updateBrowseModel(t, model, keyPress('w'))
+	require.NotNil(t, open)
+	updateBrowseModel(t, model, open())
+	assert.Contains(t, model.View().Content, "Opened https://github.com/cli/gh-cool")
+
+	// When the user moves to another extension
+	updateBrowseModel(t, model, keyPress('j'))
+
+	// Then the normal keyboard help replaces the stale action status
+	view := model.View().Content
+	assert.NotContains(t, view, "Opened https://github.com/cli/gh-cool")
+	assert.Contains(t, view, "? help")
+}
+
+func TestBrowseModelForwardsCursorMessagesWhileFiltering(t *testing.T) {
+	t.Parallel()
+
+	// Given focusing the filter schedules its initial cursor message
+	model := newBrowseModel(ExtBrowseOpts{}, []extEntry{{FullName: "cli/gh-cool"}})
+	focus := updateBrowseModel(t, model, keyPress('/'))
+	require.NotNil(t, focus)
+
+	// When the cursor message is delivered
+	cursorCommand := updateBrowseModel(t, model, focus())
+
+	// Then the text input schedules its cursor blink
+	assert.NotNil(t, cursorCommand)
+}
+
+func TestBrowseModelInstallsSelectedExtension(t *testing.T) {
+	t.Parallel()
+
+	// Given an extension is selected and not installed
+	manager := &extensions.ExtensionManagerMock{
+		InstallFunc: func(repo ghrepo.Interface, _ string) error {
+			assert.Equal(t, "cli/gh-cool", ghrepo.FullName(repo))
+			return nil
+		},
+	}
+	model := newBrowseModel(ExtBrowseOpts{
+		Em: manager,
+	}, []extEntry{
+		{
+			Name:     "gh-cool",
+			FullName: "cli/gh-cool",
+		},
+	})
+
+	// When the user presses i and installation completes
+	cmd := updateBrowseModel(t, model, keyPress('i'))
+	require.NotNil(t, cmd)
+	assert.Contains(t, model.View().Content, "Installing cli/gh-cool...")
+	updateBrowseModel(t, model, cmd())
+
+	// Then the extension is visibly marked as installed
+	assert.Contains(t, model.View().Content, "Installed cli/gh-cool!")
+	assert.Contains(t, model.View().Content, "(installed)")
+}
+
+func TestBrowseModelDoesNotStartDuplicateInstall(t *testing.T) {
+	t.Parallel()
+
+	// Given installation of the selected extension is already in progress
+	model := newBrowseModel(ExtBrowseOpts{
+		Em: &extensions.ExtensionManagerMock{
+			InstallFunc: func(ghrepo.Interface, string) error {
+				return nil
+			},
+		},
+	}, []extEntry{
+		{Name: "gh-cool", FullName: "cli/gh-cool"},
+	})
+	firstInstall := updateBrowseModel(t, model, keyPress('i'))
+	require.NotNil(t, firstInstall)
+
+	// When the user presses i again before installation completes
+	secondInstall := updateBrowseModel(t, model, keyPress('i'))
+
+	// Then no duplicate installation command is started
+	assert.Nil(t, secondInstall)
+}
+
+func TestBrowseModelRemovesSelectedExtension(t *testing.T) {
+	t.Parallel()
+
+	// Given an installed extension is selected
+	manager := &extensions.ExtensionManagerMock{
+		RemoveFunc: func(name string) error {
+			assert.Equal(t, "cool", name)
+			return nil
+		},
+	}
+	model := newBrowseModel(ExtBrowseOpts{
+		Em: manager,
+	}, []extEntry{
+		{
+			Name:      "gh-cool",
+			FullName:  "cli/gh-cool",
+			Installed: true,
+		},
+	})
+
+	// When the user presses r and removal completes
+	cmd := updateBrowseModel(t, model, keyPress('r'))
+	require.NotNil(t, cmd)
+	assert.Contains(t, model.View().Content, "Removing cli/gh-cool...")
+	updateBrowseModel(t, model, cmd())
+
+	// Then the extension is visibly marked as removed
+	assert.Contains(t, model.View().Content, "Removed cli/gh-cool!")
+	assert.NotContains(t, model.View().Content, "(installed)")
+}
+
+func TestBrowseModelKeepsExtensionUninstalledWhenInstallationFails(t *testing.T) {
+	t.Parallel()
+
+	// Given installation of the selected extension will fail
+	manager := &extensions.ExtensionManagerMock{
+		InstallFunc: func(ghrepo.Interface, string) error {
+			return errors.New("permission denied")
+		},
+	}
+	model := newBrowseModel(ExtBrowseOpts{Em: manager}, []extEntry{
+		{Name: "gh-cool", FullName: "cli/gh-cool"},
+	})
+
+	// When the user presses i and installation fails
+	cmd := updateBrowseModel(t, model, keyPress('i'))
+	require.NotNil(t, cmd)
+	updateBrowseModel(t, model, cmd())
+
+	// Then the error is visible and the extension remains uninstalled
+	view := model.View().Content
+	assert.Contains(t, view, "failed to install cli/gh-cool: permission denied")
+	assert.NotContains(t, view, "(installed)")
+}
+
+func TestBrowseModelKeepsExtensionInstalledWhenRemovalFails(t *testing.T) {
+	t.Parallel()
+
+	// Given removal of the selected installed extension will fail
+	manager := &extensions.ExtensionManagerMock{
+		RemoveFunc: func(string) error {
+			return errors.New("permission denied")
+		},
+	}
+	model := newBrowseModel(ExtBrowseOpts{Em: manager}, []extEntry{
+		{Name: "gh-cool", FullName: "cli/gh-cool", Installed: true},
+	})
+
+	// When the user presses r and removal fails
+	cmd := updateBrowseModel(t, model, keyPress('r'))
+	require.NotNil(t, cmd)
+	updateBrowseModel(t, model, cmd())
+
+	// Then the error is visible and the extension remains installed
+	view := model.View().Content
+	assert.Contains(t, view, "failed to remove cli/gh-cool: permission denied")
+	assert.Contains(t, view, "(installed)")
+}
+
+func keyPress(r rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: r, Text: string(r)}
+}
+
+func specialKey(code rune, mod tea.KeyMod) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: code, Mod: mod}
+}
+
+func updateBrowseModel(t *testing.T, model *browseModel, msg tea.Msg) tea.Cmd {
+	t.Helper()
+	updated, cmd := model.Update(msg)
+	got, ok := updated.(*browseModel)
+	require.True(t, ok, "expected the updated model to remain a browse model")
+	require.Same(t, model, got)
+	return cmd
+}
+
+type readmeLoaderStub struct {
+	content map[string]string
+	errs    map[string]error
+}
+
+type browserStub struct {
+	url string
+	err error
+}
+
+func (s *browserStub) Browse(url string) error {
+	s.url = url
+	return s.err
+}
+
+func (s readmeLoaderStub) Get(fullName string) (string, error) {
+	if err := s.errs[fullName]; err != nil {
+		return "", err
+	}
+	return s.content[fullName], nil
+}
