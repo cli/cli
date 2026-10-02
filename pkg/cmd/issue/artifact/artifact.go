@@ -4,6 +4,7 @@ package artifact
 
 import (
 	"github.com/MakeNowJust/heredoc"
+	cmdDelete "github.com/cli/cli/v2/pkg/cmd/issue/artifact/delete"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/issue/artifact/list"
 	cmdView "github.com/cli/cli/v2/pkg/cmd/issue/artifact/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -26,6 +27,7 @@ func NewCmdArtifact(f *cmdutil.Factory) *cobra.Command {
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
+	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
 
 	return cmd
 }

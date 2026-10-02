@@ -18,6 +18,9 @@ var _ ArtifactClient = &ArtifactClientMock{}
 //
 //		// make and configure a mocked ArtifactClient
 //		mockedArtifactClient := &ArtifactClientMock{
+//			DeleteFunc: func(repo ghrepo.Interface, issueNumber int, number int) error {
+//				panic("mock out the Delete method")
+//			},
 //			GetFunc: func(repo ghrepo.Interface, issueNumber int, number int) (*ArtifactWithVersions, error) {
 //				panic("mock out the Get method")
 //			},
@@ -34,6 +37,9 @@ var _ ArtifactClient = &ArtifactClientMock{}
 //
 //	}
 type ArtifactClientMock struct {
+	// DeleteFunc mocks the Delete method.
+	DeleteFunc func(repo ghrepo.Interface, issueNumber int, number int) error
+
 	// GetFunc mocks the Get method.
 	GetFunc func(repo ghrepo.Interface, issueNumber int, number int) (*ArtifactWithVersions, error)
 
@@ -45,6 +51,15 @@ type ArtifactClientMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// Delete holds details about calls to the Delete method.
+		Delete []struct {
+			// Repo is the repo argument value.
+			Repo ghrepo.Interface
+			// IssueNumber is the issueNumber argument value.
+			IssueNumber int
+			// Number is the number argument value.
+			Number int
+		}
 		// Get holds details about calls to the Get method.
 		Get []struct {
 			// Repo is the repo argument value.
@@ -73,9 +88,50 @@ type ArtifactClientMock struct {
 			Limit int
 		}
 	}
+	lockDelete        sync.RWMutex
 	lockGet           sync.RWMutex
 	lockIsPullRequest sync.RWMutex
 	lockList          sync.RWMutex
+}
+
+// Delete calls DeleteFunc.
+func (mock *ArtifactClientMock) Delete(repo ghrepo.Interface, issueNumber int, number int) error {
+	if mock.DeleteFunc == nil {
+		panic("ArtifactClientMock.DeleteFunc: method is nil but ArtifactClient.Delete was just called")
+	}
+	callInfo := struct {
+		Repo        ghrepo.Interface
+		IssueNumber int
+		Number      int
+	}{
+		Repo:        repo,
+		IssueNumber: issueNumber,
+		Number:      number,
+	}
+	mock.lockDelete.Lock()
+	mock.calls.Delete = append(mock.calls.Delete, callInfo)
+	mock.lockDelete.Unlock()
+	return mock.DeleteFunc(repo, issueNumber, number)
+}
+
+// DeleteCalls gets all the calls that were made to Delete.
+// Check the length with:
+//
+//	len(mockedArtifactClient.DeleteCalls())
+func (mock *ArtifactClientMock) DeleteCalls() []struct {
+	Repo        ghrepo.Interface
+	IssueNumber int
+	Number      int
+} {
+	var calls []struct {
+		Repo        ghrepo.Interface
+		IssueNumber int
+		Number      int
+	}
+	mock.lockDelete.RLock()
+	calls = mock.calls.Delete
+	mock.lockDelete.RUnlock()
+	return calls
 }
 
 // Get calls GetFunc.
