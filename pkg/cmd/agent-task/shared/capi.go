@@ -32,7 +32,7 @@ func CapiClientFunc(f *cmdutil.Factory) func() (capi.CapiClient, error) {
 
 		authCfg := cfg.Authentication()
 		host, _ := authCfg.DefaultHost()
-		token, _ := authCfg.ActiveToken(host)
+		token := authCfg.ActiveToken(host).Token
 
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Minute*10)
 		capiBaseURL, err := resolveCapiURL(cachedClient, host)

@@ -10,6 +10,8 @@
 package gh
 
 import (
+	"time"
+
 	o "github.com/cli/cli/v2/pkg/option"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
@@ -132,6 +134,47 @@ var TokenTypes = []TokenType{
 	TokenTypeRefresh,
 }
 
+// Credential is a resolved authentication token together with its source and, when the token is refreshable, the OAuth
+// refresh metadata. It is a single universal shape so a caller can inspect a resolved token without needing to know in
+// advance whether it is refreshable: Token and Source are always meaningful, while the refresh fields are zero for a
+// non-refreshable token.
+type Credential struct {
+	// Source identifies where the token came from, such as an environment variable, the config file, or the keyring.
+	Source string
+	// Token is the token gh would present to the API. For a refreshable credential it is the current access token.
+	Token string
+	// RefreshToken is the OAuth refresh token, set only for a refreshable credential.
+	RefreshToken string
+	// ExpiresIn is the access token lifetime in seconds as reported by the issuer, or zero when unknown.
+	ExpiresIn int
+	// RefreshTokenExpiresIn is the refresh token lifetime in seconds as reported by the issuer, or zero when unknown.
+	RefreshTokenExpiresIn int
+	// ExpiresAt is the absolute access token expiry, or nil when unknown or non-expiring.
+	ExpiresAt *time.Time
+	// RefreshTokenExpiresAt is the absolute refresh token expiry, or nil when unknown or non-expiring.
+	RefreshTokenExpiresAt *time.Time
+}
+
+// IsRefreshable reports whether the credential carries a refresh token and can therefore be renewed by gh.
+func (c Credential) IsRefreshable() bool {
+	return c.RefreshToken != ""
+}
+
+// Token source values name the origins that gh itself records in a Credential's Source. Tokens supplied through
+// environment variables are labeled dynamically by go-gh (for example GH_TOKEN) and are intentionally not enumerated
+// here.
+const (
+	// TokenSourceKeyring indicates the token was read from the system keyring, gh's secure storage.
+	TokenSourceKeyring = "keyring"
+	// TokenSourceOAuthToken indicates the token was read from the oauth_token entry in the config file.
+	TokenSourceOAuthToken = "oauth_token"
+	// TokenSourceRefreshableOAuthToken indicates the token was read from the refreshable_oauth_token entry in the
+	// config file, which holds a refreshable credential and is kept distinct from the non-expiring oauth_token entry.
+	TokenSourceRefreshableOAuthToken = "refreshable_oauth_token"
+	// TokenSourceDefault is the placeholder source reported when no token was found.
+	TokenSourceDefault = "default"
+)
+
 // AuthConfig is used for interacting with some persistent configuration for gh,
 // with knowledge on how to access encrypted storage when necessary.
 // Behavior is scoped to authentication specific tasks.
@@ -139,9 +182,11 @@ type AuthConfig interface {
 	// HasActiveToken returns true when a token for the hostname is present.
 	HasActiveToken(hostname string) bool
 
-	// ActiveToken will retrieve the active auth token for the given hostname, searching environment variables,
-	// general configuration, and finally encrypted storage.
-	ActiveToken(hostname string) (token string, source string)
+	// ActiveToken retrieves the active credential for the given hostname, searching environment variables, general
+	// configuration, and finally encrypted storage. It returns the last stored token as-is, including the current
+	// access token of a refreshable credential, and never contacts the token endpoint to refresh it. A caller that
+	// needs a token valid for API calls should use ActiveTokenWithRefresh instead.
+	ActiveToken(hostname string) Credential
 
 	// ActiveTokenType reports what kind of credential the active token for the
 	// hostname is, so a caller can decide whether it will do without handling
@@ -196,8 +241,10 @@ type AuthConfig interface {
 	// UsersForHost retrieves a list of users configured for a specific host.
 	UsersForHost(hostname string) []string
 
-	// TokenForUser retrieves the authentication token and its source for a specified user and hostname.
-	TokenForUser(hostname, user string) (token string, source string, err error)
+	// TokenForUser retrieves the credential for a specified user and hostname. Like ActiveToken it returns the last
+	// stored token as-is, including the current access token of a refreshable credential, and never refreshes it; use
+	// TokenForUserWithRefresh when the token must be valid for API calls.
+	TokenForUser(hostname, user string) (credential Credential, err error)
 
 	// The following methods are only for testing and that is a design smell we should consider fixing.
 

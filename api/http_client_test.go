@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -527,8 +528,8 @@ func (f *fakeTelemetryDisabler) Disable() {
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) ActiveToken(host string) (string, string) {
-	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], "oauth_token"
+func (c tinyConfig) ActiveToken(host string) gh.Credential {
+	return gh.Credential{Source: "oauth_token", Token: c[fmt.Sprintf("%s:%s", host, "oauth_token")]}
 }
 
 // HostForAPIHost resolves via an "api_host:<apiHost>" key holding the host that

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -14,7 +15,7 @@ import (
 const tokenUser = "x-access-token"
 
 type config interface {
-	ActiveToken(string) (string, string)
+	ActiveToken(string) gh.Credential
 	ActiveUser(string) (string, error)
 }
 
@@ -112,10 +113,12 @@ func helperRun(opts *CredentialOptions) error {
 
 	lookupHost := wants["host"]
 	var gotUser string
-	gotToken, source := cfg.ActiveToken(lookupHost)
+	cred := cfg.ActiveToken(lookupHost)
+	gotToken, source := cred.Token, cred.Source
 	if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
 		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-		gotToken, source = cfg.ActiveToken(lookupHost)
+		cred = cfg.ActiveToken(lookupHost)
+		gotToken, source = cred.Token, cred.Source
 	}
 
 	if strings.HasSuffix(source, "_TOKEN") {

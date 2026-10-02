@@ -167,7 +167,7 @@ func refreshRun(opts *RefreshOptions) error {
 	additionalScopes := set.NewStringSet()
 
 	if !opts.ResetScopes {
-		if oldToken, _ := authCfg.ActiveToken(hostname); oldToken != "" {
+		if oldToken := authCfg.ActiveToken(hostname).Token; oldToken != "" {
 			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken); err == nil {
 				for s := range strings.SplitSeq(oldScopes, ",") {
 					s = strings.TrimSpace(s)
@@ -218,7 +218,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	if credentialFlow.ShouldSetup() {
 		username, _ := authCfg.ActiveUser(hostname)
-		password, _ := authCfg.ActiveToken(hostname)
+		password := authCfg.ActiveToken(hostname).Token
 		if err := credentialFlow.Setup(hostname, username, password); err != nil {
 			return err
 		}
