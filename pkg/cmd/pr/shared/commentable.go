@@ -59,6 +59,7 @@ type CommentableOptions struct {
 	Quiet                     bool
 	Host                      string
 
+	BodyDir          string
 	BodyProvided     bool
 	KeepExistingBody bool
 	AttachFlag       *attachments.Flag
@@ -356,7 +357,7 @@ func bodyForWrite(opts *CommentableOptions, uploader *attachments.Uploader) (bod
 	if uploader == nil {
 		return opts.Body, true, nil
 	}
-	body, uploadResult, err := uploader.UploadAndAttach(context.Background(), opts.Body, opts.Assets)
+	body, uploadResult, err := uploader.UploadAndAttach(context.Background(), opts.Body, opts.BodyDir, opts.Assets)
 	opts.AttachEvent.RecordOperations(uploadResult)
 	if err != nil && uploadResult.Uploaded == 0 {
 		return "", false, err

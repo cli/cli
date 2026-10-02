@@ -1,6 +1,8 @@
 package comment
 
 import (
+	"path/filepath"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
@@ -36,8 +38,9 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 
 			Use %[1]s--attach%[1]s to upload an image or video. If the body already references an
 			attached file, such as %[1]s![alt](./login.png)%[1]s, that reference is rewritten to point
-			at the uploaded asset. Any attached file the body does not reference is appended
-			to the end of the comment.
+			at the uploaded asset. Paths in a %[1]s--body-file%[1]s are relative to its directory,
+			falling back to the working directory. Any attached file the body does not reference
+			is appended to the end of the comment.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -95,6 +98,9 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 					return err
 				}
 				opts.Body = string(b)
+				if bodyFile != "-" {
+					opts.BodyDir = filepath.Dir(bodyFile)
+				}
 			}
 
 			if runF != nil {

@@ -14,12 +14,14 @@ import (
 )
 
 // writeFiles puts real files in a temporary working directory, because
-// uploading opens the path it is given.
+// uploading opens the path it is given. A name may include directories, which
+// are created.
 func writeFiles(t *testing.T, names ...string) {
 	t.Helper()
 
 	t.Chdir(t.TempDir())
 	for _, name := range names {
+		require.NoError(t, os.MkdirAll(filepath.Dir(name), 0o755))
 		require.NoError(t, os.WriteFile(name, []byte("the bytes"), 0o600))
 	}
 }
@@ -45,6 +47,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 		files        []string
 		args         []string
 		body         string
+		markdownDir  string
 		uploads      []upload
 		wantBody     string
 		wantUploaded int
@@ -126,6 +129,17 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			wantBody:     "![the login screen](https://example.com/1)\n\n![after](https://example.com/2)",
 			wantUploaded: 2,
 			wantAppend:   1,
+			wantReplace:  1,
+		},
+		{
+			name:         "rewrites a reference relative to the directory the markdown was read from",
+			files:        []string{"docs/diagram.png"},
+			args:         []string{"./docs/diagram.png"},
+			body:         "![the diagram](./diagram.png)",
+			markdownDir:  "docs",
+			uploads:      []upload{{201, `{"url":"https://example.com/1"}`}},
+			wantBody:     "![the diagram](https://example.com/1)",
+			wantUploaded: 1,
 			wantReplace:  1,
 		},
 		{
@@ -214,7 +228,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 				)
 			}
 
-			body, result, err := testUploader(reg).UploadAndAttach(context.Background(), tt.body, assets)
+			body, result, err := testUploader(reg).UploadAndAttach(context.Background(), tt.body, tt.markdownDir, assets)
 
 			if tt.wantErr == "" {
 				require.NoError(t, err)
@@ -235,7 +249,7 @@ func TestUploaderUploadAndAttach(t *testing.T) {
 			}
 			require.Len(t, reg.Requests, len(tt.uploads))
 			for i := range reg.Requests {
-				assert.Equal(t, tt.files[i], reg.Requests[i].URL.Query().Get("name"))
+				assert.Equal(t, filepath.Base(tt.files[i]), reg.Requests[i].URL.Query().Get("name"))
 			}
 		})
 	}
@@ -255,7 +269,7 @@ func TestUploaderUploadAndAttachUploadsOnceForRepeatedReferences(t *testing.T) {
 	)
 
 	body, result, err := testUploader(reg).UploadAndAttach(context.Background(),
-		"![one](./shot.png)\n\ntext\n\n![two](./shot.png)", assets)
+		"![one](./shot.png)\n\ntext\n\n![two](./shot.png)", "", assets)
 
 	require.NoError(t, err)
 	assert.Equal(t, UploadResult{Uploaded: 1, ReplaceOperations: 1}, result)
@@ -267,7 +281,7 @@ func TestUploaderUploadAndAttachNoAssets(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
 
-	body, result, err := testUploader(reg).UploadAndAttach(context.Background(), "unchanged\n", nil)
+	body, result, err := testUploader(reg).UploadAndAttach(context.Background(), "unchanged\n", "", nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, UploadResult{}, result)
@@ -314,7 +328,7 @@ func TestUploaderUploadAndAttachDoesNotLeakTheAssetURLIntoAnError(t *testing.T) 
 		httpmock.StatusStringResponse(404, `{"message":"Not Found"}`),
 	)
 
-	body, result, err := testUploader(reg).UploadAndAttach(context.Background(), "", assets)
+	body, result, err := testUploader(reg).UploadAndAttach(context.Background(), "", "", assets)
 
 	require.Error(t, err)
 	// One asset is up and cannot be deleted, so the caller must write this
@@ -339,7 +353,7 @@ func TestUploaderUploadAndAttachAbsolutePathReference(t *testing.T) {
 		httpmock.StatusStringResponse(201, `{"url":"https://example.com/1"}`),
 	)
 
-	body, result, err := testUploader(reg).UploadAndAttach(context.Background(), "![shot](./shot.png)", assets)
+	body, result, err := testUploader(reg).UploadAndAttach(context.Background(), "![shot](./shot.png)", "", assets)
 
 	require.NoError(t, err)
 	assert.Equal(t, UploadResult{Uploaded: 1, ReplaceOperations: 1}, result)

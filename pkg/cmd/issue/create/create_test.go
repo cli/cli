@@ -112,6 +112,7 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsOpts: CreateOptions{
 				Title:       "mytitle",
 				Body:        "a body from file",
+				BodyDir:     filepath.Dir(tmpFile),
 				RecoverFile: "",
 				WebMode:     false,
 				Interactive: false,
@@ -368,6 +369,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, "", stderr.String())
 
 			assert.Equal(t, tt.wantsOpts.Body, opts.Body)
+			assert.Equal(t, tt.wantsOpts.BodyDir, opts.BodyDir)
 			assert.Equal(t, tt.wantsOpts.Title, opts.Title)
 			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
 			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
@@ -1075,6 +1077,40 @@ func Test_createRun(t *testing.T) {
 			},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "attaching rewrites a reference relative to the body file",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				Body:     "the plan ![diagram](./diagram.png)",
+				BodyDir:  "docs",
+			},
+			attach: []string{"docs/diagram.png"},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "diagram.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://github.com/OWNER/REPO/issues/12"
+						} } } }`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "the plan ![diagram](https://github.com/user-attachments/assets/AAA)", inputs["body"])
+						}))
+			},
+			wantsStdout:    "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr:    "\nCreating issue in OWNER/REPO\n\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name: "attaching sends the repository id the lookup returned",
