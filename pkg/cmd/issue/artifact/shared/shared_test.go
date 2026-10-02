@@ -330,6 +330,60 @@ func TestCheckIssue(t *testing.T) {
 	}
 }
 
+func TestCheckUploadTarget(t *testing.T) {
+	tests := []struct {
+		name      string
+		number    int
+		target    *client.UploadTarget
+		lookupErr error
+		want      *client.UploadTarget
+		wantErr   string
+	}{
+		{
+			name:   "an issue",
+			number: 142,
+			target: &client.UploadTarget{RepositoryID: 1234, ViewerPermission: "WRITE"},
+			want:   &client.UploadTarget{RepositoryID: 1234, ViewerPermission: "WRITE"},
+		},
+		{
+			name:    "a pull request",
+			number:  158,
+			target:  &client.UploadTarget{IsPullRequest: true, RepositoryID: 1234, ViewerPermission: "WRITE"},
+			wantErr: "monalisa/monas-cafe#158 is a pull request; artifacts are only supported on issues",
+		},
+		{
+			name:      "the lookup's error",
+			number:    999,
+			lookupErr: errors.New("GraphQL: Could not resolve to an issue or pull request with the number of 999. (repository.issue)"),
+			wantErr:   "GraphQL: Could not resolve to an issue or pull request with the number of 999. (repository.issue)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := ghrepo.New("monalisa", "monas-cafe")
+			mock := &client.ArtifactClientMock{
+				UploadTargetFunc: func(ghrepo.Interface, int) (*client.UploadTarget, error) {
+					return tt.target, tt.lookupErr
+				},
+			}
+
+			got, err := CheckUploadTarget(mock, repo, tt.number)
+
+			require.Len(t, mock.UploadTargetCalls(), 1)
+			assert.Equal(t, repo, mock.UploadTargetCalls()[0].Repo)
+			assert.Equal(t, tt.number, mock.UploadTargetCalls()[0].Number)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestCheckType(t *testing.T) {
 	tests := []struct {
 		name         string

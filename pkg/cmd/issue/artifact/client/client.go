@@ -4,6 +4,8 @@
 package client
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -21,6 +23,10 @@ type ArtifactClient interface {
 	// IsPullRequest reports whether number in repo is a pull request rather
 	// than an issue, with one lookup.
 	IsPullRequest(repo ghrepo.Interface, number int) (bool, error)
+	// UploadTarget is IsPullRequest for a command that uploads files with
+	// --attach. Its one lookup also returns what an upload needs to know
+	// about repo.
+	UploadTarget(repo ghrepo.Interface, number int) (*UploadTarget, error)
 	// List returns the artifacts on an issue in the order the API returns
 	// them, which is number order. An empty artifactType lists every type,
 	// and a limit of 0 lists every artifact.
@@ -30,6 +36,9 @@ type ArtifactClient interface {
 	// Delete deletes one artifact from an issue. The API can't restore a
 	// deleted artifact.
 	Delete(repo ghrepo.Interface, issueNumber int, number int) error
+	// Create creates one artifact on an issue and returns it. The API doesn't
+	// return a new artifact's description.
+	Create(repo ghrepo.Interface, issueNumber int, artifactType, name, body string) (*Artifact, error)
 }
 
 // maxPageSize is the most artifacts one request asks for.
@@ -55,6 +64,18 @@ func (c *artifactClient) IsPullRequest(repo ghrepo.Interface, number int) (bool,
 		return false, err
 	}
 	return issue.IsPullRequest(), nil
+}
+
+func (c *artifactClient) UploadTarget(repo ghrepo.Interface, number int) (*UploadTarget, error) {
+	issue, err := issueShared.FindIssueOrPR(c.httpClient, repo, number, []string{"number", "repository"})
+	if err != nil {
+		return nil, err
+	}
+	return &UploadTarget{
+		IsPullRequest:    issue.IsPullRequest(),
+		RepositoryID:     issue.RepositoryDatabaseID(),
+		ViewerPermission: issue.RepositoryViewerPermission(),
+	}, nil
 }
 
 // List requests pages until one comes back short or the limit is reached.
@@ -119,4 +140,26 @@ func (c *artifactClient) Delete(repo ghrepo.Interface, issueNumber int, number i
 		return err
 	}
 	return c.apiClient.REST(repo.RepoHost(), "DELETE", u.String(), nil, nil)
+}
+
+func (c *artifactClient) Create(repo ghrepo.Interface, issueNumber int, artifactType, name, body string) (*Artifact, error) {
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "issues", strconv.Itoa(issueNumber), "artifacts")
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := json.Marshal(map[string]string{
+		"type": artifactType,
+		"name": name,
+		"body": body,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var artifact Artifact
+	if err := c.apiClient.REST(repo.RepoHost(), "POST", u.String(), bytes.NewReader(payload), &artifact); err != nil {
+		return nil, err
+	}
+	return &artifact, nil
 }

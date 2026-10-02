@@ -2,6 +2,7 @@ package shared
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"testing"
 
@@ -200,6 +201,13 @@ func TestPrintFailure(t *testing.T) {
 			err:        errors.New(`Delete "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/2": dial tcp: lookup api.github.com: no such host`),
 			wantStderr: `X Failed to delete artifact 2: Delete "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/2": dial tcp: lookup api.github.com: no such host` + "\n",
 		},
+		{
+			name:       "an error that wraps an API error gives its whole text, which names what failed",
+			result:     Result{Name: "signin-plan.md", Source: "signin-plan.md"},
+			action:     "create artifact from signin-plan.md",
+			err:        fmt.Errorf("could not upload latte-art.png: %w", apiError(422, "Validation Failed", "7")),
+			wantStdout: "failed\t\tsignin-plan.md\tsignin-plan.md\tcould not upload latte-art.png: HTTP 422: Validation Failed (https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/7)\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -211,6 +219,73 @@ func TestPrintFailure(t *testing.T) {
 			ios.SetColorEnabled(tt.color)
 
 			PrintFailure(ios, tt.result, tt.action, tt.err)
+
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
+		})
+	}
+}
+
+func TestPrintPartialFailure(t *testing.T) {
+	uploadErr := errors.New("could not upload latte-art.png: rate limited; wait and try again")
+
+	tests := []struct {
+		name       string
+		tty        bool
+		color      bool
+		status     string
+		result     Result
+		message    string
+		err        error
+		wantStdout string
+		wantStderr string
+	}{
+		{
+			name:       "in a terminal, the message and the reason go to stderr",
+			tty:        true,
+			status:     "created",
+			result:     Result{Number: 6, Name: "signin-plan.md", Source: "signin-plan.md"},
+			message:    "Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142",
+			err:        uploadErr,
+			wantStderr: "! Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142, but could not upload latte-art.png: rate limited; wait and try again\n",
+		},
+		{
+			name:       "colors in a terminal",
+			tty:        true,
+			color:      true,
+			status:     "created",
+			result:     Result{Number: 6, Name: "signin-plan.md", Source: "signin-plan.md"},
+			message:    "Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142",
+			err:        uploadErr,
+			wantStderr: "\x1b[0;33m!\x1b[0m Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142, but could not upload latte-art.png: rate limited; wait and try again\n",
+		},
+		{
+			name:       "piped, the line keeps its status and has the reason",
+			status:     "created",
+			result:     Result{Number: 6, Name: "signin-plan.md", Source: "signin-plan.md"},
+			message:    "Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142",
+			err:        uploadErr,
+			wantStdout: "created\t6\tsignin-plan.md\tsignin-plan.md\tcould not upload latte-art.png: rate limited; wait and try again\n",
+		},
+		{
+			name:       "a reason on several lines stays on one line",
+			status:     "created",
+			result:     Result{Number: 6, Name: "signin-plan.md", Source: "signin-plan.md"},
+			message:    "Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142",
+			err:        errors.New("could not upload latte-art.png: Validation Failed\nname is invalid"),
+			wantStdout: "created\t6\tsignin-plan.md\tsignin-plan.md\tcould not upload latte-art.png: Validation Failed name is invalid\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+			ios.SetColorEnabled(tt.color)
+
+			PrintPartialFailure(ios, tt.status, tt.result, tt.message, tt.err)
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
