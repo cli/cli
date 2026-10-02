@@ -178,15 +178,22 @@ func Test_NewCmdDownload(t *testing.T) {
 }
 
 func Test_downloadRun(t *testing.T) {
+	var clobberTarget string
+	var ancestorTarget string
+	var directoryTarget string
+
 	tests := []struct {
-		name       string
-		isTTY      bool
-		opts       DownloadOptions
-		httpStubs  func(*httpmock.Registry)
-		wantErr    string
-		wantStdout string
-		wantStderr string
-		wantFiles  []string
+		name            string
+		isTTY           bool
+		opts            DownloadOptions
+		httpStubs       func(*httpmock.Registry)
+		setup           func(t *testing.T)
+		verify          func(t *testing.T)
+		wantErr         string
+		wantErrContains string
+		wantStdout      string
+		wantStderr      string
+		wantFiles       []string
 	}{
 		{
 			name:  "download all assets",
@@ -221,6 +228,24 @@ func Test_downloadRun(t *testing.T) {
 				"windows-32bit.zip",
 				"windows-64bit.zip",
 			},
+		},
+		{
+			name:  "empty destination uses current directory",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				Destination: "",
+				Concurrency: 1,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "asset.bin", "size": 3, "url": "https://api.github.com/assets/1234" }
+					]
+				}`)
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse("new"))
+			},
+			wantFiles: []string{"asset.bin"},
 		},
 		{
 			name:  "downloads published release when the draft lookup is unauthorized",
@@ -285,6 +310,149 @@ func Test_downloadRun(t *testing.T) {
 				"tmp/assets/windows-32bit.zip",
 				"tmp/assets/windows-64bit.zip",
 			},
+		},
+		{
+			name:  "HTTP failure does not create destination directory",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				Destination: "missing",
+				Concurrency: 1,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "asset.bin", "size": 3, "url": "https://api.github.com/assets/1234" }
+					]
+				}`)
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StatusStringResponse(500, "server error"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoDirExists(t, "missing")
+			},
+			wantErrContains: "HTTP 500",
+		},
+		{
+			name:  "clobber replaces final symlink",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:           "v1.2.3",
+				Destination:       ".",
+				Concurrency:       1,
+				OverwriteExisting: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "asset.bin", "size": 3, "url": "https://api.github.com/assets/1234" }
+					]
+				}`)
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse("new"))
+			},
+			setup: func(t *testing.T) {
+				t.Helper()
+				clobberTarget = "target.bin"
+				require.NoError(t, os.WriteFile(clobberTarget, []byte("old"), 0o644))
+				require.NoError(t, os.Symlink(clobberTarget, "asset.bin"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Lstat("asset.bin")
+				require.NoError(t, err)
+				assert.Zero(t, info.Mode()&os.ModeSymlink)
+				content, err := os.ReadFile("asset.bin")
+				require.NoError(t, err)
+				assert.Equal(t, "new", string(content))
+				content, err = os.ReadFile(clobberTarget)
+				require.NoError(t, err)
+				assert.Equal(t, "old", string(content))
+			},
+			wantFiles: []string{"asset.bin", "target.bin"},
+		},
+		{
+			name:  "clobber refuses symlink to directory",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:           "v1.2.3",
+				Destination:       ".",
+				Concurrency:       1,
+				OverwriteExisting: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "asset.bin", "size": 3, "url": "https://api.github.com/assets/1234" }
+					]
+				}`)
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse("new"))
+			},
+			setup: func(t *testing.T) {
+				t.Helper()
+				directoryTarget = "directory-target"
+				require.NoError(t, os.Mkdir(directoryTarget, 0o755))
+				require.NoError(t, os.Symlink(directoryTarget, "asset.bin"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Lstat("asset.bin")
+				require.NoError(t, err)
+				assert.NotZero(t, info.Mode()&os.ModeSymlink)
+				entries, err := os.ReadDir(directoryTarget)
+				require.NoError(t, err)
+				assert.Empty(t, entries)
+			},
+			wantErrContains: "is a directory",
+			wantFiles:       []string{"asset.bin"},
+		},
+		{
+			name:  "rejects ancestor symlink",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				Destination: ".",
+				Concurrency: 1,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "nested/asset.bin", "size": 3, "url": "https://api.github.com/assets/1234" }
+					]
+				}`)
+				reg.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse("new"))
+			},
+			setup: func(t *testing.T) {
+				t.Helper()
+				ancestorTarget = t.TempDir()
+				require.NoError(t, os.Symlink(ancestorTarget, "nested"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoFileExists(t, filepath.Join(ancestorTarget, "asset.bin"))
+			},
+			wantErr:   `refusing to traverse symbolic link "nested"`,
+			wantFiles: []string{"nested"},
+		},
+		{
+			name:  "rejects nonlocal asset name before request",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				Destination: ".",
+				Concurrency: 1,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"assets": [
+						{ "name": "/asset.bin", "size": 3, "url": "https://api.github.com/assets/1234" }
+					]
+				}`)
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoFileExists(t, "asset.bin")
+			},
+			wantErr: `path "/asset.bin" is not a local child path`,
 		},
 		{
 			name:  "no match for pattern",
@@ -680,6 +848,9 @@ func Test_downloadRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
 			t.Chdir(tempDir)
+			if tt.setup != nil {
+				tt.setup(t)
+			}
 
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(tt.isTTY)
@@ -702,8 +873,17 @@ func Test_downloadRun(t *testing.T) {
 			}
 
 			err := downloadRun(&tt.opts)
-			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
+			if tt.wantErr != "" || tt.wantErrContains != "" {
+				require.Error(t, err)
+				if tt.wantErr != "" {
+					assert.EqualError(t, err, tt.wantErr)
+				}
+				if tt.wantErrContains != "" {
+					assert.ErrorContains(t, err, tt.wantErrContains)
+				}
+				if tt.verify != nil {
+					tt.verify(t)
+				}
 				return
 			}
 			assert.NoError(t, err)
@@ -727,6 +907,9 @@ func Test_downloadRun(t *testing.T) {
 			downloadedFiles, err := listFiles(".")
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantFiles, downloadedFiles)
+			if tt.verify != nil {
+				tt.verify(t)
+			}
 		})
 	}
 }
@@ -838,11 +1021,17 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			_, err = f1.WriteString(oldAssetContents)
 			assert.NoError(t, err)
 			f1.Close()
+			require.NoError(t, os.Chmod(file, 0o600))
 			f2, err := os.Create(archive)
 			assert.NoError(t, err)
 			_, err = f2.WriteString(oldZipballContents)
 			assert.NoError(t, err)
 			f2.Close()
+			require.NoError(t, os.Chmod(archive, 0o600))
+			fileBefore, err := os.Stat(file)
+			require.NoError(t, err)
+			archiveBefore, err := os.Stat(archive)
+			require.NoError(t, err)
 
 			tt.opts.Destination = dest
 
@@ -883,6 +1072,8 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantFileSize, fs.Size())
 			assert.Equal(t, tt.wantArchiveSize, as.Size())
+			assert.Equal(t, fileBefore.Mode().Perm(), fs.Mode().Perm())
+			assert.Equal(t, archiveBefore.Mode().Perm(), as.Mode().Perm())
 		})
 	}
 }
@@ -1010,6 +1201,7 @@ func Test_downloadAsset_archiveAvoidsLegacyCodeload(t *testing.T) {
 
 	tempDir := t.TempDir()
 	dest := destinationWriter{dir: tempDir}
+	defer dest.Close()
 
 	err := downloadAsset(&dest, ts.Client(), safeurl.NewImmutableSafeURL(ts.URL+"/asset"), "", true)
 	require.NoError(t, err)

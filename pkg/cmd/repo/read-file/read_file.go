@@ -11,6 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -250,21 +251,22 @@ func lstat(path string) (*lstatResult, error) {
 // These indirect the file system operations used when writing output, so tests can
 // substitute them without touching the real file system.
 var (
-	lstatF     = lstat
-	mkdirAllF  = os.MkdirAll
-	writeFileF = os.WriteFile
+	lstatF          = lstat
+	writeOutputFile = rootedWriteOutputFile
 )
 
 // writeToOutput writes file content to a local path and returns the final destination.
-// A symlink target is refused, a directory target receives the file under its remote basename,
-// and missing parent directories are created. Existing files are only overwritten when clobber is true.
+// Symlink output paths are refused. A directory target receives the file under
+// its remote basename using the local operating system's path rules, and existing
+// regular files are only replaced when clobber is true.
 func writeToOutput(file *repoFile, output string, clobber bool) (string, error) {
 	dest := output
+	outputDir := ""
 
 	// A trailing separator signals the user intends dest to be a directory even if it does not exist yet.
 	asDir := strings.HasSuffix(dest, "/") || strings.HasSuffix(dest, string(os.PathSeparator))
 
-	if lr, err := lstatF(dest); err == nil {
+	if lr, err := lstatF(trimTrailingPathSeparators(dest)); err == nil {
 		if lr.isSymlink {
 			return "", fmt.Errorf("output path is a symlink")
 		}
@@ -275,8 +277,14 @@ func writeToOutput(file *repoFile, output string, clobber bool) (string, error) 
 		return "", err
 	}
 
+	name := dest
 	if asDir {
-		dest = filepath.Join(dest, file.Name)
+		name = filepath.Base(file.Name)
+		if name == "." || !filepath.IsLocal(name) {
+			return "", fmt.Errorf("invalid output filename %q", file.Name)
+		}
+		outputDir = dest
+		dest = filepath.Join(dest, name)
 	}
 
 	if lr, err := lstatF(dest); err == nil {
@@ -290,15 +298,36 @@ func writeToOutput(file *repoFile, output string, clobber bool) (string, error) 
 		return "", err
 	}
 
-	if dir := filepath.Dir(dest); dir != "" && dir != "." {
-		if err := mkdirAllF(dir, 0755); err != nil {
-			return "", err
+	if err := writeOutputFile(outputDir, name, file.Content, 0o644, clobber); err != nil {
+		if os.IsExist(err) && !clobber {
+			return "", fmt.Errorf("output path already exists: %q (use --clobber to overwrite)", dest)
 		}
-	}
-
-	if err := writeFileF(dest, file.Content, 0644); err != nil {
 		return "", err
 	}
 
 	return dest, nil
+}
+
+func trimTrailingPathSeparators(path string) string {
+	end := len(path)
+	for end > 0 && os.IsPathSeparator(path[end-1]) {
+		end--
+	}
+	if end == 0 || end <= len(filepath.VolumeName(path)) {
+		return path
+	}
+	return path[:end]
+}
+
+func rootedWriteOutputFile(dir, name string, data []byte, perm os.FileMode, replace bool) error {
+	if dir == "" {
+		return safepaths.WriteFile(name, data, perm, 0o755, replace)
+	}
+
+	root, err := safepaths.OpenRootDir(dir, 0o755)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return root.WriteFile(name, data, perm, 0o755, replace)
 }

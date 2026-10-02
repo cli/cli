@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"runtime"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 )
 
@@ -22,23 +22,37 @@ type LiveStore struct {
 }
 
 func (s *LiveStore) createJSONLinesFilePath(artifact string) string {
-	if runtime.GOOS == "windows" {
-		// Colons are special characters in Windows and cannot be used in file names.
-		// Replace them with dashes to avoid issues.
-		artifact = strings.ReplaceAll(artifact, ":", "-")
-	}
-
-	path := fmt.Sprintf("%s.jsonl", artifact)
+	path := s.createJSONLinesFileName(artifact)
 	if s.outputPath != "" {
 		return fmt.Sprintf("%s/%s", s.outputPath, path)
 	}
 	return path
 }
 
+func (s *LiveStore) createJSONLinesFileName(artifact string) string {
+	if runtime.GOOS == "windows" {
+		// Colons are special characters in Windows and cannot be used in file names.
+		// Replace them with dashes to avoid issues.
+		artifact = strings.ReplaceAll(artifact, ":", "-")
+	}
+
+	return fmt.Sprintf("%s.jsonl", artifact)
+}
+
 func (s *LiveStore) createMetadataFile(artifactDigest string, attestationsResp []*api.Attestation) (string, error) {
 	metadataFilePath := s.createJSONLinesFilePath(artifactDigest)
+	outputPath := s.outputPath
+	if outputPath == "" {
+		outputPath = "."
+	}
 
-	f, err := os.Create(metadataFilePath)
+	root, err := safepaths.OpenRootDir(outputPath, 0o755)
+	if err != nil {
+		return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to open output directory: %v", err))
+	}
+	defer root.Close()
+
+	f, err := root.Create(s.createJSONLinesFileName(artifactDigest), 0o666, 0o755, true)
 	if err != nil {
 		return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to create file: %v", err))
 	}

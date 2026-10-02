@@ -6,6 +6,8 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/require"
 )
 
@@ -71,7 +73,7 @@ func TestNewEnforcementCriteria(t *testing.T) {
 
 		c, err := newEnforcementCriteria(opts)
 		require.NoError(t, err)
-		require.Equal(t, `^https://github\.com/foo/bar/\.github/workflows/attest\.yml`, c.SANRegex)
+		require.Equal(t, `^https://github\.com/foo/bar/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`, c.SANRegex)
 		require.Zero(t, c.SAN)
 	})
 
@@ -297,25 +299,25 @@ func TestValidateSignerWorkflow(t *testing.T) {
 		{
 			name:                   "workflow with default host",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml`,
+			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`,
 			host:                   "github.com",
 		},
 		{
 			name:                   "workflow with workflow URL included",
 			providedSignerWorkflow: "github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml`,
+			expectedWorkflowRegex:  `^https://github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`,
 			host:                   "github.com",
 		},
 		{
 			name:                   "workflow with GH_HOST set",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  `^https://myhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml`,
+			expectedWorkflowRegex:  `^https://myhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`,
 			host:                   "myhost.github.com",
 		},
 		{
 			name:                   "workflow with authenticated host",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			expectedWorkflowRegex:  `^https://authedhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml`,
+			expectedWorkflowRegex:  `^https://authedhost\.github\.com/github/artifact-attestations-workflows/\.github/workflows/attest\.yml(@(refs/.*|[0-9a-fA-F]+))?$`,
 			host:                   "authedhost.github.com",
 		},
 	}
@@ -333,4 +335,185 @@ func TestValidateSignerWorkflow(t *testing.T) {
 			require.Equal(t, tc.expectedWorkflowRegex, workflowRegex)
 		}
 	}
+}
+
+// TestSignerWorkflowSANMatching drives the pattern built by validateSignerWorkflow
+// through the sigstore-go matcher that consumes it, because that matcher applies the
+// pattern with regexp.MatchString and so does not anchor it on the caller's behalf.
+func TestSignerWorkflowSANMatching(t *testing.T) {
+	const pinnedWorkflow = "owner/builder/.github/workflows/release.yml"
+	const workflowDir = "https://github.com/owner/builder/.github/workflows/"
+
+	testcases := []struct {
+		name        string
+		san         string
+		expectMatch bool
+	}{
+		{
+			name:        "pinned workflow at a branch ref",
+			san:         workflowDir + "release.yml@refs/heads/main",
+			expectMatch: true,
+		},
+		{
+			name:        "pinned workflow at a commit SHA",
+			san:         workflowDir + "release.yml@09b495c3f12c7881b3cc17209a327792065c1a1d",
+			expectMatch: true,
+		},
+		{
+			name:        "pinned workflow at a tag containing @",
+			san:         workflowDir + "release.yml@refs/tags/pkg@1.2.3",
+			expectMatch: true,
+		},
+		{
+			name:        "pinned workflow at a branch containing @",
+			san:         workflowDir + "release.yml@refs/heads/feature@v2",
+			expectMatch: true,
+		},
+		{
+			name:        "pinned workflow with no ref",
+			san:         workflowDir + "release.yml",
+			expectMatch: true,
+		},
+		{
+			name:        "workflow whose file name extends the pinned name",
+			san:         workflowDir + "release.yml.attacker.yml@refs/heads/attacker",
+			expectMatch: false,
+		},
+		{
+			name:        "workflow whose file name contains the ref separator",
+			san:         workflowDir + "release.yml@attacker.yml@refs/heads/attacker",
+			expectMatch: false,
+		},
+		{
+			name:        "different workflow in the pinned repository",
+			san:         workflowDir + "other.yml@refs/heads/main",
+			expectMatch: false,
+		},
+		{
+			name:        "pinned workflow in a lookalike repository",
+			san:         "https://github.com/owner/builder-attacker/.github/workflows/release.yml@refs/heads/main",
+			expectMatch: false,
+		},
+	}
+
+	sanRegex, err := validateSignerWorkflow("github.com", pinnedWorkflow)
+	require.NoError(t, err)
+
+	matcher, err := verify.NewSANMatcher("", sanRegex)
+	require.NoError(t, err)
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := matcher.Verify(certificate.Summary{SubjectAlternativeName: tc.san})
+			if tc.expectMatch {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+// TestSignerWorkflowSANMatchingObservedCertificate uses the SubjectAlternativeName from
+// a certificate Fulcio actually issued for a workflow stored at
+// .github/workflows/provenance-image.yml@evil.yml. Actions loads a workflow file whose
+// name contains "@", and neither the OIDC claim nor Fulcio escapes it, so the separator
+// really can appear more than once in a SAN.
+func TestSignerWorkflowSANMatchingObservedCertificate(t *testing.T) {
+	const observedSAN = "https://github.com/bdehamer/attest-demo/.github/workflows/provenance-image.yml@evil.yml@refs/heads/main"
+
+	sanRegex, err := validateSignerWorkflow("github.com", "bdehamer/attest-demo/.github/workflows/provenance-image.yml")
+	require.NoError(t, err)
+
+	matcher, err := verify.NewSANMatcher("", sanRegex)
+	require.NoError(t, err)
+
+	require.Error(t, matcher.Verify(certificate.Summary{SubjectAlternativeName: observedSAN}))
+}
+
+// TestSignerWorkflowSANMatchingPinnedRef covers a --signer-workflow value that pins a
+// ref as well as a workflow. Such a value has to match the end of the SAN exactly,
+// because a git ref may itself be named so that it begins with the pinned ref and is
+// followed by something ref-shaped.
+func TestSignerWorkflowSANMatchingPinnedRef(t *testing.T) {
+	const pinnedWorkflow = "owner/builder/.github/workflows/release.yml@refs/heads/main"
+	const workflowURL = "https://github.com/owner/builder/.github/workflows/release.yml"
+
+	testcases := []struct {
+		name        string
+		san         string
+		expectMatch bool
+	}{
+		{
+			name:        "the pinned ref",
+			san:         workflowURL + "@refs/heads/main",
+			expectMatch: true,
+		},
+		{
+			name:        "a branch whose name extends the pinned ref",
+			san:         workflowURL + "@refs/heads/mainattacker",
+			expectMatch: false,
+		},
+		{
+			name:        "a branch named so that a second ref follows the pinned ref",
+			san:         workflowURL + "@refs/heads/main@refs/heads/attacker",
+			expectMatch: false,
+		},
+		{
+			name:        "a branch named so that an object ID follows the pinned ref",
+			san:         workflowURL + "@refs/heads/main@09b495c3f12c7881b3cc17209a327792065c1a1d",
+			expectMatch: false,
+		},
+		{
+			name:        "a different ref",
+			san:         workflowURL + "@refs/heads/attacker",
+			expectMatch: false,
+		},
+	}
+
+	sanRegex, err := validateSignerWorkflow("github.com", pinnedWorkflow)
+	require.NoError(t, err)
+
+	matcher, err := verify.NewSANMatcher("", sanRegex)
+	require.NoError(t, err)
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := matcher.Verify(certificate.Summary{SubjectAlternativeName: tc.san})
+			if tc.expectMatch {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+// TestSignerWorkflowSANMatchingObservedNestedRef uses the job_workflow_ref claim
+// observed from a workflow run on a branch named "main@refs/heads/evil". Actions runs a
+// workflow from such a branch, so a pin on refs/heads/main must not admit it.
+func TestSignerWorkflowSANMatchingObservedNestedRef(t *testing.T) {
+	const observedSAN = "https://github.com/bdehamer/attest-demo/.github/workflows/control-probe.yml@refs/heads/main@refs/heads/evil"
+
+	sanRegex, err := validateSignerWorkflow("github.com", "bdehamer/attest-demo/.github/workflows/control-probe.yml@refs/heads/main")
+	require.NoError(t, err)
+
+	matcher, err := verify.NewSANMatcher("", sanRegex)
+	require.NoError(t, err)
+
+	require.Error(t, matcher.Verify(certificate.Summary{SubjectAlternativeName: observedSAN}))
+}
+
+// TestSignerWorkflowSANMatchingRepositoryValue covers a --signer-workflow value that
+// names a repository instead of a workflow. The value is still matched as a complete
+// identity, so it cannot match a repository whose name merely starts with it.
+func TestSignerWorkflowSANMatchingRepositoryValue(t *testing.T) {
+	sanRegex, err := validateSignerWorkflow("github.com", "owner/builder")
+	require.NoError(t, err)
+
+	matcher, err := verify.NewSANMatcher("", sanRegex)
+	require.NoError(t, err)
+
+	san := "https://github.com/owner/builder-attacker/.github/workflows/release.yml@refs/heads/main"
+	require.Error(t, matcher.Verify(certificate.Summary{SubjectAlternativeName: san}))
 }

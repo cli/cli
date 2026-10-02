@@ -15,6 +15,42 @@ import (
 
 const hostRegex = `^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+.*$`
 
+// signerWorkflowRefPattern matches the "@<ref>" that terminates the
+// SubjectAlternativeName of a certificate issued to a GitHub Actions workflow.
+//
+// The separator cannot be located by splitting on "@", because both sides may contain
+// one. A git ref may contain "@", as in the refs/tags/pkg@1.2.3 convention used by
+// JavaScript monorepos, and so may a workflow file name. What separates them is shape:
+// a ref is either a "refs/"-prefixed path or a bare object ID, and a workflow file name
+// can be neither. It cannot contain "/", since Actions only loads workflows stored
+// directly in .github/workflows, and it cannot be a bare object ID, since it must carry
+// a .yml or .yaml extension.
+const signerWorkflowRefPattern = `@(refs/.*|[0-9a-fA-F]+)`
+
+// signerWorkflowHasRef reports whether a --signer-workflow value already pins a ref.
+var signerWorkflowHasRef = regexp.MustCompile(signerWorkflowRefPattern + `$`)
+
+// signerWorkflowSANPattern builds the SAN pattern enforced for --signer-workflow.
+//
+// sigstore-go matches SAN patterns with regexp.MatchString, which is unanchored, so a
+// pattern anchored only at the start is a prefix match: a workflow named
+// release.yml.attacker.yml satisfies a pin on release.yml. Anchoring the end makes the
+// pin an identity match.
+//
+// The documented flag format carries no ref, and such a value has to keep matching a
+// certificate from any ref, so the ref is optional. Once the value pins a ref of its
+// own it must match the end of the SAN exactly. Leaving the ref optional there would
+// let a second ref follow the pinned one, and since a branch may be named
+// "main@refs/heads/attacker", a pin on refs/heads/main would still admit a certificate
+// built from a different branch.
+func signerWorkflowSANPattern(workflowURL string) string {
+	pattern := "^" + regexp.QuoteMeta(workflowURL)
+	if signerWorkflowHasRef.MatchString(workflowURL) {
+		return pattern + "$"
+	}
+	return pattern + "(" + signerWorkflowRefPattern + ")?$"
+}
+
 func expandToGitHubURL(tenant, ownerOrRepo string) string {
 	if tenant == "" {
 		return fmt.Sprintf("https://github.com/%s", ownerOrRepo)
@@ -155,7 +191,7 @@ func validateSignerWorkflow(hostname, signerWorkflow string) (string, error) {
 	}
 
 	if match {
-		return "^" + regexp.QuoteMeta(fmt.Sprintf("https://%s", signerWorkflow)), nil
+		return signerWorkflowSANPattern(fmt.Sprintf("https://%s", signerWorkflow)), nil
 	}
 
 	// if the provided workflow did not match the expect format
@@ -164,5 +200,5 @@ func validateSignerWorkflow(hostname, signerWorkflow string) (string, error) {
 		return "", errors.New("unknown signer workflow host")
 	}
 
-	return "^" + regexp.QuoteMeta(fmt.Sprintf("https://%s/%s", hostname, signerWorkflow)), nil
+	return signerWorkflowSANPattern(fmt.Sprintf("https://%s/%s", hostname, signerWorkflow)), nil
 }
