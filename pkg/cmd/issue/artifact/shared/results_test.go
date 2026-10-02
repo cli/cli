@@ -67,6 +67,58 @@ func TestPrintSuccess(t *testing.T) {
 	}
 }
 
+func TestPrintSkip(t *testing.T) {
+	tests := []struct {
+		name       string
+		tty        bool
+		color      bool
+		result     Result
+		subject    string
+		reason     string
+		wantStdout string
+	}{
+		{
+			name:       "in a terminal, the skip goes to stdout",
+			tty:        true,
+			result:     Result{Number: 2, Name: "2-OAuth-callback-plan.md"},
+			subject:    "2-OAuth-callback-plan.md",
+			reason:     "already exists",
+			wantStdout: "- Skipped 2-OAuth-callback-plan.md: already exists\n",
+		},
+		{
+			name:       "colors in a terminal",
+			tty:        true,
+			color:      true,
+			result:     Result{Number: 2, Name: "2-OAuth-callback-plan.md"},
+			subject:    "2-OAuth-callback-plan.md",
+			reason:     "already exists",
+			wantStdout: "\x1b[38;5;242m-\x1b[0m Skipped 2-OAuth-callback-plan.md: already exists\n",
+		},
+		{
+			name:       "piped, a skipped line with the reason",
+			result:     Result{Number: 2, Name: "2-OAuth-callback-plan.md"},
+			subject:    "2-OAuth-callback-plan.md",
+			reason:     "already exists",
+			wantStdout: "skipped\t2\t2-OAuth-callback-plan.md\t\talready exists\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+			ios.SetColorEnabled(tt.color)
+
+			PrintSkip(ios, tt.result, tt.subject, tt.reason)
+
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, "", stderr.String())
+		})
+	}
+}
+
 func TestPrintFailure(t *testing.T) {
 	artifactURL := func(number string) *url.URL {
 		u, err := url.Parse("https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/" + number)
