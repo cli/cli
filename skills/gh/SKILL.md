@@ -209,12 +209,17 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   require it. Documents are `generic` unless `--type plan` is given, and a
   plan currently behaves the same. `--type` is refused if any artifact is a
   link.
-- `gh issue artifact edit {<issue-number>|<issue-url>} <artifact-number> [--name <name>] [--body <text> | --body-file <path>] [--attach <path>]...`
+- `gh issue artifact edit {<issue-number>|<issue-url>} <artifact-number> [--name <name>] [--body <text> | --body-file <path>] [--attach <path>]... [--restore-version N]`
   renames an artifact or replaces its content, saving a new version. At least
-  one of `--name`, `--body`, `--body-file`, or `--attach` is required, and a
-  `--body-file` never renames the artifact. The type never changes: a link's
-  new content must be an `http(s)` URL or a `.url` file, and a document can't
-  take a `.url` file.
+  one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`
+  is required, and a `--body-file` never renames the artifact. The type never
+  changes: a link's new content must be an `http(s)` URL or a `.url` file, and
+  a document can't take a `.url` file. `--restore-version N` saves the name
+  and content of version N from the edit history as a new version. It works
+  for any version `view` lists, and can't be combined with `--name`,
+  `--body`, `--body-file`, or `--attach`. If the artifact already matches
+  that version, nothing is saved and `gh` exits 0, with a `skipped` line when
+  piped.
 - `gh issue artifact delete {<issue-number>|<issue-url>} <artifact-number>... [--yes]`
   deletes artifacts, which can't be restored. In a terminal, `gh` asks once
   for all of them. `--yes` skips the prompt and is required when `gh` can't
@@ -238,11 +243,12 @@ since names aren't unique. They are not GitHub Actions artifacts, which
 - `create`, `edit`, `delete`, and `download` (except with `--output -`) report
   each artifact on its own line. When piped, every line goes to stdout with
   five tab-separated columns, empty ones included: status (`created`,
-  `updated`, `deleted`, `written`, `skipped`, or `failed`), artifact number,
-  name (the file path for `download`), source (the file, URL, or `-` given to
-  `create`, or the `--body-file` value given to `edit`), and the reason for a
-  skip or failure. In a terminal, failures go to stderr. A failed artifact
-  doesn't stop the others, and the command exits 1 after any failure.
+  `updated`, `restored`, `deleted`, `written`, `skipped`, or `failed`),
+  artifact number, name (the file path for `download`), source (the file,
+  URL, or `-` given to `create`, or the `--body-file` value given to `edit`),
+  and the reason for a skip or failure. In a terminal, failures go to stderr.
+  A failed artifact doesn't stop the others, and the command exits 1 after
+  any failure.
 - `create` and `edit` read and check every file before any request, so a
   missing, empty, or binary file fails the whole command, and nothing is
   saved. Standard input is read only through `--body-file -`, and `create`
