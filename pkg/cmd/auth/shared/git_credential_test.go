@@ -21,8 +21,30 @@ func TestSetup_configureExisting(t *testing.T) {
 		},
 	}
 
-	if err := f.Setup("example.com", "monalisa", "PASSWD"); err != nil {
+	if _, err := f.Setup("example.com", "monalisa", "PASSWD", false); err != nil {
 		t.Errorf("Setup() error = %v", err)
+	}
+}
+
+func TestSetup_refreshableExternalHelper(t *testing.T) {
+	cs, restoreRun := run.Stub()
+	defer restoreRun(t)
+	// Only reject is registered: approve must not be called for a refreshable credential, otherwise the stub panics.
+	cs.Register(`git credential reject`, 0, "")
+
+	f := GitCredentialFlow{
+		helper: gitcredentials.Helper{Cmd: "osxkeychain"},
+		Updater: &gitcredentials.Updater{
+			GitClient: &git.Client{GitPath: "some/path/git"},
+		},
+	}
+
+	warning, err := f.Setup("example.com", "monalisa", "PASSWD", true)
+	if err != nil {
+		t.Errorf("Setup() error = %v", err)
+	}
+	if warning == "" {
+		t.Error("Setup() returned an empty warning for a refreshable credential with a non-gh helper")
 	}
 }
 
@@ -70,7 +92,7 @@ func TestGitCredentialsSetup_setOurs_GH(t *testing.T) {
 		},
 	}
 
-	if err := f.Setup("github.com", "monalisa", "PASSWD"); err != nil {
+	if _, err := f.Setup("github.com", "monalisa", "PASSWD", false); err != nil {
 		t.Errorf("Setup() error = %v", err)
 	}
 
@@ -104,7 +126,7 @@ func TestSetup_setOurs_nonGH(t *testing.T) {
 		},
 	}
 
-	if err := f.Setup("example.com", "monalisa", "PASSWD"); err != nil {
+	if _, err := f.Setup("example.com", "monalisa", "PASSWD", false); err != nil {
 		t.Errorf("Setup() error = %v", err)
 	}
 }
