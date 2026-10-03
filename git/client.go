@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"os/exec"
 	"path"
 	"regexp"
@@ -93,10 +94,56 @@ func (c *Client) Command(ctx context.Context, args ...string) (*Command, error) 
 		return nil, err
 	}
 	cmd := commandContext(ctx, c.GitPath, args...)
+	if cmd.Env != nil {
+		cmd.Env = sanitizeGitEnv(cmd.Env)
+	} else {
+		cmd.Env = sanitizeGitEnv()
+	}
 	cmd.Stderr = c.Stderr
 	cmd.Stdin = c.Stdin
 	cmd.Stdout = c.Stdout
 	return &Command{cmd}, nil
+}
+
+var sensitiveGitEnvNames = []string{
+	"GH_TOKEN",
+	"GITHUB_TOKEN",
+	"GH_ENTERPRISE_TOKEN",
+	"GITHUB_ENTERPRISE_TOKEN",
+}
+
+// sanitizeGitEnv filters out ambient GitHub API tokens from the environment
+// while preserving all other variables (such as PATH, SystemRoot, HOME, and
+// SSH_AUTH_SOCK) needed by Git and child processes. Authentication for Git
+// operations is mediated through the credential helper on stdio rather than
+// ambient environment variables, isolating credentials from repository hooks.
+func sanitizeGitEnv(base ...[]string) []string {
+	var env []string
+	if len(base) > 0 && base[0] != nil {
+		env = base[0]
+	} else {
+		env = os.Environ()
+	}
+
+	sanitized := make([]string, 0, len(env))
+	for _, kv := range env {
+		key, _, _ := strings.Cut(kv, "=")
+		if isSensitiveGitEnvKey(key) {
+			continue
+		}
+		sanitized = append(sanitized, kv)
+	}
+	return sanitized
+}
+
+func isSensitiveGitEnvKey(key string) bool {
+	upperKey := strings.ToUpper(key)
+	for _, name := range sensitiveGitEnvNames {
+		if upperKey == name {
+			return true
+		}
+	}
+	return false
 }
 
 // CredentialPattern is used to inform AuthenticatedCommand which patterns Git should match

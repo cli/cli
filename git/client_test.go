@@ -2417,3 +2417,32 @@ func TestClientWorktreePrune(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "path/to/git worktree prune", strings.Join(cmd.Args[3:], " "))
 }
+
+func TestClientCommand_SanitizeEnv(t *testing.T) {
+	t.Setenv("GH_TOKEN", "secret-gh-token")
+	t.Setenv("gh_token", "secret-gh-token-lower")
+	t.Setenv("GITHUB_TOKEN", "secret-github-token")
+	t.Setenv("GH_ENTERPRISE_TOKEN", "secret-enterprise-token")
+	t.Setenv("GITHUB_ENTERPRISE_TOKEN", "secret-github-enterprise-token")
+	t.Setenv("CUSTOM_SAFE_VAR", "safe-value")
+
+	client := Client{
+		GitPath: "path/to/git",
+	}
+
+	cmd, err := client.Command(context.Background(), "status")
+	require.NoError(t, err)
+	require.NotNil(t, cmd.Cmd.Env)
+
+	envMap := make(map[string]string)
+	for _, kv := range cmd.Cmd.Env {
+		k, v, _ := strings.Cut(kv, "=")
+		envMap[strings.ToUpper(k)] = v
+	}
+
+	assert.NotContains(t, envMap, "GH_TOKEN")
+	assert.NotContains(t, envMap, "GITHUB_TOKEN")
+	assert.NotContains(t, envMap, "GH_ENTERPRISE_TOKEN")
+	assert.NotContains(t, envMap, "GITHUB_ENTERPRISE_TOKEN")
+	assert.Equal(t, "safe-value", envMap["CUSTOM_SAFE_VAR"])
+}
