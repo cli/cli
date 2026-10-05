@@ -72,6 +72,9 @@ type IOStreams struct {
 	progressIndicatorMu      sync.Mutex
 	spinnerDisabled          bool
 
+	progressIndicatorInterruptCh chan os.Signal
+	progressIndicatorDoneCh      chan struct{}
+
 	alternateScreenBufferEnabled bool
 	alternateScreenBufferActive  bool
 	alternateScreenBufferMu      sync.Mutex
@@ -338,6 +341,30 @@ func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 
 	sp.Start()
 	s.progressIndicator = sp
+
+	// The spinner hides the terminal cursor and only restores it when it
+	// is stopped. If the process is interrupted while the spinner is
+	// running, it would exit without stopping the spinner, leaving the
+	// cursor hidden (https://github.com/cli/cli/issues/14601). Watch for
+	// an interrupt, stop the spinner to restore the cursor, then
+	// re-deliver the signal so the process terminates as it would have
+	// without this handler. StopProgressIndicator removes the handler
+	// and releases this goroutine when the spinner stops normally.
+	interruptCh := make(chan os.Signal, 1)
+	signal.Notify(interruptCh, os.Interrupt)
+	doneCh := make(chan struct{})
+	s.progressIndicatorInterruptCh = interruptCh
+	s.progressIndicatorDoneCh = doneCh
+	go func() {
+		select {
+		case <-interruptCh:
+			s.StopProgressIndicator()
+			if proc, err := os.FindProcess(os.Getpid()); err == nil {
+				_ = proc.Signal(os.Interrupt)
+			}
+		case <-doneCh:
+		}
+	}()
 }
 
 func (s *IOStreams) startTextualProgressIndicator(label string) {
@@ -364,6 +391,14 @@ func (s *IOStreams) startTextualProgressIndicator(label string) {
 func (s *IOStreams) StopProgressIndicator() {
 	s.progressIndicatorMu.Lock()
 	defer s.progressIndicatorMu.Unlock()
+	if s.progressIndicatorInterruptCh != nil {
+		signal.Stop(s.progressIndicatorInterruptCh)
+		s.progressIndicatorInterruptCh = nil
+	}
+	if s.progressIndicatorDoneCh != nil {
+		close(s.progressIndicatorDoneCh)
+		s.progressIndicatorDoneCh = nil
+	}
 	if s.progressIndicator == nil {
 		return
 	}
