@@ -380,11 +380,13 @@ pkgin install gh
 
 The [GitHub CLI package](https://search.nixos.org/packages?query=gh&sort=relevance&show=gh) is supported by the NixOS community with updates powered by [NixOS/nixpkgs](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name/gh/gh).
 
-To install:
+For temporary use:
 
 ```bash
-nix-env -iA nixos.gh
+nix-shell -p gh
 ```
+
+For permanent installation, see the [NixOS package instructions](https://search.nixos.org/packages?query=gh&sort=relevance&show=gh) to declare `pkgs.gh` in your NixOS configuration or Home Manager.
 
 ### OpenBSD
 
