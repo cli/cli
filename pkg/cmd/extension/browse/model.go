@@ -13,10 +13,12 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 type browseModel struct {
 	opts        ExtBrowseOpts
+	colors      *iostreams.ColorScheme
 	entries     []extEntry
 	filtered    []int
 	cursor      int
@@ -105,7 +107,7 @@ page up: scroll readme up`
 
 func newBrowseModel(opts ExtBrowseOpts, entries []extEntry) *browseModel {
 	filterInput := textinput.New()
-	filterInput.Prompt = "filter: "
+	filterInput.Prompt = ""
 
 	filtered := make([]int, len(entries))
 	for i := range entries {
@@ -117,9 +119,14 @@ func newBrowseModel(opts ExtBrowseOpts, entries []extEntry) *browseModel {
 	if opts.Logger == nil {
 		opts.Logger = log.New(io.Discard, "", 0)
 	}
+	colors := &iostreams.ColorScheme{}
+	if opts.IO != nil {
+		colors = opts.IO.ColorScheme()
+	}
 
 	model := &browseModel{
 		opts:        opts,
+		colors:      colors,
 		entries:     entries,
 		filtered:    filtered,
 		filterInput: filterInput,
@@ -140,6 +147,7 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.resizeFilter()
 		m.resizeReadme()
 		if m.readmeRaw != "" {
 			return m, m.renderLoadedReadme()
@@ -347,20 +355,21 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *browseModel) View() tea.View {
 	if m.page == helpPage {
-		view := tea.NewView(helpText)
+		view := tea.NewView(m.helpView())
 		view.AltScreen = true
 		return view
 	}
 
 	if m.page == readmePage {
-		view := tea.NewView(m.readme.View())
+		view := tea.NewView(m.readmePaneView())
 		view.AltScreen = true
 		return view
 	}
 
 	var content strings.Builder
-	fmt.Fprintf(&content, "browsing %d gh extensions\n", len(m.entries))
-	content.WriteString(m.filterInput.View())
+	content.WriteString(m.headerView())
+	content.WriteByte('\n')
+	content.WriteString(m.filterView())
 	content.WriteByte('\n')
 	content.WriteString(m.mainContent())
 	content.WriteByte('\n')
@@ -399,11 +408,14 @@ func (m *browseModel) setInstalled(fullName string, installed bool) {
 }
 
 func (m *browseModel) mainContent() string {
-	list := m.listView()
+	list := lipgloss.NewStyle().
+		Width(m.listWidth()).
+		Height(m.mainHeight()).
+		Render(m.listView())
 	if m.singleColumn() {
 		return list
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, list, " │ ", m.readme.View())
+	return lipgloss.JoinHorizontal(lipgloss.Top, list, m.readmePaneView())
 }
 
 func (m *browseModel) footerView() string {
@@ -414,10 +426,25 @@ func (m *browseModel) footerView() string {
 	case m.readmeState == readmeLoading:
 		footer = "fetching readme..."
 	default:
-		const (
-			full    = "? help  j/k move  i install  r remove  w web  enter view readme  q quit"
-			compact = "? help  j/k move  enter readme  q quit"
-			minimal = "? help  q quit"
+		var (
+			full = fmt.Sprintf(
+				"%s help  %s move  %s install  %s remove  %s web  %s view readme  %s quit",
+				m.colors.Bold("?"),
+				m.colors.Bold("j/k"),
+				m.colors.Bold("i"),
+				m.colors.Bold("r"),
+				m.colors.Bold("w"),
+				m.colors.Bold("enter"),
+				m.colors.Bold("q"),
+			)
+			compact = fmt.Sprintf(
+				"%s help  %s move  %s readme  %s quit",
+				m.colors.Bold("?"),
+				m.colors.Bold("j/k"),
+				m.colors.Bold("enter"),
+				m.colors.Bold("q"),
+			)
+			minimal = fmt.Sprintf("%s help  %s quit", m.colors.Bold("?"), m.colors.Bold("q"))
 		)
 		switch {
 		case m.width <= 0 || lipgloss.Width(full) <= m.width:
@@ -439,7 +466,7 @@ func (m *browseModel) listView() string {
 		return "no matching extensions"
 	}
 
-	var content strings.Builder
+	lines := make([]string, 0, m.pageSize()*2)
 	pageSize := m.pageSize()
 	start := min((m.cursor/pageSize)*pageSize, max(len(m.filtered)-pageSize, 0))
 	end := min(start+pageSize, len(m.filtered))
@@ -450,19 +477,31 @@ func (m *browseModel) listView() string {
 			prefix = "> "
 		}
 		title := prefix + entry.FullName
-		if entry.Official {
-			title += " (official)"
+		switch {
+		case i == m.cursor:
+			if entry.Official {
+				title += " (official)"
+			}
+			if entry.Installed {
+				title += " (installed)"
+			}
+			title = lipgloss.NewStyle().Reverse(true).Render(title)
+		default:
+			title = m.colors.Bold(title)
+			if entry.Official {
+				title += " " + m.colors.Yellow("(official)")
+			}
+			if entry.Installed {
+				title += " " + m.colors.Green("(installed)")
+			}
 		}
-		if entry.Installed {
-			title += " (installed)"
-		}
-		content.WriteString(renderListLine(title, m.listWidth()))
-		content.WriteByte('\n')
-		content.WriteString(renderListLine("  "+entry.Description(), m.listWidth()))
-		content.WriteByte('\n')
+		lines = append(lines,
+			renderListLine(title, m.listWidth()),
+			renderListLine(m.colors.Muted("  "+entry.Description()), m.listWidth()),
+		)
 	}
 
-	return content.String()
+	return strings.Join(lines, "\n")
 }
 
 func (m *browseModel) singleColumn() bool {
@@ -473,24 +512,24 @@ func (m *browseModel) listWidth() int {
 	if m.singleColumn() || m.width <= 0 {
 		return m.width
 	}
-	return max((m.width-3)/2, 1)
+	return max(m.width/2, 1)
 }
 
 func (m *browseModel) readmeWidth() int {
 	if m.page == readmePage {
-		return max(m.width, 20)
+		return max(m.width-2, 1)
 	}
 	if m.singleColumn() {
-		return max(m.width-2, 20)
+		return max(m.width-2, 1)
 	}
-	return max(m.width-m.listWidth()-3, 20)
+	return max(m.width-m.listWidth()-2, 1)
 }
 
 func (m *browseModel) pageSize() int {
-	if m.height <= 5 {
+	if m.mainHeight() <= 1 {
 		return 1
 	}
-	return max((m.height-4)/2, 1)
+	return max(m.mainHeight()/2, 1)
 }
 
 func (m *browseModel) moveByPage(direction int) tea.Cmd {
@@ -504,10 +543,10 @@ func (m *browseModel) moveByPage(direction int) tea.Cmd {
 func (m *browseModel) resizeReadme() {
 	m.readme.SetWidth(m.readmeWidth())
 	if m.page == readmePage {
-		m.readme.SetHeight(max(m.height, 1))
+		m.readme.SetHeight(max(m.height-2, 1))
 		return
 	}
-	m.readme.SetHeight(max(m.height-4, 1))
+	m.readme.SetHeight(max(m.mainHeight()-2, 1))
 }
 
 func (m *browseModel) loadSelectedReadme() tea.Cmd {
@@ -583,4 +622,63 @@ func truncateLines(content string, width int) string {
 		lines[i] = ansi.Truncate(lines[i], width, "")
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (m *browseModel) headerView() string {
+	header := m.colors.Bold(fmt.Sprintf("browsing %d gh extensions", len(m.entries)))
+	if m.width <= 0 {
+		return header
+	}
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Align(lipgloss.Center).
+		Render(header)
+}
+
+func (m *browseModel) filterView() string {
+	label := m.colors.Bold("filter:")
+	if m.filtering {
+		label = m.colors.CyanBold("filter:")
+	}
+	filter := label + " " + m.filterInput.View()
+	if m.width <= 0 {
+		return filter
+	}
+	return renderListLine(filter, m.width)
+}
+
+func (m *browseModel) helpView() string {
+	lines := strings.Split(helpText, "\n")
+	for i, line := range lines {
+		switch line {
+		case "Application", "Navigation", "Extension Management", "Filtering", "Readmes":
+			lines[i] = m.colors.Bold(line)
+		default:
+			key, description, ok := strings.Cut(line, ":")
+			if ok && key != "" {
+				lines[i] = m.colors.Bold(key) + ":" + description
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *browseModel) readmePaneView() string {
+	style := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		Width(m.readme.Width()).
+		Height(m.readme.Height())
+	if m.colors.Enabled {
+		style = style.BorderForeground(lipgloss.Color("5"))
+	}
+	return style.Render(m.readme.View())
+}
+
+func (m *browseModel) mainHeight() int {
+	return max(m.height-4, 1)
+}
+
+func (m *browseModel) resizeFilter() {
+	labelWidth := lipgloss.Width("filter: ")
+	m.filterInput.SetWidth(max(m.width-labelWidth, 1))
 }

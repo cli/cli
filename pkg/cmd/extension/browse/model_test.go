@@ -8,8 +8,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -115,6 +117,42 @@ func TestBrowseModelKeepsFooterWithinTerminalWidth(t *testing.T) {
 	}
 }
 
+func TestBrowseModelProvidesVisualHierarchyInWideLayout(t *testing.T) {
+	t.Parallel()
+
+	// Given color is enabled and an installed official extension is selected
+	ios, _, _, _ := iostreams.Test()
+	ios.SetColorEnabled(true)
+	model := newBrowseModel(ExtBrowseOpts{IO: ios}, []extEntry{
+		{
+			FullName:    "octo/gh-triage",
+			description: "issue management",
+		},
+		{
+			FullName:    "cli/gh-cool",
+			description: "terminal tools",
+			Official:    true,
+			Installed:   true,
+		},
+	})
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 120, Height: 20})
+
+	// When the wide layout is rendered
+	view := model.View().Content
+	lines := strings.Split(view, "\n")
+	plainHeader := ansi.Strip(lines[0])
+
+	// Then the heading, selection, statuses, README, and key hints have distinct styling
+	assert.Equal(t, "browsing 2 gh extensions", strings.TrimSpace(plainHeader))
+	assert.InDelta(t, strings.Index(plainHeader, "browsing"), len(plainHeader)-strings.LastIndex(plainHeader, "extensions")-len("extensions"), 1)
+	assert.Contains(t, view, "\x1b[7m")
+	assert.Regexp(t, `\x1b\[[0-9;]*33m\(official\)\x1b\[0m`, view)
+	assert.Regexp(t, `\x1b\[[0-9;]*32m\(installed\)\x1b\[0m`, view)
+	assert.Contains(t, view, "┌")
+	assert.Contains(t, view, "┐")
+	assert.Regexp(t, `\x1b\[[0-9;]*1[0-9;]*m\?\x1b\[0m`, view)
+}
+
 func TestBrowseModelFiltersExtensions(t *testing.T) {
 	t.Parallel()
 
@@ -179,7 +217,9 @@ func TestBrowseModelShowsKeyboardHelp(t *testing.T) {
 	t.Parallel()
 
 	// Given the main extension catalog is displayed
-	model := newBrowseModel(ExtBrowseOpts{}, []extEntry{
+	ios, _, _, _ := iostreams.Test()
+	ios.SetColorEnabled(true)
+	model := newBrowseModel(ExtBrowseOpts{IO: ios}, []extEntry{
 		{FullName: "cli/gh-cool", description: "terminal tools"},
 	})
 
@@ -193,6 +233,8 @@ func TestBrowseModelShowsKeyboardHelp(t *testing.T) {
 	assert.Contains(t, view, "Extension Management")
 	assert.Contains(t, view, "Filtering")
 	assert.Contains(t, view, "Readmes")
+	assert.Regexp(t, `\x1b\[[0-9;]*1[0-9;]*mApplication\x1b\[0m`, view)
+	assert.Regexp(t, `\x1b\[[0-9;]*1[0-9;]*m\?\x1b\[0m: toggle help`, view)
 }
 
 func TestBrowseModelPreviewsSelectedReadme(t *testing.T) {
@@ -279,10 +321,10 @@ func TestBrowseModelRerendersReadmeLoadedDuringResize(t *testing.T) {
 	// Then the README is rerendered for the current preview width
 	require.NotNil(t, rerender)
 	updateBrowseModel(t, model, rerender())
-	assert.Contains(t, model.View().Content, "width:99")
+	assert.Contains(t, model.View().Content, "width:98")
 }
 
-func TestBrowseModelRendersFullScreenReadmeAtTerminalWidth(t *testing.T) {
+func TestBrowseModelRendersFullScreenReadmeWithinTerminalWidth(t *testing.T) {
 	t.Parallel()
 
 	// Given the selected README is loaded in the two-column layout
@@ -302,10 +344,10 @@ func TestBrowseModelRendersFullScreenReadmeAtTerminalWidth(t *testing.T) {
 	// When the user opens the README full screen
 	rerender := updateBrowseModel(t, model, specialKey(tea.KeyEnter, 0))
 
-	// Then the README is rerendered at the full terminal width
+	// Then the README is rerendered within the full-screen border
 	require.NotNil(t, rerender)
 	updateBrowseModel(t, model, rerender())
-	assert.Contains(t, model.View().Content, "width:120")
+	assert.Contains(t, model.View().Content, "width:118")
 }
 
 func TestBrowseModelUsesSingleColumnInNarrowTerminal(t *testing.T) {
