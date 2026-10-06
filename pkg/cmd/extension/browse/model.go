@@ -497,7 +497,7 @@ func (m *browseModel) listView() string {
 		}
 		lines = append(lines,
 			renderListLine(title, m.listWidth()),
-			renderListLine(m.colors.Muted("  "+entry.Description()), m.listWidth()),
+			renderListLine("  "+entry.Description(), m.listWidth()),
 		)
 	}
 

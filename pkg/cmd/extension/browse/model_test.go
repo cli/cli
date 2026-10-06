@@ -153,6 +153,27 @@ func TestBrowseModelProvidesVisualHierarchyInWideLayout(t *testing.T) {
 	assert.Regexp(t, `\x1b\[[0-9;]*1[0-9;]*m\?\x1b\[0m`, view)
 }
 
+func TestBrowseModelKeepsDescriptionsReadableWithColorEnabled(t *testing.T) {
+	t.Parallel()
+
+	// Given color is enabled for a catalog entry with a description
+	ios, _, _, _ := iostreams.Test()
+	ios.SetColorEnabled(true)
+	model := newBrowseModel(ExtBrowseOpts{IO: ios}, []extEntry{
+		{
+			FullName:    "octo/gh-triage",
+			description: "issue management",
+		},
+	})
+
+	// When the extension list is rendered
+	description := strings.Split(model.listView(), "\n")[1]
+
+	// Then the description uses the terminal's default foreground instead of a fixed low-contrast color
+	assert.Equal(t, "issue management", strings.TrimSpace(ansi.Strip(description)))
+	assert.NotContains(t, description, "\x1b[")
+}
+
 func TestBrowseModelFiltersExtensions(t *testing.T) {
 	t.Parallel()
 
