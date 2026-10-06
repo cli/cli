@@ -217,12 +217,9 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	keystroke := key.Keystroke()
+	keystroke := key.String()
 	if keystroke == "ctrl+c" {
 		return m, tea.Quit
-	}
-	if !m.actionBusy {
-		m.status = ""
 	}
 
 	if m.page == readmePage {
@@ -245,6 +242,10 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if !m.actionBusy {
+		m.status = ""
+	}
+
 	if m.filtering {
 		switch keystroke {
 		case "enter":
@@ -255,16 +256,19 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.filterInput.SetValue("")
 			m.filtering = false
 			m.filterInput.Blur()
-			m.applyFilter()
-			return m, m.loadSelectedReadme()
+			if m.applyFilter() {
+				return m, m.loadSelectedReadme()
+			}
+			return m, nil
 		}
 
 		previous := m.filterInput.Value()
 		var cmd tea.Cmd
 		m.filterInput, cmd = m.filterInput.Update(msg)
 		if m.filterInput.Value() != previous {
-			m.applyFilter()
-			return m, m.loadSelectedReadme()
+			if m.applyFilter() {
+				return m, m.loadSelectedReadme()
+			}
 		}
 		return m, cmd
 	}
@@ -273,6 +277,9 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.page = helpPage
 	case "q":
+		if m.actionBusy {
+			return m, nil
+		}
 		return m, tea.Quit
 	case "j", "down":
 		if m.cursor < len(m.filtered)-1 {
@@ -346,14 +353,25 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case "esc":
 		m.filterInput.SetValue("")
-		m.applyFilter()
-		return m, m.loadSelectedReadme()
+		if m.applyFilter() {
+			return m, m.loadSelectedReadme()
+		}
 	}
 
 	return m, nil
 }
 
 func (m *browseModel) View() tea.View {
+	if m.height > 0 && m.height < 6 {
+		content := "terminal too small"
+		if m.width > 0 {
+			content = ansi.Truncate(content, m.width, "")
+		}
+		view := tea.NewView(content)
+		view.AltScreen = true
+		return view
+	}
+
 	if m.page == helpPage {
 		view := tea.NewView(m.helpView())
 		view.AltScreen = true
@@ -387,15 +405,25 @@ func (m *browseModel) selectedEntry() (extEntry, bool) {
 	return m.entries[m.filtered[m.cursor]], true
 }
 
-func (m *browseModel) applyFilter() {
+func (m *browseModel) applyFilter() bool {
+	previous, hadPrevious := m.selectedEntry()
 	filter := m.filterInput.Value()
 	m.filtered = m.filtered[:0]
 	for i, entry := range m.entries {
-		if filter == "" || strings.Contains(entry.FullName+entry.Description(), filter) {
+		searchable := entry.FullName + entry.Description()
+		if entry.Official {
+			searchable += " official"
+		}
+		if entry.Installed {
+			searchable += " installed"
+		}
+		if filter == "" || strings.Contains(searchable, filter) {
 			m.filtered = append(m.filtered, i)
 		}
 	}
 	m.cursor = 0
+	selected, hasSelected := m.selectedEntry()
+	return hadPrevious != hasSelected || previous.FullName != selected.FullName
 }
 
 func (m *browseModel) setInstalled(fullName string, installed bool) {
