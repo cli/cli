@@ -73,7 +73,21 @@ func TestIsOfficial(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, IsOfficial(tt.extName, tt.extOwner))
+			ext := &ExtensionMock{
+				NameFunc:  func() string { return tt.extName },
+				OwnerFunc: func() string { return tt.extOwner },
+			}
+			assert.Equal(t, tt.want, IsOfficial(ext))
 		})
 	}
+}
+
+func TestIsOfficial_DoesNotResolveOwnerForUnofficialNames(t *testing.T) {
+	ext := &ExtensionMock{
+		NameFunc:  func() string { return "my-custom-ext" },
+		OwnerFunc: func() string { return "someone" },
+	}
+
+	assert.False(t, IsOfficial(ext))
+	assert.Empty(t, ext.OwnerCalls())
 }
