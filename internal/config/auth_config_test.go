@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -14,7 +15,16 @@ import (
 // Note that NewIsolatedTestConfig sets up a Mock keyring as well
 func newTestAuthConfig(t *testing.T) *AuthConfig {
 	cfg, _ := NewIsolatedTestConfig(t, "")
-	return &AuthConfig{cfg: cfg.cfg}
+	// Neutralize the cross-process lock and disk reload so tests never take a real filesystem lock or read from disk.
+	return &AuthConfig{
+		cfg: cfg.cfg,
+		acquireRefreshLock: func(ctx context.Context, path string) (func(), error) {
+			return func() {}, nil
+		},
+		reloadConfig: func() error {
+			return nil
+		},
+	}
 }
 
 func TestTokenFromKeyring(t *testing.T) {
@@ -84,8 +94,8 @@ func TestTokenStoredInConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	cred1 := authCfg.ActiveToken("github.com")
-	token, source := cred1.Token, cred1.Source
+	cred := authCfg.ActiveToken("github.com")
+	token, source := cred.Token, cred.Source
 
 	// Then the token is successfully fetched
 	// and the source is set to oauth_token but this isn't great:
@@ -100,8 +110,8 @@ func TestTokenStoredInEnv(t *testing.T) {
 	t.Setenv("GH_TOKEN", "test-token")
 
 	// When we get the token
-	cred2 := authCfg.ActiveToken("github.com")
-	token, source := cred2.Token, cred2.Source
+	cred := authCfg.ActiveToken("github.com")
+	token, source := cred.Token, cred.Source
 
 	// Then the token is successfully fetched
 	// and the source is set to the name of the env var
@@ -116,8 +126,8 @@ func TestTokenStoredInKeyring(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	cred3 := authCfg.ActiveToken("github.com")
-	token, source := cred3.Token, cred3.Source
+	cred := authCfg.ActiveToken("github.com")
+	token, source := cred.Token, cred.Source
 
 	// Then the token is successfully fetched
 	// and the source is set to keyring
@@ -482,8 +492,8 @@ func TestSwitchUserMakesInsecureTokenActive(t *testing.T) {
 	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
 
 	// Their insecure token is now active
-	cred4 := authCfg.ActiveToken("github.com")
-	token, source := cred4.Token, cred4.Source
+	cred := authCfg.ActiveToken("github.com")
+	token, source := cred.Token, cred.Source
 	require.Equal(t, "test-token-1", token)
 	require.Equal(t, oauthTokenKey, source)
 }
@@ -542,8 +552,8 @@ func TestSwitchUserErrorsAndRestoresUserAndInsecureConfigUnderFailure(t *testing
 	require.NoError(t, err)
 	require.Equal(t, "test-user-2", activeUser)
 
-	cred5 := authCfg.ActiveToken("github.com")
-	token, source := cred5.Token, cred5.Source
+	cred := authCfg.ActiveToken("github.com")
+	token, source := cred.Token, cred.Source
 	require.Equal(t, "test-token-2", token)
 	require.Equal(t, "oauth_token", source)
 }
@@ -569,8 +579,8 @@ func TestSwitchUserErrorsAndRestoresUserAndKeyringUnderFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "test-user-2", activeUser)
 
-	cred6 := authCfg.ActiveToken("github.com")
-	token, source := cred6.Token, cred6.Source
+	cred := authCfg.ActiveToken("github.com")
+	token, source := cred.Token, cred.Source
 	require.Equal(t, "test-token-2", token)
 	require.Equal(t, "keyring", source)
 }
@@ -639,13 +649,12 @@ func TestTokenForUserSecureLogin(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	cred7, err := authCfg.TokenForUser("github.com", "test-user-1")
-	token, source := cred7.Token, cred7.Source
+	cred, err := authCfg.TokenForUser("github.com", "test-user-1")
 
 	// Then it returns the token and the source as keyring
 	require.NoError(t, err)
-	require.Equal(t, "test-token", token)
-	require.Equal(t, "keyring", source)
+	require.Equal(t, "test-token", cred.Token)
+	require.Equal(t, "keyring", cred.Source)
 }
 
 func TestTokenForUserInsecureLogin(t *testing.T) {
@@ -655,13 +664,12 @@ func TestTokenForUserInsecureLogin(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	cred8, err := authCfg.TokenForUser("github.com", "test-user-1")
-	token, source := cred8.Token, cred8.Source
+	cred, err := authCfg.TokenForUser("github.com", "test-user-1")
 
 	// Then it returns the token and the source as oauth_token
 	require.NoError(t, err)
-	require.Equal(t, "test-token", token)
-	require.Equal(t, "oauth_token", source)
+	require.Equal(t, "test-token", cred.Token)
+	require.Equal(t, "oauth_token", cred.Source)
 }
 
 func TestTokenForUserNotFoundErrors(t *testing.T) {
@@ -702,7 +710,7 @@ func TestUserWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the user correctly
@@ -719,7 +727,7 @@ func TestGitProtocolWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the git protocol correctly
@@ -736,7 +744,7 @@ func TestHostsWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the hosts correctly
@@ -752,7 +760,7 @@ func TestDefaultHostWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then the default host is still the enterprise host
@@ -769,12 +777,12 @@ func TestTokenWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the token correctly
-	cred10 := authCfg.ActiveToken("github.com")
-	token, source := cred10.Token, cred10.Source
+	cred := authCfg.ActiveToken("github.com")
+	token, source := cred.Token, cred.Source
 	require.Equal(t, "test-token", token)
 	require.Equal(t, oauthTokenKey, source)
 }
@@ -790,8 +798,8 @@ func TestTokenPrioritizesActiveUserToken(t *testing.T) {
 	authCfg.cfg.Remove([]string{hostsKey, "github.com", userKey})
 
 	// And get the token from the auth config
-	cred11 := authCfg.ActiveToken("github.com")
-	token, source := cred11.Token, cred11.Source
+	cred := authCfg.ActiveToken("github.com")
+	token, source := cred.Token, cred.Source
 
 	// Then it returns the token from the keyring active slot
 	require.Equal(t, "keyring", source)
@@ -801,8 +809,8 @@ func TestTokenPrioritizesActiveUserToken(t *testing.T) {
 	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user1")
 
 	// And get the token from the auth config
-	cred12 := authCfg.ActiveToken("github.com")
-	token, source = cred12.Token, cred12.Source
+	cred = authCfg.ActiveToken("github.com")
+	token, source = cred.Token, cred.Source
 
 	// Then it returns the token from the active user entry in the keyring
 	require.Equal(t, "keyring", source)
@@ -812,8 +820,8 @@ func TestTokenPrioritizesActiveUserToken(t *testing.T) {
 	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user2")
 
 	// And get the token from the auth config
-	cred13 := authCfg.ActiveToken("github.com")
-	token, source = cred13.Token, cred13.Source
+	cred = authCfg.ActiveToken("github.com")
+	token, source = cred.Token, cred.Source
 
 	// Then it returns the token from the active user entry in the keyring
 	require.Equal(t, "keyring", source)
@@ -831,8 +839,8 @@ func TestTokenWithActiveUserNotInKeyringFallsBackToBlank(t *testing.T) {
 	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user3")
 
 	// And get the token from the auth config
-	cred14 := authCfg.ActiveToken("github.com")
-	token, source := cred14.Token, cred14.Source
+	cred := authCfg.ActiveToken("github.com")
+	token, source := cred.Token, cred.Source
 
 	// Then it returns successfully with the fallback token
 	require.Equal(t, "keyring", source)
@@ -851,7 +859,7 @@ func TestLogoutRightAfterMigrationRemovesHost(t *testing.T) {
 
 	// When we migrate and logout
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	require.NoError(t, authCfg.Logout(host, user))
@@ -866,7 +874,7 @@ func TestLoginInsecurePostMigrationUsesConfigForToken(t *testing.T) {
 
 	// When we migrate and login with insecure storage
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
@@ -885,7 +893,7 @@ func TestLoginPostMigrationSetsGitProtocol(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
@@ -904,7 +912,7 @@ func TestLoginPostMigrationSetsUser(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
@@ -926,7 +934,7 @@ func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
 
 	// When we migrate and login again with secure storage
 	var m migration.MultiAccountDeprecated
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	_, err = authCfg.Login("github.com", "test-user", "test-token", "", true)
