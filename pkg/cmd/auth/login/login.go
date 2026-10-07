@@ -116,6 +116,9 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if tokenStdin {
+				if opts.IO.IsStdinTTY() {
+					return cmdutil.FlagErrorf("`--with-token` is intended to receive the token noninteractively through standard input, but standard input is a terminal\n\nPipe the token in instead, e.g. `gh auth login --with-token < mytoken.txt`, or run `gh auth login` for interactive setup")
+				}
 				defer opts.IO.In.Close()
 				token, err := io.ReadAll(opts.IO.In)
 				if err != nil {
