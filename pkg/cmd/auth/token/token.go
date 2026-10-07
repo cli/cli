@@ -78,9 +78,10 @@ func tokenRun(opts *TokenOptions) error {
 		}
 	} else {
 		if opts.Username == "" {
-			val, _ = authCfg.ActiveToken(hostname)
+			val = authCfg.ActiveToken(hostname).Token
 		} else {
-			val, _, _ = authCfg.TokenForUser(hostname, opts.Username)
+			cred, _ := authCfg.TokenForUser(hostname, opts.Username)
+			val = cred.Token
 		}
 	}
 

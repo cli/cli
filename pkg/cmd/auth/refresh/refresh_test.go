@@ -597,7 +597,7 @@ func Test_refreshRun(t *testing.T) {
 
 			authCfg := cfg.Authentication()
 			activeUser, _ := authCfg.ActiveUser(aa.hostname)
-			activeToken, _ := authCfg.ActiveToken(aa.hostname)
+			activeToken := authCfg.ActiveToken(aa.hostname).Token
 			require.Equal(t, "test-user", activeUser)
 			require.Equal(t, "xyz456", activeToken)
 		})

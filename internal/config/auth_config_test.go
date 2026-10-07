@@ -84,7 +84,8 @@ func TestTokenStoredInConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	token, source := authCfg.ActiveToken("github.com")
+	cred1 := authCfg.ActiveToken("github.com")
+	token, source := cred1.Token, cred1.Source
 
 	// Then the token is successfully fetched
 	// and the source is set to oauth_token but this isn't great:
@@ -99,7 +100,8 @@ func TestTokenStoredInEnv(t *testing.T) {
 	t.Setenv("GH_TOKEN", "test-token")
 
 	// When we get the token
-	token, source := authCfg.ActiveToken("github.com")
+	cred2 := authCfg.ActiveToken("github.com")
+	token, source := cred2.Token, cred2.Source
 
 	// Then the token is successfully fetched
 	// and the source is set to the name of the env var
@@ -114,7 +116,8 @@ func TestTokenStoredInKeyring(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	token, source := authCfg.ActiveToken("github.com")
+	cred3 := authCfg.ActiveToken("github.com")
+	token, source := cred3.Token, cred3.Source
 
 	// Then the token is successfully fetched
 	// and the source is set to keyring
@@ -479,7 +482,8 @@ func TestSwitchUserMakesInsecureTokenActive(t *testing.T) {
 	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
 
 	// Their insecure token is now active
-	token, source := authCfg.ActiveToken("github.com")
+	cred4 := authCfg.ActiveToken("github.com")
+	token, source := cred4.Token, cred4.Source
 	require.Equal(t, "test-token-1", token)
 	require.Equal(t, oauthTokenKey, source)
 }
@@ -538,7 +542,8 @@ func TestSwitchUserErrorsAndRestoresUserAndInsecureConfigUnderFailure(t *testing
 	require.NoError(t, err)
 	require.Equal(t, "test-user-2", activeUser)
 
-	token, source := authCfg.ActiveToken("github.com")
+	cred5 := authCfg.ActiveToken("github.com")
+	token, source := cred5.Token, cred5.Source
 	require.Equal(t, "test-token-2", token)
 	require.Equal(t, "oauth_token", source)
 }
@@ -564,7 +569,8 @@ func TestSwitchUserErrorsAndRestoresUserAndKeyringUnderFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "test-user-2", activeUser)
 
-	token, source := authCfg.ActiveToken("github.com")
+	cred6 := authCfg.ActiveToken("github.com")
+	token, source := cred6.Token, cred6.Source
 	require.Equal(t, "test-token-2", token)
 	require.Equal(t, "keyring", source)
 }
@@ -633,7 +639,8 @@ func TestTokenForUserSecureLogin(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	token, source, err := authCfg.TokenForUser("github.com", "test-user-1")
+	cred7, err := authCfg.TokenForUser("github.com", "test-user-1")
+	token, source := cred7.Token, cred7.Source
 
 	// Then it returns the token and the source as keyring
 	require.NoError(t, err)
@@ -648,7 +655,8 @@ func TestTokenForUserInsecureLogin(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	token, source, err := authCfg.TokenForUser("github.com", "test-user-1")
+	cred8, err := authCfg.TokenForUser("github.com", "test-user-1")
+	token, source := cred8.Token, cred8.Source
 
 	// Then it returns the token and the source as oauth_token
 	require.NoError(t, err)
@@ -661,7 +669,7 @@ func TestTokenForUserNotFoundErrors(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	// When we get the token
-	_, _, err := authCfg.TokenForUser("github.com", "test-user-1")
+	_, err := authCfg.TokenForUser("github.com", "test-user-1")
 
 	// Then it returns an error
 	require.EqualError(t, err, "no token found for 'test-user-1'")
@@ -765,7 +773,8 @@ func TestTokenWorksRightAfterMigration(t *testing.T) {
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the token correctly
-	token, source := authCfg.ActiveToken("github.com")
+	cred10 := authCfg.ActiveToken("github.com")
+	token, source := cred10.Token, cred10.Source
 	require.Equal(t, "test-token", token)
 	require.Equal(t, oauthTokenKey, source)
 }
@@ -781,7 +790,8 @@ func TestTokenPrioritizesActiveUserToken(t *testing.T) {
 	authCfg.cfg.Remove([]string{hostsKey, "github.com", userKey})
 
 	// And get the token from the auth config
-	token, source := authCfg.ActiveToken("github.com")
+	cred11 := authCfg.ActiveToken("github.com")
+	token, source := cred11.Token, cred11.Source
 
 	// Then it returns the token from the keyring active slot
 	require.Equal(t, "keyring", source)
@@ -791,7 +801,8 @@ func TestTokenPrioritizesActiveUserToken(t *testing.T) {
 	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user1")
 
 	// And get the token from the auth config
-	token, source = authCfg.ActiveToken("github.com")
+	cred12 := authCfg.ActiveToken("github.com")
+	token, source = cred12.Token, cred12.Source
 
 	// Then it returns the token from the active user entry in the keyring
 	require.Equal(t, "keyring", source)
@@ -801,7 +812,8 @@ func TestTokenPrioritizesActiveUserToken(t *testing.T) {
 	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user2")
 
 	// And get the token from the auth config
-	token, source = authCfg.ActiveToken("github.com")
+	cred13 := authCfg.ActiveToken("github.com")
+	token, source = cred13.Token, cred13.Source
 
 	// Then it returns the token from the active user entry in the keyring
 	require.Equal(t, "keyring", source)
@@ -819,7 +831,8 @@ func TestTokenWithActiveUserNotInKeyringFallsBackToBlank(t *testing.T) {
 	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user3")
 
 	// And get the token from the auth config
-	token, source := authCfg.ActiveToken("github.com")
+	cred14 := authCfg.ActiveToken("github.com")
+	token, source := cred14.Token, cred14.Source
 
 	// Then it returns successfully with the fallback token
 	require.Equal(t, "keyring", source)
