@@ -75,10 +75,14 @@ func TestBrowseModelQuitsOnControlCWhileFiltering(t *testing.T) {
 func TestBrowseModelKeepsMainViewWithinTerminalHeight(t *testing.T) {
 	t.Parallel()
 
-	// Given extension descriptions and README lines are wider than their panes
+	// Given the README fills its viewport with unbreakable lines as wide as the preview
+	readmeLines := make([]string, 24)
+	for i := range readmeLines {
+		readmeLines[i] = strings.Repeat("界", 29)
+	}
 	model := newBrowseModel(ExtBrowseOpts{
 		Rg: readmeLoaderStub{
-			content: map[string]string{"cli/gh-cool": strings.Repeat("code", 80)},
+			content: map[string]string{"cli/gh-cool": strings.Join(readmeLines, "\n")},
 		},
 		renderReadme: func(markdown string, width int) (string, error) {
 			return markdown, nil
@@ -89,7 +93,7 @@ func TestBrowseModelKeepsMainViewWithinTerminalHeight(t *testing.T) {
 			description: strings.Repeat("description ", 30),
 		},
 	})
-	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 120, Height: 10})
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 120, Height: 30})
 	cmd := model.Init()
 	require.NotNil(t, cmd)
 	updateBrowseModel(t, model, cmd())
@@ -98,7 +102,7 @@ func TestBrowseModelKeepsMainViewWithinTerminalHeight(t *testing.T) {
 	view := model.View().Content
 
 	// Then wrapping does not push content beyond the terminal height
-	assert.LessOrEqual(t, strings.Count(view, "\n")+1, 10)
+	assert.LessOrEqual(t, strings.Count(view, "\n")+1, 30)
 }
 
 func TestBrowseModelUsesCompactFallbackInVeryShortTerminal(t *testing.T) {

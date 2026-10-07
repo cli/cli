@@ -694,8 +694,8 @@ func (m *browseModel) helpView() string {
 func (m *browseModel) readmePaneView() string {
 	style := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
-		Width(m.readme.Width()).
-		Height(m.readme.Height())
+		Width(m.readme.Width() + 2).
+		Height(m.readme.Height() + 2)
 	if m.colors.Enabled {
 		style = style.BorderForeground(lipgloss.Color("5"))
 	}
