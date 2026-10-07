@@ -18,6 +18,7 @@ flag exists).
 Human output from `gh` is column-formatted. If you want structured data:
 
 - Add `--json field1,field2,...` for structured output.
+- For `gh issue view` and `gh pr view`, use `--json ...,comments` to include comments in structured data; use `--comments` only with the human-readable view.
 - Run a command with `--json` and **no field list** to print the full set of
   available fields, then pick what you need.
 - Use `--jq '<expr>'` for filtering without piping through a separate `jq`.
