@@ -67,10 +67,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			stdinTTY: true,
 			stdin:    "def456",
 			cli:      "--with-token",
-			wants: LoginOptions{
-				Hostname: "github.com",
-				Token:    "def456",
-			},
+			wantsErr: true,
 		},
 		{
 			name:     "nontty, hostname",
@@ -104,10 +101,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			stdinTTY: true,
 			stdin:    "ghi789",
 			cli:      "--with-token --hostname brad.vickers",
-			wants: LoginOptions{
-				Hostname: "brad.vickers",
-				Token:    "ghi789",
-			},
+			wantsErr: true,
 		},
 		{
 			name:     "tty, hostname",
@@ -305,6 +299,32 @@ func Test_NewCmdLogin(t *testing.T) {
 			assert.Equal(t, tt.wants.Clipboard, gotOpts.Clipboard)
 		})
 	}
+}
+
+func Test_NewCmdLogin_withTokenTTYStdin(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	f := &cmdutil.Factory{
+		IOStreams: ios,
+	}
+
+	ios.SetStdoutTTY(true)
+	ios.SetStdinTTY(true)
+
+	cmd := NewCmdLogin(f, func(opts *LoginOptions) error {
+		return nil
+	})
+	// TODO cobra hack-around
+	cmd.Flags().BoolP("help", "x", false, "")
+
+	cmd.SetArgs([]string{"--with-token"})
+	cmd.SetIn(&bytes.Buffer{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	_, err := cmd.ExecuteC()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--with-token")
+	assert.Contains(t, err.Error(), "< mytoken.txt")
 }
 
 func Test_loginRun_nontty(t *testing.T) {
