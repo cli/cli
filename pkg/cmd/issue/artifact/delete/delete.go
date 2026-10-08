@@ -137,7 +137,8 @@ func deleteRun(opts *DeleteOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	if !opts.Confirmed {
-		if slices.ContainsFunc(lookups, func(l lookup) bool { return l.err != nil }) {
+		hasLookupFailure := slices.ContainsFunc(lookups, func(l lookup) bool { return l.err != nil })
+		if hasLookupFailure {
 			for _, l := range lookups {
 				if l.err != nil {
 					printFailure(opts.IO, l.number, l.err)
