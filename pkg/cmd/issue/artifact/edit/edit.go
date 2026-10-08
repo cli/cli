@@ -89,11 +89,11 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			var err error
 			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 			opts.ArtifactNumber, err = shared.ParseArtifactNumber(args[1])
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 
 			// An empty --body-file names no file, as in gh issue edit.

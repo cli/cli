@@ -320,9 +320,10 @@ func TestNewCmdCreate(t *testing.T) {
 			wantErr: "requires at least 1 arg(s), only received 0",
 		},
 		{
-			name:    "an issue argument that isn't an issue",
-			args:    "OAuth signin-plan.md",
-			wantErr: `invalid issue format: "OAuth"`,
+			name:        "an issue argument that isn't an issue",
+			args:        "OAuth signin-plan.md",
+			wantErr:     `invalid issue format: "OAuth"`,
+			wantFlagErr: true,
 		},
 		{
 			name:        "nothing to create",

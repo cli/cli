@@ -61,13 +61,13 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			var err error
 			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 			opts.ArtifactNumbers = make([]int, 0, len(args)-1)
 			for _, arg := range args[1:] {
 				number, err := shared.ParseArtifactNumber(arg)
 				if err != nil {
-					return err
+					return cmdutil.FlagErrorWrap(err)
 				}
 				opts.ArtifactNumbers = append(opts.ArtifactNumbers, number)
 			}

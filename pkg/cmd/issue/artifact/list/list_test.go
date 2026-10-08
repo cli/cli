@@ -140,9 +140,10 @@ func TestNewCmdList(t *testing.T) {
 			wantErr: "accepts 1 arg(s), received 0",
 		},
 		{
-			name:    "an argument that isn't an issue",
-			args:    "OAuth",
-			wantErr: `invalid issue format: "OAuth"`,
+			name:        "an argument that isn't an issue",
+			args:        "OAuth",
+			wantErr:     `invalid issue format: "OAuth"`,
+			wantFlagErr: true,
 		},
 	}
 

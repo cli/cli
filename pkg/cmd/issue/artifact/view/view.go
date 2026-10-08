@@ -86,11 +86,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			var err error
 			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 			opts.ArtifactNumber, err = shared.ParseArtifactNumber(args[1])
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 			opts.Client = shared.ClientFunc(f)
 

@@ -129,14 +129,16 @@ func TestNewCmdView(t *testing.T) {
 			wantErr: "accepts 2 arg(s), received 1",
 		},
 		{
-			name:    "an issue argument that isn't an issue",
-			args:    "OAuth 2",
-			wantErr: `invalid issue format: "OAuth"`,
+			name:        "an issue argument that isn't an issue",
+			args:        "OAuth 2",
+			wantErr:     `invalid issue format: "OAuth"`,
+			wantFlagErr: true,
 		},
 		{
-			name:    "an artifact number that isn't a number",
-			args:    "142 OAuth",
-			wantErr: `invalid artifact number: "OAuth"`,
+			name:        "an artifact number that isn't a number",
+			args:        "142 OAuth",
+			wantErr:     `invalid artifact number: "OAuth"`,
+			wantFlagErr: true,
 		},
 	}
 

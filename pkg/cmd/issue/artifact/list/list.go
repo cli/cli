@@ -66,7 +66,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			var err error
 			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 			opts.Client = shared.ClientFunc(f)
 

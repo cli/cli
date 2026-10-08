@@ -130,7 +130,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			var err error
 			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 
 			// An empty --body-file names no file, as in gh issue create.

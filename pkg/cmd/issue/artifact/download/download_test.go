@@ -124,14 +124,16 @@ func TestNewCmdDownload(t *testing.T) {
 			wantErr: "requires at least 1 arg(s), only received 0",
 		},
 		{
-			name:    "an issue argument that isn't an issue",
-			args:    "OAuth",
-			wantErr: `invalid issue format: "OAuth"`,
+			name:        "an issue argument that isn't an issue",
+			args:        "OAuth",
+			wantErr:     `invalid issue format: "OAuth"`,
+			wantFlagErr: true,
 		},
 		{
-			name:    "an artifact number that isn't a number",
-			args:    "142 2 OAuth",
-			wantErr: `invalid artifact number: "OAuth"`,
+			name:        "an artifact number that isn't a number",
+			args:        "142 2 OAuth",
+			wantErr:     `invalid artifact number: "OAuth"`,
+			wantFlagErr: true,
 		},
 		{
 			name:        "--clobber with --skip-existing",

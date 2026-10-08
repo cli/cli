@@ -207,14 +207,16 @@ func TestNewCmdEdit(t *testing.T) {
 			wantErr: "accepts 2 arg(s), received 1",
 		},
 		{
-			name:    "an artifact number that isn't a number",
-			args:    "142 two --name 'OAuth callback plan v2'",
-			wantErr: `invalid artifact number: "two"`,
+			name:        "an artifact number that isn't a number",
+			args:        "142 two --name 'OAuth callback plan v2'",
+			wantErr:     `invalid artifact number: "two"`,
+			wantFlagErr: true,
 		},
 		{
-			name:    "an issue argument that isn't an issue",
-			args:    "OAuth 2 --name 'OAuth callback plan v2'",
-			wantErr: `invalid issue format: "OAuth"`,
+			name:        "an issue argument that isn't an issue",
+			args:        "OAuth 2 --name 'OAuth callback plan v2'",
+			wantErr:     `invalid issue format: "OAuth"`,
+			wantFlagErr: true,
 		},
 		{
 			name:        "nothing to change",
