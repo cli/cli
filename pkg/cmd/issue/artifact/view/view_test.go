@@ -13,10 +13,28 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestViewJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields(t, NewCmdView, []string{
+		"body",
+		"bodyHtml",
+		"createdAt",
+		"creator",
+		"description",
+		"id",
+		"name",
+		"number",
+		"type",
+		"updatedAt",
+		"updatedByActor",
+		"versions",
+	})
+}
 
 func TestNewCmdView(t *testing.T) {
 	tests := []struct {
@@ -25,7 +43,6 @@ func TestNewCmdView(t *testing.T) {
 		ghRepo      string
 		wantOpts    ViewOptions
 		wantRepo    string
-		wantFields  []string
 		wantErr     string
 		wantFlagErr bool
 	}{
@@ -102,13 +119,6 @@ func TestNewCmdView(t *testing.T) {
 			wantErr: "cannot use `--web` with `--json`",
 		},
 		{
-			name:       "--json with every field",
-			args:       "142 2 --json body,bodyHtml,createdAt,creator,description,id,name,number,type,updatedAt,updatedByActor,versions",
-			wantOpts:   ViewOptions{IssueNumber: 142, ArtifactNumber: 2},
-			wantRepo:   "OWNER/REPO",
-			wantFields: []string{"body", "bodyHtml", "createdAt", "creator", "description", "id", "name", "number", "type", "updatedAt", "updatedByActor", "versions"},
-		},
-		{
 			name:    "--json with url, which isn't a field",
 			args:    "142 2 --json number,url",
 			wantErr: "Unknown JSON field: \"url\"\nAvailable fields:\n  body\n  bodyHtml\n  createdAt\n  creator\n  description\n  id\n  name\n  number\n  type\n  updatedAt\n  updatedByActor\n  versions",
@@ -174,13 +184,6 @@ func TestNewCmdView(t *testing.T) {
 			repo, err := gotOpts.BaseRepo()
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantRepo, ghrepo.FullName(repo))
-
-			if tt.wantFields == nil {
-				assert.Nil(t, gotOpts.Exporter)
-			} else {
-				require.NotNil(t, gotOpts.Exporter)
-				assert.Equal(t, tt.wantFields, gotOpts.Exporter.Fields())
-			}
 		})
 	}
 }

@@ -12,10 +12,27 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestListJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields(t, NewCmdList, []string{
+		"body",
+		"bodyHtml",
+		"createdAt",
+		"creator",
+		"description",
+		"id",
+		"name",
+		"number",
+		"type",
+		"updatedAt",
+		"updatedByActor",
+	})
+}
 
 func TestNewCmdList(t *testing.T) {
 	tests := []struct {
@@ -24,7 +41,6 @@ func TestNewCmdList(t *testing.T) {
 		ghRepo      string
 		wantOpts    ListOptions
 		wantRepo    string
-		wantFields  []string
 		wantErr     string
 		wantFlagErr bool
 	}{
@@ -114,13 +130,6 @@ func TestNewCmdList(t *testing.T) {
 			wantErr: `invalid argument "docs" for "--type" flag: valid values are {generic|plan|link}`,
 		},
 		{
-			name:       "--json with every field",
-			args:       "142 --json body,bodyHtml,createdAt,creator,description,id,name,number,type,updatedAt,updatedByActor",
-			wantOpts:   ListOptions{IssueNumber: 142},
-			wantRepo:   "OWNER/REPO",
-			wantFields: []string{"body", "bodyHtml", "createdAt", "creator", "description", "id", "name", "number", "type", "updatedAt", "updatedByActor"},
-		},
-		{
 			name:    "--json with url, which isn't a field",
 			args:    "142 --json number,url",
 			wantErr: "Unknown JSON field: \"url\"\nAvailable fields:\n  body\n  bodyHtml\n  createdAt\n  creator\n  description\n  id\n  name\n  number\n  type\n  updatedAt\n  updatedByActor",
@@ -180,13 +189,6 @@ func TestNewCmdList(t *testing.T) {
 			repo, err := gotOpts.BaseRepo()
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantRepo, ghrepo.FullName(repo))
-
-			if tt.wantFields == nil {
-				assert.Nil(t, gotOpts.Exporter)
-			} else {
-				require.NotNil(t, gotOpts.Exporter)
-				assert.Equal(t, tt.wantFields, gotOpts.Exporter.Fields())
-			}
 		})
 	}
 }
