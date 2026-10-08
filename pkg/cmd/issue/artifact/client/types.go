@@ -104,7 +104,7 @@ func (a Artifact) ExportData(fields []string) map[string]any {
 		case "bodyHtml":
 			data[f] = a.BodyHTML
 		case "createdAt":
-			data[f] = exportTime(a.CreatedAt)
+			data[f] = a.CreatedAt
 		case "creator":
 			data[f] = a.Creator.export()
 		case "description":
@@ -118,7 +118,7 @@ func (a Artifact) ExportData(fields []string) map[string]any {
 		case "type":
 			data[f] = a.Type
 		case "updatedAt":
-			data[f] = exportTime(a.UpdatedAt)
+			data[f] = a.UpdatedAt
 		case "updatedByActor":
 			data[f] = a.UpdatedByActor.export()
 		}
@@ -147,7 +147,7 @@ func (v Version) export() map[string]any {
 		"name":      v.Name,
 		"body":      v.Body,
 		"bodyHtml":  v.BodyHTML,
-		"createdAt": exportTime(v.CreatedAt),
+		"createdAt": v.CreatedAt,
 		"actor":     v.Actor.export(),
 	}
 }
@@ -160,11 +160,4 @@ func (a *Actor) export() any {
 		"id":    a.ID,
 		"login": a.Login,
 	}
-}
-
-func exportTime(t *time.Time) any {
-	if t == nil {
-		return nil
-	}
-	return *t
 }
