@@ -132,7 +132,8 @@ func (u *Uploader) UploadAndAttachDocuments(ctx context.Context, docs []Document
 		urls[i] = assetURL
 	}
 
-	failures := []error{uploadErr}
+	failures := make([]error, 0, len(attachable)+1)
+	failures = append(failures, uploadErr)
 	results := make([]DocumentResult, len(attachable))
 	for i, d := range attachable {
 		result, rewriteErr := d.attach(assets, urls, uploadErr)
