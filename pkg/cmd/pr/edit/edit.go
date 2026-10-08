@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -177,13 +176,10 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			if bodyProvided || bodyFileProvided {
 				opts.Editable.Body.Edited = true
 				if bodyFileProvided {
-					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					var err error
+					opts.Editable.Body.Value, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 					if err != nil {
 						return err
-					}
-					opts.Editable.Body.Value = string(b)
-					if bodyFile != "-" {
-						opts.BodyDir = filepath.Dir(bodyFile)
 					}
 				}
 			}

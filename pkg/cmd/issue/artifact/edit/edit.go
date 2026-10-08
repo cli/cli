@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -151,7 +150,7 @@ func editRun(opts *EditOptions) error {
 
 	// The new content is read and checked before any request, so a file that
 	// can't be used fails without one.
-	content, err := readContent(opts)
+	content, dir, err := readContent(opts)
 	if err != nil {
 		return err
 	}
@@ -201,10 +200,6 @@ func editRun(opts *EditOptions) error {
 		// A --body-file's references resolve against its own directory first.
 		// Other content has no directory of its own, so its references
 		// resolve against the working directory.
-		var dir string
-		if opts.BodyFile != "" && opts.BodyFile != "-" {
-			dir = filepath.Dir(opts.BodyFile)
-		}
 		md, uploadResult, err := uploader.UploadAndAttach(context.Background(), *body, dir, opts.Assets)
 		opts.AttachEvent.RecordOperations(uploadResult)
 		// Uploads can't be undone, so the artifact is saved if any file
@@ -263,21 +258,23 @@ func restoreVersion(opts *EditOptions, c client.ArtifactClient, repo ghrepo.Inte
 }
 
 // readContent returns the new content from --body or --body-file, or nil
-// when neither was given. Standard input is only read with --body-file -, so
-// a stdin that never closes can't hang the command.
-func readContent(opts *EditOptions) (*string, error) {
+// when neither was given, and the directory a --body-file's references
+// resolve against, which is empty for any other content. Standard input is
+// only read with --body-file -, so a stdin that never closes can't hang the
+// command.
+func readContent(opts *EditOptions) (*string, string, error) {
 	if opts.BodyFile == "" {
-		return opts.Body, nil
+		return opts.Body, "", nil
 	}
-	content, err := shared.ReadContent(opts.BodyFile, opts.IO.In)
+	content, dir, err := shared.ReadContent(opts.BodyFile, opts.IO.In)
 	if err != nil {
 		source := opts.BodyFile
 		if source == "-" {
 			source = "standard input"
 		}
-		return nil, fmt.Errorf("failed to update artifact %d from %s: %w", opts.ArtifactNumber, source, err)
+		return nil, "", fmt.Errorf("failed to update artifact %d from %s: %w", opts.ArtifactNumber, source, err)
 	}
-	return &content, nil
+	return &content, dir, nil
 }
 
 // newBody returns the body to save, checked against the artifact's type, or

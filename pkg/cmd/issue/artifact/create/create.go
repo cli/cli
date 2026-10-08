@@ -340,7 +340,7 @@ func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, e
 	case fromBody:
 		a.body = s.body
 	case fromStdin:
-		body, err := shared.ReadContent(s.arg, stdin)
+		body, _, err := shared.ReadContent(s.arg, stdin)
 		if err != nil {
 			return a, fmt.Errorf("failed to create artifact from standard input: %w", err)
 		}
@@ -360,7 +360,7 @@ func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, e
 			a.name = parsed.Hostname()
 		}
 	case fromFile:
-		content, err := shared.ReadContent(s.arg, stdin)
+		content, dir, err := shared.ReadContent(s.arg, stdin)
 		if err != nil {
 			return a, fmt.Errorf("failed to create artifact from %s: %w", s.arg, err)
 		}
@@ -373,7 +373,7 @@ func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, e
 			}
 			a.artifactType, a.body = client.TypeLink, u
 		} else {
-			a.body, a.dir = content, filepath.Dir(s.arg)
+			a.body, a.dir = content, dir
 		}
 		if a.name == "" {
 			a.name = nameFromFile(s.arg)

@@ -23,26 +23,30 @@ func TestReadContent(t *testing.T) {
 		path      string
 		stdin     string
 		want      string
+		wantDir   string
 		wantErr   string
 		wantErrIs error
 	}{
 		{
-			name:  "a text file",
-			files: map[string]string{"signin-plan.md": "# Sign-in plan\n\n1. Register the callback URL.\n"},
-			path:  "signin-plan.md",
-			want:  "# Sign-in plan\n\n1. Register the callback URL.\n",
+			name:    "a text file",
+			files:   map[string]string{"signin-plan.md": "# Sign-in plan\n\n1. Register the callback URL.\n"},
+			path:    "signin-plan.md",
+			want:    "# Sign-in plan\n\n1. Register the callback URL.\n",
+			wantDir: ".",
 		},
 		{
-			name:  "a file in another directory",
-			files: map[string]string{"docs/signin-plan.md": "# Sign-in plan\n"},
-			path:  "docs/signin-plan.md",
-			want:  "# Sign-in plan\n",
+			name:    "a file in another directory",
+			files:   map[string]string{"docs/signin-plan.md": "# Sign-in plan\n"},
+			path:    "docs/signin-plan.md",
+			want:    "# Sign-in plan\n",
+			wantDir: "docs",
 		},
 		{
-			name:  "text in any language",
-			files: map[string]string{"memo.md": "# メモ\n\nラテアートの練習。\n"},
-			path:  "memo.md",
-			want:  "# メモ\n\nラテアートの練習。\n",
+			name:    "text in any language",
+			files:   map[string]string{"memo.md": "# メモ\n\nラテアートの練習。\n"},
+			path:    "memo.md",
+			want:    "# メモ\n\nラテアートの練習。\n",
+			wantDir: ".",
 		},
 		{
 			name:     "a symlink is followed",
@@ -50,19 +54,22 @@ func TestReadContent(t *testing.T) {
 			symlinks: map[string]string{"signin-plan.md": "outside.md"},
 			path:     "signin-plan.md",
 			want:     "# Sign-in plan\n",
+			wantDir:  ".",
 		},
 		{
-			name:  "standard input",
-			path:  "-",
-			stdin: "# OAuth research\n",
-			want:  "# OAuth research\n",
+			name:    "standard input has no directory",
+			path:    "-",
+			stdin:   "# OAuth research\n",
+			want:    "# OAuth research\n",
+			wantDir: "",
 		},
 		{
-			name:  "standard input is only read for -",
-			files: map[string]string{"signin-plan.md": "# Sign-in plan\n"},
-			path:  "signin-plan.md",
-			stdin: "# OAuth research\n",
-			want:  "# Sign-in plan\n",
+			name:    "standard input is only read for -",
+			files:   map[string]string{"signin-plan.md": "# Sign-in plan\n"},
+			path:    "signin-plan.md",
+			stdin:   "# OAuth research\n",
+			want:    "# Sign-in plan\n",
+			wantDir: ".",
 		},
 		{
 			name:      "a missing file, without its path",
@@ -120,7 +127,7 @@ func TestReadContent(t *testing.T) {
 			}
 			stdin := io.NopCloser(strings.NewReader(tt.stdin))
 
-			got, err := ReadContent(tt.path, stdin)
+			got, dir, err := ReadContent(tt.path, stdin)
 
 			switch {
 			case tt.wantErrIs != nil:
@@ -133,6 +140,7 @@ func TestReadContent(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.wantDir, dir)
 		})
 	}
 }

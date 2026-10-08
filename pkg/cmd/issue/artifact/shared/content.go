@@ -13,32 +13,35 @@ import (
 )
 
 // ReadContent reads an artifact's new content from the file at path,
-// following a symlink, or from stdin when path is "-". Artifact content must
-// be text, like a gist's, so binary content is refused, and so is content that
-// is empty or only whitespace. Callers read every file before any request, so
-// these refusals fail the whole command. The error doesn't name path, so a
-// caller can say which artifact failed in its own words.
-func ReadContent(path string, stdin io.ReadCloser) (string, error) {
+// following a symlink, or from stdin when path is "-". It also returns the
+// directory the content's references to attached files resolve against,
+// which is empty for stdin, as cmdutil.ReadMarkdownBodyFile gives it.
+// Artifact content must be text, like a gist's, so binary content is refused,
+// and so is content that is empty or only whitespace. Callers read every file
+// before any request, so these refusals fail the whole command. The error
+// doesn't name path, so a caller can say which artifact failed in its own
+// words.
+func ReadContent(path string, stdin io.ReadCloser) (content, dir string, err error) {
 	what := "file"
 	if path == "-" {
 		what = "input"
 	}
 
-	content, err := cmdutil.ReadFile(path, stdin)
+	content, dir, err = cmdutil.ReadMarkdownBodyFile(path, stdin)
 	if err != nil {
 		if pathErr, ok := errors.AsType[*fs.PathError](err); ok && pathErr.Path == path {
-			return "", pathErr.Err
+			return "", "", pathErr.Err
 		}
-		return "", err
+		return "", "", err
 	}
 
-	if strings.TrimSpace(string(content)) == "" {
-		return "", fmt.Errorf("%s is empty", what)
+	if strings.TrimSpace(content) == "" {
+		return "", "", fmt.Errorf("%s is empty", what)
 	}
-	if gistShared.IsBinaryContents(content) {
-		return "", fmt.Errorf("binary %s not supported", what)
+	if gistShared.IsBinaryContents([]byte(content)) {
+		return "", "", fmt.Errorf("binary %s not supported", what)
 	}
-	return string(content), nil
+	return content, dir, nil
 }
 
 // IsShortcutFile reports whether path is an Internet Shortcut file, which

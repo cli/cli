@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -138,13 +137,9 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			titleProvided := cmd.Flags().Changed("title")
 			bodyProvided := cmd.Flags().Changed("body")
 			if bodyFile != "" {
-				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				opts.Body, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 				if err != nil {
 					return err
-				}
-				opts.Body = string(b)
-				if bodyFile != "-" {
-					opts.BodyDir = filepath.Dir(bodyFile)
 				}
 				bodyProvided = true
 			}

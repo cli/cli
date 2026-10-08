@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -337,13 +336,9 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			if bodyFile != "" {
-				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				opts.Body, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 				if err != nil {
 					return err
-				}
-				opts.Body = string(b)
-				if bodyFile != "-" {
-					opts.BodyDir = filepath.Dir(bodyFile)
 				}
 				opts.BodyProvided = true
 			}
