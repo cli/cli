@@ -240,15 +240,17 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   repository. Pull requests are refused, and so is GitHub Enterprise Server.
 - `--json`/`--jq`/`--template` are available on `list` and `view` only. The
   `id` field is a global ID that no command accepts; commands take `number`.
-- `create`, `edit`, `delete`, and `download` (except with `--output -`) report
-  each artifact on its own line. When piped, every line goes to stdout with
-  five tab-separated columns, empty ones included: status (`created`,
-  `updated`, `restored`, `deleted`, `written`, `skipped`, or `failed`),
-  artifact number, name (the file path for `download`), source (the file,
-  URL, or `-` given to `create`, or the `--body-file` value given to `edit`),
-  and the reason for a skip or failure. In a terminal, failures go to stderr.
-  A failed artifact doesn't stop the others, and the command exits 1 after
-  any failure.
+- `create`, `edit`, and `download` (except with `--output -`) report each
+  artifact on its own line. When piped, every line goes to stdout with five
+  tab-separated columns, empty ones included: status (`created`, `updated`,
+  `restored`, `written`, `skipped`, or `failed`), artifact number, name (the
+  file path for `download`), source (the file, URL, or `-` given to
+  `create`, or the `--body-file` value given to `edit`), and the reason for a
+  skip or failure. In a terminal, failures go to stderr. A failed artifact
+  doesn't stop the others, and the command exits 1 after any failure.
+- `delete` reports on stderr. In a terminal, each deleted or failed artifact
+  gets a line. When piped, a deleted artifact prints nothing, and each
+  failure prints `<number>: <reason>`. Any failure exits 1.
 - `create` and `edit` read and check every file before any request, so a
   missing, empty, or binary file fails the whole command, and nothing is
   saved. Standard input is read only through `--body-file -`, and `create`

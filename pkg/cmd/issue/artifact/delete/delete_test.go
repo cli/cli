@@ -210,6 +210,7 @@ func TestDeleteRun(t *testing.T) {
 		repo          ghrepo.Interface
 		opts          DeleteOptions
 		tty           bool
+		stderrTTY     bool
 		color         bool
 		isPullRequest bool
 		lookupErr     error
@@ -234,8 +235,8 @@ func TestDeleteRun(t *testing.T) {
 				"Get monalisa/monas-cafe#142 artifact 2",
 				"Delete monalisa/monas-cafe#142 artifact 2",
 			},
-			wantStdout: "! Deleted artifacts cannot be recovered.\n" +
-				"✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n",
+			wantStdout: "! Deleted artifacts cannot be recovered.\n",
+			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n",
 		},
 		{
 			name:       "one prompt lists every artifact",
@@ -250,8 +251,8 @@ func TestDeleteRun(t *testing.T) {
 				"Delete monalisa/monas-cafe#142 artifact 2",
 				"Delete monalisa/monas-cafe#142 artifact 5",
 			},
-			wantStdout: "! Deleted artifacts cannot be recovered.\n" +
-				"✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
+			wantStdout: "! Deleted artifacts cannot be recovered.\n",
+			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
 				"✓ Deleted artifact 5 (Barista feedback notes) from monalisa/monas-cafe#142\n",
 		},
 		{
@@ -269,8 +270,8 @@ func TestDeleteRun(t *testing.T) {
 				"Delete monalisa/monas-cafe#142 artifact 3",
 				"Delete monalisa/monas-cafe#142 artifact 5",
 			},
-			wantStdout: "! Deleted artifacts cannot be recovered.\n" +
-				"✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
+			wantStdout: "! Deleted artifacts cannot be recovered.\n",
+			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
 				"✓ Deleted artifact 3 (Staging OAuth runbook) from monalisa/monas-cafe#142\n" +
 				"✓ Deleted artifact 5 (Barista feedback notes) from monalisa/monas-cafe#142\n",
 		},
@@ -338,7 +339,7 @@ func TestDeleteRun(t *testing.T) {
 				"Delete monalisa/monas-cafe#142 artifact 2",
 				"Delete monalisa/monas-cafe#142 artifact 5",
 			},
-			wantStdout: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
+			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
 				"✓ Deleted artifact 5 (Barista feedback notes) from monalisa/monas-cafe#142\n",
 		},
 		{
@@ -351,9 +352,9 @@ func TestDeleteRun(t *testing.T) {
 				"Get monalisa/monas-cafe#142 artifact 9",
 				"Delete monalisa/monas-cafe#142 artifact 2",
 			},
-			wantStdout: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n",
-			wantStderr: "X Failed to delete artifact 9: Not Found\n",
-			wantErrIs:  cmdutil.SilentError,
+			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
+				"X Failed to delete artifact 9: Not Found\n",
+			wantErrIs: cmdutil.SilentError,
 		},
 		{
 			name:       "a failed delete is reported, and the rest are still deleted",
@@ -369,10 +370,10 @@ func TestDeleteRun(t *testing.T) {
 				"Delete monalisa/monas-cafe#142 artifact 3",
 				"Delete monalisa/monas-cafe#142 artifact 5",
 			},
-			wantStdout: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
+			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
+				"X Failed to delete artifact 3: Must have admin rights to Repository.\n" +
 				"✓ Deleted artifact 5 (Barista feedback notes) from monalisa/monas-cafe#142\n",
-			wantStderr: "X Failed to delete artifact 3: Must have admin rights to Repository.\n",
-			wantErrIs:  cmdutil.SilentError,
+			wantErrIs: cmdutil.SilentError,
 		},
 		{
 			name: "a repeated number gets a line each, and the second delete fails",
@@ -385,12 +386,12 @@ func TestDeleteRun(t *testing.T) {
 				"Delete monalisa/monas-cafe#142 artifact 2",
 				"Delete monalisa/monas-cafe#142 artifact 2",
 			},
-			wantStdout: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n",
-			wantStderr: "X Failed to delete artifact 2: Not Found\n",
-			wantErrIs:  cmdutil.SilentError,
+			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
+				"X Failed to delete artifact 2: Not Found\n",
+			wantErrIs: cmdutil.SilentError,
 		},
 		{
-			name: "piped output",
+			name: "piped, a deleted artifact prints nothing, and a failure prints its number and reason on stderr",
 			opts: DeleteOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 9}, Confirmed: true},
 			wantCalls: []string{
 				"IsPullRequest monalisa/monas-cafe#142",
@@ -398,12 +399,24 @@ func TestDeleteRun(t *testing.T) {
 				"Get monalisa/monas-cafe#142 artifact 9",
 				"Delete monalisa/monas-cafe#142 artifact 2",
 			},
-			wantStdout: "deleted\t2\tOAuth callback plan\t\t\n" +
-				"failed\t9\t\t\tNot Found\n",
-			wantErrIs: cmdutil.SilentError,
+			wantStderr: "9: Not Found\n",
+			wantErrIs:  cmdutil.SilentError,
 		},
 		{
-			name:       "piped output names an artifact whose delete failed",
+			name:      "piped, with stderr in a terminal, a failure still prints its number and reason",
+			opts:      DeleteOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 9}, Confirmed: true},
+			stderrTTY: true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 artifact 2",
+				"Get monalisa/monas-cafe#142 artifact 9",
+				"Delete monalisa/monas-cafe#142 artifact 2",
+			},
+			wantStderr: "9: Not Found\n",
+			wantErrIs:  cmdutil.SilentError,
+		},
+		{
+			name:       "piped, a failed delete gives the server's message, not the name",
 			opts:       DeleteOptions{IssueNumber: 142, ArtifactNumbers: []int{3}, Confirmed: true},
 			deleteErrs: map[int]error{3: apiError(403, "Must have admin rights to Repository.", 3)},
 			wantCalls: []string{
@@ -411,7 +424,7 @@ func TestDeleteRun(t *testing.T) {
 				"Get monalisa/monas-cafe#142 artifact 3",
 				"Delete monalisa/monas-cafe#142 artifact 3",
 			},
-			wantStdout: "failed\t3\tStaging OAuth runbook\t\tMust have admin rights to Repository.\n",
+			wantStderr: "3: Must have admin rights to Repository.\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
 		{
@@ -425,18 +438,19 @@ func TestDeleteRun(t *testing.T) {
 				"Get monalisa/monas-cafe#142 artifact 8",
 				"Delete monalisa/monas-cafe#142 artifact 8",
 			},
-			wantStdout: "! Deleted artifacts cannot be recovered.\n" +
-				"✓ Deleted artifact 8 (Espresso machine manual) from monalisa/monas-cafe#142\n",
+			wantStdout: "! Deleted artifacts cannot be recovered.\n",
+			wantStderr: "✓ Deleted artifact 8 (Espresso machine manual) from monalisa/monas-cafe#142\n",
 		},
 		{
-			name: "names are cleaned up in piped output",
-			opts: DeleteOptions{IssueNumber: 142, ArtifactNumbers: []int{8}, Confirmed: true},
+			name: "piped, deleting every artifact prints nothing",
+			opts: DeleteOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 5}, Confirmed: true},
 			wantCalls: []string{
 				"IsPullRequest monalisa/monas-cafe#142",
-				"Get monalisa/monas-cafe#142 artifact 8",
-				"Delete monalisa/monas-cafe#142 artifact 8",
+				"Get monalisa/monas-cafe#142 artifact 2",
+				"Get monalisa/monas-cafe#142 artifact 5",
+				"Delete monalisa/monas-cafe#142 artifact 2",
+				"Delete monalisa/monas-cafe#142 artifact 5",
 			},
-			wantStdout: "deleted\t8\tEspresso machine manual\t\t\n",
 		},
 		{
 			name:       "colors in a terminal",
@@ -450,8 +464,8 @@ func TestDeleteRun(t *testing.T) {
 				"Get monalisa/monas-cafe#142 artifact 2",
 				"Delete monalisa/monas-cafe#142 artifact 2",
 			},
-			wantStdout: "\x1b[0;33m!\x1b[0m Deleted artifacts cannot be recovered.\n" +
-				"\x1b[0;31m✓\x1b[0m Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n",
+			wantStdout: "\x1b[0;33m!\x1b[0m Deleted artifacts cannot be recovered.\n",
+			wantStderr: "\x1b[0;31m✓\x1b[0m Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n",
 		},
 		{
 			name:  "colors for a missing number in a terminal",
@@ -475,7 +489,7 @@ func TestDeleteRun(t *testing.T) {
 				"Get monalisa/monas-cafe#142 artifact 7",
 				"Delete monalisa/monas-cafe#142 artifact 7",
 			},
-			wantStdout: "✓ Deleted artifact 7 (Espresso checklist) from monalisa/monas-cafe#142\n",
+			wantStderr: "✓ Deleted artifact 7 (Espresso checklist) from monalisa/monas-cafe#142\n",
 		},
 		{
 			name:          "a pull request is refused before any artifact request",
@@ -510,7 +524,7 @@ func TestDeleteRun(t *testing.T) {
 				"Get monas-cafe.ghe.com/monalisa/monas-cafe#142 artifact 2",
 				"Delete monas-cafe.ghe.com/monalisa/monas-cafe#142 artifact 2",
 			},
-			wantStdout: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n",
+			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n",
 		},
 	}
 
@@ -519,7 +533,7 @@ func TestDeleteRun(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdinTTY(tt.tty)
 			ios.SetStdoutTTY(tt.tty)
-			ios.SetStderrTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty || tt.stderrTTY)
 			ios.SetColorEnabled(tt.color)
 
 			repo := tt.repo

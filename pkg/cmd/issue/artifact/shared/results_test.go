@@ -345,3 +345,49 @@ func TestPrintPartialFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestFailureReason(t *testing.T) {
+	apiError := func(status int, message string) error {
+		u, err := url.Parse("https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/9")
+		require.NoError(t, err)
+		return api.HTTPError{HTTPError: &ghAPI.HTTPError{StatusCode: status, Message: message, RequestURL: u}}
+	}
+
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "an API error gives the server's message",
+			err:  apiError(404, "Not Found"),
+			want: "Not Found",
+		},
+		{
+			name: "a message on several lines stays on one line",
+			err:  apiError(422, "Validation Failed\nname is invalid"),
+			want: "Validation Failed name is invalid",
+		},
+		{
+			name: "an API error without a message gives the whole error",
+			err:  apiError(502, ""),
+			want: "HTTP 502 (https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/9)",
+		},
+		{
+			name: "an error that isn't from the API gives its own text",
+			err:  errors.New("dial tcp: lookup api.github.com: no such host"),
+			want: "dial tcp: lookup api.github.com: no such host",
+		},
+		{
+			name: "an error that wraps an API error gives its whole text, which names what failed",
+			err:  fmt.Errorf("could not upload latte-art.png: %w", apiError(422, "Validation Failed")),
+			want: "could not upload latte-art.png: HTTP 422: Validation Failed (https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/9)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, FailureReason(tt.err))
+		})
+	}
+}

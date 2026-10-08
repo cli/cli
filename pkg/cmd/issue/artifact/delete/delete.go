@@ -137,7 +137,7 @@ func deleteRun(opts *DeleteOptions) error {
 		if slices.ContainsFunc(lookups, func(l lookup) bool { return l.err != nil }) {
 			for _, l := range lookups {
 				if l.err != nil {
-					shared.PrintFailure(opts.IO, shared.Result{Number: l.number}, deleteAction(l.number), l.err)
+					printFailure(opts.IO, l.number, l.err)
 				}
 			}
 			fmt.Fprintln(opts.IO.ErrOut, "No artifacts were deleted.")
@@ -156,19 +156,21 @@ func deleteRun(opts *DeleteOptions) error {
 
 	failed := false
 	for _, l := range lookups {
-		result := shared.Result{Number: l.number, Name: l.name}
 		if l.err != nil {
-			shared.PrintFailure(opts.IO, result, deleteAction(l.number), l.err)
+			printFailure(opts.IO, l.number, l.err)
 			failed = true
 			continue
 		}
 		if err := c.Delete(repo, opts.IssueNumber, l.number); err != nil {
-			shared.PrintFailure(opts.IO, result, deleteAction(l.number), err)
+			printFailure(opts.IO, l.number, err)
 			failed = true
 			continue
 		}
-		shared.PrintSuccess(opts.IO, "deleted", result, cs.SuccessIconWithColor(cs.Red),
-			fmt.Sprintf("Deleted artifact %d (%s) from %s", l.number, l.name, issueRef))
+		// Like gh issue delete, a deleted artifact is reported on stderr, and
+		// only in a terminal: a script already knows the numbers it passed.
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Deleted artifact %d (%s) from %s\n", cs.SuccessIconWithColor(cs.Red), l.number, l.name, issueRef)
+		}
 	}
 
 	if failed {
@@ -177,8 +179,15 @@ func deleteRun(opts *DeleteOptions) error {
 	return nil
 }
 
-func deleteAction(number int) string {
-	return fmt.Sprintf("delete artifact %d", number)
+// printFailure reports an artifact gh couldn't delete, on stderr. In a
+// terminal, it's the failure line the other artifact commands print. Piped,
+// it's "<number>: <reason>", like gh codespace delete, with the same reason.
+func printFailure(ios *iostreams.IOStreams, number int, err error) {
+	if !ios.IsStdoutTTY() {
+		fmt.Fprintf(ios.ErrOut, "%d: %s\n", number, shared.FailureReason(err))
+		return
+	}
+	shared.PrintFailure(ios, shared.Result{Number: number}, fmt.Sprintf("delete artifact %d", number), err)
 }
 
 // confirmationPrompt asks once for every artifact, naming each one, such as
