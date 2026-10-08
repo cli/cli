@@ -111,6 +111,8 @@ func (c *artifactClient) List(repo ghrepo.Interface, issueNumber int, artifactTy
 		}
 		artifacts = append(artifacts, pageArtifacts...)
 
+		// The API fills every page but the last, so a page with fewer
+		// artifacts than requested is the last one.
 		if len(pageArtifacts) < perPage || (limit > 0 && len(artifacts) >= limit) {
 			break
 		}
