@@ -816,7 +816,7 @@ func TestBrowseModelShowsCompleteMultilineInstallationError(t *testing.T) {
 		"",
 		"To request support for darwin-arm64, open an issue on the extension's repo by running the following command:",
 		"",
-		"\t`gh issue create -R justDeeevin/gh-jj --title \"Add support for the darwin-arm64 architecture\"`",
+		"\t`gh issue create -R justDeeevin/gh-jj --title \"Add support for the darwin-arm64 architecture\" --body \"This extension does not support the darwin-arm64 architecture.\"`",
 	}, "\n")
 	model := newBrowseModel(ExtBrowseOpts{
 		Em: &extensions.ExtensionManagerMock{
@@ -837,6 +837,15 @@ func TestBrowseModelShowsCompleteMultilineInstallationError(t *testing.T) {
 	assert.Contains(t, view, "gh-jj unsupported for darwin-arm64.")
 	assert.Contains(t, view, "To request support for darwin-arm64")
 	assert.Contains(t, view, "gh issue create -R justDeeevin/gh-jj")
+	var commandContinuation string
+	for line := range strings.SplitSeq(view, "\n") {
+		if strings.Contains(line, "not support the darwin-arm64 architecture") {
+			commandContinuation = line
+			break
+		}
+	}
+	require.NotEmpty(t, commandContinuation)
+	assert.True(t, strings.HasPrefix(commandContinuation, "    "), "expected the wrapped command to keep its indentation")
 	assert.LessOrEqual(t, strings.Count(view, "\n")+1, 30)
 }
 

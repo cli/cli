@@ -491,12 +491,28 @@ func (m *browseModel) footerView() string {
 	if m.width <= 0 {
 		return footer
 	}
-	footer = ansi.Hardwrap(footer, m.width, true)
+	footer = wrapFooter(footer, m.width)
 	if m.height <= 0 {
 		return footer
 	}
 	lines := strings.Split(footer, "\n")
 	return strings.Join(lines[:min(len(lines), max(m.height-4, 1))], "\n")
+}
+
+func wrapFooter(footer string, width int) string {
+	var wrapped []string
+	for line := range strings.SplitSeq(footer, "\n") {
+		content := strings.TrimLeft(line, " \t")
+		indent := strings.ReplaceAll(line[:len(line)-len(content)], "\t", "    ")
+		if content == "" {
+			wrapped = append(wrapped, "")
+			continue
+		}
+		for wrappedLine := range strings.SplitSeq(ansi.Hardwrap(content, max(width-len(indent), 1), false), "\n") {
+			wrapped = append(wrapped, indent+wrappedLine)
+		}
+	}
+	return strings.Join(wrapped, "\n")
 }
 
 func (m *browseModel) listView() string {
