@@ -807,6 +807,39 @@ func TestBrowseModelKeepsExtensionUninstalledWhenInstallationFails(t *testing.T)
 	assert.NotContains(t, view, "(installed)")
 }
 
+func TestBrowseModelShowsCompleteMultilineInstallationError(t *testing.T) {
+	t.Parallel()
+
+	// Given installation fails with platform guidance spanning multiple lines
+	installError := strings.Join([]string{
+		"gh-jj unsupported for darwin-arm64.",
+		"",
+		"To request support for darwin-arm64, open an issue on the extension's repo by running the following command:",
+		"",
+		"\t`gh issue create -R justDeeevin/gh-jj --title \"Add support for the darwin-arm64 architecture\"`",
+	}, "\n")
+	model := newBrowseModel(ExtBrowseOpts{
+		Em: &extensions.ExtensionManagerMock{
+			InstallFunc: func(ghrepo.Interface, string) error {
+				return errors.New(installError)
+			},
+		},
+	}, []extEntry{{Name: "gh-jj", FullName: "justDeeevin/gh-jj"}})
+	updateBrowseModel(t, model, tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	// When the user installs the extension
+	install := updateBrowseModel(t, model, keyPress('i'))
+	require.NotNil(t, install)
+	updateBrowseModel(t, model, install())
+	view := model.View().Content
+
+	// Then the full guidance remains visible without exceeding the terminal
+	assert.Contains(t, view, "gh-jj unsupported for darwin-arm64.")
+	assert.Contains(t, view, "To request support for darwin-arm64")
+	assert.Contains(t, view, "gh issue create -R justDeeevin/gh-jj")
+	assert.LessOrEqual(t, strings.Count(view, "\n")+1, 30)
+}
+
 func TestBrowseModelKeepsExtensionInstalledWhenRemovalFails(t *testing.T) {
 	t.Parallel()
 

@@ -175,31 +175,31 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case browserResultMsg:
 		if msg.err != nil {
-			m.status = fmt.Sprintf("could not open browser for '%s': %v", msg.url, msg.err)
+			m.setStatus(fmt.Sprintf("could not open browser for '%s': %v", msg.url, msg.err))
 			m.opts.Logger.Print(m.status)
 			return m, nil
 		}
-		m.status = fmt.Sprintf("Opened %s in the browser", msg.url)
+		m.setStatus(fmt.Sprintf("Opened %s in the browser", msg.url))
 		return m, nil
 	case installResultMsg:
 		m.actionBusy = false
 		if msg.err != nil {
-			m.status = msg.err.Error()
+			m.setStatus(msg.err.Error())
 			m.opts.Logger.Print(m.status)
 			return m, nil
 		}
 		m.setInstalled(msg.fullName, true)
-		m.status = fmt.Sprintf("Installed %s!", msg.fullName)
+		m.setStatus(fmt.Sprintf("Installed %s!", msg.fullName))
 		return m, nil
 	case removeResultMsg:
 		m.actionBusy = false
 		if msg.err != nil {
-			m.status = msg.err.Error()
+			m.setStatus(msg.err.Error())
 			m.opts.Logger.Print(m.status)
 			return m, nil
 		}
 		m.setInstalled(msg.fullName, false)
-		m.status = fmt.Sprintf("Removed %s!", msg.fullName)
+		m.setStatus(fmt.Sprintf("Removed %s!", msg.fullName))
 		return m, nil
 	}
 
@@ -243,7 +243,7 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if !m.actionBusy {
-		m.status = ""
+		m.setStatus("")
 	}
 
 	if m.filtering {
@@ -309,7 +309,7 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !ok || m.opts.Browser == nil {
 			return m, nil
 		}
-		m.status = fmt.Sprintf("Opening %s in the browser...", selected.URL)
+		m.setStatus(fmt.Sprintf("Opening %s in the browser...", selected.URL))
 		url := selected.URL
 		browser := m.opts.Browser
 		return m, func() tea.Msg {
@@ -321,7 +321,7 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.actionBusy = true
-		m.status = fmt.Sprintf("Installing %s...", selected.FullName)
+		m.setStatus(fmt.Sprintf("Installing %s...", selected.FullName))
 		fullName := selected.FullName
 		manager := m.opts.Em
 		return m, func() tea.Msg {
@@ -340,7 +340,7 @@ func (m *browseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.actionBusy = true
-		m.status = fmt.Sprintf("Removing %s...", selected.FullName)
+		m.setStatus(fmt.Sprintf("Removing %s...", selected.FullName))
 		fullName := selected.FullName
 		name := strings.TrimPrefix(selected.Name, "gh-")
 		manager := m.opts.Em
@@ -435,6 +435,11 @@ func (m *browseModel) setInstalled(fullName string, installed bool) {
 	}
 }
 
+func (m *browseModel) setStatus(status string) {
+	m.status = status
+	m.resizeReadme()
+}
+
 func (m *browseModel) mainContent() string {
 	list := lipgloss.NewStyle().
 		Width(m.listWidth()).
@@ -486,7 +491,12 @@ func (m *browseModel) footerView() string {
 	if m.width <= 0 {
 		return footer
 	}
-	return ansi.Truncate(footer, m.width, "")
+	footer = ansi.Hardwrap(footer, m.width, true)
+	if m.height <= 0 {
+		return footer
+	}
+	lines := strings.Split(footer, "\n")
+	return strings.Join(lines[:min(len(lines), max(m.height-4, 1))], "\n")
 }
 
 func (m *browseModel) listView() string {
@@ -703,7 +713,8 @@ func (m *browseModel) readmePaneView() string {
 }
 
 func (m *browseModel) mainHeight() int {
-	return max(m.height-4, 1)
+	footerHeight := strings.Count(m.footerView(), "\n") + 1
+	return max(m.height-3-footerHeight, 1)
 }
 
 func (m *browseModel) resizeFilter() {
