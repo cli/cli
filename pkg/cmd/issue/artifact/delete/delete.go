@@ -69,6 +69,9 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				if err != nil {
 					return cmdutil.FlagErrorWrap(err)
 				}
+				if slices.Contains(opts.ArtifactNumbers, number) {
+					return cmdutil.FlagErrorf("duplicate artifact number: %d", number)
+				}
 				opts.ArtifactNumbers = append(opts.ArtifactNumbers, number)
 			}
 

@@ -48,12 +48,26 @@ func TestNewCmdDelete(t *testing.T) {
 			wantRepo:  "OWNER/REPO",
 		},
 		{
-			name:      "a repeated artifact number is kept",
-			args:      "142 2 2",
-			stdinTTY:  true,
-			stdoutTTY: true,
-			wantOpts:  DeleteOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 2}},
-			wantRepo:  "OWNER/REPO",
+			name:        "a repeated artifact number is refused",
+			args:        "142 2 5 2",
+			stdinTTY:    true,
+			stdoutTTY:   true,
+			wantErr:     "duplicate artifact number: 2",
+			wantFlagErr: true,
+		},
+		{
+			name:        "a number written two ways is refused",
+			args:        "142 2 02",
+			stdinTTY:    true,
+			stdoutTTY:   true,
+			wantErr:     "duplicate artifact number: 2",
+			wantFlagErr: true,
+		},
+		{
+			name:        "a repeated artifact number fails before --yes is required",
+			args:        "142 2 2",
+			wantErr:     "duplicate artifact number: 2",
+			wantFlagErr: true,
 		},
 		{
 			name:      "an issue URL names the repository",
@@ -373,21 +387,6 @@ func TestDeleteRun(t *testing.T) {
 			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
 				"X Failed to delete artifact 3: Must have admin rights to Repository.\n" +
 				"✓ Deleted artifact 5 (Barista feedback notes) from monalisa/monas-cafe#142\n",
-			wantErrIs: cmdutil.SilentError,
-		},
-		{
-			name: "a repeated number gets a line each, and the second delete fails",
-			opts: DeleteOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 2}, Confirmed: true},
-			tty:  true,
-			wantCalls: []string{
-				"IsPullRequest monalisa/monas-cafe#142",
-				"Get monalisa/monas-cafe#142 artifact 2",
-				"Get monalisa/monas-cafe#142 artifact 2",
-				"Delete monalisa/monas-cafe#142 artifact 2",
-				"Delete monalisa/monas-cafe#142 artifact 2",
-			},
-			wantStderr: "✓ Deleted artifact 2 (OAuth callback plan) from monalisa/monas-cafe#142\n" +
-				"X Failed to delete artifact 2: Not Found\n",
 			wantErrIs: cmdutil.SilentError,
 		},
 		{

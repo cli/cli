@@ -46,10 +46,28 @@ func TestNewCmdDownload(t *testing.T) {
 			wantRepo: "OWNER/REPO",
 		},
 		{
-			name:     "a repeated artifact number is kept",
-			args:     "142 2 2",
-			wantOpts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 2}, Dir: "."},
-			wantRepo: "OWNER/REPO",
+			name:        "a repeated artifact number is refused",
+			args:        "142 2 5 2",
+			wantErr:     "duplicate artifact number: 2",
+			wantFlagErr: true,
+		},
+		{
+			name:        "a number written two ways is refused",
+			args:        "142 2 02",
+			wantErr:     "duplicate artifact number: 2",
+			wantFlagErr: true,
+		},
+		{
+			name:        "a repeated artifact number is refused before --output counts the numbers",
+			args:        "142 2 2 --output callback-plan.md",
+			wantErr:     "duplicate artifact number: 2",
+			wantFlagErr: true,
+		},
+		{
+			name:        "a repeated artifact number is refused before --version counts the numbers",
+			args:        "142 2 2 --version 5",
+			wantErr:     "duplicate artifact number: 2",
+			wantFlagErr: true,
 		},
 		{
 			name:     "an issue URL names the repository",
@@ -1118,22 +1136,6 @@ func TestDownloadRun(t *testing.T) {
 			wantFiles: map[string]string{
 				"2-OAuth-callback-plan.md":    oauthPlanBody,
 				"5-Barista-feedback-notes.md": baristaBody,
-			},
-		},
-		{
-			name: "a repeated artifact gets a line each, and the second finds the first's file",
-			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 2}},
-			tty:  true,
-			wantCalls: []string{
-				"IsPullRequest monalisa/monas-cafe#142",
-				"Get monalisa/monas-cafe#142 artifact 2",
-				"Get monalisa/monas-cafe#142 artifact 2",
-			},
-			wantStdout: "✓ 2-OAuth-callback-plan.md\n",
-			wantStderr: "X Failed to write 2-OAuth-callback-plan.md: " + alreadyExists + "\n",
-			wantErrIs:  cmdutil.SilentError,
-			wantFiles: map[string]string{
-				"2-OAuth-callback-plan.md": oauthPlanBody,
 			},
 		},
 		{
