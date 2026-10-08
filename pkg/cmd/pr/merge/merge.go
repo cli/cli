@@ -413,6 +413,16 @@ func (m *mergeContext) deleteLocalBranch() error {
 		return nil
 	}
 
+	remotes, err := m.opts.Remotes()
+	if err != nil {
+		_ = m.warnf("%s Could not read repository remotes; skipping local branch delete: %s\n", m.cs.WarningIcon(), err)
+		return nil
+	}
+	if _, err := remotes.FindByRepo(m.baseRepo.RepoOwner(), m.baseRepo.RepoName()); err != nil {
+		_ = m.warnf("%s Current repository is not %s; skipping local branch delete\n", m.cs.WarningIcon(), ghrepo.FullName(m.baseRepo))
+		return nil
+	}
+
 	switchedToBranch := ""
 	headWorktree := git.WorktreeForBranch(worktrees, m.pr.HeadRefName)
 	if headWorktree != nil && headWorktree.Prunable {

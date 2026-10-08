@@ -255,10 +255,31 @@ func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, 
 }
 
 func runCommandWithBranchFunc(rt http.RoundTripper, pm *prompter.PrompterMock, branch func() (string, error), isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithRemotesFunc(rt, pm, branch, isTTY, cli, nil)
+}
+
+func runCommandWithRemotes(rt http.RoundTripper, remotes []*context.Remote, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithRemotesFunc(rt, nil, func() (string, error) {
+		return branch, nil
+	}, isTTY, cli, remotes)
+}
+
+func runCommandWithRemotesFunc(rt http.RoundTripper, pm *prompter.PrompterMock, branch func() (string, error), isTTY bool, cli string, remotes []*context.Remote) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
 	ios.SetStderrTTY(isTTY)
+
+	if remotes == nil {
+		remotes = []*context.Remote{
+			{
+				Remote: &git.Remote{
+					Name: "origin",
+				},
+				Repo: ghrepo.New("OWNER", "REPO"),
+			},
+		}
+	}
 
 	factory := &cmdutil.Factory{
 		IOStreams: ios,
@@ -267,14 +288,7 @@ func runCommandWithBranchFunc(rt http.RoundTripper, pm *prompter.PrompterMock, b
 		},
 		Branch: branch,
 		Remotes: func() (context.Remotes, error) {
-			return []*context.Remote{
-				{
-					Remote: &git.Remote{
-						Name: "origin",
-					},
-					Repo: ghrepo.New("OWNER", "REPO"),
-				},
-			}, nil
+			return remotes, nil
 		},
 		GitClient: &git.Client{
 			GhPath:  "some/path/gh",
@@ -2447,6 +2461,111 @@ func TestPrMerge_deleteBranch_noWorktreeConflict(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Contains(t, output.Stderr(), "Deleted local branch feature and switched to branch main")
 	assert.Contains(t, output.Stderr(), "Deleted remote branch feature")
+}
+
+func TestPrMerge_deleteBranch_unrelatedRepo(t *testing.T) {
+	otherRepoRemotes := []*context.Remote{
+		{
+			Remote: &git.Remote{
+				Name: "origin",
+			},
+			Repo: ghrepo.New("OTHEROWNER", "OTHERREPO"),
+		},
+	}
+
+	tests := []struct {
+		name            string
+		worktreeList    string
+		toplevel        string
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name: "same-named branch checked out in a linked worktree of an unrelated repository",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+
+				worktree /path/to/feature-wt
+				HEAD def456
+				branch refs/heads/feature
+			`),
+			toplevel: "/path/to/main",
+			wantContains: []string{
+				"Current repository is not OWNER/REPO; skipping local branch delete",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{
+				"Removed worktree",
+				"Deleted local branch",
+			},
+		},
+		{
+			name: "same-named branch without a linked worktree in an unrelated repository",
+			worktreeList: heredoc.Doc(`
+				worktree /path/to/main
+				HEAD abc123
+				branch refs/heads/main
+			`),
+			toplevel: "/path/to/main",
+			wantContains: []string{
+				"Current repository is not OWNER/REPO; skipping local branch delete",
+				"Deleted remote branch feature",
+			},
+			wantNotContains: []string{
+				"Deleted local branch",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
+
+			shared.StubFinderForRunCommandStyleTests(t,
+				"",
+				&api.PullRequest{
+					ID:               "THE-ID",
+					Number:           3,
+					Title:            "The title of the PR",
+					HeadRefName:      "feature",
+					MergeStateStatus: "CLEAN",
+					BaseRefName:      "main",
+				},
+				baseRepo("OWNER", "REPO", "main"),
+			)
+
+			http.Register(
+				httpmock.GraphQL(`mutation PullRequestMerge\b`),
+				httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
+					assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+					assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+				}))
+			http.Register(
+				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Ffeature"),
+				httpmock.StringResponse(`{}`))
+
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+
+			cs.Register(`git rev-parse --verify refs/heads/feature`, 0, "")
+			cs.Register(`git worktree list --porcelain`, 0, tt.worktreeList)
+			cs.Register(`git rev-parse --show-toplevel`, 0, tt.toplevel)
+
+			output, err := runCommandWithRemotes(http, otherRepoRemotes, "main", true, "pr merge --merge -d")
+			require.NoError(t, err)
+
+			assert.Equal(t, "", output.String())
+			for _, want := range tt.wantContains {
+				assert.Contains(t, output.Stderr(), want)
+			}
+			for _, notWant := range tt.wantNotContains {
+				assert.NotContains(t, output.Stderr(), notWant)
+			}
+		})
+	}
 }
 
 type testEditor struct{}
