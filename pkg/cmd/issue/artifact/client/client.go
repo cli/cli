@@ -140,6 +140,9 @@ func (c *artifactClient) Get(repo ghrepo.Interface, issueNumber int, number int)
 	return &ArtifactWithVersions{Artifact: response.Artifact, Versions: response.Versions}, nil
 }
 
+// Delete ignores the response's body. A successful delete can get 204 No
+// Content, which has none, or 200 with the deleted artifact's number, which
+// the caller already knows.
 func (c *artifactClient) Delete(repo ghrepo.Interface, issueNumber int, number int) error {
 	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "issues", strconv.Itoa(issueNumber), "artifacts", strconv.Itoa(number))
 	if err != nil {
