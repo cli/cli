@@ -46,8 +46,8 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Delete artifacts from an issue. A deleted artifact can't be restored.
 
-			In a terminal, gh asks for confirmation first. %[1]s--yes%[1]s skips the prompt, and it
-			is required when gh can't prompt.
+			In a terminal, deletion requires confirmation. %[1]s--yes%[1]s skips the prompt and is
+			required when prompting is unavailable.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Delete artifact 2 from issue 142
