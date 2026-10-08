@@ -2,8 +2,10 @@ package attachments
 
 import (
 	"path/filepath"
+	"runtime"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1026,6 +1028,73 @@ func TestIsSingleImage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, isSingleImage(tt.markdown, url))
+		})
+	}
+}
+
+func TestIsRelativePath(t *testing.T) {
+	tests := []struct {
+		name        string
+		path        string
+		want        bool
+		windowsOnly bool
+	}{
+		{
+			name: "a file name",
+			path: "login.png",
+			want: true,
+		},
+		{
+			name: "a path into a folder",
+			path: "shots/login.png",
+			want: true,
+		},
+		{
+			name: "a path that starts with a dot",
+			path: "./login.png",
+			want: true,
+		},
+		{
+			name: "a path into the parent folder",
+			path: "../login.png",
+			want: true,
+		},
+		{
+			name: "an empty path",
+			path: "",
+			want: false,
+		},
+		{
+			name: "a path that starts with a slash",
+			path: "/login.png",
+			want: false,
+		},
+		{
+			name:        "a drive-relative path names a drive of its own",
+			path:        `C:x`,
+			want:        false,
+			windowsOnly: true,
+		},
+		{
+			name:        "a path rooted on the current drive",
+			path:        `\x`,
+			want:        false,
+			windowsOnly: true,
+		},
+		{
+			name:        "an absolute path with a drive",
+			path:        `C:\x`,
+			want:        false,
+			windowsOnly: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.windowsOnly && runtime.GOOS != "windows" {
+				t.Skip("a Windows path")
+			}
+			assert.Equal(t, tt.want, isRelativePath(tt.path))
 		})
 	}
 }
