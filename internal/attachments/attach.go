@@ -42,9 +42,9 @@ type DocumentResult struct {
 	ReplaceOperations int
 	// Err is the upload failure when it left one of the document's attachments
 	// without a URL, because that file failed or was never tried, joined with
-	// any failure to rewrite Markdown. It is nil when every attachment uploaded
-	// and Markdown was rewritten, even if a file only other documents
-	// reference failed.
+	// any failure to rewrite Markdown. It is nil when all of this document's
+	// attachments uploaded and its Markdown was rewritten, even if an attachment
+	// used only by another document failed.
 	Err error
 }
 
