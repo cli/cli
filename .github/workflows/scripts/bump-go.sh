@@ -141,7 +141,10 @@ echo "  • set go directive → $GO_DIRECTIVE_VERSION"
 echo "  • set toolchain    → go$TOOLCHAIN_VERSION"
 
 # Reconcile the module, apply source migrations, and verify the result before
-# creating a pull request.
+# creating a pull request. govulncheck is intentionally left to PR CI: new
+# advisories in dependencies cannot be fixed by a Go bump, so blocking here
+# would prevent the PR from opening. Maintainers can instead push dependency
+# fixes onto the bump PR.
 echo "  • running go mod tidy..."
 pushd "$MODULE_DIR" > /dev/null
 go mod tidy
@@ -170,8 +173,6 @@ echo "  • running tests..."
 go test ./... || status=$?
 echo "  • running golangci-lint..."
 golangci-lint run ./... || status=$?
-echo "  • running govulncheck..."
-go run "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION" ./... || status=$?
 if [[ $status -ne 0 ]]; then
   exit "$status"
 fi
