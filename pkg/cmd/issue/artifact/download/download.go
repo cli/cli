@@ -189,9 +189,7 @@ func downloadRun(opts *DownloadOptions) error {
 			return fmt.Errorf("no artifacts to download from %s#%d", ghrepo.FullName(repo), opts.IssueNumber)
 		}
 		for _, a := range artifacts {
-			if !downloadArtifact(opts, w, &client.ArtifactWithVersions{Artifact: a}) {
-				failed = true
-			}
+			failed = !downloadArtifact(opts, w, &client.ArtifactWithVersions{Artifact: a}) || failed
 		}
 	} else {
 		for _, number := range opts.ArtifactNumbers {
@@ -201,9 +199,7 @@ func downloadRun(opts *DownloadOptions) error {
 				failed = true
 				continue
 			}
-			if !downloadArtifact(opts, w, a) {
-				failed = true
-			}
+			failed = !downloadArtifact(opts, w, a) || failed
 		}
 	}
 
