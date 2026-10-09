@@ -300,6 +300,148 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestGet(t *testing.T) {
+	createdAt := time.Date(2026, 9, 21, 23, 0, 0, 0, time.UTC)
+	updatedAt := time.Date(2026, 9, 24, 21, 0, 0, 0, time.UTC)
+	version5At := time.Date(2026, 9, 22, 20, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		repo     ghrepo.Interface
+		number   int
+		response httpmock.Responder
+		want     *ArtifactWithVersions
+		wantURL  string
+		wantErr  string
+	}{
+		{
+			name:   "decodes the artifact and its versions, in the API's order",
+			repo:   ghrepo.New("monalisa", "monas-cafe"),
+			number: 2,
+			response: httpmock.StringResponse(`{
+				"artifact": {
+					"id": 6626,
+					"number": 2,
+					"type": "generic",
+					"name": "OAuth callback plan",
+					"body": "# OAuth callback plan",
+					"body_html": "<h1>OAuth callback plan</h1>",
+					"description": "Register the callback URL.",
+					"creator": {"login": "hubot", "id": 2},
+					"updated_by_actor": {"login": "monalisa", "id": 1},
+					"created_at": "2026-09-21T23:00:00Z",
+					"updated_at": "2026-09-24T21:00:00Z"
+				},
+				"versions": [
+					{
+						"version": 12,
+						"name": "OAuth callback plan",
+						"body": "# OAuth callback plan",
+						"body_html": "<h1>OAuth callback plan</h1>",
+						"created_at": "2026-09-24T21:00:00Z",
+						"actor": {"login": "monalisa", "id": 1}
+					},
+					{
+						"version": 5,
+						"name": "OAuth plan",
+						"body": "# OAuth plan\n\n1. Register the callback URL.",
+						"body_html": "",
+						"created_at": "2026-09-22T20:00:00Z",
+						"actor": {"login": "monalisa", "id": 1}
+					},
+					{
+						"version": 1,
+						"name": "OAuth plan",
+						"body": "# OAuth plan",
+						"body_html": "",
+						"created_at": null,
+						"actor": null
+					}
+				]
+			}`),
+			want: &ArtifactWithVersions{
+				ID:             6626,
+				Number:         2,
+				Type:           "generic",
+				Name:           "OAuth callback plan",
+				Body:           "# OAuth callback plan",
+				BodyHTML:       "<h1>OAuth callback plan</h1>",
+				Description:    "Register the callback URL.",
+				Creator:        &Actor{ID: 2, Login: "hubot"},
+				UpdatedByActor: &Actor{ID: 1, Login: "monalisa"},
+				CreatedAt:      &createdAt,
+				UpdatedAt:      &updatedAt,
+				Versions: []Version{
+					{
+						Version:   12,
+						Name:      "OAuth callback plan",
+						Body:      "# OAuth callback plan",
+						BodyHTML:  "<h1>OAuth callback plan</h1>",
+						CreatedAt: &updatedAt,
+						Actor:     &Actor{ID: 1, Login: "monalisa"},
+					},
+					{
+						Version:   5,
+						Name:      "OAuth plan",
+						Body:      "# OAuth plan\n\n1. Register the callback URL.",
+						CreatedAt: &version5At,
+						Actor:     &Actor{ID: 1, Login: "monalisa"},
+					},
+					{
+						Version: 1,
+						Name:    "OAuth plan",
+						Body:    "# OAuth plan",
+					},
+				},
+			},
+			wantURL: "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/2",
+		},
+		{
+			name:   "a repository on a ghe.com host",
+			repo:   ghrepo.NewWithHost("monalisa", "monas-cafe", "monas-cafe.ghe.com"),
+			number: 3,
+			response: httpmock.JSONResponse(map[string]any{
+				"artifact": map[string]any{"id": 6627, "number": 3, "type": "link", "name": "Staging OAuth runbook"},
+				"versions": []map[string]any{{"version": 1, "name": "Staging OAuth runbook"}},
+			}),
+			want: &ArtifactWithVersions{
+				ID: 6627, Number: 3, Type: "link", Name: "Staging OAuth runbook",
+				Versions: []Version{{Version: 1, Name: "Staging OAuth runbook"}},
+			},
+			wantURL: "https://api.monas-cafe.ghe.com/repos/monalisa/monas-cafe/issues/142/artifacts/3",
+		},
+		{
+			name:     "an API error is returned as the API gives it",
+			repo:     ghrepo.New("monalisa", "monas-cafe"),
+			number:   9,
+			response: httpmock.StatusJSONResponse(404, map[string]string{"message": "Not Found"}),
+			wantURL:  "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/9",
+			wantErr:  "HTTP 404: Not Found (https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/9)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(httpmock.REST("GET", fmt.Sprintf("repos/monalisa/monas-cafe/issues/142/artifacts/%d", tt.number)), tt.response)
+
+			c := NewArtifactClient(&http.Client{Transport: reg})
+			got, err := c.Get(tt.repo, 142, tt.number)
+
+			require.Len(t, reg.Requests, 1)
+			assert.Equal(t, tt.wantURL, reg.Requests[0].URL.String())
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // artifactsPage responds with a page holding an artifact for each number.
 func artifactsPage(artifactNumbers ...int) httpmock.Responder {
 	page := make([]map[string]any, 0, len(artifactNumbers))

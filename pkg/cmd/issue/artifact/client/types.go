@@ -1,6 +1,9 @@
 package client
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // The artifact types gh knows. The API stores a type with each artifact, and
 // gh treats generic and plan artifacts alike as documents.
@@ -26,6 +29,11 @@ var ArtifactFields = []string{
 	"updatedByActor",
 }
 
+// ArtifactWithVersionsFields lists the --json fields of a single artifact: the
+// artifact fields, plus versions. List responses have no edit history, so only
+// commands that get one artifact offer versions.
+var ArtifactWithVersionsFields = append(slices.Clone(ArtifactFields), "versions")
+
 // Artifact is an issue artifact as the REST API returns it. The API can return
 // null for the users and timestamps, so those are pointers.
 type Artifact struct {
@@ -44,10 +52,32 @@ type Artifact struct {
 	UpdatedAt      *time.Time `json:"updated_at"`
 }
 
-// Actor is the user who created or last updated an artifact.
+// Actor is a user who created or updated an artifact, or saved one of its
+// versions.
 type Actor struct {
 	ID    int64  `json:"id"`
 	Login string `json:"login"`
+}
+
+// ArtifactWithVersions is one artifact with its edit history, as the API
+// returns a single artifact.
+type ArtifactWithVersions struct {
+	Artifact
+	// Versions is the edit history as the API returns it: newest first,
+	// including the current version.
+	Versions []Version
+}
+
+// Version is one saved version of an artifact. The API can return null for
+// the actor and the timestamp, so those are pointers.
+type Version struct {
+	Version   int        `json:"version"`
+	Name      string     `json:"name"`
+	Body      string     `json:"body"`
+	BodyHTML  string     `json:"body_html"`
+	CreatedAt *time.Time `json:"created_at"`
+	// Actor is the user who saved this version.
+	Actor *Actor `json:"actor"`
 }
 
 // ExportData returns the requested fields for --json output. Fields the API
@@ -81,6 +111,32 @@ func (a Artifact) ExportData(fields []string) map[string]any {
 		}
 	}
 	return data
+}
+
+// ExportData returns the requested fields for --json output, where versions
+// is the edit history, newest first. Fields the API returned as null stay
+// null.
+func (a ArtifactWithVersions) ExportData(fields []string) map[string]any {
+	data := a.Artifact.ExportData(fields)
+	if slices.Contains(fields, "versions") {
+		versions := make([]map[string]any, 0, len(a.Versions))
+		for _, v := range a.Versions {
+			versions = append(versions, v.export())
+		}
+		data["versions"] = versions
+	}
+	return data
+}
+
+func (v Version) export() map[string]any {
+	return map[string]any{
+		"version":   v.Version,
+		"name":      v.Name,
+		"body":      v.Body,
+		"bodyHtml":  v.BodyHTML,
+		"createdAt": exportTime(v.CreatedAt),
+		"actor":     v.Actor.export(),
+	}
 }
 
 func (a *Actor) export() any {

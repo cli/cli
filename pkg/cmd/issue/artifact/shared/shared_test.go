@@ -119,6 +119,54 @@ func TestParseIssueArg(t *testing.T) {
 	}
 }
 
+func TestParseArtifactNumber(t *testing.T) {
+	tests := []struct {
+		name    string
+		arg     string
+		want    int
+		wantErr string
+	}{
+		{
+			name: "a number",
+			arg:  "2",
+			want: 2,
+		},
+		{
+			name:    "zero",
+			arg:     "0",
+			wantErr: `invalid artifact number: "0"`,
+		},
+		{
+			name:    "a negative number",
+			arg:     "-2",
+			wantErr: `invalid artifact number: "-2"`,
+		},
+		{
+			name:    "a number with a hash",
+			arg:     "#2",
+			wantErr: `invalid artifact number: "#2"`,
+		},
+		{
+			name:    "a name",
+			arg:     "OAuth",
+			wantErr: `invalid artifact number: "OAuth"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseArtifactNumber(tt.arg)
+
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestCheckHost(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -198,6 +246,140 @@ func TestCheckIssue(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCheckType(t *testing.T) {
+	tests := []struct {
+		name         string
+		artifactType string
+		wantErr      string
+	}{
+		{
+			name:         "generic",
+			artifactType: "generic",
+		},
+		{
+			name:         "plan",
+			artifactType: "plan",
+		},
+		{
+			name:         "link",
+			artifactType: "link",
+		},
+		{
+			name:         "a type gh doesn't know",
+			artifactType: "bad-type",
+			wantErr:      `artifact 7 has type "bad-type", which this version of gh doesn't support; upgrade gh`,
+		},
+		{
+			name:         "an empty type",
+			artifactType: "",
+			wantErr:      `artifact 7 has type "", which this version of gh doesn't support; upgrade gh`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := CheckType(client.Artifact{Number: 7, Type: tt.artifactType, Name: "Espresso checklist"})
+
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestHTTPURL(t *testing.T) {
+	tests := []struct {
+		name   string
+		value  string
+		want   string
+		wantOK bool
+	}{
+		{
+			name:   "an https URL",
+			value:  "https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook",
+			want:   "https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook",
+			wantOK: true,
+		},
+		{
+			name:   "an http URL with a port, query and fragment",
+			value:  "http://staging.monas-cafe.example:8080/menu?day=monday#specials",
+			want:   "http://staging.monas-cafe.example:8080/menu?day=monday#specials",
+			wantOK: true,
+		},
+		{
+			name:   "surrounding whitespace is trimmed",
+			value:  " \thttps://github.com/monalisa/monas-cafe/wiki/OAuth-runbook\r\n",
+			want:   "https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook",
+			wantOK: true,
+		},
+		{
+			name:   "an uppercase scheme",
+			value:  "HTTPS://github.com/monalisa/monas-cafe",
+			want:   "HTTPS://github.com/monalisa/monas-cafe",
+			wantOK: true,
+		},
+		{
+			name:  "another scheme",
+			value: "ftp://monas-cafe.example/menu.pdf",
+		},
+		{
+			name:  "a script",
+			value: "javascript:alert(1)",
+		},
+		{
+			name:  "a local file",
+			value: "file:///etc/hosts",
+		},
+		{
+			name:  "no host",
+			value: "https:///monalisa/monas-cafe",
+		},
+		{
+			name:  "no slashes after the scheme",
+			value: "https:github.com/monalisa/monas-cafe",
+		},
+		{
+			name:  "a relative URL",
+			value: "/monalisa/monas-cafe/wiki/OAuth-runbook",
+		},
+		{
+			name:  "a space inside",
+			value: "https://github.com/monalisa/monas cafe",
+		},
+		{
+			name:  "a line break inside",
+			value: "https://github.com/monalisa/monas-cafe\nURL=file:///etc/hosts",
+		},
+		{
+			name:  "a control character",
+			value: "https://github.com/monalisa/monas-cafe\x1b[31m",
+		},
+		{
+			name:  "a non-ASCII host",
+			value: "https://ラテ.example/menu",
+		},
+		{
+			name:  "an invalid escape",
+			value: "https://github.com/monalisa/monas-cafe/%zz",
+		},
+		{
+			name:  "empty",
+			value: "  ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := HTTPURL(tt.value)
+
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
