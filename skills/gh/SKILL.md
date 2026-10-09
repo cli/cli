@@ -204,12 +204,12 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   Shortcut file becomes a link to its URL. Names can't contain some
   characters, such as parentheses. `gh` drops them from names it takes from
   file names (`plan (1).md` becomes `plan 1.md`), but sends a name given with
-  `#` or `--name` as typed. Instead of file arguments, `--body <text>`
+  `#` or `--name` as typed. Instead of file or URL arguments, `--body <text>`
   creates one document and `--body-file <path>` creates one artifact from a
-  file. `--name` names a single artifact, and `--body` and `--body-file -`
-  require it. Documents are `generic` unless `--type plan` is given, and a
-  plan currently behaves the same. `--type` is refused if any artifact is a
-  link.
+  file. Neither can be combined with file or URL arguments. `--name` names a
+  single artifact, and `--body` and `--body-file -` require it. Documents are
+  `generic` unless `--type plan` is given, and a plan currently behaves the
+  same. `--type` is refused if any artifact is a link.
 - `gh issue artifact edit {<issue-number>|<issue-url>} <artifact-number> [--name <name>] [--body <text> | --body-file <path>] [--attach <path>]... [--restore-version N]`
   renames an artifact or replaces its content, saving a new version. At least
   one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`
