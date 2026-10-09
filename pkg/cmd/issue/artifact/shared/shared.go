@@ -1,8 +1,3 @@
-// Package shared holds what more than one gh issue artifact command needs: its
-// client, its arguments, reading new content from files, finding a version in
-// an edit history, the uploader for --attach, the result lines of commands
-// that act on several artifacts and the checks that refuse what artifacts or
-// this version of gh don't support.
 package shared
 
 import (
