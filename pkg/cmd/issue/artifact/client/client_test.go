@@ -442,6 +442,59 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func TestDelete(t *testing.T) {
+	tests := []struct {
+		name     string
+		repo     ghrepo.Interface
+		number   int
+		response httpmock.Responder
+		wantURL  string
+		wantErr  string
+	}{
+		{
+			name:     "deletes the artifact",
+			repo:     ghrepo.New("monalisa", "monas-cafe"),
+			number:   5,
+			response: httpmock.StringResponse(`{}`),
+			wantURL:  "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/5",
+		},
+		{
+			name:     "a repository on a ghe.com host",
+			repo:     ghrepo.NewWithHost("monalisa", "monas-cafe", "monas-cafe.ghe.com"),
+			number:   5,
+			response: httpmock.StringResponse(`{}`),
+			wantURL:  "https://api.monas-cafe.ghe.com/repos/monalisa/monas-cafe/issues/142/artifacts/5",
+		},
+		{
+			name:     "an API error is returned as the API gives it",
+			repo:     ghrepo.New("monalisa", "monas-cafe"),
+			number:   9,
+			response: httpmock.StatusJSONResponse(404, map[string]string{"message": "Not Found"}),
+			wantURL:  "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/9",
+			wantErr:  "HTTP 404: Not Found (https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/9)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(httpmock.REST("DELETE", fmt.Sprintf("repos/monalisa/monas-cafe/issues/142/artifacts/%d", tt.number)), tt.response)
+
+			c := NewArtifactClient(&http.Client{Transport: reg})
+			err := c.Delete(tt.repo, 142, tt.number)
+
+			require.Len(t, reg.Requests, 1)
+			assert.Equal(t, tt.wantURL, reg.Requests[0].URL.String())
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 // artifactsPage responds with a page holding an artifact for each number.
 func artifactsPage(artifactNumbers ...int) httpmock.Responder {
 	page := make([]map[string]any, 0, len(artifactNumbers))
