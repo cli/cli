@@ -703,6 +703,7 @@ func TestUpdate(t *testing.T) {
 	updatedAt := time.Date(2026, 9, 24, 21, 0, 0, 0, time.UTC)
 	name := "OAuth callback plan v2"
 	body := "# OAuth callback plan\n\n![Sign-in flow](./signin-flow.png)\n"
+	empty := ""
 
 	tests := []struct {
 		name        string
@@ -771,6 +772,17 @@ func TestUpdate(t *testing.T) {
 			response:    `{"id": 6626, "number": 2, "type": "generic", "name": "OAuth callback plan v2", "body": "# OAuth callback plan\n\n![Sign-in flow](./signin-flow.png)\n"}`,
 			want:        &Artifact{ID: 6626, Number: 2, Type: "generic", Name: "OAuth callback plan v2", Body: body},
 			wantPayload: map[string]any{"name": "OAuth callback plan v2", "body": body},
+			wantURL:     "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/2",
+		},
+		{
+			name:        "sends an empty body rather than leaving it out",
+			repo:        ghrepo.New("monalisa", "monas-cafe"),
+			number:      2,
+			newBody:     &empty,
+			status:      200,
+			response:    `{"id": 6626, "number": 2, "type": "generic", "name": "OAuth callback plan", "body": ""}`,
+			want:        &Artifact{ID: 6626, Number: 2, Type: "generic", Name: "OAuth callback plan"},
+			wantPayload: map[string]any{"body": ""},
 			wantURL:     "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/2",
 		},
 		{

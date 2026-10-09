@@ -157,10 +157,14 @@ func (c *artifactClient) Create(repo ghrepo.Interface, issueNumber int, artifact
 		return nil, err
 	}
 
-	payload, err := json.Marshal(map[string]string{
-		"type": artifactType,
-		"name": name,
-		"body": body,
+	payload, err := json.Marshal(struct {
+		Type string `json:"type"`
+		Name string `json:"name"`
+		Body string `json:"body"`
+	}{
+		Type: artifactType,
+		Name: name,
+		Body: body,
 	})
 	if err != nil {
 		return nil, err
@@ -181,14 +185,14 @@ func (c *artifactClient) Update(repo ghrepo.Interface, issueNumber int, number i
 		return nil, err
 	}
 
-	fields := map[string]string{}
-	if name != nil {
-		fields["name"] = *name
-	}
-	if body != nil {
-		fields["body"] = *body
-	}
-	payload, err := json.Marshal(fields)
+	// omitempty leaves out a nil field, and still sends an empty string.
+	payload, err := json.Marshal(struct {
+		Name *string `json:"name,omitempty"`
+		Body *string `json:"body,omitempty"`
+	}{
+		Name: name,
+		Body: body,
+	})
 	if err != nil {
 		return nil, err
 	}
