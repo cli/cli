@@ -776,7 +776,7 @@ func TestEditRun(t *testing.T) {
 			opts:      EditOptions{BodyFile: "missing.md"},
 			artifact:  plan,
 			tty:       true,
-			wantErr:   "failed to update artifact 2 from missing.md: ",
+			wantErr:   "failed to read new content for artifact 2 from missing.md: ",
 			wantErrIs: fs.ErrNotExist,
 		},
 		{
@@ -785,7 +785,7 @@ func TestEditRun(t *testing.T) {
 			opts:     EditOptions{BodyFile: "signin-flow.png"},
 			artifact: plan,
 			tty:      true,
-			wantErr:  "failed to update artifact 2 from signin-flow.png: binary file not supported",
+			wantErr:  "failed to read new content for artifact 2 from signin-flow.png: binary file not supported",
 		},
 		{
 			name:     "an empty file fails before any request",
@@ -793,7 +793,7 @@ func TestEditRun(t *testing.T) {
 			opts:     EditOptions{BodyFile: "empty.md"},
 			artifact: plan,
 			tty:      true,
-			wantErr:  "failed to update artifact 2 from empty.md: file is empty",
+			wantErr:  "failed to read new content for artifact 2 from empty.md: file is empty",
 		},
 		{
 			name:     "empty standard input fails before any request",
@@ -801,7 +801,7 @@ func TestEditRun(t *testing.T) {
 			opts:     EditOptions{BodyFile: "-"},
 			artifact: runbook,
 			tty:      true,
-			wantErr:  "failed to update artifact 3 from standard input: input is empty",
+			wantErr:  "failed to read new content for artifact 3 from standard input: input is empty",
 		},
 		{
 			name:     "binary standard input fails before any request",
@@ -809,7 +809,7 @@ func TestEditRun(t *testing.T) {
 			opts:     EditOptions{BodyFile: "-"},
 			artifact: plan,
 			tty:      true,
-			wantErr:  "failed to update artifact 2 from standard input: binary input not supported",
+			wantErr:  "failed to read new content for artifact 2 from standard input: binary input not supported",
 		},
 		{
 			name:     "a failed lookup is the artifact's failure line",

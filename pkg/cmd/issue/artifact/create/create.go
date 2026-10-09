@@ -344,13 +344,13 @@ func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, e
 	case fromStdin:
 		body, _, err := shared.ReadContent(s.arg, stdin)
 		if err != nil {
-			return a, fmt.Errorf("failed to create artifact from standard input: %w", err)
+			return a, fmt.Errorf("failed to read artifact content from standard input: %w", err)
 		}
 		a.body = body
 	case fromURL:
 		u, ok := shared.HTTPURL(s.arg)
 		if !ok {
-			return a, fmt.Errorf("failed to create artifact from %s: links must be http(s) URLs with a host, in printable ASCII with no spaces", s.arg)
+			return a, fmt.Errorf("invalid artifact URL %q: must be an http(s) URL with a host, in printable ASCII with no spaces", s.arg)
 		}
 		a.artifactType, a.body = client.TypeLink, u
 		if a.name == "" {
@@ -364,7 +364,7 @@ func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, e
 	case fromFile:
 		content, dir, err := shared.ReadContent(s.arg, stdin)
 		if err != nil {
-			return a, fmt.Errorf("failed to create artifact from %s: %w", s.arg, err)
+			return a, fmt.Errorf("failed to read artifact content from %s: %w", s.arg, err)
 		}
 		if shared.IsShortcutFile(s.arg) {
 			u, err := shared.ShortcutURL(content)
@@ -384,7 +384,7 @@ func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, e
 				if s.bodyFile {
 					hint = "name it with `--name`"
 				}
-				return a, fmt.Errorf("failed to create artifact from %s: the file name has no letters or numbers; %s", s.arg, hint)
+				return a, fmt.Errorf("cannot derive an artifact name from %s: the file name has no letters or numbers; %s", s.arg, hint)
 			}
 		}
 	}

@@ -272,7 +272,7 @@ func readContent(opts *EditOptions) (*string, string, error) {
 		if source == "-" {
 			source = "standard input"
 		}
-		return nil, "", fmt.Errorf("failed to update artifact %d from %s: %w", opts.ArtifactNumber, source, err)
+		return nil, "", fmt.Errorf("failed to read new content for artifact %d from %s: %w", opts.ArtifactNumber, source, err)
 	}
 	return &content, dir, nil
 }
