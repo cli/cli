@@ -675,7 +675,7 @@ func TestEditRun(t *testing.T) {
 				"IsPullRequest monalisa/monas-cafe#142",
 				"Get monalisa/monas-cafe#142 3",
 			},
-			wantErr: "artifact 3 is a link; its new content must be an http(s) URL or a .url file",
+			wantErr: "artifact 3 is a link; pass an http(s) URL with `--body` or a .url file with `--body-file`",
 		},
 		{
 			name:     "--body text can't update a link",
@@ -686,7 +686,7 @@ func TestEditRun(t *testing.T) {
 				"IsPullRequest monalisa/monas-cafe#142",
 				"Get monalisa/monas-cafe#142 3",
 			},
-			wantErr: "artifact 3 is a link; its new content must be an http(s) URL or a .url file",
+			wantErr: "artifact 3 is a link; pass an http(s) URL with `--body` or a .url file with `--body-file`",
 		},
 		{
 			name:     "a URL that isn't a strict http(s) URL can't update a link",
@@ -698,7 +698,7 @@ func TestEditRun(t *testing.T) {
 				"IsPullRequest monalisa/monas-cafe#142",
 				"Get monalisa/monas-cafe#142 3",
 			},
-			wantErr: "artifact 3 is a link; its new content must be an http(s) URL or a .url file",
+			wantErr: "artifact 3 is a link; pass an http(s) URL with `--body` or a .url file with `--body-file`",
 		},
 		{
 			name:     "a .url file that isn't a shortcut",

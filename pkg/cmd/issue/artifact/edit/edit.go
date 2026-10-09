@@ -312,7 +312,7 @@ func newBody(opts *EditOptions, a client.Artifact, content *string) (*string, er
 	}
 	u, ok := shared.HTTPURL(*content)
 	if !ok {
-		return nil, fmt.Errorf("artifact %d is a link; its new content must be an http(s) URL or a .url file", a.Number)
+		return nil, fmt.Errorf("artifact %d is a link; pass an http(s) URL with `--body` or a .url file with `--body-file`", a.Number)
 	}
 	return &u, nil
 }
