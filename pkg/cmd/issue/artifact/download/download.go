@@ -97,6 +97,10 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			if outputSet && opts.Output == "" {
 				return cmdutil.FlagErrorf("--output cannot be blank")
 			}
+			// A blank directory would otherwise be the current directory.
+			if cmd.Flags().Changed("dir") && opts.Dir == "" {
+				return cmdutil.FlagErrorf("--dir cannot be blank")
+			}
 			versionSet := cmd.Flags().Changed("version")
 			if versionSet && opts.Version < 1 {
 				return cmdutil.FlagErrorf("invalid version: %v", opts.Version)

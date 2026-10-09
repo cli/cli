@@ -190,6 +190,12 @@ func TestNewCmdDownload(t *testing.T) {
 			wantFlagErr: true,
 		},
 		{
+			name:        "a blank --dir",
+			args:        "142 2 --dir ''",
+			wantErr:     "--dir cannot be blank",
+			wantFlagErr: true,
+		},
+		{
 			name:        "--output without an artifact number",
 			args:        "142 --output callback-plan.md",
 			wantErr:     "--output requires exactly one artifact number",
