@@ -67,10 +67,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			stdinTTY: true,
 			stdin:    "def456",
 			cli:      "--with-token",
-			wants: LoginOptions{
-				Hostname: "github.com",
-				Token:    "def456",
-			},
+			wantsErr: true,
 		},
 		{
 			name:     "nontty, hostname",
@@ -104,10 +101,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			stdinTTY: true,
 			stdin:    "ghi789",
 			cli:      "--with-token --hostname brad.vickers",
-			wants: LoginOptions{
-				Hostname: "brad.vickers",
-				Token:    "ghi789",
-			},
+			wantsErr: true,
 		},
 		{
 			name:     "tty, hostname",
@@ -303,6 +297,83 @@ func Test_NewCmdLogin(t *testing.T) {
 			assert.Equal(t, tt.wants.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
 			assert.Equal(t, tt.wants.Clipboard, gotOpts.Clipboard)
+		})
+	}
+}
+
+func Test_NewCmdLogin_withTokenStdin(t *testing.T) {
+	tests := []struct {
+		name      string
+		cli       string
+		stdin     string
+		stdinTTY  bool
+		wantErr   string
+		wantToken string
+	}{
+		{
+			name:     "terminal stdin is rejected before reading",
+			cli:      "--with-token",
+			stdin:    "abc123",
+			stdinTTY: true,
+			wantErr:  "argument to `--with-token` must be piped in through standard input, for example `gh auth login --with-token < mytoken.txt`",
+		},
+		{
+			name:      "piped stdin keeps reading the token",
+			cli:       "--with-token",
+			stdin:     "abc123\n",
+			stdinTTY:  false,
+			wantToken: "abc123",
+		},
+		{
+			name:      "piped empty stdin falls through to the existing path",
+			cli:       "--with-token",
+			stdin:     "",
+			stdinTTY:  false,
+			wantToken: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make sure there is a default host set so that
+			// the local configuration file never read from.
+			t.Setenv("GH_HOST", "github.com")
+
+			ios, stdin, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{IOStreams: ios}
+
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(tt.stdinTTY)
+			stdin.WriteString(tt.stdin)
+
+			argv, err := shlex.Split(tt.cli)
+			require.NoError(t, err)
+
+			var gotOpts *LoginOptions
+			cmd := NewCmdLogin(f, func(opts *LoginOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			// TODO cobra hack-around
+			cmd.Flags().BoolP("help", "x", false, "")
+
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				// A flag error is what makes gh print the usage message alongside
+				// this error, teaching the piped form.
+				var flagErr *cmdutil.FlagError
+				assert.ErrorAs(t, err, &flagErr)
+				assert.Nil(t, gotOpts, "the command should not have reached login")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantToken, gotOpts.Token)
 		})
 	}
 }

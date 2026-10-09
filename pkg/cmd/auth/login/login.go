@@ -115,6 +115,12 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 				return cmdutil.FlagErrorf("specify only one of `--scopes` or `--with-token`")
 			}
 
+			// Reading from a terminal never reaches EOF on its own, so --with-token
+			// would block here without telling the user what it is waiting for.
+			if tokenStdin && opts.IO.IsStdinTTY() {
+				return cmdutil.FlagErrorf("argument to `--with-token` must be piped in through standard input, for example `gh auth login --with-token < mytoken.txt`")
+			}
+
 			if tokenStdin {
 				defer opts.IO.In.Close()
 				token, err := io.ReadAll(opts.IO.In)
