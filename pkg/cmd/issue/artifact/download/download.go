@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -103,13 +104,16 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			var err error
 			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 			opts.ArtifactNumbers = make([]int, 0, len(args)-1)
 			for _, arg := range args[1:] {
 				number, err := shared.ParseArtifactNumber(arg)
 				if err != nil {
-					return err
+					return cmdutil.FlagErrorWrap(err)
+				}
+				if slices.Contains(opts.ArtifactNumbers, number) {
+					return cmdutil.FlagErrorf("duplicate artifact number: %d", number)
 				}
 				opts.ArtifactNumbers = append(opts.ArtifactNumbers, number)
 			}

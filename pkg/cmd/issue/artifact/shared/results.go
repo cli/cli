@@ -12,8 +12,8 @@ import (
 
 // Result identifies the artifact on a result line. A command that acts on
 // several artifacts reports one line for each, with PrintSuccess, PrintSkip,
-// PrintUnchanged, PrintFailure and PrintPartialFailure, so every such command
-// shares one piped format.
+// PrintUnchanged, PrintFailure and PrintPartialFailure, so create, edit and
+// download share one piped format.
 type Result struct {
 	// Number is the artifact's number. 0 leaves its column empty, for an
 	// artifact that has no number.
@@ -29,7 +29,7 @@ type Result struct {
 
 // PrintSuccess prints the line for an artifact the command acted on. In a
 // terminal, the line is icon and message on stdout. Otherwise it is a piped
-// line on stdout whose status is status, such as "deleted", with an empty
+// line on stdout whose status is status, such as "created", with an empty
 // reason.
 func PrintSuccess(ios *iostreams.IOStreams, status string, r Result, icon, message string) {
 	if !ios.IsStdoutTTY() {
@@ -71,7 +71,7 @@ func PrintUnchanged(ios *iostreams.IOStreams, r Result, message, reason string) 
 // on stderr. Otherwise it is a piped line on stdout whose status is "failed".
 // The command exits 1 after any failure.
 func PrintFailure(ios *iostreams.IOStreams, r Result, action string, err error) {
-	reason := failureReason(err)
+	reason := FailureReason(err)
 	if !ios.IsStdoutTTY() {
 		printResultLine(ios.Out, "failed", r, reason)
 		return
@@ -87,7 +87,7 @@ func PrintFailure(ios *iostreams.IOStreams, r Result, action string, err error) 
 // piped line on stdout with err's reason. The command exits 1 after it, like
 // after a failure.
 func PrintPartialFailure(ios *iostreams.IOStreams, status string, r Result, message string, err error) {
-	reason := failureReason(err)
+	reason := FailureReason(err)
 	if !ios.IsStdoutTTY() {
 		printResultLine(ios.Out, status, r, reason)
 		return
@@ -105,13 +105,13 @@ func printResultLine(w io.Writer, status string, r Result, reason string) {
 	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", status, number, r.Name, r.Source, reason)
 }
 
-// failureReason returns what a result line says about err. The line already
+// FailureReason returns what a result line says about err. The line already
 // names the artifact, so an error from an artifact request gives only the
 // server's message. Other errors, and API errors without a message, give
 // their whole text. That includes an error that wraps an API error, such as a
 // failed --attach upload, whose text names the file. Whitespace is cleaned up
 // so the result stays on one line.
-func failureReason(err error) string {
+func FailureReason(err error) string {
 	if httpErr, ok := err.(api.HTTPError); ok && httpErr.HTTPError != nil && httpErr.Message != "" {
 		return text.RemoveExcessiveWhitespace(httpErr.Message)
 	}

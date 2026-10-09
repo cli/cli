@@ -525,18 +525,27 @@ func TestDelete(t *testing.T) {
 		wantURL  string
 		wantErr  string
 	}{
+		// A successful delete can get 204 No Content, or 200 with the deleted
+		// artifact's number.
 		{
-			name:     "deletes the artifact",
+			name:     "deletes the artifact when the API answers 204 No Content",
 			repo:     ghrepo.New("monalisa", "monas-cafe"),
 			number:   5,
-			response: httpmock.StringResponse(`{}`),
+			response: httpmock.StatusStringResponse(204, ""),
 			wantURL:  "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/5",
+		},
+		{
+			name:     "deletes the artifact when the API answers 200 with its number",
+			repo:     ghrepo.New("monalisa", "monas-cafe"),
+			number:   7,
+			response: httpmock.StringResponse(`{"number":7,"deleted":true}`),
+			wantURL:  "https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/7",
 		},
 		{
 			name:     "a repository on a ghe.com host",
 			repo:     ghrepo.NewWithHost("monalisa", "monas-cafe", "monas-cafe.ghe.com"),
 			number:   5,
-			response: httpmock.StringResponse(`{}`),
+			response: httpmock.StatusStringResponse(204, ""),
 			wantURL:  "https://api.monas-cafe.ghe.com/repos/monalisa/monas-cafe/issues/142/artifacts/5",
 		},
 		{

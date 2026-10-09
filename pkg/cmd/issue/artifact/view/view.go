@@ -52,7 +52,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			Display an issue artifact's name, type, authors, content, and edit history. A
 			link shows its URL.
 
-			Use %[1]s--version%[1]s to show an earlier version from the edit history.
+			By default, the current version is shown. Use %[1]s--version%[1]s to show an earlier
+			version from the edit history.
 
 			With %[1]s--web%[1]s, open a link artifact's URL in the browser. Artifacts have no
 			web page of their own, so documents can't be opened with %[1]s--web%[1]s.
@@ -86,11 +87,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			var err error
 			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 			opts.ArtifactNumber, err = shared.ParseArtifactNumber(args[1])
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 			opts.Client = shared.ClientFunc(f)
 

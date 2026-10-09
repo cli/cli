@@ -1,8 +1,6 @@
 package comment
 
 import (
-	"path/filepath"
-
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
@@ -93,13 +91,10 @@ func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if bodyFile != "" {
-				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				var err error
+				opts.Body, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 				if err != nil {
 					return err
-				}
-				opts.Body = string(b)
-				if bodyFile != "-" {
-					opts.BodyDir = filepath.Dir(bodyFile)
 				}
 			}
 

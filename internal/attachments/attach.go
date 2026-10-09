@@ -42,9 +42,9 @@ type DocumentResult struct {
 	ReplaceOperations int
 	// Err is the upload failure when it left one of the document's attachments
 	// without a URL, because that file failed or was never tried, joined with
-	// any failure to rewrite Markdown. It is nil when every attachment uploaded
-	// and Markdown was rewritten, even if a file only other documents
-	// reference failed.
+	// any failure to rewrite Markdown. It is nil when all of this document's
+	// attachments uploaded and its Markdown was rewritten, even if an attachment
+	// used only by another document failed.
 	Err error
 }
 
@@ -132,7 +132,8 @@ func (u *Uploader) UploadAndAttachDocuments(ctx context.Context, docs []Document
 		urls[i] = assetURL
 	}
 
-	failures := []error{uploadErr}
+	failures := make([]error, 0, len(attachable)+1)
+	failures = append(failures, uploadErr)
 	results := make([]DocumentResult, len(attachable))
 	for i, d := range attachable {
 		result, rewriteErr := d.attach(assets, urls, uploadErr)

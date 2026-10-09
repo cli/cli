@@ -42,10 +42,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "list {<issue-number> | <issue-url>}",
 		Short: "List artifacts on an issue (preview)",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			List the artifacts on an issue, in number order. Every artifact is listed
-			unless you set --limit.
-		`),
+			unless you set %[1]s--limit%[1]s.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# List the artifacts on issue 142
 			$ gh issue artifact list 142
@@ -66,7 +66,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			var err error
 			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
 			if err != nil {
-				return err
+				return cmdutil.FlagErrorWrap(err)
 			}
 			opts.Client = shared.ClientFunc(f)
 
