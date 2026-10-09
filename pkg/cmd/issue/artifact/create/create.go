@@ -179,6 +179,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 					opts.Sources = append(opts.Sources, s)
 				}
 				if nameSet {
+					// Earlier validation guarantees exactly one positional source.
 					if opts.Sources[0].name != "" {
 						return cmdutil.FlagErrorf("specify the name with `#<name>` or `--name`, not both")
 					}
@@ -189,7 +190,8 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			if cmd.Flags().Changed("type") && slices.ContainsFunc(opts.Sources, source.isLink) {
 				return cmdutil.FlagErrorf("`--type` only applies to documents; links are created from URLs and .url files")
 			}
-			// A link has no Markdown to attach files to.
+			// At least one document is required with --attach, since a link has
+			// no Markdown to attach files to.
 			if opts.AttachFlag.Changed() && !slices.ContainsFunc(opts.Sources, func(s source) bool { return !s.isLink() }) {
 				return cmdutil.FlagErrorf("`--attach` can't be used with link artifacts")
 			}
