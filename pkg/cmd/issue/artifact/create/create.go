@@ -158,7 +158,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			switch {
 			case bodySet || bodyFile == "-":
 				if !nameSet {
-					return cmdutil.FlagErrorf("`--name` is required when the content has no file name")
+					return cmdutil.FlagErrorf("`--name` is required with `--body` or `--body-file -`")
 				}
 				if !bodySet {
 					opts.Sources = []source{{kind: fromStdin, arg: "-", name: name}}

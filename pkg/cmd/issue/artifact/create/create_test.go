@@ -377,13 +377,13 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name:        "--body needs --name",
 			args:        "142 --body 'The order sync skipped decaf orders.'",
-			wantErr:     "`--name` is required when the content has no file name",
+			wantErr:     "`--name` is required with `--body` or `--body-file -`",
 			wantFlagErr: true,
 		},
 		{
 			name:        "standard input needs --name",
 			args:        "142 --body-file -",
-			wantErr:     "`--name` is required when the content has no file name",
+			wantErr:     "`--name` is required with `--body` or `--body-file -`",
 			wantFlagErr: true,
 		},
 		{
