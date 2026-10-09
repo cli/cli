@@ -25,7 +25,9 @@
 //
 //	// Every reasonable cancellation possible belongs here.
 //
-//	md, result, err := uploader.UploadAndAttach(ctx, md, attachmentArgs)
+//	// bodyDir is the directory of the --body-file md was read from, or ""
+//	// when md came from no file.
+//	md, result, err := uploader.UploadAndAttach(ctx, md, bodyDir, attachmentArgs)
 //	if result.Uploaded == 0 {
 //		return err
 //	}

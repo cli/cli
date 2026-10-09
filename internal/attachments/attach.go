@@ -18,6 +18,12 @@ type UploadResult struct {
 // successful uploads the markdown did not reference. Assets after a failure
 // are not attempted.
 //
+// markdownDir is the directory of the file md was read from, such as a
+// --body-file, or "" when md came from no file, such as --body or standard
+// input. A relative reference resolves against markdownDir first, because a
+// Markdown file's links are written relative to the file, and then against the
+// working directory, so a reference written from there keeps matching.
+//
 // The result reports how many assets reached the server and how those successful
 // uploads changed the markdown. A caller must write the returned markdown when
 // Uploaded is above zero, even when the returned error is non-nil. An upload
@@ -27,14 +33,14 @@ type UploadResult struct {
 //
 // The markdown is returned unchanged when it could not be rewritten, so a
 // caller that assigns the result in place never destroys what it was given.
-func (u *Uploader) UploadAndAttach(ctx context.Context, md string, assets []UserAsset) (string, UploadResult, error) {
+func (u *Uploader) UploadAndAttach(ctx context.Context, md, markdownDir string, assets []UserAsset) (string, UploadResult, error) {
 	args := make([]attachmentArg, len(assets))
 	for i, a := range assets {
 		f := a.getAsset()
 		args[i] = attachmentArg{Path: f.path, Alt: f.alt, RendersAsPlayer: a.rendersAsPlayer()}
 	}
 
-	attachableMD, err := newAttachableMarkdown(md, args)
+	attachableMD, err := newAttachableMarkdown(md, markdownDir, args)
 	if err != nil {
 		return md, UploadResult{}, err
 	}

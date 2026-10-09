@@ -213,6 +213,18 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantOperations:       &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
+			name:                 "creating rewrites a reference relative to the body file",
+			opts:                 CommentableOptions{Body: "the plan ![diagram](./diagram.png)", BodyDir: "docs", InputType: InputTypeInline},
+			attach:               []string{"docs/diagram.png"},
+			repositoryDatabaseID: 1234,
+			uploads:              []attachments.UploadStub{{Name: "diagram.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			wantQuery:            `mutation CommentCreate\b`,
+			wantBody:             "the plan ![diagram](https://example.com/1)",
+			wantStdout:           "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
+			wantUploads:          1,
+			wantOperations:       &attachments.UploadResult{ReplaceOperations: 1},
+		},
+		{
 			name:                 "creating writes what uploaded when one upload fails",
 			opts:                 CommentableOptions{Body: "see below", InputType: InputTypeInline},
 			attach:               []string{"a.png", "b.png"},

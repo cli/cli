@@ -147,6 +147,7 @@ func TestNewCmdCreate(t *testing.T) {
 				Title:               "mytitle",
 				TitleProvided:       true,
 				Body:                "a body from file",
+				BodyDir:             filepath.Dir(tmpFile),
 				BodyProvided:        true,
 				Autofill:            false,
 				RecoverFile:         "",
@@ -393,6 +394,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, "", stderr.String())
 
 			assert.Equal(t, tt.wantsOpts.Body, opts.Body)
+			assert.Equal(t, tt.wantsOpts.BodyDir, opts.BodyDir)
 			assert.Equal(t, tt.wantsOpts.BodyProvided, opts.BodyProvided)
 			assert.Equal(t, tt.wantsOpts.Title, opts.Title)
 			assert.Equal(t, tt.wantsOpts.TitleProvided, opts.TitleProvided)
@@ -1786,6 +1788,34 @@ func Test_createRun(t *testing.T) {
 						} } } }`,
 						func(input map[string]any) {
 							assert.Equal(t, "before ![the shot](https://github.com/user-attachments/assets/ASSET) after", input["body"])
+						}))
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
+		},
+		{
+			name: "attaching rewrites a reference relative to the body file",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "the plan ![diagram](./diagram.png)"
+				opts.BodyDir = "docs"
+				opts.HeadBranch = "feature"
+				opts.Assets = attachments.NewTestAssets(t, "docs/diagram.png")
+				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				attachments.StubUpload(reg, 1234, "diagram.png", 201, `{"url": "https://github.com/user-attachments/assets/ASSET"}`)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]any) {
+							assert.Equal(t, "the plan ![diagram](https://github.com/user-attachments/assets/ASSET)", input["body"])
 						}))
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",

@@ -110,7 +110,9 @@ blocked-by/blocking relationships.
   `gh pr create --attach './login.png#The login error state'`. Without alt
   text, the filename is used.
 - `--attach` paths and local Markdown destinations may be absolute or relative
-  to the directory where `gh` runs.
+  to the directory where `gh` runs. When the body comes from a file with
+  `--body-file`, relative destinations resolve against that file's directory
+  first, then the directory where `gh` runs.
 - If the body references an attached path, `gh` rewrites that Markdown
   reference to the uploaded URL. The reference keeps its existing alt text.
   Otherwise, `gh` appends the attachment to the body. For example:
