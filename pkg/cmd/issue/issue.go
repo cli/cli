@@ -3,6 +3,7 @@ package issue
 import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	cmdArtifact "github.com/cli/cli/v2/pkg/cmd/issue/artifact"
 	cmdClose "github.com/cli/cli/v2/pkg/cmd/issue/close"
 	cmdComment "github.com/cli/cli/v2/pkg/cmd/issue/comment"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/issue/create"
@@ -62,6 +63,7 @@ func NewCmdIssue(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *
 		cmdUnpin.NewCmdUnpin(f, nil),
 		cmdTransfer.NewCmdTransfer(f, nil),
 		cmdDelete.NewCmdDelete(f, nil),
+		cmdArtifact.NewCmdArtifact(f),
 	)
 
 	return cmd
