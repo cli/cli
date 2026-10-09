@@ -190,10 +190,11 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   content.
 - `gh issue artifact view {<issue-number>|<issue-url>} <artifact-number> [--version N] [--json <fields>] [--web]`
   shows one artifact and its edit history. Piped output is `name:`, `number:`,
-  `type:`, and other `key:` lines, then `--` and the raw body. `--version N`
-  shows that version from the edit history and can't be combined with
-  `--json` or `--web`. `--json versions` returns the edit history, newest
-  first. `--web` opens a link artifact's URL.
+  `version:`, `type:`, `creator:`, `created:`, `updated-by:`, and `updated:`
+  lines, in that order, then `--` and the raw body. `--version N` shows that
+  version from the edit history and can't be combined with `--json` or
+  `--web`. `--json versions` returns the edit history, newest first. `--web`
+  opens a link artifact's URL.
 - `gh issue artifact create {<issue-number>|<issue-url>} [<file>[#<name>] | <url>]... [--body <text> | --body-file <path>] [--name <name>] [--type generic|plan] [--attach <path>]...`
   (alias `new`) creates one artifact per file or URL, in argument
   order. A text file becomes a document named after the file, or after the
