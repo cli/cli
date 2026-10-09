@@ -248,8 +248,10 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   `restored`, `written`, `skipped`, or `failed`), artifact number, name (the
   file path for `download`), source (the file, URL, or `-` given to
   `create`, or the `--body-file` value given to `edit`), and the reason for a
-  skip or failure. In a terminal, failures go to stderr. A failed artifact
-  doesn't stop the others, and the command exits 1 after any failure.
+  skip, a failure, or `--attach` files that didn't upload. In a terminal,
+  failures go to stderr. A failed artifact doesn't stop the others, and the
+  command exits 1 after any failure or failed upload. After `create` exits 1,
+  retry only the `failed` lines, since the others were created.
 - `delete` reports on stderr. In a terminal, each deleted or failed artifact
   gets a line. When piped, a deleted artifact prints nothing, and each
   failure prints `<number>: <reason>`. Any failure exits 1.
