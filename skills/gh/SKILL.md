@@ -193,8 +193,8 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   `version:`, `type:`, `creator:`, `created:`, `updated-by:`, and `updated:`
   lines, in that order, then `--` and the raw body. `--version N` shows that
   version from the edit history. `--version`, `--json`, and `--web` are
-  mutually exclusive. `--json versions` returns the edit history, newest
-  first. `--web` opens a link artifact's URL.
+  mutually exclusive. `--json versions` returns the edit history. `--web`
+  opens a link artifact's URL.
 - `gh issue artifact create {<issue-number>|<issue-url>} [<file>[#<name>] | <url>]... [--body <text> | --body-file <path>] [--name <name>] [--type generic|plan] [--attach <path>]...`
   (alias `new`) creates one artifact per file or URL, in argument
   order. A text file becomes a document named after the file, or after the
