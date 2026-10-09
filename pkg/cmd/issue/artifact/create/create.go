@@ -56,8 +56,8 @@ const (
 	fromURL
 	// fromStdin is --body-file -.
 	fromStdin
-	// fromBody is --body.
-	fromBody
+	// fromBodyFlag is --body.
+	fromBodyFlag
 )
 
 // source is one artifact to create, as the command line gave it.
@@ -167,7 +167,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				if strings.TrimSpace(body) == "" {
 					return cmdutil.FlagErrorf("--body cannot be blank")
 				}
-				opts.Sources = []source{{kind: fromBody, name: name, body: body}}
+				opts.Sources = []source{{kind: fromBodyFlag, name: name, body: body}}
 			case bodyFileSet:
 				opts.Sources = []source{{kind: fromFile, arg: bodyFile, name: name, bodyFile: true}}
 			default:
@@ -337,7 +337,7 @@ func createRun(opts *CreateOptions) error {
 func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, error) {
 	a := artifact{source: s, artifactType: documentType, name: s.name}
 	switch s.kind {
-	case fromBody:
+	case fromBodyFlag:
 		a.body = s.body
 	case fromStdin:
 		body, _, err := shared.ReadContent(s.arg, stdin)
@@ -473,7 +473,7 @@ func createAction(a artifact) string {
 	switch a.source.kind {
 	case fromStdin:
 		return "create artifact from standard input"
-	case fromBody:
+	case fromBodyFlag:
 		return fmt.Sprintf("create artifact (%s)", text.RemoveExcessiveWhitespace(a.name))
 	}
 	return "create artifact from " + a.source.arg

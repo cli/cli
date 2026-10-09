@@ -181,7 +181,7 @@ func TestNewCmdCreate(t *testing.T) {
 			args: "142 --name 'Root cause' --body 'The order sync skipped decaf orders.'",
 			wantOpts: CreateOptions{
 				IssueNumber: 142,
-				Sources:     []source{{kind: fromBody, name: "Root cause", body: "The order sync skipped decaf orders."}},
+				Sources:     []source{{kind: fromBodyFlag, name: "Root cause", body: "The order sync skipped decaf orders."}},
 			},
 			wantRepo: "OWNER/REPO",
 		},
@@ -236,7 +236,7 @@ func TestNewCmdCreate(t *testing.T) {
 			args: "142 --body 'Notes' --name Notes --type generic",
 			wantOpts: CreateOptions{
 				IssueNumber: 142,
-				Sources:     []source{{kind: fromBody, name: "Notes", body: "Notes"}},
+				Sources:     []source{{kind: fromBodyFlag, name: "Notes", body: "Notes"}},
 				Type:        "generic",
 			},
 			wantRepo: "OWNER/REPO",
@@ -698,7 +698,7 @@ func TestCreateRun(t *testing.T) {
 		},
 		{
 			name: "--body",
-			opts: CreateOptions{Sources: []source{{kind: fromBody, name: "Root cause", body: "The order sync skipped decaf orders."}}},
+			opts: CreateOptions{Sources: []source{{kind: fromBodyFlag, name: "Root cause", body: "The order sync skipped decaf orders."}}},
 			tty:  true,
 			wantCalls: []string{
 				"IsPullRequest monalisa/monas-cafe#142",
@@ -709,7 +709,7 @@ func TestCreateRun(t *testing.T) {
 		},
 		{
 			name: "a typed name is sent as typed, and printed with its whitespace cleaned up",
-			opts: CreateOptions{Sources: []source{{kind: fromBody, name: " Root\tcause\n", body: "The order sync skipped decaf orders."}}},
+			opts: CreateOptions{Sources: []source{{kind: fromBodyFlag, name: " Root\tcause\n", body: "The order sync skipped decaf orders."}}},
 			tty:  true,
 			wantCalls: []string{
 				"IsPullRequest monalisa/monas-cafe#142",
@@ -859,7 +859,7 @@ func TestCreateRun(t *testing.T) {
 		},
 		{
 			name:       "a failure from --body names the artifact",
-			opts:       CreateOptions{Sources: []source{{kind: fromBody, name: "Plan (1)", body: "The order sync skipped decaf orders."}}},
+			opts:       CreateOptions{Sources: []source{{kind: fromBodyFlag, name: "Plan (1)", body: "The order sync skipped decaf orders."}}},
 			tty:        true,
 			createErrs: map[string]error{"Plan (1)": apiError(422, "Validation Failed")},
 			wantCalls: []string{
@@ -935,7 +935,7 @@ func TestCreateRun(t *testing.T) {
 		},
 		{
 			name: "piped, --body has no source, and the name is cleaned up",
-			opts: CreateOptions{Sources: []source{{kind: fromBody, name: " Root\tcause\n", body: "The order sync skipped decaf orders."}}},
+			opts: CreateOptions{Sources: []source{{kind: fromBodyFlag, name: " Root\tcause\n", body: "The order sync skipped decaf orders."}}},
 			wantCalls: []string{
 				"IsPullRequest monalisa/monas-cafe#142",
 				`Create monalisa/monas-cafe#142 generic " Root\tcause\n"`,
