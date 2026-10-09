@@ -65,9 +65,10 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			artifact fails unless you use %[1]s--clobber%[1]s to overwrite it or %[1]s--skip-existing%[1]s
 			to skip it.
 
-			Use %[1]s--output%[1]s to choose the path for a single artifact, or %[1]s--output -%[1]s to
-			print its content. Use %[1]s--version%[1]s with a single artifact to download an
-			earlier version from its edit history.
+			Use %[1]s--dir%[1]s to choose the directory to download files into, %[1]s--output%[1]s to
+			choose the path for a single artifact, or %[1]s--output -%[1]s to print its content.
+			Use %[1]s--version%[1]s with a single artifact to download an earlier version from
+			its edit history.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Download every artifact on issue 142
