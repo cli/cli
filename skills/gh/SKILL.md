@@ -207,9 +207,10 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   `#` or `--name` as typed. Instead of file or URL arguments, `--body <text>`
   creates one document and `--body-file <path>` creates one artifact from a
   file. Neither can be combined with file or URL arguments. `--name` names a
-  single artifact, and `--body` and `--body-file -` require it. Documents are
-  `generic` unless `--type plan` is given, and a plan currently behaves the
-  same. `--type` is refused if any artifact is a link.
+  single artifact. It's required with `--body` or `--body-file -`, and can't
+  be combined with a `#<name>` suffix. Documents are `generic` unless
+  `--type plan` is given, and a plan currently behaves the same. `--type` is
+  refused if any artifact is a link.
 - `gh issue artifact edit {<issue-number>|<issue-url>} <artifact-number> [--name <name>] [--body <text> | --body-file <path>] [--attach <path>]... [--restore-version N]`
   renames an artifact or replaces its content, saving a new version. At least
   one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`
