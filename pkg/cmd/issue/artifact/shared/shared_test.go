@@ -1,13 +1,19 @@
 package shared
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/attachments"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -380,6 +386,117 @@ func TestCheckUploadTarget(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestNewUploader(t *testing.T) {
+	tests := []struct {
+		name       string
+		repo       ghrepo.Interface
+		number     int
+		target     *client.UploadTarget
+		lookupErr  error
+		httpErr    error
+		token      string
+		wantUpload bool
+		wantErr    string
+	}{
+		{
+			name:       "uploads against the issue's repository",
+			repo:       ghrepo.New("monalisa", "monas-cafe"),
+			number:     142,
+			target:     &client.UploadTarget{RepositoryID: 1234, ViewerPermission: "WRITE"},
+			wantUpload: true,
+		},
+		{
+			name:       "uploads to a ghe.com host",
+			repo:       ghrepo.NewWithHost("monalisa", "monas-cafe", "monas-cafe.ghe.com"),
+			number:     142,
+			target:     &client.UploadTarget{RepositoryID: 1234, ViewerPermission: "MAINTAIN"},
+			wantUpload: true,
+		},
+		{
+			name:    "a pull request",
+			repo:    ghrepo.New("monalisa", "monas-cafe"),
+			number:  158,
+			target:  &client.UploadTarget{IsPullRequest: true, RepositoryID: 1234, ViewerPermission: "WRITE"},
+			wantErr: "monalisa/monas-cafe#158 is a pull request; artifacts are only supported on issues",
+		},
+		{
+			name:      "the lookup's error",
+			repo:      ghrepo.New("monalisa", "monas-cafe"),
+			number:    999,
+			lookupErr: errors.New("GraphQL: Could not resolve to an issue or pull request with the number of 999. (repository.issue)"),
+			wantErr:   "GraphQL: Could not resolve to an issue or pull request with the number of 999. (repository.issue)",
+		},
+		{
+			name:    "without write access",
+			repo:    ghrepo.New("monalisa", "monas-cafe"),
+			number:  142,
+			target:  &client.UploadTarget{RepositoryID: 1234, ViewerPermission: "READ"},
+			wantErr: "attaching files requires write access to the repository",
+		},
+		{
+			name:    "a token that can't upload",
+			repo:    ghrepo.New("monalisa", "monas-cafe"),
+			number:  142,
+			target:  &client.UploadTarget{RepositoryID: 1234, ViewerPermission: "WRITE"},
+			token:   "ghs_aninstallationtoken",
+			wantErr: "unsupported authentication type",
+		},
+		{
+			name:    "the HTTP client's error",
+			repo:    ghrepo.New("monalisa", "monas-cafe"),
+			number:  142,
+			target:  &client.UploadTarget{RepositoryID: 1234, ViewerPermission: "WRITE"},
+			httpErr: errors.New("no token"),
+			wantErr: "no token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assets := attachments.NewTestAssets(t, "signin-flow.png")
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.wantUpload {
+				attachments.StubUploadToHost(t, reg, "uploads."+tt.repo.RepoHost(), 1234, "signin-flow.png", 200,
+					`{"url": "https://github.com/user-attachments/assets/AAA"}`)
+			}
+			mock := &client.ArtifactClientMock{
+				UploadTargetFunc: func(ghrepo.Interface, int) (*client.UploadTarget, error) {
+					return tt.target, tt.lookupErr
+				},
+			}
+			httpClient := func() (*http.Client, error) {
+				if tt.httpErr != nil {
+					return nil, tt.httpErr
+				}
+				return &http.Client{Transport: reg}, nil
+			}
+			cfg := func() (gh.Config, error) {
+				token := tt.token
+				if token == "" {
+					token = "gho_atokenthatcanupload"
+				}
+				return config.NewMockConfigFromString(fmt.Sprintf("hosts:\n  %s:\n    user: monalisa\n    oauth_token: %s\n", tt.repo.RepoHost(), token)), nil
+			}
+
+			uploader, err := NewUploader(mock, tt.repo, tt.number, httpClient, cfg)
+
+			require.Len(t, mock.UploadTargetCalls(), 1)
+			assert.Equal(t, tt.repo, mock.UploadTargetCalls()[0].Repo)
+			assert.Equal(t, tt.number, mock.UploadTargetCalls()[0].Number)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				assert.Nil(t, uploader)
+				return
+			}
+			require.NoError(t, err)
+			md, _, err := uploader.UploadAndAttach(context.Background(), "", "", assets)
+			require.NoError(t, err)
+			assert.Equal(t, "![signin-flow](https://github.com/user-attachments/assets/AAA)", md)
 		})
 	}
 }

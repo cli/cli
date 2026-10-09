@@ -33,6 +33,9 @@ var _ ArtifactClient = &ArtifactClientMock{}
 //			ListFunc: func(repo ghrepo.Interface, issueNumber int, artifactType string, limit int) ([]Artifact, error) {
 //				panic("mock out the List method")
 //			},
+//			UpdateFunc: func(repo ghrepo.Interface, issueNumber int, number int, name *string, body *string) (*Artifact, error) {
+//				panic("mock out the Update method")
+//			},
 //			UploadTargetFunc: func(repo ghrepo.Interface, number int) (*UploadTarget, error) {
 //				panic("mock out the UploadTarget method")
 //			},
@@ -57,6 +60,9 @@ type ArtifactClientMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(repo ghrepo.Interface, issueNumber int, artifactType string, limit int) ([]Artifact, error)
+
+	// UpdateFunc mocks the Update method.
+	UpdateFunc func(repo ghrepo.Interface, issueNumber int, number int, name *string, body *string) (*Artifact, error)
 
 	// UploadTargetFunc mocks the UploadTarget method.
 	UploadTargetFunc func(repo ghrepo.Interface, number int) (*UploadTarget, error)
@@ -112,6 +118,19 @@ type ArtifactClientMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
+		// Update holds details about calls to the Update method.
+		Update []struct {
+			// Repo is the repo argument value.
+			Repo ghrepo.Interface
+			// IssueNumber is the issueNumber argument value.
+			IssueNumber int
+			// Number is the number argument value.
+			Number int
+			// Name is the name argument value.
+			Name *string
+			// Body is the body argument value.
+			Body *string
+		}
 		// UploadTarget holds details about calls to the UploadTarget method.
 		UploadTarget []struct {
 			// Repo is the repo argument value.
@@ -125,6 +144,7 @@ type ArtifactClientMock struct {
 	lockGet           sync.RWMutex
 	lockIsPullRequest sync.RWMutex
 	lockList          sync.RWMutex
+	lockUpdate        sync.RWMutex
 	lockUploadTarget  sync.RWMutex
 }
 
@@ -333,6 +353,54 @@ func (mock *ArtifactClientMock) ListCalls() []struct {
 	mock.lockList.RLock()
 	calls = mock.calls.List
 	mock.lockList.RUnlock()
+	return calls
+}
+
+// Update calls UpdateFunc.
+func (mock *ArtifactClientMock) Update(repo ghrepo.Interface, issueNumber int, number int, name *string, body *string) (*Artifact, error) {
+	if mock.UpdateFunc == nil {
+		panic("ArtifactClientMock.UpdateFunc: method is nil but ArtifactClient.Update was just called")
+	}
+	callInfo := struct {
+		Repo        ghrepo.Interface
+		IssueNumber int
+		Number      int
+		Name        *string
+		Body        *string
+	}{
+		Repo:        repo,
+		IssueNumber: issueNumber,
+		Number:      number,
+		Name:        name,
+		Body:        body,
+	}
+	mock.lockUpdate.Lock()
+	mock.calls.Update = append(mock.calls.Update, callInfo)
+	mock.lockUpdate.Unlock()
+	return mock.UpdateFunc(repo, issueNumber, number, name, body)
+}
+
+// UpdateCalls gets all the calls that were made to Update.
+// Check the length with:
+//
+//	len(mockedArtifactClient.UpdateCalls())
+func (mock *ArtifactClientMock) UpdateCalls() []struct {
+	Repo        ghrepo.Interface
+	IssueNumber int
+	Number      int
+	Name        *string
+	Body        *string
+} {
+	var calls []struct {
+		Repo        ghrepo.Interface
+		IssueNumber int
+		Number      int
+		Name        *string
+		Body        *string
+	}
+	mock.lockUpdate.RLock()
+	calls = mock.calls.Update
+	mock.lockUpdate.RUnlock()
 	return calls
 }
 

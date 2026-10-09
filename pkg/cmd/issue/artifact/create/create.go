@@ -287,7 +287,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if len(opts.Assets) > 0 {
-		uploader, err := newUploader(opts, c, repo)
+		uploader, err := shared.NewUploader(c, repo, opts.IssueNumber, opts.HttpClient, opts.Config)
 		if err != nil {
 			return err
 		}
@@ -409,25 +409,6 @@ func nameFromFile(path string) string {
 
 func isLetterOrNumber(r rune) bool {
 	return unicode.IsLetter(r) || unicode.IsNumber(r)
-}
-
-// newUploader returns the uploader for --attach. It checks the issue like
-// CheckIssue does, with one lookup that also returns what an upload needs.
-func newUploader(opts *CreateOptions, c client.ArtifactClient, repo ghrepo.Interface) (*attachments.Uploader, error) {
-	target, err := shared.CheckUploadTarget(c, repo, opts.IssueNumber)
-	if err != nil {
-		return nil, err
-	}
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return nil, err
-	}
-	cfg, err := opts.Config()
-	if err != nil {
-		return nil, err
-	}
-	host := repo.RepoHost()
-	return attachments.NewUploader(httpClient, cfg.Authentication().ActiveTokenType(host), host, target.RepositoryID, target.ViewerPermission)
 }
 
 // attach uploads the --attach files, each once, and points every document at
