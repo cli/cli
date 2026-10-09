@@ -370,9 +370,10 @@ func TestNewCmdCreate(t *testing.T) {
 			wantFlagErr: true,
 		},
 		{
-			name:    "a blank name after #",
-			args:    "142 'signin-plan.md#'",
-			wantErr: "failed to create artifact from signin-plan.md: the name after `#` cannot be blank",
+			name:        "a blank name after #",
+			args:        "142 'signin-plan.md#'",
+			wantErr:     "artifact name after `#` cannot be blank in \"signin-plan.md#\"",
+			wantFlagErr: true,
 		},
 		{
 			name:        "--body needs --name",

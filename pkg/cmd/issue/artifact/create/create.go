@@ -238,7 +238,7 @@ func parseSource(arg string) (source, error) {
 		return source{}, cmdutil.FlagErrorf("cannot create an artifact from `-`; use `--body-file -` to read standard input")
 	}
 	if path != arg && name == "" {
-		return source{}, fmt.Errorf("failed to create artifact from %s: the name after `#` cannot be blank", path)
+		return source{}, cmdutil.FlagErrorf("artifact name after `#` cannot be blank in %q", arg)
 	}
 	return source{kind: fromFile, arg: path, name: name}, nil
 }
