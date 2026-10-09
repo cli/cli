@@ -115,13 +115,13 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			# Create documents from two files, naming the first
 			$ gh issue artifact create 142 'docs/signin-plan.md#Sign-in plan' oauth-research.md
 
-			# Create a link
+			# Create a link with a name
 			$ gh issue artifact create 142 https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook --name 'Staging OAuth runbook'
 
 			# Create a document from standard input
 			$ cat order-sync.log | gh issue artifact create 142 --body-file - --name 'Order sync log'
 
-			# Upload a screenshot that the document references
+			# Upload an image that the document references
 			$ gh issue artifact create 142 signin-plan.md --attach ./signin-flow.png
 		`),
 		Aliases: []string{"add", "new"},

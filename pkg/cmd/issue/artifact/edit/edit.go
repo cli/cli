@@ -78,7 +78,7 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			# Point a link at a new URL
 			$ gh issue artifact edit 142 3 --body https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook-v2
 
-			# Append a screenshot to a document
+			# Append an image to a document
 			$ gh issue artifact edit 142 2 --attach ./signin-flow.png
 
 			# Restore an earlier version
