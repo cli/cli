@@ -538,6 +538,24 @@ func TestDownloadRun(t *testing.T) {
 			},
 		},
 		{
+			name: "--dir can already exist, and its other files are kept",
+			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 5}, Dir: "artifacts"},
+			tty:  true,
+			setup: func(t *testing.T) {
+				require.NoError(t, os.Mkdir("artifacts", 0755))
+				writeTestFile(t, p("artifacts/my-notes.md"), "my notes\n")
+			},
+			wantCalls: []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2", "Get monalisa/monas-cafe#142 artifact 5"},
+			wantStdout: "✓ " + p("artifacts/2-OAuth-callback-plan.md") + "\n" +
+				"✓ " + p("artifacts/5-Barista-feedback-notes.md") + "\n",
+			wantFiles: map[string]string{
+				"artifacts/":                            "",
+				"artifacts/my-notes.md":                 "my notes\n",
+				"artifacts/2-OAuth-callback-plan.md":    oauthPlanBody,
+				"artifacts/5-Barista-feedback-notes.md": baristaBody,
+			},
+		},
+		{
 			name:       "--dir creates missing parent directories",
 			opts:       DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Dir: p("notes/oauth")},
 			tty:        true,
