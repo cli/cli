@@ -151,6 +151,26 @@ func TestNewCmdEdit(t *testing.T) {
 			wantRepo:       "OWNER/REPO",
 		},
 		{
+			name: "--restore-version",
+			args: "142 2 --restore-version 5",
+			wantOpts: EditOptions{
+				IssueNumber:    142,
+				ArtifactNumber: 2,
+				RestoreVersion: 5,
+			},
+			wantRepo: "OWNER/REPO",
+		},
+		{
+			name: "an empty --body-file names no file, so it goes with --restore-version",
+			args: "142 2 --restore-version 5 --body-file ''",
+			wantOpts: EditOptions{
+				IssueNumber:    142,
+				ArtifactNumber: 2,
+				RestoreVersion: 5,
+			},
+			wantRepo: "OWNER/REPO",
+		},
+		{
 			name: "an issue URL names the repository",
 			args: "https://github.com/monalisa/monas-cafe/issues/142 2 --name 'OAuth callback plan v2'",
 			wantOpts: EditOptions{
@@ -199,13 +219,13 @@ func TestNewCmdEdit(t *testing.T) {
 		{
 			name:        "nothing to change",
 			args:        "142 2",
-			wantErr:     "specify at least one of `--name`, `--body`, `--body-file`, or `--attach`",
+			wantErr:     "specify at least one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`",
 			wantFlagErr: true,
 		},
 		{
 			name:        "an empty --body-file names no file",
 			args:        "142 2 --body-file ''",
-			wantErr:     "specify at least one of `--name`, `--body`, `--body-file`, or `--attach`",
+			wantErr:     "specify at least one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`",
 			wantFlagErr: true,
 		},
 		{
@@ -230,6 +250,54 @@ func TestNewCmdEdit(t *testing.T) {
 			name:        "a blank --body",
 			args:        "142 2 --body ' \n'",
 			wantErr:     "--body cannot be blank",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--restore-version 0",
+			args:        "142 2 --restore-version 0",
+			wantErr:     "invalid version: 0",
+			wantFlagErr: true,
+		},
+		{
+			name:        "a negative --restore-version",
+			args:        "142 2 --restore-version -1",
+			wantErr:     "invalid version: -1",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--restore-version with --name",
+			args:        "142 2 --restore-version 5 --name 'OAuth plan v2'",
+			wantErr:     "the `--restore-version` flag is not supported with `--name`, `--body`, `--body-file`, or `--attach`",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--restore-version with --body",
+			args:        "142 2 --restore-version 5 --body '# OAuth plan'",
+			wantErr:     "the `--restore-version` flag is not supported with `--name`, `--body`, `--body-file`, or `--attach`",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--restore-version with --body-file",
+			args:        "142 2 --restore-version 5 --body-file 2-OAuth-callback-plan.md",
+			wantErr:     "the `--restore-version` flag is not supported with `--name`, `--body`, `--body-file`, or `--attach`",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--restore-version with --attach",
+			args:        "142 2 --restore-version 5 --attach signin-flow.png",
+			wantErr:     "the `--restore-version` flag is not supported with `--name`, `--body`, `--body-file`, or `--attach`",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--restore-version with --body and --body-file",
+			args:        "142 2 --restore-version 5 --body '# OAuth plan' --body-file 2-OAuth-callback-plan.md",
+			wantErr:     "the `--restore-version` flag is not supported with `--name`, `--body`, `--body-file`, or `--attach`",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--restore-version 0 with --name",
+			args:        "142 2 --restore-version 0 --name 'OAuth plan v2'",
+			wantErr:     "the `--restore-version` flag is not supported with `--name`, `--body`, `--body-file`, or `--attach`",
 			wantFlagErr: true,
 		},
 		{
@@ -302,6 +370,7 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.Equal(t, tt.wantOpts.Name, gotOpts.Name)
 			assert.Equal(t, tt.wantOpts.Body, gotOpts.Body)
 			assert.Equal(t, tt.wantOpts.BodyFile, gotOpts.BodyFile)
+			assert.Equal(t, tt.wantOpts.RestoreVersion, gotOpts.RestoreVersion)
 
 			var assetPaths []string
 			for _, a := range gotOpts.Assets {
@@ -331,11 +400,27 @@ func TestEditRun(t *testing.T) {
 		newPlan     = "# OAuth callback plan\n\n1. Register the callback URL.\n2. Test the callback on staging.\n"
 		newPlanFlow = "# OAuth callback plan\n\n![Sign-in flow](./signin-flow.png)\n"
 		shortcut    = "[InternetShortcut]\r\nURL=" + runbookURLv2 + "\r\n"
+		oldPlanBody = "# OAuth plan\n\n1. Register the callback URL."
 	)
 	plan := client.Artifact{Number: 2, Type: "generic", Name: "OAuth callback plan", Body: planBody}
 	approvedPlan := client.Artifact{Number: 1, Type: "plan", Name: "Approved plan", Body: "# Approved plan"}
 	runbook := client.Artifact{Number: 3, Type: "link", Name: "Staging OAuth runbook", Body: runbookURL}
 	badType := client.Artifact{Number: 2, Type: "bad-type", Name: "OAuth callback plan", Body: planBody}
+	// Part of plan's edit history, newest first. Version 9 renamed it, as in
+	// the spec, and here the current version, 12, has version 9's name and
+	// body.
+	planVersions := []client.Version{
+		{Version: 12, Name: "OAuth callback plan", Body: planBody},
+		{Version: 11, Name: "OAuth callback plan", Body: planBody + "\n3. Test the callback on staging."},
+		{Version: 9, Name: "OAuth callback plan", Body: planBody},
+		{Version: 5, Name: "OAuth plan", Body: oldPlanBody},
+	}
+	// The runbook after its URL changed, with its first URL as version 1.
+	movedRunbook := client.Artifact{Number: 3, Type: "link", Name: "Staging OAuth runbook", Body: runbookURLv2}
+	movedRunbookVersions := []client.Version{
+		{Version: 2, Name: "Staging OAuth runbook", Body: runbookURLv2},
+		{Version: 1, Name: "Staging OAuth runbook", Body: runbookURL},
+	}
 
 	tests := []struct {
 		name     string
@@ -346,8 +431,10 @@ func TestEditRun(t *testing.T) {
 		uploads  []attachments.UploadStub
 		stdin    string
 		opts     EditOptions
-		// artifact is what the artifact's lookup returns.
+		// artifact is what the artifact's lookup returns, with versions as its
+		// edit history.
 		artifact      client.Artifact
+		versions      []client.Version
 		tty           bool
 		color         bool
 		isPullRequest bool
@@ -1190,6 +1277,232 @@ func TestEditRun(t *testing.T) {
 			wantOps:    &attachments.UploadResult{AppendOperations: 1},
 			wantStdout: "✓ Updated artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142\n",
 		},
+		{
+			name:     "--restore-version saves an earlier version's name and body",
+			opts:     EditOptions{RestoreVersion: 5},
+			artifact: plan,
+			versions: planVersions,
+			tty:      true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+				"Update monalisa/monas-cafe#142 2",
+			},
+			wantName:   new("OAuth plan"),
+			wantBody:   new(oldPlanBody),
+			wantStdout: "✓ Restored artifact 2 (OAuth plan) to version 5 on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:     "piped, a restore is a restored line",
+			opts:     EditOptions{RestoreVersion: 5},
+			artifact: plan,
+			versions: planVersions,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+				"Update monalisa/monas-cafe#142 2",
+			},
+			wantName:   new("OAuth plan"),
+			wantBody:   new(oldPlanBody),
+			wantStdout: "restored\t2\tOAuth plan\t\t\n",
+		},
+		{
+			name:     "--restore-version undoes a rename, which kept the body",
+			opts:     EditOptions{RestoreVersion: 12},
+			artifact: client.Artifact{Number: 2, Type: "generic", Name: "OAuth callback plan v2", Body: planBody},
+			versions: append([]client.Version{{Version: 13, Name: "OAuth callback plan v2", Body: planBody}}, planVersions...),
+			tty:      true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+				"Update monalisa/monas-cafe#142 2",
+			},
+			wantName:   new("OAuth callback plan"),
+			wantBody:   new(planBody),
+			wantStdout: "✓ Restored artifact 2 (OAuth callback plan) to version 12 on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:     "--restore-version gives a link its earlier URL",
+			opts:     EditOptions{RestoreVersion: 1},
+			artifact: movedRunbook,
+			versions: movedRunbookVersions,
+			tty:      true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 3",
+				"Update monalisa/monas-cafe#142 3",
+			},
+			wantName:   new("Staging OAuth runbook"),
+			wantBody:   new(runbookURL),
+			wantStdout: "✓ Restored artifact 3 (Staging OAuth runbook) to version 1 on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:     "a version's name and body are sent as the API returned them, and the name is printed cleaned up",
+			opts:     EditOptions{RestoreVersion: 5},
+			artifact: plan,
+			versions: []client.Version{
+				{Version: 12, Name: "OAuth callback plan", Body: planBody},
+				{Version: 5, Name: " OAuth\tplan\n", Body: "\n# OAuth plan ^[[1m\n\n"},
+			},
+			tty: true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+				"Update monalisa/monas-cafe#142 2",
+			},
+			wantName:   new(" OAuth\tplan\n"),
+			wantBody:   new("\n# OAuth plan ^[[1m\n\n"),
+			wantStdout: "✓ Restored artifact 2 (OAuth plan) to version 5 on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:     "a link's earlier content is sent unchecked, and the server's error is the reason",
+			opts:     EditOptions{RestoreVersion: 1},
+			artifact: movedRunbook,
+			versions: []client.Version{
+				{Version: 2, Name: "Staging OAuth runbook", Body: runbookURLv2},
+				{Version: 1, Name: "Staging OAuth runbook", Body: "wiki/OAuth-runbook"},
+			},
+			tty:       true,
+			updateErr: apiError(422, "Validation Failed"),
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 3",
+				"Update monalisa/monas-cafe#142 3",
+			},
+			wantName:   new("Staging OAuth runbook"),
+			wantBody:   new("wiki/OAuth-runbook"),
+			wantStderr: "X Failed to restore artifact 3: Validation Failed\n",
+			wantErrIs:  cmdutil.SilentError,
+		},
+		{
+			name:     "restoring the current version saves nothing",
+			opts:     EditOptions{RestoreVersion: 12},
+			artifact: plan,
+			versions: planVersions,
+			tty:      true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+			},
+			wantStderr: "! Artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142 already matches version 12\n",
+		},
+		{
+			name:     "piped, restoring the current version is a skipped line",
+			opts:     EditOptions{RestoreVersion: 12},
+			artifact: plan,
+			versions: planVersions,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+			},
+			wantStdout: "skipped\t2\tOAuth callback plan\t\talready matches version 12\n",
+		},
+		{
+			name:     "restoring an earlier version the artifact already matches saves nothing",
+			opts:     EditOptions{RestoreVersion: 9},
+			artifact: plan,
+			versions: planVersions,
+			tty:      true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+			},
+			wantStderr: "! Artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142 already matches version 9\n",
+		},
+		{
+			name:     "piped, restoring an earlier version the artifact already matches is a skipped line",
+			opts:     EditOptions{RestoreVersion: 9},
+			artifact: plan,
+			versions: planVersions,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+			},
+			wantStdout: "skipped\t2\tOAuth callback plan\t\talready matches version 9\n",
+		},
+		{
+			name:     "colors in a terminal, for a version the artifact already matches",
+			opts:     EditOptions{RestoreVersion: 12},
+			artifact: plan,
+			versions: planVersions,
+			tty:      true,
+			color:    true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+			},
+			wantStderr: "\x1b[0;33m!\x1b[0m Artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142 already matches version 12\n",
+		},
+		{
+			name:     "a version the API didn't return fails before anything is saved",
+			opts:     EditOptions{RestoreVersion: 99},
+			artifact: plan,
+			versions: planVersions,
+			tty:      true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+			},
+			wantErr: "version 99 not found for artifact 2",
+		},
+		{
+			name:     "with --restore-version, a type gh doesn't know is refused before anything is saved",
+			opts:     EditOptions{RestoreVersion: 5},
+			artifact: badType,
+			versions: planVersions,
+			tty:      true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+			},
+			wantErr: `artifact 2 has type "bad-type", which this version of gh doesn't support; upgrade gh`,
+		},
+		{
+			name:      "a failed restore is the artifact's failure line",
+			opts:      EditOptions{RestoreVersion: 5},
+			artifact:  plan,
+			versions:  planVersions,
+			tty:       true,
+			updateErr: apiError(422, "Validation Failed"),
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+				"Update monalisa/monas-cafe#142 2",
+			},
+			wantName:   new("OAuth plan"),
+			wantBody:   new(oldPlanBody),
+			wantStderr: "X Failed to restore artifact 2: Validation Failed\n",
+			wantErrIs:  cmdutil.SilentError,
+		},
+		{
+			name:      "piped, a failed restore keeps the current name",
+			opts:      EditOptions{RestoreVersion: 5},
+			artifact:  plan,
+			versions:  planVersions,
+			updateErr: apiError(422, "Validation Failed"),
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 2",
+				"Update monalisa/monas-cafe#142 2",
+			},
+			wantName:   new("OAuth plan"),
+			wantBody:   new(oldPlanBody),
+			wantStdout: "failed\t2\tOAuth callback plan\t\tValidation Failed\n",
+			wantErrIs:  cmdutil.SilentError,
+		},
+		{
+			name:     "a failed lookup for a restore is the artifact's failure line",
+			opts:     EditOptions{ArtifactNumber: 9, RestoreVersion: 5},
+			artifact: plan,
+			tty:      true,
+			getErr:   apiError(404, "Not Found"),
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				"Get monalisa/monas-cafe#142 9",
+			},
+			wantStderr: "X Failed to restore artifact 9: Not Found\n",
+			wantErrIs:  cmdutil.SilentError,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1255,7 +1568,7 @@ func TestEditRun(t *testing.T) {
 					if tt.getErr != nil {
 						return nil, tt.getErr
 					}
-					return &client.ArtifactWithVersions{Artifact: tt.artifact}, nil
+					return &client.ArtifactWithVersions{Artifact: tt.artifact, Versions: tt.versions}, nil
 				},
 				UpdateFunc: func(r ghrepo.Interface, issueNumber, number int, name, body *string) (*client.Artifact, error) {
 					calls = append(calls, fmt.Sprintf("Update %s %d", issueRef(r, issueNumber), number))

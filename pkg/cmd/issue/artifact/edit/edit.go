@@ -39,6 +39,10 @@ type EditOptions struct {
 	// standard input, or empty when --body-file wasn't given. Result lines
 	// show it as the source.
 	BodyFile string
+	// RestoreVersion is the version from the edit history to restore with
+	// --restore-version, or 0 when it wasn't given. A restore takes its name
+	// and body from that version, so no other flag goes with it.
+	RestoreVersion int
 
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
@@ -61,6 +65,9 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			link's new content must be an http(s) URL or a %[1]s.url%[1]s Internet Shortcut file.
 
 			With only %[1]s--attach%[1]s, the attachments are appended to the current content.
+
+			With %[1]s--restore-version%[1]s, an earlier version's name and content are saved as a
+			new version. %[1]sgh issue artifact view%[1]s shows the edit history.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Rename an artifact
@@ -74,6 +81,9 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 
 			# Append a screenshot to a document
 			$ gh issue artifact edit 142 2 --attach ./signin-flow.png
+
+			# Restore an earlier version
+			$ gh issue artifact edit 142 2 --restore-version 5
 		`),
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -88,12 +98,19 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			}
 
 			// An empty --body-file names no file, as in gh issue edit.
+			editing := opts.Name != nil || opts.Body != nil || opts.BodyFile != "" || opts.AttachFlag.Changed()
+			restoring := cmd.Flags().Changed("restore-version")
+			if restoring && editing {
+				return cmdutil.FlagErrorf("the `--restore-version` flag is not supported with `--name`, `--body`, `--body-file`, or `--attach`")
+			}
 			if err := cmdutil.MutuallyExclusive("specify only one of `--body` or `--body-file`", opts.Body != nil, opts.BodyFile != ""); err != nil {
 				return err
 			}
 			switch {
-			case opts.Name == nil && opts.Body == nil && opts.BodyFile == "" && !opts.AttachFlag.Changed():
-				return cmdutil.FlagErrorf("specify at least one of `--name`, `--body`, `--body-file`, or `--attach`")
+			case restoring && opts.RestoreVersion < 1:
+				return cmdutil.FlagErrorf("invalid version: %v", opts.RestoreVersion)
+			case !restoring && !editing:
+				return cmdutil.FlagErrorf("specify at least one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`")
 			case opts.Name != nil && *opts.Name == "":
 				return cmdutil.FlagErrorf("--name cannot be blank")
 			case opts.Body != nil && strings.TrimSpace(*opts.Body) == "":
@@ -118,6 +135,7 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 	cmd.Flags().StringVarP(&opts.BodyFile, "body-file", "F", "", "Read new content from `file` (use \"-\" to read from standard input)")
 	cmdutil.NilStringFlag(cmd, &opts.Name, "name", "", "New name")
 	opts.AttachFlag = attachments.AddFlag(cmd)
+	cmd.Flags().IntVar(&opts.RestoreVersion, "restore-version", 0, "Restore the version with this `number` from the edit history")
 
 	return cmd
 }
@@ -154,6 +172,9 @@ func editRun(opts *EditOptions) error {
 	}
 
 	action := fmt.Sprintf("update artifact %d", opts.ArtifactNumber)
+	if opts.RestoreVersion > 0 {
+		action = fmt.Sprintf("restore artifact %d", opts.ArtifactNumber)
+	}
 	result := shared.Result{Number: opts.ArtifactNumber, Source: opts.BodyFile}
 	current, err := c.Get(repo, opts.IssueNumber, opts.ArtifactNumber)
 	if err != nil {
@@ -166,6 +187,9 @@ func editRun(opts *EditOptions) error {
 	// depends on it runs before anything is uploaded or saved.
 	if err := shared.CheckType(current.Artifact); err != nil {
 		return err
+	}
+	if opts.RestoreVersion > 0 {
+		return restoreVersion(opts, c, repo, current, result, action)
 	}
 	body, err := newBody(opts, current.Artifact, content)
 	if err != nil {
@@ -205,6 +229,36 @@ func editRun(opts *EditOptions) error {
 		return cmdutil.SilentError
 	}
 	shared.PrintSuccess(opts.IO, "updated", result, opts.IO.ColorScheme().SuccessIcon(), message)
+	return nil
+}
+
+// restoreVersion saves the name and body of version opts.RestoreVersion as a
+// new version. They are sent as the API returned them, so the server checks
+// them like any other edit. Every save adds a version to the edit history,
+// even when nothing changed, so nothing is saved when the artifact already
+// matches the version.
+func restoreVersion(opts *EditOptions, c client.ArtifactClient, repo ghrepo.Interface, current *client.ArtifactWithVersions, result shared.Result, action string) error {
+	v, err := shared.FindVersion(current, opts.RestoreVersion)
+	if err != nil {
+		return err
+	}
+	// FindVersion returns nil for the current version, which the artifact
+	// matches.
+	if v == nil || (v.Name == current.Name && v.Body == current.Body) {
+		message := fmt.Sprintf("Artifact %d (%s) on %s#%d already matches version %d", opts.ArtifactNumber, result.Name, ghrepo.FullName(repo), opts.IssueNumber, opts.RestoreVersion)
+		shared.PrintUnchanged(opts.IO, result, message, fmt.Sprintf("already matches version %d", opts.RestoreVersion))
+		return nil
+	}
+
+	updated, err := c.Update(repo, opts.IssueNumber, opts.ArtifactNumber, &v.Name, &v.Body)
+	if err != nil {
+		shared.PrintFailure(opts.IO, result, action, err)
+		return cmdutil.SilentError
+	}
+
+	result.Name = text.RemoveExcessiveWhitespace(updated.Name)
+	message := fmt.Sprintf("Restored artifact %d (%s) to version %d on %s#%d", opts.ArtifactNumber, result.Name, opts.RestoreVersion, ghrepo.FullName(repo), opts.IssueNumber)
+	shared.PrintSuccess(opts.IO, "restored", result, opts.IO.ColorScheme().SuccessIcon(), message)
 	return nil
 }
 

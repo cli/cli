@@ -12,8 +12,8 @@ import (
 
 // Result identifies the artifact on a result line. A command that acts on
 // several artifacts reports one line for each, with PrintSuccess, PrintSkip,
-// PrintFailure and PrintPartialFailure, so every such command shares one piped
-// format.
+// PrintUnchanged, PrintFailure and PrintPartialFailure, so every such command
+// shares one piped format.
 type Result struct {
 	// Number is the artifact's number. 0 leaves its column empty, for an
 	// artifact that has no number.
@@ -50,6 +50,20 @@ func PrintSkip(ios *iostreams.IOStreams, r Result, subject, reason string) {
 		return
 	}
 	fmt.Fprintf(ios.Out, "%s Skipped %s: %s\n", ios.ColorScheme().Muted("-"), subject, reason)
+}
+
+// PrintUnchanged prints the line for an artifact the command didn't change
+// because it already was as asked, such as an artifact that already matches
+// the version to restore. In a terminal, it reads "! <message>" on stderr, like
+// gh issue close on a closed issue, so stdout stays empty. Otherwise it is a
+// piped line on stdout whose status is "skipped", with reason. It isn't a
+// failure, so the command exits 0 after it.
+func PrintUnchanged(ios *iostreams.IOStreams, r Result, message, reason string) {
+	if !ios.IsStdoutTTY() {
+		printResultLine(ios.Out, "skipped", r, reason)
+		return
+	}
+	fmt.Fprintf(ios.ErrOut, "%s %s\n", ios.ColorScheme().WarningIcon(), message)
 }
 
 // PrintFailure prints the line for an artifact the command couldn't act on,
