@@ -297,6 +297,7 @@ func artifactFileName(number int, name, artifactType string) (string, error) {
 		}
 		return r
 	}, name)
+	// A name already ending in the extension keeps it, in its own case.
 	if cut := len(stem) - len(ext); cut >= 0 && strings.EqualFold(stem[cut:], ext) {
 		stem, ext = stem[:cut], stem[cut:]
 	}
