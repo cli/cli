@@ -352,20 +352,36 @@ func (w *fileWriter) Close() error {
 
 // path returns where an artifact's file goes: in Dir under its file name, or
 // at Output. Like gh repo read-file --output, an existing directory, or a path
-// ending in a separator, gets the file under its file name. Stat follows a
-// symlink, so a symlink to a directory counts as a directory, like any parent
-// directory.
+// ending in a separator, gets the file under its file name, and a symlink at
+// Output is never followed, even to a directory. path returns the symlink
+// itself, so write refuses it like any other symlink. Dir and the directories
+// above Output may still be symlinks.
 func (w *fileWriter) path(fileName string) string {
 	if w.output == "" {
 		return filepath.Join(w.dir, fileName)
 	}
-	if strings.HasSuffix(w.output, "/") || strings.HasSuffix(w.output, string(filepath.Separator)) {
-		return filepath.Join(w.output, fileName)
+	target := trimTrailingSeparators(w.output)
+	asDir := target != w.output
+	if info, err := os.Lstat(target); err == nil {
+		if info.Mode()&fs.ModeSymlink != 0 {
+			return target
+		}
+		asDir = asDir || info.IsDir()
 	}
-	if info, err := os.Stat(w.output); err == nil && info.IsDir() {
+	if asDir {
 		return filepath.Join(w.output, fileName)
 	}
 	return w.output
+}
+
+// trimTrailingSeparators drops the separators that end path, but keeps a root
+// such as / or C:\ whole.
+func trimTrailingSeparators(path string) string {
+	end := len(path)
+	for end > len(filepath.VolumeName(path))+1 && os.IsPathSeparator(path[end-1]) {
+		end--
+	}
+	return path[:end]
 }
 
 var errAlreadyExists = errors.New("already exists (use --clobber to overwrite or --skip-existing to skip)")

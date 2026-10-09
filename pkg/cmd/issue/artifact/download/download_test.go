@@ -910,19 +910,51 @@ func TestDownloadRun(t *testing.T) {
 			},
 		},
 		{
-			name: "--output can name a symlink to a directory",
-			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Output: "linked"},
+			name: "--output refuses a symlink to a directory, even with --clobber",
+			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Output: "linked", Clobber: true},
 			tty:  true,
 			setup: func(t *testing.T) {
 				require.NoError(t, os.Mkdir("real", 0755))
 				symlinkTestFile(t, "real", "linked")
 			},
 			wantCalls:  []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
-			wantStdout: "✓ " + p("linked/2-OAuth-callback-plan.md") + "\n",
+			wantStderr: "X Failed to write linked: is a symlink\n",
+			wantErrIs:  cmdutil.SilentError,
 			wantFiles: map[string]string{
-				"linked":                        "symlink to real",
-				"real/":                         "",
-				"real/2-OAuth-callback-plan.md": oauthPlanBody,
+				"linked": "symlink to real",
+				"real/":  "",
+			},
+		},
+		{
+			name: "--output ending in a separator refuses a symlink to a directory",
+			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Output: "linked" + string(filepath.Separator)},
+			tty:  true,
+			setup: func(t *testing.T) {
+				require.NoError(t, os.Mkdir("real", 0755))
+				symlinkTestFile(t, "real", "linked")
+			},
+			wantCalls:  []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
+			wantStderr: "X Failed to write linked: is a symlink\n",
+			wantErrIs:  cmdutil.SilentError,
+			wantFiles: map[string]string{
+				"linked": "symlink to real",
+				"real/":  "",
+			},
+		},
+		{
+			name: "--output can be inside a symlink to a directory",
+			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Output: p("linked/callback-plan.md")},
+			tty:  true,
+			setup: func(t *testing.T) {
+				require.NoError(t, os.Mkdir("real", 0755))
+				symlinkTestFile(t, "real", "linked")
+			},
+			wantCalls:  []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
+			wantStdout: "✓ " + p("linked/callback-plan.md") + "\n",
+			wantFiles: map[string]string{
+				"linked":                "symlink to real",
+				"real/":                 "",
+				"real/callback-plan.md": oauthPlanBody,
 			},
 		},
 		{
