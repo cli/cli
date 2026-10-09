@@ -195,7 +195,7 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   `--json` or `--web`. `--json versions` returns the edit history, newest
   first. `--web` opens a link artifact's URL.
 - `gh issue artifact create {<issue-number>|<issue-url>} [<file>[#<name>] | <url>]... [--body <text> | --body-file <path>] [--name <name>] [--type generic|plan] [--attach <path>]...`
-  (aliases `add`, `new`) creates one artifact per file or URL, in argument
+  (alias `new`) creates one artifact per file or URL, in argument
   order. A text file becomes a document named after the file, or after the
   text following `#`:
   `gh issue artifact create 142 'docs/signin-plan.md#Sign-in plan'`. An

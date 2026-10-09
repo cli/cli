@@ -267,14 +267,10 @@ func TestNewCmdCreate(t *testing.T) {
 			wantRepo:       "OWNER/REPO",
 		},
 		{
-			name:  "the add alias",
-			alias: "add",
-			args:  "142 signin-plan.md",
-			wantOpts: CreateOptions{
-				IssueNumber: 142,
-				Sources:     []source{{kind: fromFile, arg: "signin-plan.md"}},
-			},
-			wantRepo: "OWNER/REPO",
+			name:    "add isn't an alias",
+			alias:   "add",
+			args:    "142 signin-plan.md",
+			wantErr: `unknown command "add" for "artifact"`,
 		},
 		{
 			name:  "the new alias",

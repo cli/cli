@@ -124,7 +124,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			# Upload an image that the document references
 			$ gh issue artifact create 142 signin-plan.md --attach ./signin-flow.png
 		`),
-		Aliases: []string{"add", "new"},
+		Aliases: []string{"new"},
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
