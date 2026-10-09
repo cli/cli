@@ -63,7 +63,7 @@ func NewCmdIssue(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *
 		cmdUnpin.NewCmdUnpin(f, nil),
 		cmdTransfer.NewCmdTransfer(f, nil),
 		cmdDelete.NewCmdDelete(f, nil),
-		cmdArtifact.NewCmdArtifact(f),
+		cmdArtifact.NewCmdArtifact(f, telemetry),
 	)
 
 	return cmd
