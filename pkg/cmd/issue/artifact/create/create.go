@@ -100,7 +100,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			%[1]s.url%[1]s Internet Shortcut file, becomes a link; a URL is named after its host.
 
 			Artifact names can't contain some characters, such as parentheses. When a
-			file's name has them, gh drops them: %[1]splan (1).md%[1]s is named %[1]splan 1.md%[1]s.
+			file's name has them, they're removed: %[1]splan (1).md%[1]s is named %[1]splan 1.md%[1]s.
 
 			Use %[1]s--body%[1]s to create a single document from text, or %[1]s--body-file%[1]s to create
 			one artifact from a file (%[1]s-%[1]s reads standard input). %[1]s--name%[1]s sets its name.
