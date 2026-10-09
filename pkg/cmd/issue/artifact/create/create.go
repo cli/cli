@@ -146,11 +146,11 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			case len(fileArgs) == 0 && !bodySet && !bodyFileSet:
 				return cmdutil.FlagErrorf("specify a file or URL, or use `--body` or `--body-file`")
 			case len(fileArgs) > 0 && (bodySet || bodyFileSet):
-				return cmdutil.FlagErrorf("specify files or one of --body and --body-file, not both")
+				return cmdutil.FlagErrorf("specify files or one of `--body` and `--body-file`, not both")
 			case nameSet && len(fileArgs) > 1:
-				return cmdutil.FlagErrorf("--name can only be used when creating one artifact")
+				return cmdutil.FlagErrorf("`--name` can only be used when creating one artifact")
 			case nameSet && name == "":
-				return cmdutil.FlagErrorf("--name cannot be blank")
+				return cmdutil.FlagErrorf("`--name` cannot be blank")
 			}
 
 			// Standard input is only read with --body-file -, so a stdin that
@@ -158,14 +158,14 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			switch {
 			case bodySet || bodyFile == "-":
 				if !nameSet {
-					return cmdutil.FlagErrorf("--name is required when the content has no file name")
+					return cmdutil.FlagErrorf("`--name` is required when the content has no file name")
 				}
 				if !bodySet {
 					opts.Sources = []source{{kind: fromStdin, arg: "-", name: name}}
 					break
 				}
 				if strings.TrimSpace(body) == "" {
-					return cmdutil.FlagErrorf("--body cannot be blank")
+					return cmdutil.FlagErrorf("`--body` cannot be blank")
 				}
 				opts.Sources = []source{{kind: fromBodyFlag, name: name, body: body}}
 			case bodyFileSet:
@@ -187,11 +187,11 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			}
 
 			if cmd.Flags().Changed("type") && slices.ContainsFunc(opts.Sources, source.isLink) {
-				return cmdutil.FlagErrorf("--type only applies to documents; links are created from URLs and .url files")
+				return cmdutil.FlagErrorf("`--type` only applies to documents; links are created from URLs and .url files")
 			}
 			// A link has no Markdown to attach files to.
 			if opts.AttachFlag.Changed() && !slices.ContainsFunc(opts.Sources, func(s source) bool { return !s.isLink() }) {
-				return cmdutil.FlagErrorf("--attach can't be used with link artifacts")
+				return cmdutil.FlagErrorf("`--attach` can't be used with link artifacts")
 			}
 
 			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())

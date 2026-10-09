@@ -342,19 +342,19 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name:        "files and --body",
 			args:        "142 signin-plan.md --name Plan --body 'More text'",
-			wantErr:     "specify files or one of --body and --body-file, not both",
+			wantErr:     "specify files or one of `--body` and `--body-file`, not both",
 			wantFlagErr: true,
 		},
 		{
 			name:        "a URL and --body-file",
 			args:        "142 " + runbookURL + " --body-file signin-plan.md",
-			wantErr:     "specify files or one of --body and --body-file, not both",
+			wantErr:     "specify files or one of `--body` and `--body-file`, not both",
 			wantFlagErr: true,
 		},
 		{
 			name:        "--name with several files",
 			args:        "142 signin-plan.md oauth-research.md --name Plan",
-			wantErr:     "--name can only be used when creating one artifact",
+			wantErr:     "`--name` can only be used when creating one artifact",
 			wantFlagErr: true,
 		},
 		{
@@ -366,7 +366,7 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name:        "a blank --name",
 			args:        "142 signin-plan.md --name ''",
-			wantErr:     "--name cannot be blank",
+			wantErr:     "`--name` cannot be blank",
 			wantFlagErr: true,
 		},
 		{
@@ -377,19 +377,19 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name:        "--body needs --name",
 			args:        "142 --body 'The order sync skipped decaf orders.'",
-			wantErr:     "--name is required when the content has no file name",
+			wantErr:     "`--name` is required when the content has no file name",
 			wantFlagErr: true,
 		},
 		{
 			name:        "standard input needs --name",
 			args:        "142 --body-file -",
-			wantErr:     "--name is required when the content has no file name",
+			wantErr:     "`--name` is required when the content has no file name",
 			wantFlagErr: true,
 		},
 		{
 			name:        "a blank --body",
 			args:        "142 --name 'Root cause' --body ' \n'",
-			wantErr:     "--body cannot be blank",
+			wantErr:     "`--body` cannot be blank",
 			wantFlagErr: true,
 		},
 		{
@@ -401,19 +401,19 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name:        "--type with a URL",
 			args:        "142 " + runbookURL + " --type plan",
-			wantErr:     "--type only applies to documents; links are created from URLs and .url files",
+			wantErr:     "`--type` only applies to documents; links are created from URLs and .url files",
 			wantFlagErr: true,
 		},
 		{
 			name:        "--type with a .url file among documents",
 			args:        "142 signin-plan.md oauth-runbook.url --type generic",
-			wantErr:     "--type only applies to documents; links are created from URLs and .url files",
+			wantErr:     "`--type` only applies to documents; links are created from URLs and .url files",
 			wantFlagErr: true,
 		},
 		{
 			name:        "--type with --body-file and a .url file",
 			args:        "142 --body-file OAUTH-RUNBOOK.URL --type plan",
-			wantErr:     "--type only applies to documents; links are created from URLs and .url files",
+			wantErr:     "`--type` only applies to documents; links are created from URLs and .url files",
 			wantFlagErr: true,
 		},
 		{
@@ -424,7 +424,7 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name:        "--attach with only links",
 			args:        "142 " + runbookURL + " oauth-runbook.url --attach signin-flow.png",
-			wantErr:     "--attach can't be used with link artifacts",
+			wantErr:     "`--attach` can't be used with link artifacts",
 			wantFlagErr: true,
 		},
 		{

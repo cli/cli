@@ -174,13 +174,13 @@ func TestNewCmdDownload(t *testing.T) {
 		{
 			name:        "a blank --output",
 			args:        "142 2 --output ''",
-			wantErr:     "--output cannot be blank",
+			wantErr:     "`--output` cannot be blank",
 			wantFlagErr: true,
 		},
 		{
 			name:        "a blank --output with several artifact numbers",
 			args:        "142 2 5 --output ''",
-			wantErr:     "--output cannot be blank",
+			wantErr:     "`--output` cannot be blank",
 			wantFlagErr: true,
 		},
 		{
@@ -192,37 +192,37 @@ func TestNewCmdDownload(t *testing.T) {
 		{
 			name:        "a blank --dir",
 			args:        "142 2 --dir ''",
-			wantErr:     "--dir cannot be blank",
+			wantErr:     "`--dir` cannot be blank",
 			wantFlagErr: true,
 		},
 		{
 			name:        "--output without an artifact number",
 			args:        "142 --output callback-plan.md",
-			wantErr:     "--output requires exactly one artifact number",
+			wantErr:     "`--output` requires exactly one artifact number",
 			wantFlagErr: true,
 		},
 		{
 			name:        "--output with several artifact numbers",
 			args:        "142 2 5 --output callback-plan.md",
-			wantErr:     "--output requires exactly one artifact number",
+			wantErr:     "`--output` requires exactly one artifact number",
 			wantFlagErr: true,
 		},
 		{
 			name:        "--output - with several artifact numbers",
 			args:        "142 2 5 --output -",
-			wantErr:     "--output requires exactly one artifact number",
+			wantErr:     "`--output` requires exactly one artifact number",
 			wantFlagErr: true,
 		},
 		{
 			name:        "--version without an artifact number",
 			args:        "142 --version 5",
-			wantErr:     "--version requires exactly one artifact number",
+			wantErr:     "`--version` requires exactly one artifact number",
 			wantFlagErr: true,
 		},
 		{
 			name:        "--version with several artifact numbers",
 			args:        "142 2 5 --version 5",
-			wantErr:     "--version requires exactly one artifact number",
+			wantErr:     "`--version` requires exactly one artifact number",
 			wantFlagErr: true,
 		},
 		{
@@ -300,7 +300,7 @@ func TestDownloadRun(t *testing.T) {
 		baristaBody     = "# Barista feedback notes\n\n- The sign-in button is hard to find on the menu page."
 		hoursBody       = "# Opening hours\n\nMonday to Friday, 7 to 3."
 		manualURL       = " https://github.com/monalisa/monas-cafe/wiki/Espresso-machine-manual\n"
-		alreadyExists   = "already exists (use --clobber to overwrite or --skip-existing to skip)"
+		alreadyExists   = "already exists (use `--clobber` to overwrite or `--skip-existing` to skip)"
 	)
 	generic := func(number int, name, body string) *client.ArtifactWithVersions {
 		return &client.ArtifactWithVersions{Number: number, Type: "generic", Name: name, Body: body}

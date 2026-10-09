@@ -111,9 +111,9 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			case !restoring && !editing:
 				return cmdutil.FlagErrorf("specify at least one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`")
 			case opts.Name != nil && *opts.Name == "":
-				return cmdutil.FlagErrorf("--name cannot be blank")
+				return cmdutil.FlagErrorf("`--name` cannot be blank")
 			case opts.Body != nil && strings.TrimSpace(*opts.Body) == "":
-				return cmdutil.FlagErrorf("--body cannot be blank")
+				return cmdutil.FlagErrorf("`--body` cannot be blank")
 			}
 
 			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
@@ -296,7 +296,7 @@ func newBody(opts *EditOptions, a client.Artifact, content *string) (*string, er
 	}
 
 	if len(opts.Assets) > 0 {
-		return nil, fmt.Errorf("artifact %d is a link; --attach can't be used with link artifacts", a.Number)
+		return nil, fmt.Errorf("artifact %d is a link; `--attach` can't be used with link artifacts", a.Number)
 	}
 	if content == nil {
 		return nil, nil

@@ -164,11 +164,11 @@ func viewRun(opts *ViewOptions) error {
 // own, so there is nothing to open for a document.
 func openLink(opts *ViewOptions, a client.Artifact) error {
 	if a.Type != client.TypeLink {
-		return fmt.Errorf("artifact %d is not a link; --web only opens link artifacts", a.Number)
+		return fmt.Errorf("artifact %d is not a link; `--web` only opens link artifacts", a.Number)
 	}
 	u, ok := shared.HTTPURL(a.Body)
 	if !ok {
-		return fmt.Errorf("artifact %d doesn't link to an http(s) URL; --web only opens http(s) URLs", a.Number)
+		return fmt.Errorf("artifact %d doesn't link to an http(s) URL; `--web` only opens http(s) URLs", a.Number)
 	}
 
 	// A link can point anywhere, so the message shows the whole URL, where

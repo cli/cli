@@ -245,13 +245,13 @@ func TestNewCmdEdit(t *testing.T) {
 		{
 			name:        "a blank --name",
 			args:        "142 2 --name ''",
-			wantErr:     "--name cannot be blank",
+			wantErr:     "`--name` cannot be blank",
 			wantFlagErr: true,
 		},
 		{
 			name:        "a blank --body",
 			args:        "142 2 --body ' \n'",
-			wantErr:     "--body cannot be blank",
+			wantErr:     "`--body` cannot be blank",
 			wantFlagErr: true,
 		},
 		{
@@ -746,7 +746,7 @@ func TestEditRun(t *testing.T) {
 				"Get monalisa/monas-cafe#142 3",
 			},
 			wantOps: &attachments.UploadResult{},
-			wantErr: "artifact 3 is a link; --attach can't be used with link artifacts",
+			wantErr: "artifact 3 is a link; `--attach` can't be used with link artifacts",
 		},
 		{
 			name:     "a type gh doesn't know is refused before anything is saved",

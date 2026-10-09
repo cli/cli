@@ -727,7 +727,7 @@ func TestViewRun(t *testing.T) {
 			tty:       true,
 			artifact:  oauthPlan,
 			wantCalls: []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
-			wantErr:   "artifact 2 is not a link; --web only opens link artifacts",
+			wantErr:   "artifact 2 is not a link; `--web` only opens link artifacts",
 		},
 		{
 			name:      "--web refuses a link that isn't an http(s) URL",
@@ -735,7 +735,7 @@ func TestViewRun(t *testing.T) {
 			tty:       true,
 			artifact:  link("file:///etc/hosts"),
 			wantCalls: []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 3"},
-			wantErr:   "artifact 3 doesn't link to an http(s) URL; --web only opens http(s) URLs",
+			wantErr:   "artifact 3 doesn't link to an http(s) URL; `--web` only opens http(s) URLs",
 		},
 		{
 			name: "a type gh doesn't know is refused",

@@ -95,11 +95,11 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			// A blank path would otherwise download every artifact under
 			// its usual name.
 			if outputSet && opts.Output == "" {
-				return cmdutil.FlagErrorf("--output cannot be blank")
+				return cmdutil.FlagErrorf("`--output` cannot be blank")
 			}
 			// A blank directory would otherwise be the current directory.
 			if cmd.Flags().Changed("dir") && opts.Dir == "" {
-				return cmdutil.FlagErrorf("--dir cannot be blank")
+				return cmdutil.FlagErrorf("`--dir` cannot be blank")
 			}
 			versionSet := cmd.Flags().Changed("version")
 			if versionSet && opts.Version < 1 {
@@ -126,10 +126,10 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			// One path holds one file, and each artifact numbers its own
 			// versions, so both flags need exactly one artifact.
 			if outputSet && len(opts.ArtifactNumbers) != 1 {
-				return cmdutil.FlagErrorf("--output requires exactly one artifact number")
+				return cmdutil.FlagErrorf("`--output` requires exactly one artifact number")
 			}
 			if versionSet && len(opts.ArtifactNumbers) != 1 {
-				return cmdutil.FlagErrorf("--version requires exactly one artifact number")
+				return cmdutil.FlagErrorf("`--version` requires exactly one artifact number")
 			}
 			opts.Client = shared.ClientFunc(f)
 
@@ -384,7 +384,7 @@ func trimTrailingSeparators(path string) string {
 	return path[:end]
 }
 
-var errAlreadyExists = errors.New("already exists (use --clobber to overwrite or --skip-existing to skip)")
+var errAlreadyExists = errors.New("already exists (use `--clobber` to overwrite or `--skip-existing` to skip)")
 
 // afterCheck runs after write checks a file's path and before it writes the
 // file. Tests replace it to change the file system in between, as another
