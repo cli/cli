@@ -544,6 +544,41 @@ func TestCheckType(t *testing.T) {
 	}
 }
 
+func TestSupportsAttachments(t *testing.T) {
+	tests := []struct {
+		name         string
+		artifactType string
+		want         bool
+	}{
+		{
+			name:         "generic",
+			artifactType: "generic",
+			want:         true,
+		},
+		{
+			name:         "plan",
+			artifactType: "plan",
+			want:         true,
+		},
+		{
+			name:         "link",
+			artifactType: "link",
+			want:         false,
+		},
+		{
+			name:         "a type gh doesn't know",
+			artifactType: "bad-type",
+			want:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, SupportsAttachments(tt.artifactType))
+		})
+	}
+}
+
 func TestHTTPURL(t *testing.T) {
 	tests := []struct {
 		name   string

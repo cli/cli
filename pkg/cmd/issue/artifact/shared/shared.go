@@ -152,6 +152,18 @@ func CheckType(a client.Artifact) error {
 	return fmt.Errorf("artifact %d has type %q, which this version of gh doesn't support; upgrade gh", a.Number, a.Type)
 }
 
+// SupportsAttachments reports whether an artifact of type artifactType can
+// take --attach files. Attachments go in Markdown, which only generic and plan
+// artifacts hold, so a type gh learns later supports them only once it's
+// added here.
+func SupportsAttachments(artifactType string) bool {
+	switch artifactType {
+	case client.TypeGeneric, client.TypePlan:
+		return true
+	}
+	return false
+}
+
 // HTTPURL returns value with surrounding whitespace trimmed, and whether it is
 // an http(s) URL: an absolute http or https URL with a host, in printable
 // ASCII with no spaces. Artifact commands use this one check wherever they read

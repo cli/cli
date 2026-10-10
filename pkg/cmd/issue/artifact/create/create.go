@@ -46,6 +46,15 @@ type CreateOptions struct {
 	Assets      []attachments.UserAsset
 }
 
+// documentType returns the type of the documents to create: --type, or
+// generic without it.
+func (opts *CreateOptions) documentType() string {
+	if opts.Type == "" {
+		return client.TypeGeneric
+	}
+	return opts.Type
+}
+
 // sourceKind is where an artifact's content comes from.
 type sourceKind int
 
@@ -79,6 +88,15 @@ type source struct {
 // isLink reports whether the source creates a link: a URL, or a .url file.
 func (s source) isLink() bool {
 	return s.kind == fromURL || (s.kind == fromFile && shared.IsShortcutFile(s.arg))
+}
+
+// artifactType returns the type of the source's artifact: link for a link,
+// or documentType for a document.
+func (s source) artifactType(documentType string) string {
+	if s.isLink() {
+		return client.TypeLink
+	}
+	return documentType
 }
 
 // NewCmdCreate creates the gh issue artifact create command.
@@ -190,10 +208,12 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			if cmd.Flags().Changed("type") && slices.ContainsFunc(opts.Sources, source.isLink) {
 				return cmdutil.FlagErrorf("`--type` only applies to documents; links are created from URLs and .url files")
 			}
-			// At least one document is required with --attach, since a link has
-			// no Markdown to attach files to.
-			if opts.AttachFlag.Changed() && !slices.ContainsFunc(opts.Sources, func(s source) bool { return !s.isLink() }) {
-				return cmdutil.FlagErrorf("`--attach` can't be used with link artifacts")
+			// --attach needs at least one artifact whose type supports
+			// attachments. A link doesn't, since it has no Markdown to attach
+			// files to.
+			documentType := opts.documentType()
+			if opts.AttachFlag.Changed() && !slices.ContainsFunc(opts.Sources, func(s source) bool { return shared.SupportsAttachments(s.artifactType(documentType)) }) {
+				return cmdutil.FlagErrorf("`--attach` can't be used with %s artifacts", opts.Sources[0].artifactType(documentType))
 			}
 
 			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
@@ -270,10 +290,7 @@ func createRun(opts *CreateOptions) error {
 
 	// Every artifact is read and checked before any request, so a file that
 	// can't be used fails the whole command and nothing is created.
-	documentType := opts.Type
-	if documentType == "" {
-		documentType = client.TypeGeneric
-	}
+	documentType := opts.documentType()
 	artifacts := make([]artifact, 0, len(opts.Sources))
 	for _, s := range opts.Sources {
 		a, err := readSource(s, opts.IO.In, documentType)
@@ -414,8 +431,9 @@ func isLetterOrNumber(r rune) bool {
 }
 
 // attach uploads the --attach files, each once, and points every document at
-// the files it references. Links are left out, since they have no Markdown.
-// With one document, the files it doesn't reference are appended to it.
+// the files it references. Artifacts whose type doesn't support attachments,
+// such as links, are left out. With one document, the files it doesn't
+// reference are appended to it.
 //
 // Uploads can't be undone, so a document is saved if any of its files
 // uploaded, even when another failed, and that failure is the reason on its
@@ -424,7 +442,7 @@ func attach(opts *CreateOptions, uploader *attachments.Uploader, artifacts []art
 	var docs []attachments.Document
 	var indexes []int
 	for i, a := range artifacts {
-		if a.artifactType == client.TypeLink {
+		if !shared.SupportsAttachments(a.artifactType) {
 			continue
 		}
 		docs = append(docs, attachments.Document{Markdown: a.body, Dir: a.dir})

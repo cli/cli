@@ -278,13 +278,16 @@ func readContent(opts *EditOptions) (*string, string, error) {
 }
 
 // newBody returns the body to save, checked against the artifact's type, or
-// nil to keep the current body. A link's new content must be an http(s) URL:
+// nil to keep the current body. Only a type that supports attachments takes
+// --attach, and a link doesn't. A link's new content must be an http(s) URL:
 // a .url file is read as a shortcut, and anything else must be a bare URL,
-// with its surrounding whitespace trimmed. A link has no Markdown for
-// --attach. Any other artifact is a Markdown document, which never takes a
-// .url file, and with only --attach, the files are appended to its current
-// body.
+// with its surrounding whitespace trimmed. Any other artifact is a Markdown
+// document, which never takes a .url file, and with only --attach, the files
+// are appended to its current body.
 func newBody(opts *EditOptions, a client.Artifact, content *string) (*string, error) {
+	if len(opts.Assets) > 0 && !shared.SupportsAttachments(a.Type) {
+		return nil, fmt.Errorf("artifact %d is a %s; `--attach` can't be used with %s artifacts", a.Number, a.Type, a.Type)
+	}
 	if a.Type != client.TypeLink {
 		if shared.IsShortcutFile(opts.BodyFile) {
 			return nil, fmt.Errorf("artifact %d is not a link; .url files can only update link artifacts", a.Number)
@@ -295,9 +298,6 @@ func newBody(opts *EditOptions, a client.Artifact, content *string) (*string, er
 		return content, nil
 	}
 
-	if len(opts.Assets) > 0 {
-		return nil, fmt.Errorf("artifact %d is a link; `--attach` can't be used with link artifacts", a.Number)
-	}
 	if content == nil {
 		return nil, nil
 	}
