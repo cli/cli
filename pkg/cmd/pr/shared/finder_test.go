@@ -517,6 +517,152 @@ func TestFind(t *testing.T) {
 			wantRepo: "https://github.com/OWNER/REPO",
 		},
 		{
+			name: "when provided a branch argument that tracks a fork remote, it finds the cross-repository PR",
+			args: args{
+				selector:   "blueberries",
+				fields:     []string{"id", "number"},
+				baseRepoFn: stubBaseRepoFn(ghrepo.New("ORIGINOWNER", "REPO"), nil),
+				branchFn: func() (string, error) {
+					return "blueberries", nil
+				},
+				gitConfigClient: stubGitConfigClient{
+					readBranchConfigFn:  stubBranchConfig(git.BranchConfig{}, nil),
+					pushDefaultFn:       stubPushDefault(git.PushDefaultSimple, nil),
+					remotePushDefaultFn: stubRemotePushDefault("", nil),
+					pushRevisionFn:      stubPushRevision(git.RemoteTrackingRef{Remote: "upstream", Branch: "blueberries"}, nil),
+				},
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query PullRequestForBranch\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+						"pullRequests":{"nodes":[
+							{
+								"number": 13,
+								"state": "OPEN",
+								"baseRefName": "main",
+								"headRefName": "blueberries",
+								"isCrossRepository": true,
+								"headRepositoryOwner": {"login":"UPSTREAMOWNER"}
+							}
+						]}
+					}}}`))
+			},
+			wantPR:   13,
+			wantRepo: "https://github.com/ORIGINOWNER/REPO",
+		},
+		{
+			name: "when provided a branch argument made by pr checkout, it resolves the PR by number",
+			args: args{
+				selector: "blueberries",
+				fields:   []string{"id", "number"},
+				baseRepoFn: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("OWNER/REPO")
+				},
+				gitConfigClient: stubGitConfigClient{
+					readBranchConfigFn: stubBranchConfig(git.BranchConfig{
+						MergeRef: "refs/pull/13/head",
+					}, nil),
+				},
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query PullRequestByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+						"pullRequest":{"number":13}
+					}}}`))
+			},
+			wantPR:   13,
+			wantRepo: "https://github.com/OWNER/REPO",
+		},
+		{
+			name: "when provided a branch argument with no local tracking config, it falls back to the base repo branch",
+			args: args{
+				selector:   "blueberries",
+				fields:     []string{"id", "number"},
+				baseRepoFn: stubBaseRepoFn(ghrepo.New("ORIGINOWNER", "REPO"), nil),
+				gitConfigClient: stubGitConfigClient{
+					readBranchConfigFn:  stubBranchConfig(git.BranchConfig{}, nil),
+					pushDefaultFn:       stubPushDefault(git.PushDefaultSimple, nil),
+					remotePushDefaultFn: stubRemotePushDefault("", nil),
+					pushRevisionFn:      stubPushRevision(git.RemoteTrackingRef{}, errors.New("testErr")),
+				},
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query PullRequestForBranch\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+						"pullRequests":{"nodes":[
+							{
+								"number": 13,
+								"state": "OPEN",
+								"baseRefName": "main",
+								"headRefName": "blueberries",
+								"isCrossRepository": false,
+								"headRepositoryOwner": {"login":"ORIGINOWNER"}
+							}
+						]}
+					}}}`))
+			},
+			wantPR:   13,
+			wantRepo: "https://github.com/ORIGINOWNER/REPO",
+		},
+		{
+			name: "when git config cannot be read for a branch argument, it falls back to the base repo branch",
+			args: args{
+				selector:   "blueberries",
+				fields:     []string{"id", "number"},
+				baseRepoFn: stubBaseRepoFn(ghrepo.New("ORIGINOWNER", "REPO"), nil),
+				gitConfigClient: stubGitConfigClient{
+					readBranchConfigFn: stubBranchConfig(git.BranchConfig{}, errors.New("testErr")),
+				},
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query PullRequestForBranch\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+						"pullRequests":{"nodes":[
+							{
+								"number": 13,
+								"state": "OPEN",
+								"baseRefName": "main",
+								"headRefName": "blueberries",
+								"isCrossRepository": false,
+								"headRepositoryOwner": {"login":"ORIGINOWNER"}
+							}
+						]}
+					}}}`))
+			},
+			wantPR:   13,
+			wantRepo: "https://github.com/ORIGINOWNER/REPO",
+		},
+		{
+			name: "when provided an explicit owner:branch argument, it resolves without consulting local git config",
+			args: args{
+				selector:   "UPSTREAMOWNER:blueberries",
+				fields:     []string{"id", "number"},
+				baseRepoFn: stubBaseRepoFn(ghrepo.New("ORIGINOWNER", "REPO"), nil),
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query PullRequestForBranch\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+						"pullRequests":{"nodes":[
+							{
+								"number": 13,
+								"state": "OPEN",
+								"baseRefName": "main",
+								"headRefName": "blueberries",
+								"isCrossRepository": true,
+								"headRepositoryOwner": {"login":"UPSTREAMOWNER"}
+							}
+						]}
+					}}}`))
+			},
+			wantPR:   13,
+			wantRepo: "https://github.com/ORIGINOWNER/REPO",
+		},
+		{
 			name: "no argument reads current branch",
 			args: args{
 				selector: "",

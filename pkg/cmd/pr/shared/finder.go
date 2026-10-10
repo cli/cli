@@ -95,9 +95,8 @@ func StubFinderForRunCommandStyleTests(t *testing.T, selector string, pr *api.Pu
 type FindOptions struct {
 	// Selector can be a number with optional `#` prefix, a branch name with optional `<owner>:` prefix, or
 	// a PR URL.
-	Selector string
-	// Fields lists the GraphQL fields to fetch for the PullRequest.
-	Fields []string
+	Selector string // Fields lists the GraphQL fields to fetch for the PullRequest.
+	Fields   []string
 	// BaseBranch is the name of the base branch to scope the PR-for-branch lookup to.
 	BaseBranch string
 	// States lists the possible PR states to scope the PR-for-branch lookup to.
@@ -143,8 +142,7 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		}
 
 		// Determine if the branch is configured to merge to a special PR ref
-		prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
-		if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
+		if m := prHeadRefRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
 			prNumber, _ := strconv.Atoi(m[1])
 			f.prNumber = prNumber
 		}
@@ -179,15 +177,19 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		} else {
 			f.branchName = opts.Selector
 
-			qualifiedHeadRef, err := ParseQualifiedHeadRef(f.branchName)
+			if strings.Contains(f.branchName, ":") {
+				// An explicit <owner>:<branch> selector is already fully qualified
+				// and needs no git tracking resolution.
+				prRefs, err = prFindRefsForBranch(f.baseRefRepo, opts.BaseBranch, f.branchName)
+			} else {
+				// An unqualified selector may name a local branch that tracks a fork
+				// remote or a refs/pull/<number>/head merge ref; resolve it the same
+				// way as the currently checked-out branch, and fall back to the
+				// unqualified branch name when git config is unavailable.
+				prRefs, err = f.resolveBranchSelectorRefs(opts)
+			}
 			if err != nil {
 				return nil, nil, err
-			}
-
-			prRefs = PRFindRefs{
-				qualifiedHeadRef: qualifiedHeadRef,
-				baseRepo:         f.baseRefRepo,
-				baseBranchName:   o.SomeIfNonZero(opts.BaseBranch),
 			}
 		}
 	}
@@ -296,6 +298,68 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	}
 
 	return pr, f.baseRefRepo, g.Wait()
+}
+
+// prHeadRefRE matches branch merge refs that point directly at a pull request
+// head, for example refs/pull/123/head.
+var prHeadRefRE = regexp.MustCompile(`^refs/pull/(\d+)/head$`)
+
+// prFindRefsForBranch builds PRFindRefs for a branch selector parsed as-is,
+// without consulting local git branch configuration. An explicit
+// <owner>:<branch> selector keeps its owner; a plain branch name is left
+// unqualified against the base repository.
+func prFindRefsForBranch(baseRepo ghrepo.Interface, baseBranchName, branchName string) (PRFindRefs, error) {
+	qualifiedHeadRef, err := ParseQualifiedHeadRef(branchName)
+	if err != nil {
+		return PRFindRefs{}, err
+	}
+
+	return PRFindRefs{
+		qualifiedHeadRef: qualifiedHeadRef,
+		baseRepo:         baseRepo,
+		baseBranchName:   o.SomeIfNonZero(baseBranchName),
+	}, nil
+}
+
+// resolveBranchSelectorRefs resolves PR refs for an unqualified branch selector by
+// inspecting the local git branch tracking configuration, mirroring how the
+// currently checked-out branch is resolved. A merge ref of the form
+// refs/pull/<number>/head resolves to a PR number, and a branch tracking a remote
+// fork qualifies the head ref with the fork owner. When the branch is not local,
+// has no tracking remote, or git configuration cannot be read (for example,
+// outside a git repository), the selector falls back to an unqualified head ref
+// against the base repository.
+func (f *finder) resolveBranchSelectorRefs(opts FindOptions) (PRFindRefs, error) {
+	branchConfig, err := f.gitConfigClient.ReadBranchConfig(context.Background(), f.branchName)
+	if err != nil {
+		return prFindRefsForBranch(f.baseRefRepo, opts.BaseBranch, f.branchName)
+	}
+
+	if m := prHeadRefRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
+		prNumber, _ := strconv.Atoi(m[1])
+		f.prNumber = prNumber
+	}
+	if f.prNumber != 0 {
+		// Resolved by number; the refs are not used in this case.
+		return PRFindRefs{}, nil
+	}
+
+	prRefsResolver := NewPullRequestFindRefsResolver(
+		// We requested the branch config already, so let's cache that
+		CachedBranchConfigGitConfigClient{
+			CachedBranchConfig: branchConfig,
+			GitConfigClient:    f.gitConfigClient,
+		},
+		f.remotesFn,
+	)
+	prRefs, err := prRefsResolver.ResolvePullRequestRefs(f.baseRefRepo, opts.BaseBranch, f.branchName)
+	if err != nil {
+		// The branch may not exist locally or its tracking remote may not be
+		// resolvable; use the unqualified head ref against the base repository.
+		return prFindRefsForBranch(f.baseRefRepo, opts.BaseBranch, f.branchName)
+	}
+
+	return prRefs, nil
 }
 
 var pullURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/pull/(\d+)(.*$)`)
