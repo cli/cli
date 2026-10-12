@@ -239,13 +239,13 @@ func refreshRun(opts *RefreshOptions) error {
 
 	// Short-lived tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
 	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
+	// The wasRefreshable downgrade is intentionally not reported here: it is already warned about up front (before the
+	// browser prompt) so the user can abort, and repeating it after completion is redundant.
 	switch {
 	case result.Refreshable != nil && !opts.ShortLived:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues short-lived refreshable token\n", cs.WarningIcon())
 	case result.Refreshable != nil:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Received short-lived refreshable token\n", cs.SuccessIcon())
-	case wasRefreshable && !opts.ShortLived:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was short-lived; pass --short-lived to preserve it\n", cs.WarningIcon())
 	case opts.ShortLived:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue a short-lived refreshable token\n", cs.WarningIcon())
 	}
