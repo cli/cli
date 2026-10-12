@@ -619,7 +619,9 @@ func (c *AuthConfig) setActiveCredential(hostname, user string) (bool, error) {
 	_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
 
 	// A refreshable credential is the managed credential, so prefer it. It lives only in the per-user slot and is
-	// surfaced as active through the active user key, so confirming it exists is all that activation needs.
+	// surfaced as active through the active user key, so confirming it exists is all that activation needs. The
+	// refreshable-then-keyring-then-config order here is kept identical to TokenForUser so activation and resolution
+	// never disagree about which credential is current.
 	if _, _, err := c.refreshableForUser(hostname, user); err == nil {
 		return true, nil
 	} else if !errors.Is(err, errRefreshableNotFound) {
@@ -653,19 +655,24 @@ func (c *AuthConfig) UsersForHost(hostname string) []string {
 // TokenForUser retrieves the credential for the given user and hostname. Like ActiveToken it returns the last stored
 // token as-is, including the current access token of a refreshable credential, and never refreshes it; use
 // TokenForUserWithRefresh when the token must be valid for API calls.
+//
+// It checks the managed refreshable credential first, then the non-refreshable keyring token, then the non-refreshable
+// config token. This order is kept identical to setActiveCredential so activation and resolution always agree on which
+// credential is current, even in the mixed state that should never occur because logging in with one kind removes the
+// other.
 func (c *AuthConfig) TokenForUser(hostname, user string) (gh.Credential, error) {
+	if credential, _, err := c.refreshableForUser(hostname, user); err == nil {
+		return credential, nil
+	} else if !errors.Is(err, errRefreshableNotFound) {
+		return gh.Credential{}, err
+	}
+
 	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
 		return gh.Credential{Source: gh.TokenSourceKeyring, Token: token}, nil
 	}
 
 	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
 		return gh.Credential{Source: gh.TokenSourceOAuthToken, Token: token}, nil
-	}
-
-	if credential, _, err := c.refreshableForUser(hostname, user); err == nil {
-		return credential, nil
-	} else if !errors.Is(err, errRefreshableNotFound) {
-		return gh.Credential{}, err
 	}
 
 	return gh.Credential{Source: gh.TokenSourceDefault}, fmt.Errorf("no token found for '%s'", user)
