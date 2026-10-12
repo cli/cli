@@ -490,6 +490,13 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 		insecureStorageUsed = true
 	}
 
+	// Remove any refreshable credential for this user so the non-refreshable and refreshable forms never coexist. This
+	// mirrors loginRefreshable, which removes the non-expiring credential when storing a refreshable one. Without it,
+	// setActiveCredential keeps resolving the stale refreshable record as active and never copies the new
+	// non-refreshable token into the host-level slot, which also leaves go-gh extensions unable to read a token.
+	_ = c.cfg.Remove(refreshablePath(hostname, username))
+	_ = keyring.Delete(refreshableServiceName(hostname), username)
+
 	return insecureStorageUsed, c.completeLogin(hostname, username, gitProtocol)
 }
 
