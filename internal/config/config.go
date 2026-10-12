@@ -296,6 +296,14 @@ func (c *AuthConfig) ActiveToken(hostname string) gh.Credential {
 		return gh.Credential{Source: source, Token: token}
 	}
 
+	// Intentional behavior change from older gh: the active-user lookup goes through TokenForUser, which also consults
+	// the per-user config oauth_token and the refreshable slot, rather than only the per-user keyring slot. This is
+	// groundwork for refreshable credentials and is the more correct result. The only observable difference is when a
+	// user has a per-user config oauth_token (or refreshable record) but no per-user keyring slot while an unkeyed
+	// keyring token also exists: older gh returned the unkeyed keyring token, whereas we now return the per-user
+	// credential. That state is rare because activateUser mirrors a per-user insecure token into the host-level
+	// oauth_token, which TokenFromEnvOrConfig resolves above before we reach here. This is accepted and pinned by
+	// TestActiveTokenPrefersPerUserConfigTokenOverUnkeyedKeyring.
 	if user, err := c.ActiveUser(hostname); err == nil {
 		if credential, err := c.TokenForUser(hostname, user); err == nil {
 			return credential
