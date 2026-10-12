@@ -208,6 +208,7 @@ func formatMatch(t string, matches []search.Match, io *iostreams.IOStreams) []st
 	for i, c := range t {
 		if c == '\n' {
 			if found {
+				b.WriteString(cs.Reset())
 				lines = append(lines, b.String())
 			}
 			found = false
@@ -223,6 +224,7 @@ func formatMatch(t string, matches []search.Match, io *iostreams.IOStreams) []st
 		b.WriteRune(c)
 	}
 	if found {
+		b.WriteString(cs.Reset())
 		lines = append(lines, b.String())
 	}
 	return lines
