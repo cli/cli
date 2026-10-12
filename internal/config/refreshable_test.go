@@ -468,6 +468,39 @@ func TestLoginRefreshablePurgesNonExpiringLogin(t *testing.T) {
 	require.Equal(t, "access", cred.Token)
 }
 
+// TestLoginPurgesRefreshableRecord is the inverse of TestLoginRefreshablePurgesNonExpiringLogin: logging in with a
+// non-refreshable token must remove the user's refreshable record so the two kinds never coexist. The regression it
+// guards (cli/cli#14451 review): a leftover refreshable record short-circuits activateUser, so the new token is never
+// copied into the host-level oauth_token slot and go-gh extensions can no longer read a token.
+func TestLoginPurgesRefreshableRecord(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+
+	// A prior short-lived login stores a refreshable credential in the keyring.
+	credential := gh.Credential{Token: "access", RefreshToken: "refresh"}
+	_, err := authCfg.LoginRefreshable("github.com", "test-user", credential, "ssh", true)
+	require.NoError(t, err)
+
+	// Switching back to a non-refreshable token with insecure storage must purge the refreshable record.
+	_, err = authCfg.Login("github.com", "test-user", "plain-token", "ssh", false)
+	require.NoError(t, err)
+
+	// The refreshable record is gone from both storage forms.
+	_, err = refreshableFromKeyring("github.com", "test-user")
+	require.ErrorIs(t, err, errRefreshableNotFound)
+	requireNoKey(t, authCfg.cfg, refreshablePath("github.com", "test-user"))
+
+	// TokenForUser resolves the new non-refreshable token.
+	cred, err := authCfg.TokenForUser("github.com", "test-user")
+	require.NoError(t, err)
+	require.Equal(t, "plain-token", cred.Token)
+
+	// And it was copied into the host-level oauth_token slot that go-gh reads for extensions, which regressed before
+	// this fix because the stale refreshable record short-circuited activation.
+	hostToken, err := authCfg.cfg.Get([]string{hostsKey, "github.com", oauthTokenKey})
+	require.NoError(t, err)
+	require.Equal(t, "plain-token", hostToken)
+}
+
 func TestWithFreshConfigUnderLockInvokesReloadBeforeFn(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
