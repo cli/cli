@@ -166,17 +166,18 @@ func TestTokenForUserResolution(t *testing.T) {
 			wantSource: "keyring",
 		},
 		{
-			// This state should not occur in practice: logging in with a refreshable token deletes or replaces any
-			// non-refreshable user and host tokens for that account. The case documents the resolution precedence
-			// regardless, so a stale non-expiring token still wins if one is ever present.
-			name: "prefers non-expiring token over refreshable",
+			// This state should not occur in practice: logging in with a non-refreshable token deletes any
+			// refreshable record for that account, and logging in with a refreshable token deletes the non-expiring
+			// tokens. The case documents the resolution precedence regardless: the managed refreshable credential
+			// wins, matching setActiveCredential so activation and resolution never disagree.
+			name: "prefers refreshable over non-expiring token",
 			setup: func(t *testing.T, authCfg *AuthConfig) {
 				authCfg.cfg.Set([]string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey}, "plain-token")
 				setRefreshableConfigField(t, authCfg, "github.com", "test-user", "access_token", "access")
 				setRefreshableConfigField(t, authCfg, "github.com", "test-user", "refresh_token", "refresh")
 			},
-			wantToken:  "plain-token",
-			wantSource: "oauth_token",
+			wantToken:  "access",
+			wantSource: "refreshable_oauth_token",
 		},
 	}
 	for _, tt := range tests {
