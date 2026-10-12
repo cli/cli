@@ -403,7 +403,7 @@ func apiRun(opts *ApiOptions) error {
 		AppVersion:        opts.AppVersion,
 		InvokingAgent:     opts.InvokingAgent,
 		CacheTTL:          opts.CacheTTL,
-		Config:            cfg.Authentication(),
+		RefreshingConfig:  cfg.Authentication(),
 		EnableCache:       opts.CacheTTL > 0,
 		Log:               log,
 		LogColorize:       opts.IO.ColorEnabled(),

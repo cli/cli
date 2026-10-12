@@ -144,7 +144,7 @@ func TestUploadAuthentication(t *testing.T) {
 			)
 
 			client := &http.Client{
-				Transport: api.AddAuthTokenHeader(
+				Transport: api.AddAuthTokenHeaderWithRefresh(
 					reg,
 					staticTokenConfig{tt.configuredHost: tt.configuredToken},
 				),

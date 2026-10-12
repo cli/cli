@@ -107,7 +107,7 @@ func TestRequestExplicitAuthorizationHeaderIsPreserved(t *testing.T) {
 
 	httpClient := &http.Client{}
 	httpmock.ReplaceTripper(httpClient, reg)
-	httpClient.Transport = AddAuthTokenHeader(httpClient.Transport, tinyConfig{"github.com:oauth_token": "config-token"})
+	httpClient.Transport = AddAuthTokenHeaderWithRefresh(httpClient.Transport, tinyConfig{"github.com:oauth_token": "config-token"})
 	client := NewClientFromHTTP(httpClient)
 
 	reg.Register(httpmock.MatchAny, httpmock.StatusStringResponse(200, "{}"))
@@ -356,9 +356,9 @@ func TestRequestHeadersAgainstRealTransport(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	httpClient, err := NewHTTPClient(HTTPClientOptions{
-		AppVersion: "v1.2.3",
-		Config:     tinyConfig{serverHostname(t, ts.URL) + ":oauth_token": "MYTOKEN"},
-		Log:        ios.ErrOut,
+		AppVersion:       "v1.2.3",
+		RefreshingConfig: tinyConfig{serverHostname(t, ts.URL) + ":oauth_token": "MYTOKEN"},
+		Log:              ios.ErrOut,
 	})
 	require.NoError(t, err)
 	client := NewClientFromHTTP(httpClient)
