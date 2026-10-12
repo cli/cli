@@ -411,3 +411,60 @@ func TestCodeRun(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatMatch(t *testing.T) {
+	const (
+		hl    = "\x1b[0;30;43m"
+		reset = "\x1b[0m"
+	)
+	tests := []struct {
+		name     string
+		fragment string
+		matches  []search.Match
+		want     []string
+	}{
+		{
+			name:     "match ending mid-line",
+			fragment: "foo bar baz",
+			matches:  []search.Match{{Indices: []int{4, 7}}},
+			want:     []string{"foo " + hl + "bar" + reset + " baz"},
+		},
+		{
+			name:     "match ending at newline",
+			fragment: "foo bar\nbaz",
+			matches:  []search.Match{{Indices: []int{4, 7}}},
+			want:     []string{"foo " + hl + "bar" + reset},
+		},
+		{
+			name:     "match ending at end of fragment",
+			fragment: "foo bar",
+			matches:  []search.Match{{Indices: []int{4, 7}}},
+			want:     []string{"foo " + hl + "bar" + reset},
+		},
+		{
+			name:     "match spanning newline",
+			fragment: "foo bar\nbaz qux",
+			matches:  []search.Match{{Indices: []int{4, 11}}},
+			want:     []string{"foo " + hl + "bar" + reset},
+		},
+		{
+			name:     "closed match is not reset again at newline",
+			fragment: "foo bar  \nbaz",
+			matches:  []search.Match{{Indices: []int{0, 3}}},
+			want:     []string{hl + "foo" + reset + " bar  "},
+		},
+		{
+			name:     "matches on multiple lines",
+			fragment: "foo\nbar\nbaz",
+			matches:  []search.Match{{Indices: []int{0, 3}}, {Indices: []int{8, 11}}},
+			want:     []string{hl + "foo" + reset, hl + "baz" + reset},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			ios.SetColorEnabled(true)
+			assert.Equal(t, tt.want, formatMatch(tt.fragment, tt.matches, ios))
+		})
+	}
+}
