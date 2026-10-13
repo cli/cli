@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -337,6 +338,27 @@ func Test_statusRun(t *testing.T) {
 				  - Short-lived token that gh refreshes automatically
 				  - Token expires: 2000-01-01T00:00:00Z
 				  - Token scopes: 'repo', 'read:org'
+			`),
+		},
+		{
+			name: "rejected refresh token surfaces a clear error without a scope request",
+			opts: StatusOptions{},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past)
+				setRefresher(t, c, &ghmock.TokenRefresherMock{
+					RefreshFunc: func(string, string) (gh.RefreshableCredential, error) {
+						return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
+					},
+				})
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Refresh token for github.com account monalisa was rejected
+				  - Active account: true
+				  - The stored short-lived credential was removed because its refresh token is no longer valid.
+				  - To re-authenticate, run: gh auth login -h github.com
 			`),
 		},
 		{
@@ -784,6 +806,24 @@ func Test_statusRun(t *testing.T) {
 				})
 			},
 			wantOut: `{"hosts":{"github.com":[{"state":"timeout","error":"Get \"https://api.github.com/\": context deadline exceeded","active":true,"host":"github.com","login":"monalisa","tokenSource":"GH_CONFIG_DIR/hosts.yml","gitProtocol":"https"}]}}` + "\n",
+			wantErr: nil, // should not return error in machine-readable mode
+		},
+		{
+			name: "json, rejected refresh token",
+			opts: StatusOptions{
+				Hostname: "github.com",
+			},
+			jsonFields: []string{"hosts"},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past)
+				setRefresher(t, c, &ghmock.TokenRefresherMock{
+					RefreshFunc: func(string, string) (gh.RefreshableCredential, error) {
+						return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
+					},
+				})
+			},
+			wantOut: `{"hosts":{"github.com":[{"state":"refresh_expired","error":"refresh token for github.com was rejected; the stored credential was removed","active":true,"host":"github.com","login":"monalisa","tokenSource":"","gitProtocol":"https"}]}}` + "\n",
 			wantErr: nil, // should not return error in machine-readable mode
 		},
 		{
