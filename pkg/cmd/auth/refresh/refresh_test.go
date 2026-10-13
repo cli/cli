@@ -52,7 +52,16 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "--expiring",
 			wants: RefreshOptions{
 				Hostname: "",
-				Expiring: true,
+				Expiring: new(true),
+			},
+		},
+		{
+			name: "tty expiring=false",
+			tty:  true,
+			cli:  "--expiring=false",
+			wants: RefreshOptions{
+				Hostname: "",
+				Expiring: new(false),
 			},
 		},
 		{
@@ -538,7 +547,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			opts: &RefreshOptions{
 				Hostname: "github.com",
-				Expiring: true,
+				Expiring: new(true),
 			},
 			authOut: authOut{
 				username:    "test-user",
