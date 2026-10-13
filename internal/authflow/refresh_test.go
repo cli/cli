@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/oauth"
+	oauthapi "github.com/cli/oauth/api"
 	"github.com/stretchr/testify/require"
 )
 
@@ -123,4 +124,45 @@ func TestTokenRefresherRefreshRejected(t *testing.T) {
 	// original library error is preserved in the chain.
 	require.ErrorIs(t, err, gh.ErrRefreshTokenInvalid)
 	require.ErrorIs(t, err, oauth.ErrRefreshTokenInvalid)
+}
+
+func TestAuthResultFromToken(t *testing.T) {
+	// Production anchors the lifetime at timeNow().UTC(), so mirror that with a UTC anchor here.
+	requestedAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+
+	t.Run("with refresh token populates a refreshable credential", func(t *testing.T) {
+		token := &oauthapi.AccessToken{
+			Token:                 "gho_NEW",
+			RefreshToken:          "ghr_NEW",
+			ExpiresIn:             28800,
+			RefreshTokenExpiresIn: 15897600,
+		}
+
+		result := authResultFromToken(token, "monalisa", requestedAt)
+
+		require.Equal(t, "gho_NEW", result.Token)
+		require.Equal(t, "monalisa", result.Username)
+		require.NotNil(t, result.Refreshable)
+		require.Equal(t, "gho_NEW", result.Refreshable.Token)
+		require.Equal(t, "ghr_NEW", result.Refreshable.RefreshToken)
+		// Absolute expiries are derived from the server lifetimes, anchored at requestedAt.
+		require.NotNil(t, result.Refreshable.ExpiresAt)
+		require.Equal(t, requestedAt.Add(28800*time.Second), *result.Refreshable.ExpiresAt)
+		require.NotNil(t, result.Refreshable.RefreshTokenExpiresAt)
+		require.Equal(t, requestedAt.Add(15897600*time.Second), *result.Refreshable.RefreshTokenExpiresAt)
+	})
+
+	t.Run("without refresh token yields a plain token", func(t *testing.T) {
+		token := &oauthapi.AccessToken{
+			Token:     "gho_NEW",
+			ExpiresIn: 28800,
+		}
+
+		result := authResultFromToken(token, "monalisa", requestedAt)
+
+		require.Equal(t, "gho_NEW", result.Token)
+		require.Equal(t, "monalisa", result.Username)
+		// The server did not honor the short-lived request, so nothing refreshable is carried forward.
+		require.Nil(t, result.Refreshable)
+	})
 }

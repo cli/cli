@@ -3,7 +3,7 @@
 # Guided, interactive end-to-end verification for refreshable (short-lived) OAuth tokens.
 #
 # This script is a review aid, not a merged test. It walks a reviewer through the
-# scenarios in files/e2e-verification-scenarios.md one command at a time, using a
+# refreshable (short-lived) OAuth token scenarios one command at a time, using a
 # Given / When / Then framing. For each step it:
 #
 #   1. Prints Given / When / Then and the exact command it is about to run.
@@ -225,10 +225,6 @@ echo
 printf "%sReady? Press Enter to begin%s (q to quit): " "$BOLD" "$RESET"
 read -r ans; [ "$ans" = "q" ] && exit 0
 echo; divider; echo
-
-# ===========================================================================
-# NEW SYSTEM
-# ===========================================================================
 
 # --- Step: login with --short-lived -------------------------------------------
 label "Given" "a clean auth state for $HOST"

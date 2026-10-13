@@ -371,6 +371,43 @@ func TestLogin(t *testing.T) {
 				assert.Contains(t, stderr, "Host did not issue a short-lived refreshable token\n")
 			},
 		},
+		{
+			name: "interactive, short-lived forces the web flow instead of offering token paste",
+			opts: LoginOptions{
+				Hostname:         "example.com",
+				Interactive:      true,
+				ShortLived:       true,
+				GitProtocol:      "ssh",
+				SkipSSHKeyPrompt: true,
+				Prompter: &prompter.PrompterMock{
+					SelectFunc: func(prompt, _ string, _ []string) (int, error) {
+						// --short-lived must not reach the authentication-method choice, since a pasted token can
+						// never be refreshable. Any such prompt here is a regression.
+						t.Errorf("unexpected Select prompt under --short-lived: %q", prompt)
+						return -1, prompter.NoSuchPromptErr(prompt)
+					},
+				},
+				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
+					if !requestRefreshToken {
+						t.Error("expected requestRefreshToken to be true")
+					}
+					return &authflow.AuthResult{
+						Token:       "gho_access",
+						Username:    "monalisa",
+						Refreshable: &gh.Credential{Token: "gho_access", RefreshToken: "ghr_refresh"},
+					}, nil
+				},
+			},
+			wantsConfig: map[string]string{
+				"example.com:user":          "monalisa",
+				"example.com:oauth_token":   "gho_access",
+				"example.com:refresh_token": "ghr_refresh",
+				"example.com:git_protocol":  "ssh",
+			},
+			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
+				assert.Contains(t, stderr, "Received short-lived refreshable token\n")
+			},
+		},
 	}
 
 	for _, tt := range tests {
