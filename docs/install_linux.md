@@ -477,11 +477,18 @@ To upgrade:
 webi gh@stable
 ```
 
-## Discouraged
-
-> [!WARNING]
-> The GitHub CLI team actively discourages use of the following methods of installation.
-
 ### Snap
 
-The [GitHub CLI package](https://snapcraft.io/gh) has [so many issues with Snap](https://github.com/casperdcl/cli/issues/7) as a runtime mechanism for apps like GitHub CLI that our team suggests _never installing gh as a snap_.
+The [GitHub CLI snap](https://snapcraft.io/gh) is maintained by a third party.
+
+To install:
+
+```shell
+sudo snap install gh --classic
+```
+
+To upgrade:
+
+```shell
+sudo snap refresh gh
+```
