@@ -173,6 +173,396 @@ func TestParseArtifactNumber(t *testing.T) {
 	}
 }
 
+func TestParseArtifactArgs(t *testing.T) {
+	// The spec's artifacts 2 and 5 on issue 142, and 1 on issue 137.
+	const (
+		oauthPlanURL = "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2"
+		baristaURL   = "https://github.com/monalisa/monas-cafe/issues/142/artifacts/5"
+		approvedURL  = "https://github.com/monalisa/monas-cafe/issues/137/artifacts/1"
+	)
+
+	tests := []struct {
+		name              string
+		args              []string
+		issueAlone        bool
+		wantIssue         int
+		wantRepo          string
+		wantNumbers       []int
+		wantBaseRepoCalls int
+		wantErr           string
+	}{
+		{
+			name:              "an issue and artifact numbers, in argument order",
+			args:              []string{"142", "5", "2"},
+			wantIssue:         142,
+			wantRepo:          "github.com/OWNER/REPO",
+			wantNumbers:       []int{5, 2},
+			wantBaseRepoCalls: 1,
+		},
+		{
+			name:        "an issue URL names its repository",
+			args:        []string{"https://github.com/monalisa/monas-cafe/issues/142", "2"},
+			wantIssue:   142,
+			wantRepo:    "github.com/monalisa/monas-cafe",
+			wantNumbers: []int{2},
+		},
+		{
+			name:        "an artifact URL names its repository, issue and number",
+			args:        []string{oauthPlanURL},
+			wantIssue:   142,
+			wantRepo:    "github.com/monalisa/monas-cafe",
+			wantNumbers: []int{2},
+		},
+		{
+			name:        "artifact URLs on one issue, in argument order",
+			args:        []string{baristaURL, oauthPlanURL},
+			wantIssue:   142,
+			wantRepo:    "github.com/monalisa/monas-cafe",
+			wantNumbers: []int{5, 2},
+		},
+		{
+			name:        "an artifact URL on a ghe.com host",
+			args:        []string{"https://monas-cafe.ghe.com/monalisa/monas-cafe/issues/142/artifacts/3"},
+			wantIssue:   142,
+			wantRepo:    "monas-cafe.ghe.com/monalisa/monas-cafe",
+			wantNumbers: []int{3},
+		},
+		{
+			name:        "an http artifact URL, whose query and fragment are ignored",
+			args:        []string{"http://github.com/monalisa/monas-cafe/issues/142/artifacts/2?tab=history#step-2"},
+			wantIssue:   142,
+			wantRepo:    "github.com/monalisa/monas-cafe",
+			wantNumbers: []int{2},
+		},
+		{
+			name:        "the repository's case doesn't make another issue",
+			args:        []string{oauthPlanURL, "https://github.com/Monalisa/Monas-Cafe/issues/142/artifacts/5"},
+			wantIssue:   142,
+			wantRepo:    "github.com/monalisa/monas-cafe",
+			wantNumbers: []int{2, 5},
+		},
+		{
+			name:    "artifact URLs on different issues",
+			args:    []string{oauthPlanURL, approvedURL},
+			wantErr: "artifact URLs must all be on the same issue",
+		},
+		{
+			name:    "artifact URLs in different repositories",
+			args:    []string{oauthPlanURL, "https://github.com/monalisa/monas-menu/issues/142/artifacts/5"},
+			wantErr: "artifact URLs must all be on the same issue",
+		},
+		{
+			name:    "artifact URLs on different hosts",
+			args:    []string{oauthPlanURL, "https://monas-cafe.ghe.com/monalisa/monas-cafe/issues/142/artifacts/5"},
+			wantErr: "artifact URLs must all be on the same issue",
+		},
+		{
+			name:    "an artifact URL followed by an artifact number",
+			args:    []string{oauthPlanURL, "5"},
+			wantErr: `invalid artifact URL: "5"`,
+		},
+		{
+			name:    "an issue followed by an artifact URL",
+			args:    []string{"142", baristaURL},
+			wantErr: `invalid artifact number: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/5"`,
+		},
+		{
+			name:    "a repeated artifact number",
+			args:    []string{"142", "2", "5", "2"},
+			wantErr: "duplicate artifact number: 2",
+		},
+		{
+			name:    "a repeated artifact URL",
+			args:    []string{oauthPlanURL, baristaURL, oauthPlanURL},
+			wantErr: "duplicate artifact number: 2",
+		},
+		{
+			name:              "with issueAlone, an issue alone names every artifact on it",
+			args:              []string{"142"},
+			issueAlone:        true,
+			wantIssue:         142,
+			wantRepo:          "github.com/OWNER/REPO",
+			wantNumbers:       []int{},
+			wantBaseRepoCalls: 1,
+		},
+		{
+			name:        "with issueAlone, an issue URL alone",
+			args:        []string{"https://github.com/monalisa/monas-cafe/issues/142"},
+			issueAlone:  true,
+			wantIssue:   142,
+			wantRepo:    "github.com/monalisa/monas-cafe",
+			wantNumbers: []int{},
+		},
+		{
+			name:        "with issueAlone, an artifact URL alone",
+			args:        []string{oauthPlanURL},
+			issueAlone:  true,
+			wantIssue:   142,
+			wantRepo:    "github.com/monalisa/monas-cafe",
+			wantNumbers: []int{2},
+		},
+		{
+			name:       "with issueAlone, a lone argument that isn't an issue",
+			args:       []string{"OAuth"},
+			issueAlone: true,
+			wantErr:    `invalid issue format: "OAuth"`,
+		},
+		{
+			name:    "without issueAlone, an issue number alone names no artifact",
+			args:    []string{"142"},
+			wantErr: "artifact number or URL is required",
+		},
+		{
+			name:    "without issueAlone, an issue URL alone names no artifact",
+			args:    []string{"https://github.com/monalisa/monas-cafe/issues/142"},
+			wantErr: "artifact number or URL is required",
+		},
+		{
+			name:    "without issueAlone, a pull request URL alone names no artifact",
+			args:    []string{"https://github.com/monalisa/monas-cafe/pull/158"},
+			wantErr: "artifact number or URL is required",
+		},
+		{
+			name:    "without issueAlone, a lone argument that isn't an issue names no artifact",
+			args:    []string{"OAuth"},
+			wantErr: "artifact number or URL is required",
+		},
+		{
+			name:        "with issueAlone, an issue URL with a trailing slash",
+			args:        []string{"https://github.com/monalisa/monas-cafe/issues/142/"},
+			issueAlone:  true,
+			wantIssue:   142,
+			wantRepo:    "github.com/monalisa/monas-cafe",
+			wantNumbers: []int{},
+		},
+		{
+			name:        "an artifact URL with a trailing slash",
+			args:        []string{"https://github.com/monalisa/monas-cafe/issues/142/artifacts/2/"},
+			wantIssue:   142,
+			wantRepo:    "github.com/monalisa/monas-cafe",
+			wantNumbers: []int{2},
+		},
+		{
+			name:       "a mistyped artifact URL isn't read as its issue",
+			args:       []string{"https://github.com/monalisa/monas-cafe/issues/142/artifacts/two"},
+			issueAlone: true,
+			wantErr:    `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/two"`,
+		},
+		{
+			name:       "any URL that goes on past its issue number is read as an artifact URL",
+			args:       []string{"https://github.com/monalisa/monas-cafe/issues/142/artifact/2"},
+			issueAlone: true,
+			wantErr:    `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/142/artifact/2"`,
+		},
+		{
+			name:       "a dot segment doesn't hide an artifact URL",
+			args:       []string{"https://github.com/monalisa/monas-cafe/issues/142/./artifacts/2"},
+			issueAlone: true,
+			wantErr:    `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/142/./artifacts/2"`,
+		},
+		{
+			name:    "a pull request URL that goes on past its number",
+			args:    []string{"https://github.com/monalisa/monas-cafe/pull/158/files", "2"},
+			wantErr: `invalid artifact URL: "https://github.com/monalisa/monas-cafe/pull/158/files"`,
+		},
+		{
+			name:       "an issue's artifacts without a number",
+			args:       []string{"https://github.com/monalisa/monas-cafe/issues/142/artifacts"},
+			issueAlone: true,
+			wantErr:    `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/142/artifacts"`,
+		},
+		{
+			name:    "a path that goes on past the artifact number",
+			args:    []string{"https://github.com/monalisa/monas-cafe/issues/142/artifacts/2/edit"},
+			wantErr: `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2/edit"`,
+		},
+		{
+			name:    "artifact 0",
+			args:    []string{"https://github.com/monalisa/monas-cafe/issues/142/artifacts/0"},
+			wantErr: `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/0"`,
+		},
+		{
+			name:    "issue 0",
+			args:    []string{"https://github.com/monalisa/monas-cafe/issues/0/artifacts/2"},
+			wantErr: `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/0/artifacts/2"`,
+		},
+		{
+			name:    "an artifact on a pull request",
+			args:    []string{"https://github.com/monalisa/monas-cafe/pull/158/artifacts/1"},
+			wantErr: `invalid artifact URL: "https://github.com/monalisa/monas-cafe/pull/158/artifacts/1"`,
+		},
+		{
+			name:    "the API's URL for an artifact isn't an artifact URL, so it names no artifact",
+			args:    []string{"https://api.github.com/repos/monalisa/monas-cafe/issues/142/artifacts/2"},
+			wantErr: "artifact number or URL is required",
+		},
+		{
+			name:    "an artifact URL without a host",
+			args:    []string{"https:///monalisa/monas-cafe/issues/142/artifacts/2"},
+			wantErr: `invalid artifact URL: "https:///monalisa/monas-cafe/issues/142/artifacts/2"`,
+		},
+		{
+			name:    "an issue argument that isn't an issue",
+			args:    []string{"OAuth", "2"},
+			wantErr: `invalid issue format: "OAuth"`,
+		},
+		{
+			name:    "an artifact number that isn't a number",
+			args:    []string{"142", "2", "OAuth"},
+			wantErr: `invalid artifact number: "OAuth"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseRepoCalls := 0
+			baseRepo := func() (ghrepo.Interface, error) {
+				baseRepoCalls++
+				return ghrepo.New("OWNER", "REPO"), nil
+			}
+
+			issue, repoFunc, numbers, err := ParseArtifactArgs(tt.args, baseRepo, tt.issueAlone)
+
+			assert.Equal(t, 0, baseRepoCalls, "the base repository is resolved later, by the run function")
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantIssue, issue)
+			assert.Equal(t, tt.wantNumbers, numbers)
+			repo, err := repoFunc()
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantRepo, repo.RepoHost()+"/"+ghrepo.FullName(repo))
+			assert.Equal(t, tt.wantBaseRepoCalls, baseRepoCalls)
+		})
+	}
+}
+
+func TestParseArtifactArg(t *testing.T) {
+	const runbookURL = "https://github.com/monalisa/monas-cafe/issues/142/artifacts/3"
+
+	tests := []struct {
+		name              string
+		args              []string
+		wantIssue         int
+		wantRepo          string
+		wantNumber        int
+		wantBaseRepoCalls int
+		wantErr           string
+	}{
+		{
+			name:              "an issue and an artifact number",
+			args:              []string{"142", "3"},
+			wantIssue:         142,
+			wantRepo:          "github.com/OWNER/REPO",
+			wantNumber:        3,
+			wantBaseRepoCalls: 1,
+		},
+		{
+			name:       "an issue URL names its repository",
+			args:       []string{"https://github.com/monalisa/monas-cafe/issues/142", "3"},
+			wantIssue:  142,
+			wantRepo:   "github.com/monalisa/monas-cafe",
+			wantNumber: 3,
+		},
+		{
+			name:       "an artifact URL names its repository, issue and number",
+			args:       []string{runbookURL},
+			wantIssue:  142,
+			wantRepo:   "github.com/monalisa/monas-cafe",
+			wantNumber: 3,
+		},
+		{
+			name:       "an artifact URL on a ghe.com host",
+			args:       []string{"https://monas-cafe.ghe.com/monalisa/monas-cafe/issues/142/artifacts/3"},
+			wantIssue:  142,
+			wantRepo:   "monas-cafe.ghe.com/monalisa/monas-cafe",
+			wantNumber: 3,
+		},
+		{
+			name:    "an artifact URL followed by an artifact number",
+			args:    []string{runbookURL, "2"},
+			wantErr: `invalid artifact URL: "2"`,
+		},
+		{
+			name:    "two artifact URLs",
+			args:    []string{runbookURL, "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2"},
+			wantErr: "too many arguments",
+		},
+		{
+			name:    "two artifact URLs on different issues",
+			args:    []string{runbookURL, "https://github.com/monalisa/monas-cafe/issues/137/artifacts/1"},
+			wantErr: "too many arguments",
+		},
+		{
+			name:    "the same artifact URL twice",
+			args:    []string{runbookURL, runbookURL},
+			wantErr: "too many arguments",
+		},
+		{
+			name:    "an issue and two artifact numbers",
+			args:    []string{"142", "3", "2"},
+			wantErr: "too many arguments",
+		},
+		{
+			name:    "a mistyped artifact URL followed by an artifact number",
+			args:    []string{"https://github.com/monalisa/monas-cafe/issues/142/artifacts/three", "2"},
+			wantErr: `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/three"`,
+		},
+		{
+			name:    "an issue number alone names no artifact",
+			args:    []string{"142"},
+			wantErr: "artifact number or URL is required",
+		},
+		{
+			name:    "an issue URL alone names no artifact",
+			args:    []string{"https://github.com/monalisa/monas-cafe/issues/142"},
+			wantErr: "artifact number or URL is required",
+		},
+		{
+			name:    "a mistyped artifact URL",
+			args:    []string{"https://github.com/monalisa/monas-cafe/issues/142/artifacts/three"},
+			wantErr: `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/three"`,
+		},
+		{
+			name:    "an issue followed by an artifact URL",
+			args:    []string{"142", runbookURL},
+			wantErr: `invalid artifact number: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/3"`,
+		},
+		{
+			name:    "an issue argument that isn't an issue",
+			args:    []string{"OAuth", "3"},
+			wantErr: `invalid issue format: "OAuth"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseRepoCalls := 0
+			baseRepo := func() (ghrepo.Interface, error) {
+				baseRepoCalls++
+				return ghrepo.New("OWNER", "REPO"), nil
+			}
+
+			issue, repoFunc, number, err := ParseArtifactArg(tt.args, baseRepo)
+
+			assert.Equal(t, 0, baseRepoCalls, "the base repository is resolved later, by the run function")
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantIssue, issue)
+			assert.Equal(t, tt.wantNumber, number)
+			repo, err := repoFunc()
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantRepo, repo.RepoHost()+"/"+ghrepo.FullName(repo))
+			assert.Equal(t, tt.wantBaseRepoCalls, baseRepoCalls)
+		})
+	}
+}
+
 func TestFindVersion(t *testing.T) {
 	// Artifact 2 on the spec's issue 142 keeps its versions newest first.
 	// Version 9 renamed it.

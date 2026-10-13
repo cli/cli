@@ -46,11 +46,14 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view {<issue-number> | <issue-url>} <artifact-number>",
+		Use:   "view {<issue> <artifact-number> | <artifact-url>}",
 		Short: "View an issue artifact (preview)",
 		Long: heredoc.Docf(`
 			Display an issue artifact's name, type, authors, content, and edit history. A
 			link shows its URL.
+
+			Name the artifact by its issue and number, or by its URL. %[1]s<issue>%[1]s is an
+			issue number or URL.
 
 			By default, the current version is shown. Use %[1]s--version%[1]s to show an earlier
 			version from the edit history.
@@ -64,13 +67,16 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			# View an earlier version
 			$ gh issue artifact view 142 2 --version 5
 
+			# View an artifact by its URL
+			$ gh issue artifact view https://github.com/monalisa/monas-cafe/issues/142/artifacts/3
+
 			# Open a link artifact in the browser
 			$ gh issue artifact view 142 3 --web
 
 			# Print an artifact's body
 			$ gh issue artifact view 142 2 --json body --jq .body
 		`),
-		Args: cobra.ExactArgs(2),
+		Args: cmdutil.RangeArgs(1, 2, shared.MissingArtifactMessage),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			versionSet := cmd.Flags().Changed("version")
 			if err := cmdutil.MutuallyExclusive("specify only one of `--version` or `--json`", versionSet, opts.Exporter != nil); err != nil {
@@ -84,11 +90,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			}
 
 			var err error
-			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
-			if err != nil {
-				return cmdutil.FlagErrorWrap(err)
-			}
-			opts.ArtifactNumber, err = shared.ParseArtifactNumber(args[1])
+			opts.IssueNumber, opts.BaseRepo, opts.ArtifactNumber, err = shared.ParseArtifactArg(args, f.BaseRepo)
 			if err != nil {
 				return cmdutil.FlagErrorWrap(err)
 			}

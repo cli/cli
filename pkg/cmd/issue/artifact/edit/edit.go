@@ -57,11 +57,14 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 	}
 
 	cmd := &cobra.Command{
-		Use:   "edit {<issue-number> | <issue-url>} <artifact-number>",
+		Use:   "edit {<issue> <artifact-number> | <artifact-url>}",
 		Short: "Edit an issue artifact (preview)",
 		Long: heredoc.Docf(`
 			Rename an issue artifact or replace its content. The type never changes, so a
 			link's new content must be an http(s) URL or a %[1]s.url%[1]s Internet Shortcut file.
+
+			Name the artifact by its issue and number, or by its URL. %[1]s<issue>%[1]s is an
+			issue number or URL.
 
 			With only %[1]s--attach%[1]s, the attachments are appended to the current content.
 
@@ -84,14 +87,10 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			# Restore an earlier version
 			$ gh issue artifact edit 142 2 --restore-version 5
 		`),
-		Args: cobra.ExactArgs(2),
+		Args: cmdutil.RangeArgs(1, 2, shared.MissingArtifactMessage),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
-			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
-			if err != nil {
-				return cmdutil.FlagErrorWrap(err)
-			}
-			opts.ArtifactNumber, err = shared.ParseArtifactNumber(args[1])
+			opts.IssueNumber, opts.BaseRepo, opts.ArtifactNumber, err = shared.ParseArtifactArg(args, f.BaseRepo)
 			if err != nil {
 				return cmdutil.FlagErrorWrap(err)
 			}

@@ -41,10 +41,13 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "delete {<issue-number> | <issue-url>} <artifact-number>...",
+		Use:   "delete {<issue> <artifact-number>... | <artifact-url>...}",
 		Short: "Delete issue artifacts (preview)",
 		Long: heredoc.Docf(`
 			Delete artifacts from an issue. A deleted artifact can't be restored.
+
+			Name artifacts by their issue and numbers, or by their URLs, which must all be
+			on one issue. %[1]s<issue>%[1]s is an issue number or URL.
 
 			In a terminal, deletion requires confirmation. %[1]s--yes%[1]s skips the prompt and is
 			required when prompting is unavailable.
@@ -56,23 +59,12 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			# Delete two artifacts without a prompt
 			$ gh issue artifact delete 142 2 5 --yes
 		`),
-		Args: cobra.MinimumNArgs(2),
+		Args: cmdutil.MinimumArgs(1, shared.MissingArtifactMessage),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
-			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
+			opts.IssueNumber, opts.BaseRepo, opts.ArtifactNumbers, err = shared.ParseArtifactArgs(args, f.BaseRepo, false)
 			if err != nil {
 				return cmdutil.FlagErrorWrap(err)
-			}
-			opts.ArtifactNumbers = make([]int, 0, len(args)-1)
-			for _, arg := range args[1:] {
-				number, err := shared.ParseArtifactNumber(arg)
-				if err != nil {
-					return cmdutil.FlagErrorWrap(err)
-				}
-				if slices.Contains(opts.ArtifactNumbers, number) {
-					return cmdutil.FlagErrorf("duplicate artifact number: %d", number)
-				}
-				opts.ArtifactNumbers = append(opts.ArtifactNumbers, number)
 			}
 
 			if !opts.IO.CanPrompt() && !opts.Confirmed {

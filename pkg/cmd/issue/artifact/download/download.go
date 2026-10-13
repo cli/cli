@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -54,11 +53,12 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Use:   "download {<issue-number> | <issue-url>} [<artifact-number>...]",
+		Use:   "download {<issue> [<artifact-number>...] | <artifact-url>...}",
 		Short: "Download issue artifacts (preview)",
 		Long: heredoc.Docf(`
 			Download issue artifacts to files. Without artifact numbers, every artifact
-			on the issue is downloaded.
+			on the issue is downloaded. Artifacts can also be named by their URLs, which
+			must all be on one issue. %[1]s<issue>%[1]s is an issue number or URL.
 
 			Each file is named %[1]s<number>-<name>%[1]s. Documents end in %[1]s.md%[1]s, and links are
 			saved as %[1]s.url%[1]s Internet Shortcut files. If a file already exists, that
@@ -107,20 +107,10 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			}
 
 			var err error
-			opts.IssueNumber, opts.BaseRepo, err = shared.ParseIssueArg(args[0], f.BaseRepo)
+			// An issue alone downloads every artifact on it.
+			opts.IssueNumber, opts.BaseRepo, opts.ArtifactNumbers, err = shared.ParseArtifactArgs(args, f.BaseRepo, true)
 			if err != nil {
 				return cmdutil.FlagErrorWrap(err)
-			}
-			opts.ArtifactNumbers = make([]int, 0, len(args)-1)
-			for _, arg := range args[1:] {
-				number, err := shared.ParseArtifactNumber(arg)
-				if err != nil {
-					return cmdutil.FlagErrorWrap(err)
-				}
-				if slices.Contains(opts.ArtifactNumbers, number) {
-					return cmdutil.FlagErrorf("duplicate artifact number: %d", number)
-				}
-				opts.ArtifactNumbers = append(opts.ArtifactNumbers, number)
 			}
 
 			// One path holds one file, and each artifact numbers its own

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -56,6 +57,146 @@ func ParseArtifactNumber(arg string) (int, error) {
 		return 0, fmt.Errorf("invalid artifact number: %q", arg)
 	}
 	return number, nil
+}
+
+// MissingArtifactMessage is the usage error for a command that needs an
+// artifact when none is named: no arguments, or a lone argument that isn't an
+// artifact URL, such as an issue alone. It's worded like gh issue develop's
+// "issue number or url is required".
+const MissingArtifactMessage = "artifact number or URL is required"
+
+// ParseArtifactArgs reads the arguments of a command that names artifacts in
+// either of two forms, {<issue> <artifact-number>... | <artifact-url>...}, and
+// returns the issue number, the function that resolves its repository, and
+// the artifact numbers in argument order. args must not be empty, which the
+// command's Args check ensures.
+//
+// The first argument decides the form. When it's an artifact URL, every
+// argument must be one, all on the same issue, since the command's results
+// name one issue. An artifact URL names its own repository, like an issue URL
+// in ParseIssueArg, and any URL that goes on past its issue number is read as
+// one. Otherwise, the first argument is the issue, read by ParseIssueArg, and
+// the rest are artifact numbers. Either way, a repeated number is an error,
+// since a second request for it could only fail or repeat the first.
+//
+// With issueAlone, a lone issue argument names every artifact on it, and the
+// numbers are empty. Without it, a lone argument that isn't an artifact URL
+// names no artifact, which fails with MissingArtifactMessage.
+func ParseArtifactArgs(args []string, baseRepo func() (ghrepo.Interface, error), issueAlone bool) (int, func() (ghrepo.Interface, error), []int, error) {
+	if isArtifactURL(args[0]) {
+		return parseArtifactURLs(args)
+	}
+	if len(args) == 1 && !issueAlone {
+		return 0, nil, nil, errors.New(MissingArtifactMessage)
+	}
+
+	issueNumber, repo, err := ParseIssueArg(args[0], baseRepo)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	numbers := make([]int, 0, len(args)-1)
+	for _, arg := range args[1:] {
+		number, err := ParseArtifactNumber(arg)
+		if err != nil {
+			return 0, nil, nil, err
+		}
+		if numbers, err = appendNew(numbers, number); err != nil {
+			return 0, nil, nil, err
+		}
+	}
+	return issueNumber, repo, numbers, nil
+}
+
+// ParseArtifactArg is ParseArtifactArgs for a command that takes one
+// artifact, {<issue> <artifact-number> | <artifact-url>}. A second artifact
+// URL is always one too many, so it's refused before the URLs' issues and
+// numbers are compared.
+func ParseArtifactArg(args []string, baseRepo func() (ghrepo.Interface, error)) (int, func() (ghrepo.Interface, error), int, error) {
+	if len(args) > 1 && isArtifactURL(args[0]) && isArtifactURL(args[1]) {
+		return 0, nil, 0, errors.New("too many arguments")
+	}
+	issueNumber, repo, numbers, err := ParseArtifactArgs(args, baseRepo, false)
+	if err != nil {
+		return 0, nil, 0, err
+	}
+	if len(numbers) != 1 {
+		return 0, nil, 0, errors.New("too many arguments")
+	}
+	return issueNumber, repo, numbers[0], nil
+}
+
+// artifactURLPath matches the path of an artifact's page on GitHub, the URL
+// the API returns for it: /<owner>/<repo>/issues/<issue>/artifacts/<number>.
+var artifactURLPath = regexp.MustCompile(`^/([^/]+)/([^/]+)/issues/(\d+)/artifacts/(\d+)/?$`)
+
+// pastIssuePath matches a path that goes on past its issue or pull request
+// number. ParseIssueArg reads such a URL as its issue, but here it can only be
+// meant as an artifact URL, so a mistyped one fails instead of naming its
+// whole issue.
+var pastIssuePath = regexp.MustCompile(`^/[^/]+/[^/]+/(?:issues|pull)/[^/]+/.`)
+
+// isArtifactURL reports whether arg is meant as an artifact URL: an http(s)
+// URL whose path goes on past its issue number. parseArtifactURL decides
+// whether it's a valid one.
+func isArtifactURL(arg string) bool {
+	u, err := url.Parse(arg)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && pastIssuePath.MatchString(u.Path)
+}
+
+// parseArtifactURLs reads every argument as an artifact URL on the same
+// issue.
+func parseArtifactURLs(args []string) (int, func() (ghrepo.Interface, error), []int, error) {
+	var repo ghrepo.Interface
+	var issueNumber int
+	numbers := make([]int, 0, len(args))
+	for _, arg := range args {
+		r, issue, number, err := parseArtifactURL(arg)
+		if err != nil {
+			return 0, nil, nil, err
+		}
+		if repo == nil {
+			repo, issueNumber = r, issue
+		} else if issue != issueNumber || !ghrepo.IsSame(r, repo) {
+			return 0, nil, nil, errors.New("artifact URLs must all be on the same issue")
+		}
+		if numbers, err = appendNew(numbers, number); err != nil {
+			return 0, nil, nil, err
+		}
+	}
+	return issueNumber, func() (ghrepo.Interface, error) { return repo, nil }, numbers, nil
+}
+
+// parseArtifactURL reads an artifact URL into its repository, issue number
+// and artifact number. Like an issue URL, it may be http, and its query and
+// fragment are ignored: only those three are read from it, and requests go to
+// the API.
+func parseArtifactURL(arg string) (ghrepo.Interface, int, int, error) {
+	invalid := fmt.Errorf("invalid artifact URL: %q", arg)
+	u, err := url.Parse(arg)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		return nil, 0, 0, invalid
+	}
+	m := artifactURLPath.FindStringSubmatch(u.Path)
+	if m == nil {
+		return nil, 0, 0, invalid
+	}
+	issueNumber, err := strconv.Atoi(m[3])
+	if err != nil || issueNumber < 1 {
+		return nil, 0, 0, invalid
+	}
+	number, err := strconv.Atoi(m[4])
+	if err != nil || number < 1 {
+		return nil, 0, 0, invalid
+	}
+	return ghrepo.NewWithHost(m[1], m[2], u.Hostname()), issueNumber, number, nil
+}
+
+// appendNew appends number to numbers, refusing a number already there.
+func appendNew(numbers []int, number int) ([]int, error) {
+	if slices.Contains(numbers, number) {
+		return nil, fmt.Errorf("duplicate artifact number: %d", number)
+	}
+	return append(numbers, number), nil
 }
 
 // FindVersion returns the version numbered number from an artifact's edit

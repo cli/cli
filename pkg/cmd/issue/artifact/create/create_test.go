@@ -746,7 +746,7 @@ func TestCreateRun(t *testing.T) {
 			name:    "a URL that isn't a strict http(s) URL fails before any request",
 			opts:    CreateOptions{Sources: []source{{kind: fromURL, arg: "https://ラテ.example/menu"}}},
 			tty:     true,
-			wantErr: "invalid artifact URL \"https://ラテ.example/menu\": must be an http(s) URL with a host, in printable ASCII with no spaces",
+			wantErr: "invalid link URL \"https://ラテ.example/menu\": must be an http(s) URL with a host, in printable ASCII with no spaces",
 		},
 		{
 			name:  "a .url file",

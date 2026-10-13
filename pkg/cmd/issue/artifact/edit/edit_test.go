@@ -202,9 +202,74 @@ func TestNewCmdEdit(t *testing.T) {
 			wantRepo: "monalisa/monas-cafe",
 		},
 		{
-			name:    "no artifact number",
-			args:    "142 --name 'OAuth callback plan v2'",
-			wantErr: "accepts 2 arg(s), received 1",
+			name: "an artifact URL names the repository, issue and number",
+			args: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2 --name 'OAuth callback plan v2'",
+			wantOpts: EditOptions{
+				IssueNumber:    142,
+				ArtifactNumber: 2,
+				Name:           new("OAuth callback plan v2"),
+			},
+			wantRepo: "monalisa/monas-cafe",
+		},
+		{
+			name:   "an artifact URL names the repository over GH_REPO",
+			args:   "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2 --restore-version 5",
+			ghRepo: "monalisa/monas-menu",
+			wantOpts: EditOptions{
+				IssueNumber:    142,
+				ArtifactNumber: 2,
+				RestoreVersion: 5,
+			},
+			wantRepo: "monalisa/monas-cafe",
+		},
+		{
+			name:        "an issue number alone names no artifact",
+			args:        "142 --name 'OAuth callback plan v2'",
+			wantErr:     "artifact number or URL is required",
+			wantFlagErr: true,
+		},
+		{
+			name:        "an issue URL alone names no artifact",
+			args:        "https://github.com/monalisa/monas-cafe/issues/142 --name 'OAuth callback plan v2'",
+			wantErr:     "artifact number or URL is required",
+			wantFlagErr: true,
+		},
+		{
+			name:        "no arguments",
+			args:        "--name 'OAuth callback plan v2'",
+			wantErr:     "artifact number or URL is required",
+			wantFlagErr: true,
+		},
+		{
+			name:        "no arguments and no flags",
+			args:        "",
+			wantErr:     "artifact number or URL is required",
+			wantFlagErr: true,
+		},
+		{
+			name:        "three arguments",
+			args:        "142 2 3 --name 'OAuth callback plan v2'",
+			wantErr:     "too many arguments",
+			wantFlagErr: true,
+		},
+		{
+			name:        "an artifact URL with an artifact number",
+			args:        "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2 5 --name 'OAuth callback plan v2'",
+			wantErr:     `invalid artifact URL: "5"`,
+			wantFlagErr: true,
+		},
+		{
+			name: "two artifact URLs, even on different issues",
+			args: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2 " +
+				"https://github.com/monalisa/monas-cafe/issues/137/artifacts/1 --name 'OAuth callback plan v2'",
+			wantErr:     "too many arguments",
+			wantFlagErr: true,
+		},
+		{
+			name:        "a malformed artifact URL fails before the flags are checked",
+			args:        "https://github.com/monalisa/monas-cafe/issues/142/artifacts/0",
+			wantErr:     `invalid artifact URL: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/0"`,
+			wantFlagErr: true,
 		},
 		{
 			name:        "an artifact number that isn't a number",

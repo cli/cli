@@ -367,7 +367,7 @@ func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, e
 	case fromURL:
 		u, ok := shared.HTTPURL(s.arg)
 		if !ok {
-			return a, fmt.Errorf("invalid artifact URL %q: must be an http(s) URL with a host, in printable ASCII with no spaces", s.arg)
+			return a, fmt.Errorf("invalid link URL %q: must be an http(s) URL with a host, in printable ASCII with no spaces", s.arg)
 		}
 		a.artifactType, a.body = client.TypeLink, u
 		if a.name == "" {
