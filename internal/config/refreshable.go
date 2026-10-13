@@ -48,12 +48,13 @@ func flockRefreshLock(ctx context.Context, path string) (unlock func(), err erro
 	return unlock, err
 }
 
-// withFreshConfigForRefresh runs fn, a token-refresh read-modify-write, while holding both an in-process mutex and a
-// cross-process advisory lock, and reloads the configuration from disk before running fn so it observes any credential
-// another process persisted. The mutex serializes goroutines sharing this AuthConfig; the file lock serializes
-// separate gh processes. Together they prevent concurrent refreshes from each spending a rotating refresh token based
-// on stale state. fn runs with both locks held and should perform the credential read, token exchange, and write as
-// one unit.
+// withFreshConfigForRefresh runs fn, a credential-store read-modify-write (a token refresh, or a logout that must not
+// race one), while holding both an in-process mutex and a cross-process advisory lock, and reloads the configuration
+// from disk before running fn so it observes any credential another process persisted. The mutex serializes goroutines
+// sharing this AuthConfig; the file lock serializes separate gh processes. Together they prevent concurrent refreshes
+// from each spending a rotating refresh token based on stale state, and ensure logout cannot be overwritten by a
+// refresh that finishes after it. fn runs with both locks held and should perform the credential read and write as one
+// unit.
 //
 // The file lock is best effort: if it cannot be acquired (for example on a filesystem without advisory locking, or if
 // another process holds it past refreshLockTimeout), fn still runs so a filesystem limitation never blocks the user.

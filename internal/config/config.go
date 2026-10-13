@@ -556,40 +556,44 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
 func (c *AuthConfig) Logout(hostname, username string) error {
-	users := c.UsersForHost(hostname)
+	// Run under the shared refresh lock so logout wins any race with an in-flight refresh: a concurrent refresh
+	// cannot persist a rotated credential after logout has removed the account and reported success.
+	return c.withFreshConfigForRefresh(func() error {
+		users := c.UsersForHost(hostname)
 
-	// The user's per-user keyring records are not covered by removing config keys, so delete them explicitly.
-	// Historically the per-user token was only removed in the single-user branch, leaking it when logging out of a
-	// multi-user host.
-	_ = keyring.Delete(refreshableServiceName(hostname), username)
-	_ = keyring.Delete(keyringServiceName(hostname), username)
+		// The user's per-user keyring records are not covered by removing config keys, so delete them explicitly.
+		// Historically the per-user token was only removed in the single-user branch, leaking it when logging out of a
+		// multi-user host.
+		_ = keyring.Delete(refreshableServiceName(hostname), username)
+		_ = keyring.Delete(keyringServiceName(hostname), username)
 
-	// If there is only one (or zero) users, then we remove the host
-	// and unset the keyring tokens.
-	if len(users) < 2 {
-		_ = c.cfg.Remove([]string{hostsKey, hostname})
-		_ = keyring.Delete(keyringServiceName(hostname), "")
-		return ghConfig.Write(c.cfg)
-	}
+		// If there is only one (or zero) users, then we remove the host
+		// and unset the keyring tokens.
+		if len(users) < 2 {
+			_ = c.cfg.Remove([]string{hostsKey, hostname})
+			_ = keyring.Delete(keyringServiceName(hostname), "")
+			return ghConfig.Write(c.cfg)
+		}
 
-	// Otherwise, we remove the user from this host
-	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
+		// Otherwise, we remove the user from this host
+		_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
 
-	// This error is ignorable because we already know there is an active user for the host
-	activeUser, _ := c.ActiveUser(hostname)
+		// This error is ignorable because we already know there is an active user for the host
+		activeUser, _ := c.ActiveUser(hostname)
 
-	// If the user we're removing isn't active, then we just write the config
-	if activeUser != username {
-		return ghConfig.Write(c.cfg)
-	}
+		// If the user we're removing isn't active, then we just write the config
+		if activeUser != username {
+			return ghConfig.Write(c.cfg)
+		}
 
-	// Otherwise we get the first user in the slice that isn't the user we're removing
-	switchUserIdx := slices.IndexFunc(users, func(n string) bool {
-		return n != username
+		// Otherwise we get the first user in the slice that isn't the user we're removing
+		switchUserIdx := slices.IndexFunc(users, func(n string) bool {
+			return n != username
+		})
+
+		// And activate them
+		return c.activateUser(hostname, users[switchUserIdx])
 	})
-
-	// And activate them
-	return c.activateUser(hostname, users[switchUserIdx])
 }
 
 func (c *AuthConfig) activateUser(hostname, user string) error {
