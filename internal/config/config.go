@@ -558,7 +558,7 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 func (c *AuthConfig) Logout(hostname, username string) error {
 	// Run under the shared refresh lock so logout wins any race with an in-flight refresh: a concurrent refresh
 	// cannot persist a rotated credential after logout has removed the account and reported success.
-	return c.withFreshConfigForRefresh(func() error {
+	return c.withFreshConfigForRefresh(func(lockHeld bool) error {
 		users := c.UsersForHost(hostname)
 
 		// The user's per-user keyring records are not covered by removing config keys, so delete them explicitly.
