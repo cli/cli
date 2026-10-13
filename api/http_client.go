@@ -17,14 +17,14 @@ import (
 )
 
 // config is the token source used to authenticate requests. It uses primitive types so packages outside
-// github.com/cli/cli/v2 can implement it. It is the public, backward-compatible seam and does not support refreshing a
-// short-lived token.
+// github.com/cli/cli/v2 can implement it. It is the public, backward-compatible seam and does not support refreshing an
+// expiring token.
 type config interface {
 	ActiveToken(string) (string, string)
 	HostForAPIHost(string) (string, bool)
 }
 
-// refreshingConfig is a refresh-aware token source. It can renew a near-expiry short-lived token before a request and
+// refreshingConfig is a refresh-aware token source. It can renew a near-expiry token before a request and
 // is implemented by gh's own configuration. It references the public auth credential types rather than primitive
 // strings so the resolved token and its refresh metadata travel together.
 type refreshingConfig interface {
@@ -41,7 +41,7 @@ type HTTPClientOptions struct {
 	// with no refresh.
 	Config config
 	// RefreshingConfig is the refresh-aware token source gh supplies for its own clients. Provide either Config or
-	// RefreshingConfig, never both; NewHTTPClient returns an error if both are set. When set, a near-expiry short-lived
+	// RefreshingConfig, never both; NewHTTPClient returns an error if both are set. When set, a near-expiry
 	// token is refreshed on demand before each request.
 	RefreshingConfig refreshingConfig
 	EnableCache      bool
@@ -201,7 +201,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
 }
 
 // AddAuthTokenHeaderWithRefresh is the refresh-aware counterpart of AddAuthTokenHeader. It renews a near-expiry
-// short-lived token before attaching it, and is the attach helper gh's own code uses so its requests go through the
+// token before attaching it, and is the attach helper gh's own code uses so its requests go through the
 // refresh path rather than the backward-compatible primitive seam.
 func AddAuthTokenHeaderWithRefresh(rt http.RoundTripper, cfg refreshingConfig) http.RoundTripper {
 	return addAuthHeaderRoundTripper(rt, func(host string) string {

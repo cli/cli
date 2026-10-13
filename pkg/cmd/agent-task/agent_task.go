@@ -88,7 +88,7 @@ func requireOAuthToken(f *cmdutil.Factory) error {
 	cred := authCfg.ActiveToken(host)
 
 	// Tokens from sources "oauth_token", "keyring", and "refreshable_oauth_token" are
-	// likely minted through our device flow. The refreshable source covers a short-lived
+	// likely minted through our device flow. The refreshable source covers an expiring
 	// login whose credential fell back to plaintext config; without it, such a login would
 	// be rejected here before the CAPI refresh path can run.
 	tokenSourceIsDeviceFlow := cred.Source == gh.TokenSourceOAuthToken ||

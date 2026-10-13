@@ -47,12 +47,12 @@ func Test_NewCmdRefresh(t *testing.T) {
 			},
 		},
 		{
-			name: "tty short-lived",
+			name: "tty expiring",
 			tty:  true,
-			cli:  "--short-lived",
+			cli:  "--expiring",
 			wants: RefreshOptions{
-				Hostname:   "",
-				ShortLived: true,
+				Hostname: "",
+				Expiring: true,
 			},
 		},
 		{
@@ -215,7 +215,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			require.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
 			require.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
 			require.Equal(t, tt.wants.Clipboard, gotOpts.Clipboard)
-			require.Equal(t, tt.wants.ShortLived, gotOpts.ShortLived)
+			require.Equal(t, tt.wants.Expiring, gotOpts.Expiring)
 		})
 	}
 }
@@ -226,7 +226,7 @@ type authArgs struct {
 	interactive   bool
 	clipboard     bool
 	secureStorage bool
-	shortLived    bool
+	expiring      bool
 }
 type authOut struct {
 	username    string
@@ -532,13 +532,13 @@ func Test_refreshRun(t *testing.T) {
 			},
 		},
 		{
-			name: "short-lived requested, host issues a refreshable credential",
+			name: "expiring requested, host issues a refreshable credential",
 			cfgHosts: []string{
 				"github.com",
 			},
 			opts: &RefreshOptions{
-				Hostname:   "github.com",
-				ShortLived: true,
+				Hostname: "github.com",
+				Expiring: true,
 			},
 			authOut: authOut{
 				username:    "test-user",
@@ -550,13 +550,13 @@ func Test_refreshRun(t *testing.T) {
 				scopes:        []string{},
 				secureStorage: true,
 				clipboard:     true,
-				shortLived:    true,
+				expiring:      true,
 			},
 			wantStoredToken:        "gho_access",
 			wantStoredRefreshToken: "ghr_refresh",
 		},
 		{
-			name: "existing refreshable credential without --short-lived warns about downgrade",
+			name: "existing refreshable credential without --expiring warns about downgrade",
 			cfgHosts: []string{
 				"github.com",
 			},
@@ -567,11 +567,11 @@ func Test_refreshRun(t *testing.T) {
 				scopes:        []string{},
 				secureStorage: true,
 				clipboard:     true,
-				shortLived:    false,
+				expiring:      false,
 			},
 			wantStoredToken:        "xyz456",
 			wantStoredRefreshToken: "",
-			wantStderrContains:     "Original token was short-lived; pass --short-lived to preserve it\n",
+			wantStderrContains:     "Original token was expiring; pass --expiring to preserve it\n",
 		},
 		{
 			name: "expired refreshable token is refreshed so its scopes are preserved",
@@ -587,7 +587,7 @@ func Test_refreshRun(t *testing.T) {
 				scopes:        []string{"repo", "read:org"},
 				secureStorage: true,
 				clipboard:     true,
-				shortLived:    false,
+				expiring:      false,
 			},
 			wantStoredToken:        "xyz456",
 			wantStoredRefreshToken: "",
@@ -605,7 +605,7 @@ func Test_refreshRun(t *testing.T) {
 				scopes:        []string{},
 				secureStorage: true,
 				clipboard:     true,
-				shortLived:    false,
+				expiring:      false,
 			},
 			wantStoredToken:        "xyz456",
 			wantStoredRefreshToken: "",
@@ -632,7 +632,7 @@ func Test_refreshRun(t *testing.T) {
 				aa.scopes = scopes
 				aa.interactive = interactive
 				aa.clipboard = clipboard
-				aa.shortLived = requestRefreshToken
+				aa.expiring = requestRefreshToken
 				if tt.authOut != (authOut{}) {
 					if tt.authOut.err != nil {
 						return nil, tt.authOut.err
@@ -719,7 +719,7 @@ func Test_refreshRun(t *testing.T) {
 			require.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
 			require.Equal(t, tt.wantAuthArgs.interactive, aa.interactive)
 			require.Equal(t, tt.wantAuthArgs.clipboard, aa.clipboard)
-			require.Equal(t, tt.wantAuthArgs.shortLived, aa.shortLived)
+			require.Equal(t, tt.wantAuthArgs.expiring, aa.expiring)
 
 			authCfg := cfg.Authentication()
 			activeUser, _ := authCfg.ActiveUser(aa.hostname)

@@ -525,7 +525,7 @@ func TestLoginRefreshablePurgesNonExpiringLogin(t *testing.T) {
 func TestLoginPurgesRefreshableRecord(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
-	// A prior short-lived login stores a refreshable credential in the keyring.
+	// A prior expiring login stores a refreshable credential in the keyring.
 	credential := gh.Credential{Token: "access", RefreshToken: "refresh"}
 	_, err := authCfg.LoginRefreshable("github.com", "test-user", credential, "ssh", true)
 	require.NoError(t, err)
