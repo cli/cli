@@ -338,6 +338,7 @@ func Test_loginRun_nontty(t *testing.T) {
 		env                     map[string]string
 		httpStubs               func(*httpmock.Registry)
 		cfgStubs                func(*testing.T, gh.Config)
+		preferExpiringCfg       string
 		wantRequestRefreshToken *bool
 		wantHosts               string
 		wantErr                 string
@@ -542,6 +543,22 @@ func Test_loginRun_nontty(t *testing.T) {
 			wantStderr:      "✓ Authentication complete.\n✓ Logged in as monalisa\n",
 			wantSecureToken: "xyz456",
 		},
+		{
+			name: "unset --expiring with prefer_expiring_credentials enabled requests a refresh token",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+			},
+			preferExpiringCfg:       "enabled",
+			wantRequestRefreshToken: new(true),
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                    user: monalisa
+            `),
+			wantStderr:      "✓ Authentication complete.\n! Host did not issue an expiring refreshable token\n✓ Logged in as monalisa\n",
+			wantSecureToken: "xyz456",
+		},
 	}
 
 	for _, tt := range tests {
@@ -554,6 +571,9 @@ func Test_loginRun_nontty(t *testing.T) {
 			cfg, readConfigs := config.NewIsolatedTestConfig(t, "")
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
+			}
+			if tt.preferExpiringCfg != "" {
+				cfg.Set("", "prefer_expiring_credentials", tt.preferExpiringCfg)
 			}
 			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
