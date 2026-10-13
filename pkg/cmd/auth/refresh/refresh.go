@@ -35,7 +35,7 @@ type RefreshOptions struct {
 
 	Interactive     bool
 	InsecureStorage bool
-	Expiring        bool
+	Expiring        *bool
 	Clipboard       *bool
 }
 
@@ -77,6 +77,9 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			This is a preference, not a guarantee: whether expiring tokens are issued depends on the
 			host and the OAuth app configuration. A host without support issues a non-expiring token
 			instead, and a host configured for them may issue expiring tokens even without the flag.
+			Enable the %[1]sprefer_expiring_credentials%[1]s configuration to prefer expiring credentials
+			without passing %[1]s--expiring%[1]s every time, and pass %[1]s--expiring=false%[1]s to request a
+			non-expiring token even when that configuration is enabled.
 			When using expiring credentials for git operations, git 2.46 or newer is recommended so
 			gh can mark the token as non-cacheable; with older git a credential caching helper may store
 			and reuse an expired token.
@@ -126,7 +129,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	_ = cmd.Flags().MarkHidden("secure-storage")
 
 	cmd.Flags().BoolVarP(&opts.InsecureStorage, "insecure-storage", "", false, "Save authentication credentials in plain text instead of credential store")
-	cmd.Flags().BoolVar(&opts.Expiring, "expiring", false, "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
+	cmdutil.NilBoolFlag(cmd, &opts.Expiring, "expiring", "", "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
 
 	return cmd
 }
@@ -164,6 +167,8 @@ func refreshRun(opts *RefreshOptions) error {
 		return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
 	}
 
+	expiring := shared.ShouldPreferExpiring(cfg, opts.Expiring, hostname)
+
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
 		fmt.Fprint(opts.IO.ErrOut, "To refresh credentials stored in GitHub CLI, first clear the value from the environment.\n")
@@ -176,7 +181,7 @@ func refreshRun(opts *RefreshOptions) error {
 	// and browser prompts) so the user can abort rather than discover only afterwards that refreshing without
 	// --expiring downgrades it to a non-expiring token.
 	wasRefreshable := authCfg.ActiveToken(hostname).IsRefreshable()
-	if wasRefreshable && !opts.Expiring {
+	if wasRefreshable && !expiring {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was expiring; pass --expiring to preserve it\n", cs.WarningIcon())
 	}
 
@@ -231,7 +236,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	result, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, copyToClipboard, opts.Expiring)
+	result, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, copyToClipboard, expiring)
 	if err != nil {
 		return err
 	}
@@ -256,11 +261,11 @@ func refreshRun(opts *RefreshOptions) error {
 	// The wasRefreshable downgrade is intentionally not reported here: it is already warned about up front (before the
 	// browser prompt) so the user can abort, and repeating it after completion is redundant.
 	switch {
-	case result.Refreshable != nil && !opts.Expiring:
+	case result.Refreshable != nil && !expiring:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues expiring refreshable token\n", cs.WarningIcon())
 	case result.Refreshable != nil:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Received expiring refreshable token\n", cs.SuccessIcon())
-	case opts.Expiring:
+	case expiring:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue an expiring refreshable token\n", cs.WarningIcon())
 	}
 

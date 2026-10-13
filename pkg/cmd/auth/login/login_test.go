@@ -10,6 +10,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/authflow"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -156,6 +158,22 @@ func Test_NewCmdLogin(t *testing.T) {
 				Hostname:  "github.com",
 				Web:       true,
 				Clipboard: new(false),
+			},
+		},
+		{
+			name: "nontty expiring",
+			cli:  "--expiring",
+			wants: LoginOptions{
+				Hostname: "github.com",
+				Expiring: new(true),
+			},
+		},
+		{
+			name: "nontty expiring disabled",
+			cli:  "--expiring=false",
+			wants: LoginOptions{
+				Hostname: "github.com",
+				Expiring: new(false),
 			},
 		},
 		{
@@ -308,21 +326,24 @@ func Test_NewCmdLogin(t *testing.T) {
 			assert.Equal(t, tt.wants.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
 			assert.Equal(t, tt.wants.Clipboard, gotOpts.Clipboard)
+			assert.Equal(t, tt.wants.Expiring, gotOpts.Expiring)
 		})
 	}
 }
 
 func Test_loginRun_nontty(t *testing.T) {
 	tests := []struct {
-		name            string
-		opts            *LoginOptions
-		env             map[string]string
-		httpStubs       func(*httpmock.Registry)
-		cfgStubs        func(*testing.T, gh.Config)
-		wantHosts       string
-		wantErr         string
-		wantStderr      string
-		wantSecureToken string
+		name                    string
+		opts                    *LoginOptions
+		env                     map[string]string
+		httpStubs               func(*httpmock.Registry)
+		cfgStubs                func(*testing.T, gh.Config)
+		preferExpiringCfg       string
+		wantRequestRefreshToken *bool
+		wantHosts               string
+		wantErr                 string
+		wantStderr              string
+		wantSecureToken         string
 	}{
 		{
 			name: "insecure with token",
@@ -475,6 +496,69 @@ func Test_loginRun_nontty(t *testing.T) {
             `),
 			wantSecureToken: "newUserToken",
 		},
+		{
+			name: "explicit --expiring requests a refresh token via the web flow",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Expiring: new(true),
+			},
+			wantRequestRefreshToken: new(true),
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                    user: monalisa
+            `),
+			wantStderr:      "✓ Authentication complete.\n! Host did not issue an expiring refreshable token\n✓ Logged in as monalisa\n",
+			wantSecureToken: "xyz456",
+		},
+		{
+			name: "explicit --expiring=false does not request a refresh token",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Expiring: new(false),
+			},
+			wantRequestRefreshToken: new(false),
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                    user: monalisa
+            `),
+			wantStderr:      "✓ Authentication complete.\n✓ Logged in as monalisa\n",
+			wantSecureToken: "xyz456",
+		},
+		{
+			name: "unset --expiring without config does not request a refresh token",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+			},
+			wantRequestRefreshToken: new(false),
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                    user: monalisa
+            `),
+			wantStderr:      "✓ Authentication complete.\n✓ Logged in as monalisa\n",
+			wantSecureToken: "xyz456",
+		},
+		{
+			name: "unset --expiring with prefer_expiring_credentials enabled requests a refresh token",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+			},
+			preferExpiringCfg:       "enabled",
+			wantRequestRefreshToken: new(true),
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                    user: monalisa
+            `),
+			wantStderr:      "✓ Authentication complete.\n! Host did not issue an expiring refreshable token\n✓ Logged in as monalisa\n",
+			wantSecureToken: "xyz456",
+		},
 	}
 
 	for _, tt := range tests {
@@ -488,8 +572,19 @@ func Test_loginRun_nontty(t *testing.T) {
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
+			if tt.preferExpiringCfg != "" {
+				cfg.Set("", "prefer_expiring_credentials", tt.preferExpiringCfg)
+			}
 			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
+			}
+
+			var gotRequestRefreshToken *bool
+			if tt.wantRequestRefreshToken != nil {
+				tt.opts.AuthFlow = func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
+					gotRequestRefreshToken = &requestRefreshToken
+					return &authflow.AuthResult{Token: "xyz456", Username: "monalisa"}, nil
+				}
 			}
 
 			reg := &httpmock.Registry{}
@@ -516,6 +611,11 @@ func Test_loginRun_nontty(t *testing.T) {
 				assert.EqualError(t, err, tt.wantErr)
 			} else {
 				assert.NoError(t, err)
+			}
+
+			if tt.wantRequestRefreshToken != nil {
+				require.NotNil(t, gotRequestRefreshToken, "expected the auth flow to be invoked")
+				assert.Equal(t, *tt.wantRequestRefreshToken, *gotRequestRefreshToken)
 			}
 
 			mainBuf := bytes.Buffer{}
