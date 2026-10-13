@@ -56,10 +56,12 @@ func flockRefreshLock(ctx context.Context, path string) (unlock func(), err erro
 // refresh that finishes after it. fn runs with both locks held and should perform the credential read and write as one
 // unit.
 //
-// The file lock is best effort: if it cannot be acquired (for example on a filesystem without advisory locking, or if
-// another process holds it past refreshLockTimeout), fn still runs so a filesystem limitation never blocks the user.
-// fn receives lockHeld reporting whether the cross-process lock was actually acquired, so it can skip destructive
-// cleanup that is only safe when peers are serialized; see refreshCredentialForUser for why cleanup is gated on it.
+// The file lock is best effort: fn still runs so a filesystem limitation never blocks the user. This tolerates both
+// being unable to create the config directory that holds the lock file (for example a read-only mount) and being
+// unable to acquire the lock itself (a filesystem without advisory locking, or another process holding it past
+// refreshLockTimeout). fn receives lockHeld reporting whether the cross-process lock was actually acquired, so it can
+// skip destructive cleanup that is only safe when peers are serialized; see refreshCredentialForUser for why cleanup
+// is gated on it.
 //
 // The reload refreshes the shared configuration in place, so any config changes not yet written to disk are discarded.
 // That is acceptable on the refresh path because mutations are persisted as they happen.
@@ -67,28 +69,26 @@ func (c *AuthConfig) withFreshConfigForRefresh(fn func(lockHeld bool) error) err
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
+	// Best-effort cross-process lock; see the godoc. We proceed without it rather than fail the user's refresh when
+	// the config directory cannot be created or the lock cannot be acquired. lockHeld then tells fn to skip cleanup
+	// that is unsafe without serialized peers. The residual risk without the lock is two processes refreshing at once
+	// and spending a rotating token twice.
+	var lockHeld bool
+	unlock := func() {}
 	dir := ghConfig.ConfigDir()
-	if err := os.MkdirAll(dir, 0771); err != nil {
-		return fmt.Errorf("could not create config directory for the refresh lock: %w", err)
-	}
+	if err := os.MkdirAll(dir, 0771); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), refreshLockTimeout)
+		defer cancel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), refreshLockTimeout)
-	defer cancel()
+		acquire := c.acquireRefreshLock
+		if acquire == nil {
+			acquire = flockRefreshLock
+		}
 
-	acquire := c.acquireRefreshLock
-	if acquire == nil {
-		acquire = flockRefreshLock
-	}
-
-	unlock, err := acquire(ctx, filepath.Join(dir, refreshLockFile))
-	lockHeld := err == nil
-	if err != nil {
-		// We could not acquire the cross-process lock, either because the filesystem does not support advisory
-		// locking (some network or FUSE mounts) or because another process held it past refreshLockTimeout. We
-		// deliberately ignore the error and proceed rather than fail the user's command over a filesystem
-		// limitation. The residual risk is two processes refreshing at once and spending a rotating token twice.
-		// fn is told the lock was not held so it can skip destructive cleanup that would otherwise race a peer.
-		unlock = func() {}
+		if u, err := acquire(ctx, filepath.Join(dir, refreshLockFile)); err == nil {
+			unlock = u
+			lockHeld = true
+		}
 	}
 	defer unlock()
 
