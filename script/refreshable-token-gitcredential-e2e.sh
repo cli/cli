@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
 # Guided, interactive end-to-end verification for the git credential helper with
-# refreshable (short-lived) OAuth tokens.
+# refreshable (expiring) OAuth tokens.
 #
 # This script is a review aid, not a merged test. It runs on your own host (no
 # container) so you exercise the gh binary under test against your real git.
 # It walks you, one command at a time, through what happens when gh is set as
-# your git credential helper and hands git a short-lived token: resolving a
+# your git credential helper and hands git an expiring token: resolving a
 # credential, refreshing an expired one on demand, marking the credential
 # non-cacheable on git 2.46 or newer, and warning on older git.
 #
@@ -15,7 +15,7 @@
 #   1. gh must be YOUR git credential helper. You run this build's
 #      `gh auth setup-git --hostname github.com` so git calls the binary under
 #      test, not whatever gh is already on your PATH.
-#   2. Your git version. gh can only mark a short-lived token as non-cacheable
+#   2. Your git version. gh can only mark an expiring token as non-cacheable
 #      (the git 2.46 "ephemeral" attribute) on git 2.46 or newer. On older git
 #      gh instead warns, on stderr and surfaced by git, that a caching helper
 #      chained in front of gh could serve a stale token.
@@ -199,7 +199,7 @@ if [ ! -x "$GH" ]; then
 fi
 HOST="${GH_E2E_HOST:-github.com}"
 HELPER_KEY="credential.https://$HOST.helper"
-NONCACHEABLE_WARNING="cannot mark the short-lived token as non-cacheable"
+NONCACHEABLE_WARNING="cannot mark the expiring token as non-cacheable"
 
 # GH_DISPLAY is the name shown in the command echoes. Commands still execute
 # with the resolved GH binary; the echoes just read as plain `gh`.
@@ -311,24 +311,24 @@ if [ "$GIT_NEW" -ne 1 ]; then
   warn_red \
     "WARNING: your git (${GIT_RAW:-unknown}) is older than 2.46." \
     "Older git does not support the authtype capability, so gh cannot mark a" \
-    "short-lived token as non-cacheable (the git 2.46 ephemeral attribute)." \
+    "expiring token as non-cacheable (the git 2.46 ephemeral attribute)." \
     "If a credential caching helper is chained in front of gh, it may store the" \
-    "short-lived token and keep serving it after gh has refreshed or replaced it," \
+    "expiring token and keep serving it after gh has refreshed or replaced it," \
     "causing stale-token failures. Upgrade to git 2.46 or newer, or avoid a" \
     "credential caching helper for $HOST."
   echo
   note "You will see this same non-cacheable warning at runtime whenever the gh"
-  note "credential helper resolves a short-lived token on this git: gh prints it to"
+  note "credential helper resolves an expiring token on this git: gh prints it to"
   note "stderr and git surfaces it. This script exercises that path below."
 else
-  note "Your git is 2.46 or newer, so gh marks short-lived credentials ephemeral"
+  note "Your git is 2.46 or newer, so gh marks expiring credentials ephemeral"
   note "and a caching helper chained in front of gh will refuse to store them."
 fi
 echo
 note "For reference, two related warnings live in the auth commands themselves:"
 note "  - gh auth login and gh auth refresh recommend git 2.46+ in their --help text."
 note "  - if a non-gh credential helper is configured for a host, gh auth login and"
-note "    gh auth refresh warn at runtime that it cannot refresh short-lived tokens"
+note "    gh auth refresh warn at runtime that it cannot refresh expiring tokens"
 note "    and point you at gh auth setup-git. That is a separate warning from the"
 note "    git-version one above."
 echo
@@ -344,22 +344,22 @@ echo; divider; echo
 # Scenarios
 # ===========================================================================
 
-# --- Step: log in over HTTPS requesting a short-lived credential --------------
+# --- Step: log in over HTTPS requesting an expiring credential --------------
 label "Given" "a clean auth state for $HOST, using default storage"
-label "When" "we log in over HTTPS requesting a short-lived credential"
-label "Then" "login succeeds, reports a short-lived refreshable token, and sets git protocol to https"
-cmdline "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --short-lived --clipboard"
+label "When" "we log in over HTTPS requesting an expiring credential"
+label "Then" "login succeeds, reports an expiring refreshable token, and sets git protocol to https"
+cmdline "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --expiring --clipboard"
 note   "  (HTTPS is required: the git credential helper only applies to https remotes.)"
 note   "  (--clipboard copies the one-time code, so you can just paste it into the browser.)"
 note   "  (Storage is left at the default; this flow does not depend on the storage type.)"
 note_bold "  ACTION: during login gh asks \"Authenticate Git with your GitHub credentials?\". Confirm it (answer Yes) so gh configures git to use this build as the credential helper for $HOST."
 confirm_run
 run_interactive \
-  "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --short-lived --clipboard" \
-  "\"$GH\" auth login --hostname \"$HOST\" --git-protocol https --short-lived --clipboard"
+  "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --expiring --clipboard" \
+  "\"$GH\" auth login --hostname \"$HOST\" --git-protocol https --expiring --clipboard"
 
 label "Expected:"
-assert_err_contains "login reports a short-lived refreshable token" "refreshable token"
+assert_err_contains "login reports an expiring refreshable token" "refreshable token"
 next_step
 
 # --- Step: make this build gh's git credential helper -------------------------
@@ -430,7 +430,7 @@ assert_out_contains "git still received a username from the helper" "username="
 next_step
 
 # --- Step: version-dependent non-cacheable marking ----------------------------
-label "Given" "a refreshable short-lived credential and gh as the helper"
+label "Given" "a refreshable expiring credential and gh as the helper"
 label "When" "git ${GIT_RAW:-unknown} asks gh for credentials"
 if [ "$GIT_NEW" -eq 1 ]; then
   label "Then" "gh marks the credential ephemeral so a caching helper will not store it, and prints no warning"

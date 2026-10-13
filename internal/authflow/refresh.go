@@ -117,8 +117,8 @@ func credentialFromAccessToken(token *oauthapi.AccessToken, requestedAt time.Tim
 }
 
 // authResultFromToken projects the OAuth flow's access token and the resolved username onto an AuthResult. A refresh
-// token is present only when the server honored the short-lived request, so the refreshable credential is gated on it
-// rather than on requestRefreshToken. requestedAt anchors any short-lived token's lifetime.
+// token is present only when the server honored the expiring request, so the refreshable credential is gated on it
+// rather than on requestRefreshToken. requestedAt anchors any expiring token's lifetime.
 func authResultFromToken(token *oauthapi.AccessToken, username string, requestedAt time.Time) *AuthResult {
 	result := &AuthResult{
 		Token:    token.Token,

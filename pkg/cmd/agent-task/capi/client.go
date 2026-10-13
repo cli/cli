@@ -29,7 +29,7 @@ type CAPIClient struct {
 	capiBaseURL string
 }
 
-// authConfig resolves the active token for a GitHub host, refreshing a short-lived token when it is near expiry.
+// authConfig resolves the active token for a GitHub host, refreshing an expiring token when it is near expiry.
 // It is satisfied by gh's AuthConfig and lets the transport obtain a fresh token on each request.
 type authConfig interface {
 	ActiveTokenWithRefresh(hostname string) (gh.Credential, gh.RefreshStatus, error)
@@ -72,7 +72,7 @@ func newCAPITransport(authCfg authConfig, host string, capiBaseURL string, rp ht
 }
 
 func (ct *capiTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Resolve the token per request so a short-lived token is refreshed just before use. The base transport's own
+	// Resolve the token per request so an expiring token is refreshed just before use. The base transport's own
 	// refresh is skipped once we set the Authorization header, so the CAPI transport must refresh here itself.
 	// Refresh is best effort: a failed refresh still yields the last stored token and the API decides its validity.
 	cred, _, _ := ct.authCfg.ActiveTokenWithRefresh(ct.host)

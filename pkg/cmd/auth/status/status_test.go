@@ -278,7 +278,7 @@ func Test_statusRun(t *testing.T) {
 			`),
 		},
 		{
-			name: "refreshes an expiring short-lived token",
+			name: "refreshes an expiring token",
 			opts: StatusOptions{},
 			cfgStubs: func(t *testing.T, c gh.Config) {
 				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -305,14 +305,14 @@ func Test_statusRun(t *testing.T) {
 				  - Active account: true
 				  - Git operations protocol: https
 				  - Token: gho_*****
-				  - Short-lived token that gh refreshes automatically
+				  - Expiring token that gh refreshes automatically
 				  - Token expires: 2099-01-02T03:04:05Z
 				  - Token refreshed just now
 				  - Token scopes: 'repo', 'read:org'
 			`),
 		},
 		{
-			name: "no-refresh leaves an expiring short-lived token untouched",
+			name: "no-refresh leaves an expiring token untouched",
 			opts: StatusOptions{NoRefresh: true},
 			cfgStubs: func(t *testing.T, c gh.Config) {
 				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -335,7 +335,7 @@ func Test_statusRun(t *testing.T) {
 				  - Active account: true
 				  - Git operations protocol: https
 				  - Token: gho_*****
-				  - Short-lived token that gh refreshes automatically
+				  - Expiring token that gh refreshes automatically
 				  - Token expires: 2000-01-01T00:00:00Z
 				  - Token scopes: 'repo', 'read:org'
 			`),
@@ -357,7 +357,7 @@ func Test_statusRun(t *testing.T) {
 				github.com
 				  X Refresh token for github.com account monalisa was rejected
 				  - Active account: true
-				  - The stored short-lived credential was removed because its refresh token is no longer valid.
+				  - The stored expiring credential was removed because its refresh token is no longer valid.
 				  - To re-authenticate, run: gh auth login -h github.com
 			`),
 		},

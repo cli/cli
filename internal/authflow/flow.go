@@ -36,7 +36,7 @@ type AuthResult struct {
 // AuthFlow initiates an OAuth device or web application flow to acquire a
 // token. The provided HTTP client should be a plain client that does not set
 // auth or other headers. When requestRefreshToken is true, gh asks the server
-// for a short-lived, refreshable credential; the server may still issue a
+// for an expiring, refreshable credential; the server may still issue a
 // non-expiring token, in which case AuthResult.Refreshable is nil.
 func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, b browser.Browser, isCopyToClipboard bool, requestRefreshToken bool) (*AuthResult, error) {
 	w := IO.ErrOut
@@ -104,7 +104,7 @@ func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams
 
 	fmt.Fprintln(w, notice)
 
-	// Anchor any short-lived token's lifetime to the instant before the flow begins. DetectFlow blocks through the
+	// Anchor any expiring token's lifetime to the instant before the flow begins. DetectFlow blocks through the
 	// user's browser interaction and the server issues the token at the end, so this instant is at or before issuance
 	// and never overestimates the expiry. Use UTC so the derived absolute expiry matches the canonical UTC form gh
 	// stores and displays.

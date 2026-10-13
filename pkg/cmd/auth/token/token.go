@@ -37,7 +37,7 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 
 			Without the %[1]s--user%[1]s flag, the active account for the host is chosen.
 
-			If the token is an expired or near-expiry short-lived token that supports refreshing, it is refreshed
+			If the token is an expired or near-expiry token that supports refreshing, it is refreshed
 			automatically before being printed, unless %[1]s--no-refresh%[1]s is given.
 		`, "`"),
 		Args: cobra.ExactArgs(0),
@@ -54,7 +54,7 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to output the token for")
 	cmd.Flags().BoolVarP(&opts.SecureStorage, "secure-storage", "", false, "Search only secure credential store for authentication token")
 	_ = cmd.Flags().MarkHidden("secure-storage")
-	cmd.Flags().BoolVarP(&opts.NoRefresh, "no-refresh", "", false, "Do not automatically refresh an expired short-lived token")
+	cmd.Flags().BoolVarP(&opts.NoRefresh, "no-refresh", "", false, "Do not automatically refresh an expired token")
 
 	return cmd
 }
@@ -161,7 +161,7 @@ func resolveUsername(authCfg gh.AuthConfig, hostname, username string) string {
 }
 
 // getTokenReadOnly resolves the stored active token for the hostname and optional username without contacting the
-// token endpoint. It still surfaces a refreshable credential's stored access token, so a short-lived token is
+// token endpoint. It still surfaces a refreshable credential's stored access token, so an expiring token is
 // returned, just not refreshed.
 func getTokenReadOnly(authCfg gh.AuthConfig, hostname, username string) gh.Credential {
 	if username == "" {
