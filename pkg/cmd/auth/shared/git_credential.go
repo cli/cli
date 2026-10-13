@@ -80,11 +80,15 @@ func (flow *GitCredentialFlow) ShouldSetup() bool {
 // Setup configures git to use the newly obtained credential for the given hostname.
 //
 // If no credential helper is configured for the host, gh configures itself as the helper. Otherwise a non-gh helper
-// is already configured: for a non-refreshable credential the existing helper is updated with the new credential, but
-// for a refreshable credential the existing credential is rejected and nothing is stored, because an external helper
-// cannot refresh a short-lived token and would keep serving it after it expires. In that case a non-empty warning is
-// returned so the caller can advise the user to configure gh as the git credential helper. The warning is undecorated
-// so the caller controls presentation.
+// is already configured: for a non-refreshable credential the existing helper is updated with the new credential. For
+// a refreshable credential the external helper cannot refresh a short-lived token and would keep serving it after it
+// expires, so Setup offers to configure gh as the helper instead. If the user accepts, gh is configured as the helper.
+// If the user declines, the existing credential is rejected and nothing is stored, and a non-empty warning is returned
+// so the caller can advise the user. The warning is undecorated so the caller controls presentation.
+//
+// This is the earliest point where both facts are known: whether the token is refreshable is decided by the server
+// during the auth flow, so the --short-lived preference alone cannot determine it beforehand. Setup is only reached
+// when the user already opted into git setup during the interactive prompt, so prompting again here is safe.
 func (flow *GitCredentialFlow) Setup(hostname, username, authToken string, refreshable bool) (string, error) {
 	// If there is no credential helper configured then we will set ourselves up as
 	// the credential helper for this host.
@@ -93,9 +97,22 @@ func (flow *GitCredentialFlow) Setup(hostname, username, authToken string, refre
 	}
 
 	// A non-gh helper is configured. It cannot refresh a short-lived token and would keep serving the token after it
-	// expires, so we do not store a refreshable credential in it. We clear any existing credential so the problem
-	// surfaces immediately rather than silently after expiry, and return a warning for the caller to show.
+	// expires, so storing a refreshable credential in it is a trap. Offer to make gh the helper instead, since gh can
+	// refresh the token transparently.
 	if refreshable {
+		setupGh, err := flow.Prompter.Confirm(
+			fmt.Sprintf("The git credential helper configured for %s cannot refresh short-lived tokens. Set up gh as the git credential helper instead?", hostname),
+			true,
+		)
+		if err != nil {
+			return "", err
+		}
+		if setupGh {
+			return "", flow.HelperConfig.ConfigureOurs(hostname)
+		}
+
+		// The user declined, so we clear any existing credential and store nothing, surfacing the problem immediately
+		// rather than silently after expiry, and return a warning for the caller to show.
 		if err := flow.Updater.RejectExisting(hostname); err != nil {
 			return "", err
 		}
