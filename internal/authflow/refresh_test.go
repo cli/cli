@@ -162,7 +162,7 @@ func TestAuthResultFromToken(t *testing.T) {
 
 		require.Equal(t, "gho_NEW", result.Token)
 		require.Equal(t, "monalisa", result.Username)
-		// The server did not honor the short-lived request, so nothing refreshable is carried forward.
+		// The server did not honor the expiring request, so nothing refreshable is carried forward.
 		require.Nil(t, result.Refreshable)
 	})
 }

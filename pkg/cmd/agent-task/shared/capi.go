@@ -40,7 +40,7 @@ func CapiClientFunc(f *cmdutil.Factory) func() (capi.CapiClient, error) {
 		}
 
 		// The CAPI client authenticates by setting the token header itself, which bypasses the base HTTP client's
-		// auto-refresh. Pass authCfg so the CAPI transport can refresh a short-lived token on each request.
+		// auto-refresh. Pass authCfg so the CAPI transport can refresh an expiring token on each request.
 		return capi.NewCAPIClient(httpClient, authCfg, host, capiBaseURL), nil
 	}
 }

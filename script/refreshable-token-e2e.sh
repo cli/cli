@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Guided, interactive end-to-end verification for refreshable (short-lived) OAuth tokens.
+# Guided, interactive end-to-end verification for refreshable (expiring) OAuth tokens.
 #
 # This script is a review aid, not a merged test. It walks a reviewer through the
-# refreshable (short-lived) OAuth token scenarios one command at a time, using a
+# refreshable (expiring) OAuth token scenarios one command at a time, using a
 # Given / When / Then framing. For each step it:
 #
 #   1. Prints Given / When / Then and the exact command it is about to run.
@@ -226,24 +226,24 @@ printf "%sReady? Press Enter to begin%s (q to quit): " "$BOLD" "$RESET"
 read -r ans; [ "$ans" = "q" ] && exit 0
 echo; divider; echo
 
-# --- Step: login with --short-lived -------------------------------------------
+# --- Step: login with --expiring -------------------------------------------
 label "Given" "a clean auth state for $HOST"
-label "When" "we log in requesting a short-lived credential"
-label "Then" "login succeeds and reports it received a short-lived refreshable token"
-cmdline "$GH_DISPLAY auth login --hostname $HOST --short-lived --clipboard $STORE_FLAG"
+label "When" "we log in requesting an expiring credential"
+label "Then" "login succeeds and reports it received an expiring refreshable token"
+cmdline "$GH_DISPLAY auth login --hostname $HOST --expiring --clipboard $STORE_FLAG"
 note   "  (--clipboard copies the one-time code, so you can just paste it into the browser.)"
 confirm_run
 run_interactive \
-  "$GH_DISPLAY auth login --hostname $HOST --short-lived --clipboard $STORE_FLAG" \
-  "\"$GH\" auth login --hostname \"$HOST\" --short-lived --clipboard $STORE_FLAG"
+  "$GH_DISPLAY auth login --hostname $HOST --expiring --clipboard $STORE_FLAG" \
+  "\"$GH\" auth login --hostname \"$HOST\" --expiring --clipboard $STORE_FLAG"
 
 label "Expected:"
 manual "login succeeds with no error"
-assert_err_contains "confirms a short-lived refreshable token was received" "Received short-lived refreshable token"
+assert_err_contains "confirms an expiring refreshable token was received" "Received expiring refreshable token"
 next_step
 
 # --- Step: an ordinary command refreshes an expired token ---------------------
-label "Given" "a signed-in short-lived credential"
+label "Given" "a signed-in expiring credential"
 label "When" "an ordinary command runs while the access token is expired or near expiry"
 label "Then" "the command succeeds and gh refreshes the token first"
 cmdline "$GH_DISPLAY api repos/cli/cli/contents/.gitattributes"
@@ -259,7 +259,7 @@ assert_refresh      "a refresh happened"
 next_step
 
 # --- Step: a valid token is not refreshed -------------------------------------
-label "Given" "the same short-lived credential with a still-valid access token"
+label "Given" "the same expiring credential with a still-valid access token"
 label "When" "the same command runs"
 label "Then" "the command succeeds without any refresh"
 cmdline "$GH_DISPLAY api repos/cli/cli/contents/.gitattributes"
@@ -299,9 +299,9 @@ next_step
 # those steps fall back to the GH_DEBUG=api log detection used elsewhere.
 
 # --- Step: status refreshes an expired token ----------------------------------
-label "Given" "a signed-in short-lived credential"
+label "Given" "a signed-in expiring credential"
 label "When" "auth status runs while the access token is expired or near expiry"
-label "Then" "status refreshes the token and shows it as a short-lived refreshable credential"
+label "Then" "status refreshes the token and shows it as an expiring refreshable credential"
 cmdline "$GH_DISPLAY auth status"
 note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
 confirm_run
@@ -310,12 +310,12 @@ run_batch \
   "GH_AT_EXPIRES_IN=1 \"$GH\" auth status"
 
 label "Expected:"
-assert_out_contains "the account is shown as a short-lived refreshable credential" "Short-lived token that gh refreshes automatically"
+assert_out_contains "the account is shown as an expiring refreshable credential" "Expiring token that gh refreshes automatically"
 assert_out_contains "status reports it refreshed the token just now" "Token refreshed just now"
 next_step
 
 # --- Step: status --json also refreshes ---------------------------------------
-label "Given" "the same short-lived credential"
+label "Given" "the same expiring credential"
 label "When" "auth status --json hosts runs while the access token is expired or near expiry"
 label "Then" "status refreshes the token and the JSON carries the refreshable fields"
 cmdline "$GH_DISPLAY auth status --json hosts"
@@ -331,7 +331,7 @@ assert_refresh      "a refresh happened"
 next_step
 
 # --- Step: status does not refresh a valid token ------------------------------
-label "Given" "the same short-lived credential with a still-valid access token"
+label "Given" "the same expiring credential with a still-valid access token"
 label "When" "auth status runs"
 label "Then" "status shows the refreshable credential without refreshing it"
 cmdline "$GH_DISPLAY auth status"
@@ -341,12 +341,12 @@ run_batch \
   "\"$GH\" auth status"
 
 label "Expected:"
-assert_out_contains "the account is shown as a short-lived refreshable credential" "Short-lived token that gh refreshes automatically"
+assert_out_contains "the account is shown as an expiring refreshable credential" "Expiring token that gh refreshes automatically"
 assert_out_absent   "no refresh happened" "Token refreshed just now"
 next_step
 
 # --- Step: status --json does not refresh a valid token -----------------------
-label "Given" "the same short-lived credential with a still-valid access token"
+label "Given" "the same expiring credential with a still-valid access token"
 label "When" "auth status --json hosts runs"
 label "Then" "the JSON carries the refreshable fields and no refresh happens"
 cmdline "$GH_DISPLAY auth status --json hosts"
@@ -361,7 +361,7 @@ assert_no_refresh   "no refresh happened"
 next_step
 
 # --- Step: status --no-refresh never refreshes --------------------------------
-label "Given" "a signed-in short-lived credential"
+label "Given" "a signed-in expiring credential"
 label "When" "auth status --no-refresh runs while the access token is expired or near expiry"
 label "Then" "status still shows the refreshable credential but does not refresh it"
 cmdline "$GH_DISPLAY auth status --no-refresh"
@@ -372,12 +372,12 @@ run_batch \
   "GH_AT_EXPIRES_IN=1 \"$GH\" auth status --no-refresh"
 
 label "Expected:"
-assert_out_contains "the account is shown as a short-lived refreshable credential" "Short-lived token that gh refreshes automatically"
+assert_out_contains "the account is shown as an expiring refreshable credential" "Expiring token that gh refreshes automatically"
 assert_out_absent   "no refresh happened despite forced expiry" "Token refreshed just now"
 next_step
 
 # --- Step: status --json --no-refresh never refreshes -------------------------
-label "Given" "a signed-in short-lived credential"
+label "Given" "a signed-in expiring credential"
 label "When" "auth status --json hosts --no-refresh runs while the access token is expired or near expiry"
 label "Then" "the JSON carries the refreshable fields and no refresh happens"
 cmdline "$GH_DISPLAY auth status --json hosts --no-refresh"
@@ -433,7 +433,7 @@ next_step
 # GH_DEBUG=api log (a POST to the OAuth token endpoint).
 
 # --- Step: token refreshes an expired token -----------------------------------
-label "Given" "a signed-in short-lived credential"
+label "Given" "a signed-in expiring credential"
 label "When" "auth token runs while the access token is expired or near expiry"
 label "Then" "gh refreshes the token and prints the refreshed value"
 cmdline "$GH_DISPLAY auth token"
@@ -449,7 +449,7 @@ assert_refresh      "a refresh happened"
 next_step
 
 # --- Step: token does not refresh a valid token -------------------------------
-label "Given" "the same short-lived credential with a still-valid access token"
+label "Given" "the same expiring credential with a still-valid access token"
 label "When" "auth token runs"
 label "Then" "gh prints the current token without refreshing it"
 cmdline "$GH_DISPLAY auth token"
@@ -464,7 +464,7 @@ assert_no_refresh   "no refresh happened"
 next_step
 
 # --- Step: token --no-refresh never refreshes ---------------------------------
-label "Given" "a signed-in short-lived credential"
+label "Given" "a signed-in expiring credential"
 label "When" "auth token --no-refresh runs while the access token is expired or near expiry"
 label "Then" "gh prints the stored token as-is without refreshing it"
 cmdline "$GH_DISPLAY auth token --no-refresh"
@@ -496,7 +496,7 @@ assert_no_refresh   "no refresh happened (an environment token is never refreshe
 next_step
 
 # --- Step: token --secure-storage refreshes an expired token ------------------
-label "Given" "a signed-in short-lived credential"
+label "Given" "a signed-in expiring credential"
 label "When" "auth token --secure-storage runs while the access token is expired or near expiry"
 label "Then" "gh refreshes the token and prints the refreshed value"
 cmdline "$GH_DISPLAY auth token --secure-storage"
@@ -512,7 +512,7 @@ assert_refresh      "a refresh happened"
 next_step
 
 # --- Step: token --secure-storage does not refresh a valid token --------------
-label "Given" "the same short-lived credential with a still-valid access token"
+label "Given" "the same expiring credential with a still-valid access token"
 label "When" "auth token --secure-storage runs"
 label "Then" "gh prints the current token without refreshing it"
 cmdline "$GH_DISPLAY auth token --secure-storage"
@@ -527,7 +527,7 @@ assert_no_refresh   "no refresh happened"
 next_step
 
 # --- Step: token --secure-storage --no-refresh never refreshes ----------------
-label "Given" "a signed-in short-lived credential"
+label "Given" "a signed-in expiring credential"
 label "When" "auth token --secure-storage --no-refresh runs while the access token is expired or near expiry"
 if [ "$THEME" = "config" ]; then
   label "Then" "no refresh happens and gh reports no token, because secure storage is keyring-only and the token lives in config"
@@ -572,16 +572,16 @@ next_step
 # AUTH REFRESH
 # ---------------------------------------------------------------------------
 
-# --- Step: refresh --short-lived keeps the credential refreshable -------------
-label "Given" "a signed-in short-lived credential"
-label "When" "we run auth refresh --short-lived"
-label "Then" "the flow completes and the credential stays short-lived and refreshable"
-cmdline "$GH_DISPLAY auth refresh --hostname $HOST --short-lived --clipboard $STORE_FLAG"
+# --- Step: refresh --expiring keeps the credential refreshable -------------
+label "Given" "a signed-in expiring credential"
+label "When" "we run auth refresh --expiring"
+label "Then" "the flow completes and the credential stays expiring and refreshable"
+cmdline "$GH_DISPLAY auth refresh --hostname $HOST --expiring --clipboard $STORE_FLAG"
 note   "  (--clipboard copies the one-time code, so you can just paste it into the browser.)"
 confirm_run
 run_interactive \
-  "$GH_DISPLAY auth refresh --hostname $HOST --short-lived --clipboard $STORE_FLAG" \
-  "\"$GH\" auth refresh --hostname \"$HOST\" --short-lived --clipboard $STORE_FLAG"
+  "$GH_DISPLAY auth refresh --hostname $HOST --expiring --clipboard $STORE_FLAG" \
+  "\"$GH\" auth refresh --hostname \"$HOST\" --expiring --clipboard $STORE_FLAG"
 
 label "Expected:"
 manual "the refresh flow completes without error"
@@ -593,7 +593,7 @@ next_step
 
 echo
 printf "%sCleanup%s\n" "$BOLD" "$RESET"
-note "You are still signed in with a short-lived refreshable credential for $HOST."
+note "You are still signed in with an expiring refreshable credential for $HOST."
 note "You can keep it to experiment further, or log out now to return to a clean state."
 printf "\n%sLog out now?%s [y/N]: " "$BOLD" "$RESET"
 read -r ans

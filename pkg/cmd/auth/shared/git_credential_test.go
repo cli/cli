@@ -50,8 +50,8 @@ func TestSetup_refreshableExternalHelper_declineGh(t *testing.T) {
 	if err != nil {
 		t.Errorf("Setup() error = %v", err)
 	}
-	if !strings.Contains(warning, "cannot refresh short-lived tokens") {
-		t.Errorf("Setup() warning = %q, want it to mention that the helper cannot refresh short-lived tokens", warning)
+	if !strings.Contains(warning, "cannot refresh expiring tokens") {
+		t.Errorf("Setup() warning = %q, want it to mention that the helper cannot refresh expiring tokens", warning)
 	}
 	if !strings.Contains(warning, "was not stored") {
 		t.Errorf("Setup() warning = %q, want it to state that the credential was not stored", warning)

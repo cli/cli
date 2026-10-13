@@ -301,9 +301,9 @@ func TestLogin(t *testing.T) {
 		{
 			name: "web flow, host issues a refreshable credential",
 			opts: LoginOptions{
-				Hostname:   "example.com",
-				Web:        true,
-				ShortLived: true,
+				Hostname: "example.com",
+				Web:      true,
+				Expiring: true,
 				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
 					if !requestRefreshToken {
 						t.Error("expected requestRefreshToken to be true")
@@ -323,7 +323,7 @@ func TestLogin(t *testing.T) {
 			},
 			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
 				assert.Contains(t, stderr, "Authentication complete.")
-				assert.Contains(t, stderr, "Received short-lived refreshable token\n")
+				assert.Contains(t, stderr, "Received expiring refreshable token\n")
 			},
 		},
 		{
@@ -349,15 +349,15 @@ func TestLogin(t *testing.T) {
 				"example.com:git_protocol":  "",
 			},
 			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
-				assert.Contains(t, stderr, "Host issues short-lived refreshable token\n")
+				assert.Contains(t, stderr, "Host issues expiring refreshable token\n")
 			},
 		},
 		{
-			name: "web flow, short-lived requested but host issues a non-expiring token",
+			name: "web flow, expiring requested but host issues a non-expiring token",
 			opts: LoginOptions{
-				Hostname:   "example.com",
-				Web:        true,
-				ShortLived: true,
+				Hostname: "example.com",
+				Web:      true,
+				Expiring: true,
 				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, _ bool) (*authflow.AuthResult, error) {
 					return &authflow.AuthResult{Token: "gho_plain", Username: "monalisa"}, nil
 				},
@@ -368,22 +368,22 @@ func TestLogin(t *testing.T) {
 				"example.com:git_protocol": "",
 			},
 			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
-				assert.Contains(t, stderr, "Host did not issue a short-lived refreshable token\n")
+				assert.Contains(t, stderr, "Host did not issue an expiring refreshable token\n")
 			},
 		},
 		{
-			name: "interactive, short-lived forces the web flow instead of offering token paste",
+			name: "interactive, expiring forces the web flow instead of offering token paste",
 			opts: LoginOptions{
 				Hostname:         "example.com",
 				Interactive:      true,
-				ShortLived:       true,
+				Expiring:         true,
 				GitProtocol:      "ssh",
 				SkipSSHKeyPrompt: true,
 				Prompter: &prompter.PrompterMock{
 					SelectFunc: func(prompt, _ string, _ []string) (int, error) {
-						// --short-lived must not reach the authentication-method choice, since a pasted token can
+						// --expiring must not reach the authentication-method choice, since a pasted token can
 						// never be refreshable. Any such prompt here is a regression.
-						t.Errorf("unexpected Select prompt under --short-lived: %q", prompt)
+						t.Errorf("unexpected Select prompt under --expiring: %q", prompt)
 						return -1, prompter.NoSuchPromptErr(prompt)
 					},
 				},
@@ -405,7 +405,7 @@ func TestLogin(t *testing.T) {
 				"example.com:git_protocol":  "ssh",
 			},
 			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
-				assert.Contains(t, stderr, "Received short-lived refreshable token\n")
+				assert.Contains(t, stderr, "Received expiring refreshable token\n")
 			},
 		},
 	}

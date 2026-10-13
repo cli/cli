@@ -39,7 +39,7 @@ type LoginOptions struct {
 	GitProtocol      string
 	InsecureStorage  bool
 	SkipSSHKeyPrompt bool
-	ShortLived       bool
+	Expiring         bool
 	Clipboard        *bool
 }
 
@@ -92,11 +92,11 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			prompting to create and upload a new key if one is not found. This can be skipped with
 			%[1]s--skip-ssh-key%[1]s flag.
 
-			Use %[1]s--short-lived%[1]s to prefer short-lived credentials that gh refreshes automatically.
-			This is a preference, not a guarantee: whether short-lived tokens are issued depends on the
+			Use %[1]s--expiring%[1]s to prefer expiring credentials that gh refreshes automatically.
+			This is a preference, not a guarantee: whether expiring tokens are issued depends on the
 			host and the OAuth app configuration. A host without support issues a non-expiring token
-			instead, and a host configured for them may issue short-lived tokens even without the flag.
-			When using short-lived credentials for git operations, git 2.46 or newer is recommended so
+			instead, and a host configured for them may issue expiring tokens even without the flag.
+			When using expiring credentials for git operations, git 2.46 or newer is recommended so
 			gh can mark the token as non-cacheable; with older git a credential caching helper may store
 			and reuse an expired token.
 
@@ -123,8 +123,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			if tokenStdin && len(opts.Scopes) > 0 {
 				return cmdutil.FlagErrorf("specify only one of `--scopes` or `--with-token`")
 			}
-			if tokenStdin && opts.ShortLived {
-				return cmdutil.FlagErrorf("specify only one of `--short-lived` or `--with-token`")
+			if tokenStdin && opts.Expiring {
+				return cmdutil.FlagErrorf("specify only one of `--expiring` or `--with-token`")
 			}
 
 			if tokenStdin {
@@ -173,7 +173,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
 	cmd.Flags().BoolVar(&opts.SkipSSHKeyPrompt, "skip-ssh-key", false, "Skip generate/upload SSH key prompt")
-	cmd.Flags().BoolVar(&opts.ShortLived, "short-lived", false, "Prefer short-lived credentials that gh refreshes automatically, if the host supports them")
+	cmd.Flags().BoolVar(&opts.Expiring, "expiring", false, "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
 
 	return cmd
 }
@@ -255,7 +255,7 @@ func loginRun(opts *LoginOptions) error {
 		SecureStorage:    !opts.InsecureStorage,
 		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
 		CopyToClipboard:  copyToClipboard,
-		ShortLived:       opts.ShortLived,
+		Expiring:         opts.Expiring,
 	})
 }
 
