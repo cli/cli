@@ -558,7 +558,7 @@ func TestWithFreshConfigUnderLockInvokesReloadBeforeFn(t *testing.T) {
 		return nil
 	}
 
-	err := authCfg.withFreshConfigForRefresh(func() error {
+	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
 		order = append(order, "fn")
 		return nil
 	})
@@ -573,7 +573,7 @@ func TestWithFreshConfigUnderLockPropagatesReloadError(t *testing.T) {
 	authCfg.reloadConfig = func() error { return sentinel }
 
 	fnRan := false
-	err := authCfg.withFreshConfigForRefresh(func() error {
+	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
 		fnRan = true
 		return nil
 	})
@@ -586,7 +586,7 @@ func TestWithFreshConfigUnderLockPropagatesError(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 	sentinel := errors.New("boom")
 
-	err := authCfg.withFreshConfigForRefresh(func() error { return sentinel })
+	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error { return sentinel })
 
 	require.ErrorIs(t, err, sentinel)
 }
@@ -604,7 +604,7 @@ func TestWithFreshConfigUnderLockSerializesInProcess(t *testing.T) {
 
 	for range goroutines {
 		wg.Go(func() {
-			_ = authCfg.withFreshConfigForRefresh(func() error {
+			_ = authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
 				n := active.Add(1)
 				for {
 					m := maxActive.Load()
@@ -751,6 +751,41 @@ func TestActiveTokenWithRefresh(t *testing.T) {
 		require.Equal(t, gh.RefreshStatusInapplicable, status)
 		require.Empty(t, credential.Token)
 		require.Len(t, refresher.RefreshCalls(), 1)
+	})
+
+	t.Run("reports expiry but leaves the credential when the refresh token is rejected without the lock", func(t *testing.T) {
+		// Without the cross-process lock a rejection is ambiguous: a peer may have already spent this single-use
+		// refresh token and be about to persist the replacement. Destroying storage here could race that peer and
+		// discard a valid credential, so the rejected process must leave storage untouched while still reporting the
+		// rejection. Contrast with the lock-held case above, which does remove the credential.
+		authCfg := newTestAuthConfig(t)
+		authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+			return nil, errors.New("advisory locking unavailable")
+		}
+		refresher := &ghmock.TokenRefresherMock{
+			RefreshFunc: func(refreshToken string, hostname string) (gh.RefreshableCredential, error) {
+				return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
+			},
+		}
+		authCfg.SetTokenRefresher(refresher)
+		loginRefreshableWithExpiry(t, authCfg, host, user, "old-access", "old-refresh", time.Now().Add(-time.Hour), false)
+
+		credential, status, err := authCfg.ActiveTokenWithRefresh(host)
+
+		require.ErrorIs(t, err, gh.ErrRefreshTokenInvalid)
+		require.Equal(t, gh.RefreshStatusExpired, status)
+		require.Empty(t, credential.Token)
+
+		// The stored credential is untouched, so it still resolves and a peer's replacement write (or a retry once
+		// the lock is available) can still land.
+		stored, _, err := authCfg.refreshableForUser(host, user)
+		require.NoError(t, err)
+		require.Equal(t, "old-refresh", stored.RefreshToken)
+
+		// Because the credential was not removed, a subsequent attempt still reaches the refresher rather than
+		// short-circuiting on a missing credential.
+		_, _, _ = authCfg.ActiveTokenWithRefresh(host)
+		require.Len(t, refresher.RefreshCalls(), 2)
 	})
 
 	t.Run("cannot refresh when no refresher is configured", func(t *testing.T) {
