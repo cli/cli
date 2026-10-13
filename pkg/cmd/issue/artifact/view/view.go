@@ -55,8 +55,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			By default, the current version is shown. Use %[1]s--version%[1]s to show an earlier
 			version from the edit history.
 
-			With %[1]s--web%[1]s, open a link artifact's URL in the browser. Artifacts have no
-			web page of their own, so documents can't be opened with %[1]s--web%[1]s.
+			With %[1]s--web%[1]s, open a document's page on GitHub, or a link's URL.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# View artifact 2 on issue 142
@@ -102,7 +101,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open a link artifact's URL in the browser")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open a document's page on GitHub, or a link's URL")
 	cmd.Flags().IntVar(&opts.Version, "version", 0, "Show the version with this `number` from the edit history")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, client.ArtifactWithVersionsFields)
 
@@ -139,7 +138,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if opts.WebMode {
-		return openLink(opts, artifact.Artifact)
+		return openInBrowser(opts, artifact.Artifact)
 	}
 
 	if opts.Exporter != nil {
@@ -160,29 +159,31 @@ func viewRun(opts *ViewOptions) error {
 	return printHumanArtifact(opts, repo, artifact, viewing)
 }
 
-// openLink opens a link artifact's URL. Artifacts have no web page of their
-// own, so there is nothing to open for a document.
-func openLink(opts *ViewOptions, a client.Artifact) error {
-	if a.Type != client.TypeLink {
-		return fmt.Errorf("artifact %d is not a link; `--web` only opens link artifacts", a.Number)
-	}
-	u, ok := shared.HTTPURL(a.Body)
-	if !ok {
-		return fmt.Errorf("artifact %d doesn't link to an http(s) URL; `--web` only opens http(s) URLs", a.Number)
+// openInBrowser opens a document's page on GitHub, or a link's URL. The page
+// comes from the API, so the message shows it like gh issue view --web does.
+// A link's URL is anything its author saved, so only an http(s) URL opens,
+// and the message shows the whole URL, where text.DisplayURL would hide its
+// port, query and fragment.
+func openInBrowser(opts *ViewOptions, a client.Artifact) error {
+	target, shown := a.URL, text.DisplayURL(a.URL)
+	if a.Type == client.TypeLink {
+		u, ok := shared.HTTPURL(a.Body)
+		if !ok {
+			return fmt.Errorf("artifact %d doesn't link to an http(s) URL; `--web` only opens http(s) URLs", a.Number)
+		}
+		target, shown = u, u
 	}
 
-	// A link can point anywhere, so the message shows the whole URL, where
-	// text.DisplayURL would hide its port, query and fragment.
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", u)
+		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", shown)
 	}
-	return opts.Browser.Browse(u)
+	return opts.Browser.Browse(target)
 }
 
 // printRawArtifact prints key lines in a fixed order, then the body after a
 // "--" line, like gh issue view. Null values print as empty fields, so every
 // artifact has the same lines. An earlier version replaces the name, version,
-// editor and body, while the creator still describes the artifact.
+// editor and body, while the creator and URL still describe the artifact.
 func printRawArtifact(out io.Writer, a *client.ArtifactWithVersions, viewing *client.Version) {
 	name, body := a.Name, a.Body
 	updatedBy, updatedAt := a.UpdatedByActor, a.UpdatedAt
@@ -204,6 +205,7 @@ func printRawArtifact(out io.Writer, a *client.ArtifactWithVersions, viewing *cl
 	fmt.Fprintf(out, "created:\t%s\n", timestamp(a.CreatedAt))
 	fmt.Fprintf(out, "updated-by:\t%s\n", login(updatedBy))
 	fmt.Fprintf(out, "updated:\t%s\n", timestamp(updatedAt))
+	fmt.Fprintf(out, "url:\t%s\n", a.URL)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, body)
 }
@@ -241,7 +243,7 @@ func printHumanArtifact(opts *ViewOptions, repo ghrepo.Interface, a *client.Arti
 		fmt.Fprintln(out)
 	}
 
-	fmt.Fprintln(out, cs.Muted("View this issue on GitHub: "+ghrepo.GenerateRepoURL(repo, "issues/%d", opts.IssueNumber)))
+	fmt.Fprintln(out, cs.Muted("View this artifact on GitHub: "+a.URL))
 	return nil
 }
 

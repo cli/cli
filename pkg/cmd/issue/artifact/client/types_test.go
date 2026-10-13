@@ -25,6 +25,7 @@ func TestArtifactExportData(t *testing.T) {
 		UpdatedByActor: &Actor{ID: 1, Login: "monalisa"},
 		CreatedAt:      &createdAt,
 		UpdatedAt:      &updatedAt,
+		URL:            "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2",
 	}
 
 	tests := []struct {
@@ -48,7 +49,8 @@ func TestArtifactExportData(t *testing.T) {
 				"number": 2,
 				"type": "generic",
 				"updatedAt": "2026-09-24T21:00:00Z",
-				"updatedByActor": {"id": 1, "login": "monalisa"}
+				"updatedByActor": {"id": 1, "login": "monalisa"},
+				"url": "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2"
 			}`,
 		},
 		{
@@ -101,6 +103,7 @@ func TestArtifactWithVersionsExportData(t *testing.T) {
 		UpdatedByActor: &Actor{ID: 1, Login: "monalisa"},
 		CreatedAt:      &createdAt,
 		UpdatedAt:      &updatedAt,
+		URL:            "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2",
 		Versions: []Version{
 			{
 				Version:   2,
@@ -143,6 +146,7 @@ func TestArtifactWithVersionsExportData(t *testing.T) {
 				"type": "generic",
 				"updatedAt": "2026-09-24T21:00:00Z",
 				"updatedByActor": {"id": 1, "login": "monalisa"},
+				"url": "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2",
 				"versions": [
 					{
 						"version": 2,

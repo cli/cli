@@ -32,6 +32,7 @@ func TestViewJSONFields(t *testing.T) {
 		"type",
 		"updatedAt",
 		"updatedByActor",
+		"url",
 		"versions",
 	})
 }
@@ -119,9 +120,10 @@ func TestNewCmdView(t *testing.T) {
 			wantErr: "cannot use `--web` with `--json`",
 		},
 		{
-			name:    "--json with url, which isn't a field",
-			args:    "142 2 --json number,url",
-			wantErr: "Unknown JSON field: \"url\"\nAvailable fields:\n  body\n  bodyHtml\n  createdAt\n  creator\n  description\n  id\n  name\n  number\n  type\n  updatedAt\n  updatedByActor\n  versions",
+			name:     "--json url",
+			args:     "142 2 --json number,url",
+			wantOpts: ViewOptions{IssueNumber: 142, ArtifactNumber: 2},
+			wantRepo: "OWNER/REPO",
 		},
 		{
 			name:    "no artifact number",
@@ -221,6 +223,7 @@ func TestViewRun(t *testing.T) {
 		UpdatedByActor: monalisa,
 		CreatedAt:      at("2026-09-21T23:00:00Z"),
 		UpdatedAt:      at("2026-09-24T21:00:00Z"),
+		URL:            "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2",
 		Versions: []client.Version{
 			version(12, "OAuth callback plan", monalisa, "2026-09-24T21:00:00Z", oauthPlanBody),
 			version(11, "OAuth callback plan", copilot, "2026-09-24T18:00:00Z", ""),
@@ -237,8 +240,9 @@ func TestViewRun(t *testing.T) {
 		},
 	}
 
-	// Artifact 3 on the spec's issue 142, a link saved once.
+	// Artifact 3 on the spec's issue 142, a link saved once, and its page.
 	const runbookURL = "https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook"
+	const runbookPage = "https://github.com/monalisa/monas-cafe/issues/142/artifacts/3"
 	runbook := &client.ArtifactWithVersions{
 		ID:             6627,
 		Number:         3,
@@ -249,10 +253,15 @@ func TestViewRun(t *testing.T) {
 		UpdatedByActor: copilot,
 		CreatedAt:      at("2026-09-23T22:00:00Z"),
 		UpdatedAt:      at("2026-09-23T22:00:00Z"),
+		URL:            runbookPage,
 		Versions: []client.Version{
 			version(1, "Staging OAuth runbook", copilot, "2026-09-23T22:00:00Z", runbookURL),
 		},
 	}
+
+	// The same link on a ghe.com host, where its page is too.
+	tenancyRunbook := &client.ArtifactWithVersions{Artifact: runbook.Artifact, Versions: runbook.Versions}
+	tenancyRunbook.URL = "https://monas-cafe.ghe.com/monalisa/monas-cafe/issues/142/artifacts/3"
 
 	// The same link after monalisa moved it to the production runbook.
 	const productionRunbookURL = "https://github.com/monalisa/monas-cafe/wiki/Production-OAuth-runbook"
@@ -265,6 +274,7 @@ func TestViewRun(t *testing.T) {
 		UpdatedByActor: monalisa,
 		CreatedAt:      at("2026-09-23T22:00:00Z"),
 		UpdatedAt:      at("2026-09-24T21:00:00Z"),
+		URL:            runbookPage,
 		Versions: []client.Version{
 			version(2, "Production OAuth runbook", monalisa, "2026-09-24T21:00:00Z", productionRunbookURL),
 			version(1, "Staging OAuth runbook", copilot, "2026-09-23T22:00:00Z", runbookURL),
@@ -280,6 +290,7 @@ func TestViewRun(t *testing.T) {
 		Body:      runbookURL,
 		CreatedAt: at("2026-09-23T22:00:00Z"),
 		UpdatedAt: at("2026-09-24T21:00:00Z"),
+		URL:       runbookPage,
 		Versions: []client.Version{
 			{Version: 2, Name: "Staging OAuth runbook", Body: runbookURL, CreatedAt: at("2026-09-24T21:00:00Z")},
 			{Version: 1, Name: "Staging OAuth runbook", Body: runbookURL, Actor: copilot},
@@ -289,12 +300,12 @@ func TestViewRun(t *testing.T) {
 	// A link whose users and times the API returned as null, with no
 	// versions.
 	nulls := &client.ArtifactWithVersions{
-		Number: 3, Type: "link", Name: "Staging OAuth runbook", Body: runbookURL,
+		Number: 3, Type: "link", Name: "Staging OAuth runbook", Body: runbookURL, URL: runbookPage,
 	}
 
 	link := func(body string) *client.ArtifactWithVersions {
 		return &client.ArtifactWithVersions{
-			Number: 3, Type: "link", Name: "Staging OAuth runbook", Body: body,
+			Number: 3, Type: "link", Name: "Staging OAuth runbook", Body: body, URL: runbookPage,
 		}
 	}
 
@@ -356,7 +367,7 @@ func TestViewRun(t *testing.T) {
 				2   Copilot   about 3 days ago 
 				1   Copilot   about 3 days ago 
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/2
 			`),
 		},
 		{
@@ -374,7 +385,7 @@ func TestViewRun(t *testing.T) {
 				Edit history
 				1  Copilot  about 1 day ago  Current
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3
 			`),
 		},
 		{
@@ -392,7 +403,7 @@ func TestViewRun(t *testing.T) {
 				"\x1b[0;1;39mEdit history\x1b[0m\n" +
 				"1  Copilot  \x1b[38;5;242mabout 1 day ago\x1b[0m  \x1b[0;1;36mCurrent\x1b[0m\n" +
 				"\n" +
-				"\x1b[38;5;242mView this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142\x1b[0m\n",
+				"\x1b[38;5;242mView this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3\x1b[0m\n",
 		},
 		{
 			name:      "--version shows an earlier version, marked Viewing",
@@ -424,7 +435,7 @@ func TestViewRun(t *testing.T) {
 				2   Copilot   about 3 days ago 
 				1   Copilot   about 3 days ago 
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/2
 			`),
 		},
 		{
@@ -443,7 +454,7 @@ func TestViewRun(t *testing.T) {
 				2  monalisa  about 2 hours ago  Current
 				1  Copilot   about 1 day ago    Viewing
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3
 			`),
 		},
 		{
@@ -462,7 +473,7 @@ func TestViewRun(t *testing.T) {
 				2  monalisa  about 2 hours ago  Current
 				1  Copilot   about 1 day ago  
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3
 			`),
 		},
 		{
@@ -489,7 +500,7 @@ func TestViewRun(t *testing.T) {
 				2  ghost    about 2 hours ago  Current
 				1  Copilot                   
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3
 			`),
 		},
 		{
@@ -504,7 +515,7 @@ func TestViewRun(t *testing.T) {
 
 				  https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3
 			`),
 		},
 		{
@@ -523,7 +534,7 @@ func TestViewRun(t *testing.T) {
 				2  ghost    about 2 hours ago  Current
 				1  Copilot                     Viewing
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3
 			`),
 		},
 		{
@@ -531,7 +542,7 @@ func TestViewRun(t *testing.T) {
 			opts: ViewOptions{IssueNumber: 142, ArtifactNumber: 3, Version: 2},
 			tty:  true,
 			artifact: &client.ArtifactWithVersions{
-				Number: 3, Type: "link", Name: "Production OAuth runbook", Body: productionRunbookURL,
+				Number: 3, Type: "link", Name: "Production OAuth runbook", Body: productionRunbookURL, URL: runbookPage,
 				Versions: []client.Version{
 					version(3, "Production OAuth runbook", monalisa, "2026-09-24T21:00:00Z", productionRunbookURL),
 					version(2, "Staging OAuth runbook", nil, "2026-09-24T18:00:00Z", runbookURL),
@@ -550,7 +561,7 @@ func TestViewRun(t *testing.T) {
 				2  ghost     about 5 hours ago  Viewing
 				1  Copilot   about 1 day ago  
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3
 			`),
 		},
 		{
@@ -567,6 +578,7 @@ func TestViewRun(t *testing.T) {
 				created:	2026-09-21T23:00:00Z
 				updated-by:	monalisa
 				updated:	2026-09-24T21:00:00Z
+				url:	https://github.com/monalisa/monas-cafe/issues/142/artifacts/2
 				--
 				# OAuth callback plan
 
@@ -588,6 +600,7 @@ func TestViewRun(t *testing.T) {
 				created:	2026-09-21T23:00:00Z
 				updated-by:	monalisa
 				updated:	2026-09-22T20:00:00Z
+				url:	https://github.com/monalisa/monas-cafe/issues/142/artifacts/2
 				--
 				# OAuth plan
 
@@ -607,6 +620,7 @@ func TestViewRun(t *testing.T) {
 				"created:\t2026-09-23T22:00:00Z\n" +
 				"updated-by:\t\n" +
 				"updated:\t2026-09-24T21:00:00Z\n" +
+				"url:\thttps://github.com/monalisa/monas-cafe/issues/142/artifacts/3\n" +
 				"--\n" +
 				"https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook\n",
 		},
@@ -623,6 +637,7 @@ func TestViewRun(t *testing.T) {
 				"created:\t\n" +
 				"updated-by:\t\n" +
 				"updated:\t\n" +
+				"url:\thttps://github.com/monalisa/monas-cafe/issues/142/artifacts/3\n" +
 				"--\n" +
 				"https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook\n",
 		},
@@ -639,6 +654,7 @@ func TestViewRun(t *testing.T) {
 				"created:\t2026-09-23T22:00:00Z\n" +
 				"updated-by:\tCopilot\n" +
 				"updated:\t\n" +
+				"url:\thttps://github.com/monalisa/monas-cafe/issues/142/artifacts/3\n" +
 				"--\n" +
 				"https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook\n",
 		},
@@ -649,6 +665,13 @@ func TestViewRun(t *testing.T) {
 			artifact:   oauthPlan,
 			wantCalls:  []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
 			wantStdout: `{"name":"OAuth callback plan","number":2,"type":"generic"}` + "\n",
+		},
+		{
+			name:       "--json with url, the artifact's page",
+			opts:       ViewOptions{IssueNumber: 142, ArtifactNumber: 2, Exporter: jsonExporter("number", "url")},
+			artifact:   oauthPlan,
+			wantCalls:  []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
+			wantStdout: `{"number":2,"url":"https://github.com/monalisa/monas-cafe/issues/142/artifacts/2"}` + "\n",
 		},
 		{
 			name:      "--json with versions",
@@ -683,7 +706,7 @@ func TestViewRun(t *testing.T) {
 				Edit history
 				1  Copilot  about 1 day ago  Current
 
-				View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3
 			`),
 			wantStderr: "error starting pager: EOF found when expecting closing quote\n",
 		},
@@ -722,12 +745,32 @@ func TestViewRun(t *testing.T) {
 			wantBrowsed: "http://staging.monas-cafe.example:8080/oauth?step=callback#retry",
 		},
 		{
-			name:      "--web refuses a document",
-			opts:      ViewOptions{IssueNumber: 142, ArtifactNumber: 2, WebMode: true},
-			tty:       true,
-			artifact:  oauthPlan,
-			wantCalls: []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
-			wantErr:   "artifact 2 is not a link; `--web` only opens link artifacts",
+			name:        "--web opens a document's page on GitHub",
+			opts:        ViewOptions{IssueNumber: 142, ArtifactNumber: 2, WebMode: true},
+			tty:         true,
+			artifact:    oauthPlan,
+			wantCalls:   []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
+			wantStderr:  "Opening https://github.com/monalisa/monas-cafe/issues/142/artifacts/2 in your browser.\n",
+			wantBrowsed: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2",
+		},
+		{
+			name:        "--web when piped opens a document's page without a message",
+			opts:        ViewOptions{IssueNumber: 142, ArtifactNumber: 2, WebMode: true},
+			artifact:    oauthPlan,
+			wantCalls:   []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
+			wantBrowsed: "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2",
+		},
+		{
+			name: "--web opens a plan's page, since a plan is a document",
+			opts: ViewOptions{IssueNumber: 137, ArtifactNumber: 1, WebMode: true},
+			tty:  true,
+			artifact: &client.ArtifactWithVersions{
+				Number: 1, Type: "plan", Name: "Approved plan", Body: "# Approved plan",
+				URL: "https://github.com/monalisa/monas-cafe/issues/137/artifacts/1",
+			},
+			wantCalls:   []string{"IsPullRequest monalisa/monas-cafe#137", "Get monalisa/monas-cafe#137 artifact 1"},
+			wantStderr:  "Opening https://github.com/monalisa/monas-cafe/issues/137/artifacts/1 in your browser.\n",
+			wantBrowsed: "https://github.com/monalisa/monas-cafe/issues/137/artifacts/1",
 		},
 		{
 			name:      "--web refuses a link that isn't an http(s) URL",
@@ -784,7 +827,7 @@ func TestViewRun(t *testing.T) {
 			repo:     ghrepo.NewWithHost("monalisa", "monas-cafe", "monas-cafe.ghe.com"),
 			opts:     ViewOptions{IssueNumber: 142, ArtifactNumber: 3},
 			tty:      true,
-			artifact: runbook,
+			artifact: tenancyRunbook,
 			wantCalls: []string{
 				"IsPullRequest monas-cafe.ghe.com/monalisa/monas-cafe#142",
 				"Get monas-cafe.ghe.com/monalisa/monas-cafe#142 artifact 3",
@@ -798,7 +841,25 @@ func TestViewRun(t *testing.T) {
 				Edit history
 				1  Copilot  about 1 day ago  Current
 
-				View this issue on GitHub: https://monas-cafe.ghe.com/monalisa/monas-cafe/issues/142
+				View this artifact on GitHub: https://monas-cafe.ghe.com/monalisa/monas-cafe/issues/142/artifacts/3
+			`),
+		},
+		{
+			name: "the footer is the artifact's URL as the API returns it, in the owner's own case",
+			opts: ViewOptions{IssueNumber: 142, ArtifactNumber: 3},
+			tty:  true,
+			artifact: &client.ArtifactWithVersions{
+				Number: 3, Type: "link", Name: "Staging OAuth runbook", Body: runbookURL,
+				URL: "https://github.com/MonaLisa/monas-cafe/issues/142/artifacts/3",
+			},
+			wantCalls: []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 3"},
+			wantStdout: heredoc.Doc(`
+				Staging OAuth runbook monalisa/monas-cafe#142
+				Artifact 3 • link
+
+				  https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook
+
+				View this artifact on GitHub: https://github.com/MonaLisa/monas-cafe/issues/142/artifacts/3
 			`),
 		},
 		{

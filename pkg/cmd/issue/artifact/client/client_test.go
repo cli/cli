@@ -188,7 +188,8 @@ func TestList(t *testing.T) {
 						"creator": {"login": "hubot", "id": 2},
 						"updated_by_actor": {"login": "monalisa", "id": 1},
 						"created_at": "2026-09-21T23:00:00Z",
-						"updated_at": "2026-09-24T21:00:00Z"
+						"updated_at": "2026-09-24T21:00:00Z",
+						"html_url": "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2"
 					},
 					{
 						"id": 6627,
@@ -201,7 +202,8 @@ func TestList(t *testing.T) {
 						"creator": null,
 						"updated_by_actor": null,
 						"created_at": null,
-						"updated_at": null
+						"updated_at": null,
+						"html_url": "https://github.com/monalisa/monas-cafe/issues/142/artifacts/3"
 					}
 				]`),
 			},
@@ -218,6 +220,7 @@ func TestList(t *testing.T) {
 					UpdatedByActor: &Actor{ID: 1, Login: "monalisa"},
 					CreatedAt:      &createdAt,
 					UpdatedAt:      &updatedAt,
+					URL:            "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2",
 				},
 				{
 					ID:     6627,
@@ -225,6 +228,7 @@ func TestList(t *testing.T) {
 					Type:   "link",
 					Name:   "Staging OAuth runbook",
 					Body:   "https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook",
+					URL:    "https://github.com/monalisa/monas-cafe/issues/142/artifacts/3",
 				},
 			},
 			wantURLs: []string{listURL + "?per_page=100"},
@@ -404,7 +408,8 @@ func TestGet(t *testing.T) {
 					"creator": {"login": "hubot", "id": 2},
 					"updated_by_actor": {"login": "monalisa", "id": 1},
 					"created_at": "2026-09-21T23:00:00Z",
-					"updated_at": "2026-09-24T21:00:00Z"
+					"updated_at": "2026-09-24T21:00:00Z",
+					"html_url": "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2"
 				},
 				"versions": [
 					{
@@ -445,6 +450,7 @@ func TestGet(t *testing.T) {
 				UpdatedByActor: &Actor{ID: 1, Login: "monalisa"},
 				CreatedAt:      &createdAt,
 				UpdatedAt:      &updatedAt,
+				URL:            "https://github.com/monalisa/monas-cafe/issues/142/artifacts/2",
 				Versions: []Version{
 					{
 						Version:   12,

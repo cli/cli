@@ -31,6 +31,7 @@ func TestListJSONFields(t *testing.T) {
 		"type",
 		"updatedAt",
 		"updatedByActor",
+		"url",
 	})
 }
 
@@ -130,9 +131,10 @@ func TestNewCmdList(t *testing.T) {
 			wantErr: `invalid argument "docs" for "--type" flag: valid values are {generic|plan|link}`,
 		},
 		{
-			name:    "--json with url, which isn't a field",
-			args:    "142 --json number,url",
-			wantErr: "Unknown JSON field: \"url\"\nAvailable fields:\n  body\n  bodyHtml\n  createdAt\n  creator\n  description\n  id\n  name\n  number\n  type\n  updatedAt\n  updatedByActor",
+			name:     "--json url",
+			args:     "142 --json number,url",
+			wantOpts: ListOptions{IssueNumber: 142},
+			wantRepo: "OWNER/REPO",
 		},
 		{
 			name:    "no issue",
@@ -202,9 +204,10 @@ func TestListRun(t *testing.T) {
 	}
 
 	// The artifacts on the spec's issue 142.
-	oauthPlan := client.Artifact{ID: 6626, Number: 2, Type: "generic", Name: "OAuth callback plan", UpdatedAt: hoursAgo(2)}
-	runbook := client.Artifact{ID: 6627, Number: 3, Type: "link", Name: "Staging OAuth runbook", UpdatedAt: hoursAgo(24)}
-	feedback := client.Artifact{ID: 6629, Number: 5, Type: "generic", Name: "Barista feedback notes", UpdatedAt: hoursAgo(72)}
+	const issuePage = "https://github.com/monalisa/monas-cafe/issues/142"
+	oauthPlan := client.Artifact{ID: 6626, Number: 2, Type: "generic", Name: "OAuth callback plan", UpdatedAt: hoursAgo(2), URL: issuePage + "/artifacts/2"}
+	runbook := client.Artifact{ID: 6627, Number: 3, Type: "link", Name: "Staging OAuth runbook", UpdatedAt: hoursAgo(24), URL: issuePage + "/artifacts/3"}
+	feedback := client.Artifact{ID: 6629, Number: 5, Type: "generic", Name: "Barista feedback notes", UpdatedAt: hoursAgo(72), URL: issuePage + "/artifacts/5"}
 	// The documents on the spec's issue 137.
 	approvedPlan := client.Artifact{ID: 6640, Number: 1, Type: "plan", Name: "Approved plan", UpdatedAt: hoursAgo(5)}
 	research := client.Artifact{ID: 6641, Number: 2, Type: "generic", Name: "OAuth provider research", UpdatedAt: hoursAgo(1)}
@@ -450,6 +453,15 @@ func TestListRun(t *testing.T) {
 			artifacts:  map[string][]client.Artifact{"": {oauthPlan, runbook, feedback}},
 			wantCalls:  []string{"IsPullRequest monalisa/monas-cafe#142", `List monalisa/monas-cafe#142 type="" limit=0`},
 			wantStdout: `[{"name":"OAuth callback plan","number":2,"type":"generic"},{"name":"Staging OAuth runbook","number":3,"type":"link"},{"name":"Barista feedback notes","number":5,"type":"generic"}]` + "\n",
+		},
+		{
+			name:      "--json with url, each artifact's page",
+			opts:      ListOptions{IssueNumber: 142, Exporter: jsonExporter("number", "url")},
+			artifacts: map[string][]client.Artifact{"": {oauthPlan, runbook, feedback}},
+			wantCalls: []string{"IsPullRequest monalisa/monas-cafe#142", `List monalisa/monas-cafe#142 type="" limit=0`},
+			wantStdout: `[{"number":2,"url":"https://github.com/monalisa/monas-cafe/issues/142/artifacts/2"},` +
+				`{"number":3,"url":"https://github.com/monalisa/monas-cafe/issues/142/artifacts/3"},` +
+				`{"number":5,"url":"https://github.com/monalisa/monas-cafe/issues/142/artifacts/5"}]` + "\n",
 		},
 		{
 			name: "--json keeps nulls and exact names",

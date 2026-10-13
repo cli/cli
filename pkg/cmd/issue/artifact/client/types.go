@@ -14,7 +14,8 @@ const (
 )
 
 // ArtifactFields lists the --json fields of an artifact. They are the fields
-// the API returns, camelCased the way gh release names REST fields.
+// the API returns, named the way gh release names REST fields: camelCased,
+// with the web URL, html_url, as url.
 var ArtifactFields = []string{
 	"body",
 	"bodyHtml",
@@ -27,6 +28,7 @@ var ArtifactFields = []string{
 	"type",
 	"updatedAt",
 	"updatedByActor",
+	"url",
 }
 
 // ArtifactWithVersionsFields lists the --json fields of a single artifact: the
@@ -50,6 +52,8 @@ type Artifact struct {
 	UpdatedByActor *Actor     `json:"updated_by_actor"`
 	CreatedAt      *time.Time `json:"created_at"`
 	UpdatedAt      *time.Time `json:"updated_at"`
+	// URL is the artifact's page on GitHub, from the API's html_url.
+	URL string `json:"html_url"`
 }
 
 // Actor is a user who created or updated an artifact, or saved one of its
@@ -121,6 +125,8 @@ func (a Artifact) ExportData(fields []string) map[string]any {
 			data[f] = a.UpdatedAt
 		case "updatedByActor":
 			data[f] = a.UpdatedByActor.export()
+		case "url":
+			data[f] = a.URL
 		}
 	}
 	return data
