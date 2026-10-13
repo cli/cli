@@ -117,7 +117,7 @@ func (flow *GitCredentialFlow) Setup(hostname, username, authToken string, refre
 			return "", err
 		}
 		return fmt.Sprintf(
-			"The configured git credential helper for %[1]s cannot refresh short-lived tokens, so git operations will fail once the token expires. Run 'gh auth setup-git --hostname %[1]s' to let gh manage git authentication.",
+			"The configured git credential helper for %[1]s cannot refresh short-lived tokens, so the new credential was not stored in it. Git operations may prompt for credentials or fail on the next attempt. Run 'gh auth setup-git --hostname %[1]s' to let gh manage git authentication.",
 			hostname,
 		), nil
 	}
