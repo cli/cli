@@ -63,6 +63,10 @@ label() { # label <word> <rest...>
 
 note() { printf "%s%s%s\n" "$DIM" "$*" "$RESET"; }
 
+# note_bold prints a bold reviewer-action note, used when the reviewer must do
+# something during the step rather than just read passive context.
+note_bold() { printf "%s%s%s\n" "$BOLD" "$*" "$RESET"; }
+
 # cmdline prints the exact command that is about to run, highlighted and set
 # apart from the dim explanatory notes.
 cmdline() { printf "  %s%s%s\n" "$YELLOW" "$*" "$RESET"; }
@@ -348,6 +352,7 @@ cmdline "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --short-li
 note   "  (HTTPS is required: the git credential helper only applies to https remotes.)"
 note   "  (--clipboard copies the one-time code, so you can just paste it into the browser.)"
 note   "  (Storage is left at the default; this flow does not depend on the storage type.)"
+note_bold "  ACTION: during login gh asks \"Authenticate Git with your GitHub credentials?\". Confirm it (answer Yes) so gh configures git to use this build as the credential helper for $HOST."
 confirm_run
 run_interactive \
   "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --short-lived --clipboard" \
