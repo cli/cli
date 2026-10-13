@@ -188,13 +188,14 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   Piped output is tab-separated number, name, type, and RFC 3339 update time.
   `--json` fields include `body`, so one call can return every artifact's
   content.
-- `gh issue artifact view {<issue-number>|<issue-url>} <artifact-number> [--version N] [--json <fields>] [--web]`
-  shows one artifact and its edit history. Piped output is `name:`, `number:`,
-  `version:`, `type:`, `creator:`, `created:`, `updated-by:`, and `updated:`
-  lines, in that order, then `--` and the raw body. `--version N` shows that
-  version from the edit history. `--version`, `--json`, and `--web` are
-  mutually exclusive. `--json versions` returns the edit history. `--web`
-  opens a link artifact's URL.
+- `gh issue artifact view {<issue> <artifact-number> | <artifact-url>} [--version N] [--json <fields>] [--web]`
+  shows one artifact and its edit history. In a terminal, it ends with the
+  artifact's URL. Piped output is `name:`, `number:`, `version:`, `type:`,
+  `creator:`, `created:`, `updated-by:`, `updated:`, and `url:` lines, in
+  that order, then `--` and the raw body. `--version N` shows that version
+  from the edit history. `--version`, `--json`, and `--web` are mutually
+  exclusive. `--json versions` returns the edit history. `--web` opens a
+  document's page on GitHub, or a link's URL.
 - `gh issue artifact create {<issue-number>|<issue-url>} [<file>[#<name>] | <url>]... [--body <text> | --body-file <path>] [--name <name>] [--type generic|plan] [--attach <path>]...`
   (alias `new`) creates one artifact per file or URL, in argument
   order. A text file becomes a document named after the file, or after the
@@ -211,7 +212,7 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   be combined with a `#<name>` suffix. Documents are `generic` unless
   `--type plan` is given, and a plan currently behaves the same. `--type` is
   refused if any artifact is a link.
-- `gh issue artifact edit {<issue-number>|<issue-url>} <artifact-number> [--name <name>] [--body <text> | --body-file <path>] [--attach <path>]... [--restore-version N]`
+- `gh issue artifact edit {<issue> <artifact-number> | <artifact-url>} [--name <name>] [--body <text> | --body-file <path>] [--attach <path>]... [--restore-version N]`
   renames an artifact or replaces its content, saving a new version. At least
   one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`
   is required, and a `--body-file` never renames the artifact. The type never
@@ -222,12 +223,12 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   `--body`, `--body-file`, or `--attach`. If the artifact already matches
   that version, nothing is saved and `gh` exits 0, with a `skipped` line when
   piped.
-- `gh issue artifact delete {<issue-number>|<issue-url>} <artifact-number>... [--yes]`
+- `gh issue artifact delete {<issue> <artifact-number>... | <artifact-url>...} [--yes]`
   deletes artifacts, which can't be restored. In a terminal, `gh` asks once
   for all of them. `--yes` skips the prompt and is required when `gh` can't
   prompt. Without `--yes`, a failed lookup stops the command before the
   prompt, and nothing is deleted. With `--yes`, every number is attempted.
-- `gh issue artifact download {<issue-number>|<issue-url>} [<artifact-number>...] [--dir <dir> | --output <path>] [--clobber | --skip-existing] [--version N]`
+- `gh issue artifact download {<issue> [<artifact-number>...] | <artifact-url>...} [--dir <dir> | --output <path>] [--clobber | --skip-existing] [--version N]`
   writes the given artifacts, or every artifact on the issue, to files in
   `--dir` (default `.`). Each file is named `<number>-<name>`, with path
   separators, whitespace, control characters, and characters Windows forbids
@@ -239,9 +240,14 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   `--output -` prints its stored body (a link's URL) with nothing else.
   Without numbers, an issue with no artifacts is an error.
 - The issue argument is a number or an issue URL, and a URL selects its own
-  repository. Pull requests are refused, and so is GitHub Enterprise Server.
+  repository. An artifact URL,
+  `https://github.com/<owner>/<repo>/issues/<issue>/artifacts/<number>`, can
+  replace the issue and number, and selects its repository the same way.
+  Artifact URLs in one command must be on the same issue. Pull requests are
+  refused, and so is GitHub Enterprise Server.
 - `--json`/`--jq`/`--template` are available on `list` and `view` only. The
-  `id` field is a global ID that no command accepts; commands take `number`.
+  `id` field is a global ID that no command accepts; commands take `number`,
+  or `url`, the artifact's page on GitHub.
 - `create`, `edit`, and `download` (except with `--output -`) report each
   artifact on its own line. When piped, every line goes to stdout with five
   tab-separated columns, empty ones included: status (`created`, `updated`,
