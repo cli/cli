@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	gitCredentialCmd "github.com/cli/cli/v2/pkg/cmd/auth/gitcredential"
 	authLoginCmd "github.com/cli/cli/v2/pkg/cmd/auth/login"
 	authLogoutCmd "github.com/cli/cli/v2/pkg/cmd/auth/logout"
@@ -13,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdAuth(f *cmdutil.Factory) *cobra.Command {
+func NewCmdAuth(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "auth <command>",
 		Short:   "Authenticate gh and git with GitHub",
@@ -22,16 +23,24 @@ func NewCmdAuth(f *cmdutil.Factory) *cobra.Command {
 
 	cmdutil.DisableAuthCheck(cmd)
 
-	cmd.AddCommand(authLoginCmd.NewCmdLogin(f, nil))
+	loginCmd := authLoginCmd.NewCmdLogin(f, telemetry, nil)
+	refreshCmd := authRefreshCmd.NewCmdRefresh(f, telemetry, nil)
+
+	cmd.AddCommand(loginCmd)
 	cmd.AddCommand(authLogoutCmd.NewCmdLogout(f, nil))
 	cmd.AddCommand(authStatusCmd.NewCmdStatus(f, nil))
-	cmd.AddCommand(authRefreshCmd.NewCmdRefresh(f, nil))
+	cmd.AddCommand(refreshCmd)
 	cmd.AddCommand(gitCredentialCmd.NewCmdCredential(f, nil))
 	cmd.AddCommand(authSetupGitCmd.NewCmdSetupGit(f, nil))
 	cmd.AddCommand(authTokenCmd.NewCmdToken(f, nil))
 	cmd.AddCommand(authSwitchCmd.NewCmdSwitch(f, nil))
 
 	cmdutil.DisableTelemetryForSubcommands(cmd)
+
+	// Opt login and refresh back into telemetry so we can observe auth usage, such as the configured git credential
+	// helper. The rest of the auth subcommands stay excluded.
+	cmdutil.EnableTelemetry(loginCmd)
+	cmdutil.EnableTelemetry(refreshCmd)
 
 	return cmd
 }

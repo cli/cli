@@ -203,7 +203,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			require.NoError(t, err)
 
 			var gotOpts *RefreshOptions
-			cmd := NewCmdRefresh(f, func(opts *RefreshOptions) error {
+			cmd := NewCmdRefresh(f, nil, func(opts *RefreshOptions) error {
 				gotOpts = opts
 				return nil
 			})

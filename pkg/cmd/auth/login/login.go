@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
@@ -28,6 +29,7 @@ type LoginOptions struct {
 	GitClient       *git.Client
 	Prompter        shared.Prompt
 	Browser         browser.Browser
+	Telemetry       ghtelemetry.InvocationRecorder
 
 	MainExecutable string
 
@@ -48,7 +50,7 @@ type LoginOptions struct {
 	AuthFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
 }
 
-func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
+func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*LoginOptions) error) *cobra.Command {
 	opts := &LoginOptions{
 		IO:              f.IOStreams,
 		Config:          f.Config,
@@ -57,6 +59,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		GitClient:       f.GitClient,
 		Prompter:        f.Prompter,
 		Browser:         f.Browser,
+		Telemetry:       telemetry,
 	}
 
 	var tokenStdin bool
@@ -125,6 +128,10 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.Telemetry != nil {
+				opts.Telemetry.SetSampleRate(ghtelemetry.SAMPLE_ALL)
+			}
+
 			if tokenStdin && opts.Web {
 				return cmdutil.FlagErrorf("specify only one of `--web` or `--with-token`")
 			}
@@ -208,6 +215,15 @@ func loginRun(opts *LoginOptions) error {
 	// https://github.com/cli/go-gh/pull/105
 	hostname = strings.ToLower(hostname)
 
+	helperConfig := &gitcredentials.HelperConfig{
+		SelfExecutablePath: opts.MainExecutable,
+		GitClient:          opts.GitClient,
+	}
+
+	// Record the configured git credential helper before login reconfigures it, so the event reflects the state the
+	// user started from.
+	shared.RecordAuthInvocationTelemetry(opts.Telemetry, "login", hostname, helperConfig, cfg.PreferExpiringCredentials(hostname).Value)
+
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
 		fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
@@ -251,11 +267,8 @@ func loginRun(opts *LoginOptions) error {
 		Prompter:        opts.Prompter,
 		Browser:         opts.Browser,
 		CredentialFlow: &shared.GitCredentialFlow{
-			Prompter: opts.Prompter,
-			HelperConfig: &gitcredentials.HelperConfig{
-				SelfExecutablePath: opts.MainExecutable,
-				GitClient:          opts.GitClient,
-			},
+			Prompter:     opts.Prompter,
+			HelperConfig: helperConfig,
 			Updater: &gitcredentials.Updater{
 				GitClient: opts.GitClient,
 			},
