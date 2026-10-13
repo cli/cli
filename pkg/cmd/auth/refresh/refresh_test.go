@@ -256,6 +256,7 @@ func Test_refreshRun(t *testing.T) {
 		authOut                authOut
 		oldScopes              string
 		clipboard              string
+		preferExpiringCfg      string
 		wantErr                string
 		nontty                 bool
 		wantAuthArgs           authArgs
@@ -565,6 +566,49 @@ func Test_refreshRun(t *testing.T) {
 			wantStoredRefreshToken: "ghr_refresh",
 		},
 		{
+			name: "prefer_expiring_credentials config requests expiring without the flag",
+			cfgHosts: []string{
+				"github.com",
+			},
+			preferExpiringCfg: "enabled",
+			opts: &RefreshOptions{
+				Hostname: "github.com",
+			},
+			authOut: authOut{
+				username:    "test-user",
+				token:       "gho_access",
+				refreshable: &gh.Credential{Token: "gho_access", RefreshToken: "ghr_refresh"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     true,
+				expiring:      true,
+			},
+			wantStoredToken:        "gho_access",
+			wantStoredRefreshToken: "ghr_refresh",
+		},
+		{
+			name: "--expiring=false overrides prefer_expiring_credentials config",
+			cfgHosts: []string{
+				"github.com",
+			},
+			preferExpiringCfg: "enabled",
+			opts: &RefreshOptions{
+				Hostname: "github.com",
+				Expiring: new(false),
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     true,
+				expiring:      false,
+			},
+			wantStoredToken: "xyz456",
+		},
+		{
 			name: "existing refreshable credential without --expiring warns about downgrade",
 			cfgHosts: []string{
 				"github.com",
@@ -658,6 +702,9 @@ func Test_refreshRun(t *testing.T) {
 			cfg, _ := config.NewIsolatedTestConfig(t, "")
 			if tt.clipboard != "" {
 				cfg.Set("", "clipboard", tt.clipboard)
+			}
+			if tt.preferExpiringCfg != "" {
+				cfg.Set("", "prefer_expiring_credentials", tt.preferExpiringCfg)
 			}
 			for _, hostname := range tt.cfgHosts {
 				switch {

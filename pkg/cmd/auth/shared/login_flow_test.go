@@ -84,6 +84,60 @@ func TestShouldCopyToClipboard(t *testing.T) {
 	}
 }
 
+func TestShouldPreferExpiring(t *testing.T) {
+	tests := []struct {
+		name       string
+		configured string
+		flagValue  *bool
+		want       bool
+	}{
+		{
+			name: "disabled by default",
+			want: false,
+		},
+		{
+			name:       "enabled by configuration",
+			configured: "enabled",
+			want:       true,
+		},
+		{
+			name:       "explicit flag enables disabled configuration",
+			configured: "disabled",
+			flagValue:  new(true),
+			want:       true,
+		},
+		{
+			name:       "explicit flag disables enabled configuration",
+			configured: "enabled",
+			flagValue:  new(false),
+			want:       false,
+		},
+		{
+			name:       "explicit flag and configuration both prefer expiring",
+			configured: "enabled",
+			flagValue:  new(true),
+			want:       true,
+		},
+		{
+			name:       "explicit flag and configuration both disable expiring",
+			configured: "disabled",
+			flagValue:  new(false),
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.NewMockConfig()
+			if tt.configured != "" {
+				cfg.Set("github.com", "prefer_expiring_credentials", tt.configured)
+			}
+
+			require.Equal(t, tt.want, ShouldPreferExpiring(cfg, tt.flagValue, "github.com"))
+		})
+	}
+}
+
 func TestLogin(t *testing.T) {
 	tests := []struct {
 		name         string

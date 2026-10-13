@@ -35,6 +35,7 @@ const (
 	pagerKey              = "pager"
 	promptKey             = "prompt"
 	preferEditorPromptKey = "prefer_editor_prompt"
+	preferExpiringKey     = "prefer_expiring_credentials"
 	spinnerKey            = "spinner"
 	telemetryKey          = "telemetry"
 	userKey               = "user"
@@ -182,6 +183,11 @@ func (c *cfg) Prompt(hostname string) gh.ConfigEntry {
 func (c *cfg) PreferEditorPrompt(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, preferEditorPromptKey).Unwrap()
+}
+
+func (c *cfg) PreferExpiringCredentials(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, preferExpiringKey).Unwrap()
 }
 
 func (c *cfg) Spinner(hostname string) gh.ConfigEntry {
@@ -765,6 +771,8 @@ editor:
 prompt: enabled
 # Preference for editor-based interactive prompting. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
 prefer_editor_prompt: disabled
+# Whether to prefer expiring credentials that gh refreshes automatically when logging in or refreshing, without passing --expiring. Supported values: enabled, disabled
+prefer_expiring_credentials: disabled
 # A pager program to send command output to, e.g. "less". If blank, will refer to environment. Set the value to "cat" to disable the pager.
 pager:
 # Aliases allow you to create nicknames for gh commands
@@ -852,6 +860,15 @@ var Options = []ConfigOption{
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.PreferEditorPrompt(hostname).Value
+		},
+	},
+	{
+		Key:           preferExpiringKey,
+		Description:   "toggle preference for expiring credentials that gh refreshes automatically when logging in or refreshing",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.PreferExpiringCredentials(hostname).Value
 		},
 	},
 	{
