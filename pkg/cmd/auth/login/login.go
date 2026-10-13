@@ -115,6 +115,10 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 				return cmdutil.FlagErrorf("specify only one of `--scopes` or `--with-token`")
 			}
 
+			if tokenStdin && opts.IO.IsStdinTTY() {
+				return cmdutil.FlagErrorf("`--with-token` must be used non-interactively, e.g. `gh auth login --with-token < mytoken.txt`")
+			}
+
 			if tokenStdin {
 				defer opts.IO.In.Close()
 				token, err := io.ReadAll(opts.IO.In)
