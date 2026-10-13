@@ -53,6 +53,9 @@ func TestSetup_refreshableExternalHelper_declineGh(t *testing.T) {
 	if !strings.Contains(warning, "cannot refresh short-lived tokens") {
 		t.Errorf("Setup() warning = %q, want it to mention that the helper cannot refresh short-lived tokens", warning)
 	}
+	if !strings.Contains(warning, "was not stored") {
+		t.Errorf("Setup() warning = %q, want it to state that the credential was not stored", warning)
+	}
 	if !strings.Contains(warning, "gh auth setup-git --hostname example.com") {
 		t.Errorf("Setup() warning = %q, want it to suggest running gh auth setup-git for the host", warning)
 	}
