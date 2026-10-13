@@ -347,7 +347,6 @@ run_interactive \
 
 label "Expected:"
 assert_err_contains "login reports a short-lived refreshable token" "refreshable token"
-manual "you selected HTTPS as the git protocol"
 next_step
 
 # --- Step: make this build gh's git credential helper -------------------------
