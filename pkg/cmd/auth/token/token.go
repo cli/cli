@@ -90,10 +90,9 @@ func tokenRun(opts *TokenOptions) error {
 	// --secure-storage: read the token straight from the keyring and consult no environment variable or config
 	// entry at all.
 	case opts.SecureStorage && !opts.NoRefresh:
-		// We cannot use ActiveToken or ActiveTokenWithRefresh upfront here: with no username they resolve the active
-		// token, which an environment variable such as GH_TOKEN can shadow, defeating --secure-storage. So when no
-		// username is given we resolve one and look the token up under it directly in the keyring. The refresh path
-		// does not need this fallback because a refreshable token is always stored under a user.
+		// We resolve a username for the refresh lookup because a refreshable token is always stored under a user,
+		// and ActiveTokenWithRefresh cannot be used upfront: with no username it resolves the active token, which an
+		// environment variable such as GH_TOKEN can shadow, defeating --secure-storage.
 		user := resolveUsername(authCfg, hostname, opts.Username)
 		var cred gh.Credential
 		if user != "" {
@@ -102,7 +101,9 @@ func tokenRun(opts *TokenOptions) error {
 		if cred.IsRefreshable() {
 			val = cred.Token
 		} else {
-			val = getNonRefreshableTokenFromKeyring(authCfg, hostname, user)
+			// Non-refreshable fallback: read the keyring keyed on the actual flag value, so an omitted --user reads
+			// the legacy unkeyed slot exactly as the original --secure-storage behaviour did, not a per-user slot.
+			val = getNonRefreshableTokenFromKeyring(authCfg, hostname, opts.Username)
 		}
 
 	// --secure-storage --no-refresh: rare combination with no known caller. Respect --secure-storage strictly and
@@ -110,18 +111,20 @@ func tokenRun(opts *TokenOptions) error {
 	// (refreshable or not) is irrelevant here because refreshing was also declined, so there is no lifecycle to
 	// honor; whoever passed --secure-storage wants the securely stored token specifically, so that is respected.
 	case opts.SecureStorage && opts.NoRefresh:
-		// As in the case above, ActiveToken cannot be used upfront because an environment variable such as GH_TOKEN
-		// can shadow the active token. So when no username is given we resolve one and read its keyring token
-		// directly, falling back to the legacy unkeyed keyring slot when no active user is recorded.
+		// We read under the resolved user so a refreshable token stored in the keyring is still surfaced, but only
+		// return it when it genuinely came from the keyring. ActiveToken cannot be used upfront because an
+		// environment variable such as GH_TOKEN can shadow the active token.
 		user := resolveUsername(authCfg, hostname, opts.Username)
 		var cred gh.Credential
 		if user != "" {
 			cred = getTokenReadOnly(authCfg, hostname, user)
-		} else if token, err := authCfg.TokenFromKeyring(hostname); err == nil {
-			cred = gh.Credential{Source: gh.TokenSourceKeyring, Token: token}
 		}
 		if cred.Source == gh.TokenSourceKeyring {
 			val = cred.Token
+		} else {
+			// Non-refreshable fallback: read the keyring keyed on the actual flag value, so an omitted --user reads
+			// the legacy unkeyed slot exactly as the original --secure-storage behaviour did, not a per-user slot.
+			val = getNonRefreshableTokenFromKeyring(authCfg, hostname, opts.Username)
 		}
 	}
 
