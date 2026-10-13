@@ -43,8 +43,8 @@ type LoginOptions struct {
 	CopyToClipboard  bool
 	Expiring         bool
 
-	// authFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
-	authFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
+	// AuthFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
+	AuthFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
 
 	sshContext ssh.Context
 }
@@ -163,7 +163,7 @@ func Login(opts *LoginOptions) error {
 	var refreshableCredential *gh.Credential
 
 	if authMode == 0 {
-		authFlow := opts.authFlow
+		authFlow := opts.AuthFlow
 		if authFlow == nil {
 			authFlow = authflow.AuthFlow
 		}

@@ -304,7 +304,7 @@ func TestLogin(t *testing.T) {
 				Hostname: "example.com",
 				Web:      true,
 				Expiring: true,
-				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
+				AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
 					if !requestRefreshToken {
 						t.Error("expected requestRefreshToken to be true")
 					}
@@ -331,7 +331,7 @@ func TestLogin(t *testing.T) {
 			opts: LoginOptions{
 				Hostname: "example.com",
 				Web:      true,
-				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
+				AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
 					if requestRefreshToken {
 						t.Error("expected requestRefreshToken to be false")
 					}
@@ -358,7 +358,7 @@ func TestLogin(t *testing.T) {
 				Hostname: "example.com",
 				Web:      true,
 				Expiring: true,
-				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, _ bool) (*authflow.AuthResult, error) {
+				AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, _ bool) (*authflow.AuthResult, error) {
 					return &authflow.AuthResult{Token: "gho_plain", Username: "monalisa"}, nil
 				},
 			},
@@ -387,7 +387,7 @@ func TestLogin(t *testing.T) {
 						return -1, prompter.NoSuchPromptErr(prompt)
 					},
 				},
-				authFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
+				AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
 					if !requestRefreshToken {
 						t.Error("expected requestRefreshToken to be true")
 					}

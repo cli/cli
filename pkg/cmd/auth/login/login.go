@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -39,8 +40,12 @@ type LoginOptions struct {
 	GitProtocol      string
 	InsecureStorage  bool
 	SkipSSHKeyPrompt bool
-	Expiring         bool
+	Expiring         *bool
 	Clipboard        *bool
+
+	// AuthFlow is indirected so tests can stub the interactive authorization. When nil, the shared login flow uses
+	// the real authflow.AuthFlow.
+	AuthFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -123,7 +128,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			if tokenStdin && len(opts.Scopes) > 0 {
 				return cmdutil.FlagErrorf("specify only one of `--scopes` or `--with-token`")
 			}
-			if tokenStdin && opts.Expiring {
+			if tokenStdin && opts.Expiring != nil && *opts.Expiring {
 				return cmdutil.FlagErrorf("specify only one of `--expiring` or `--with-token`")
 			}
 
@@ -173,7 +178,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
 	cmd.Flags().BoolVar(&opts.SkipSSHKeyPrompt, "skip-ssh-key", false, "Skip generate/upload SSH key prompt")
-	cmd.Flags().BoolVar(&opts.Expiring, "expiring", false, "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
+	cmdutil.NilBoolFlag(cmd, &opts.Expiring, "expiring", "", "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
 
 	return cmd
 }
@@ -255,7 +260,8 @@ func loginRun(opts *LoginOptions) error {
 		SecureStorage:    !opts.InsecureStorage,
 		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
 		CopyToClipboard:  copyToClipboard,
-		Expiring:         opts.Expiring,
+		Expiring:         opts.Expiring != nil && *opts.Expiring,
+		AuthFlow:         opts.AuthFlow,
 	})
 }
 
