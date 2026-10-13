@@ -142,7 +142,9 @@ func Login(opts *LoginOptions) error {
 	}
 
 	var authMode int
-	if opts.Web {
+	if opts.Web || opts.ShortLived {
+		// A pasted personal access token can never be refreshable, so a short-lived login must use the web flow.
+		// Forcing it here avoids offering a token-paste option that would silently ignore --short-lived.
 		authMode = 0
 	} else if opts.Interactive {
 		options := []string{"Login with a web browser", "Paste an authentication token"}
