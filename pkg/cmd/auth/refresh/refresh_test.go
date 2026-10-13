@@ -2,14 +2,17 @@ package refresh
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -239,6 +242,8 @@ func Test_refreshRun(t *testing.T) {
 		prompterStubs          func(*prompter.PrompterMock)
 		cfgHosts               []string
 		cfgRefreshable         bool
+		cfgRefreshableExpired  bool
+		refresher              *ghmock.TokenRefresherMock
 		authOut                authOut
 		oldScopes              string
 		clipboard              string
@@ -569,6 +574,44 @@ func Test_refreshRun(t *testing.T) {
 			wantStderrContains:     "Original token was short-lived; pass --short-lived to preserve it\n",
 		},
 		{
+			name: "expired refreshable token is refreshed so its scopes are preserved",
+			cfgHosts: []string{
+				"github.com",
+			},
+			cfgRefreshableExpired: true,
+			refresher:             renewingRefresher(),
+			oldScopes:             "repo, read:org",
+			opts:                  &RefreshOptions{},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"repo", "read:org"},
+				secureStorage: true,
+				clipboard:     true,
+				shortLived:    false,
+			},
+			wantStoredToken:        "xyz456",
+			wantStoredRefreshToken: "",
+		},
+		{
+			name: "expired refreshable token that cannot be refreshed warns that scopes were not preserved",
+			cfgHosts: []string{
+				"github.com",
+			},
+			cfgRefreshableExpired: true,
+			refresher:             failingRefresher(),
+			opts:                  &RefreshOptions{},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     true,
+				shortLived:    false,
+			},
+			wantStoredToken:        "xyz456",
+			wantStoredRefreshToken: "",
+			wantStderrContains:     "Could not read the current token's scopes",
+		},
+		{
 			name: "errors when active user does not match user returned by auth flow",
 			cfgHosts: []string{
 				"github.com",
@@ -608,10 +651,19 @@ func Test_refreshRun(t *testing.T) {
 				cfg.Set("", "clipboard", tt.clipboard)
 			}
 			for _, hostname := range tt.cfgHosts {
-				if tt.cfgRefreshable {
+				switch {
+				case tt.cfgRefreshableExpired:
+					// Store a refreshable credential whose access token has already expired and wire the refresher the
+					// case provides, so the scope carry-forward path exercises ActiveTokenWithRefresh.
+					authCfg := cfg.Authentication()
+					authCfg.SetTokenRefresher(tt.refresher)
+					expiry := time.Now().Add(-time.Hour)
+					_, err := authCfg.LoginRefreshable(hostname, "test-user", gh.Credential{Token: "expired-access", RefreshToken: "ghr_old", ExpiresAt: &expiry}, "https", false)
+					require.NoError(t, err)
+				case tt.cfgRefreshable:
 					_, err := cfg.Authentication().LoginRefreshable(hostname, "test-user", gh.Credential{Token: "abc123", RefreshToken: "ghr_old"}, "https", false)
 					require.NoError(t, err)
-				} else {
+				default:
 					_, err := cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
 					require.NoError(t, err)
 				}
@@ -629,9 +681,11 @@ func Test_refreshRun(t *testing.T) {
 			httpReg.Register(
 				httpmock.REST("GET", ""),
 				func(req *http.Request) (*http.Response, error) {
-					statusCode := 200
-					if req.Header.Get("Authorization") != "token abc123" {
-						statusCode = 400
+					// The expired stored token 400s; the renewed token and the non-expiring token succeed.
+					statusCode := 400
+					switch req.Header.Get("Authorization") {
+					case "token abc123", "token new-access":
+						statusCode = 200
 					}
 					return &http.Response{
 						Request:    req,
@@ -682,5 +736,28 @@ func Test_refreshRun(t *testing.T) {
 				require.Contains(t, stderr.String(), tt.wantStderrContains)
 			}
 		})
+	}
+}
+
+// renewingRefresher renews any refresh token to a fresh, long-lived credential whose access token is "new-access".
+func renewingRefresher() *ghmock.TokenRefresherMock {
+	future := time.Now().Add(time.Hour)
+	return &ghmock.TokenRefresherMock{
+		RefreshFunc: func(_, _ string) (gh.RefreshableCredential, error) {
+			return gh.RefreshableCredential{
+				AccessToken:  "new-access",
+				RefreshToken: "new-refresh",
+				ExpiresAt:    &future,
+			}, nil
+		},
+	}
+}
+
+// failingRefresher always fails to renew, simulating a transient refresh error.
+func failingRefresher() *ghmock.TokenRefresherMock {
+	return &ghmock.TokenRefresherMock{
+		RefreshFunc: func(_, _ string) (gh.RefreshableCredential, error) {
+			return gh.RefreshableCredential{}, errors.New("refresh failed")
+		},
 	}
 }
