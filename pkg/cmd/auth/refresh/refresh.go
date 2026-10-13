@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -24,6 +25,7 @@ type RefreshOptions struct {
 	PlainHttpClient func() (*http.Client, error)
 	GitClient       *git.Client
 	Prompter        shared.Prompt
+	Telemetry       ghtelemetry.InvocationRecorder
 
 	MainExecutable string
 
@@ -39,7 +41,7 @@ type RefreshOptions struct {
 	Clipboard       *bool
 }
 
-func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
+func NewCmdRefresh(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*RefreshOptions) error) *cobra.Command {
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
@@ -49,6 +51,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 		PlainHttpClient: f.PlainHttpClient,
 		GitClient:       f.GitClient,
 		Prompter:        f.Prompter,
+		Telemetry:       telemetry,
 	}
 
 	cmd := &cobra.Command{
@@ -104,6 +107,10 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			$ gh auth refresh --clipboard
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.Telemetry != nil {
+				opts.Telemetry.SetSampleRate(ghtelemetry.SAMPLE_ALL)
+			}
+
 			opts.Interactive = opts.IO.CanPrompt()
 
 			if !opts.Interactive && opts.Hostname == "" {
@@ -224,6 +231,10 @@ func refreshRun(opts *RefreshOptions) error {
 			GitClient: opts.GitClient,
 		},
 	}
+
+	// Record the configured git credential helper before the refresh flow runs, reusing the flow's helper config.
+	shared.RecordAuthInvocationTelemetry(opts.Telemetry, "refresh", hostname, credentialFlow.HelperConfig, cfg.PreferExpiringCredentials(hostname).Value)
+
 	gitProtocol := cfg.GitProtocol(hostname).Value
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {

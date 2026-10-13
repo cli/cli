@@ -301,7 +301,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			assert.NoError(t, err)
 
 			var gotOpts *LoginOptions
-			cmd := NewCmdLogin(f, func(opts *LoginOptions) error {
+			cmd := NewCmdLogin(f, nil, func(opts *LoginOptions) error {
 				gotOpts = opts
 				return nil
 			})
