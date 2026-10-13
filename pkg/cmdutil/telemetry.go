@@ -68,6 +68,13 @@ func DisableTelemetry(cmd *cobra.Command) {
 	cmd.Annotations["telemetry"] = "disabled"
 }
 
+// EnableTelemetry clears the "disabled" telemetry annotation on cmd, re-enabling the standard command_invocation
+// instrumentation. It is the counterpart to DisableTelemetry and is used to opt specific commands back in after a
+// parent disabled a whole subtree with DisableTelemetryForSubcommands.
+func EnableTelemetry(cmd *cobra.Command) {
+	delete(cmd.Annotations, "telemetry")
+}
+
 func DisableTelemetryForSubcommands(cmd *cobra.Command) {
 	for _, c := range cmd.Commands() {
 		DisableTelemetry(c)

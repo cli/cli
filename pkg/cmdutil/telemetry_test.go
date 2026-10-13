@@ -233,6 +233,30 @@ func TestRecordTelemetry(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, recorder.Events(), "telemetry should not be recorded for disabled commands")
 	})
+
+	t.Run("records commands re-enabled after being disabled", func(t *testing.T) {
+		t.Parallel()
+
+		// Given a command that was disabled and then re-enabled
+		recorder := &telemetry.EventRecorderSpy{}
+		cmd := &cobra.Command{
+			Use:  "internal",
+			RunE: func(cmd *cobra.Command, args []string) error { return nil },
+		}
+		cmd.SetArgs([]string{})
+		cmdutil.DisableTelemetry(cmd)
+		cmdutil.EnableTelemetry(cmd)
+		cmdutil.RecordTelemetry(cmd, recorder)
+
+		// When Cobra executes the command
+		_, err := cmd.ExecuteC()
+
+		// Then the command is recorded again
+		require.NoError(t, err)
+		events := recorder.Events()
+		require.Len(t, events, 1)
+		assert.Equal(t, "internal", events[0].Dimensions["command"])
+	})
 }
 
 func TestRecordTelemetryForSubcommands(t *testing.T) {
