@@ -41,7 +41,7 @@ type LoginOptions struct {
 	SecureStorage    bool
 	SkipSSHKeyPrompt bool
 	CopyToClipboard  bool
-	ShortLived       bool
+	Expiring         bool
 
 	// authFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
 	authFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
@@ -142,9 +142,9 @@ func Login(opts *LoginOptions) error {
 	}
 
 	var authMode int
-	if opts.Web || opts.ShortLived {
-		// A pasted personal access token can never be refreshable, so a short-lived login must use the web flow.
-		// Forcing it here avoids offering a token-paste option that would silently ignore --short-lived.
+	if opts.Web || opts.Expiring {
+		// A pasted personal access token can never be refreshable, so an expiring login must use the web flow.
+		// Forcing it here avoids offering a token-paste option that would silently ignore --expiring.
 		authMode = 0
 	} else if opts.Interactive {
 		options := []string{"Login with a web browser", "Paste an authentication token"}
@@ -167,7 +167,7 @@ func Login(opts *LoginOptions) error {
 		if authFlow == nil {
 			authFlow = authflow.AuthFlow
 		}
-		result, err := authFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard, opts.ShortLived)
+		result, err := authFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard, opts.Expiring)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
@@ -229,15 +229,15 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication credentials saved in plain text\n", cs.Yellow("!"))
 	}
 
-	// Short-lived tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
+	// Expiring tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
 	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
 	switch {
-	case refreshableCredential != nil && !opts.ShortLived:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues short-lived refreshable token\n", cs.WarningIcon())
+	case refreshableCredential != nil && !opts.Expiring:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues expiring refreshable token\n", cs.WarningIcon())
 	case refreshableCredential != nil:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Received short-lived refreshable token\n", cs.SuccessIcon())
-	case opts.ShortLived && authMode == 0:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue a short-lived refreshable token\n", cs.WarningIcon())
+		fmt.Fprintf(opts.IO.ErrOut, "%s Received expiring refreshable token\n", cs.SuccessIcon())
+	case opts.Expiring && authMode == 0:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue an expiring refreshable token\n", cs.WarningIcon())
 	}
 
 	if opts.CredentialFlow.ShouldSetup() {

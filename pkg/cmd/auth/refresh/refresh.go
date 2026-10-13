@@ -35,7 +35,7 @@ type RefreshOptions struct {
 
 	Interactive     bool
 	InsecureStorage bool
-	ShortLived      bool
+	Expiring        bool
 	Clipboard       *bool
 }
 
@@ -73,11 +73,11 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			inactive account, you will have to use %[1]sgh auth switch%[1]s to that account first before using
 			this command, and then switch back when you are done.
 
-			Use %[1]s--short-lived%[1]s to prefer short-lived credentials that gh refreshes automatically.
-			This is a preference, not a guarantee: whether short-lived tokens are issued depends on the
+			Use %[1]s--expiring%[1]s to prefer expiring credentials that gh refreshes automatically.
+			This is a preference, not a guarantee: whether expiring tokens are issued depends on the
 			host and the OAuth app configuration. A host without support issues a non-expiring token
-			instead, and a host configured for them may issue short-lived tokens even without the flag.
-			When using short-lived credentials for git operations, git 2.46 or newer is recommended so
+			instead, and a host configured for them may issue expiring tokens even without the flag.
+			When using expiring credentials for git operations, git 2.46 or newer is recommended so
 			gh can mark the token as non-cacheable; with older git a credential caching helper may store
 			and reuse an expired token.
 
@@ -126,7 +126,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	_ = cmd.Flags().MarkHidden("secure-storage")
 
 	cmd.Flags().BoolVarP(&opts.InsecureStorage, "insecure-storage", "", false, "Save authentication credentials in plain text instead of credential store")
-	cmd.Flags().BoolVar(&opts.ShortLived, "short-lived", false, "Prefer short-lived credentials that gh refreshes automatically, if the host supports them")
+	cmd.Flags().BoolVar(&opts.Expiring, "expiring", false, "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
 
 	return cmd
 }
@@ -174,10 +174,10 @@ func refreshRun(opts *RefreshOptions) error {
 
 	// Capture whether the stored credential is refreshable before it is replaced. Warn up front (before the credential
 	// and browser prompts) so the user can abort rather than discover only afterwards that refreshing without
-	// --short-lived downgrades it to a non-expiring token.
+	// --expiring downgrades it to a non-expiring token.
 	wasRefreshable := authCfg.ActiveToken(hostname).IsRefreshable()
-	if wasRefreshable && !opts.ShortLived {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was short-lived; pass --short-lived to preserve it\n", cs.WarningIcon())
+	if wasRefreshable && !opts.Expiring {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was expiring; pass --expiring to preserve it\n", cs.WarningIcon())
 	}
 
 	additionalScopes := set.NewStringSet()
@@ -231,7 +231,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	result, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, copyToClipboard, opts.ShortLived)
+	result, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, copyToClipboard, opts.Expiring)
 	if err != nil {
 		return err
 	}
@@ -251,17 +251,17 @@ func refreshRun(opts *RefreshOptions) error {
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 
-	// Short-lived tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
+	// Expiring tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
 	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
 	// The wasRefreshable downgrade is intentionally not reported here: it is already warned about up front (before the
 	// browser prompt) so the user can abort, and repeating it after completion is redundant.
 	switch {
-	case result.Refreshable != nil && !opts.ShortLived:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues short-lived refreshable token\n", cs.WarningIcon())
+	case result.Refreshable != nil && !opts.Expiring:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues expiring refreshable token\n", cs.WarningIcon())
 	case result.Refreshable != nil:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Received short-lived refreshable token\n", cs.SuccessIcon())
-	case opts.ShortLived:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue a short-lived refreshable token\n", cs.WarningIcon())
+		fmt.Fprintf(opts.IO.ErrOut, "%s Received expiring refreshable token\n", cs.SuccessIcon())
+	case opts.Expiring:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue an expiring refreshable token\n", cs.WarningIcon())
 	}
 
 	if credentialFlow.ShouldSetup() {

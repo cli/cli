@@ -306,7 +306,7 @@ func (c *AuthConfig) setRefreshableInConfig(hostname, username string, credentia
 	}
 }
 
-// refreshExpiryLeeway is how far ahead of a short-lived access token's expiry gh proactively refreshes it, so a token
+// refreshExpiryLeeway is how far ahead of an access token's expiry gh proactively refreshes it, so a token
 // on the verge of expiring is renewed before it can fail an in-flight request.
 const refreshExpiryLeeway = 10 * time.Minute
 

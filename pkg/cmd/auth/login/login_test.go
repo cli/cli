@@ -182,8 +182,8 @@ func Test_NewCmdLogin(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:     "short-lived and with-token",
-			cli:      "--short-lived --with-token",
+			name:     "expiring and with-token",
+			cli:      "--expiring --with-token",
 			wantsErr: true,
 		},
 		{
