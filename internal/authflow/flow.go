@@ -119,18 +119,7 @@ func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams
 		return nil, err
 	}
 
-	result := &AuthResult{
-		Token:    token.Token,
-		Username: userLogin,
-	}
-	// A refresh token is present only when the server honored the short-lived request, so gate the refreshable
-	// credential on it rather than on requestRefreshToken.
-	if token.RefreshToken != "" {
-		credential := credentialFromAccessToken(token, requestedAt)
-		result.Refreshable = &credential
-	}
-
-	return result, nil
+	return authResultFromToken(token, userLogin, requestedAt), nil
 }
 
 func getCallbackURI(oauthHost string) string {
