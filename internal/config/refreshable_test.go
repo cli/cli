@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -344,6 +345,52 @@ func TestLogoutRemovesAllUserCredentialRecords(t *testing.T) {
 
 	// The whole host entry, and therefore every config-stored credential, is gone.
 	_, err = authCfg.cfg.Get([]string{hostsKey, "github.com"})
+	require.Error(t, err)
+	require.Empty(t, authCfg.UsersForHost("github.com"))
+}
+
+func TestLogoutAcquiresRefreshLock(t *testing.T) {
+	// Logout must run under the same lock the refresh path uses so it wins any race with an in-flight refresh. Pin
+	// that it acquires and releases the shared refresh lock; without the fix Logout mutates the config without ever
+	// touching the lock and this fails.
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "gho_token", "https", false)
+	require.NoError(t, err)
+
+	var locked, unlocked bool
+	authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+		locked = true
+		return func() { unlocked = true }, nil
+	}
+
+	require.NoError(t, authCfg.Logout("github.com", "test-user"))
+	require.True(t, locked, "logout must acquire the shared refresh lock")
+	require.True(t, unlocked, "logout must release the shared refresh lock")
+}
+
+func TestLogoutReloadsFreshConfigBeforeRemovingCredentials(t *testing.T) {
+	// A concurrent refresh can persist a rotated credential while logout is in flight. Because logout reloads the
+	// freshest config under the lock before deleting, it sees and removes whatever the refresh just wrote. Pin that
+	// reload happens, and that it happens before the deletion, so logout never leaves a freshly persisted credential
+	// behind. Without the fix Logout never reloads and this fails.
+	authCfg := newTestAuthConfig(t)
+	setRefreshableConfigField(t, authCfg, "github.com", "test-user", "access_token", "access")
+	setRefreshableConfigField(t, authCfg, "github.com", "test-user", "refresh_token", "refresh")
+	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user")
+
+	reloaded := false
+	authCfg.reloadConfig = func() error {
+		reloaded = true
+		// Reload runs under the lock before any deletion, so the credential is still present at this point.
+		_, err := authCfg.cfg.Get(append(refreshablePath("github.com", "test-user"), "access_token"))
+		require.NoError(t, err, "reload must run before logout removes the credential")
+		return nil
+	}
+
+	require.NoError(t, authCfg.Logout("github.com", "test-user"))
+	require.True(t, reloaded, "logout must reload the config under the refresh lock")
+
+	_, err := authCfg.cfg.Get([]string{hostsKey, "github.com"})
 	require.Error(t, err)
 	require.Empty(t, authCfg.UsersForHost("github.com"))
 }
