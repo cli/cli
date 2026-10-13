@@ -473,6 +473,20 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 // If the encrypt option is specified it will first try to store the auth token
 // in encrypted storage and will fall back to the plain text config file.
 func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secureStorage bool) (bool, error) {
+	// Run under the shared refresh lock, like LoginRefreshable and Logout, so login serializes against an in-flight
+	// refresh and wins either ordering: a refresh that persists first is superseded by the credential stored here, and
+	// a refresh still waiting on the lock reloads afterwards, finds the refreshable record removed below, and bails
+	// without persisting. The lock is best effort, so login still proceeds when it is unavailable.
+	var insecureStorageUsed bool
+	err := c.withFreshConfigForRefresh(func(lockHeld bool) error {
+		var err error
+		insecureStorageUsed, err = c.login(hostname, username, token, gitProtocol, secureStorage)
+		return err
+	})
+	return insecureStorageUsed, err
+}
+
+func (c *AuthConfig) login(hostname, username, token, gitProtocol string, secureStorage bool) (bool, error) {
 	// In this section we set up the users config
 	var setErr error
 	if secureStorage {
@@ -494,8 +508,9 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	// mirrors loginRefreshable, which removes the non-expiring credential when storing a refreshable one. Without it,
 	// setActiveCredential keeps resolving the stale refreshable record as active and never copies the new
 	// non-refreshable token into the host-level slot, which also leaves go-gh extensions unable to read a token.
-	_ = c.cfg.Remove(refreshablePath(hostname, username))
-	_ = keyring.Delete(refreshableServiceName(hostname), username)
+	if err := c.purgeRefreshableForLogin(hostname, username); err != nil {
+		return insecureStorageUsed, err
+	}
 
 	return insecureStorageUsed, c.completeLogin(hostname, username, gitProtocol)
 }

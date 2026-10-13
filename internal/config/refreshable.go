@@ -154,6 +154,26 @@ func (c *AuthConfig) loginRefreshable(hostname, username string, credential gh.C
 	return insecureStorageUsed, c.completeLogin(hostname, username, gitProtocol)
 }
 
+// purgeRefreshableForLogin removes any refreshable credential for the user during a non-refreshable login so the two
+// credential forms cannot coexist. A surviving refreshable record outranks the freshly stored token during
+// activation, so a removal that silently failed would let login report success while the old credential stays active.
+//
+// Rather than infer success from the delete error (which an OS keyring reports inconsistently), it verifies the
+// post-condition by re-reading. Surfacing must not break environments without a working keyring, where a delete
+// reports the keyring is unavailable even though nothing is stored: an unavailable keyring resolves to
+// errRefreshableNotFound here, so the check stays silent exactly where a delete error would be spurious. Only a record
+// that genuinely survives removal resolves without error and is surfaced.
+func (c *AuthConfig) purgeRefreshableForLogin(hostname, username string) error {
+	// Best-effort removal in both stores, matching loginRefreshable's symmetric cleanup.
+	_ = c.cfg.Remove(refreshablePath(hostname, username))
+	_ = keyring.Delete(refreshableServiceName(hostname), username)
+
+	if _, _, err := c.refreshableForUser(hostname, username); err == nil {
+		return errors.New("could not remove the existing refreshable credential, which would shadow this login")
+	}
+	return nil
+}
+
 // refreshableForUser returns the refreshable credential stored for the user along with whether it came from secure
 // storage. It prefers the secure keyring and falls back to the insecure configuration record, returning
 // errRefreshableNotFound when neither exists.
