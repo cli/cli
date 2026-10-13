@@ -86,10 +86,9 @@ func tokenRun(opts *TokenOptions) error {
 
 	// --secure-storage: compatibility mode for go-gh, which cannot read gh's storage directly. A refreshable token
 	// is returned regardless of where it is stored, because gh owns its lifecycle and a go-gh based caller cannot
-	// obtain it any other way; a token that was just refreshed is likewise returned as is, so a freshly minted
-	// (possibly no longer refreshable) token is not silently dropped. Otherwise this reproduces the original
-	// behaviour of the auth token command under --secure-storage: read the token straight from the keyring and
-	// consult no environment variable or config entry at all.
+	// obtain it any other way. Otherwise this reproduces the original behaviour of the auth token command under
+	// --secure-storage: read the token straight from the keyring and consult no environment variable or config
+	// entry at all.
 	case opts.SecureStorage && !opts.NoRefresh:
 		// We cannot use ActiveToken or ActiveTokenWithRefresh upfront here: with no username they resolve the active
 		// token, which an environment variable such as GH_TOKEN can shadow, defeating --secure-storage. So when no
@@ -100,7 +99,7 @@ func tokenRun(opts *TokenOptions) error {
 		if user != "" {
 			cred, refreshStatus = getTokenWithRefresh(authCfg, hostname, user)
 		}
-		if cred.IsRefreshable() || refreshStatus == gh.RefreshStatusDone {
+		if cred.IsRefreshable() {
 			val = cred.Token
 		} else {
 			val = getNonRefreshableTokenFromKeyring(authCfg, hostname, user)
