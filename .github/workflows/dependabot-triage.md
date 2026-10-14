@@ -245,14 +245,20 @@ steps:
   # and warns it not to read a module's absence from these files as safety.
   #
   # There is deliberately no `actions/setup-go` step here. The compiler detects
-  # the `go` invocations below and emits its own Setup Go step, taking the
-  # version from `go.mod`, so an explicit one would be silently replaced and
-  # would drift. That generated step is not conditional, so a run with no Go
-  # work still pays for the toolchain but not for the module downloads below.
+  # the `go` invocations below and emits its own Setup Go step, replacing any
+  # explicit one. That generated step does NOT read `go.mod`: it installs the
+  # compiler's built-in default Go version, and `actions/setup-go` exports
+  # `GOTOOLCHAIN=local`, so when `go.mod` requires a newer Go every command
+  # below fails. The step therefore sets `GOTOOLCHAIN=auto`, which makes Go
+  # download the toolchain `go.mod` declares and so tracks Go bumps without
+  # pinning a version here. The generated step is not conditional, so a run with
+  # no Go work still pays for that install but not for the downloads below.
   - name: Vendor dependency source for the agent
     if: steps.worklist.outputs.needs_go == 'true'
     run: |
       set -uo pipefail
+      export GOTOOLCHAIN=auto
+      go version
       PKGS=/tmp/gh-aw/go-production-packages.txt
       rm -f "$PKGS" "$PKGS.tmp"
 
