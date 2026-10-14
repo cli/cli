@@ -118,7 +118,7 @@ safe-outputs:
       steps:
         - name: Create GitHub App token
           id: app-token
-          uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
+          uses: actions/create-github-app-token@v3.3.0
           with:
             client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
             private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}

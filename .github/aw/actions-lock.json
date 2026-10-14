@@ -1,5 +1,10 @@
 {
   "entries": {
+    "actions/create-github-app-token@v3.3.0": {
+      "repo": "actions/create-github-app-token",
+      "version": "v3.3.0",
+      "sha": "64ab729a6294000f5aa4a4bc0b73d1f32bc45510"
+    },
     "github/gh-aw-actions/setup-cli@v0.89.21": {
       "repo": "github/gh-aw-actions/setup-cli",
       "version": "v0.89.21",
