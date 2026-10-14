@@ -252,6 +252,17 @@ func Test_NewCmdLogin(t *testing.T) {
 				SkipSSHKeyPrompt: true,
 			},
 		},
+		{
+			name:     "tty with-token, no input (regression)",
+			stdinTTY: true,
+			stdin:    "",
+			cli:      "--with-token",
+			wants: LoginOptions{
+				Hostname:    "github.com",
+				Token:       "",
+				Interactive: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
