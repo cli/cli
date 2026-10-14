@@ -42,6 +42,7 @@ func Test_NewCmdLogin(t *testing.T) {
 		defaultHost string
 		wants       LoginOptions
 		wantsErr    bool
+		errMsg      string
 	}{
 		{
 			name:  "nontty, with-token",
@@ -65,12 +66,9 @@ func Test_NewCmdLogin(t *testing.T) {
 		{
 			name:     "tty, with-token",
 			stdinTTY: true,
-			stdin:    "def456",
 			cli:      "--with-token",
-			wants: LoginOptions{
-				Hostname: "github.com",
-				Token:    "def456",
-			},
+			wantsErr: true,
+			errMsg:   "`--with-token` must be used non-interactively, for example `gh auth login --with-token < mytoken.txt`\nTo paste a token interactively, run `gh auth login` instead.",
 		},
 		{
 			name:     "nontty, hostname",
@@ -102,12 +100,9 @@ func Test_NewCmdLogin(t *testing.T) {
 		{
 			name:     "tty, with-token, hostname",
 			stdinTTY: true,
-			stdin:    "ghi789",
 			cli:      "--with-token --hostname brad.vickers",
-			wants: LoginOptions{
-				Hostname: "brad.vickers",
-				Token:    "ghi789",
-			},
+			wantsErr: true,
+			errMsg:   "`--with-token` must be used non-interactively, for example `gh auth login --with-token < mytoken.txt`\nTo paste a token interactively, run `gh auth login` instead.",
 		},
 		{
 			name:     "tty, hostname",
@@ -180,6 +175,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			name:     "web and with-token",
 			cli:      "--web --with-token",
 			wantsErr: true,
+			errMsg:   "specify only one of `--web` or `--with-token`",
 		},
 		{
 			name:     "tty one scope",
@@ -292,7 +288,7 @@ func Test_NewCmdLogin(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.EqualError(t, err, tt.errMsg)
 				return
 			}
 			assert.NoError(t, err)
