@@ -499,6 +499,12 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 				mockEmptyV2ProjectItems(t, r)
 			},
 			expectedOutputs: []string{
+				`title:\tsome title`,
+				`state:\tOPEN`,
+				`author:\tmarseilles`,
+				`comments:\t6`,
+				`number:\t123`,
+				`some body`,
 				`author:\tmonalisa`,
 				`association:\t`,
 				`edited:\ttrue`,

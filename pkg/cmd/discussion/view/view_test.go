@@ -489,6 +489,16 @@ func TestViewRun(t *testing.T) {
 				Order:    "oldest",
 			},
 			wantStdout: heredoc.Doc(`
+				title:	an interesting question
+				state:	OPEN
+				category:	Q&A
+				author:	monalisa
+				labels:	help-wanted
+				comments:	2
+				number:	123
+				url:	https://github.com/OWNER/REPO/discussions/123
+				--
+				about my interesting question
 				author:	octocat
 				created:	2025-03-01T00:00:00Z
 				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1
@@ -580,6 +590,16 @@ func TestViewRun(t *testing.T) {
 				Order:    "oldest",
 			},
 			wantStdout: heredoc.Doc(`
+				title:	an interesting question
+				state:	OPEN
+				category:	Q&A
+				author:	monalisa
+				labels:	help-wanted
+				comments:	2
+				number:	123
+				url:	https://github.com/OWNER/REPO/discussions/123
+				--
+				about my interesting question
 				author:	octocat
 				created:	2025-03-01T00:00:00Z
 				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1

@@ -331,11 +331,15 @@ func viewRun(opts *ViewOptions) error {
 		return printHumanView(opts, discussion)
 	}
 
+	if err := printRawView(opts.IO.Out, discussion); err != nil {
+		return err
+	}
+
 	if opts.Comments {
 		return printRawComments(opts.IO.Out, discussion.Comments)
 	}
 
-	return printRawView(opts.IO.Out, discussion)
+	return nil
 }
 
 func printHumanView(opts *ViewOptions, d *client.Discussion) error {

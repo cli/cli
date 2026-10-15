@@ -801,6 +801,11 @@ func TestPRView_nontty_Comments(t *testing.T) {
 				"CommentsForPullRequest": "./fixtures/prViewPreviewFullComments.json",
 			},
 			expectedOutputs: []string{
+				`title:\tsome title`,
+				`state:\tOPEN`,
+				`author:\tnobody`,
+				`url:\thttps://github.com/OWNER/REPO/pull/12`,
+				`some body`,
 				`author:\tmonalisa`,
 				`association:\tnone`,
 				`edited:\ttrue`,

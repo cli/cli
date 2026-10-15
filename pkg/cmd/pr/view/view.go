@@ -135,12 +135,15 @@ func viewRun(opts *ViewOptions) error {
 		return printHumanPrPreview(opts, baseRepo, pr)
 	}
 
-	if opts.Comments {
-		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments, pr.DisplayableReviews()))
-		return nil
+	if err := printRawPrPreview(opts.IO, pr); err != nil {
+		return err
 	}
 
-	return printRawPrPreview(opts.IO, pr)
+	if opts.Comments {
+		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments, pr.DisplayableReviews()))
+	}
+
+	return nil
 }
 
 func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {

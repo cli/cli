@@ -191,12 +191,15 @@ func viewRun(opts *ViewOptions) error {
 		return printHumanIssuePreview(opts, baseRepo, issue)
 	}
 
-	if opts.Comments {
-		fmt.Fprint(opts.IO.Out, prShared.RawCommentList(issue.Comments, api.PullRequestReviews{}))
-		return nil
+	if err := printRawIssuePreview(opts.IO.Out, issue); err != nil {
+		return err
 	}
 
-	return printRawIssuePreview(opts.IO.Out, issue)
+	if opts.Comments {
+		fmt.Fprint(opts.IO.Out, prShared.RawCommentList(issue.Comments, api.PullRequestReviews{}))
+	}
+
+	return nil
 }
 
 func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
