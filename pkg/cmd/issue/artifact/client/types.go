@@ -6,11 +6,13 @@ import (
 )
 
 // The artifact types gh knows. The API stores a type with each artifact, and
-// gh treats generic and plan artifacts alike as documents.
+// gh treats generic and plan artifacts alike as Markdown documents. An
+// embedded_html artifact is an HTML document, whose body is raw HTML.
 const (
-	TypeGeneric = "generic"
-	TypePlan    = "plan"
-	TypeLink    = "link"
+	TypeGeneric      = "generic"
+	TypePlan         = "plan"
+	TypeLink         = "link"
+	TypeEmbeddedHTML = "embedded_html"
 )
 
 // ArtifactFields lists the --json fields of an artifact. They are the fields

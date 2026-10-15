@@ -910,6 +910,10 @@ func TestCheckType(t *testing.T) {
 			artifactType: "link",
 		},
 		{
+			name:         "embedded_html",
+			artifactType: "embedded_html",
+		},
+		{
 			name:         "a type gh doesn't know",
 			artifactType: "bad-type",
 			wantErr:      `artifact 7 has type "bad-type", which this version of gh doesn't support; upgrade gh`,
@@ -953,6 +957,11 @@ func TestSupportsAttachments(t *testing.T) {
 		{
 			name:         "link",
 			artifactType: "link",
+			want:         false,
+		},
+		{
+			name:         "embedded_html, since --attach only rewrites Markdown",
+			artifactType: "embedded_html",
 			want:         false,
 		},
 		{

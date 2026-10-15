@@ -126,9 +126,15 @@ func TestNewCmdList(t *testing.T) {
 			wantRepo: "OWNER/REPO",
 		},
 		{
+			name:     "--type embedded_html",
+			args:     "142 --type embedded_html",
+			wantOpts: ListOptions{IssueNumber: 142, Type: "embedded_html"},
+			wantRepo: "OWNER/REPO",
+		},
+		{
 			name:    "an unknown --type",
 			args:    "142 --type docs",
-			wantErr: `invalid argument "docs" for "--type" flag: valid values are {generic|plan|link}`,
+			wantErr: `invalid argument "docs" for "--type" flag: valid values are {generic|plan|link|embedded_html}`,
 		},
 		{
 			name:     "--json url",
@@ -211,6 +217,8 @@ func TestListRun(t *testing.T) {
 	// The documents on the spec's issue 137.
 	approvedPlan := client.Artifact{ID: 6640, Number: 1, Type: "plan", Name: "Approved plan", UpdatedAt: hoursAgo(5)}
 	research := client.Artifact{ID: 6641, Number: 2, Type: "generic", Name: "OAuth provider research", UpdatedAt: hoursAgo(1)}
+	// The HTML document on the spec's issue 166.
+	menuPrototype := client.Artifact{ID: 6650, Number: 1, Type: "embedded_html", Name: "Menu prototype", UpdatedAt: hoursAgo(1)}
 
 	jsonExporter := func(fields ...string) cmdutil.Exporter {
 		e := cmdutil.NewJSONExporter()
@@ -307,6 +315,23 @@ func TestListRun(t *testing.T) {
 
 				NUMBER  NAME                   TYPE  UPDATED
 				3       Staging OAuth runbook  link  about 1 day ago
+			`),
+		},
+		{
+			name:      "--type embedded_html asks for HTML documents alone",
+			opts:      ListOptions{IssueNumber: 166, Type: "embedded_html"},
+			tty:       true,
+			artifacts: map[string][]client.Artifact{"embedded_html": {menuPrototype}},
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#166",
+				`List monalisa/monas-cafe#166 type="embedded_html" limit=0`,
+			},
+			wantStdout: heredoc.Doc(`
+
+				Showing 1 artifact on monalisa/monas-cafe#166 that matches your search
+
+				NUMBER  NAME            TYPE           UPDATED
+				1       Menu prototype  embedded_html  about 1 hour ago
 			`),
 		},
 		{

@@ -1,5 +1,5 @@
 // Package artifact holds gh issue artifact, the command group for the
-// Markdown documents and links attached to an issue.
+// Markdown documents, HTML documents and links attached to an issue.
 package artifact
 
 import (
@@ -25,7 +25,7 @@ func NewCmdArtifact(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder
 		Long: heredoc.Docf(`
 			Working with issue artifacts in the GitHub CLI is in preview and subject to change without notice.
 
-			Issue artifacts are Markdown documents and links attached to an issue.
+			Issue artifacts are Markdown documents, HTML documents and links attached to an issue.
 			They are not GitHub Actions artifacts; to download those, use %[1]sgh run download%[1]s.
 		`, "`"),
 	}

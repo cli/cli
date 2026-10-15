@@ -287,7 +287,7 @@ func pullRequestError(repo ghrepo.Interface, number int) error {
 // same for every type, such as list, don't call it.
 func CheckType(a client.Artifact) error {
 	switch a.Type {
-	case client.TypeGeneric, client.TypePlan, client.TypeLink:
+	case client.TypeGeneric, client.TypePlan, client.TypeLink, client.TypeEmbeddedHTML:
 		return nil
 	}
 	return fmt.Errorf("artifact %d has type %q, which this version of gh doesn't support; upgrade gh", a.Number, a.Type)

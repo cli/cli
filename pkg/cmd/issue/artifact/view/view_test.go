@@ -383,6 +383,25 @@ func TestViewRun(t *testing.T) {
 		}
 	}
 
+	// Artifact 1 on the spec's issue 166, an HTML document saved once, and
+	// its page.
+	const menuHTML = "<!doctype html>\n<html>\n<body><h1>Seasonal menu</h1><p>Maple oat latte</p></body>\n</html>\n"
+	const menuPage = "https://github.com/monalisa/monas-cafe/issues/166/artifacts/1"
+	menuPrototype := &client.ArtifactWithVersions{
+		Number:         1,
+		Type:           "embedded_html",
+		Name:           "Menu prototype",
+		Body:           menuHTML,
+		Creator:        monalisa,
+		UpdatedByActor: monalisa,
+		CreatedAt:      at("2026-09-24T22:00:00Z"),
+		UpdatedAt:      at("2026-09-24T22:00:00Z"),
+		URL:            menuPage,
+		Versions: []client.Version{
+			version(1, "Menu prototype", monalisa, "2026-09-24T22:00:00Z", menuHTML),
+		},
+	}
+
 	jsonExporter := func(fields ...string) cmdutil.Exporter {
 		e := cmdutil.NewJSONExporter()
 		e.SetFields(fields)
@@ -478,6 +497,43 @@ func TestViewRun(t *testing.T) {
 				"1  Copilot  \x1b[38;5;242mabout 1 day ago\x1b[0m  \x1b[0;1;36mCurrent\x1b[0m\n" +
 				"\n" +
 				"\x1b[38;5;242mView this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/142/artifacts/3\x1b[0m\n",
+		},
+		{
+			name:      "an HTML document in a terminal prints its source as stored, with no rendering or indentation",
+			opts:      ViewOptions{IssueNumber: 166, ArtifactNumber: 1},
+			tty:       true,
+			artifact:  menuPrototype,
+			wantCalls: []string{"IsPullRequest monalisa/monas-cafe#166", "Get monalisa/monas-cafe#166 artifact 1"},
+			wantStdout: heredoc.Doc(`
+				Menu prototype monalisa/monas-cafe#166
+				Artifact 1 • embedded_html • monalisa created about 1 hour ago
+
+				<!doctype html>
+				<html>
+				<body><h1>Seasonal menu</h1><p>Maple oat latte</p></body>
+				</html>
+
+				Edit history
+				1  monalisa  about 1 hour ago  Current
+
+				View this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/166/artifacts/1
+			`),
+		},
+		{
+			name:  "an HTML document's source has no colors, and ends its own line",
+			opts:  ViewOptions{IssueNumber: 166, ArtifactNumber: 1},
+			tty:   true,
+			color: true,
+			artifact: &client.ArtifactWithVersions{
+				Number: 1, Type: "embedded_html", Name: "Menu prototype", Body: "<p>Maple oat latte</p>", URL: menuPage,
+			},
+			wantCalls: []string{"IsPullRequest monalisa/monas-cafe#166", "Get monalisa/monas-cafe#166 artifact 1"},
+			wantStdout: "\x1b[0;1;39mMenu prototype\x1b[0m monalisa/monas-cafe#166\n" +
+				"\x1b[38;5;242mArtifact 1 • embedded_html\x1b[0m\n" +
+				"\n" +
+				"<p>Maple oat latte</p>\n" +
+				"\n" +
+				"\x1b[38;5;242mView this artifact on GitHub: https://github.com/monalisa/monas-cafe/issues/166/artifacts/1\x1b[0m\n",
 		},
 		{
 			name:      "--version shows an earlier version, marked Viewing",
@@ -682,6 +738,23 @@ func TestViewRun(t *testing.T) {
 			`),
 		},
 		{
+			name:      "piped output of an HTML document is the same as for any artifact",
+			opts:      ViewOptions{IssueNumber: 166, ArtifactNumber: 1},
+			artifact:  menuPrototype,
+			wantCalls: []string{"IsPullRequest monalisa/monas-cafe#166", "Get monalisa/monas-cafe#166 artifact 1"},
+			wantStdout: "name:\tMenu prototype\n" +
+				"number:\t1\n" +
+				"version:\t1\n" +
+				"type:\tembedded_html\n" +
+				"creator:\tmonalisa\n" +
+				"created:\t2026-09-24T22:00:00Z\n" +
+				"updated-by:\tmonalisa\n" +
+				"updated:\t2026-09-24T22:00:00Z\n" +
+				"url:\thttps://github.com/monalisa/monas-cafe/issues/166/artifacts/1\n" +
+				"--\n" +
+				menuHTML + "\n",
+		},
+		{
 			name:      "piped output cleans up names and leaves null users empty",
 			opts:      ViewOptions{IssueNumber: 142, ArtifactNumber: 3},
 			artifact:  ghosts,
@@ -845,6 +918,15 @@ func TestViewRun(t *testing.T) {
 			wantCalls:   []string{"IsPullRequest monalisa/monas-cafe#137", "Get monalisa/monas-cafe#137 artifact 1"},
 			wantStderr:  "Opening https://github.com/monalisa/monas-cafe/issues/137/artifacts/1 in your browser.\n",
 			wantBrowsed: "https://github.com/monalisa/monas-cafe/issues/137/artifacts/1",
+		},
+		{
+			name:        "--web opens an HTML document's page on GitHub",
+			opts:        ViewOptions{IssueNumber: 166, ArtifactNumber: 1, WebMode: true},
+			tty:         true,
+			artifact:    menuPrototype,
+			wantCalls:   []string{"IsPullRequest monalisa/monas-cafe#166", "Get monalisa/monas-cafe#166 artifact 1"},
+			wantStderr:  "Opening https://github.com/monalisa/monas-cafe/issues/166/artifacts/1 in your browser.\n",
+			wantBrowsed: "https://github.com/monalisa/monas-cafe/issues/166/artifacts/1",
 		},
 		{
 			name:      "--web refuses a link that isn't an http(s) URL",

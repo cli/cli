@@ -78,7 +78,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 0, "Maximum number of artifacts to fetch")
-	cmdutil.StringEnumFlag(cmd, &opts.Type, "type", "", "", []string{client.TypeGeneric, client.TypePlan, client.TypeLink}, "Filter by type")
+	cmdutil.StringEnumFlag(cmd, &opts.Type, "type", "", "", []string{client.TypeGeneric, client.TypePlan, client.TypeLink, client.TypeEmbeddedHTML}, "Filter by type")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, client.ArtifactFields)
 
 	return cmd
@@ -132,8 +132,9 @@ func listRun(opts *ListOptions) error {
 
 // listArtifacts lists the artifacts of one type, or of every type when
 // artifactType is empty. gh treats generic and plan artifacts alike as
-// documents, so either type lists both: each type is listed up to the limit,
-// then the two are merged in number order and cut to the limit.
+// Markdown documents, so either type lists both: each type is listed up to
+// the limit, then the two are merged in number order and cut to the limit.
+// Any other type is listed alone.
 func listArtifacts(c client.ArtifactClient, repo ghrepo.Interface, issueNumber int, artifactType string, limit int) ([]client.Artifact, error) {
 	if artifactType != client.TypeGeneric && artifactType != client.TypePlan {
 		return c.List(repo, issueNumber, artifactType, limit)
