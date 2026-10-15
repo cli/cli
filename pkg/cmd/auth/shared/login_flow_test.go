@@ -426,6 +426,25 @@ func TestLogin(t *testing.T) {
 			},
 		},
 		{
+			name: "web flow, expiring on an enterprise host warns the token may not be expiring",
+			opts: LoginOptions{
+				Hostname: "example.com",
+				Web:      true,
+				Expiring: true,
+				AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, _ bool) (*authflow.AuthResult, error) {
+					return &authflow.AuthResult{Token: "gho_plain", Username: "monalisa"}, nil
+				},
+			},
+			wantsConfig: map[string]string{
+				"example.com:user":         "monalisa",
+				"example.com:oauth_token":  "gho_plain",
+				"example.com:git_protocol": "",
+			},
+			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
+				assert.Contains(t, stderr, "example.com may not support expiring tokens")
+			},
+		},
+		{
 			name: "interactive, expiring forces the web flow instead of offering token paste",
 			opts: LoginOptions{
 				Hostname:         "example.com",

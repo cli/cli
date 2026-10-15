@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const defaultSSHKeyTitle = "GitHub CLI"
@@ -73,6 +74,12 @@ func Login(opts *LoginOptions) error {
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
 
+	// A GitHub Enterprise Server host may not support expiring tokens. Surface this once the hostname is known, from
+	// interactive selection or the --hostname flag, so the user understands they may receive a non-expiring token.
+	if opts.Expiring && ghauth.IsEnterprise(hostname) {
+		fmt.Fprintf(opts.IO.ErrOut, "%s %s may not support expiring tokens\n", cs.WarningIcon(), hostname)
+	}
+
 	gitProtocol := strings.ToLower(opts.GitProtocol)
 	if opts.Interactive && gitProtocol == "" {
 		options := []string{
@@ -93,7 +100,7 @@ func Login(opts *LoginOptions) error {
 	var additionalScopes []string
 
 	if opts.Interactive && gitProtocol == "https" {
-		if err := opts.CredentialFlow.Prompt(hostname); err != nil {
+		if err := opts.CredentialFlow.Prompt(hostname, opts.Expiring); err != nil {
 			return err
 		}
 		additionalScopes = append(additionalScopes, opts.CredentialFlow.Scopes()...)

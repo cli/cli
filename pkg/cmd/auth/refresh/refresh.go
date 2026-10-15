@@ -226,7 +226,9 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 	gitProtocol := cfg.GitProtocol(hostname).Value
 	if opts.Interactive && gitProtocol == "https" {
-		if err := credentialFlow.Prompt(hostname); err != nil {
+		// refresh keeps the existing prompt; the expiring cred-helper prompt is login-only and is revisited in the
+		// refresh token-kind change.
+		if err := credentialFlow.Prompt(hostname, false); err != nil {
 			return err
 		}
 		additionalScopes.AddValues(credentialFlow.Scopes())
