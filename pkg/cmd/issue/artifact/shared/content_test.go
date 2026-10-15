@@ -182,6 +182,57 @@ func TestIsShortcutFile(t *testing.T) {
 	}
 }
 
+func TestIsHTMLFile(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "a .html file",
+			path: "menu-prototype.html",
+			want: true,
+		},
+		{
+			name: "a .htm file",
+			path: "docs/specials.htm",
+			want: true,
+		},
+		{
+			name: "any case",
+			path: "MENU.HTML",
+			want: true,
+		},
+		{
+			name: "any case, for .htm too",
+			path: "Specials.Htm",
+			want: true,
+		},
+		{
+			name: "a Markdown file",
+			path: "signin-plan.md",
+		},
+		{
+			name: "html elsewhere in the name",
+			path: "menu.html.md",
+		},
+		{
+			name: "another extension that ends in html",
+			path: "menu.xhtml",
+		},
+		{
+			name: "no extension",
+			path: "html",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsHTMLFile(tt.path))
+		})
+	}
+}
+
 func TestShortcutURL(t *testing.T) {
 	const runbook = "https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook"
 
