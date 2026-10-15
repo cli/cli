@@ -1,6 +1,8 @@
 package shared
 
 import (
+	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -8,7 +10,25 @@ import (
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 )
+
+// stubHelperConfig is a test double for the HelperConfig interface that returns a fixed configured helper and records
+// whether gh was configured as the credential helper.
+type stubHelperConfig struct {
+	helper        gitcredentials.Helper
+	helperErr     error
+	configuredOur bool
+}
+
+func (s *stubHelperConfig) ConfigureOurs(string) error {
+	s.configuredOur = true
+	return nil
+}
+
+func (s *stubHelperConfig) ConfiguredHelper(string) (gitcredentials.Helper, error) {
+	return s.helper, s.helperErr
+}
 
 func TestSetup_configureExisting(t *testing.T) {
 	cs, restoreRun := run.Stub()
@@ -174,5 +194,125 @@ func TestSetup_setOurs_nonGH(t *testing.T) {
 
 	if _, err := f.Setup("example.com", "monalisa", "PASSWD", false); err != nil {
 		t.Errorf("Setup() error = %v", err)
+	}
+}
+
+func TestPrompt_expiring_configure(t *testing.T) {
+	var gotMessage string
+	hc := &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "osxkeychain"}}
+	f := GitCredentialFlow{
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(message, _ string, options []string) (int, error) {
+				gotMessage = message
+				return slices.Index(options, "Set up gh as your Git credential helper (recommended)"), nil
+			},
+		},
+		HelperConfig: hc,
+	}
+
+	if err := f.Prompt("github.com", true); err != nil {
+		t.Fatalf("Prompt() error = %v", err)
+	}
+	if !f.ShouldSetup() {
+		t.Error("ShouldSetup() = false, want true after choosing to configure gh")
+	}
+	if !slices.Contains(f.Scopes(), "workflow") {
+		t.Errorf("Scopes() = %v, want it to include workflow", f.Scopes())
+	}
+	if !strings.Contains(gotMessage, "expiring token") {
+		t.Errorf("prompt message = %q, want it to explain the expiring token consequence", gotMessage)
+	}
+}
+
+func TestPrompt_expiring_decline(t *testing.T) {
+	f := GitCredentialFlow{
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(_, _ string, options []string) (int, error) {
+				return slices.Index(options, "Continue without it (you manage Git credentials yourself)"), nil
+			},
+		},
+		HelperConfig: &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "osxkeychain"}},
+	}
+
+	if err := f.Prompt("github.com", true); err != nil {
+		t.Fatalf("Prompt() error = %v", err)
+	}
+	if f.ShouldSetup() {
+		t.Error("ShouldSetup() = true, want false after declining to configure gh")
+	}
+}
+
+func TestPrompt_expiring_stop(t *testing.T) {
+	f := GitCredentialFlow{
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(_, _ string, options []string) (int, error) {
+				return slices.Index(options, "Cancel"), nil
+			},
+		},
+		HelperConfig: &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "osxkeychain"}},
+	}
+
+	err := f.Prompt("github.com", true)
+	if !errors.Is(err, cmdutil.CancelError) {
+		t.Errorf("Prompt() error = %v, want cmdutil.CancelError", err)
+	}
+	if f.ShouldSetup() {
+		t.Error("ShouldSetup() = true, want false after stopping the sign-in")
+	}
+}
+
+func TestPrompt_expiring_alreadyOurs(t *testing.T) {
+	selectCalled := false
+	f := GitCredentialFlow{
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(_, _ string, options []string) (int, error) {
+				selectCalled = true
+				return slices.Index(options, "Set up gh as your Git credential helper (recommended)"), nil
+			},
+		},
+		HelperConfig: &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "!/path/to/gh auth git-credential"}},
+	}
+
+	if err := f.Prompt("github.com", true); err != nil {
+		t.Fatalf("Prompt() error = %v", err)
+	}
+	if selectCalled {
+		t.Error("Select was called even though gh is already the credential helper")
+	}
+	if f.ShouldSetup() {
+		t.Error("ShouldSetup() = true, want false when gh is already the credential helper")
+	}
+	if !slices.Contains(f.Scopes(), "workflow") {
+		t.Errorf("Scopes() = %v, want it to include workflow", f.Scopes())
+	}
+}
+
+func TestSetup_expiring_externalHelper_configuresOurs(t *testing.T) {
+	cs, restoreRun := run.Stub()
+	defer restoreRun(t)
+	// Configuring gh writes the helper config; no reject and no prompt are expected for an expiring login.
+	cs.Register(`git config --global --replace-all credential\.`, 0, "")
+	cs.Register(`git config --global --add credential\.`, 0, "", func(args []string) {
+		if val := args[len(args)-1]; val != "!/path/to/gh auth git-credential" {
+			t.Errorf("global credential helper configured to %q", val)
+		}
+	})
+
+	f := GitCredentialFlow{
+		// Prompter is deliberately nil: Setup must not re-prompt for an expiring login.
+		expiring: true,
+		helper:   gitcredentials.Helper{Cmd: "osxkeychain"},
+		HelperConfig: &gitcredentials.HelperConfig{
+			SelfExecutablePath: "/path/to/gh",
+			GitClient:          &git.Client{GitPath: "some/path/git"},
+		},
+	}
+
+	warning, err := f.Setup("example.com", "monalisa", "PASSWD", true)
+	if err != nil {
+		t.Errorf("Setup() error = %v", err)
+	}
+	if warning != "" {
+		t.Errorf("Setup() warning = %q, want empty after configuring gh for an expiring login", warning)
 	}
 }
