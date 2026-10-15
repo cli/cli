@@ -192,7 +192,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "v", shared.Private, []string{shared.All, shared.Private, shared.Selected}, "Set visibility for an organization secret")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization or user secret")
 	cmd.Flags().BoolVar(&noRepositoriesSelected, "no-repos-selected", false, "No repositories can access the organization secret")
-	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified)")
+	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified, or if set to \"-\")")
 	cmd.Flags().BoolVar(&opts.DoNotStore, "no-store", false, "Print the encrypted, base64-encoded value instead of storing it on GitHub")
 	cmd.Flags().StringVarP(&opts.EnvFile, "env-file", "f", "", "Load secret names and values from a dotenv-formatted `file`")
 	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Agents, shared.Codespaces, shared.Dependabot}, "Set the application for a secret")
@@ -411,7 +411,9 @@ func getSecretsFromOptions(opts *SetOptions) (map[string][]byte, error) {
 }
 
 func getBody(opts *SetOptions) ([]byte, error) {
-	if opts.Body != "" {
+	// A body of "-" reads from standard input, matching the convention used
+	// by --env-file and other commands.
+	if opts.Body != "" && opts.Body != "-" {
 		return []byte(opts.Body), nil
 	}
 

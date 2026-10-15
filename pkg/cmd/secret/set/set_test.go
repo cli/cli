@@ -824,6 +824,12 @@ func Test_getBody(t *testing.T) {
 			want:  "a secret",
 			stdin: "a secret\n",
 		},
+		{
+			name:    "dash body reads from stdin",
+			bodyArg: "-",
+			want:    "a secret",
+			stdin:   "a secret",
+		},
 	}
 
 	for _, tt := range tests {
