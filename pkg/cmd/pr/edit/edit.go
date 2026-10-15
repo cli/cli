@@ -40,6 +40,7 @@ type EditOptions struct {
 	SelectorArg string
 	Interactive bool
 
+	BodyDir     string
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
@@ -77,7 +78,8 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			Use %[1]s--attach%[1]s to upload an image or video. Without a body flag the pull
 			request keeps the body it already has and the attachment is appended to it. If the
 			body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that reference
-			is rewritten to point at the uploaded asset instead.
+			is rewritten to point at the uploaded asset instead. Paths in a %[1]s--body-file%[1]s are
+			relative to its directory, falling back to the working directory.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -174,11 +176,11 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			if bodyProvided || bodyFileProvided {
 				opts.Editable.Body.Edited = true
 				if bodyFileProvided {
-					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					var err error
+					opts.Editable.Body.Value, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 					if err != nil {
 						return err
 					}
-					opts.Editable.Body.Value = string(b)
 				}
 			}
 
@@ -424,7 +426,7 @@ func editRun(opts *EditOptions) error {
 
 		// Nothing that can prompt or cancel may follow this.
 		var uploadResult attachments.UploadResult
-		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.BodyDir, opts.Assets)
 		opts.AttachEvent.RecordOperations(uploadResult)
 
 		// With nothing uploaded, even a body the caller typed goes unwritten:

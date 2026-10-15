@@ -97,7 +97,8 @@ blocked-by/blocking relationships.
 ## Attaching images and videos
 
 `--attach <path>` is available on `gh issue create`, `gh issue edit`,
-`gh issue comment`, `gh pr create`, `gh pr edit`, and `gh pr comment`.
+`gh issue comment`, `gh pr create`, `gh pr edit`, `gh pr comment`,
+`gh issue artifact create`, and `gh issue artifact edit`.
 
 - Repeat `--attach` to upload multiple files:
   `gh issue comment 12 --attach ./before.png --attach ./after.png`.
@@ -110,7 +111,10 @@ blocked-by/blocking relationships.
   `gh pr create --attach './login.png#The login error state'`. Without alt
   text, the filename is used.
 - `--attach` paths and local Markdown destinations may be absolute or relative
-  to the directory where `gh` runs.
+  to the directory where `gh` runs. When the body comes from a file with
+  `--body-file`, or from a file argument to `gh issue artifact create`,
+  relative destinations resolve against that file's directory first, then the
+  directory where `gh` runs.
 - If the body references an attached path, `gh` rewrites that Markdown
   reference to the uploaded URL. The reference keeps its existing alt text.
   Otherwise, `gh` appends the attachment to the body. For example:
@@ -125,13 +129,23 @@ blocked-by/blocking relationships.
 - `gh issue comment` and `gh pr comment`: `--attach` cannot be used with
   `--web` or `--delete-last`. It works alone, with `--edit-last`, or with one
   of `--body`, `--body-file`, or `--editor`.
+- `gh issue artifact create` and `gh issue artifact edit`: `--attach` works
+  only on documents, not links. With several documents, `create` uploads each
+  file once and points every document that references it at the upload, and
+  a file that no document references is an error before anything uploads.
+  `edit` with only `--attach` appends the files to the artifact's current
+  content.
 - Uploads require GitHub.com or a GHE.com tenant, an OAuth token, classic PAT,
   or fine-grained PAT, and `WRITE`, `MAINTAIN`, or `ADMIN` repository
   permission. GitHub Enterprise Server and most GitHub App tokens are
   unsupported.
 - Uploads stop at the first failure. If earlier files uploaded, `gh` still
-  writes those attachments and exits non-zero. Create and edit commands also
-  print the issue or pull request URL.
+  writes those attachments and exits non-zero. `gh issue create`,
+  `gh issue edit`, `gh pr create`, and `gh pr edit` also print the issue or
+  pull request URL. `gh issue artifact create` and `edit` still save an
+  artifact that is missing some of its files if any of them uploaded, with
+  the upload error as the reason on its `created` or `updated` line. If none
+  of them uploaded, the artifact isn't saved and gets a `failed` line.
 
 ## Discussions (`gh discussion`)
 
@@ -159,6 +173,102 @@ Preview command set, subject to change. Subcommands:
   needs a comment ID or URL. `--yes` skips the `--delete` confirmation.
 - `--json`/`--jq`/`--template` are available on `list` and `view` only;
   `create` and `edit` print the discussion URL. `comment` prints the discussion comment (or reply) URL.
+
+## Issue artifacts (`gh issue artifact`)
+
+Preview command set, subject to change. Issue artifacts are Markdown documents
+(type `generic` or `plan`) and links (type `link`) attached to an issue. Each
+has a number on its issue, and commands address artifacts by that number,
+since names aren't unique. They are not GitHub Actions artifacts, which
+`gh run download` handles. Subcommands:
+
+- `gh issue artifact list {<issue-number>|<issue-url>} [--type generic|plan|link] [--limit N] [--json <fields>]`
+  (alias `ls`) lists artifacts in number order. There is no default limit:
+  every artifact is listed unless `--limit` is set. `--type generic` and
+  `--type plan` both list every document, and each keeps its stored type.
+  Piped output is tab-separated number, name, type, and RFC 3339 update time.
+  `--json` fields include `body`, so one call can return every artifact's
+  content.
+- `gh issue artifact view {<issue> <artifact-number> | <artifact-url>} [--version N] [--json <fields>] [--web]`
+  shows one artifact and its edit history. In a terminal, it ends with the
+  artifact's URL. Piped output is `name:`, `number:`, `version:`, `type:`,
+  `creator:`, `created:`, `updated-by:`, `updated:`, and `url:` lines, in
+  that order, then `--` and the raw body. `--version N` shows that version
+  from the edit history. `--version`, `--json`, and `--web` are mutually
+  exclusive. `--json versions` returns the edit history. `--web` opens a
+  document's page on GitHub, or a link's URL.
+- `gh issue artifact create {<issue-number>|<issue-url>} [<file>[#<name>] | <url>]... [--body <text> | --body-file <path>] [--name <name>] [--type generic|plan] [--attach <path>]...`
+  (alias `new`) creates one artifact per file or URL, in argument
+  order. A text file becomes a document named after the file, or after the
+  text following `#`:
+  `gh issue artifact create 142 'docs/signin-plan.md#Sign-in plan'`. An
+  `http(s)` URL becomes a link named after its host, and a `.url` Internet
+  Shortcut file becomes a link to its URL. Names can't contain some
+  characters, such as parentheses. `gh` drops them from names it takes from
+  file names (`plan (1).md` becomes `plan 1.md`), but sends a name given with
+  `#` or `--name` as typed. Instead of file or URL arguments, `--body <text>`
+  creates one document and `--body-file <path>` creates one artifact from a
+  file. Neither can be combined with file or URL arguments. `--name` names a
+  single artifact. It's required with `--body` or `--body-file -`, and can't
+  be combined with a `#<name>` suffix. Documents are `generic` unless
+  `--type plan` is given, and a plan currently behaves the same. `--type` is
+  refused if any artifact is a link.
+- `gh issue artifact edit {<issue> <artifact-number> | <artifact-url>} [--name <name>] [--body <text> | --body-file <path>] [--attach <path>]... [--restore-version N]`
+  renames an artifact or replaces its content, saving a new version. At least
+  one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`
+  is required, and a `--body-file` never renames the artifact. The type never
+  changes: a link's new content must be an `http(s)` URL or a `.url` file, and
+  a document can't take a `.url` file. `--restore-version N` saves the name
+  and content of version N from the edit history as a new version. It works
+  for any version `view` lists, and can't be combined with `--name`,
+  `--body`, `--body-file`, or `--attach`. If the artifact already matches
+  that version, nothing is saved and `gh` exits 0, with a `skipped` line when
+  piped.
+- `gh issue artifact delete {<issue> <artifact-number>... | <artifact-url>...} [--yes]`
+  deletes artifacts, which can't be restored. In a terminal, `gh` asks once
+  for all of them. `--yes` skips the prompt and is required when `gh` can't
+  prompt. Without `--yes`, a failed lookup stops the command before the
+  prompt, and nothing is deleted. With `--yes`, every number is attempted.
+- `gh issue artifact download {<issue> [<artifact-number>...] | <artifact-url>...} [--dir <dir> | --output <path>] [--clobber | --skip-existing] [--version N]`
+  writes the given artifacts, or every artifact on the issue, to files in
+  `--dir` (default `.`). Each file is named `<number>-<name>`, with path
+  separators, whitespace, control characters, and characters Windows forbids
+  replaced by `-`. Documents end in `.md`, and links are saved as `.url`
+  Internet Shortcut files, which `create` and `edit` read back as links. An
+  existing file fails that artifact unless `--clobber` overwrites it or
+  `--skip-existing` skips it. `--output <path>` and `--version N` (an earlier
+  version from the edit history) need exactly one artifact number, and
+  `--output -` prints its stored body (a link's URL) with nothing else.
+  Without numbers, an issue with no artifacts is an error.
+- The issue argument is a number or an issue URL, and a URL selects its own
+  repository. An artifact URL,
+  `https://github.com/<owner>/<repo>/issues/<issue>/artifacts/<number>`, can
+  replace the issue and number, and selects its repository the same way.
+  Artifact URLs in one command must be on the same issue. Pull requests are
+  refused, and so is GitHub Enterprise Server.
+- `--json`/`--jq`/`--template` are available on `list` and `view` only. The
+  `id` field is a global ID that no command accepts; commands take `number`,
+  or `url`, the artifact's page on GitHub.
+- `create`, `edit`, and `download` (except with `--output -`) report each
+  artifact on its own line. When piped, every line goes to stdout with five
+  tab-separated columns, empty ones included: status (`created`, `updated`,
+  `restored`, `written`, `skipped`, or `failed`), artifact number, name (the
+  file path for `download`), source (the file, URL, or `-` given to
+  `create`, or the `--body-file` value given to `edit`), and the reason for a
+  skip, a failure, or `--attach` files that didn't upload. In a terminal,
+  failures go to stderr. A failed artifact doesn't stop the others, and the
+  command exits 1 after any failure or failed upload. After `create` exits 1,
+  retry only the `failed` lines, since the others were created.
+- `delete` reports on stderr. In a terminal, each deleted or failed artifact
+  gets a line. When piped, a deleted artifact prints nothing, and each
+  failure prints `<number>: <reason>`. Any failure exits 1.
+- `create` and `edit` read and check every file before any request, so a
+  missing, empty, or binary file fails the whole command, and nothing is
+  saved. Standard input is read only through `--body-file -`, and `create`
+  refuses a `-` argument.
+- `view`, `edit`, and `download` refuse an artifact whose type this version
+  of `gh` doesn't know, with a message to upgrade `gh`. `list` and `delete`
+  work with any type.
 
 ## Reading files and directories (`gh repo read-file` / `read-dir`)
 

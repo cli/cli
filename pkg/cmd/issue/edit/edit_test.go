@@ -133,6 +133,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				BodyDir: filepath.Dir(tmpFile),
 			},
 			wantsErr: false,
 		},
@@ -522,6 +523,7 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.Equal(t, tt.output.IssueNumbers, gotOpts.IssueNumbers)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.Editable, gotOpts.Editable)
+			assert.Equal(t, tt.output.BodyDir, gotOpts.BodyDir)
 			assert.Equal(t, tt.output.Parent, gotOpts.Parent)
 			assert.Equal(t, tt.output.RemoveParent, gotOpts.RemoveParent)
 			assert.Equal(t, tt.output.AddSubIssues, gotOpts.AddSubIssues)
@@ -1409,6 +1411,27 @@ func Test_editRun(t *testing.T) {
 				mockIssueUpdateWithBody(t, reg, "a new body\n\n![shot](https://example.com/1)")
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "attaching rewrites a reference relative to the body file",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Body: prShared.EditableString{
+					Value:  "the plan ![diagram](./diagram.png)",
+					Edited: true,
+				},
+				BodyDir:      "docs",
+				FetchOptions: prShared.FetchOptions,
+			},
+			attach:  []string{"docs/diagram.png"},
+			uploads: []attachments.UploadStub{{Name: "diagram.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
+				mockIssueUpdateWithBody(t, reg, "the plan ![diagram](https://example.com/1)")
+			},
+			stdout:         "https://github.com/OWNER/REPO/issue/123\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name: "an empty body flag clears the body and leaves the attachment",
