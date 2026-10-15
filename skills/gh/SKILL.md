@@ -130,11 +130,11 @@ blocked-by/blocking relationships.
   `--web` or `--delete-last`. It works alone, with `--edit-last`, or with one
   of `--body`, `--body-file`, or `--editor`.
 - `gh issue artifact create` and `gh issue artifact edit`: `--attach` works
-  only on documents, not links. With several documents, `create` uploads each
-  file once and points every document that references it at the upload, and
-  a file that no document references is an error before anything uploads.
-  `edit` with only `--attach` appends the files to the artifact's current
-  content.
+  only on Markdown documents, not links or HTML documents. With several
+  Markdown documents, `create` uploads each file once and points every
+  document that references it at the upload, and a file that no document
+  references is an error before anything uploads. `edit` with only
+  `--attach` appends the files to the artifact's current content.
 - Uploads require GitHub.com or a GHE.com tenant, an OAuth token, classic PAT,
   or fine-grained PAT, and `WRITE`, `MAINTAIN`, or `ADMIN` repository
   permission. GitHub Enterprise Server and most GitHub App tokens are
@@ -177,18 +177,19 @@ Preview command set, subject to change. Subcommands:
 ## Issue artifacts (`gh issue artifact`)
 
 Preview command set, subject to change. Issue artifacts are Markdown documents
-(type `generic` or `plan`) and links (type `link`) attached to an issue. Each
-has a number on its issue, and commands address artifacts by that number,
-since names aren't unique. They are not GitHub Actions artifacts, which
-`gh run download` handles. Subcommands:
+(type `generic` or `plan`), HTML documents (type `embedded_html`), and links
+(type `link`) attached to an issue. Each has a number on its issue, and
+commands address artifacts by that number, since names aren't unique. They
+are not GitHub Actions artifacts, which `gh run download` handles.
+Subcommands:
 
-- `gh issue artifact list {<issue-number>|<issue-url>} [--type generic|plan|link] [--limit N] [--json <fields>]`
+- `gh issue artifact list {<issue-number>|<issue-url>} [--type generic|plan|link|embedded_html] [--limit N] [--json <fields>]`
   (alias `ls`) lists artifacts in number order. There is no default limit:
   every artifact is listed unless `--limit` is set. `--type generic` and
-  `--type plan` both list every document, and each keeps its stored type.
-  Piped output is tab-separated number, name, type, and RFC 3339 update time.
-  `--json` fields include `body`, so one call can return every artifact's
-  content.
+  `--type plan` both list every Markdown document, and each keeps its stored
+  type. Piped output is tab-separated number, name, type, and RFC 3339
+  update time. `--json` fields include `body`, so one call can return every
+  artifact's content.
 - `gh issue artifact view {<issue> <artifact-number> | <artifact-url>} [--version N] [--json <fields>] [--web]`
   shows one artifact and its edit history. In a terminal, it ends with the
   artifact's URL. Piped output is `name:`, `number:`, `version:`, `type:`,
@@ -197,11 +198,12 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   from the edit history. `--version`, `--json`, and `--web` are mutually
   exclusive. `--json versions` returns the edit history. `--web` opens a
   document's page on GitHub, or a link's URL.
-- `gh issue artifact create {<issue-number>|<issue-url>} [<file>[#<name>] | <url>]... [--body <text> | --body-file <path>] [--name <name>] [--type generic|plan] [--attach <path>]...`
+- `gh issue artifact create {<issue-number>|<issue-url>} [<file>[#<name>] | <url>]... [--body <text> | --body-file <path>] [--name <name>] [--type generic|plan|embedded_html] [--attach <path>]...`
   (alias `new`) creates one artifact per file or URL, in argument
   order. A text file becomes a document named after the file, or after the
   text following `#`:
-  `gh issue artifact create 142 'docs/signin-plan.md#Sign-in plan'`. An
+  `gh issue artifact create 142 'docs/signin-plan.md#Sign-in plan'`. A
+  `.html` or `.htm` file becomes an HTML document. An
   `http(s)` URL becomes a link named after its host, and a `.url` Internet
   Shortcut file becomes a link to its URL. Names can't contain some
   characters, such as parentheses. `gh` drops them from names it takes from
@@ -210,9 +212,11 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   creates one document and `--body-file <path>` creates one artifact from a
   file. Neither can be combined with file or URL arguments. `--name` names a
   single artifact. It's required with `--body` or `--body-file -`, and can't
-  be combined with a `#<name>` suffix. Documents are `generic` unless
-  `--type plan` is given, and a plan currently behaves the same. `--type` is
-  refused if any artifact is a link.
+  be combined with a `#<name>` suffix. Documents are `generic`, and HTML
+  documents `embedded_html`. `--type` sets the type of every document
+  instead, whatever the file extension, so `--type embedded_html` makes
+  `--body` or `--body-file -` an HTML document. A plan currently behaves the
+  same as a generic document. `--type` is refused if any artifact is a link.
 - `gh issue artifact edit {<issue> <artifact-number> | <artifact-url>} [--name <name>] [--body <text> | --body-file <path>] [--attach <path>]... [--restore-version N]`
   renames an artifact or replaces its content, saving a new version. At least
   one of `--name`, `--body`, `--body-file`, `--attach`, or `--restore-version`
@@ -233,13 +237,14 @@ since names aren't unique. They are not GitHub Actions artifacts, which
   writes the given artifacts, or every artifact on the issue, to files in
   `--dir` (default `.`). Each file is named `<number>-<name>`, with path
   separators, whitespace, control characters, and characters Windows forbids
-  replaced by `-`. Documents end in `.md`, and links are saved as `.url`
-  Internet Shortcut files, which `create` and `edit` read back as links. An
-  existing file fails that artifact unless `--clobber` overwrites it or
-  `--skip-existing` skips it. `--output <path>` and `--version N` (an earlier
-  version from the edit history) need exactly one artifact number, and
-  `--output -` prints its stored body (a link's URL) with nothing else.
-  Without numbers, an issue with no artifacts is an error.
+  replaced by `-`. Markdown documents end in `.md`, HTML documents in
+  `.html` or `.htm`, and links are saved as `.url` Internet Shortcut files,
+  which `create` and `edit` read back as links. An existing file fails that
+  artifact unless `--clobber` overwrites it or `--skip-existing` skips it.
+  `--output <path>` and `--version N` (an earlier version from the edit
+  history) need exactly one artifact number, and `--output -` prints its
+  stored body (a link's URL) with nothing else. Without numbers, an issue
+  with no artifacts is an error.
 - The issue argument is a number or an issue URL, and a URL selects its own
   repository. An artifact URL,
   `https://github.com/<owner>/<repo>/issues/<issue>/artifacts/<number>`, can
