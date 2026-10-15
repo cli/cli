@@ -61,6 +61,17 @@ func TestNewCmdView(t *testing.T) {
 	// Test shared parsing of issue number / URL.
 	argparsetest.TestArgParsing(t, NewCmdView)
 
+	t.Run("help explains non-terminal comments output", func(t *testing.T) {
+		cmd := NewCmdView(&cmdutil.Factory{}, nil)
+		var stdout bytes.Buffer
+		cmd.SetOut(&stdout)
+		cmd.SetArgs([]string{"--help"})
+
+		_, err := cmd.ExecuteC()
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "With `--comments`, display all comments. When standard output is not a terminal,\nonly comments are displayed, without the issue title, body, or other metadata.")
+	})
+
 	t.Run("comments and JSON are mutually exclusive", func(t *testing.T) {
 		cmd := NewCmdView(&cmdutil.Factory{}, func(*ViewOptions) error {
 			return nil
@@ -474,6 +485,7 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 		cli             string
 		httpStubs       func(*httpmock.Registry)
 		expectedOutputs []string
+		absentOutputs   []string
 		wantsErr        bool
 	}{
 		"without comments flag": {
@@ -492,7 +504,8 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 			},
 		},
 		"with comments flag": {
-			cli: "123 --comments",
+			cli:           "123 --comments",
+			absentOutputs: []string{"some body", "title:\tsome title", "number:\t123"},
 			httpStubs: func(r *httpmock.Registry) {
 				r.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse("./fixtures/issueView_previewSingleComment.json"))
 				r.Register(httpmock.GraphQL(`query CommentsForIssue\b`), httpmock.FileResponse("./fixtures/issueView_previewFullComments.json"))
@@ -542,6 +555,9 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 			assert.Equal(t, "", output.Stderr())
 			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
+			for _, absent := range tc.absentOutputs {
+				assert.NotContains(t, output.String(), absent)
+			}
 		})
 	}
 }
