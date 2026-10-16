@@ -53,6 +53,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			Without an argument, the pull request that belongs to the current branch
 			is displayed.
 
+			When %[1]s--comments%[1]s is used, terminal output includes the pull request details, comments,
+			and reviews. When output is piped or redirected, only comments and reviews are printed.
+
 			With %[1]s--web%[1]s flag, open the pull request in a web browser instead.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
