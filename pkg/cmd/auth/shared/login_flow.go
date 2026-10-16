@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
@@ -113,8 +115,11 @@ func Login(opts *LoginOptions) error {
 	authEvent.RecordHelperBefore(opts.CredentialFlow.DetectConfiguredHelper(hostname))
 
 	if opts.Interactive && gitProtocol == "https" {
-		promptResult, err := opts.CredentialFlow.Prompt(hostname, opts.Expiring)
-		authEvent.RecordPromptResponse(promptResult)
+		err := opts.CredentialFlow.Prompt(hostname, opts.Expiring)
+		if errors.Is(err, ErrExpiringSetupCredHelperCancelled) {
+			authEvent.RecordExpiringSetupCancelled(true)
+			return cmdutil.CancelError
+		}
 		if err != nil {
 			return err
 		}

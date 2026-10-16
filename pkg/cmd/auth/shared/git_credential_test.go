@@ -10,7 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
-	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 // stubHelperConfig is a test double for the HelperConfig interface that returns a fixed configured helper and records
@@ -199,8 +199,10 @@ func TestSetup_setOurs_nonGH(t *testing.T) {
 
 func TestPrompt_expiring_configure(t *testing.T) {
 	var gotMessage string
+	ios, _, _, stderr := iostreams.Test()
 	hc := &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "osxkeychain"}}
 	f := GitCredentialFlow{
+		IO: ios,
 		Prompter: &prompter.PrompterMock{
 			SelectFunc: func(message, _ string, options []string) (int, error) {
 				gotMessage = message
@@ -210,12 +212,9 @@ func TestPrompt_expiring_configure(t *testing.T) {
 		HelperConfig: hc,
 	}
 
-	result, err := f.Prompt("github.com", true)
+	err := f.Prompt("github.com", true)
 	if err != nil {
 		t.Fatalf("Prompt() error = %v", err)
-	}
-	if result != PromptConfigure {
-		t.Errorf("Prompt() result = %q, want %q", result, PromptConfigure)
 	}
 	if !f.ShouldSetup() {
 		t.Error("ShouldSetup() = false, want true after choosing to configure gh")
@@ -223,13 +222,18 @@ func TestPrompt_expiring_configure(t *testing.T) {
 	if !slices.Contains(f.Scopes(), "workflow") {
 		t.Errorf("Scopes() = %v, want it to include workflow", f.Scopes())
 	}
-	if !strings.Contains(gotMessage, "expiring token") {
-		t.Errorf("prompt message = %q, want it to explain the expiring token consequence", gotMessage)
+	if !strings.Contains(gotMessage, "How would you like to proceed?") {
+		t.Errorf("prompt message = %q, want the short decision prompt", gotMessage)
+	}
+	if !strings.Contains(stderr.String(), "expiring token") {
+		t.Errorf("warning = %q, want it to explain the expiring token consequence", stderr.String())
 	}
 }
 
 func TestPrompt_expiring_decline(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
 	f := GitCredentialFlow{
+		IO: ios,
 		Prompter: &prompter.PrompterMock{
 			SelectFunc: func(_, _ string, options []string) (int, error) {
 				return slices.Index(options, "Continue without it (you manage Git credentials yourself)"), nil
@@ -238,12 +242,9 @@ func TestPrompt_expiring_decline(t *testing.T) {
 		HelperConfig: &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "osxkeychain"}},
 	}
 
-	result, err := f.Prompt("github.com", true)
+	err := f.Prompt("github.com", true)
 	if err != nil {
 		t.Fatalf("Prompt() error = %v", err)
-	}
-	if result != PromptDecline {
-		t.Errorf("Prompt() result = %q, want %q", result, PromptDecline)
 	}
 	if f.ShouldSetup() {
 		t.Error("ShouldSetup() = true, want false after declining to configure gh")
@@ -251,7 +252,9 @@ func TestPrompt_expiring_decline(t *testing.T) {
 }
 
 func TestPrompt_expiring_stop(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
 	f := GitCredentialFlow{
+		IO: ios,
 		Prompter: &prompter.PrompterMock{
 			SelectFunc: func(_, _ string, options []string) (int, error) {
 				return slices.Index(options, "Cancel"), nil
@@ -260,12 +263,9 @@ func TestPrompt_expiring_stop(t *testing.T) {
 		HelperConfig: &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "osxkeychain"}},
 	}
 
-	result, err := f.Prompt("github.com", true)
-	if !errors.Is(err, cmdutil.CancelError) {
-		t.Errorf("Prompt() error = %v, want cmdutil.CancelError", err)
-	}
-	if result != PromptCancel {
-		t.Errorf("Prompt() result = %q, want %q", result, PromptCancel)
+	err := f.Prompt("github.com", true)
+	if !errors.Is(err, ErrExpiringSetupCredHelperCancelled) {
+		t.Errorf("Prompt() error = %v, want ErrExpiringSetupCredHelperCancelled", err)
 	}
 	if f.ShouldSetup() {
 		t.Error("ShouldSetup() = true, want false after stopping the sign-in")
@@ -284,12 +284,9 @@ func TestPrompt_expiring_alreadyOurs(t *testing.T) {
 		HelperConfig: &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "!/path/to/gh auth git-credential"}},
 	}
 
-	result, err := f.Prompt("github.com", true)
+	err := f.Prompt("github.com", true)
 	if err != nil {
 		t.Fatalf("Prompt() error = %v", err)
-	}
-	if result != PromptNotShown {
-		t.Errorf("Prompt() result = %q, want %q", result, PromptNotShown)
 	}
 	if selectCalled {
 		t.Error("Select was called even though gh is already the credential helper")

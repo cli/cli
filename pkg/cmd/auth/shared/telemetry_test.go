@@ -32,7 +32,7 @@ func TestBeginAuthTelemetry_gating(t *testing.T) {
 		assert.Equal(t, "auth_invocation", events[0].Type)
 		assert.Equal(t, "login", events[0].Dimensions["auth_command"])
 		assert.Equal(t, "true", events[0].Dimensions["expiring_requested"])
-		assert.Equal(t, "not_shown", events[0].Dimensions["gh_as_cred_helper_prompt_resp"])
+		assert.Equal(t, "false", events[0].Dimensions["expiring_setup_cred_helper_cancelled"])
 		assert.Equal(t, "false", events[0].Dimensions["auth_success"])
 	})
 
@@ -50,7 +50,7 @@ func TestAuthTelemetryEvent_records(t *testing.T) {
 	recorder := &telemetry.InvocationRecorderSpy{}
 	event := BeginAuthTelemetry(recorder, "login", "github.com", false)
 
-	event.RecordPromptResponse(PromptConfigure)
+	event.RecordExpiringSetupCancelled(true)
 	event.RecordHelperBefore("other")
 	event.RecordHelperAfter("ours")
 	event.RecordGitProtocol("ssh")
@@ -61,7 +61,7 @@ func TestAuthTelemetryEvent_records(t *testing.T) {
 	events := recorder.Events()
 	require.Len(t, events, 1)
 	dims := events[0].Dimensions
-	assert.Equal(t, "configure", dims["gh_as_cred_helper_prompt_resp"])
+	assert.Equal(t, "true", dims["expiring_setup_cred_helper_cancelled"])
 	assert.Equal(t, "other", dims["git_credential_helper_before"])
 	assert.Equal(t, "ours", dims["git_credential_helper_after"])
 	assert.Equal(t, "ssh", dims["git_protocol"])
@@ -90,7 +90,7 @@ func TestAuthTelemetryEvent_nilIsNoOp(t *testing.T) {
 	var event *AuthTelemetryEvent
 
 	assert.NotPanics(t, func() {
-		event.RecordPromptResponse(PromptConfigure)
+		event.RecordExpiringSetupCancelled(true)
 		event.RecordHelperBefore("none")
 		event.RecordHelperAfter("ours")
 		event.RecordGitProtocol("https")

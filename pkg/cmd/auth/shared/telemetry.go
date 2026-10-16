@@ -26,23 +26,23 @@ func BeginAuthTelemetry(recorder ghtelemetry.InvocationRecorder, command, hostna
 	pendingEvent := recorder.Begin(ghtelemetry.Event{
 		Type: "auth_invocation",
 		Dimensions: ghtelemetry.Dimensions{
-			"auth_command":                  command,
-			"expiring_requested":            fmt.Sprintf("%v", expiringRequested),
-			"gh_as_cred_helper_prompt_resp": string(PromptNotShown),
-			"auth_success":                  "false",
+			"auth_command":                         command,
+			"expiring_requested":                   fmt.Sprintf("%v", expiringRequested),
+			"expiring_setup_cred_helper_cancelled": "false",
+			"auth_success":                         "false",
 		},
 	})
 
 	return &AuthTelemetryEvent{pendingEvent: pendingEvent}
 }
 
-// RecordPromptResponse captures what happened when the git credential helper prompt was offered: configure, decline,
-// cancel, or not_shown.
-func (e *AuthTelemetryEvent) RecordPromptResponse(response PromptResult) {
+// RecordExpiringSetupCancelled records whether the user cancelled the sign-in at the expiring credential-helper prompt.
+// That prompt, and therefore a cancellation, is only reachable on an expiring login.
+func (e *AuthTelemetryEvent) RecordExpiringSetupCancelled(cancelled bool) {
 	if e == nil {
 		return
 	}
-	e.pendingEvent.UpsertDimensions(ghtelemetry.Dimensions{"gh_as_cred_helper_prompt_resp": string(response)})
+	e.pendingEvent.UpsertDimensions(ghtelemetry.Dimensions{"expiring_setup_cred_helper_cancelled": fmt.Sprintf("%v", cancelled)})
 }
 
 // RecordGitProtocol captures the git operations protocol selected for the host, as "https" or "ssh", or "unset" when no

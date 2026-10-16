@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
@@ -500,6 +501,7 @@ func TestLogin(t *testing.T) {
 			tt.opts.Config = &cfg
 			tt.opts.HTTPClient = &http.Client{Transport: reg}
 			tt.opts.CredentialFlow = &GitCredentialFlow{
+				IO: ios,
 				// Helper detection now runs for every sign-in, including the non-interactive and SSH cases in this
 				// table, so provide a fake helper config to keep the read hermetic instead of shelling out to git.
 				HelperConfig: &gitcredentials.FakeHelperConfig{
@@ -636,13 +638,57 @@ func TestLogin_recordsAuthTelemetry(t *testing.T) {
 	assert.Equal(t, "auth_invocation", events[0].Type)
 	assert.Equal(t, "login", dims["auth_command"])
 	assert.Equal(t, "false", dims["expiring_requested"])
-	assert.Equal(t, "configure", dims["gh_as_cred_helper_prompt_resp"])
+	assert.Equal(t, "false", dims["expiring_setup_cred_helper_cancelled"])
 	assert.Equal(t, "https", dims["git_protocol"])
 	assert.Equal(t, "none", dims["git_credential_helper_before"])
 	assert.Equal(t, "ours", dims["git_credential_helper_after"])
 	assert.Equal(t, "false", dims["expiring_received"])
 	assert.Equal(t, "keyring", dims["storage_type"])
 	assert.Equal(t, "true", dims["auth_success"])
+}
+
+func TestLogin_recordsExpiringSetupCancelled(t *testing.T) {
+	// An interactive https login that asks for an expiring token and then cancels at the credential-helper prompt
+	// should record expiring_setup_cred_helper_cancelled=true and surface the warning.
+	ios, _, _, stderr := iostreams.Test()
+	recorder := &telemetry.InvocationRecorderSpy{}
+
+	opts := &LoginOptions{
+		IO:          ios,
+		Config:      tinyConfig{},
+		HTTPClient:  &http.Client{},
+		Hostname:    "github.com",
+		Interactive: true,
+		GitProtocol: "https",
+		Expiring:    true,
+		Telemetry:   recorder,
+		Prompter:    &prompter.PrompterMock{},
+		CredentialFlow: &GitCredentialFlow{
+			IO: ios,
+			Prompter: &prompter.PrompterMock{
+				SelectFunc: func(_, _ string, options []string) (int, error) {
+					return prompter.IndexFor(options, "Cancel")
+				},
+			},
+			HelperConfig: &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers: map[string]gitcredentials.Helper{
+					"github.com": {Cmd: "osxkeychain"},
+				},
+			},
+		},
+	}
+
+	err := Login(opts)
+	assert.ErrorIs(t, err, cmdutil.CancelError)
+
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	dims := events[0].Dimensions
+	assert.Equal(t, "true", dims["expiring_requested"])
+	assert.Equal(t, "true", dims["expiring_setup_cred_helper_cancelled"])
+	assert.Equal(t, "false", dims["auth_success"])
+	assert.Contains(t, stderr.String(), "expiring token")
 }
 
 func TestLogin_doesNotRecordAuthTelemetryForEnterprise(t *testing.T) {
