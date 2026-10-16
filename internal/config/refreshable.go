@@ -30,10 +30,10 @@ var errRefreshableNotFound = errors.New("no refreshable credentials found")
 // expiry-based refresh decisions.
 var timeNow = time.Now
 
-// refreshLockFile names the cross-process lock, in the config directory, that serializes token refreshes. Only the
-// refresh path takes it because refreshing is the sole operation that spends a single-use rotating refresh token;
-// other config mutations such as auth login or logout overwrite credentials wholesale and are safe under
-// last-writer-wins, so a single refresh-scoped lock is enough.
+// refreshLockFile names the cross-process lock, in the config directory, that serializes credential-store
+// read-modify-writes so they cannot race a token refresh. The name is refresh-centric because protecting the
+// single-use rotating refresh token from concurrent spending is why the lock exists, but any credential mutation that
+// must not race a refresh acquires it. See withFreshConfigForRefresh for the operations that take it.
 const refreshLockFile = "refresh.lock"
 
 // refreshLockTimeout bounds how long withFreshConfigForRefresh waits for the cross-process lock before giving up and
