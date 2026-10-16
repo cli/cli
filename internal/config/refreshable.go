@@ -147,9 +147,11 @@ func (c *AuthConfig) loginRefreshable(hostname, username string, credential gh.C
 	}
 
 	// Remove any non-expiring credential for this user so a stale token cannot be resolved in preference to the
-	// refreshable record.
-	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username, oauthTokenKey})
-	_ = keyring.Delete(keyringServiceName(hostname), username)
+	// refreshable record. Verify the removal: the ordinary keyring is now resolved before the refreshable credential,
+	// so a silently failed delete would let a stale token outrank this login.
+	if err := c.purgeNonExpiringForRefreshableLogin(hostname, username); err != nil {
+		return insecureStorageUsed, err
+	}
 
 	return insecureStorageUsed, c.completeLogin(hostname, username, gitProtocol)
 }
@@ -170,6 +172,29 @@ func (c *AuthConfig) purgeRefreshableForLogin(hostname, username string) error {
 
 	if _, _, err := c.refreshableForUser(hostname, username); err == nil {
 		return errors.New("could not remove the existing refreshable credential, which would shadow this login")
+	}
+	return nil
+}
+
+// purgeNonExpiringForRefreshableLogin removes any non-expiring credential for the user during a refreshable login so
+// the two credential forms cannot coexist. The ordinary keyring is now resolved before the refreshable credential, so
+// a surviving non-expiring token would outrank the freshly stored refreshable one; a removal that silently failed
+// would let login report success while the stale token keeps winning.
+//
+// Like purgeRefreshableForLogin, it verifies the post-condition by re-reading rather than trusting the delete error,
+// which an OS keyring reports inconsistently. An unavailable keyring makes the read fail too, which reads here as "not
+// present", so the check stays silent exactly where a delete error would be spurious. Only a token that genuinely
+// survives removal is surfaced.
+func (c *AuthConfig) purgeNonExpiringForRefreshableLogin(hostname, username string) error {
+	// Best-effort removal in both stores, matching login's symmetric cleanup.
+	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username, oauthTokenKey})
+	_ = keyring.Delete(keyringServiceName(hostname), username)
+
+	if _, err := keyring.Get(keyringServiceName(hostname), username); err == nil {
+		return errors.New("could not remove the existing non-expiring credential, which would shadow this login")
+	}
+	if _, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, username, oauthTokenKey}); err == nil {
+		return errors.New("could not remove the existing non-expiring credential, which would shadow this login")
 	}
 	return nil
 }
