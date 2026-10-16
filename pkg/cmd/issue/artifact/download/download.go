@@ -60,10 +60,10 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			on the issue is downloaded. Artifacts can also be named by their URLs, which
 			must all be on one issue. %[1]s<issue>%[1]s is an issue number or URL.
 
-			Each file is named %[1]s<number>-<name>%[1]s. Documents end in %[1]s.md%[1]s, and links are
-			saved as %[1]s.url%[1]s Internet Shortcut files. If a file already exists, that
-			artifact fails unless you use %[1]s--clobber%[1]s to overwrite it or %[1]s--skip-existing%[1]s
-			to skip it.
+			Each file is named %[1]s<number>-<name>%[1]s. Markdown documents end in %[1]s.md%[1]s, HTML
+			documents in %[1]s.html%[1]s, and links are saved as %[1]s.url%[1]s Internet Shortcut files.
+			If a file already exists, that artifact fails unless you use %[1]s--clobber%[1]s to
+			overwrite it or %[1]s--skip-existing%[1]s to skip it.
 
 			Use %[1]s--dir%[1]s to choose the directory to download files into, %[1]s--output%[1]s to
 			choose the path for a single artifact, or %[1]s--output -%[1]s to print its content.
@@ -267,18 +267,24 @@ func selectVersion(a *client.ArtifactWithVersions, version int) (string, string,
 // maxFileNameBytes is the longest file name most file systems allow.
 const maxFileNameBytes = 255
 
-// artifactFileName names an artifact's file <number>-<name>, plus .md, or
-// .url for a link, unless the name already ends with it in any case. Only
-// what would cause a problem changes, the same way on every OS, so an
+// artifactFileName names an artifact's file <number>-<name>, plus .md, .url
+// for a link, or .html for an HTML document, unless the name already ends
+// with it in any case. An HTML document's name may end with .htm instead.
+// Only what would cause a problem changes, the same way on every OS, so an
 // artifact gets the same file name everywhere: separators, control
 // characters, whitespace and the characters Windows forbids each become "-".
 // The number keeps a name such as CON from being a Windows device name. The
 // name is shortened, at a character boundary, only when the file name would
 // pass maxFileNameBytes.
 func artifactFileName(number int, name, artifactType string) (string, error) {
-	ext := ".md"
-	if artifactType == client.TypeLink {
-		ext = ".url"
+	// The first extension is the one added. A name already ending in any of
+	// them keeps it, in its own case.
+	exts := []string{".md"}
+	switch artifactType {
+	case client.TypeLink:
+		exts = []string{".url"}
+	case client.TypeEmbeddedHTML:
+		exts = []string{".html", ".htm"}
 	}
 
 	stem := strings.Map(func(r rune) rune {
@@ -287,9 +293,12 @@ func artifactFileName(number int, name, artifactType string) (string, error) {
 		}
 		return r
 	}, name)
-	// A name already ending in the extension keeps it, in its own case.
-	if cut := len(stem) - len(ext); cut >= 0 && strings.EqualFold(stem[cut:], ext) {
-		stem, ext = stem[:cut], stem[cut:]
+	ext := exts[0]
+	for _, e := range exts {
+		if cut := len(stem) - len(e); cut >= 0 && strings.EqualFold(stem[cut:], e) {
+			stem, ext = stem[:cut], stem[cut:]
+			break
+		}
 	}
 
 	prefix := strconv.Itoa(number) + "-"

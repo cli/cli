@@ -468,11 +468,15 @@ func TestEditRun(t *testing.T) {
 		newPlanFlow = "# OAuth callback plan\n\n![Sign-in flow](./signin-flow.png)\n"
 		shortcut    = "[InternetShortcut]\r\nURL=" + runbookURLv2 + "\r\n"
 		oldPlanBody = "# OAuth plan\n\n1. Register the callback URL."
+		menuHTML    = "<!doctype html>\n<html>\n<body><h1>Seasonal menu</h1><p>Maple oat latte</p></body>\n</html>\n"
+		newMenuHTML = "<!doctype html>\n<html>\n<body><h1>Winter menu</h1><p>Chestnut latte</p></body>\n</html>\n"
 	)
 	plan := client.Artifact{Number: 2, Type: "generic", Name: "OAuth callback plan", Body: planBody}
 	approvedPlan := client.Artifact{Number: 1, Type: "plan", Name: "Approved plan", Body: "# Approved plan"}
 	runbook := client.Artifact{Number: 3, Type: "link", Name: "Staging OAuth runbook", Body: runbookURL}
 	badType := client.Artifact{Number: 2, Type: "bad-type", Name: "OAuth callback plan", Body: planBody}
+	// The HTML document on the spec's issue 166.
+	menuPrototype := client.Artifact{Number: 1, Type: "embedded_html", Name: "Menu prototype", Body: menuHTML}
 	// Part of plan's edit history, newest first. Version 9 renamed it, as in
 	// the spec, and here the current version, 12, has version 9's name and
 	// body.
@@ -607,6 +611,32 @@ func TestEditRun(t *testing.T) {
 			},
 			wantBody:   new(newPlan),
 			wantStdout: "✓ Updated artifact 1 (Approved plan) on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:     "an HTML document takes its new source from a file, and keeps its type",
+			files:    map[string]string{"menu-prototype.html": newMenuHTML},
+			opts:     EditOptions{IssueNumber: 166, BodyFile: "menu-prototype.html"},
+			artifact: menuPrototype,
+			tty:      true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#166",
+				"Get monalisa/monas-cafe#166 1",
+				"Update monalisa/monas-cafe#166 1",
+			},
+			wantBody:   new(newMenuHTML),
+			wantStdout: "✓ Updated artifact 1 (Menu prototype) on monalisa/monas-cafe#166\n",
+		},
+		{
+			name:     "a .url file can't update an HTML document",
+			files:    map[string]string{"oauth-runbook.url": shortcut},
+			opts:     EditOptions{IssueNumber: 166, BodyFile: "oauth-runbook.url"},
+			artifact: menuPrototype,
+			tty:      true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#166",
+				"Get monalisa/monas-cafe#166 1",
+			},
+			wantErr: "artifact 1 is not a link; .url files can only update link artifacts",
 		},
 		{
 			name:     "a symlink is read",
@@ -812,6 +842,19 @@ func TestEditRun(t *testing.T) {
 			},
 			wantOps: &attachments.UploadResult{},
 			wantErr: "artifact 3 is a link; `--attach` can't be used with link artifacts",
+		},
+		{
+			name:     "--attach can't be used with an HTML document, and nothing uploads",
+			attach:   []string{"menu-photo.png"},
+			opts:     EditOptions{IssueNumber: 166},
+			artifact: menuPrototype,
+			tty:      true,
+			wantCalls: []string{
+				"UploadTarget monalisa/monas-cafe#166",
+				"Get monalisa/monas-cafe#166 1",
+			},
+			wantOps: &attachments.UploadResult{},
+			wantErr: "`--attach` can't be used with HTML artifacts",
 		},
 		{
 			name:     "a type gh doesn't know is refused before anything is saved",
@@ -1402,6 +1445,24 @@ func TestEditRun(t *testing.T) {
 			wantName:   new("Staging OAuth runbook"),
 			wantBody:   new(runbookURL),
 			wantStdout: "✓ Restored artifact 3 (Staging OAuth runbook) to version 1 on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:     "--restore-version gives an HTML document its earlier source",
+			opts:     EditOptions{IssueNumber: 166, RestoreVersion: 1},
+			artifact: client.Artifact{Number: 1, Type: "embedded_html", Name: "Menu prototype", Body: newMenuHTML},
+			versions: []client.Version{
+				{Version: 2, Name: "Menu prototype", Body: newMenuHTML},
+				{Version: 1, Name: "Menu prototype", Body: menuHTML},
+			},
+			tty: true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#166",
+				"Get monalisa/monas-cafe#166 1",
+				"Update monalisa/monas-cafe#166 1",
+			},
+			wantName:   new("Menu prototype"),
+			wantBody:   new(menuHTML),
+			wantStdout: "✓ Restored artifact 1 (Menu prototype) to version 1 on monalisa/monas-cafe#166\n",
 		},
 		{
 			name:     "a version's name and body are sent as the API returned them, and the name is printed cleaned up",

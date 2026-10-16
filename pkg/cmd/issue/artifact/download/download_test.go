@@ -348,6 +348,7 @@ func TestDownloadRun(t *testing.T) {
 		baristaBody     = "# Barista feedback notes\n\n- The sign-in button is hard to find on the menu page."
 		hoursBody       = "# Opening hours\n\nMonday to Friday, 7 to 3."
 		manualURL       = " https://github.com/monalisa/monas-cafe/wiki/Espresso-machine-manual\n"
+		menuHTML        = "<!doctype html>\n<html>\n<body><h1>Seasonal menu</h1><p>Maple oat latte</p></body>\n</html>\n"
 		alreadyExists   = "already exists (use `--clobber` to overwrite or `--skip-existing` to skip)"
 	)
 	generic := func(number int, name, body string) *client.ArtifactWithVersions {
@@ -355,6 +356,9 @@ func TestDownloadRun(t *testing.T) {
 	}
 	link := func(number int, name, body string) *client.ArtifactWithVersions {
 		return &client.ArtifactWithVersions{Number: number, Type: "link", Name: name, Body: body}
+	}
+	htmlDocument := func(number int, name, body string) *client.ArtifactWithVersions {
+		return &client.ArtifactWithVersions{Number: number, Type: "embedded_html", Name: name, Body: body}
 	}
 
 	// Artifact 2 on the spec's issue 142 has 12 versions. Version 9 renamed
@@ -367,9 +371,11 @@ func TestDownloadRun(t *testing.T) {
 		{Version: 1, Name: "OAuth plan", Body: "# OAuth plan"},
 	}
 
-	// The spec's issues 142, 145 and 161, plus two with what the fixtures
-	// can't hold: names older artifacts may have (150), and a type gh doesn't
-	// know and links whose bodies need care (151).
+	// The spec's issues 142, 145, 161 and 166, plus three with what the
+	// fixtures can't hold: names older artifacts may have (150), a type gh
+	// doesn't know and links whose bodies need care (151), and names that
+	// already end in an extension, on HTML documents and a Markdown document
+	// (152).
 	issues := map[int][]*client.ArtifactWithVersions{
 		142: {
 			oauthPlan,
@@ -401,7 +407,16 @@ func TestDownloadRun(t *testing.T) {
 			link(8, "Supplier portal", "file:///srv/suppliers"),
 			link(9, "Espresso machine manual", manualURL),
 		},
+		152: {
+			htmlDocument(1, "menu-prototype.html", menuHTML),
+			htmlDocument(2, "Menu.HTM", menuHTML),
+			htmlDocument(3, "specials.md", menuHTML),
+			generic(4, "Menu notes.html", "# Menu notes"),
+		},
 		161: {},
+		166: {
+			htmlDocument(1, "Menu prototype", menuHTML),
+		},
 	}
 	apiError := func(status int, message string, issueNumber, number int) error {
 		u, err := url.Parse(fmt.Sprintf("https://api.github.com/repos/monalisa/monas-cafe/issues/%d/artifacts/%d", issueNumber, number))
@@ -544,6 +559,38 @@ func TestDownloadRun(t *testing.T) {
 				"5-Menu.URL":             "[InternetShortcut]\r\nURL=https://github.com/monalisa/monas-cafe/wiki/Menu\r\n",
 				"6-README.md.url":        "[InternetShortcut]\r\nURL=https://github.com/monalisa/monas-cafe/blob/main/README.md\r\n",
 				"7-Opening-hours.url.md": "# Opening hours",
+			},
+		},
+		{
+			name:       "an HTML document is saved as .html",
+			opts:       DownloadOptions{IssueNumber: 166},
+			tty:        true,
+			wantCalls:  []string{"IsPullRequest monalisa/monas-cafe#166", "List monalisa/monas-cafe#166"},
+			wantStdout: "✓ 1-Menu-prototype.html\n",
+			wantFiles: map[string]string{
+				"1-Menu-prototype.html": menuHTML,
+			},
+		},
+		{
+			name: "an HTML document's name that ends with .html or .htm, in any case, keeps it, and a Markdown document's doesn't",
+			opts: DownloadOptions{IssueNumber: 152, ArtifactNumbers: []int{1, 2, 3, 4}},
+			tty:  true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#152",
+				"Get monalisa/monas-cafe#152 artifact 1",
+				"Get monalisa/monas-cafe#152 artifact 2",
+				"Get monalisa/monas-cafe#152 artifact 3",
+				"Get monalisa/monas-cafe#152 artifact 4",
+			},
+			wantStdout: "✓ 1-menu-prototype.html\n" +
+				"✓ 2-Menu.HTM\n" +
+				"✓ 3-specials.md.html\n" +
+				"✓ 4-Menu-notes.html.md\n",
+			wantFiles: map[string]string{
+				"1-menu-prototype.html": menuHTML,
+				"2-Menu.HTM":            menuHTML,
+				"3-specials.md.html":    menuHTML,
+				"4-Menu-notes.html.md":  "# Menu notes",
 			},
 		},
 		{
@@ -936,6 +983,16 @@ func TestDownloadRun(t *testing.T) {
 			wantStdout: "✓ runbook.txt\n",
 			wantFiles: map[string]string{
 				"runbook.txt": runbookShortcut,
+			},
+		},
+		{
+			name:       "--output writes an HTML document's source",
+			opts:       DownloadOptions{IssueNumber: 166, ArtifactNumbers: []int{1}, Output: "menu.html"},
+			tty:        true,
+			wantCalls:  []string{"IsPullRequest monalisa/monas-cafe#166", "Get monalisa/monas-cafe#166 artifact 1"},
+			wantStdout: "✓ menu.html\n",
+			wantFiles: map[string]string{
+				"menu.html": menuHTML,
 			},
 		},
 		{

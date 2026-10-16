@@ -225,9 +225,20 @@ func printHumanArtifact(opts *ViewOptions, repo ghrepo.Interface, a *client.Arti
 	fmt.Fprintf(out, "%s %s#%d\n", cs.Bold(text.RemoveExcessiveWhitespace(name)), ghrepo.FullName(repo), opts.IssueNumber)
 	fmt.Fprintln(out, cs.Muted(metadataLine(a.Artifact, viewing, now)))
 
-	if a.Type == client.TypeLink {
+	switch a.Type {
+	case client.TypeLink:
 		fmt.Fprintf(out, "\n  %s\n\n", strings.TrimSpace(body))
-	} else {
+	case client.TypeEmbeddedHTML:
+		// gh never renders HTML, so the source prints as stored, the way gh
+		// gist view prints a file that isn't Markdown. The API client has
+		// already turned any escape sequences into caret notation, so the
+		// source can't control the terminal.
+		fmt.Fprintf(out, "\n%s", body)
+		if !strings.HasSuffix(body, "\n") {
+			fmt.Fprintln(out)
+		}
+		fmt.Fprintln(out)
+	default:
 		md, err := markdown.Render(body,
 			markdown.WithTheme(opts.IO.TerminalTheme()),
 			markdown.WithWrap(opts.IO.TerminalWidth()))

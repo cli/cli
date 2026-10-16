@@ -51,6 +51,13 @@ func IsShortcutFile(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".url")
 }
 
+// IsHTMLFile reports whether path is an HTML file, which create reads as an
+// HTML document. It goes by the .html and .htm extensions, in any case.
+func IsHTMLFile(path string) bool {
+	ext := filepath.Ext(path)
+	return strings.EqualFold(ext, ".html") || strings.EqualFold(ext, ".htm")
+}
+
 // ErrNoShortcutSection is ShortcutURL's error for content with no
 // [InternetShortcut] section, such as a bare URL, so a caller can add a hint.
 var ErrNoShortcutSection = errors.New("no [InternetShortcut] section")

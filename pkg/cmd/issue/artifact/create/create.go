@@ -37,22 +37,14 @@ type CreateOptions struct {
 	// Sources are the artifacts to create, in argument order, which is the
 	// order they are created in.
 	Sources []source
-	// Type is the type of documents, from --type. Empty creates generic
-	// documents.
+	// Type is the type of every document, from --type. Empty gives each
+	// document the type its source implies: embedded_html for a .html or .htm
+	// file, and generic otherwise.
 	Type string
 
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
-}
-
-// documentType returns the type of the documents to create: --type, or
-// generic without it.
-func (opts *CreateOptions) documentType() string {
-	if opts.Type == "" {
-		return client.TypeGeneric
-	}
-	return opts.Type
 }
 
 // sourceKind is where an artifact's content comes from.
@@ -91,12 +83,18 @@ func (s source) isLink() bool {
 }
 
 // artifactType returns the type of the source's artifact: link for a link,
-// or documentType for a document.
-func (s source) artifactType(documentType string) string {
-	if s.isLink() {
+// or for a document, the type from --type when typeFlag is set. Without it, a
+// .html or .htm file is an HTML document, and any other document is generic.
+func (s source) artifactType(typeFlag string) string {
+	switch {
+	case s.isLink():
 		return client.TypeLink
+	case typeFlag != "":
+		return typeFlag
+	case s.kind == fromFile && shared.IsHTMLFile(s.arg):
+		return client.TypeEmbeddedHTML
 	}
-	return documentType
+	return client.TypeGeneric
 }
 
 // NewCmdCreate creates the gh issue artifact create command.
@@ -114,8 +112,9 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 		Short: "Create issue artifacts (preview)",
 		Long: heredoc.Docf(`
 			Create one artifact for each file or URL. A text file becomes a document
-			named after the file; add %[1]s#<name>%[1]s to choose a different name. A URL, or a
-			%[1]s.url%[1]s Internet Shortcut file, becomes a link; a URL is named after its host.
+			named after the file; add %[1]s#<name>%[1]s to choose a different name. A %[1]s.html%[1]s or
+			%[1]s.htm%[1]s file becomes an HTML document. A URL, or a %[1]s.url%[1]s Internet Shortcut
+			file, becomes a link; a URL is named after its host.
 
 			Artifact names can't contain some characters, such as parentheses. When a
 			file's name has them, they're removed: %[1]splan (1).md%[1]s is named %[1]splan 1.md%[1]s.
@@ -123,8 +122,9 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			Use %[1]s--body%[1]s to create a single document from text, or %[1]s--body-file%[1]s to create
 			one artifact from a file (%[1]s-%[1]s reads standard input). %[1]s--name%[1]s sets its name.
 
-			Documents are saved as %[1]sgeneric%[1]s unless %[1]s--type plan%[1]s is given. A plan
-			currently behaves the same as a generic document.
+			Documents are saved as %[1]sgeneric%[1]s, and HTML documents as %[1]sembedded_html%[1]s. Use
+			%[1]s--type%[1]s to set the type of every document instead, whatever the file
+			extension. A plan currently behaves the same as a generic document.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Create a document from a file
@@ -132,6 +132,9 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 
 			# Create documents from two files, naming the first
 			$ gh issue artifact create 142 'docs/signin-plan.md#Sign-in plan' oauth-research.md
+
+			# Create an HTML document from a file
+			$ gh issue artifact create 142 menu-prototype.html
 
 			# Create a link with a name
 			$ gh issue artifact create 142 https://github.com/monalisa/monas-cafe/wiki/OAuth-runbook --name 'Staging OAuth runbook'
@@ -209,11 +212,14 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				return cmdutil.FlagErrorf("`--type` only applies to documents; links are created from URLs and .url files")
 			}
 			// --attach needs at least one artifact whose type supports
-			// attachments. A link doesn't, since it has no Markdown to attach
-			// files to.
-			documentType := opts.documentType()
-			if opts.AttachFlag.Changed() && !slices.ContainsFunc(opts.Sources, func(s source) bool { return shared.SupportsAttachments(s.artifactType(documentType)) }) {
-				return cmdutil.FlagErrorf("`--attach` can't be used with %s artifacts", opts.Sources[0].artifactType(documentType))
+			// attachments. Links and HTML documents don't, since --attach
+			// only rewrites Markdown.
+			if opts.AttachFlag.Changed() && !slices.ContainsFunc(opts.Sources, func(s source) bool { return shared.SupportsAttachments(s.artifactType(opts.Type)) }) {
+				kind := opts.Sources[0].artifactType(opts.Type)
+				if kind == client.TypeEmbeddedHTML {
+					kind = "HTML"
+				}
+				return cmdutil.FlagErrorf("`--attach` can't be used with %s artifacts", kind)
 			}
 
 			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
@@ -233,7 +239,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 	cmd.Flags().StringVarP(&body, "body", "b", "", "Content for a single document")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read content for a single artifact from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVar(&name, "name", "", "Name for a single artifact")
-	cmdutil.StringEnumFlag(cmd, &opts.Type, "type", "", "", []string{client.TypeGeneric, client.TypePlan}, "Type for documents")
+	cmdutil.StringEnumFlag(cmd, &opts.Type, "type", "", "", []string{client.TypeGeneric, client.TypePlan, client.TypeEmbeddedHTML}, "Type for documents")
 	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	return cmd
@@ -290,10 +296,9 @@ func createRun(opts *CreateOptions) error {
 
 	// Every artifact is read and checked before any request, so a file that
 	// can't be used fails the whole command and nothing is created.
-	documentType := opts.documentType()
 	artifacts := make([]artifact, 0, len(opts.Sources))
 	for _, s := range opts.Sources {
-		a, err := readSource(s, opts.IO.In, documentType)
+		a, err := readSource(s, opts.IO.In, opts.Type)
 		if err != nil {
 			return err
 		}
@@ -353,8 +358,9 @@ func createRun(opts *CreateOptions) error {
 }
 
 // readSource reads an artifact's content and works out its type and name.
-func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, error) {
-	a := artifact{source: s, artifactType: documentType, name: s.name}
+// typeFlag is the type from --type, or empty without it.
+func readSource(s source, stdin io.ReadCloser, typeFlag string) (artifact, error) {
+	a := artifact{source: s, artifactType: s.artifactType(typeFlag), name: s.name}
 	switch s.kind {
 	case fromBodyFlag:
 		a.body = s.body
@@ -369,7 +375,7 @@ func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, e
 		if !ok {
 			return a, fmt.Errorf("invalid link URL %q: must be an http(s) URL with a host, in printable ASCII with no spaces", s.arg)
 		}
-		a.artifactType, a.body = client.TypeLink, u
+		a.body = u
 		if a.name == "" {
 			// The server rejects the ":" and "/" of a whole URL in a name.
 			parsed, err := url.Parse(u)
@@ -390,7 +396,7 @@ func readSource(s source, stdin io.ReadCloser, documentType string) (artifact, e
 			} else if err != nil {
 				return a, fmt.Errorf("%s: %w", s.arg, err)
 			}
-			a.artifactType, a.body = client.TypeLink, u
+			a.body = u
 		} else {
 			a.body, a.dir = content, dir
 		}
@@ -430,10 +436,10 @@ func isLetterOrNumber(r rune) bool {
 	return unicode.IsLetter(r) || unicode.IsNumber(r)
 }
 
-// attach uploads the --attach files, each once, and points every document at
-// the files it references. Artifacts whose type doesn't support attachments,
-// such as links, are left out. With one document, the files it doesn't
-// reference are appended to it.
+// attach uploads the --attach files, each once, and points every Markdown
+// document at the files it references. Artifacts whose type doesn't support
+// attachments, such as links and HTML documents, are left out. With one
+// Markdown document, the files it doesn't reference are appended to it.
 //
 // Uploads can't be undone, so a document is saved if any of its files
 // uploaded, even when another failed, and that failure is the reason on its

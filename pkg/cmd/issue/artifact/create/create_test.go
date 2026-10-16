@@ -242,6 +242,16 @@ func TestNewCmdCreate(t *testing.T) {
 			wantRepo: "OWNER/REPO",
 		},
 		{
+			name: "--type embedded_html",
+			args: "142 --body-file - --name 'Menu prototype' --type embedded_html",
+			wantOpts: CreateOptions{
+				IssueNumber: 142,
+				Sources:     []source{{kind: fromStdin, arg: "-", name: "Menu prototype"}},
+				Type:        "embedded_html",
+			},
+			wantRepo: "OWNER/REPO",
+		},
+		{
 			name: "--attach",
 			args: "142 signin-plan.md --attach signin-flow.png --attach './landing-page.png#Landing page'",
 			wantOpts: CreateOptions{
@@ -261,6 +271,32 @@ func TestNewCmdCreate(t *testing.T) {
 					{kind: fromFile, arg: "signin-plan.md"},
 					{kind: fromURL, arg: runbookURL},
 				},
+			},
+			wantAssetPaths: []string{"signin-flow.png"},
+			wantEvents:     attachEvent(1),
+			wantRepo:       "OWNER/REPO",
+		},
+		{
+			name: "--attach with a document and an HTML document",
+			args: "142 menu-prototype.html signin-plan.md --attach signin-flow.png",
+			wantOpts: CreateOptions{
+				IssueNumber: 142,
+				Sources: []source{
+					{kind: fromFile, arg: "menu-prototype.html"},
+					{kind: fromFile, arg: "signin-plan.md"},
+				},
+			},
+			wantAssetPaths: []string{"signin-flow.png"},
+			wantEvents:     attachEvent(1),
+			wantRepo:       "OWNER/REPO",
+		},
+		{
+			name: "--attach with a .html file saved as a Markdown document",
+			args: "142 menu-prototype.html --type generic --attach signin-flow.png",
+			wantOpts: CreateOptions{
+				IssueNumber: 142,
+				Sources:     []source{{kind: fromFile, arg: "menu-prototype.html"}},
+				Type:        "generic",
 			},
 			wantAssetPaths: []string{"signin-flow.png"},
 			wantEvents:     attachEvent(1),
@@ -420,12 +456,30 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name:    "a --type gh doesn't know",
 			args:    "142 signin-plan.md --type bad-type",
-			wantErr: `invalid argument "bad-type" for "--type" flag: valid values are {generic|plan}`,
+			wantErr: `invalid argument "bad-type" for "--type" flag: valid values are {generic|plan|embedded_html}`,
 		},
 		{
 			name:        "--attach with only links",
 			args:        "142 " + runbookURL + " oauth-runbook.url --attach signin-flow.png",
 			wantErr:     "`--attach` can't be used with link artifacts",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--attach with only HTML documents, from .html and .htm files in any case",
+			args:        "142 menu-prototype.html SPECIALS.HTM --attach signin-flow.png",
+			wantErr:     "`--attach` can't be used with HTML artifacts",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--attach with a .html file from --body-file",
+			args:        "142 --body-file menu-prototype.html --attach signin-flow.png",
+			wantErr:     "`--attach` can't be used with HTML artifacts",
+			wantFlagErr: true,
+		},
+		{
+			name:        "--attach with --type embedded_html",
+			args:        "142 --name 'Menu prototype' --body '<p>Maple oat latte</p>' --type embedded_html --attach signin-flow.png",
+			wantErr:     "`--attach` can't be used with HTML artifacts",
 			wantFlagErr: true,
 		},
 		{
@@ -530,6 +584,10 @@ func TestCreateRun(t *testing.T) {
 		signinPlanFlow = "# Sign-in plan\n\n![Sign-in flow](./signin-flow.png)\n"
 		baristaFlow    = "# Barista notes\n\nThe flow in ![Sign-in flow](./signin-flow.png) confused them.\n"
 		shortcut       = "[InternetShortcut]\r\nURL=" + runbookURL + "\r\n"
+		menuHTML       = "<!doctype html>\n<html>\n<body><h1>Seasonal menu</h1><p>Maple oat latte</p></body>\n</html>\n"
+		// menuHTMLFlow would have its Markdown reference replaced, were it a
+		// Markdown document.
+		menuHTMLFlow = "<h1>Seasonal menu</h1>\n\n![Sign-in flow](./signin-flow.png)\n"
 	)
 
 	tests := []struct {
@@ -680,6 +738,85 @@ func TestCreateRun(t *testing.T) {
 			},
 			wantBodies: []string{signinPlan},
 			wantStdout: "✓ Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:  ".html and .htm files, in any case, are HTML documents named after the file",
+			files: map[string]string{"menu-prototype.html": menuHTML, "specials.htm": menuHTML, "MENU.HTML": menuHTML},
+			opts: CreateOptions{Sources: []source{
+				{kind: fromFile, arg: "menu-prototype.html"},
+				{kind: fromFile, arg: "specials.htm"},
+				{kind: fromFile, arg: "MENU.HTML"},
+			}},
+			tty: true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				`Create monalisa/monas-cafe#142 embedded_html "menu-prototype.html"`,
+				`Create monalisa/monas-cafe#142 embedded_html "specials.htm"`,
+				`Create monalisa/monas-cafe#142 embedded_html "MENU.HTML"`,
+			},
+			wantBodies: []string{menuHTML, menuHTML, menuHTML},
+			wantStdout: "✓ Created artifact 6 (menu-prototype.html) on monalisa/monas-cafe#142\n" +
+				"✓ Created artifact 7 (specials.htm) on monalisa/monas-cafe#142\n" +
+				"✓ Created artifact 8 (MENU.HTML) on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:  "--body-file with a .html file is an HTML document too",
+			files: map[string]string{"menu-prototype.html": menuHTML},
+			opts:  CreateOptions{Sources: []source{{kind: fromFile, arg: "menu-prototype.html", bodyFile: true}}},
+			tty:   true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				`Create monalisa/monas-cafe#142 embedded_html "menu-prototype.html"`,
+			},
+			wantBodies: []string{menuHTML},
+			wantStdout: "✓ Created artifact 6 (menu-prototype.html) on monalisa/monas-cafe#142\n",
+		},
+		{
+			name: "--type embedded_html makes --body an HTML document",
+			opts: CreateOptions{Sources: []source{{kind: fromBodyFlag, name: "Menu prototype", body: menuHTML}}, Type: "embedded_html"},
+			tty:  true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				`Create monalisa/monas-cafe#142 embedded_html "Menu prototype"`,
+			},
+			wantBodies: []string{menuHTML},
+			wantStdout: "✓ Created artifact 6 (Menu prototype) on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:  "--type embedded_html makes standard input an HTML document",
+			stdin: menuHTML,
+			opts:  CreateOptions{Sources: []source{{kind: fromStdin, arg: "-", name: "Menu prototype"}}, Type: "embedded_html"},
+			tty:   true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				`Create monalisa/monas-cafe#142 embedded_html "Menu prototype"`,
+			},
+			wantBodies: []string{menuHTML},
+			wantStdout: "✓ Created artifact 6 (Menu prototype) on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:  "--type generic saves a .html file's source as a Markdown document",
+			files: map[string]string{"menu-prototype.html": menuHTML},
+			opts:  CreateOptions{Sources: []source{{kind: fromFile, arg: "menu-prototype.html"}}, Type: "generic"},
+			tty:   true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				`Create monalisa/monas-cafe#142 generic "menu-prototype.html"`,
+			},
+			wantBodies: []string{menuHTML},
+			wantStdout: "✓ Created artifact 6 (menu-prototype.html) on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:  "--type plan overrides a .htm file's extension too",
+			files: map[string]string{"specials.htm": menuHTML},
+			opts:  CreateOptions{Sources: []source{{kind: fromFile, arg: "specials.htm"}}, Type: "plan"},
+			tty:   true,
+			wantCalls: []string{
+				"IsPullRequest monalisa/monas-cafe#142",
+				`Create monalisa/monas-cafe#142 plan "specials.htm"`,
+			},
+			wantBodies: []string{menuHTML},
+			wantStdout: "✓ Created artifact 6 (specials.htm) on monalisa/monas-cafe#142\n",
 		},
 		{
 			name:  "standard input",
@@ -1169,6 +1306,23 @@ func TestCreateRun(t *testing.T) {
 			wantBodies: []string{runbookURL, "# Sign-in plan\n\n1. Register the callback URL.\n\n![latte-art](https://github.com/user-attachments/assets/AAA)"},
 			wantOps:    &attachments.UploadResult{AppendOperations: 1},
 			wantStdout: "✓ Created artifact 6 (github.com) on monalisa/monas-cafe#142\n" +
+				"✓ Created artifact 7 (signin-plan.md) on monalisa/monas-cafe#142\n",
+		},
+		{
+			name:    "--attach leaves an HTML document out, so the one Markdown document takes what isn't referenced",
+			files:   map[string]string{"menu-prototype.html": menuHTMLFlow, "signin-plan.md": signinPlan},
+			attach:  []string{"signin-flow.png"},
+			uploads: []attachments.UploadStub{uploaded("signin-flow.png", "AAA")},
+			opts:    CreateOptions{Sources: []source{{kind: fromFile, arg: "menu-prototype.html"}, {kind: fromFile, arg: "signin-plan.md"}}},
+			tty:     true,
+			wantCalls: []string{
+				"UploadTarget monalisa/monas-cafe#142",
+				`Create monalisa/monas-cafe#142 embedded_html "menu-prototype.html"`,
+				`Create monalisa/monas-cafe#142 generic "signin-plan.md"`,
+			},
+			wantBodies: []string{menuHTMLFlow, signinPlan + "\n![signin-flow](https://github.com/user-attachments/assets/AAA)"},
+			wantOps:    &attachments.UploadResult{AppendOperations: 1},
+			wantStdout: "✓ Created artifact 6 (menu-prototype.html) on monalisa/monas-cafe#142\n" +
 				"✓ Created artifact 7 (signin-plan.md) on monalisa/monas-cafe#142\n",
 		},
 		{
