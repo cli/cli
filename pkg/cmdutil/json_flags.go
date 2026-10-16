@@ -29,7 +29,7 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	addJqFlag(f, "q")
 	addTemplateFlag(f, "t")
 
-	setupJsonFlags(cmd, exportTarget, fields)
+	setupJsonFlags(cmd, exportTarget, fields, true)
 }
 
 func AddJSONFlagsWithoutShorthand(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
@@ -38,7 +38,15 @@ func AddJSONFlagsWithoutShorthand(cmd *cobra.Command, exportTarget *Exporter, fi
 	addJqFlag(f, "")
 	addTemplateFlag(f, "")
 
-	setupJsonFlags(cmd, exportTarget, fields)
+	setupJsonFlags(cmd, exportTarget, fields, true)
+}
+
+func AddJSONAndJQFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
+	f := cmd.Flags()
+	addJsonFlag(f)
+	addJqFlag(f, "")
+
+	setupJsonFlags(cmd, exportTarget, fields, false)
 }
 
 func addJsonFlag(f *pflag.FlagSet) {
@@ -51,7 +59,7 @@ func addTemplateFlag(f *pflag.FlagSet, shorthand string) {
 	f.StringP("template", shorthand, "", "Format JSON output using a Go template; see \"gh help formatting\"")
 }
 
-func setupJsonFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
+func setupJsonFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string, withTemplateFlag bool) {
 
 	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
@@ -77,7 +85,7 @@ func setupJsonFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string)
 				return err
 			}
 		}
-		if export, err := checkJSONFlags(c); err == nil {
+		if export, err := checkJSONFlags(c, withTemplateFlag); err == nil {
 			if export == nil {
 				*exportTarget = nil
 			} else {
@@ -118,12 +126,21 @@ func setupJsonFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string)
 	cmd.Annotations["help:json-fields"] = strings.Join(fields, ",")
 }
 
-func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
+func checkJSONFlags(cmd *cobra.Command, withTemplateFlag bool) (*jsonExporter, error) {
 	f := cmd.Flags()
 	jsonFlag := f.Lookup("json")
 	jqFlag := f.Lookup("jq")
-	tplFlag := f.Lookup("template")
 	webFlag := f.Lookup("web")
+
+	var tplFlag *pflag.Flag
+	if withTemplateFlag {
+		tplFlag = f.Lookup("template")
+	}
+
+	templateValue := ""
+	if tplFlag != nil {
+		templateValue = tplFlag.Value.String()
+	}
 
 	if jsonFlag.Changed {
 		if webFlag != nil && webFlag.Changed {
@@ -133,11 +150,11 @@ func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
 		return &jsonExporter{
 			fields:   jv.GetSlice(),
 			filter:   jqFlag.Value.String(),
-			template: tplFlag.Value.String(),
+			template: templateValue,
 		}, nil
 	} else if jqFlag.Changed {
 		return nil, errors.New("cannot use `--jq` without specifying `--json`")
-	} else if tplFlag.Changed {
+	} else if tplFlag != nil && tplFlag.Changed {
 		return nil, errors.New("cannot use `--template` without specifying `--json`")
 	}
 	return nil, nil
