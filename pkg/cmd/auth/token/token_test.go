@@ -105,13 +105,15 @@ func TestNewCmdToken(t *testing.T) {
 
 func TestTokenRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       TokenOptions
-		env        map[string]string
-		cfgStubs   func(*testing.T, gh.Config)
-		wantStdout string
-		wantErr    bool
-		wantErrMsg string
+		name               string
+		opts               TokenOptions
+		env                map[string]string
+		cfgStubs           func(*testing.T, gh.Config)
+		wantStdout         string
+		wantErr            bool
+		wantErrMsg         string
+		wantStderrContains string
+		wantStderrOmits    string
 	}{
 		{
 			name: "token",
@@ -119,7 +121,8 @@ func TestTokenRun(t *testing.T) {
 			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
-			wantStdout: "gho_ABCDEFG\n",
+			wantStdout:      "gho_ABCDEFG\n",
+			wantStderrOmits: "This token will expire",
 		},
 		{
 			name: "token by hostname",
@@ -175,7 +178,8 @@ func TestTokenRun(t *testing.T) {
 			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				loginRefreshable(t, cfg, "github.com", "test-user", "gho_REFRESHABLE", "ghr_TOKEN", false)
 			},
-			wantStdout: "gho_REFRESHABLE\n",
+			wantStdout:         "gho_REFRESHABLE\n",
+			wantStderrContains: "This token will expire",
 		},
 		{
 			name: "no-refresh returns the stored token without refreshing",
@@ -183,7 +187,8 @@ func TestTokenRun(t *testing.T) {
 			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
-			wantStdout: "gho_ABCDEFG\n",
+			wantStdout:      "gho_ABCDEFG\n",
+			wantStderrOmits: "This token will expire",
 		},
 		{
 			name: "no-refresh returns a refreshable token's stored access token",
@@ -191,7 +196,8 @@ func TestTokenRun(t *testing.T) {
 			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				loginRefreshable(t, cfg, "github.com", "test-user", "gho_REFRESHABLE", "ghr_TOKEN", false)
 			},
-			wantStdout: "gho_REFRESHABLE\n",
+			wantStdout:         "gho_REFRESHABLE\n",
+			wantStderrContains: "This token will expire",
 		},
 		{
 			name:       "returns a token from the environment",
@@ -209,7 +215,7 @@ func TestTokenRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 			tt.opts.IO = ios
 
 			cfg, _ := config.NewIsolatedTestConfig(t, "")
@@ -235,19 +241,27 @@ func TestTokenRun(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, tt.wantStdout, stdout.String())
+			if tt.wantStderrContains != "" {
+				require.Contains(t, stderr.String(), tt.wantStderrContains)
+			}
+			if tt.wantStderrOmits != "" {
+				require.NotContains(t, stderr.String(), tt.wantStderrOmits)
+			}
 		})
 	}
 }
 
 func TestTokenRunSecureStorage(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       TokenOptions
-		env        map[string]string
-		cfgStubs   func(*testing.T, gh.Config)
-		wantStdout string
-		wantErr    bool
-		wantErrMsg string
+		name               string
+		opts               TokenOptions
+		env                map[string]string
+		cfgStubs           func(*testing.T, gh.Config)
+		wantStdout         string
+		wantErr            bool
+		wantErrMsg         string
+		wantStderrContains string
+		wantStderrOmits    string
 	}{
 		// State 3: --secure-storage without --no-refresh (compatibility mode for go-gh).
 		{
@@ -256,7 +270,8 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", true)
 			},
-			wantStdout: "gho_ABCDEFG\n",
+			wantStdout:      "gho_ABCDEFG\n",
+			wantStderrOmits: "This token will expire",
 		},
 		{
 			name: "state 3: plain token in keyring by hostname is returned",
@@ -310,7 +325,8 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				loginRefreshable(t, cfg, "github.com", "test-user", "gho_REFRESHABLE", "ghr_TOKEN", true)
 			},
-			wantStdout: "gho_REFRESHABLE\n",
+			wantStdout:         "gho_REFRESHABLE\n",
+			wantStderrContains: "This token will expire",
 		},
 		{
 			name: "state 3: refreshable token in keyring is returned despite environment token",
@@ -397,7 +413,8 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				loginRefreshable(t, cfg, "github.com", "test-user", "gho_REFRESHABLE", "ghr_TOKEN", true)
 			},
-			wantStdout: "gho_REFRESHABLE\n",
+			wantStdout:         "gho_REFRESHABLE\n",
+			wantStderrContains: "This token will expire",
 		},
 		{
 			name: "state 4: refreshable token in keyring is returned despite environment token",
@@ -431,7 +448,7 @@ func TestTokenRunSecureStorage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 			tt.opts.IO = ios
 			tt.opts.SecureStorage = true
 
@@ -458,6 +475,12 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, tt.wantStdout, stdout.String())
+			if tt.wantStderrContains != "" {
+				require.Contains(t, stderr.String(), tt.wantStderrContains)
+			}
+			if tt.wantStderrOmits != "" {
+				require.NotContains(t, stderr.String(), tt.wantStderrOmits)
+			}
 		})
 	}
 }
@@ -540,25 +563,28 @@ func TestTokenRunRefresh(t *testing.T) {
 	future := time.Now().Add(time.Hour)
 
 	tests := []struct {
-		name           string
-		secureStorage  bool
-		noRefresh      bool
-		setup          func(*testing.T, gh.Config)
-		refresher      *ghmock.TokenRefresherMock
-		wantStdout     string
-		wantErrMsg     string
-		wantRefresh    int
-		wantRefreshTok string
+		name               string
+		secureStorage      bool
+		noRefresh          bool
+		setup              func(*testing.T, gh.Config)
+		refresher          *ghmock.TokenRefresherMock
+		wantStdout         string
+		wantErrMsg         string
+		wantRefresh        int
+		wantRefreshTok     string
+		wantStderrContains string
+		wantStderrOmits    string
 	}{
 		{
 			name: "state 1: expiring refreshable in config is refreshed",
 			setup: func(t *testing.T, cfg gh.Config) {
 				loginRefreshableWithExpiry(t, cfg, "github.com", "test-user", "gho_OLD", "ghr_OLD", false, &past)
 			},
-			refresher:      renewingRefresher("gho_NEW", "ghr_NEW"),
-			wantStdout:     "gho_NEW\n",
-			wantRefresh:    1,
-			wantRefreshTok: "ghr_OLD",
+			refresher:          renewingRefresher("gho_NEW", "ghr_NEW"),
+			wantStdout:         "gho_NEW\n",
+			wantRefresh:        1,
+			wantRefreshTok:     "ghr_OLD",
+			wantStderrContains: "This token will expire",
 		},
 		{
 			name: "state 1: expiring refreshable in keyring is refreshed",
@@ -575,9 +601,10 @@ func TestTokenRunRefresh(t *testing.T) {
 			setup: func(t *testing.T, cfg gh.Config) {
 				loginRefreshableWithExpiry(t, cfg, "github.com", "test-user", "gho_OLD", "ghr_OLD", false, &future)
 			},
-			refresher:   renewingRefresher("gho_NEW", "ghr_NEW"),
-			wantStdout:  "gho_OLD\n",
-			wantRefresh: 0,
+			refresher:          renewingRefresher("gho_NEW", "ghr_NEW"),
+			wantStdout:         "gho_OLD\n",
+			wantRefresh:        0,
+			wantStderrContains: "This token will expire on ",
 		},
 		{
 			name: "state 1: failed refresh falls back to the stored token",
@@ -657,9 +684,10 @@ func TestTokenRunRefresh(t *testing.T) {
 			setup: func(t *testing.T, cfg gh.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_PLAIN", "https", true)
 			},
-			refresher:   renewingRefresher("gho_NEW", "ghr_NEW"),
-			wantStdout:  "gho_PLAIN\n",
-			wantRefresh: 0,
+			refresher:       renewingRefresher("gho_NEW", "ghr_NEW"),
+			wantStdout:      "gho_PLAIN\n",
+			wantRefresh:     0,
+			wantStderrOmits: "This token will expire",
 		},
 		{
 			name:          "state 3: rejected refresh token errors even under secure-storage",
@@ -709,7 +737,7 @@ func TestTokenRunRefresh(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 			opts := TokenOptions{
 				IO:            ios,
 				SecureStorage: tt.secureStorage,
@@ -734,6 +762,12 @@ func TestTokenRunRefresh(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.wantStdout, stdout.String())
+				if tt.wantStderrContains != "" {
+					require.Contains(t, stderr.String(), tt.wantStderrContains)
+				}
+				if tt.wantStderrOmits != "" {
+					require.NotContains(t, stderr.String(), tt.wantStderrOmits)
+				}
 			}
 
 			if tt.refresher != nil {

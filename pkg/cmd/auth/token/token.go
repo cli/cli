@@ -3,6 +3,7 @@ package token
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/gh"
@@ -65,6 +66,7 @@ func tokenRun(opts *TokenOptions) error {
 		return err
 	}
 	authCfg := cfg.Authentication()
+	cs := opts.IO.ColorScheme()
 
 	hostname := opts.Hostname
 	if hostname == "" {
@@ -72,17 +74,18 @@ func tokenRun(opts *TokenOptions) error {
 	}
 
 	var val string
+	var cred gh.Credential
 	var refreshStatus gh.RefreshStatus
 	switch {
 	// No flags: return the active token, refreshing it when necessary, from wherever it is stored.
 	case !opts.SecureStorage && !opts.NoRefresh:
-		var cred gh.Credential
 		cred, refreshStatus = getTokenWithRefresh(authCfg, hostname, opts.Username)
 		val = cred.Token
 
 	// --no-refresh: return the stored active token from wherever it is stored, without refreshing.
 	case !opts.SecureStorage && opts.NoRefresh:
-		val = getTokenReadOnly(authCfg, hostname, opts.Username).Token
+		cred = getTokenReadOnly(authCfg, hostname, opts.Username)
+		val = cred.Token
 
 	// --secure-storage: compatibility mode for go-gh, which cannot read gh's storage directly. A refreshable token
 	// is returned regardless of where it is stored, because gh owns its lifecycle and a go-gh based caller cannot
@@ -94,12 +97,13 @@ func tokenRun(opts *TokenOptions) error {
 		// and ActiveTokenWithRefresh cannot be used upfront: with no username it resolves the active token, which an
 		// environment variable such as GH_TOKEN can shadow, defeating --secure-storage.
 		user := resolveUsername(authCfg, hostname, opts.Username)
-		var cred gh.Credential
+		var c gh.Credential
 		if user != "" {
-			cred, refreshStatus = getTokenWithRefresh(authCfg, hostname, user)
+			c, refreshStatus = getTokenWithRefresh(authCfg, hostname, user)
 		}
-		if cred.IsRefreshable() {
-			val = cred.Token
+		if c.IsRefreshable() {
+			cred = c
+			val = c.Token
 		} else {
 			// Non-refreshable fallback: read the keyring keyed on the actual flag value, so an omitted --user reads
 			// the legacy unkeyed slot exactly as the original --secure-storage behaviour did, not a per-user slot.
@@ -115,12 +119,13 @@ func tokenRun(opts *TokenOptions) error {
 		// return it when it genuinely came from the keyring. ActiveToken cannot be used upfront because an
 		// environment variable such as GH_TOKEN can shadow the active token.
 		user := resolveUsername(authCfg, hostname, opts.Username)
-		var cred gh.Credential
+		var c gh.Credential
 		if user != "" {
-			cred = getTokenReadOnly(authCfg, hostname, user)
+			c = getTokenReadOnly(authCfg, hostname, user)
 		}
-		if cred.Source == gh.TokenSourceKeyring {
-			val = cred.Token
+		if c.Source == gh.TokenSourceKeyring {
+			cred = c
+			val = c.Token
 		} else {
 			// Non-refreshable fallback: read the keyring keyed on the actual flag value, so an omitted --user reads
 			// the legacy unkeyed slot exactly as the original --secure-storage behaviour did, not a per-user slot.
@@ -145,6 +150,17 @@ func tokenRun(opts *TokenOptions) error {
 			errMsg += fmt.Sprintf(" account %s", opts.Username)
 		}
 		return errors.New(errMsg)
+	}
+
+	// The token is written to stdout as a script contract, so this caution goes to stderr only, and before the token
+	// so it stays visible even when stdout is redirected. A refreshable token is short-lived: gh may rotate it at any
+	// time, so a value captured now can stop working before its nominal expiry.
+	if cred.IsRefreshable() {
+		if cred.ExpiresAt != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "%s This token will expire on %s, or may be revoked before that time as a result of an expected refresh.\n", cs.WarningIcon(), cred.ExpiresAt.UTC().Format(time.RFC3339))
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "%s This token will expire, or may be revoked at any time as a result of an expected refresh.\n", cs.WarningIcon())
+		}
 	}
 
 	fmt.Fprintf(opts.IO.Out, "%s\n", val)
