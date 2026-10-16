@@ -194,10 +194,12 @@ func refreshRun(opts *RefreshOptions) error {
 
 	// Capture whether the stored credential is refreshable before it is replaced. Warn up front (before the credential
 	// and browser prompts) so the user can abort rather than discover only afterwards that refreshing without
-	// --expiring downgrades it to a non-expiring token.
+	// --expiring downgrades it to a non-expiring token. Skip the warning when the user explicitly passed
+	// --expiring=false, since they already opted out and the suggestion to pass --expiring would be noise.
+	explicitlyOptedOut := opts.Expiring != nil && !*opts.Expiring
 	wasRefreshable := authCfg.ActiveToken(hostname).IsRefreshable()
-	if wasRefreshable && !expiring {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was expiring; pass --expiring to preserve it\n", cs.WarningIcon())
+	if wasRefreshable && !expiring && !explicitlyOptedOut {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was an expiring token; pass --expiring to preserve it\n", cs.WarningIcon())
 	}
 
 	additionalScopes := set.NewStringSet()

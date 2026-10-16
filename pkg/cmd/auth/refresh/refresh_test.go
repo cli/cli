@@ -267,6 +267,7 @@ func Test_refreshRun(t *testing.T) {
 		wantStoredToken        string
 		wantStoredRefreshToken string
 		wantStderrContains     string
+		wantStderrOmits        string
 	}{
 		{
 			name:    "no hosts configured",
@@ -628,7 +629,27 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantStoredToken:        "xyz456",
 			wantStoredRefreshToken: "",
-			wantStderrContains:     "Original token was expiring; pass --expiring to preserve it\n",
+			wantStderrContains:     "Original token was an expiring token; pass --expiring to preserve it\n",
+		},
+		{
+			name: "existing refreshable credential with --expiring=false omits downgrade warning",
+			cfgHosts: []string{
+				"github.com",
+			},
+			cfgRefreshable: true,
+			opts: &RefreshOptions{
+				Expiring: new(false),
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     true,
+				expiring:      false,
+			},
+			wantStoredToken:        "xyz456",
+			wantStoredRefreshToken: "",
+			wantStderrOmits:        "Original token was an expiring token",
 		},
 		{
 			name: "expired refreshable token is refreshed so its scopes are preserved",
@@ -801,6 +822,9 @@ func Test_refreshRun(t *testing.T) {
 
 			if tt.wantStderrContains != "" {
 				require.Contains(t, stderr.String(), tt.wantStderrContains)
+			}
+			if tt.wantStderrOmits != "" {
+				require.NotContains(t, stderr.String(), tt.wantStderrOmits)
 			}
 		})
 	}
