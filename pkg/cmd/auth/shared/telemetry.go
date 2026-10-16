@@ -58,7 +58,7 @@ func (e *AuthTelemetryEvent) RecordGitProtocol(protocol string) {
 }
 
 // RecordHelperBefore captures the git credential helper configured before login reconfigured it, as one of "ours",
-// "other", or "none".
+// "other", "none", or "error" when the helper could not be read.
 func (e *AuthTelemetryEvent) RecordHelperBefore(category string) {
 	if e == nil {
 		return
@@ -66,8 +66,8 @@ func (e *AuthTelemetryEvent) RecordHelperBefore(category string) {
 	e.pendingEvent.UpsertDimensions(ghtelemetry.Dimensions{"git_credential_helper_before": category})
 }
 
-// RecordHelperAfter captures the git credential helper configured after login completed, as one of "ours", "other", or
-// "none".
+// RecordHelperAfter captures the git credential helper configured after login completed, as one of "ours", "other",
+// "none", or "error" when the helper could not be read.
 func (e *AuthTelemetryEvent) RecordHelperAfter(category string) {
 	if e == nil {
 		return
