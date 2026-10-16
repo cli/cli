@@ -237,6 +237,10 @@ func Login(opts *LoginOptions) error {
 		}
 	}
 
+	// Record the server's issuance outcome as soon as the auth flow returns. It is independent of local persistence, so
+	// a later storage failure must not hide that an expiring, refreshable token was issued.
+	authEvent.RecordExpiringReceived(refreshableCredential != nil)
+
 	if username == "" {
 		var err error
 		username, err = GetCurrentLogin(httpClient, hostname, authToken)
@@ -274,7 +278,10 @@ func Login(opts *LoginOptions) error {
 	}
 
 	authEvent.RecordStorage(insecureStorageUsed)
-	authEvent.RecordExpiringReceived(refreshableCredential != nil)
+
+	// Record success as soon as the credential is persisted. The git credential-helper setup and SSH key upload below
+	// are separate side effects whose failure must not retract a credential that was already stored successfully.
+	authEvent.RecordSuccess()
 
 	// Expiring tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
 	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
@@ -319,8 +326,6 @@ func Login(opts *LoginOptions) error {
 	if userWasAlreadyLoggedIn {
 		fmt.Fprintf(opts.IO.ErrOut, "%s You were already logged in to this account\n", cs.WarningIcon())
 	}
-
-	authEvent.RecordSuccess()
 
 	return nil
 }
