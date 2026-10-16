@@ -260,7 +260,7 @@ func Test_refreshRun(t *testing.T) {
 		authOut                authOut
 		oldScopes              string
 		clipboard              string
-		preferExpiringCfg      string
+		expiringCredentialsCfg string
 		wantErr                string
 		nontty                 bool
 		wantAuthArgs           authArgs
@@ -570,11 +570,11 @@ func Test_refreshRun(t *testing.T) {
 			wantStoredRefreshToken: "ghr_refresh",
 		},
 		{
-			name: "prefer_expiring_credentials config requests expiring without the flag",
+			name: "expiring_credentials config requests expiring without the flag",
 			cfgHosts: []string{
 				"github.com",
 			},
-			preferExpiringCfg: "enabled",
+			expiringCredentialsCfg: "enabled",
 			opts: &RefreshOptions{
 				Hostname: "github.com",
 			},
@@ -594,11 +594,11 @@ func Test_refreshRun(t *testing.T) {
 			wantStoredRefreshToken: "ghr_refresh",
 		},
 		{
-			name: "--expiring=false overrides prefer_expiring_credentials config",
+			name: "--expiring=false overrides expiring_credentials config",
 			cfgHosts: []string{
 				"github.com",
 			},
-			preferExpiringCfg: "enabled",
+			expiringCredentialsCfg: "enabled",
 			opts: &RefreshOptions{
 				Hostname: "github.com",
 				Expiring: new(false),
@@ -707,8 +707,8 @@ func Test_refreshRun(t *testing.T) {
 			if tt.clipboard != "" {
 				cfg.Set("", "clipboard", tt.clipboard)
 			}
-			if tt.preferExpiringCfg != "" {
-				cfg.Set("", "prefer_expiring_credentials", tt.preferExpiringCfg)
+			if tt.expiringCredentialsCfg != "" {
+				cfg.Set("", "expiring_credentials", tt.expiringCredentialsCfg)
 			}
 			for _, hostname := range tt.cfgHosts {
 				switch {

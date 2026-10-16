@@ -87,7 +87,7 @@ func TestShouldCopyToClipboard(t *testing.T) {
 	}
 }
 
-func TestShouldPreferExpiring(t *testing.T) {
+func TestShouldUseExpiring(t *testing.T) {
 	tests := []struct {
 		name       string
 		configured string
@@ -133,10 +133,10 @@ func TestShouldPreferExpiring(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := config.NewMockConfig()
 			if tt.configured != "" {
-				cfg.Set("github.com", "prefer_expiring_credentials", tt.configured)
+				cfg.Set("github.com", "expiring_credentials", tt.configured)
 			}
 
-			require.Equal(t, tt.want, ShouldPreferExpiring(cfg, tt.flagValue, "github.com"))
+			require.Equal(t, tt.want, ShouldUseExpiring(cfg, tt.flagValue, "github.com"))
 		})
 	}
 }

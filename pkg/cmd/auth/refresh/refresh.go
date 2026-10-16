@@ -84,7 +84,7 @@ func NewCmdRefresh(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 			This is a preference, not a guarantee: whether expiring tokens are issued depends on the
 			host and the OAuth app configuration. A host without support issues a non-expiring token
 			instead, and a host configured for them may issue expiring tokens even without the flag.
-			Enable the %[1]sprefer_expiring_credentials%[1]s configuration to prefer expiring credentials
+			Enable the %[1]sexpiring_credentials%[1]s configuration to prefer expiring credentials
 			without passing %[1]s--expiring%[1]s every time, and pass %[1]s--expiring=false%[1]s to request a
 			non-expiring token even when that configuration is enabled.
 			When using expiring credentials for git operations, git 2.46 or newer is recommended so
@@ -178,7 +178,7 @@ func refreshRun(opts *RefreshOptions) error {
 		return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
 	}
 
-	expiring := shared.ShouldPreferExpiring(cfg, opts.Expiring, hostname)
+	expiring := shared.ShouldUseExpiring(cfg, opts.Expiring, hostname)
 
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
