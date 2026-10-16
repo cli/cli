@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -301,7 +302,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			assert.NoError(t, err)
 
 			var gotOpts *LoginOptions
-			cmd := NewCmdLogin(f, func(opts *LoginOptions) error {
+			cmd := NewCmdLogin(f, nil, func(opts *LoginOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -603,6 +604,11 @@ func Test_loginRun_nontty(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
+			tt.opts.helperConfig = &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers:            map[string]gitcredentials.Helper{},
+			}
+
 			_, restoreRun := run.Stub()
 			defer restoreRun(t)
 
@@ -672,10 +678,6 @@ func Test_loginRun_Survey(t *testing.T) {
 					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git config credential\.https:/`, 1, "")
-				rs.Register(`git config credential\.helper`, 1, "")
-			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
 				reg.Register(
@@ -715,10 +717,6 @@ func Test_loginRun_Survey(t *testing.T) {
 					return "brad.vickers", nil
 				}
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git config credential\.https:/`, 1, "")
-				rs.Register(`git config credential\.helper`, 1, "")
-			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,read:public_key"))
 				reg.Register(
@@ -754,10 +752,6 @@ func Test_loginRun_Survey(t *testing.T) {
 					}
 					return -1, prompter.NoSuchPromptErr(prompt)
 				}
-			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git config credential\.https:/`, 1, "")
-				rs.Register(`git config credential\.helper`, 1, "")
 			},
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
@@ -808,10 +802,6 @@ func Test_loginRun_Survey(t *testing.T) {
 					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git config credential\.https:/`, 1, "")
-				rs.Register(`git config credential\.helper`, 1, "")
-			},
 			wantHosts: heredoc.Doc(`
                 github.com:
                     git_protocol: https
@@ -843,10 +833,6 @@ func Test_loginRun_Survey(t *testing.T) {
 			cfgStubs: func(t *testing.T, c gh.Config) {
 				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
 				require.NoError(t, err)
-			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git config credential\.https:/`, 1, "")
-				rs.Register(`git config credential\.helper`, 1, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
@@ -917,6 +903,11 @@ func Test_loginRun_Survey(t *testing.T) {
 			tt.opts.Prompter = pm
 
 			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+
+			tt.opts.helperConfig = &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers:            map[string]gitcredentials.Helper{},
+			}
 
 			rs, restoreRun := run.Stub()
 			defer restoreRun(t)

@@ -12,12 +12,16 @@ import (
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/telemetry"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -203,7 +207,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			require.NoError(t, err)
 
 			var gotOpts *RefreshOptions
-			cmd := NewCmdRefresh(f, func(opts *RefreshOptions) error {
+			cmd := NewCmdRefresh(f, nil, func(opts *RefreshOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -763,6 +767,13 @@ func Test_refreshRun(t *testing.T) {
 			}
 			tt.opts.Prompter = pm
 
+			// Helper detection now runs for every refresh, so provide a fake helper config to keep the read hermetic
+			// instead of shelling out to git.
+			tt.opts.helperConfig = &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers:            map[string]gitcredentials.Helper{},
+			}
+
 			err := refreshRun(tt.opts)
 			if tt.wantErr != "" {
 				require.Contains(t, err.Error(), tt.wantErr)
@@ -793,6 +804,93 @@ func Test_refreshRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_refreshRun_recordsTelemetry(t *testing.T) {
+	cfg, _ := config.NewIsolatedTestConfig(t, "")
+	_, err := cfg.Authentication().Login("github.com", "test-user", "abc123", "https", false)
+	require.NoError(t, err)
+
+	recorder := &telemetry.InvocationRecorderSpy{}
+	ios, _, _, _ := iostreams.Test()
+	ios.SetStdinTTY(false)
+	ios.SetStdoutTTY(false)
+
+	opts := &RefreshOptions{
+		IO:          ios,
+		Hostname:    "github.com",
+		Telemetry:   recorder,
+		ResetScopes: true,
+		Config: func() (gh.Config, error) {
+			return cfg, nil
+		},
+		AuthFlow: func(_ *http.Client, _ *iostreams.IOStreams, _ string, _ []string, _, _, _ bool) (*authflow.AuthResult, error) {
+			return &authflow.AuthResult{Token: "xyz456", Username: "test-user"}, nil
+		},
+		PlainHttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: &httpmock.Registry{}}, nil
+		},
+		Prompter: &prompter.PrompterMock{},
+		helperConfig: &gitcredentials.FakeHelperConfig{
+			SelfExecutablePath: "/path/to/gh",
+			Helpers:            map[string]gitcredentials.Helper{},
+		},
+	}
+
+	require.NoError(t, refreshRun(opts))
+
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	assert.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
+	dims := events[0].Dimensions
+	assert.Equal(t, "auth_invocation", events[0].Type)
+	assert.Equal(t, "refresh", dims["auth_command"])
+	assert.Equal(t, "false", dims["expiring_requested"])
+	assert.Equal(t, "not_shown", dims["gh_as_cred_helper_prompt_resp"])
+	assert.Equal(t, "https", dims["git_protocol"])
+	assert.Equal(t, "false", dims["expiring_received"])
+	assert.Equal(t, "true", dims["auth_success"])
+	// Helper telemetry is recorded even for this non-interactive refresh. No helper is configured and no setup runs,
+	// so before and after are both "none".
+	assert.Equal(t, "none", dims["git_credential_helper_before"])
+	assert.Equal(t, "none", dims["git_credential_helper_after"])
+	assert.Contains(t, []string{"keyring", "plaintext"}, dims["storage_type"])
+}
+
+func Test_refreshRun_doesNotRecordTelemetryForEnterprise(t *testing.T) {
+	cfg, _ := config.NewIsolatedTestConfig(t, "")
+	_, err := cfg.Authentication().Login("ghe.example.com", "test-user", "abc123", "https", false)
+	require.NoError(t, err)
+
+	recorder := &telemetry.InvocationRecorderSpy{}
+	ios, _, _, _ := iostreams.Test()
+	ios.SetStdinTTY(false)
+	ios.SetStdoutTTY(false)
+
+	opts := &RefreshOptions{
+		IO:          ios,
+		Hostname:    "ghe.example.com",
+		Telemetry:   recorder,
+		ResetScopes: true,
+		Config: func() (gh.Config, error) {
+			return cfg, nil
+		},
+		AuthFlow: func(_ *http.Client, _ *iostreams.IOStreams, _ string, _ []string, _, _, _ bool) (*authflow.AuthResult, error) {
+			return &authflow.AuthResult{Token: "xyz456", Username: "test-user"}, nil
+		},
+		PlainHttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: &httpmock.Registry{}}, nil
+		},
+		Prompter: &prompter.PrompterMock{},
+		helperConfig: &gitcredentials.FakeHelperConfig{
+			SelfExecutablePath: "/path/to/gh",
+			Helpers:            map[string]gitcredentials.Helper{},
+		},
+	}
+
+	require.NoError(t, refreshRun(opts))
+
+	assert.Empty(t, recorder.Events())
 }
 
 // renewingRefresher renews any refresh token to a fresh, long-lived credential whose access token is "new-access".
