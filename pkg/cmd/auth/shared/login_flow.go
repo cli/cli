@@ -46,7 +46,13 @@ type LoginOptions struct {
 	SkipSSHKeyPrompt bool
 	CopyToClipboard  bool
 	Expiring         bool
-	Telemetry        ghtelemetry.InvocationRecorder
+
+	// ExpiringExplicitlyRequested reports that the user passed --expiring to force expiring credentials. A pasted
+	// token can never be expiring, so the paste option is suppressed only in this case. A config-derived preference
+	// (expiring_credentials enabled) does not suppress paste: choosing it simply yields a non-expiring token.
+	ExpiringExplicitlyRequested bool
+
+	Telemetry ghtelemetry.InvocationRecorder
 
 	// AuthFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
 	AuthFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
@@ -179,9 +185,10 @@ func Login(opts *LoginOptions) error {
 	}
 
 	var authMode int
-	if opts.Web || opts.Expiring {
-		// A pasted personal access token can never be refreshable, so an expiring login must use the web flow.
-		// Forcing it here avoids offering a token-paste option that would silently ignore --expiring.
+	if opts.Web || opts.ExpiringExplicitlyRequested {
+		// A pasted personal access token can never be refreshable. When the user explicitly passes --expiring,
+		// force the web flow so the paste option cannot silently ignore that request. A config-derived preference
+		// does not suppress paste: choosing it simply yields a non-expiring token.
 		authMode = 0
 	} else if opts.Interactive {
 		options := []string{"Login with a web browser", "Paste an authentication token"}

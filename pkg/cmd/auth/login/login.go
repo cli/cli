@@ -277,12 +277,13 @@ func loginRun(opts *LoginOptions) error {
 				GitClient: opts.GitClient,
 			},
 		},
-		SecureStorage:    !opts.InsecureStorage,
-		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
-		CopyToClipboard:  copyToClipboard,
-		Expiring:         shared.ShouldUseExpiring(cfg, opts.Expiring, hostname),
-		Telemetry:        opts.Telemetry,
-		AuthFlow:         opts.AuthFlow,
+		SecureStorage:               !opts.InsecureStorage,
+		SkipSSHKeyPrompt:            opts.SkipSSHKeyPrompt,
+		CopyToClipboard:             copyToClipboard,
+		Expiring:                    shared.ShouldUseExpiring(cfg, opts.Expiring, hostname),
+		ExpiringExplicitlyRequested: opts.Expiring != nil && *opts.Expiring,
+		Telemetry:                   opts.Telemetry,
+		AuthFlow:                    opts.AuthFlow,
 	})
 }
 

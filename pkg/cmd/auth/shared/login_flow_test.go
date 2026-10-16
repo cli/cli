@@ -448,18 +448,60 @@ func TestLogin(t *testing.T) {
 			},
 		},
 		{
-			name: "interactive, expiring forces the web flow instead of offering token paste",
+			name: "interactive, explicit --expiring forces the web flow instead of offering token paste",
 			opts: LoginOptions{
-				Hostname:         "example.com",
-				Interactive:      true,
-				Expiring:         true,
-				GitProtocol:      "ssh",
-				SkipSSHKeyPrompt: true,
+				Hostname:                    "example.com",
+				Interactive:                 true,
+				Expiring:                    true,
+				ExpiringExplicitlyRequested: true,
+				GitProtocol:                 "ssh",
+				SkipSSHKeyPrompt:            true,
 				Prompter: &prompter.PrompterMock{
 					SelectFunc: func(prompt, _ string, _ []string) (int, error) {
 						// --expiring must not reach the authentication-method choice, since a pasted token can
 						// never be refreshable. Any such prompt here is a regression.
 						t.Errorf("unexpected Select prompt under --expiring: %q", prompt)
+						return -1, prompter.NoSuchPromptErr(prompt)
+					},
+				},
+				AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
+					if !requestRefreshToken {
+						t.Error("expected requestRefreshToken to be true")
+					}
+					return &authflow.AuthResult{
+						Token:       "gho_access",
+						Username:    "monalisa",
+						Refreshable: &gh.Credential{Token: "gho_access", RefreshToken: "ghr_refresh"},
+					}, nil
+				},
+			},
+			wantsConfig: map[string]string{
+				"example.com:user":          "monalisa",
+				"example.com:oauth_token":   "gho_access",
+				"example.com:refresh_token": "ghr_refresh",
+				"example.com:git_protocol":  "ssh",
+			},
+			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
+				assert.Contains(t, stderr, "Received expiring refreshable token\n")
+			},
+		},
+		{
+			name: "interactive, config-derived expiring still offers token paste",
+			opts: LoginOptions{
+				Hostname:    "example.com",
+				Interactive: true,
+				// Expiring is true from the expiring_credentials config, but the flag was not passed, so the
+				// authentication-method choice must still be offered and include the token-paste option.
+				Expiring:         true,
+				GitProtocol:      "ssh",
+				SkipSSHKeyPrompt: true,
+				Prompter: &prompter.PrompterMock{
+					SelectFunc: func(prompt, _ string, options []string) (int, error) {
+						if prompt == "How would you like to authenticate GitHub CLI?" {
+							assert.Contains(t, options, "Paste an authentication token")
+							return 0, nil
+						}
+						t.Errorf("unexpected Select prompt: %q", prompt)
 						return -1, prompter.NoSuchPromptErr(prompt)
 					},
 				},
