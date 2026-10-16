@@ -36,11 +36,12 @@ type GitCredentialFlow struct {
 	HelperConfig HelperConfig
 	Updater      *gitcredentials.Updater
 
-	shouldSetup    bool
-	expiring       bool
-	helper         gitcredentials.Helper
-	scopes         []string
-	configuredOurs bool
+	shouldSetup     bool
+	expiring        bool
+	helper          gitcredentials.Helper
+	helperDetectErr error
+	scopes          []string
+	configuredOurs  bool
 }
 
 // Prompt offers to set up gh as the git credential helper for hostname and reports the outcome as a PromptResult. The
@@ -145,20 +146,28 @@ func (flow *GitCredentialFlow) Scopes() []string {
 }
 
 // DetectConfiguredHelper reads the git credential helper configured for hostname and returns its category ("ours",
-// "other", or "none"). It performs its own read instead of relying on Prompt having run, so callers can observe the
-// helper even for non-interactive or SSH sign-ins that never reach the prompt. The detected helper is stored on the
-// flow so a later ResultingHelperCategory reflects it when no setup runs. The read is intentionally not cached: a
-// repeated read inside Prompt stays cheap and keeps each caller's error handling independent.
+// "other", or "none"), or "error" when the read fails. It performs its own read instead of relying on Prompt having
+// run, so callers can observe the helper even for non-interactive or SSH sign-ins that never reach the prompt. The
+// detected helper and any read error are stored on the flow so a later ResultingHelperCategory reflects them when no
+// setup runs. The read is intentionally not cached: a repeated read inside Prompt stays cheap and keeps each caller's
+// error handling independent.
 func (flow *GitCredentialFlow) DetectConfiguredHelper(hostname string) string {
-	flow.helper, _ = flow.HelperConfig.ConfiguredHelper(hostname)
+	flow.helper, flow.helperDetectErr = flow.HelperConfig.ConfiguredHelper(hostname)
+	if flow.helperDetectErr != nil {
+		return "error"
+	}
 	return helperCategory(flow.helper)
 }
 
 // ResultingHelperCategory reports the git credential helper in effect after Setup ran, as one of "ours", "other", or
-// "none". It reflects the flow's own decisions without re-reading git configuration.
+// "none", or "error" when helper detection failed and no setup replaced it. It reflects the flow's own decisions
+// without re-reading git configuration.
 func (flow *GitCredentialFlow) ResultingHelperCategory() string {
 	if flow.configuredOurs {
 		return "ours"
+	}
+	if flow.helperDetectErr != nil {
+		return "error"
 	}
 	return helperCategory(flow.helper)
 }

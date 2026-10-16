@@ -331,3 +331,38 @@ func TestSetup_expiring_externalHelper_configuresOurs(t *testing.T) {
 		t.Errorf("Setup() warning = %q, want empty after configuring gh for an expiring login", warning)
 	}
 }
+
+func TestDetectConfiguredHelper(t *testing.T) {
+	tests := []struct {
+		name      string
+		helper    gitcredentials.Helper
+		helperErr error
+		want      string
+	}{
+		{name: "ours", helper: gitcredentials.Helper{Cmd: "!/path/to/gh auth git-credential"}, want: "ours"},
+		{name: "other", helper: gitcredentials.Helper{Cmd: "osxkeychain"}, want: "other"},
+		{name: "none", helper: gitcredentials.Helper{}, want: "none"},
+		{name: "error", helperErr: errors.New("git config failed"), want: "error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := GitCredentialFlow{
+				HelperConfig: &stubHelperConfig{helper: tt.helper, helperErr: tt.helperErr},
+			}
+			if got := f.DetectConfiguredHelper("example.com"); got != tt.want {
+				t.Errorf("DetectConfiguredHelper() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResultingHelperCategory_detectionErrorWithoutSetup(t *testing.T) {
+	f := GitCredentialFlow{
+		HelperConfig: &stubHelperConfig{helperErr: errors.New("git config failed")},
+	}
+	// A failed detection with no subsequent setup must stay "error", not collapse to "none".
+	f.DetectConfiguredHelper("example.com")
+	if got := f.ResultingHelperCategory(); got != "error" {
+		t.Errorf("ResultingHelperCategory() = %q, want %q", got, "error")
+	}
+}
