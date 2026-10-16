@@ -108,8 +108,8 @@ func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	mock.PreferEditorPromptFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.PreferEditorPrompt(hostname)
 	}
-	mock.PreferExpiringCredentialsFunc = func(hostname string) gh.ConfigEntry {
-		return cfg.PreferExpiringCredentials(hostname)
+	mock.ExpiringCredentialsFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.ExpiringCredentials(hostname)
 	}
 	mock.SpinnerFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Spinner(hostname)

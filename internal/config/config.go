@@ -20,27 +20,27 @@ import (
 // Important: some of the following configuration settings are used outside of `cli/cli`,
 // they are defined here to avoid `cli/cli` being changed unexpectedly.
 const (
-	accessibleColorsKey   = "accessible_colors" // used by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
-	accessiblePrompterKey = "accessible_prompter"
-	aliasesKey            = "aliases"
-	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
-	clipboardKey          = "clipboard"
-	colorLabelsKey        = "color_labels"
-	apiHostKey            = "api_host" // used by cli/go-gh to redirect API requests for a host
-	editorKey             = "editor"   // used by cli/go-gh to open interactive text editor
-	gitProtocolKey        = "git_protocol"
-	hostsKey              = "hosts" // used by cli/go-gh to locate authenticated host tokens
-	httpUnixSocketKey     = "http_unix_socket"
-	oauthTokenKey         = "oauth_token" // used by cli/go-gh to locate authenticated host tokens
-	pagerKey              = "pager"
-	promptKey             = "prompt"
-	preferEditorPromptKey = "prefer_editor_prompt"
-	preferExpiringKey     = "prefer_expiring_credentials"
-	spinnerKey            = "spinner"
-	telemetryKey          = "telemetry"
-	userKey               = "user"
-	usersKey              = "users"
-	versionKey            = "version"
+	accessibleColorsKey    = "accessible_colors" // used by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
+	accessiblePrompterKey  = "accessible_prompter"
+	aliasesKey             = "aliases"
+	browserKey             = "browser" // used by cli/go-gh to open URLs in web browsers
+	clipboardKey           = "clipboard"
+	colorLabelsKey         = "color_labels"
+	apiHostKey             = "api_host" // used by cli/go-gh to redirect API requests for a host
+	editorKey              = "editor"   // used by cli/go-gh to open interactive text editor
+	gitProtocolKey         = "git_protocol"
+	hostsKey               = "hosts" // used by cli/go-gh to locate authenticated host tokens
+	httpUnixSocketKey      = "http_unix_socket"
+	oauthTokenKey          = "oauth_token" // used by cli/go-gh to locate authenticated host tokens
+	pagerKey               = "pager"
+	promptKey              = "prompt"
+	preferEditorPromptKey  = "prefer_editor_prompt"
+	expiringCredentialsKey = "expiring_credentials"
+	spinnerKey             = "spinner"
+	telemetryKey           = "telemetry"
+	userKey                = "user"
+	usersKey               = "users"
+	versionKey             = "version"
 )
 
 func NewConfig() (gh.Config, error) {
@@ -185,9 +185,9 @@ func (c *cfg) PreferEditorPrompt(hostname string) gh.ConfigEntry {
 	return c.GetOrDefault(hostname, preferEditorPromptKey).Unwrap()
 }
 
-func (c *cfg) PreferExpiringCredentials(hostname string) gh.ConfigEntry {
+func (c *cfg) ExpiringCredentials(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
-	return c.GetOrDefault(hostname, preferExpiringKey).Unwrap()
+	return c.GetOrDefault(hostname, expiringCredentialsKey).Unwrap()
 }
 
 func (c *cfg) Spinner(hostname string) gh.ConfigEntry {
@@ -643,23 +643,26 @@ func (c *AuthConfig) setActiveCredential(hostname, user string) (bool, error) {
 	_ = keyring.Delete(keyringServiceName(hostname), "")
 	_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
 
-	// A refreshable credential is the managed credential, so prefer it. It lives only in the per-user slot and is
-	// surfaced as active through the active user key, so confirming it exists is all that activation needs. The
-	// refreshable-then-keyring-then-config order here is kept identical to TokenForUser so activation and resolution
-	// never disagree about which credential is current.
-	if _, _, err := c.refreshableForUser(hostname, user); err == nil {
-		return true, nil
-	} else if !errors.Is(err, errRefreshableNotFound) {
-		return false, err
-	}
-
-	// Otherwise fall back to a non-expiring credential in the keyring or insecure config.
+	// The non-expiring keyring token is checked first so the common non-refreshable user does not pay an extra
+	// refreshable-slot keyring miss on every lookup. On a hit, copy it into the host active slot. This keyring-first
+	// order is kept identical to TokenForUser so activation and resolution never disagree about which credential is
+	// current, even in the mixed state that write paths keep unreachable.
 	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
 		if err = keyring.Set(keyringServiceName(hostname), "", token); err != nil {
 			return false, fmt.Errorf("failed to move active token in keyring: %v", err)
 		}
 		return true, nil
 	}
+
+	// Then the managed refreshable credential. It lives only in the per-user slot and is surfaced as active through the
+	// active user key, so confirming it exists is all that activation needs.
+	if _, _, err := c.refreshableForUser(hostname, user); err == nil {
+		return true, nil
+	} else if !errors.Is(err, errRefreshableNotFound) {
+		return false, err
+	}
+
+	// Otherwise fall back to a non-expiring credential in the insecure config.
 	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
 		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
 		return true, nil
@@ -681,19 +684,20 @@ func (c *AuthConfig) UsersForHost(hostname string) []string {
 // token as-is, including the current access token of a refreshable credential, and never refreshes it; use
 // TokenForUserWithRefresh when the token must be valid for API calls.
 //
-// It checks the managed refreshable credential first, then the non-refreshable keyring token, then the non-refreshable
-// config token. This order is kept identical to setActiveCredential so activation and resolution always agree on which
-// credential is current, even in the mixed state that should never occur because logging in with one kind removes the
-// other.
+// It checks the non-refreshable keyring token first, then the managed refreshable credential, then the non-refreshable
+// config token. The ordinary keyring is probed first so the common non-refreshable user pays a single keyring lookup
+// rather than an extra miss on the refreshable slot on every request. This order is kept identical to
+// setActiveCredential so activation and resolution always agree on which credential is current, even in the mixed
+// state that should never occur because logging in with one kind removes the other.
 func (c *AuthConfig) TokenForUser(hostname, user string) (gh.Credential, error) {
+	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
+		return gh.Credential{Source: gh.TokenSourceKeyring, Token: token}, nil
+	}
+
 	if credential, _, err := c.refreshableForUser(hostname, user); err == nil {
 		return credential, nil
 	} else if !errors.Is(err, errRefreshableNotFound) {
 		return gh.Credential{}, err
-	}
-
-	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
-		return gh.Credential{Source: gh.TokenSourceKeyring, Token: token}, nil
 	}
 
 	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
@@ -772,7 +776,7 @@ prompt: enabled
 # Preference for editor-based interactive prompting. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
 prefer_editor_prompt: disabled
 # Whether to prefer expiring credentials that gh refreshes automatically when logging in or refreshing, without passing --expiring. Supported values: enabled, disabled
-prefer_expiring_credentials: disabled
+expiring_credentials: disabled
 # A pager program to send command output to, e.g. "less". If blank, will refer to environment. Set the value to "cat" to disable the pager.
 pager:
 # Aliases allow you to create nicknames for gh commands
@@ -863,12 +867,12 @@ var Options = []ConfigOption{
 		},
 	},
 	{
-		Key:           preferExpiringKey,
+		Key:           expiringCredentialsKey,
 		Description:   "toggle preference for expiring credentials that gh refreshes automatically when logging in or refreshing",
 		DefaultValue:  "disabled",
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.PreferExpiringCredentials(hostname).Value
+			return c.ExpiringCredentials(hostname).Value
 		},
 	},
 	{

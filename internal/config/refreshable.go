@@ -30,10 +30,12 @@ var errRefreshableNotFound = errors.New("no refreshable credentials found")
 // expiry-based refresh decisions.
 var timeNow = time.Now
 
-// refreshLockFile names the cross-process lock, in the config directory, that serializes token refreshes. Only the
-// refresh path takes it because refreshing is the sole operation that spends a single-use rotating refresh token;
-// other config mutations such as auth login or logout overwrite credentials wholesale and are safe under
-// last-writer-wins, so a single refresh-scoped lock is enough.
+// refreshLockFile names the cross-process lock, in the state directory, that serializes credential-store
+// read-modify-writes so they cannot race a token refresh. The name is refresh-centric because protecting the
+// single-use rotating refresh token from concurrent spending is why the lock exists, but any credential mutation that
+// must not race a refresh acquires it. See withFreshConfigForRefresh for the operations that take it. It lives in the
+// state directory rather than the config directory because the config directory can be read-only (for example under
+// nix home-manager), and a lock file is transient runtime state.
 const refreshLockFile = "refresh.lock"
 
 // refreshLockTimeout bounds how long withFreshConfigForRefresh waits for the cross-process lock before giving up and
@@ -57,7 +59,7 @@ func flockRefreshLock(ctx context.Context, path string) (unlock func(), err erro
 // unit.
 //
 // The file lock is best effort: fn still runs so a filesystem limitation never blocks the user. This tolerates both
-// being unable to create the config directory that holds the lock file (for example a read-only mount) and being
+// being unable to create the state directory that holds the lock file (for example a read-only mount) and being
 // unable to acquire the lock itself (a filesystem without advisory locking, or another process holding it past
 // refreshLockTimeout). fn receives lockHeld reporting whether the cross-process lock was actually acquired, so it can
 // skip destructive cleanup that is only safe when peers are serialized; see refreshCredentialForUser for why cleanup
@@ -70,12 +72,16 @@ func (c *AuthConfig) withFreshConfigForRefresh(fn func(lockHeld bool) error) err
 	defer c.refreshMu.Unlock()
 
 	// Best-effort cross-process lock; see the godoc. We proceed without it rather than fail the user's refresh when
-	// the config directory cannot be created or the lock cannot be acquired. lockHeld then tells fn to skip cleanup
+	// the state directory cannot be created or the lock cannot be acquired. lockHeld then tells fn to skip cleanup
 	// that is unsafe without serialized peers. The residual risk without the lock is two processes refreshing at once
 	// and spending a rotating token twice.
 	var lockHeld bool
 	unlock := func() {}
-	dir := ghConfig.ConfigDir()
+	// Put the lock in the state directory, not the config directory. The config directory can be read-only: under nix
+	// home-manager and similar setups, managed config files are symlinked into the immutable nix store, so creating a
+	// lock file there always fails. The state directory is XDG's location for writable runtime state, home-manager
+	// leaves it writable, and gh already writes state there (state.yml, telemetry), so it is the safer bet.
+	dir := ghConfig.StateDir()
 	if err := os.MkdirAll(dir, 0771); err == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), refreshLockTimeout)
 		defer cancel()
@@ -147,9 +153,11 @@ func (c *AuthConfig) loginRefreshable(hostname, username string, credential gh.C
 	}
 
 	// Remove any non-expiring credential for this user so a stale token cannot be resolved in preference to the
-	// refreshable record.
-	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username, oauthTokenKey})
-	_ = keyring.Delete(keyringServiceName(hostname), username)
+	// refreshable record. Verify the removal: the ordinary keyring is now resolved before the refreshable credential,
+	// so a silently failed delete would let a stale token outrank this login.
+	if err := c.purgeNonExpiringForRefreshableLogin(hostname, username); err != nil {
+		return insecureStorageUsed, err
+	}
 
 	return insecureStorageUsed, c.completeLogin(hostname, username, gitProtocol)
 }
@@ -170,6 +178,29 @@ func (c *AuthConfig) purgeRefreshableForLogin(hostname, username string) error {
 
 	if _, _, err := c.refreshableForUser(hostname, username); err == nil {
 		return errors.New("could not remove the existing refreshable credential, which would shadow this login")
+	}
+	return nil
+}
+
+// purgeNonExpiringForRefreshableLogin removes any non-expiring credential for the user during a refreshable login so
+// the two credential forms cannot coexist. The ordinary keyring is now resolved before the refreshable credential, so
+// a surviving non-expiring token would outrank the freshly stored refreshable one; a removal that silently failed
+// would let login report success while the stale token keeps winning.
+//
+// Like purgeRefreshableForLogin, it verifies the post-condition by re-reading rather than trusting the delete error,
+// which an OS keyring reports inconsistently. An unavailable keyring makes the read fail too, which reads here as "not
+// present", so the check stays silent exactly where a delete error would be spurious. Only a token that genuinely
+// survives removal is surfaced.
+func (c *AuthConfig) purgeNonExpiringForRefreshableLogin(hostname, username string) error {
+	// Best-effort removal in both stores, matching login's symmetric cleanup.
+	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username, oauthTokenKey})
+	_ = keyring.Delete(keyringServiceName(hostname), username)
+
+	if _, err := keyring.Get(keyringServiceName(hostname), username); err == nil {
+		return errors.New("could not remove the existing non-expiring credential, which would shadow this login")
+	}
+	if _, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, username, oauthTokenKey}); err == nil {
+		return errors.New("could not remove the existing non-expiring credential, which would shadow this login")
 	}
 	return nil
 }
