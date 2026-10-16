@@ -210,8 +210,12 @@ func TestPrompt_expiring_configure(t *testing.T) {
 		HelperConfig: hc,
 	}
 
-	if err := f.Prompt("github.com", true); err != nil {
+	result, err := f.Prompt("github.com", true)
+	if err != nil {
 		t.Fatalf("Prompt() error = %v", err)
+	}
+	if result != PromptConfigure {
+		t.Errorf("Prompt() result = %q, want %q", result, PromptConfigure)
 	}
 	if !f.ShouldSetup() {
 		t.Error("ShouldSetup() = false, want true after choosing to configure gh")
@@ -234,8 +238,12 @@ func TestPrompt_expiring_decline(t *testing.T) {
 		HelperConfig: &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "osxkeychain"}},
 	}
 
-	if err := f.Prompt("github.com", true); err != nil {
+	result, err := f.Prompt("github.com", true)
+	if err != nil {
 		t.Fatalf("Prompt() error = %v", err)
+	}
+	if result != PromptDecline {
+		t.Errorf("Prompt() result = %q, want %q", result, PromptDecline)
 	}
 	if f.ShouldSetup() {
 		t.Error("ShouldSetup() = true, want false after declining to configure gh")
@@ -252,9 +260,12 @@ func TestPrompt_expiring_stop(t *testing.T) {
 		HelperConfig: &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "osxkeychain"}},
 	}
 
-	err := f.Prompt("github.com", true)
+	result, err := f.Prompt("github.com", true)
 	if !errors.Is(err, cmdutil.CancelError) {
 		t.Errorf("Prompt() error = %v, want cmdutil.CancelError", err)
+	}
+	if result != PromptCancel {
+		t.Errorf("Prompt() result = %q, want %q", result, PromptCancel)
 	}
 	if f.ShouldSetup() {
 		t.Error("ShouldSetup() = true, want false after stopping the sign-in")
@@ -273,8 +284,12 @@ func TestPrompt_expiring_alreadyOurs(t *testing.T) {
 		HelperConfig: &stubHelperConfig{helper: gitcredentials.Helper{Cmd: "!/path/to/gh auth git-credential"}},
 	}
 
-	if err := f.Prompt("github.com", true); err != nil {
+	result, err := f.Prompt("github.com", true)
+	if err != nil {
 		t.Fatalf("Prompt() error = %v", err)
+	}
+	if result != PromptNotShown {
+		t.Errorf("Prompt() result = %q, want %q", result, PromptNotShown)
 	}
 	if selectCalled {
 		t.Error("Select was called even though gh is already the credential helper")

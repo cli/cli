@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
@@ -28,6 +29,7 @@ type LoginOptions struct {
 	GitClient       *git.Client
 	Prompter        shared.Prompt
 	Browser         browser.Browser
+	Telemetry       ghtelemetry.InvocationRecorder
 
 	MainExecutable string
 
@@ -46,9 +48,13 @@ type LoginOptions struct {
 	// AuthFlow is indirected so tests can stub the interactive authorization. When nil, the shared login flow uses
 	// the real authflow.AuthFlow.
 	AuthFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
+
+	// helperConfig overrides git credential helper inspection and configuration. It is nil in production, where
+	// runLogin builds the real HelperConfig from GitClient; tests set a fake to avoid shelling out to git.
+	helperConfig shared.HelperConfig
 }
 
-func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
+func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*LoginOptions) error) *cobra.Command {
 	opts := &LoginOptions{
 		IO:              f.IOStreams,
 		Config:          f.Config,
@@ -57,6 +63,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		GitClient:       f.GitClient,
 		Prompter:        f.Prompter,
 		Browser:         f.Browser,
+		Telemetry:       telemetry,
 	}
 
 	var tokenStdin bool
@@ -125,6 +132,10 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.Telemetry != nil {
+				opts.Telemetry.SetSampleRate(ghtelemetry.SAMPLE_ALL)
+			}
+
 			if tokenStdin && opts.Web {
 				return cmdutil.FlagErrorf("specify only one of `--web` or `--with-token`")
 			}
@@ -238,6 +249,14 @@ func loginRun(opts *LoginOptions) error {
 		return loginErr
 	}
 
+	helperConfig := opts.helperConfig
+	if helperConfig == nil {
+		helperConfig = &gitcredentials.HelperConfig{
+			SelfExecutablePath: opts.MainExecutable,
+			GitClient:          opts.GitClient,
+		}
+	}
+
 	return shared.Login(&shared.LoginOptions{
 		IO:              opts.IO,
 		Config:          authCfg,
@@ -251,11 +270,8 @@ func loginRun(opts *LoginOptions) error {
 		Prompter:        opts.Prompter,
 		Browser:         opts.Browser,
 		CredentialFlow: &shared.GitCredentialFlow{
-			Prompter: opts.Prompter,
-			HelperConfig: &gitcredentials.HelperConfig{
-				SelfExecutablePath: opts.MainExecutable,
-				GitClient:          opts.GitClient,
-			},
+			Prompter:     opts.Prompter,
+			HelperConfig: helperConfig,
 			Updater: &gitcredentials.Updater{
 				GitClient: opts.GitClient,
 			},
@@ -264,6 +280,7 @@ func loginRun(opts *LoginOptions) error {
 		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
 		CopyToClipboard:  copyToClipboard,
 		Expiring:         shared.ShouldPreferExpiring(cfg, opts.Expiring, hostname),
+		Telemetry:        opts.Telemetry,
 		AuthFlow:         opts.AuthFlow,
 	})
 }
