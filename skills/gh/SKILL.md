@@ -304,6 +304,38 @@ Sometimes useful data isn't on the typed commands. Examples:
   `{owner}/{repo}` placeholder is filled in for you when run from a repo
   with detected remotes; pass them literally if you want determinism.
 
+## Passing values in `gh api`
+
+Field flags look interchangeable but transform values differently:
+
+- `-f/--raw-field key=value` always sends a literal string. No JSON type
+  conversion, no `@` expansion. Use it for strings that begin with `@`, for
+  `query`/`operationName` in GraphQL, and when you want exact quoting
+  (for example `-f body='{"state":"open"}'`).
+- `-F/--field key=value` converts typed values (`true`, `false`, `null`, and
+  integers to JSON types), expands `{owner}`, `{repo}`, `{branch}` from the
+  current repo's remotes, and reads from the named file when the value
+  starts with `@` (`@-` reads stdin). Use it for file bodies
+  (`-F body=@msg.md`) and GraphQL variables. Do not pass a `@`-prefixed
+  body to `-F` unless you mean to read that file.
+- To avoid the `@` ambiguity entirely, send the body with `--input file`
+  (or `--input -` for stdin); parameters passed with field flags are then
+  placed on the query string instead.
+- Placeholders such as `{owner}` are only expanded by `-F`, so use `-F` when
+  you want the shorthand and `-f` when you want the literal text.
+
+Mutations:
+
+- `gh api` infers `POST` once any field is added; override with
+  `--method` (`-X`).
+- A successful mutation returns the updated object; trim the output with
+  `--jq` (or `-q`).
+- For content that could be mistaken for a file marker, prefer `--input`
+  or `-f body=@-` with stdin.
+- Review thread replies and comment updates need the PR comments
+  endpoints; pass review and comment IDs explicitly and re-read the object
+  afterward to confirm the change.
+
 ## Authentication
 
 - `gh auth status` prints the active host(s), user, and which env var (if
