@@ -846,7 +846,7 @@ func Test_refreshRun_recordsTelemetry(t *testing.T) {
 	assert.Equal(t, "auth_invocation", events[0].Type)
 	assert.Equal(t, "refresh", dims["auth_command"])
 	assert.Equal(t, "false", dims["expiring_requested"])
-	assert.Equal(t, "not_shown", dims["gh_as_cred_helper_prompt_resp"])
+	assert.Equal(t, "false", dims["expiring_setup_cred_helper_cancelled"])
 	assert.Equal(t, "https", dims["git_protocol"])
 	assert.Equal(t, "false", dims["expiring_received"])
 	assert.Equal(t, "true", dims["auth_success"])

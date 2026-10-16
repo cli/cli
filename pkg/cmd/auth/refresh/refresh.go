@@ -238,6 +238,7 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 	credentialFlow := &shared.GitCredentialFlow{
 		Prompter:     opts.Prompter,
+		IO:           opts.IO,
 		HelperConfig: helperConfig,
 		Updater: &gitcredentials.Updater{
 			GitClient: opts.GitClient,
@@ -254,10 +255,9 @@ func refreshRun(opts *RefreshOptions) error {
 
 	if opts.Interactive && gitProtocol == "https" {
 		// refresh keeps the existing prompt; the expiring cred-helper prompt is login-only and is revisited in the
-		// refresh token-kind change.
-		promptResult, err := credentialFlow.Prompt(hostname, false)
-		authEvent.RecordPromptResponse(promptResult)
-		if err != nil {
+		// refresh token-kind change. A non-expiring prompt can never be cancelled, so
+		// expiring_setup_cred_helper_cancelled stays false for refreshes.
+		if err := credentialFlow.Prompt(hostname, false); err != nil {
 			return err
 		}
 		additionalScopes.AddValues(credentialFlow.Scopes())

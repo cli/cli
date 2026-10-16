@@ -271,6 +271,7 @@ func loginRun(opts *LoginOptions) error {
 		Browser:         opts.Browser,
 		CredentialFlow: &shared.GitCredentialFlow{
 			Prompter:     opts.Prompter,
+			IO:           opts.IO,
 			HelperConfig: helperConfig,
 			Updater: &gitcredentials.Updater{
 				GitClient: opts.GitClient,

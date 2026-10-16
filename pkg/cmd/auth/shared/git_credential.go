@@ -6,7 +6,7 @@ import (
 
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
-	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 type HelperConfig interface {
@@ -14,24 +14,14 @@ type HelperConfig interface {
 	ConfiguredHelper(hostname string) (gitcredentials.Helper, error)
 }
 
-// PromptResult reports what happened when the git credential helper prompt was offered during a login or refresh.
-// It is reported even when no prompt was shown, so callers can distinguish a declined or cancelled prompt from one
-// that was short-circuited because gh is already the configured helper.
-type PromptResult string
-
-const (
-	// PromptConfigure means the user chose to set up gh as the git credential helper.
-	PromptConfigure PromptResult = "configure"
-	// PromptDecline means the user chose not to set up gh as the git credential helper.
-	PromptDecline PromptResult = "decline"
-	// PromptCancel means the user cancelled the sign-in from the expiring credential helper prompt.
-	PromptCancel PromptResult = "cancel"
-	// PromptNotShown means no prompt was presented, for example because gh is already the configured helper.
-	PromptNotShown PromptResult = "not_shown"
-)
+// ErrExpiringSetupCredHelperCancelled is returned by [GitCredentialFlow.Prompt] when the user cancels the sign-in at
+// the expiring credential-helper prompt. It is distinct from a generic cancellation so callers can observe this
+// specific outcome (for example to record telemetry) before translating it into their own cancellation handling.
+var ErrExpiringSetupCredHelperCancelled = errors.New("expiring credential-helper setup cancelled")
 
 type GitCredentialFlow struct {
 	Prompter Prompt
+	IO       *iostreams.IOStreams
 
 	HelperConfig HelperConfig
 	Updater      *gitcredentials.Updater
@@ -44,11 +34,10 @@ type GitCredentialFlow struct {
 	configuredOurs  bool
 }
 
-// Prompt offers to set up gh as the git credential helper for hostname and reports the outcome as a PromptResult. The
-// result is meaningful even when the returned error is non-nil (for example PromptCancel accompanies a cancellation),
-// so callers can record what happened before handling the error. When gh is already the configured helper no prompt is
-// shown and PromptNotShown is returned.
-func (flow *GitCredentialFlow) Prompt(hostname string, expiring bool) (PromptResult, error) {
+// Prompt offers to set up gh as the git credential helper for hostname. On an expiring login the user can cancel the
+// sign-in entirely, in which case the returned error is [ErrExpiringSetupCredHelperCancelled]. When gh is already the
+// configured helper no prompt is shown and a nil error is returned.
+func (flow *GitCredentialFlow) Prompt(hostname string, expiring bool) error {
 	flow.expiring = expiring
 
 	// First we'll fetch the credential helper that would be used for this host
@@ -61,7 +50,7 @@ func (flow *GitCredentialFlow) Prompt(hostname string, expiring bool) (PromptRes
 	// scope to ensure that git push operations that include workflow changes succeed.
 	if flow.helper.IsOurs() {
 		flow.scopes = append(flow.scopes, "workflow")
-		return PromptNotShown, nil
+		return nil
 	}
 
 	// An expiring login needs gh as the credential helper so it can refresh the token, so we present a dedicated
@@ -73,7 +62,7 @@ func (flow *GitCredentialFlow) Prompt(hostname string, expiring bool) (PromptRes
 	// Prompt the user for whether they want to configure git with the newly obtained token
 	result, err := flow.Prompter.Confirm("Authenticate Git with your GitHub credentials?", true)
 	if err != nil {
-		return PromptNotShown, err
+		return err
 	}
 	flow.shouldSetup = result
 
@@ -90,55 +79,55 @@ func (flow *GitCredentialFlow) Prompt(hostname string, expiring bool) (PromptRes
 		//  * https://git-scm.com/docs/git-config#_description
 		//  * https://github.com/cli/cli/pull/4109
 		if _, ok := errors.AsType[*git.NotInstalled](configuredHelperErr); ok {
-			return PromptConfigure, configuredHelperErr
+			return configuredHelperErr
 		}
 
 		// On the other hand, if the user has requested setup we'll additionally request the workflow
 		// scope to ensure that git push operations that include workflow changes succeed.
 		flow.scopes = append(flow.scopes, "workflow")
-		return PromptConfigure, nil
 	}
 
-	return PromptDecline, nil
+	return nil
 }
 
 // promptExpiring runs the credential-helper decision for an expiring login. gh must be the git credential helper to
-// refresh an expiring token, so the user is told that declining will break their HTTPS git operations once the token
-// expires and is offered three choices: configure gh, continue without it, or stop the sign-in. configuredHelperErr
-// carries any error from detecting the existing helper so that a missing git binary aborts before the auth flow runs.
-func (flow *GitCredentialFlow) promptExpiring(hostname string, configuredHelperErr error) (PromptResult, error) {
+// refresh an expiring token, so the consequence of declining is printed as a warning and the user is offered three
+// choices: configure gh, continue without it, or stop the sign-in. Cancelling returns
+// [ErrExpiringSetupCredHelperCancelled]. configuredHelperErr carries any error from detecting the existing helper so
+// that a missing git binary aborts before the auth flow runs.
+func (flow *GitCredentialFlow) promptExpiring(hostname string, configuredHelperErr error) error {
+	cs := flow.IO.ColorScheme()
+	fmt.Fprintf(flow.IO.ErrOut,
+		"%s You asked for an expiring token, which gh refreshes automatically. For that to work, gh must be your "+
+			"Git credential helper for %s. Otherwise Git will not learn about refreshed tokens and your HTTPS Git "+
+			"operations will start to fail once the current token expires, within hours.\n",
+		cs.WarningIcon(), hostname)
+
 	options := []string{
 		"Set up gh as your Git credential helper (recommended)",
 		"Continue without it (you manage Git credentials yourself)",
 		"Cancel",
 	}
 
-	message := "You asked for an expiring token, which gh refreshes automatically. For that to work, gh must be your " +
-		"Git credential helper for " + hostname + ". Otherwise Git will not learn about refreshed tokens and your " +
-		"HTTPS Git operations will start to fail once the current token expires, within hours. How would you like to proceed?"
-
-	choice, err := flow.Prompter.Select(message, options[0], options)
+	choice, err := flow.Prompter.Select("How would you like to proceed?", options[0], options)
 	if err != nil {
-		return PromptNotShown, err
+		return err
 	}
 
 	switch choice {
 	case 0: // Set up gh as the Git credential helper.
 		// Abort before the auth flow if git isn't installed, matching the non-expiring prompt above.
 		if _, ok := errors.AsType[*git.NotInstalled](configuredHelperErr); ok {
-			return PromptConfigure, configuredHelperErr
+			return configuredHelperErr
 		}
 		flow.shouldSetup = true
 		flow.scopes = append(flow.scopes, "workflow")
-		return PromptConfigure, nil
-	case 1: // Continue without gh as the Git credential helper.
-		// shouldSetup stays false: the user accepted that git will not be configured with the new credential.
-		return PromptDecline, nil
 	case 2: // Cancel the sign-in.
-		return PromptCancel, cmdutil.CancelError
+		return ErrExpiringSetupCredHelperCancelled
 	}
+	// case 1 (continue without gh): shouldSetup stays false, the user accepted that git will not be configured.
 
-	return PromptNotShown, nil
+	return nil
 }
 
 func (flow *GitCredentialFlow) Scopes() []string {
