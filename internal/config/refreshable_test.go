@@ -711,17 +711,19 @@ func TestWithFreshConfigUnderLockPropagatesError(t *testing.T) {
 	require.ErrorIs(t, err, sentinel)
 }
 
-func TestWithFreshConfigUnderLockProceedsWhenConfigDirCannotBeCreated(t *testing.T) {
+func TestWithFreshConfigUnderLockProceedsWhenStateDirCannotBeCreated(t *testing.T) {
 	// If we have reached a refresh, the environment is already set up enough to proceed. A read-only mount (or any
-	// other reason the config directory cannot be created) must not fail the user's command; we degrade to running
+	// other reason the state directory cannot be created) must not fail the user's command; we degrade to running
 	// without the lock, exactly as when the lock cannot be acquired.
 	authCfg := newTestAuthConfig(t)
 
-	// Point the config dir under a regular file so MkdirAll fails with ENOTDIR regardless of privileges (running as
+	// Point the state dir under a regular file so MkdirAll fails with ENOTDIR regardless of privileges (running as
 	// root would bypass a read-only directory bit, but never a non-directory path component).
 	file := filepath.Join(t.TempDir(), "not-a-dir")
 	require.NoError(t, os.WriteFile(file, nil, 0600))
-	t.Setenv("GH_CONFIG_DIR", filepath.Join(file, "config"))
+	// go-gh checks XDG_STATE_HOME first on every platform (before the Windows-only LocalAppData), so this overrides
+	// the state dir regardless of the OS the test runs on.
+	t.Setenv("XDG_STATE_HOME", filepath.Join(file, "state"))
 
 	ran := false
 	observedLockHeld := true
@@ -732,7 +734,7 @@ func TestWithFreshConfigUnderLockProceedsWhenConfigDirCannotBeCreated(t *testing
 	})
 
 	require.NoError(t, err)
-	require.True(t, ran, "fn must still run when the config directory cannot be created")
+	require.True(t, ran, "fn must still run when the state directory cannot be created")
 	require.False(t, observedLockHeld, "the lock cannot be held when its directory cannot be created")
 }
 
