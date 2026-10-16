@@ -271,6 +271,11 @@ func refreshRun(opts *RefreshOptions) error {
 	if err != nil {
 		return err
 	}
+
+	// Record the server's issuance outcome as soon as the auth flow returns. It is independent of local persistence, so
+	// a later storage failure must not hide that an expiring, refreshable token was issued.
+	authEvent.RecordExpiringReceived(result.Refreshable != nil)
+
 	activeUser, _ := authCfg.ActiveUser(hostname)
 	if activeUser != "" && activeUser != result.Username {
 		return fmt.Errorf("error refreshing credentials for %s, received credentials for %s, did you use the correct account in the browser?", activeUser, result.Username)
@@ -288,7 +293,10 @@ func refreshRun(opts *RefreshOptions) error {
 			authEvent.RecordStorage(insecureStorageUsed)
 		}
 	}
-	authEvent.RecordExpiringReceived(result.Refreshable != nil)
+
+	// Record success as soon as the credential is persisted. The git credential-helper setup below is a separate side
+	// effect whose failure must not retract a credential that was already stored successfully.
+	authEvent.RecordSuccess()
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 
@@ -321,8 +329,6 @@ func refreshRun(opts *RefreshOptions) error {
 	// before value (gh observed the helper and changed nothing); for interactive HTTPS it reflects any setup. It is
 	// derived from the flow's decisions rather than re-reading git configuration.
 	authEvent.RecordHelperAfter(credentialFlow.ResultingHelperCategory())
-
-	authEvent.RecordSuccess()
 
 	return nil
 }
