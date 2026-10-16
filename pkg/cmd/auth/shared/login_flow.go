@@ -62,14 +62,14 @@ func ShouldCopyToClipboard(cfg gh.Config, flagValue *bool) bool {
 	return cfg.Clipboard().Value == "enabled"
 }
 
-// ShouldPreferExpiring resolves whether to prefer expiring credentials that gh refreshes automatically. An explicit
-// --expiring flag value wins; when the flag is unset it falls back to the prefer_expiring_credentials config setting
+// ShouldUseExpiring resolves whether to prefer expiring credentials that gh refreshes automatically. An explicit
+// --expiring flag value wins; when the flag is unset it falls back to the expiring_credentials config setting
 // for the host.
-func ShouldPreferExpiring(cfg gh.Config, flagValue *bool, hostname string) bool {
+func ShouldUseExpiring(cfg gh.Config, flagValue *bool, hostname string) bool {
 	if flagValue != nil {
 		return *flagValue
 	}
-	return cfg.PreferExpiringCredentials(hostname).Value == "enabled"
+	return cfg.ExpiringCredentials(hostname).Value == "enabled"
 }
 
 func Login(opts *LoginOptions) error {
