@@ -470,11 +470,13 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				fmt.Fprintf(opts.IO.ErrOut, "%s Changing the repository visibility to %s will cause permanent loss of %s and %s.\n", cs.WarningIcon(), selectedVisibility, text.Pluralize(r.StargazerCount, "star"), text.Pluralize(r.Watchers.TotalCount, "watcher"))
 			}
 
-			confirmed, err := p.Confirm(fmt.Sprintf("Do you want to change visibility to %s?", selectedVisibility), false)
+			repoFullName := ghrepo.FullName(opts.Repository)
+			confirmationPrompt := fmt.Sprintf("Type %s to confirm changing visibility to %s", repoFullName, selectedVisibility)
+			confirmedRepository, err := p.Input(confirmationPrompt, "")
 			if err != nil {
 				return err
 			}
-			if confirmed {
+			if confirmedRepository == repoFullName {
 				opts.Edits.Visibility = &selectedVisibility
 			}
 		case optionMergeOptions:
