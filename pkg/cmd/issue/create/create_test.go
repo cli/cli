@@ -922,13 +922,9 @@ func Test_createRun(t *testing.T) {
 							"id": "REPOID",
 							"hasIssuesEnabled": true
 						} } }`))
-				r.Register(
-					httpmock.GraphQL(`mutation IssueCreate\b`),
-					httpmock.StringResponse(`
-						{ "data": { "createIssue": { "issue": {
-							"id": "ISSUE_ID_123",
-							"URL": "https://github.com/OWNER/REPO/issues/123"
-						} } } }`))
+				// No IssueCreate stub: an unresolvable type must fail before the
+				// mutation, otherwise the issue exists but its URL is never printed
+				// and automation retries, filing duplicates.
 				r.Register(
 					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
 					httpmock.StringResponse(`
