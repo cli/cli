@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
@@ -634,6 +635,33 @@ func TestPRView_Preview(t *testing.T) {
 			test.ExpectLines(t, out, tc.expectedOutputs...)
 		})
 	}
+}
+
+func TestPRView_tty_wrappedLink(t *testing.T) {
+	t.Setenv("GLAMOUR_STYLE", "notty")
+	t.Setenv("GH_MDWIDTH", "30")
+
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	pr := &api.PullRequest{
+		Number:    123,
+		CreatedAt: now,
+		Body:      "https://github.com/cli/cli/issues/3718",
+	}
+	opts := &ViewOptions{
+		IO:          ios,
+		Finder:      shared.NewMockFinder("123", pr, ghrepo.New("OWNER", "REPO")),
+		SelectorArg: "123",
+		Now:         func() time.Time { return now },
+	}
+
+	require.NoError(t, viewRun(opts))
+	assert.Empty(t, stderr.String())
+	assert.Contains(t, stdout.String(),
+		"\x1b]8;id=1327397575;https://github.com/cli/cli/issues/3718\ahttps://github.com/cli/cli\x1b]8;;\a\n"+
+			"  \x1b]8;id=1327397575;https://github.com/cli/cli/issues/3718\a/issues/3718\x1b]8;;\a")
 }
 
 func TestPRView_web_currentBranch(t *testing.T) {
