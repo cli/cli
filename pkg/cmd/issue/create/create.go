@@ -479,6 +479,18 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
+		// Resolve --type before creating the issue. An unknown type used to be
+		// reported only after api.IssueCreate had run, so the issue existed but
+		// its URL was never printed and the command exited 1, which made
+		// automation retry and file duplicates. Nothing here depends on the new
+		// issue, and the interactive flow already holds the selected ID.
+		if opts.IssueType != "" && opts.issueTypeID == "" {
+			opts.issueTypeID, err = issueShared.ResolveIssueTypeName(apiClient, baseRepo, opts.IssueType)
+			if err != nil {
+				return
+			}
+		}
+
 		var newIssue *api.Issue
 		newIssue, err = api.IssueCreate(apiClient, repo, params)
 		if err != nil {
