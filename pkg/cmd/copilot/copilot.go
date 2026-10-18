@@ -20,7 +20,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/safeurl"
@@ -39,7 +38,7 @@ type CopilotOptions struct {
 	Remove      bool
 }
 
-func NewCmdCopilot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CopilotOptions) error) *cobra.Command {
+func NewCmdCopilot(f *cmdutil.Factory, runF func(*CopilotOptions) error) *cobra.Command {
 	opts := &CopilotOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
@@ -82,7 +81,6 @@ func NewCmdCopilot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 		`),
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			telemetry.SetSampleRate(ghtelemetry.SAMPLE_ALL)
 
 			stopParsePos := -1
 			for i, arg := range args {

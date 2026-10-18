@@ -269,7 +269,6 @@ func TestNewCmdView(t *testing.T) {
 func TestViewRun(t *testing.T) {
 	// Markdown rendering reads these, so the operator's settings can't change
 	// the output.
-	t.Setenv("GLAMOUR_STYLE", "")
 	t.Setenv("GH_MDWIDTH", "")
 
 	now := time.Date(2026, 9, 24, 23, 30, 0, 0, time.UTC)

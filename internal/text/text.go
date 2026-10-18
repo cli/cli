@@ -8,16 +8,24 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
-	"github.com/cli/go-gh/v2/pkg/text"
+	"github.com/mattn/go-runewidth"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 var whitespaceRE = regexp.MustCompile(`\s+`)
+var indentRE = regexp.MustCompile(`(?m)^`)
 
 func Indent(s, indent string) string {
-	return text.Indent(s, indent)
+	if len(strings.TrimSpace(s)) == 0 {
+		return s
+	}
+	return indentRE.ReplaceAllLiteralString(s, indent)
 }
 
 // Title returns a copy of the string s with all Unicode letters that begin words mapped to their Unicode title case.
@@ -32,19 +40,113 @@ func RemoveExcessiveWhitespace(s string) string {
 }
 
 func DisplayWidth(s string) int {
-	return text.DisplayWidth(s)
+	var width int
+	var inEscapeSequence bool
+	for _, r := range s {
+		if r == '\x1b' {
+			inEscapeSequence = true
+		} else if inEscapeSequence {
+			if isEscapeTerminator(r) {
+				inEscapeSequence = false
+			}
+		} else {
+			width += runewidth.RuneWidth(r)
+		}
+	}
+	return width
 }
 
 func Truncate(maxWidth int, s string) string {
-	return text.Truncate(maxWidth, s)
+	if DisplayWidth(s) <= maxWidth {
+		return s
+	}
+	tail := ""
+	if maxWidth >= 5 {
+		tail = "..."
+	}
+	tailWidth := DisplayWidth(tail)
+	if maxWidth < tailWidth {
+		return tail
+	}
+
+	widthLimit := maxWidth - tailWidth
+	var result strings.Builder
+	var escapeSequence strings.Builder
+	var lastColorSequence strings.Builder
+	var currentWidth int
+	var inEscapeSequence bool
+	var sequenceChanged bool
+	for _, r := range s {
+		if r == '\x1b' {
+			inEscapeSequence = true
+			sequenceChanged = true
+			escapeSequence.WriteRune(r)
+		} else if inEscapeSequence {
+			escapeSequence.WriteRune(r)
+			if isEscapeTerminator(r) {
+				inEscapeSequence = false
+				sequence := escapeSequence.String()
+				result.WriteString(sequence)
+				escapeSequence.Reset()
+				if strings.HasSuffix(sequence, "[0m") {
+					lastColorSequence.Reset()
+					sequenceChanged = false
+				} else if r == 'm' {
+					lastColorSequence.WriteString(sequence)
+				}
+			}
+		} else {
+			currentWidth += runewidth.RuneWidth(r)
+			if currentWidth > widthLimit {
+				result.WriteString(tail)
+				if lastColorSequence.Len() > 0 && sequenceChanged {
+					result.WriteString("\x1b[0m")
+				}
+				return result.String()
+			}
+			result.WriteRune(r)
+		}
+	}
+	result.WriteString(escapeSequence.String())
+	if DisplayWidth(result.String()) < maxWidth {
+		result.WriteByte(' ')
+	}
+	return result.String()
+}
+
+func isEscapeTerminator(r rune) bool {
+	return r >= 0x40 && r <= 0x5a || r >= 0x61 && r <= 0x7a
 }
 
 func Pluralize(num int, thing string) string {
-	return text.Pluralize(num, thing)
+	if num == 1 {
+		return fmt.Sprintf("%d %s", num, thing)
+	}
+	return fmt.Sprintf("%d %ss", num, thing)
 }
 
 func FuzzyAgo(a, b time.Time) string {
-	return text.RelativeTimeAgo(a, b)
+	ago := a.Sub(b)
+	if ago < time.Minute {
+		return "less than a minute ago"
+	}
+	if ago < time.Hour {
+		return fmtDuration(int(ago.Minutes()), "minute")
+	}
+	if ago < 24*time.Hour {
+		return fmtDuration(int(ago.Hours()), "hour")
+	}
+	if ago < 30*24*time.Hour {
+		return fmtDuration(int(ago.Hours())/24, "day")
+	}
+	if ago < 365*24*time.Hour {
+		return fmtDuration(int(ago.Hours())/24/30, "month")
+	}
+	return fmtDuration(int(ago.Hours()/24/365), "year")
+}
+
+func fmtDuration(amount int, unit string) string {
+	return fmt.Sprintf("about %s ago", Pluralize(amount, unit))
 }
 
 // FuzzyIn returns a human readable description of how far b lies in the future relative to a, such as "in about 7
@@ -107,11 +209,20 @@ func DisplayURL(urlStr string) string {
 
 // RemoveDiacritics returns the input value without "diacritics", or accent marks
 func RemoveDiacritics(value string) string {
-	return text.RemoveDiacritics(value)
+	removeMarks := runes.Remove(runes.In(unicode.Mn))
+	normalize := transform.Chain(norm.NFD, removeMarks, norm.NFC)
+	result, _, err := transform.String(normalize, value)
+	if err != nil {
+		return value
+	}
+	return result
 }
 
 func PadRight(maxWidth int, s string) string {
-	return text.PadRight(maxWidth, s)
+	if padWidth := maxWidth - DisplayWidth(s); padWidth > 0 {
+		s += strings.Repeat(" ", padWidth)
+	}
+	return s
 }
 
 // FormatSlice concatenates elements of the given string slice into a

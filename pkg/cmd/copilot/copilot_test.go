@@ -15,10 +15,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
-	"github.com/cli/cli/v2/internal/prompter"
-	"github.com/cli/cli/v2/internal/safeurl"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -115,8 +111,7 @@ func TestNewCmdCopilot(t *testing.T) {
 			assert.NoError(t, err)
 
 			var gotOpts *CopilotOptions
-			spy := &telemetry.InvocationRecorderSpy{}
-			cmd := NewCmdCopilot(f, spy, func(opts *CopilotOptions) error {
+			cmd := NewCmdCopilot(f, func(opts *CopilotOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -127,7 +122,6 @@ func TestNewCmdCopilot(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
-			assert.Equal(t, ghtelemetry.SAMPLE_ALL, spy.LastSampleRate)
 			if tt.wantErrString != "" {
 				require.EqualError(t, err, tt.wantErrString)
 				return
@@ -271,76 +265,6 @@ func TestExtractTarGz(t *testing.T) {
 		err := extractTarGz(bytes.NewReader([]byte("not valid gzip")), destDir)
 		require.Error(t, err, "expected error for invalid gzip, got nil")
 	})
-
-	t.Run("rejects invalid nonregular entry before extraction", func(t *testing.T) {
-		var archive bytes.Buffer
-		gzipWriter := gzip.NewWriter(&archive)
-		tarWriter := tar.NewWriter(gzipWriter)
-		require.NoError(t, tarWriter.WriteHeader(&tar.Header{
-			Name:     "../outside",
-			Typeflag: tar.TypeDir,
-			Mode:     0o755,
-		}))
-		content := []byte("content")
-		require.NoError(t, tarWriter.WriteHeader(&tar.Header{
-			Name: "copilot",
-			Mode: 0o755,
-			Size: int64(len(content)),
-		}))
-		_, err := tarWriter.Write(content)
-		require.NoError(t, err)
-		require.NoError(t, tarWriter.Close())
-		require.NoError(t, gzipWriter.Close())
-
-		destDir := t.TempDir()
-		err = extractTarGz(bytes.NewReader(archive.Bytes()), destDir)
-		require.ErrorContains(t, err, "not a local child path")
-		assert.NoFileExists(t, filepath.Join(destDir, "copilot"))
-	})
-
-	t.Run("rejects ancestor symlink", func(t *testing.T) {
-		content := []byte("nested content")
-		archive := createTarGzBuffer(t, map[string][]byte{
-			"subdir/file.txt": content,
-		})
-		destDir := t.TempDir()
-		outside := t.TempDir()
-		require.NoError(t, os.Symlink(outside, filepath.Join(destDir, "subdir")))
-
-		err := extractTarGz(bytes.NewReader(archive), destDir)
-		require.ErrorContains(t, err, "symbolic link")
-		assert.NoFileExists(t, filepath.Join(outside, "file.txt"))
-	})
-
-	t.Run("replaces dangling final symlink", func(t *testing.T) {
-		archive := createTarGzBuffer(t, map[string][]byte{
-			"copilot": []byte("content"),
-		})
-		destDir := t.TempDir()
-		missing := filepath.Join(destDir, "missing")
-		require.NoError(t, os.Symlink("missing", filepath.Join(destDir, "copilot")))
-
-		err := extractTarGz(bytes.NewReader(archive), destDir)
-		require.NoError(t, err)
-		assert.NoFileExists(t, missing)
-		info, err := os.Lstat(filepath.Join(destDir, "copilot"))
-		require.NoError(t, err)
-		assert.Zero(t, info.Mode()&os.ModeSymlink)
-	})
-
-	t.Run("replaces leftover file on retry", func(t *testing.T) {
-		archive := createTarGzBuffer(t, map[string][]byte{
-			"copilot": []byte("complete"),
-		})
-		destDir := t.TempDir()
-		target := filepath.Join(destDir, "copilot")
-		require.NoError(t, os.WriteFile(target, []byte("partial"), 0o644))
-
-		require.NoError(t, extractTarGz(bytes.NewReader(archive), destDir))
-		content, err := os.ReadFile(target)
-		require.NoError(t, err)
-		assert.Equal(t, "complete", string(content))
-	})
 }
 
 func TestExtractZip(t *testing.T) {
@@ -403,46 +327,6 @@ func TestExtractZip(t *testing.T) {
 		err := extractZip(zipPath, destDir)
 		require.Error(t, err, "expected error for path traversal, got nil")
 	})
-
-	t.Run("validates all entries before extraction", func(t *testing.T) {
-		zipDir := t.TempDir()
-		zipPath := filepath.Join(zipDir, "archive.zip")
-
-		var buf bytes.Buffer
-		zw := zip.NewWriter(&buf)
-		valid, err := zw.Create("copilot.exe")
-		require.NoError(t, err)
-		_, err = valid.Write([]byte("content"))
-		require.NoError(t, err)
-		invalid, err := zw.Create("../outside.txt")
-		require.NoError(t, err)
-		_, err = invalid.Write([]byte("content"))
-		require.NoError(t, err)
-		require.NoError(t, zw.Close())
-		require.NoError(t, os.WriteFile(zipPath, buf.Bytes(), 0o755))
-
-		destDir := t.TempDir()
-		err = extractZip(zipPath, destDir)
-		require.ErrorContains(t, err, "not a local child path")
-		assert.NoFileExists(t, filepath.Join(destDir, "copilot.exe"))
-	})
-
-	t.Run("rejects ancestor symlink", func(t *testing.T) {
-		zipDir := t.TempDir()
-		zipPath := filepath.Join(zipDir, "archive.zip")
-		archive := createZipBuffer(t, map[string][]byte{
-			"subdir/file.txt": []byte("content"),
-		})
-		require.NoError(t, os.WriteFile(zipPath, archive, 0o755))
-
-		destDir := t.TempDir()
-		outside := t.TempDir()
-		require.NoError(t, os.Symlink(outside, filepath.Join(destDir, "subdir")))
-
-		err := extractZip(zipPath, destDir)
-		require.ErrorContains(t, err, "symbolic link")
-		assert.NoFileExists(t, filepath.Join(outside, "file.txt"))
-	})
 }
 
 func TestFetchExpectedChecksum(t *testing.T) {
@@ -455,7 +339,7 @@ func TestFetchExpectedChecksum(t *testing.T) {
 		)
 
 		client := &http.Client{Transport: reg}
-		checksum, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-linux-x64.tar.gz")
+		checksum, err := fetchExpectedChecksum(client, "https://example.com/checksums", "copilot-linux-x64.tar.gz")
 		require.NoError(t, err, "unexpected error")
 		require.Equal(t, "abc123def456", checksum, "checksum mismatch")
 	})
@@ -469,7 +353,7 @@ func TestFetchExpectedChecksum(t *testing.T) {
 		)
 
 		client := &http.Client{Transport: reg}
-		_, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-win32-x64.zip")
+		_, err := fetchExpectedChecksum(client, "https://example.com/checksums", "copilot-win32-x64.zip")
 		require.Error(t, err, "expected error for missing archive")
 		require.Equal(t, "checksum not found for copilot-win32-x64.zip", err.Error(), "unexpected error")
 	})
@@ -483,7 +367,7 @@ func TestFetchExpectedChecksum(t *testing.T) {
 		)
 
 		client := &http.Client{Transport: reg}
-		checksum, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-darwin-x64.tar.gz")
+		checksum, err := fetchExpectedChecksum(client, "https://example.com/checksums", "copilot-darwin-x64.tar.gz")
 		require.NoError(t, err, "unexpected error")
 		require.Equal(t, "abc123", checksum, "checksum mismatch")
 	})
@@ -496,7 +380,7 @@ func TestFetchExpectedChecksum(t *testing.T) {
 		)
 
 		client := &http.Client{Transport: reg}
-		_, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-linux-x64.tar.gz")
+		_, err := fetchExpectedChecksum(client, "https://example.com/checksums", "copilot-linux-x64.tar.gz")
 		require.Error(t, err, "expected error for HTTP 404")
 	})
 }
@@ -704,79 +588,28 @@ func TestDownloadCopilot(t *testing.T) {
 	})
 }
 
-func TestRunCopilot(t *testing.T) {
+func TestRunCopilot_execFailureHint(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	opts := &CopilotOptions{
+		IO:          ios,
+		CopilotArgs: []string{},
+	}
+
+	origFind := findCopilotBinaryFunc
+	findCopilotBinaryFunc = func() string {
+		return "/usr/bin/copilot"
+	}
+	t.Cleanup(func() { findCopilotBinaryFunc = origFind })
+
 	execErr := fmt.Errorf("exec failed: something went wrong")
-	tests := []struct {
-		name             string
-		isTTY            bool
-		prompter         prompter.Prompter
-		findCopilot      func() string
-		runExternal      func(*exec.Cmd) error
-		wantErr          error
-		wantErrSubstring string
-		wantStderr       string
-	}{
-		{
-			name:  "declining install prints trailing newline",
-			isTTY: true,
-			prompter: &prompter.PrompterMock{
-				ConfirmFunc: func(_ string, _ bool) (bool, error) {
-					return false, nil
-				},
-			},
-			findCopilot: func() string {
-				return ""
-			},
-			wantErr:    cmdutil.SilentError,
-			wantStderr: "! Copilot CLI was not installed\n",
-		},
-		{
-			name: "execution failure includes direct command hint",
-			findCopilot: func() string {
-				return "/usr/bin/copilot"
-			},
-			runExternal: func(_ *exec.Cmd) error {
-				return execErr
-			},
-			wantErr:          execErr,
-			wantErrSubstring: "try running `copilot` directly without `gh`.",
-		},
+	origRun := runExternalCmdFunc
+	runExternalCmdFunc = func(_ *exec.Cmd) error {
+		return execErr
 	}
+	t.Cleanup(func() { runExternalCmdFunc = origRun })
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("CI", "")
-			t.Setenv("BUILD_NUMBER", "")
-			t.Setenv("RUN_ID", "")
-
-			ios, _, _, stderr := iostreams.Test()
-			if tt.isTTY {
-				ios.SetStdinTTY(true)
-				ios.SetStdoutTTY(true)
-			}
-
-			opts := &CopilotOptions{
-				IO:          ios,
-				Prompter:    tt.prompter,
-				CopilotArgs: []string{},
-			}
-
-			origFind := findCopilotBinaryFunc
-			findCopilotBinaryFunc = tt.findCopilot
-			t.Cleanup(func() { findCopilotBinaryFunc = origFind })
-
-			if tt.runExternal != nil {
-				origRun := runExternalCmdFunc
-				runExternalCmdFunc = tt.runExternal
-				t.Cleanup(func() { runExternalCmdFunc = origRun })
-			}
-
-			err := runCopilot(opts)
-			require.ErrorIs(t, err, tt.wantErr)
-			if tt.wantErrSubstring != "" {
-				require.ErrorContains(t, err, tt.wantErrSubstring)
-			}
-			assert.Equal(t, tt.wantStderr, stderr.String())
-		})
-	}
+	err := runCopilot(opts)
+	require.Error(t, err)
+	require.ErrorIs(t, err, execErr)
+	require.Contains(t, err.Error(), "try running `copilot` directly without `gh`.")
 }

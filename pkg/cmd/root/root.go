@@ -6,23 +6,18 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
-	accessibilityCmd "github.com/cli/cli/v2/pkg/cmd/accessibility"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	agentTaskCmd "github.com/cli/cli/v2/pkg/cmd/agent-task"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
-	attestationCmd "github.com/cli/cli/v2/pkg/cmd/attestation"
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
 	cacheCmd "github.com/cli/cli/v2/pkg/cmd/cache"
-	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
 	copilotCmd "github.com/cli/cli/v2/pkg/cmd/copilot"
 	discussionCmd "github.com/cli/cli/v2/pkg/cmd/discussion"
-	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
 	gpgKeyCmd "github.com/cli/cli/v2/pkg/cmd/gpg-key"
@@ -31,7 +26,6 @@ import (
 	licensesCmd "github.com/cli/cli/v2/pkg/cmd/licenses"
 	orgCmd "github.com/cli/cli/v2/pkg/cmd/org"
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
-	previewCmd "github.com/cli/cli/v2/pkg/cmd/preview"
 	projectCmd "github.com/cli/cli/v2/pkg/cmd/project"
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
@@ -40,15 +34,12 @@ import (
 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
 	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
-	sendTelemetryCmd "github.com/cli/cli/v2/pkg/cmd/send-telemetry"
-	skillsCmd "github.com/cli/cli/v2/pkg/cmd/skills"
 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
 	statusCmd "github.com/cli/cli/v2/pkg/cmd/status"
 	variableCmd "github.com/cli/cli/v2/pkg/cmd/variable"
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
 	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
@@ -61,7 +52,7 @@ func (ae *AuthError) Error() string {
 	return ae.err.Error()
 }
 
-func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, version, buildDate string) (*cobra.Command, error) {
+func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, error) {
 	io := f.IOStreams
 	cfg, err := f.Config()
 	if err != nil {
@@ -126,38 +117,27 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 		ID:    "actions",
 		Title: "GitHub Actions commands",
 	})
-	cmd.AddGroup(&cobra.Group{
-		ID:    "extension",
-		Title: "Extension commands",
-	})
 
 	// Child commands
 	cmd.AddCommand(versionCmd.NewCmdVersion(f, version, buildDate))
-	cmd.AddCommand(accessibilityCmd.NewCmdAccessibility(f))
 	cmd.AddCommand(actionsCmd.NewCmdActions(f))
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
-	cmd.AddCommand(authCmd.NewCmdAuth(f, telemetry))
-	cmd.AddCommand(attestationCmd.NewCmdAttestation(f))
+	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
-	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
 	cmd.AddCommand(searchCmd.NewCmdSearch(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(variableCmd.NewCmdVariable(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
-	cmd.AddCommand(codespaceCmd.NewCmdCodespace(f))
 	cmd.AddCommand(projectCmd.NewCmdProject(f))
-	cmd.AddCommand(previewCmd.NewCmdPreview(f))
-	cmd.AddCommand(skillsCmd.NewCmdSkills(f, telemetry))
 
 	// Root commands with standalone functionality and no subcommands
-	cmd.AddCommand(copilotCmd.NewCmdCopilot(f, telemetry, nil))
+	cmd.AddCommand(copilotCmd.NewCmdCopilot(f, nil))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(licensesCmd.NewCmdLicenses(f))
-	cmd.AddCommand(sendTelemetryCmd.NewCmdSendTelemetry(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
@@ -166,9 +146,9 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 	cmd.AddCommand(agentTaskCmd.NewCmdAgentTask(&repoResolvingCmdFactory))
 	cmd.AddCommand(browseCmd.NewCmdBrowse(&repoResolvingCmdFactory, nil))
 	cmd.AddCommand(discussionCmd.NewCmdDiscussion(&repoResolvingCmdFactory))
-	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory, telemetry))
+	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
 	cmd.AddCommand(orgCmd.NewCmdOrg(&repoResolvingCmdFactory))
-	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory, telemetry))
+	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 	cmd.AddCommand(rulesetCmd.NewCmdRuleset(&repoResolvingCmdFactory))
@@ -250,7 +230,6 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
-	cmdutil.RecordTelemetryForSubcommands(cmd, telemetry)
 
 	// The reference command produces paged output that displays information on every other command.
 	// Therefore, we explicitly set the Long text and HelpFunc here after all other commands are registered.

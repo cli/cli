@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"charm.land/lipgloss/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/safeurl"
@@ -672,12 +671,8 @@ func statusRun(opts *StatusOptions) error {
 	cs := opts.IO.ColorScheme()
 	out := opts.IO.Out
 	fullWidth := opts.IO.TerminalWidth()
-	halfWidth := (fullWidth / 2) - 2
 
 	idStyle := cs.Cyan
-	// Lip Gloss v2 counts the right border within Width, so add a cell to keep the content as wide as the right half.
-	leftHalfStyle := lipgloss.NewStyle().Width(halfWidth + 1).Padding(0).MarginRight(1).BorderRight(true).BorderStyle(lipgloss.NormalBorder())
-	rightHalfStyle := lipgloss.NewStyle().Width(halfWidth).Padding(0)
 
 	section := func(header string, items []StatusItem, width, rowLimit int) (string, error) {
 		tableOut := &bytes.Buffer{}
@@ -708,37 +703,35 @@ func statusRun(opts *StatusOptions) error {
 		return tableOut.String(), nil
 	}
 
-	mSection, err := section("Mentions", sg.Mentions, halfWidth, 5)
-	if err != nil {
-		return fmt.Errorf("failed to render 'Mentions': %w", err)
-	}
-	mSection = rightHalfStyle.Render(mSection)
-
-	rrSection, err := section("Review Requests", sg.ReviewRequests, halfWidth, 5)
-	if err != nil {
-		return fmt.Errorf("failed to render 'Review Requests': %w", err)
-	}
-	rrSection = leftHalfStyle.Render(rrSection)
-
-	prSection, err := section("Assigned Pull Requests", sg.AssignedPRs, halfWidth, 5)
-	if err != nil {
-		return fmt.Errorf("failed to render 'Assigned Pull Requests': %w", err)
-	}
-	prSection = rightHalfStyle.Render(prSection)
-
-	issueSection, err := section("Assigned Issues", sg.AssignedIssues, halfWidth, 5)
+	issueSection, err := section("Assigned Issues", sg.AssignedIssues, fullWidth, 5)
 	if err != nil {
 		return fmt.Errorf("failed to render 'Assigned Issues': %w", err)
 	}
-	issueSection = leftHalfStyle.Render(issueSection)
+
+	prSection, err := section("Assigned Pull Requests", sg.AssignedPRs, fullWidth, 5)
+	if err != nil {
+		return fmt.Errorf("failed to render 'Assigned Pull Requests': %w", err)
+	}
+
+	rrSection, err := section("Review Requests", sg.ReviewRequests, fullWidth, 5)
+	if err != nil {
+		return fmt.Errorf("failed to render 'Review Requests': %w", err)
+	}
+
+	mSection, err := section("Mentions", sg.Mentions, fullWidth, 5)
+	if err != nil {
+		return fmt.Errorf("failed to render 'Mentions': %w", err)
+	}
 
 	raSection, err := section("Repository Activity", sg.RepoActivity, fullWidth, 10)
 	if err != nil {
 		return fmt.Errorf("failed to render 'Repository Activity': %w", err)
 	}
 
-	fmt.Fprintln(out, lipgloss.JoinHorizontal(lipgloss.Top, issueSection, prSection))
-	fmt.Fprintln(out, lipgloss.JoinHorizontal(lipgloss.Top, rrSection, mSection))
+	fmt.Fprint(out, issueSection)
+	fmt.Fprint(out, prSection)
+	fmt.Fprint(out, rrSection)
+	fmt.Fprint(out, mSection)
 	fmt.Fprintln(out, raSection)
 
 	if sg.HasAuthErrors() {

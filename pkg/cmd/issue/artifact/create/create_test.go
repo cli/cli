@@ -12,9 +12,9 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -33,15 +33,6 @@ const (
 )
 
 func TestNewCmdCreate(t *testing.T) {
-	attachEvent := func(count int64) []ghtelemetry.Event {
-		return []ghtelemetry.Event{{
-			Type:       "attachment_invocation",
-			Dimensions: ghtelemetry.Dimensions{"command": "create"},
-			Measures: ghtelemetry.Measures{
-				"attach_count": count, "append_ops_count": 0, "replace_ops_count": 0,
-			},
-		}}
-	}
 
 	tests := []struct {
 		name string
@@ -51,7 +42,6 @@ func TestNewCmdCreate(t *testing.T) {
 		ghRepo         string
 		wantOpts       CreateOptions
 		wantAssetPaths []string
-		wantEvents     []ghtelemetry.Event
 		wantRepo       string
 		wantErr        string
 		wantFlagErr    bool
@@ -257,7 +247,6 @@ func TestNewCmdCreate(t *testing.T) {
 				Sources:     []source{{kind: fromFile, arg: "signin-plan.md"}},
 			},
 			wantAssetPaths: []string{"signin-flow.png", "./landing-page.png"},
-			wantEvents:     attachEvent(2),
 			wantRepo:       "OWNER/REPO",
 		},
 		{
@@ -271,7 +260,6 @@ func TestNewCmdCreate(t *testing.T) {
 				},
 			},
 			wantAssetPaths: []string{"signin-flow.png"},
-			wantEvents:     attachEvent(1),
 			wantRepo:       "OWNER/REPO",
 		},
 		{
@@ -285,7 +273,6 @@ func TestNewCmdCreate(t *testing.T) {
 				},
 			},
 			wantAssetPaths: []string{"signin-flow.png"},
-			wantEvents:     attachEvent(1),
 			wantRepo:       "OWNER/REPO",
 		},
 		{
@@ -297,7 +284,6 @@ func TestNewCmdCreate(t *testing.T) {
 				Type:        "generic",
 			},
 			wantAssetPaths: []string{"signin-flow.png"},
-			wantEvents:     attachEvent(1),
 			wantRepo:       "OWNER/REPO",
 		},
 		{
@@ -484,7 +470,6 @@ func TestNewCmdCreate(t *testing.T) {
 			name:       "--attach with a file it can't upload",
 			args:       "142 signin-plan.md --attach signin-plan.md",
 			wantErr:    "signin-plan.md is not a supported file type (supported: png, jpg, jpeg, gif, webp, svg, mp4, mov, webm)",
-			wantEvents: attachEvent(1),
 		},
 	}
 
@@ -513,8 +498,7 @@ func TestNewCmdCreate(t *testing.T) {
 			}
 
 			var gotOpts *CreateOptions
-			recorder := &telemetry.InvocationRecorderSpy{}
-			cmd := NewCmdCreate(f, recorder, func(opts *CreateOptions) error {
+			cmd := NewCmdCreate(f, func(opts *CreateOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -536,7 +520,6 @@ func TestNewCmdCreate(t *testing.T) {
 			_, err = run.ExecuteC()
 
 			assert.Equal(t, "# OAuth research\n", stdin.String(), "standard input is only read by the run function")
-			assert.Equal(t, tt.wantEvents, recorder.Events())
 			assert.Equal(t, "", stdout.String())
 			assert.Equal(t, "", stderr.String())
 			if tt.wantErr != "" {
@@ -558,7 +541,6 @@ func TestNewCmdCreate(t *testing.T) {
 				assetPaths = append(assetPaths, a.Path())
 			}
 			assert.Equal(t, tt.wantAssetPaths, assetPaths)
-			assert.Equal(t, tt.wantAssetPaths != nil, gotOpts.AttachEvent != nil, "--attach use is recorded")
 
 			repo, err := gotOpts.BaseRepo()
 			require.NoError(t, err)
@@ -602,10 +584,10 @@ func TestCreateRun(t *testing.T) {
 		isPullRequest bool
 		lookupErr     error
 		permission    string
+		token         string
 		createErrs    map[string]error
 		wantCalls     []string
 		wantBodies    []string
-		wantOps       *attachments.UploadResult
 		wantStdout    string
 		wantStderr    string
 		wantErr       string
@@ -1143,7 +1125,6 @@ func TestCreateRun(t *testing.T) {
 			},
 			wantBodies: []string{"# Sign-in plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n\n" +
 				"![landing-page](https://github.com/user-attachments/assets/BBB)"},
-			wantOps:    &attachments.UploadResult{AppendOperations: 1, ReplaceOperations: 1},
 			wantStdout: "✓ Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1158,7 +1139,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "signin-plan.md"`,
 			},
 			wantBodies: []string{"![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n"},
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1173,7 +1153,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "barista-notes.md"`,
 			},
 			wantBodies: []string{"![Menu photo](https://github.com/user-attachments/assets/AAA)\n"},
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Created artifact 6 (barista-notes.md) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1188,7 +1167,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "Sign-in plan"`,
 			},
 			wantBodies: []string{"![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n"},
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Created artifact 6 (Sign-in plan) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1207,7 +1185,6 @@ func TestCreateRun(t *testing.T) {
 				"# Sign-in plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n",
 				"# Barista notes\n\nThe flow in ![Sign-in flow](https://github.com/user-attachments/assets/AAA) confused them.\n",
 			},
-			wantOps: &attachments.UploadResult{ReplaceOperations: 2},
 			wantStdout: "✓ Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142\n" +
 				"✓ Created artifact 7 (barista-notes.md) on monalisa/monas-cafe#142\n",
 		},
@@ -1227,7 +1204,6 @@ func TestCreateRun(t *testing.T) {
 				"# Sign-in plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n",
 				oauthResearch,
 			},
-			wantOps: &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142\n" +
 				"✓ Created artifact 7 (oauth-research.md) on monalisa/monas-cafe#142\n",
 		},
@@ -1243,7 +1219,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "oauth-research.md"`,
 			},
 			wantBodies: []string{oauthResearch},
-			wantOps:    &attachments.UploadResult{},
 			wantStdout: "✓ Created artifact 6 (oauth-research.md) on monalisa/monas-cafe#142\n",
 			wantStderr: "X Failed to create artifact from signin-plan.md: could not upload ./signin-flow.png: attaching files requires write access to the repository\n",
 			wantErrIs:  cmdutil.SilentError,
@@ -1255,7 +1230,6 @@ func TestCreateRun(t *testing.T) {
 			opts:      CreateOptions{Sources: []source{{kind: fromFile, arg: "signin-plan.md"}, {kind: fromFile, arg: "barista-notes.md"}}},
 			tty:       true,
 			wantCalls: []string{"UploadTarget monalisa/monas-cafe#142"},
-			wantOps:   &attachments.UploadResult{},
 			wantErr:   "no file references ./latte-art.png; reference it in a file, or attach it when creating a single artifact",
 		},
 		{
@@ -1265,7 +1239,6 @@ func TestCreateRun(t *testing.T) {
 			opts:      CreateOptions{Sources: []source{{kind: fromFile, arg: "signin-plan.md"}, {kind: fromFile, arg: "barista-notes.md"}}},
 			tty:       true,
 			wantCalls: []string{"UploadTarget monalisa/monas-cafe#142"},
-			wantOps:   &attachments.UploadResult{},
 			wantErr:   "no file references ./latte-art.png, ./menu-photo.png, or ./landing-page.png; reference them in a file, or attach them when creating a single artifact",
 		},
 		{
@@ -1275,7 +1248,6 @@ func TestCreateRun(t *testing.T) {
 			opts:      CreateOptions{Sources: []source{{kind: fromFile, arg: "signin-plan.md"}, {kind: fromFile, arg: "barista-notes.md"}}},
 			tty:       true,
 			wantCalls: []string{"UploadTarget monalisa/monas-cafe#142"},
-			wantOps:   &attachments.UploadResult{},
 			wantErr:   "no file references ./latte-art.png or ./menu-photo.png; reference them in a file, or attach them when creating a single artifact",
 		},
 		{
@@ -1285,7 +1257,6 @@ func TestCreateRun(t *testing.T) {
 			opts:      CreateOptions{Sources: []source{{kind: fromFile, arg: "signin-plan.md"}}},
 			tty:       true,
 			wantCalls: []string{"UploadTarget monalisa/monas-cafe#142"},
-			wantOps:   &attachments.UploadResult{},
 			wantErr:   "cannot embed a video as a reference-style image: ./repro.mp4",
 		},
 		{
@@ -1301,7 +1272,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "signin-plan.md"`,
 			},
 			wantBodies: []string{runbookURL, "# Sign-in plan\n\n1. Register the callback URL.\n\n![latte-art](https://github.com/user-attachments/assets/AAA)"},
-			wantOps:    &attachments.UploadResult{AppendOperations: 1},
 			wantStdout: "✓ Created artifact 6 (github.com) on monalisa/monas-cafe#142\n" +
 				"✓ Created artifact 7 (signin-plan.md) on monalisa/monas-cafe#142\n",
 		},
@@ -1318,7 +1288,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "signin-plan.md"`,
 			},
 			wantBodies: []string{menuHTMLFlow, signinPlan + "\n![signin-flow](https://github.com/user-attachments/assets/AAA)"},
-			wantOps:    &attachments.UploadResult{AppendOperations: 1},
 			wantStdout: "✓ Created artifact 6 (menu-prototype.html) on monalisa/monas-cafe#142\n" +
 				"✓ Created artifact 7 (signin-plan.md) on monalisa/monas-cafe#142\n",
 		},
@@ -1330,7 +1299,6 @@ func TestCreateRun(t *testing.T) {
 			opts:       CreateOptions{Sources: []source{{kind: fromFile, arg: "signin-plan.md"}}},
 			tty:        true,
 			wantCalls:  []string{"UploadTarget monalisa/monas-cafe#142"},
-			wantOps:    &attachments.UploadResult{},
 			wantStderr: "X Failed to create artifact from signin-plan.md: could not upload ./signin-flow.png: attaching files requires write access to the repository\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
@@ -1349,7 +1317,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "signin-plan.md"`,
 			},
 			wantBodies: []string{"![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n\n![Latte art](./latte-art.png)\n"},
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStderr: "! Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142, but could not upload ./latte-art.png: rate limited; wait and try again\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
@@ -1367,7 +1334,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "signin-plan.md"`,
 			},
 			wantBodies: []string{"![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n\n![Latte art](./latte-art.png)\n"},
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "created\t6\tsignin-plan.md\tsignin-plan.md\tcould not upload ./latte-art.png: rate limited; wait and try again\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
@@ -1389,7 +1355,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "signin-plan.md"`,
 			},
 			wantBodies: []string{"# Sign-in plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n"},
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142\n",
 			wantStderr: "X Failed to create artifact from barista-notes.md: could not upload ./latte-art.png: rate limited; wait and try again\n",
 			wantErrIs:  cmdutil.SilentError,
@@ -1406,7 +1371,6 @@ func TestCreateRun(t *testing.T) {
 			wantCalls: []string{
 				"UploadTarget monalisa/monas-cafe#142",
 			},
-			wantOps: &attachments.UploadResult{},
 			wantStdout: "failed\t\tsignin-plan.md\tsignin-plan.md\tcould not upload ./signin-flow.png: attaching files requires write access to the repository\n" +
 				"failed\t\tbarista-notes.md\tbarista-notes.md\tcould not upload ./signin-flow.png: attaching files requires write access to the repository\n",
 			wantErrIs: cmdutil.SilentError,
@@ -1424,7 +1388,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monalisa/monas-cafe#142 generic "signin-plan.md"`,
 			},
 			wantBodies: []string{"# Sign-in plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n"},
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStderr: "X Failed to create artifact from signin-plan.md: Not Found\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
@@ -1449,6 +1412,16 @@ func TestCreateRun(t *testing.T) {
 			wantErr:    "attaching files requires write access to the repository",
 		},
 		{
+			name:      "--attach needs a token that can upload",
+			files:     map[string]string{"signin-plan.md": signinPlanFlow},
+			attach:    []string{"signin-flow.png"},
+			opts:      CreateOptions{Sources: []source{{kind: fromFile, arg: "signin-plan.md"}}},
+			tty:       true,
+			token:     "ghs_aninstallationtoken",
+			wantCalls: []string{"UploadTarget monalisa/monas-cafe#142"},
+			wantErr:   "unsupported authentication type",
+		},
+		{
 			name:    "--attach uploads to a ghe.com host",
 			repo:    ghrepo.NewWithHost("monalisa", "monas-cafe", "monas-cafe.ghe.com"),
 			files:   map[string]string{"signin-plan.md": signinPlanFlow},
@@ -1461,7 +1434,6 @@ func TestCreateRun(t *testing.T) {
 				`Create monas-cafe.ghe.com/monalisa/monas-cafe#142 generic "signin-plan.md"`,
 			},
 			wantBodies: []string{"# Sign-in plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n"},
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Created artifact 6 (signin-plan.md) on monalisa/monas-cafe#142\n",
 		},
 	}
@@ -1535,11 +1507,6 @@ func TestCreateRun(t *testing.T) {
 					return &client.Artifact{Number: lastNumber, Type: artifactType, Name: name, Body: body}, nil
 				},
 			}
-
-			recorder := &telemetry.InvocationRecorderSpy{}
-			if len(tt.attach) > 0 {
-				opts.AttachEvent = attachments.BeginTelemetry(recorder, "gh test", len(tt.attach))
-			}
 			if opts.IssueNumber == 0 {
 				opts.IssueNumber = 142
 			}
@@ -1547,6 +1514,13 @@ func TestCreateRun(t *testing.T) {
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return repo, nil }
 			opts.Client = func() (client.ArtifactClient, error) { return mock, nil }
 			opts.HttpClient = func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
+			opts.Config = func() (gh.Config, error) {
+				token := tt.token
+				if token == "" {
+					token = "gho_atokenthatcanupload"
+				}
+				return config.NewMockConfigFromString(fmt.Sprintf("hosts:\n  %s:\n    user: monalisa\n    oauth_token: %s\n", repo.RepoHost(), token)), nil
+			}
 
 			err := createRun(&opts)
 
@@ -1556,9 +1530,6 @@ func TestCreateRun(t *testing.T) {
 				bodies = append(bodies, call.Body)
 			}
 			assert.Equal(t, tt.wantBodies, bodies)
-			if tt.wantOps != nil {
-				attachments.AssertTestTelemetryEvents(t, recorder.Events(), len(tt.attach), *tt.wantOps)
-			}
 			switch {
 			case tt.wantErrIs != nil:
 				require.ErrorIs(t, err, tt.wantErrIs)

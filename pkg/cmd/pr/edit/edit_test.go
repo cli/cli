@@ -7,15 +7,15 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
+	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/telemetry"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -33,13 +33,6 @@ func TestNewCmdEdit(t *testing.T) {
 	tmpImage := filepath.Join(t.TempDir(), "shot.png")
 	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
 
-	attachmentEvent := []ghtelemetry.Event{{
-		Type:       "attachment_invocation",
-		Dimensions: ghtelemetry.Dimensions{"command": "edit"},
-		Measures: ghtelemetry.Measures{
-			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
-		},
-	}}
 
 	tests := []struct {
 		name             string
@@ -49,8 +42,6 @@ func TestNewCmdEdit(t *testing.T) {
 		wantAssetPaths   []string
 		expectedBaseRepo ghrepo.Interface
 		wantsErr         bool
-		wantEvents       []ghtelemetry.Event
-		wantSampleRate   int
 	}{
 		{
 			name:  "no argument",
@@ -324,11 +315,9 @@ func TestNewCmdEdit(t *testing.T) {
 				Interactive: false,
 			},
 			wantAssetPaths: []string{tmpImage},
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
-			name:     "argument validation skips attachment telemetry",
+			name:     "argument validation rejects invalid attachment input",
 			input:    fmt.Sprintf("23 24 --attach '%s'", tmpImage),
 			wantsErr: true,
 		},
@@ -346,26 +335,21 @@ func TestNewCmdEdit(t *testing.T) {
 				},
 			},
 			wantAssetPaths: []string{tmpImage},
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
 			name:           "attach rejects a missing file",
 			input:          "23 --attach ./nope.png",
 			wantsErr:       true,
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
-			name:     "body flag conflict skips attachment telemetry",
+			name:     "body flag conflict rejects invalid attachment input",
 			input:    fmt.Sprintf("23 --body test --body-file '%s' --attach '%s'", tmpFile, tmpImage),
 			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given command inputs and an invocation recorder
-			ios, stdin, _, _ := iostreams.Test()
+						ios, stdin, _, _ := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
@@ -382,8 +366,7 @@ func TestNewCmdEdit(t *testing.T) {
 			require.NoError(t, err)
 
 			var gotOpts *EditOptions
-			recorder := &telemetry.InvocationRecorderSpy{}
-			cmd := NewCmdEdit(f, recorder, func(opts *EditOptions) error {
+			cmd := NewCmdEdit(f, func(opts *EditOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -396,10 +379,7 @@ func TestNewCmdEdit(t *testing.T) {
 
 			// When the command executes
 			_, err = cmd.ExecuteC()
-			// Then telemetry starts only if execution reaches attachment validation
-			assert.Equal(t, tt.wantEvents, recorder.Events())
-			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
-			if tt.wantsErr {
+						if tt.wantsErr {
 				require.Error(t, err)
 				return
 			}
@@ -435,7 +415,11 @@ func Test_editRun(t *testing.T) {
 		input     *EditOptions
 		httpStubs func(*testing.T, *httpmock.Registry)
 		attach    []string
-		uploads   []attachments.UploadStub
+		// Empty means the default token, which can upload.
+		token string
+		// Overrides token, for a row that needs more than one host.
+		hostTokens map[string]string
+		uploads    []attachments.UploadStub
 		// Empty means the row does not care which host was reached.
 		wantUploadHost     string
 		wantLookupFields   []string
@@ -443,7 +427,6 @@ func Test_editRun(t *testing.T) {
 		stdout             string
 		stderr             string
 		wantErr            string
-		wantOperations     *attachments.UploadResult
 	}{
 		{
 			name: "non-interactive",
@@ -1249,14 +1232,14 @@ func Test_editRun(t *testing.T) {
 			wantErr: "the user quit the editor",
 		},
 		{
-			name: "a permission that cannot upload fails before any prompt",
+			name: "a token that cannot upload fails before any prompt",
 			input: &EditOptions{
 				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					URL:        "https://github.com/OWNER/REPO/pull/123",
 					Body:       "the original body",
-					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "READ"},
+					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive:     true,
 				Surveyor:        testSurveyor{},
@@ -1264,7 +1247,8 @@ func Test_editRun(t *testing.T) {
 				EditorRetriever: testEditorRetriever{},
 			},
 			attach:  []string{"shot.png"},
-			wantErr: "attaching files requires write access to the repository",
+			token:   "ghs_anactionstoken",
+			wantErr: "unsupported authentication type",
 		},
 		{
 			name: "attaching with no body flag keeps the body already on the pull request",
@@ -1285,7 +1269,6 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
 			},
 			stdout:         "https://github.com/OWNER/REPO/pull/123\n",
-			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "an empty body flag clears the body and leaves the attachment",
@@ -1335,7 +1318,6 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdateWithBody(t, reg, "the plan ![diagram](https://example.com/1)")
 			},
 			stdout:         "https://github.com/OWNER/REPO/pull/123\n",
-			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name: "attaching does not double what the editor already carried",
@@ -1391,7 +1373,6 @@ func Test_editRun(t *testing.T) {
 			},
 			stdout:         "https://github.com/OWNER/REPO/pull/123\n",
 			wantErr:        "could not upload ./b.png: attaching files requires write access to the repository",
-			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a sole failed upload leaves the body alone and still edits the title",
@@ -1529,7 +1510,9 @@ func Test_editRun(t *testing.T) {
 			wantErr: "could not upload ./a.png: attaching files requires write access to the repository",
 		},
 		{
-			name: "the upload goes to the host the pull request was fetched from",
+			// The default host deliberately holds a token that cannot upload,
+			// so tidying these fixture tokens weakens the row without failing it.
+			name: "the token comes from the host the pull request was fetched from",
 			input: &EditOptions{
 				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "https://acme.ghe.com/OWNER/REPO/pull/123",
@@ -1542,6 +1525,7 @@ func Test_editRun(t *testing.T) {
 				Fetcher:     testFetcher{},
 			},
 			attach:         []string{"shot.png"},
+			hostTokens:     map[string]string{"github.com": "ghs_anactionstoken", "acme.ghe.com": "gho_atenanttoken"},
 			uploads:        []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
 			wantUploadHost: "uploads.acme.ghe.com",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -1681,9 +1665,18 @@ func Test_editRun(t *testing.T) {
 				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
 			// Given a pending event when operation counts are under test
-			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
-			if tt.wantOperations != nil {
-				tt.input.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
+			// The host comes from the pull request the row's finder returns, so
+			// a row can hold a token for a host the config's default is not.
+			hostTokens := tt.hostTokens
+			if hostTokens == nil {
+				token := tt.token
+				if token == "" {
+					token = "gho_atokenthatcanupload"
+				}
+				hostTokens = map[string]string{"github.com": token}
+			}
+			tt.input.Config = func() (gh.Config, error) {
+				return config.NewMockConfigFromString(hostsConfig(hostTokens)), nil
 			}
 
 			var lookupFields []string
@@ -1691,10 +1684,7 @@ func Test_editRun(t *testing.T) {
 
 			// When pull request editing runs
 			err := editRun(tt.input)
-			if tt.wantOperations != nil {
-				// Then telemetry retains completed operations, including partial results
-				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(tt.attach), *tt.wantOperations)
-			}
+
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 			} else {
@@ -1723,6 +1713,15 @@ type fieldCapturingFinder struct {
 func (f fieldCapturingFinder) Find(opts shared.FindOptions) (*api.PullRequest, ghrepo.Interface, error) {
 	*f.fields = opts.Fields
 	return f.PRFinder.Find(opts)
+}
+
+func hostsConfig(tokens map[string]string) string {
+	var b strings.Builder
+	b.WriteString("hosts:\n")
+	for host, token := range tokens {
+		fmt.Fprintf(&b, "  %s:\n    user: monalisa\n    oauth_token: %s\n", host, token)
+	}
+	return b.String()
 }
 
 type mockRepoMetadataOptions struct {

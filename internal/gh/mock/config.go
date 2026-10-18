@@ -22,9 +22,6 @@ var _ gh.Config = &ConfigMock{}
 //			AccessibleColorsFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the AccessibleColors method")
 //			},
-//			AccessiblePrompterFunc: func(hostname string) gh.ConfigEntry {
-//				panic("mock out the AccessiblePrompter method")
-//			},
 //			AliasesFunc: func() gh.AliasConfig {
 //				panic("mock out the Aliases method")
 //			},
@@ -46,6 +43,9 @@ var _ gh.Config = &ConfigMock{}
 //			EditorFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Editor method")
 //			},
+//			ExpiringCredentialsFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the ExpiringCredentials method")
+//			},
 //			GetOrDefaultFunc: func(hostname string, key string) o.Option[gh.ConfigEntry] {
 //				panic("mock out the GetOrDefault method")
 //			},
@@ -55,17 +55,11 @@ var _ gh.Config = &ConfigMock{}
 //			HTTPUnixSocketFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the HTTPUnixSocket method")
 //			},
-//			MigrateFunc: func(migration gh.Migration) error {
-//				panic("mock out the Migrate method")
-//			},
 //			PagerFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Pager method")
 //			},
 //			PreferEditorPromptFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the PreferEditorPrompt method")
-//			},
-//			ExpiringCredentialsFunc: func(hostname string) gh.ConfigEntry {
-//				panic("mock out the ExpiringCredentials method")
 //			},
 //			PromptFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Prompt method")
@@ -75,12 +69,6 @@ var _ gh.Config = &ConfigMock{}
 //			},
 //			SpinnerFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Spinner method")
-//			},
-//			TelemetryFunc: func() gh.ConfigEntry {
-//				panic("mock out the Telemetry method")
-//			},
-//			VersionFunc: func() o.Option[string] {
-//				panic("mock out the Version method")
 //			},
 //			WriteFunc: func() error {
 //				panic("mock out the Write method")
@@ -94,9 +82,6 @@ var _ gh.Config = &ConfigMock{}
 type ConfigMock struct {
 	// AccessibleColorsFunc mocks the AccessibleColors method.
 	AccessibleColorsFunc func(hostname string) gh.ConfigEntry
-
-	// AccessiblePrompterFunc mocks the AccessiblePrompter method.
-	AccessiblePrompterFunc func(hostname string) gh.ConfigEntry
 
 	// AliasesFunc mocks the Aliases method.
 	AliasesFunc func() gh.AliasConfig
@@ -119,6 +104,9 @@ type ConfigMock struct {
 	// EditorFunc mocks the Editor method.
 	EditorFunc func(hostname string) gh.ConfigEntry
 
+	// ExpiringCredentialsFunc mocks the ExpiringCredentials method.
+	ExpiringCredentialsFunc func(hostname string) gh.ConfigEntry
+
 	// GetOrDefaultFunc mocks the GetOrDefault method.
 	GetOrDefaultFunc func(hostname string, key string) o.Option[gh.ConfigEntry]
 
@@ -128,17 +116,11 @@ type ConfigMock struct {
 	// HTTPUnixSocketFunc mocks the HTTPUnixSocket method.
 	HTTPUnixSocketFunc func(hostname string) gh.ConfigEntry
 
-	// MigrateFunc mocks the Migrate method.
-	MigrateFunc func(migration gh.Migration) error
-
 	// PagerFunc mocks the Pager method.
 	PagerFunc func(hostname string) gh.ConfigEntry
 
 	// PreferEditorPromptFunc mocks the PreferEditorPrompt method.
 	PreferEditorPromptFunc func(hostname string) gh.ConfigEntry
-
-	// ExpiringCredentialsFunc mocks the ExpiringCredentials method.
-	ExpiringCredentialsFunc func(hostname string) gh.ConfigEntry
 
 	// PromptFunc mocks the Prompt method.
 	PromptFunc func(hostname string) gh.ConfigEntry
@@ -149,12 +131,6 @@ type ConfigMock struct {
 	// SpinnerFunc mocks the Spinner method.
 	SpinnerFunc func(hostname string) gh.ConfigEntry
 
-	// TelemetryFunc mocks the Telemetry method.
-	TelemetryFunc func() gh.ConfigEntry
-
-	// VersionFunc mocks the Version method.
-	VersionFunc func() o.Option[string]
-
 	// WriteFunc mocks the Write method.
 	WriteFunc func() error
 
@@ -162,11 +138,6 @@ type ConfigMock struct {
 	calls struct {
 		// AccessibleColors holds details about calls to the AccessibleColors method.
 		AccessibleColors []struct {
-			// Hostname is the hostname argument value.
-			Hostname string
-		}
-		// AccessiblePrompter holds details about calls to the AccessiblePrompter method.
-		AccessiblePrompter []struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
@@ -197,6 +168,11 @@ type ConfigMock struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
+		// ExpiringCredentials holds details about calls to the ExpiringCredentials method.
+		ExpiringCredentials []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
 		// GetOrDefault holds details about calls to the GetOrDefault method.
 		GetOrDefault []struct {
 			// Hostname is the hostname argument value.
@@ -214,11 +190,6 @@ type ConfigMock struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
-		// Migrate holds details about calls to the Migrate method.
-		Migrate []struct {
-			// Migration is the migration argument value.
-			Migration gh.Migration
-		}
 		// Pager holds details about calls to the Pager method.
 		Pager []struct {
 			// Hostname is the hostname argument value.
@@ -226,11 +197,6 @@ type ConfigMock struct {
 		}
 		// PreferEditorPrompt holds details about calls to the PreferEditorPrompt method.
 		PreferEditorPrompt []struct {
-			// Hostname is the hostname argument value.
-			Hostname string
-		}
-		// ExpiringCredentials holds details about calls to the ExpiringCredentials method.
-		ExpiringCredentials []struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
@@ -253,18 +219,11 @@ type ConfigMock struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
-		// Telemetry holds details about calls to the Telemetry method.
-		Telemetry []struct {
-		}
-		// Version holds details about calls to the Version method.
-		Version []struct {
-		}
 		// Write holds details about calls to the Write method.
 		Write []struct {
 		}
 	}
 	lockAccessibleColors    sync.RWMutex
-	lockAccessiblePrompter  sync.RWMutex
 	lockAliases             sync.RWMutex
 	lockAuthentication      sync.RWMutex
 	lockBrowser             sync.RWMutex
@@ -272,18 +231,15 @@ type ConfigMock struct {
 	lockClipboard           sync.RWMutex
 	lockColorLabels         sync.RWMutex
 	lockEditor              sync.RWMutex
+	lockExpiringCredentials sync.RWMutex
 	lockGetOrDefault        sync.RWMutex
 	lockGitProtocol         sync.RWMutex
 	lockHTTPUnixSocket      sync.RWMutex
-	lockMigrate             sync.RWMutex
 	lockPager               sync.RWMutex
 	lockPreferEditorPrompt  sync.RWMutex
-	lockExpiringCredentials sync.RWMutex
 	lockPrompt              sync.RWMutex
 	lockSet                 sync.RWMutex
 	lockSpinner             sync.RWMutex
-	lockTelemetry           sync.RWMutex
-	lockVersion             sync.RWMutex
 	lockWrite               sync.RWMutex
 }
 
@@ -316,38 +272,6 @@ func (mock *ConfigMock) AccessibleColorsCalls() []struct {
 	mock.lockAccessibleColors.RLock()
 	calls = mock.calls.AccessibleColors
 	mock.lockAccessibleColors.RUnlock()
-	return calls
-}
-
-// AccessiblePrompter calls AccessiblePrompterFunc.
-func (mock *ConfigMock) AccessiblePrompter(hostname string) gh.ConfigEntry {
-	if mock.AccessiblePrompterFunc == nil {
-		panic("ConfigMock.AccessiblePrompterFunc: method is nil but Config.AccessiblePrompter was just called")
-	}
-	callInfo := struct {
-		Hostname string
-	}{
-		Hostname: hostname,
-	}
-	mock.lockAccessiblePrompter.Lock()
-	mock.calls.AccessiblePrompter = append(mock.calls.AccessiblePrompter, callInfo)
-	mock.lockAccessiblePrompter.Unlock()
-	return mock.AccessiblePrompterFunc(hostname)
-}
-
-// AccessiblePrompterCalls gets all the calls that were made to AccessiblePrompter.
-// Check the length with:
-//
-//	len(mockedConfig.AccessiblePrompterCalls())
-func (mock *ConfigMock) AccessiblePrompterCalls() []struct {
-	Hostname string
-} {
-	var calls []struct {
-		Hostname string
-	}
-	mock.lockAccessiblePrompter.RLock()
-	calls = mock.calls.AccessiblePrompter
-	mock.lockAccessiblePrompter.RUnlock()
 	return calls
 }
 
@@ -555,6 +479,38 @@ func (mock *ConfigMock) EditorCalls() []struct {
 	return calls
 }
 
+// ExpiringCredentials calls ExpiringCredentialsFunc.
+func (mock *ConfigMock) ExpiringCredentials(hostname string) gh.ConfigEntry {
+	if mock.ExpiringCredentialsFunc == nil {
+		panic("ConfigMock.ExpiringCredentialsFunc: method is nil but Config.ExpiringCredentials was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockExpiringCredentials.Lock()
+	mock.calls.ExpiringCredentials = append(mock.calls.ExpiringCredentials, callInfo)
+	mock.lockExpiringCredentials.Unlock()
+	return mock.ExpiringCredentialsFunc(hostname)
+}
+
+// ExpiringCredentialsCalls gets all the calls that were made to ExpiringCredentials.
+// Check the length with:
+//
+//	len(mockedConfig.ExpiringCredentialsCalls())
+func (mock *ConfigMock) ExpiringCredentialsCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockExpiringCredentials.RLock()
+	calls = mock.calls.ExpiringCredentials
+	mock.lockExpiringCredentials.RUnlock()
+	return calls
+}
+
 // GetOrDefault calls GetOrDefaultFunc.
 func (mock *ConfigMock) GetOrDefault(hostname string, key string) o.Option[gh.ConfigEntry] {
 	if mock.GetOrDefaultFunc == nil {
@@ -655,38 +611,6 @@ func (mock *ConfigMock) HTTPUnixSocketCalls() []struct {
 	return calls
 }
 
-// Migrate calls MigrateFunc.
-func (mock *ConfigMock) Migrate(migration gh.Migration) error {
-	if mock.MigrateFunc == nil {
-		panic("ConfigMock.MigrateFunc: method is nil but Config.Migrate was just called")
-	}
-	callInfo := struct {
-		Migration gh.Migration
-	}{
-		Migration: migration,
-	}
-	mock.lockMigrate.Lock()
-	mock.calls.Migrate = append(mock.calls.Migrate, callInfo)
-	mock.lockMigrate.Unlock()
-	return mock.MigrateFunc(migration)
-}
-
-// MigrateCalls gets all the calls that were made to Migrate.
-// Check the length with:
-//
-//	len(mockedConfig.MigrateCalls())
-func (mock *ConfigMock) MigrateCalls() []struct {
-	Migration gh.Migration
-} {
-	var calls []struct {
-		Migration gh.Migration
-	}
-	mock.lockMigrate.RLock()
-	calls = mock.calls.Migrate
-	mock.lockMigrate.RUnlock()
-	return calls
-}
-
 // Pager calls PagerFunc.
 func (mock *ConfigMock) Pager(hostname string) gh.ConfigEntry {
 	if mock.PagerFunc == nil {
@@ -749,38 +673,6 @@ func (mock *ConfigMock) PreferEditorPromptCalls() []struct {
 	calls = mock.calls.PreferEditorPrompt
 	mock.lockPreferEditorPrompt.RUnlock()
 	return calls
-}
-
-// ExpiringCredentialsCalls gets all the calls that were made to ExpiringCredentials.
-// Check the length with:
-//
-//	len(mockedConfig.ExpiringCredentialsCalls())
-func (mock *ConfigMock) ExpiringCredentialsCalls() []struct {
-	Hostname string
-} {
-	var calls []struct {
-		Hostname string
-	}
-	mock.lockExpiringCredentials.RLock()
-	calls = mock.calls.ExpiringCredentials
-	mock.lockExpiringCredentials.RUnlock()
-	return calls
-}
-
-// ExpiringCredentials calls ExpiringCredentialsFunc.
-func (mock *ConfigMock) ExpiringCredentials(hostname string) gh.ConfigEntry {
-	if mock.ExpiringCredentialsFunc == nil {
-		panic("ConfigMock.ExpiringCredentialsFunc: method is nil but Config.ExpiringCredentials was just called")
-	}
-	callInfo := struct {
-		Hostname string
-	}{
-		Hostname: hostname,
-	}
-	mock.lockExpiringCredentials.Lock()
-	mock.calls.ExpiringCredentials = append(mock.calls.ExpiringCredentials, callInfo)
-	mock.lockExpiringCredentials.Unlock()
-	return mock.ExpiringCredentialsFunc(hostname)
 }
 
 // Prompt calls PromptFunc.
@@ -884,60 +776,6 @@ func (mock *ConfigMock) SpinnerCalls() []struct {
 	mock.lockSpinner.RLock()
 	calls = mock.calls.Spinner
 	mock.lockSpinner.RUnlock()
-	return calls
-}
-
-// Telemetry calls TelemetryFunc.
-func (mock *ConfigMock) Telemetry() gh.ConfigEntry {
-	if mock.TelemetryFunc == nil {
-		panic("ConfigMock.TelemetryFunc: method is nil but Config.Telemetry was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockTelemetry.Lock()
-	mock.calls.Telemetry = append(mock.calls.Telemetry, callInfo)
-	mock.lockTelemetry.Unlock()
-	return mock.TelemetryFunc()
-}
-
-// TelemetryCalls gets all the calls that were made to Telemetry.
-// Check the length with:
-//
-//	len(mockedConfig.TelemetryCalls())
-func (mock *ConfigMock) TelemetryCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockTelemetry.RLock()
-	calls = mock.calls.Telemetry
-	mock.lockTelemetry.RUnlock()
-	return calls
-}
-
-// Version calls VersionFunc.
-func (mock *ConfigMock) Version() o.Option[string] {
-	if mock.VersionFunc == nil {
-		panic("ConfigMock.VersionFunc: method is nil but Config.Version was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockVersion.Lock()
-	mock.calls.Version = append(mock.calls.Version, callInfo)
-	mock.lockVersion.Unlock()
-	return mock.VersionFunc()
-}
-
-// VersionCalls gets all the calls that were made to Version.
-// Check the length with:
-//
-//	len(mockedConfig.VersionCalls())
-func (mock *ConfigMock) VersionCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockVersion.RLock()
-	calls = mock.calls.Version
-	mock.lockVersion.RUnlock()
 	return calls
 }
 

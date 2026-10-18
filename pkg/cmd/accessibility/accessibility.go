@@ -51,9 +51,6 @@ func NewCmdAccessibility(f *cmdutil.Factory) *cobra.Command {
 			# Display color using customizable, 4-bit accessible colors
 			$ gh config set accessible_colors enabled
 
-			# Use input prompts without redrawing the screen
-			$ gh config set accessible_prompter enabled
-
 			# Disable motion-based spinners for progress indicators in favor of text
 			$ gh config set spinner disabled
 		`),
@@ -69,7 +66,6 @@ func longDescription(io *iostreams.IOStreams) string {
 	cs := io.ColorScheme()
 	title := cs.Bold("Learn about GitHub CLI's accessibility experiences")
 	color := cs.Bold("Customizable and contrasting colors")
-	prompter := cs.Bold("Non-interactive user input prompting")
 	spinner := cs.Bold("Text-based spinners")
 	feedback := cs.Bold("Join the conversation")
 
@@ -109,19 +105,6 @@ func longDescription(io *iostreams.IOStreams) string {
 
 		%[4]s
 
-		Interactive text user interfaces manipulate the terminal cursor to redraw parts
-		of the screen, which can be difficult for speech synthesizers or braille displays
-		to accurately detect and read.
-
-		For a more accessible experience, the GitHub CLI can provide a similar experience using
-		non-interactive prompts for user input.
-
-		To enable this experience, use one of the following methods:
-		- Run %[1]sgh config set accessible_prompter enabled%[1]s
-		- Set %[1]sGH_ACCESSIBLE_PROMPTER=enabled%[1]s environment variable
-
-		%[5]s
-
 		Motion-based spinners communicate in-progress activity by manipulating the
 		terminal cursor to create a spinning effect, which may cause discomfort to users
 		with motion sensitivity or miscommunicate information to speech synthesizers.
@@ -133,11 +116,11 @@ func longDescription(io *iostreams.IOStreams) string {
 		- Run %[1]sgh config set spinner disabled%[1]s
 		- Set %[1]sGH_SPINNER_DISABLED=yes%[1]s environment variable
 
-		%[6]s
+		%[5]s
 
 		We invite you to join us in improving GitHub CLI accessibility by sharing your
 		feedback and ideas through GitHub Accessibility feedback channels:
 
-		%[7]s
-	`, "`", title, color, prompter, spinner, feedback, a11yDiscussionsURL)
+		%[6]s
+	`, "`", title, color, spinner, feedback, a11yDiscussionsURL)
 }

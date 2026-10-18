@@ -15,7 +15,6 @@ import (
 
 	"github.com/cli/cli/v2/pkg/auth"
 	o "github.com/cli/cli/v2/pkg/option"
-	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
 type ConfigSource string
@@ -41,8 +40,6 @@ type Config interface {
 
 	// AccessibleColors returns the configured accessible_colors setting, optionally scoped by host.
 	AccessibleColors(hostname string) ConfigEntry
-	// AccessiblePrompter returns the configured accessible_prompter setting, optionally scoped by host.
-	AccessiblePrompter(hostname string) ConfigEntry
 	// Browser returns the configured browser, optionally scoped by host.
 	Browser(hostname string) ConfigEntry
 	// Clipboard returns the configured clipboard setting, ignoring host scoping since clipboard is a global setting.
@@ -65,8 +62,6 @@ type Config interface {
 	ExpiringCredentials(hostname string) ConfigEntry
 	// Spinner returns the configured spinner setting, optionally scoped by host.
 	Spinner(hostname string) ConfigEntry
-	// Telemetry returns the configured telemetry setting, ignoring host scoping since telemetry is a global setting.
-	Telemetry() ConfigEntry
 
 	// Aliases provides persistent storage and modification of command aliases.
 	Aliases() AliasConfig
@@ -77,34 +72,8 @@ type Config interface {
 	// CacheDir returns the directory where the cacheable artifacts can be persisted.
 	CacheDir() string
 
-	// Migrate applies a migration to the configuration.
-	Migrate(Migration) error
-
-	// Version returns the current schema version of the configuration.
-	Version() o.Option[string]
-
 	// Write persists modifications to the configuration.
 	Write() error
-}
-
-// Migration is the interface that config migrations must implement.
-//
-// Migrations will receive a copy of the config, and should modify that copy
-// as necessary. After migration has completed, the modified config contents
-// will be used.
-//
-// The calling code is expected to verify that the current version of the config
-// matches the PreVersion of the migration before calling Do, and will set the
-// config version to the PostVersion after the migration has completed successfully.
-//
-//go:generate moq -rm  -pkg ghmock -out mock/migration.go . Migration
-type Migration interface {
-	// PreVersion is the required config version for this to be applied
-	PreVersion() string
-	// PostVersion is the config version that must be applied after migration
-	PostVersion() string
-	// Do is expected to apply any necessary changes to the config in place
-	Do(*ghConfig.Config) error
 }
 
 // TokenType is the kind of credential a token is, and its value is the prefix

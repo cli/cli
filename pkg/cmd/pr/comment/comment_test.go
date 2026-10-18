@@ -14,9 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -34,13 +32,6 @@ func TestNewCmdComment(t *testing.T) {
 	tmpImage := filepath.Join(t.TempDir(), "login.png")
 	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
 
-	attachmentEvent := []ghtelemetry.Event{{
-		Type:       "attachment_invocation",
-		Dimensions: ghtelemetry.Dimensions{"command": "comment"},
-		Measures: ghtelemetry.Measures{
-			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
-		},
-	}}
 
 	tests := []struct {
 		name             string
@@ -50,9 +41,6 @@ func TestNewCmdComment(t *testing.T) {
 		wantsErr         bool
 		wantsErrContains string
 		isTTY            bool
-		wantEvents       []ghtelemetry.Event
-		wantSampleRate   int
-
 		// Which fields the lookup asks for is decided at construction, so it
 		// can only be proved here.
 		queryWants string
@@ -300,8 +288,6 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			name:           "--attach alone is enough of a body to post without prompting",
 			input:          fmt.Sprintf("1 --attach '%s'", tmpImage),
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -311,7 +297,7 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:     "argument validation skips attachment telemetry",
+			name:     "argument validation rejects invalid attachment input",
 			input:    fmt.Sprintf("1 2 --attach '%s'", tmpImage),
 			isTTY:    false,
 			wantsErr: true,
@@ -319,8 +305,6 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			name:           "--attach with --body keeps the body and records that one was given",
 			input:          fmt.Sprintf("1 --body test --attach '%s'", tmpImage),
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeInline,
@@ -333,8 +317,6 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			name:           "--attach with --edit-last is accepted and needs no body",
 			input:          fmt.Sprintf("1 --edit-last --attach '%s'", tmpImage),
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -348,8 +330,6 @@ func TestNewCmdComment(t *testing.T) {
 			// that this one replaces the comment rather than keeping it.
 			name:           "--attach with --edit-last and --body records the body that replaces the comment",
 			input:          fmt.Sprintf("1 --edit-last --body 'a new body' --attach '%s'", tmpImage),
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeInline,
@@ -380,14 +360,10 @@ func TestNewCmdComment(t *testing.T) {
 			isTTY:            true,
 			wantsErr:         true,
 			wantsErrContains: "./nope.png: ",
-			wantEvents:       attachmentEvent,
-			wantSampleRate:   ghtelemetry.SAMPLE_ALL,
 		},
 		{
 			name:           "--attach asks the pull request lookup for the repository id",
 			input:          fmt.Sprintf("1 --attach '%s'", tmpImage),
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 			output: shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -412,8 +388,7 @@ func TestNewCmdComment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given command inputs and an invocation recorder
-			ios, stdin, _, _ := iostreams.Test()
+						ios, stdin, _, _ := iostreams.Test()
 			isTTY := tt.isTTY
 			ios.SetStdoutTTY(isTTY)
 			ios.SetStdinTTY(isTTY)
@@ -462,8 +437,7 @@ func TestNewCmdComment(t *testing.T) {
 			require.NoError(t, err)
 
 			var gotOpts *shared.CommentableOptions
-			recorder := &telemetry.InvocationRecorderSpy{}
-			cmd := NewCmdComment(f, recorder, func(opts *shared.CommentableOptions) error {
+			cmd := NewCmdComment(f, func(opts *shared.CommentableOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -476,10 +450,7 @@ func TestNewCmdComment(t *testing.T) {
 
 			// When the command executes
 			_, err = cmd.ExecuteC()
-			// Then telemetry starts only if execution reaches attachment validation
-			assert.Equal(t, tt.wantEvents, recorder.Events())
-			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
-			if tt.wantsErr {
+						if tt.wantsErr {
 				require.Error(t, err)
 				if tt.wantsErrContains != "" {
 					require.ErrorContains(t, err, tt.wantsErrContains)

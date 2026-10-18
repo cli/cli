@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"regexp"
 	"sync"
-	"time"
 
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
@@ -15,10 +14,8 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/debug"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
-	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
@@ -26,11 +23,11 @@ import (
 var ssoHeader string
 var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
 
-func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, executablePath string, telemetryDisabler ghtelemetry.Disabler) *cmdutil.Factory {
+func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, executablePath string) *cmdutil.Factory {
 	// Inject the OAuth token refresher into the AuthConfig so refreshable credentials can be renewed during ordinary
 	// commands. It is wrapped around cfgFunc before anything else so every consumer resolves the same refresher-aware
 	// configuration.
-	cfgFunc = configWithTokenRefresher(cfgFunc, tokenRefresherHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler))
+	cfgFunc = configWithTokenRefresher(cfgFunc, tokenRefresherHttpClientFunc(ios, appVersion, invokingAgent))
 
 	f := &cmdutil.Factory{
 		AppVersion:     appVersion,
@@ -40,16 +37,13 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	}
 
 	f.IOStreams = ios
-	f.TelemetryDisabler = telemetryDisabler
-	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
-	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
-	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
+	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent)
+	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent)
 	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
 	f.Remotes = remotesFunc(f)    // Depends on Config, and GitClient
 	f.BaseRepo = BaseRepoFunc(f.Remotes)
 	f.Prompter = newPrompter(f)              // Depends on Config and IOStreams
 	f.Browser = newBrowser(f)                // Depends on Config, and IOStreams
-	f.ExtensionManager = extensionManager(f) // Depends on Config, HttpClient, and IOStreams
 	f.Branch = branchFunc(f)                 // Depends on GitClient
 
 	return f
@@ -194,7 +188,7 @@ func remotesFunc(f *cmdutil.Factory) func() (ghContext.Remotes, error) {
 	return rr.Resolver()
 }
 
-func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
+func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
 		cfg, err := cfgFunc()
 		if err != nil {
@@ -206,7 +200,6 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 			LogColorize:       ios.ColorEnabled(),
 			AppVersion:        appVersion,
 			InvokingAgent:     invokingAgent,
-			TelemetryDisabler: telemetryDisabler,
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {
@@ -222,7 +215,7 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 // full request/response trace. A token refresh is a side-band exchange triggered from within an ordinary request's
 // round trip, so a verbose trace would interleave the refresh traffic in the middle of the request trace the user is
 // actually inspecting. Auth flows that should surface their own full traffic use f.PlainHttpClient instead.
-func tokenRefresherHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
+func tokenRefresherHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAgent string) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
 		logHeadlineOnly := true
 		if verbose, ok := debug.Config().VerboseTokenRefresh.Value(); ok {
@@ -236,13 +229,12 @@ func tokenRefresherHttpClientFunc(ios *iostreams.IOStreams, appVersion string, i
 			InvokingAgent:   invokingAgent,
 			// This is required to prevent automatic setting of auth and other headers.
 			SkipDefaultHeaders: true,
-			TelemetryDisabler:  telemetryDisabler,
 		}
 		return api.NewHTTPClient(opts)
 	}
 }
 
-func plainHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
+func plainHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAgent string) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
 		opts := api.HTTPClientOptions{
 			Log:           ios.ErrOut,
@@ -251,7 +243,6 @@ func plainHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAg
 			InvokingAgent: invokingAgent,
 			// This is required to prevent automatic setting of auth and other headers.
 			SkipDefaultHeaders: true,
-			TelemetryDisabler:  telemetryDisabler,
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {
@@ -324,25 +315,6 @@ func branchFunc(f *cmdutil.Factory) func() (string, error) {
 		}
 		return currentBranch, nil
 	}
-}
-
-func extensionManager(f *cmdutil.Factory) *extension.Manager {
-	em := extension.NewManager(f.IOStreams, f.GitClient, f.ExecutablePath)
-
-	cfg, err := f.Config()
-	if err != nil {
-		return em
-	}
-	em.SetConfig(cfg)
-
-	client, err := f.HttpClient()
-	if err != nil {
-		return em
-	}
-
-	em.SetClient(api.NewCachedHTTPClient(client, time.Second*30))
-
-	return em
 }
 
 // SSOURL returns the URL of a SAML SSO challenge received by the server for clients that use ExtractHeader

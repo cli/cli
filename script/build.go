@@ -58,6 +58,8 @@ var tasks = map[string]func(string) error{
 			ldflags = fmt.Sprintf("-X github.com/cli/cli/v2/internal/authflow.oauthClientID=%s %s", os.Getenv("GH_OAUTH_CLIENT_ID"), ldflags)
 		}
 
+		ldflags = fmt.Sprintf("-s -w %s", ldflags)
+
 		args := []string{"go", "build", "-trimpath"}
 		if buildTags != "" {
 			args = append(args, "-tags", buildTags)

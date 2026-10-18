@@ -500,72 +500,6 @@ func TestHTTPClientSanitizeControlCharactersC1(t *testing.T) {
 	assert.Equal(t, "monalisa¡", issue.Author.Login)
 }
 
-func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer ts.Close()
-
-	tests := []struct {
-		name         string
-		host         string
-		wantDisabled bool
-	}{
-		{
-			name:         "enterprise host triggers disable",
-			host:         "ghes.example.com",
-			wantDisabled: true,
-		},
-		{
-			name:         "github.com does not trigger disable",
-			host:         "github.com",
-			wantDisabled: false,
-		},
-		{
-			name:         "tenancy host does not trigger disable",
-			host:         "my-company.ghe.com",
-			wantDisabled: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			disabler := &fakeTelemetryDisabler{}
-			client, err := NewHTTPClient(HTTPClientOptions{
-				TelemetryDisabler: disabler,
-			})
-			require.NoError(t, err)
-
-			req, err := http.NewRequest("GET", ts.URL, nil)
-			require.NoError(t, err)
-			req.Host = tt.host
-
-			res, err := client.Do(req)
-			require.NoError(t, err)
-			assert.Equal(t, 204, res.StatusCode)
-			assert.Equal(t, tt.wantDisabled, disabler.disabled, "Disable() called")
-		})
-	}
-}
-
-func TestNewHTTPClientWithoutTelemetryDisabler(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer ts.Close()
-
-	client, err := NewHTTPClient(HTTPClientOptions{})
-	require.NoError(t, err)
-
-	req, err := http.NewRequest("GET", ts.URL, nil)
-	require.NoError(t, err)
-	req.Host = "ghes.example.com"
-
-	res, err := client.Do(req)
-	require.NoError(t, err)
-	assert.Equal(t, 204, res.StatusCode)
-}
-
 func TestNewExternalHTTPClient(t *testing.T) {
 	tests := []struct {
 		name string
@@ -613,14 +547,6 @@ func TestNewExternalHTTPClient(t *testing.T) {
 			assert.Empty(t, gotReq.Header.Values("time-zone"))
 		})
 	}
-}
-
-type fakeTelemetryDisabler struct {
-	disabled bool
-}
-
-func (f *fakeTelemetryDisabler) Disable() {
-	f.disabled = true
 }
 
 type tinyConfig map[string]string

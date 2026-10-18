@@ -17,12 +17,11 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
+	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
-	"github.com/cli/cli/v2/internal/telemetry"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -40,13 +39,6 @@ func TestNewCmdEdit(t *testing.T) {
 	tmpImage := filepath.Join(t.TempDir(), "shot.png")
 	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
 
-	attachmentEvent := []ghtelemetry.Event{{
-		Type:       "attachment_invocation",
-		Dimensions: ghtelemetry.Dimensions{"command": "edit"},
-		Measures: ghtelemetry.Measures{
-			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
-		},
-	}}
 
 	tests := []struct {
 		name             string
@@ -60,8 +52,6 @@ func TestNewCmdEdit(t *testing.T) {
 		// wantErrIsNotExist covers an error whose text the operating system
 		// words differently, so the assertion cannot be on the message.
 		wantErrIsNotExist bool
-		wantEvents        []ghtelemetry.Event
-		wantSampleRate    int
 	}{
 		{
 			name:     "no argument",
@@ -418,11 +408,9 @@ func TestNewCmdEdit(t *testing.T) {
 				Interactive:  false,
 			},
 			wantAssetPaths: []string{tmpImage},
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
-			name:        "argument validation skips attachment telemetry",
+			name:        "argument validation rejects invalid attachment input",
 			input:       fmt.Sprintf("--attach '%s'", tmpImage),
 			wantsErr:    true,
 			wantsErrMsg: "requires at least 1 arg(s), only received 0",
@@ -441,19 +429,15 @@ func TestNewCmdEdit(t *testing.T) {
 				},
 			},
 			wantAssetPaths: []string{tmpImage},
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
 			name:           "attach flag with more than one issue",
 			input:          fmt.Sprintf("23 34 --attach '%s'", tmpImage),
 			wantsErr:       true,
 			wantsErrMsg:    "`--attach` cannot be used when editing multiple issues",
-			wantEvents:     attachmentEvent,
-			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
-			name:        "body flag conflict skips attachment telemetry",
+			name:        "body flag conflict rejects invalid attachment input",
 			input:       fmt.Sprintf("23 --body test --body-file '%s' --attach '%s'", tmpFile, tmpImage),
 			wantsErr:    true,
 			wantsErrMsg: "specify only one of `--body` or `--body-file`",
@@ -464,14 +448,11 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr:          true,
 			wantsErrMsg:       "./nope.png: ",
 			wantErrIsNotExist: true,
-			wantEvents:        attachmentEvent,
-			wantSampleRate:    ghtelemetry.SAMPLE_ALL,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given command inputs and an invocation recorder
-			ios, stdin, _, _ := iostreams.Test()
+						ios, stdin, _, _ := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
@@ -488,8 +469,7 @@ func TestNewCmdEdit(t *testing.T) {
 			require.NoError(t, err)
 
 			var gotOpts *EditOptions
-			recorder := &telemetry.InvocationRecorderSpy{}
-			cmd := NewCmdEdit(f, recorder, func(opts *EditOptions) error {
+			cmd := NewCmdEdit(f, func(opts *EditOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -502,10 +482,7 @@ func TestNewCmdEdit(t *testing.T) {
 
 			// When the command executes
 			_, err = cmd.ExecuteC()
-			// Then telemetry starts only if execution reaches attachment validation
-			assert.Equal(t, tt.wantEvents, recorder.Events())
-			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
-			if tt.wantsErr {
+						if tt.wantsErr {
 				require.Error(t, err)
 				if tt.wantsErrMsg != "" {
 					if tt.wantErrIsNotExist {
@@ -553,12 +530,13 @@ func TestNewCmdEdit(t *testing.T) {
 
 func Test_editRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     *EditOptions
-		httpStubs func(*testing.T, *httpmock.Registry)
-		attach    []string
-		host      string
-		uploads   []attachments.UploadStub
+		name       string
+		input      *EditOptions
+		httpStubs  func(*testing.T, *httpmock.Registry)
+		attach     []string
+		host       string
+		hostTokens map[string]string
+		uploads    []attachments.UploadStub
 		// The lookup builds its field list from a set, so the order varies and
 		// a row cannot assert the whole query.
 		wantLookupSelections   []string
@@ -570,7 +548,6 @@ func Test_editRun(t *testing.T) {
 		// Used instead of wantErrMsg when the subject is which errors survive,
 		// leaving their wording to the layer that formats them.
 		wantErrContains []string
-		wantOperations  *attachments.UploadResult
 	}{
 		{
 			name: "non-interactive",
@@ -1389,7 +1366,6 @@ func Test_editRun(t *testing.T) {
 				mockIssueUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
 			},
 			stdout:         "https://github.com/OWNER/REPO/issue/123\n",
-			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a body flag replaces the body the attachment is then appended to",
@@ -1429,7 +1405,6 @@ func Test_editRun(t *testing.T) {
 				mockIssueUpdateWithBody(t, reg, "the plan ![diagram](https://example.com/1)")
 			},
 			stdout:         "https://github.com/OWNER/REPO/issue/123\n",
-			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name: "an empty body flag clears the body and leaves the attachment",
@@ -1557,7 +1532,6 @@ func Test_editRun(t *testing.T) {
 			stdout:          "https://github.com/OWNER/REPO/issue/123\n",
 			wantErr:         true,
 			wantErrContains: []string{"./second.png"},
-			wantOperations:  &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a sole failed upload does not write the body",
@@ -1686,7 +1660,7 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
 		{
-			name: "the upload goes to the host the issue was fetched from",
+			name: "the token comes from the host the issue was fetched from",
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
@@ -1694,9 +1668,10 @@ func Test_editRun(t *testing.T) {
 			},
 			attach: []string{"shot.png"},
 			// A ghe.com tenant rather than a GHES host, which NewUploader
-			// refuses.
-			host:    "acme.ghe.com",
-			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			// refuses before it looks at the token at all.
+			host:       "acme.ghe.com",
+			hostTokens: map[string]string{"github.com": "ghs_anactionstoken", "acme.ghe.com": "gho_atenanttoken"},
+			uploads:    []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
 				mockIssueUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
@@ -1765,17 +1740,17 @@ func Test_editRun(t *testing.T) {
 				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
 			// Given a pending event when operation counts are under test
-			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
-			if tt.wantOperations != nil {
-				tt.input.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
+			hostTokens := tt.hostTokens
+			if hostTokens == nil {
+				hostTokens = map[string]string{host: "gho_atokenthatcanupload"}
+			}
+			tt.input.Config = func() (gh.Config, error) {
+				return config.NewMockConfigFromString(hostsConfig(hostTokens)), nil
 			}
 
 			// When issue editing runs
 			err := editRun(tt.input)
-			if tt.wantOperations != nil {
-				// Then telemetry retains completed operations, including partial results
-				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(tt.attach), *tt.wantOperations)
-			}
+
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.wantErrMsg != "" {
@@ -1831,6 +1806,16 @@ func (g *graphQLRecorder) recorded() string {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return strings.Join(g.queries, "\n")
+}
+
+// hostsConfig renders a config holding one token per host.
+func hostsConfig(tokens map[string]string) string {
+	var b strings.Builder
+	b.WriteString("hosts:\n")
+	for host, token := range tokens {
+		fmt.Fprintf(&b, "  %s:\n    user: monalisa\n    oauth_token: %s\n", host, token)
+	}
+	return b.String()
 }
 
 func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {

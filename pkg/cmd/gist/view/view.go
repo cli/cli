@@ -15,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -167,16 +166,7 @@ func viewRun(opts *ViewOptions) error {
 		}
 
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
-			// Markdown rendering emits application-styled output to Out, so its
-			// input is sanitized here; --allow-escape-sequences applies to the
-			// raw dump below.
-			rendered, err := markdown.Render(content.String(),
-				markdown.WithTheme(opts.IO.TerminalTheme()),
-				markdown.WithWrap(opts.IO.TerminalWidth()))
-			if err != nil {
-				return err
-			}
-			_, err = fmt.Fprint(opts.IO.Out, rendered)
+			_, err := fmt.Fprint(opts.IO.Out, content.String())
 			return err
 		}
 

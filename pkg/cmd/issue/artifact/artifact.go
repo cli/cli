@@ -4,7 +4,6 @@ package artifact
 
 import (
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/issue/artifact/create"
 	cmdDelete "github.com/cli/cli/v2/pkg/cmd/issue/artifact/delete"
 	cmdDownload "github.com/cli/cli/v2/pkg/cmd/issue/artifact/download"
@@ -15,10 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewCmdArtifact returns the gh issue artifact command group, which is in
-// preview. It inherits -R from gh issue. telemetry records --attach use, as
-// in the other commands that take it.
-func NewCmdArtifact(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *cobra.Command {
+func NewCmdArtifact(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "artifact <command>",
 		Short: "Work with issue artifacts (preview)",
@@ -32,8 +28,8 @@ func NewCmdArtifact(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
-	cmd.AddCommand(cmdCreate.NewCmdCreate(f, telemetry, nil))
-	cmd.AddCommand(cmdEdit.NewCmdEdit(f, telemetry, nil))
+	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
+	cmd.AddCommand(cmdEdit.NewCmdEdit(f, nil))
 	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
 	cmd.AddCommand(cmdDownload.NewCmdDownload(f, nil))
 

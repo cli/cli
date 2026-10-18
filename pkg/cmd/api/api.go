@@ -18,7 +18,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
@@ -26,7 +25,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/cli/go-gh/v2/pkg/jq"
-	"github.com/cli/go-gh/v2/pkg/template"
+	"github.com/cli/cli/v2/internal/template"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +41,6 @@ type ApiOptions struct {
 	Config            func() (gh.Config, error)
 	HttpClient        func(api.HTTPClientOptions) (*http.Client, error)
 	IO                *iostreams.IOStreams
-	TelemetryDisabler ghtelemetry.Disabler
 
 	Hostname            string
 	RequestMethod       string
@@ -74,7 +72,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		Config:            f.Config,
 		HttpClient:        api.NewHTTPClient,
 		IO:                f.IOStreams,
-		TelemetryDisabler: f.TelemetryDisabler,
 	}
 
 	cmd := &cobra.Command{
@@ -408,7 +405,6 @@ func apiRun(opts *ApiOptions) error {
 		Log:               log,
 		LogColorize:       opts.IO.ColorEnabled(),
 		LogVerboseHTTP:    opts.Verbose,
-		TelemetryDisabler: opts.TelemetryDisabler,
 	})
 	if err != nil {
 		return err

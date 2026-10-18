@@ -381,72 +381,6 @@ func Test_newIOStreams_spinnerDisabled(t *testing.T) {
 	}
 }
 
-func Test_newIOStreams_accessiblePrompterEnabled(t *testing.T) {
-	tests := []struct {
-		name                      string
-		config                    gh.Config
-		accessiblePrompterEnabled bool
-		env                       map[string]string
-	}{
-		{
-			name:                      "default config",
-			accessiblePrompterEnabled: false,
-		},
-		{
-			name:                      "config with accessible prompter enabled",
-			config:                    enableAccessiblePrompterConfig(),
-			accessiblePrompterEnabled: true,
-		},
-		{
-			name:                      "config with accessible prompter disabled",
-			config:                    disableAccessiblePrompterConfig(),
-			accessiblePrompterEnabled: false,
-		},
-		{
-			name:                      "accessible prompter enabled via GH_ACCESSIBLE_PROMPTER env var = 1",
-			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "1"},
-			accessiblePrompterEnabled: true,
-		},
-		{
-			name:                      "accessible prompter enabled via GH_ACCESSIBLE_PROMPTER env var = true",
-			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "true"},
-			accessiblePrompterEnabled: true,
-		},
-		{
-			name:                      "accessible prompter disabled via GH_ACCESSIBLE_PROMPTER env var = 0",
-			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "0"},
-			accessiblePrompterEnabled: false,
-		},
-		{
-			name:                      "config disabled but env enabled, respects env",
-			config:                    disableAccessiblePrompterConfig(),
-			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "true"},
-			accessiblePrompterEnabled: true,
-		},
-		{
-			name:                      "config enabled but env disabled, respects env",
-			config:                    enableAccessiblePrompterConfig(),
-			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "false"},
-			accessiblePrompterEnabled: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			for k, v := range tt.env {
-				t.Setenv(k, v)
-			}
-			var cfg gh.Config
-			if tt.config != nil {
-				cfg = tt.config
-			} else {
-				cfg = config.NewMockConfig()
-			}
-			io := newIOStreams(cfg, "")
-			assert.Equal(t, tt.accessiblePrompterEnabled, io.AccessiblePrompterEnabled())
-		})
-	}
-}
-
 func Test_newIOStreams_colorLabels(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -602,14 +536,6 @@ func pagerConfig() gh.Config {
 
 func disablePromptConfig() gh.Config {
 	return config.NewMockConfigFromString("prompt: disabled")
-}
-
-func enableAccessiblePrompterConfig() gh.Config {
-	return config.NewMockConfigFromString("accessible_prompter: enabled")
-}
-
-func disableAccessiblePrompterConfig() gh.Config {
-	return config.NewMockConfigFromString("accessible_prompter: disabled")
 }
 
 func disableSpinnersConfig() gh.Config {

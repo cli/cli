@@ -35,7 +35,7 @@ With a public preview in hand it's time to decide whether or not to mainline you
 
 - How complex is the support burden for your feature?
 
-If this feature requires extensive or specialized support, you will either need to release it as an extension or work with the CLI team to get maintainer access to `cli/cli`. The CLI team is very small and cannot promise any kind of SLA for supporting your work. For example, the `gh cs` command is sufficiently specialized and complex that we have given the `codespaces` team write access to the repository to maintain their own pull request review process. We have not put it in an extension as Codespaces are a core GitHub product with widespread use among our users.
+If this feature requires extensive or specialized support, you will either need to release it as an extension or work with the CLI team to get maintainer access to `cli/cli`. The CLI team is very small and cannot promise any kind of SLA for supporting your work.
 
 - What kind of release cadence do you want?
 

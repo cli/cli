@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/auth"
 	"github.com/cli/cli/v2/utils"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
@@ -53,7 +52,6 @@ type HTTPClientOptions struct {
 	// client so a refresh triggered mid request does not dump a full trace into the middle of the user's request log.
 	LogHeadlineOnly    bool
 	SkipDefaultHeaders bool
-	TelemetryDisabler  ghtelemetry.Disabler
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
@@ -106,13 +104,6 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		client.Transport = AddAuthTokenHeaderWithRefresh(client.Transport, opts.RefreshingConfig)
 	} else if opts.Config != nil {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
-	}
-
-	if opts.TelemetryDisabler != nil {
-		client.Transport = telemetryDisablerTransport{
-			wrappedTransport:  client.Transport,
-			telemetryDisabler: opts.TelemetryDisabler,
-		}
 	}
 
 	return client, nil
@@ -288,19 +279,4 @@ func getHostname(r *http.Request) string {
 		host = r.URL.Host
 	}
 	return (&url.URL{Host: host}).Hostname()
-}
-
-type telemetryDisablerTransport struct {
-	wrappedTransport  http.RoundTripper
-	telemetryDisabler ghtelemetry.Disabler
-}
-
-func (t telemetryDisablerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// If the request is aimed at an enterprise host, disable telemetry.
-	// Currently, requests that are sent to configured api_hosts will be treated as enterprise hosts,
-	// even though they may be GHEC with Data Residency.
-	if ghauth.IsEnterprise(getHostname(req)) {
-		t.telemetryDisabler.Disable()
-	}
-	return t.wrappedTransport.RoundTrip(req)
 }

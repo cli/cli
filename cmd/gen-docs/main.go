@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,11 +9,8 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/docs"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/pflag"
 )
@@ -53,8 +49,7 @@ func run(args []string) error {
 		Config: func() (gh.Config, error) {
 			return config.NewMockConfigFromString(""), nil
 		},
-		ExtensionManager: &em{},
-	}, &telemetry.NoOpService{}, "", "")
+	}, "", "")
 	rootCmd.InitDefaultHelpCmd()
 
 	if err := os.MkdirAll(*dir, 0755); err != nil {
@@ -94,41 +89,4 @@ type browser struct{}
 
 func (b *browser) Browse(_ string) error {
 	return nil
-}
-
-// Implements extensions.ExtensionManager interface.
-type em struct{}
-
-func (e *em) List() []extensions.Extension {
-	return nil
-}
-
-func (e *em) Install(_ ghrepo.Interface, _ string) error {
-	return nil
-}
-
-func (e *em) InstallLocal(_ string) error {
-	return nil
-}
-
-func (e *em) Upgrade(_ string, _ bool) error {
-	return nil
-}
-
-func (e *em) Remove(_ string) error {
-	return nil
-}
-
-func (e *em) Dispatch(_ []string, _ io.Reader, _, _ io.Writer) (bool, error) {
-	return false, nil
-}
-
-func (e *em) Create(_ string, _ extensions.ExtTemplateType) error {
-	return nil
-}
-
-func (e *em) EnableDryRunMode() {}
-
-func (e *em) UpdateDir(_ string) string {
-	return ""
 }

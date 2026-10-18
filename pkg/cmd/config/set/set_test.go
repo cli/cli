@@ -258,7 +258,6 @@ func Test_validateScope(t *testing.T) {
 	assert.NoError(t, validateScope("clipboard", ""))
 	assert.NoError(t, validateScope("prompt", "github.com"))
 	assert.NoError(t, validateScope("prefer_editor_prompt", "github.com"))
-	assert.NoError(t, validateScope("telemetry", "github.com"))
 	assert.NoError(t, validateScope("editor", "github.com"))
 	assert.NoError(t, validateScope("editor", ""))
 	assert.NoError(t, validateScope("unknown", "github.com"))

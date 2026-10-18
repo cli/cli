@@ -2,15 +2,18 @@ package shared
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
@@ -144,7 +147,7 @@ func TestCommentablePreRun(t *testing.T) {
 			cmd := commentableCmd(t, opts, tt.input)
 
 			// When comment preparation validates those inputs
-			err := CommentablePreRun(cmd, opts, &telemetry.NoOpService{})
+			err := CommentablePreRun(cmd, opts)
 
 			// Then it reports the validation error or prepares the comment options
 			if tt.wantErr != "" {
@@ -172,23 +175,21 @@ func TestCommentablePreRun(t *testing.T) {
 
 func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 	tests := []struct {
-		name   string
-		opts   CommentableOptions
-		attach []string
-		host   string
+		name       string
+		opts       CommentableOptions
+		attach     []string
+		host       string
+		hostTokens map[string]string
 		// Empty means the default, which can upload.
 		viewerPermission     string
 		repositoryDatabaseID int64
 		uploads              []attachments.UploadStub
-		// Empty means the row does not care which host was reached.
-		wantUploadHost string
-		wantQuery      string
-		writeFails     bool
-		wantBody       string
-		wantStdout     string
-		wantErr        string
-		wantUploads    int
-		wantOperations *attachments.UploadResult
+		wantQuery            string
+		writeFails           bool
+		wantBody             string
+		wantStdout           string
+		wantErr              string
+		wantUploads          int
 	}{
 		{
 			name:       "creating with no asset uploads nothing",
@@ -207,7 +208,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantBody:             "see below\n\n![shot](https://example.com/1)",
 			wantStdout:           "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 			wantUploads:          1,
-			wantOperations:       &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name:                 "creating rewrites a reference relative to the body file",
@@ -219,7 +219,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantBody:             "the plan ![diagram](https://example.com/1)",
 			wantStdout:           "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 			wantUploads:          1,
-			wantOperations:       &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name:                 "creating writes what uploaded when one upload fails",
@@ -235,7 +234,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantStdout:     "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 			wantErr:        "could not upload ./b.png: attaching files requires write access to the repository",
 			wantUploads:    2,
-			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name:                 "creating writes nothing when every upload fails",
@@ -245,7 +243,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			uploads:              []attachments.UploadStub{{Name: "a.png", Status: 404, Body: `{"message":"Not Found"}`}},
 			wantErr:              "could not upload ./a.png: attaching files requires write access to the repository\nno comment was posted",
 			wantUploads:          1,
-			wantOperations:       &attachments.UploadResult{},
 		},
 		{
 			name:                 "creating writes nothing when every upload fails and the body has text",
@@ -262,7 +259,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			attach:               []string{"repro.mp4"},
 			repositoryDatabaseID: 1234,
 			wantErr:              "cannot embed a video as a reference-style image: ./repro.mp4\nno comment was posted",
-			wantOperations:       &attachments.UploadResult{},
 		},
 		{
 			name:                 "creating reports the upload and the write when both fail",
@@ -277,7 +273,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			writeFails:     true,
 			wantErr:        "could not upload ./b.png: attaching files requires write access to the repository\nGraphQL: the write failed",
 			wantUploads:    2,
-			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "editing keeps the comment when no body flag was given",
@@ -359,7 +354,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			host: "github.example.com",
 		},
 		{
-			name: "a permission that cannot upload fails before the editor opens",
+			name: "a token that cannot upload fails before the editor opens",
 			opts: CommentableOptions{
 				InputType: InputTypeEditor,
 				EditSurvey: func(string) (string, error) {
@@ -367,20 +362,20 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 				},
 			},
 			attach:               []string{"shot.png"},
-			viewerPermission:     "READ",
+			hostTokens:           map[string]string{"github.com": "ghs_anactionstoken"},
 			repositoryDatabaseID: 1234,
-			wantErr:              "attaching files requires write access to the repository",
+			wantErr:              "unsupported authentication type",
 		},
 		{
 			// This covers the shared comment path only. A command that builds
-			// its own uploader decides its own host and needs its own row.
-			name:                 "the upload goes to the host the commentable was fetched from",
+			// its own uploader decides its own token and needs its own row.
+			name:                 "the token comes from the host the commentable was fetched from",
 			opts:                 CommentableOptions{Body: "see below", InputType: InputTypeInline},
 			attach:               []string{"shot.png"},
 			host:                 "acme.ghe.com",
+			hostTokens:           map[string]string{"github.com": "ghs_anactionstoken", "acme.ghe.com": "gho_atenanttoken"},
 			repositoryDatabaseID: 1234,
 			uploads:              []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
-			wantUploadHost:       "uploads.acme.ghe.com",
 			wantQuery:            `mutation CommentCreate\b`,
 			wantBody:             "see below\n\n![shot](https://example.com/1)",
 			wantStdout:           "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
@@ -395,18 +390,15 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantErr:              "attaching files requires write access to the repository",
 		},
 		{
-			// GraphQL has no viewerPermission for a GitHub App installation,
-			// so the endpoint decides.
-			name:                 "an empty permission leaves the upload to the endpoint",
+			// An empty permission means the command forgot to request the
+			// repository field, which is a different fault from too low a
+			// permission, and only one of the two has a remedy.
+			name:                 "an unknown permission stops the upload",
 			opts:                 CommentableOptions{Body: "see below", InputType: InputTypeInline},
 			attach:               []string{"shot.png"},
 			repositoryDatabaseID: 1234,
 			viewerPermission:     "none",
-			uploads:              []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
-			wantQuery:            `mutation CommentCreate\b`,
-			wantBody:             "see below\n\n![shot](https://example.com/1)",
-			wantStdout:           "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
-			wantUploads:          1,
+			wantErr:              "could not determine your permission on the repository to attach files",
 		},
 		{
 			name:                 "a missing repository id stops the upload",
@@ -425,10 +417,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			defer reg.Verify(t)
 
 			for _, u := range tt.uploads {
-				if tt.wantUploadHost != "" {
-					attachments.StubUploadToHost(t, reg, tt.wantUploadHost, tt.repositoryDatabaseID, u.Name, u.Status, u.Body)
-					continue
-				}
 				attachments.StubUpload(reg, tt.repositoryDatabaseID, u.Name, u.Status, u.Body)
 			}
 
@@ -460,16 +448,18 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 				opts.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
 			// Given a pending event when operation counts are under test
-			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
-			if tt.wantOperations != nil {
-				opts.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
-			}
-
 			host := tt.host
 			if host == "" {
 				host = "github.com"
 			}
 
+			hostTokens := tt.hostTokens
+			if hostTokens == nil {
+				hostTokens = map[string]string{host: "gho_atokenthatcanupload"}
+			}
+			opts.Config = func() (gh.Config, error) {
+				return config.NewMockConfigFromString(hostsConfig(hostTokens)), nil
+			}
 			viewerPermission := tt.viewerPermission
 			switch viewerPermission {
 			case "":
@@ -497,10 +487,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 
 			// When comment creation or editing runs
 			err := CommentableRun(&opts)
-			if tt.wantOperations != nil {
-				// Then telemetry retains completed operations, including partial results
-				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(tt.attach), *tt.wantOperations)
-			}
+
 
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
@@ -519,4 +506,13 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			assert.Equal(t, tt.wantUploads, uploads, "asset uploads")
 		})
 	}
+}
+
+func hostsConfig(tokens map[string]string) string {
+	var b strings.Builder
+	b.WriteString("hosts:\n")
+	for host, token := range tokens {
+		fmt.Fprintf(&b, "  %s:\n    user: monalisa\n    oauth_token: %s\n", host, token)
+	}
+	return b.String()
 }
