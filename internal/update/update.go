@@ -16,7 +16,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/safeurl"
-	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/hashicorp/go-version"
 	"github.com/mattn/go-isatty"
 	"gopkg.in/yaml.v3"
@@ -34,48 +33,6 @@ type ReleaseInfo struct {
 type StateEntry struct {
 	CheckedForUpdateAt time.Time   `yaml:"checked_for_update_at"`
 	LatestRelease      ReleaseInfo `yaml:"latest_release"`
-}
-
-// ShouldCheckForExtensionUpdate decides whether we check for updates for GitHub CLI extensions based on user preferences and current execution context.
-// During cli/cli#9934, this logic was split out from ShouldCheckForUpdate() because we envisioned it going in a different direction.
-func ShouldCheckForExtensionUpdate() bool {
-	if os.Getenv("GH_NO_EXTENSION_UPDATE_NOTIFIER") != "" {
-		return false
-	}
-	if os.Getenv("CODESPACES") != "" {
-		return false
-	}
-	return !ci.IsCI() && IsTerminal(os.Stdout) && IsTerminal(os.Stderr)
-}
-
-// CheckForExtensionUpdate checks whether an update exists for a specific extension based on extension type and recency of last check within past 24 hours.
-func CheckForExtensionUpdate(em extensions.ExtensionManager, ext extensions.Extension, now time.Time) (*ReleaseInfo, error) {
-	// local extensions cannot have updates, so avoid work that ultimately returns nothing.
-	if ext.IsLocal() {
-		return nil, nil
-	}
-
-	stateFilePath := filepath.Join(em.UpdateDir(ext.Name()), "state.yml")
-	stateEntry, _ := getStateEntry(stateFilePath)
-	if stateEntry != nil && now.Sub(stateEntry.CheckedForUpdateAt).Hours() < 24 {
-		return nil, nil
-	}
-
-	releaseInfo := &ReleaseInfo{
-		Version: ext.LatestVersion(),
-		URL:     ext.URL(),
-	}
-
-	err := setStateEntry(stateFilePath, now, *releaseInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	if ext.UpdateAvailable() {
-		return releaseInfo, nil
-	}
-
-	return nil, nil
 }
 
 // ShouldCheckForUpdate decides whether we check for updates for the GitHub CLI based on user preferences and current execution context.

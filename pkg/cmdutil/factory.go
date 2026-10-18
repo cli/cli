@@ -7,10 +7,8 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
-	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
@@ -19,12 +17,10 @@ type Factory struct {
 	ExecutablePath string
 	InvokingAgent  string
 
-	Browser           browser.Browser
-	ExtensionManager  extensions.ExtensionManager
-	GitClient         *git.Client
-	IOStreams         *iostreams.IOStreams
-	Prompter          prompter.Prompter
-	TelemetryDisabler ghtelemetry.Disabler
+	Browser          browser.Browser
+	GitClient        *git.Client
+	IOStreams        *iostreams.IOStreams
+	Prompter         prompter.Prompter
 
 	BaseRepo func() (ghrepo.Interface, error)
 	Branch   func() (string, error)

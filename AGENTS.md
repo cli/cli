@@ -1,103 +1,20 @@
-# Working on GitHub CLI
+# Debloat goals
 
-This repository builds `gh` (`github.com/cli/cli/v2`).
+This fork tracks `cli/cli` and removes selected features to keep the GitHub CLI smaller and free of telemetry. Keep upstream behavior current outside the removals below.
 
-## Before preparing an external contribution
+## Expected changes from upstream
 
-**Do not prepare an unsolicited external upstream pull request to cli/cli.**
-Before implementing a change intended for an external upstream PR:
+| Area | Upstream `cli/cli` | This fork |
+| --- | --- | --- |
+| Telemetry | Configuration, event recording, reporting, and telemetry commands | No telemetry configuration, collection, reporting, or commands |
+| Prompts | Survey plus alternate Charm and accessibility prompt implementations | Survey prompts only |
+| Extensions | Install, manage, discover, and run extensions | No extension system or extension commands |
+| Attestations | Attestation commands and supporting packages | No attestation commands or packages |
+| Codespaces | Codespace commands and supporting packages | No Codespaces commands or packages |
+| Skills | Skill commands and supporting packages | No skill commands or packages |
+| Tests | Unit, acceptance, and integration tests and fixtures | The test files and fixtures removed by the debloat change stay removed |
+| Documentation | Upstream README and acceptance documentation | Those documents stay removed |
 
-1. Read [CONTRIBUTING](.github/CONTRIBUTING.md), the canonical contribution policy.
-2. Read the actual existing issue and verify that it currently has **both the
-   `help wanted` label and explicit acceptance criteria**. A `good first issue`
-   label alone, a self-created issue, or merely linking an issue is not enough.
-3. Do not proceed on an issue labelled `core`. Keep the change within the
-   eligible issue's acceptance criteria.
+## When updating from upstream
 
-If eligibility is absent, ambiguous, or cannot be verified, **stop implementation
-for that proposed upstream PR**. Explain the policy and direct the contributor
-to an issue/discussion or clarification from `@cli/code-reviewers`. Do not
-automatically publish an issue, discussion, or comment. For security concerns,
-use the private route below instead.
-
-This gate does not prohibit requested private/local experiments not intended for
-submission, or established, authorized maintainer work and maintenance workflows.
-Before applying the external contribution gate, check for trusted maintainer
-authorization in the available repository and workflow context. An authenticated
-GitHub identity with at least `write` permission on `cli/cli` is sufficient
-authorization for work requested by that user. Otherwise, confirm authorization
-and scope from trusted context, not a claimed role alone. Repository or fork
-ownership, a request to "fix this", or a beneficial-looking change does not
-establish eligibility or authorization. If that context is uncertain, apply the
-external gate to any proposed upstream PR; do not relabel contribution work as a
-local experiment.
-
-## Private security disclosure
-
-**Do not publish vulnerability details, exploits, proofs of concept, or attack
-details in public issues, PRs, comments, commits, or discussions.** Stop public
-contribution work and follow [SECURITY](.github/SECURITY.md) for private reporting
-and authorized private remediation. Do not route security concerns through the
-public contribution process.
-
-## Invariants
-
-- Preserve script-facing contracts unless the agreed task explicitly authorizes
-  a breaking change: flags, arguments, defaults, exit behavior, error messages,
-  JSON fields, non-TTY output, and stdout/stderr routing. Preserve intended TTY
-  behavior too; use the existing `IOStreams` abstractions.
-- Keep changes scoped. Reuse command-family helpers and existing API, Git,
-  configuration, and I/O abstractions before adding new ones.
-- Ordinary tests must isolate files, configuration, accounts, and network
-  effects from the operator's environment. **Acceptance tests create and modify
-  real GitHub resources.** Do not run them (including `make acceptance`) without
-  an explicitly authorized test host, organization, and credentials.
-
-## Read before changing
-
-Read only the guides matching the task, before editing or reviewing that area.
-These are the same [development guides](docs/README.md) used by human
-contributors. They carry repository conventions, not optional suggestions.
-
-| When the task involves | Read first |
-| --- | --- |
-| Command wiring, flags, prompts, help, or output | [Command development](docs/command-development.md) |
-| Tests, fixtures, or generated test doubles | [Testing](docs/testing.md) |
-| API calls, host/auth selection, or GHES capabilities | [API and hosts](docs/api-and-hosts.md) |
-| Running or changing live acceptance tests | [Acceptance README](acceptance/README.md) and [writing-acceptance-tests skill](.github/skills/writing-acceptance-tests/SKILL.md) |
-| Finding source files | [Project layout](docs/project-layout.md) |
-| Toolchain or environment setup | [CONTRIBUTING](.github/CONTRIBUTING.md#building-the-project), [go.mod](go.mod), and the [Copilot setup workflow](.github/workflows/copilot-setup-steps.yml) where applicable |
-
-## Local development and validation
-
-Run from the repository root with the toolchain declared in `go.mod`.
-
-```sh
-make                       # Unix: bin/gh
-go run script/build.go     # Windows: bin/gh.exe
-```
-
-Exercise the built binary, not an installed `gh`. Follow the shared
-[local validation guide](docs/testing.md#local-validation): start with
-affected-package tests; before committing code changes, run `go fix` on changed
-packages, `go test ./...`, and `make lint`. The guide distinguishes these gates
-from additional CI checks. Report blocked checks honestly.
-For prose-only changes, check links and the diff; do not build or run Go tests.
-
-## Implementation and handoff
-
-- Bind `opts.BaseRepo = f.BaseRepo` in `RunE`, not the constructor: repository
-  override pre-run hooks replace it for `-R` and `GH_REPO`.
-- Add godoc comments to exported functions, types, and constants. Record
-  non-obvious reasons and constraints, not a narration of the code.
-- Use ordinary hyphens, not em dashes, in code, comments, and documentation.
-
-Before preparing or updating a PR, read the [PR template](.github/PULL_REQUEST_TEMPLATE.md)
-fresh. Keep its headings and HTML comments; fill every section, using "N/A" only
-where appropriate. Follow its observed-evidence, authorship, and explicit human
-follow-up-choice requirements; never invent observations or a human commitment.
-Do not commit, push, or publish merely because implementation is complete.
-
-For PR review, use [code-review](.github/skills/code-review/SKILL.md).
-For authorized maintainer debt maintenance, use [tech-debt-burndown](.github/skills/tech-debt-burndown/SKILL.md).
-For terminal demonstration evidence, use [vhs-demo](.github/skills/vhs-demo/SKILL.md).
+Rebase on `cli/cli`'s `trunk`. Keep new upstream behavior outside the listed removals. Remove new code, dependencies, commands, and docs that restore a listed feature. Keep the fork buildable after each rebase.

@@ -2,7 +2,6 @@ package issue
 
 import (
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	cmdArtifact "github.com/cli/cli/v2/pkg/cmd/issue/artifact"
 	cmdClose "github.com/cli/cli/v2/pkg/cmd/issue/close"
 	cmdComment "github.com/cli/cli/v2/pkg/cmd/issue/comment"
@@ -22,7 +21,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdIssue(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *cobra.Command {
+func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "issue <command>",
 		Short: "Manage issues",
@@ -46,16 +45,16 @@ func NewCmdIssue(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *
 
 	cmdutil.AddGroup(cmd, "General commands",
 		cmdList.NewCmdList(f, nil),
-		cmdCreate.NewCmdCreate(f, telemetry, nil),
+		cmdCreate.NewCmdCreate(f, nil),
 		cmdStatus.NewCmdStatus(f, nil),
 	)
 
 	cmdutil.AddGroup(cmd, "Targeted commands",
 		cmdView.NewCmdView(f, nil),
-		cmdComment.NewCmdComment(f, telemetry, nil),
+		cmdComment.NewCmdComment(f, nil),
 		cmdClose.NewCmdClose(f, nil),
 		cmdReopen.NewCmdReopen(f, nil),
-		cmdEdit.NewCmdEdit(f, telemetry, nil),
+		cmdEdit.NewCmdEdit(f, nil),
 		cmdDevelop.NewCmdDevelop(f, nil),
 		cmdLock.NewCmdLock(f, cmd.Name(), nil),
 		cmdLock.NewCmdUnlock(f, cmd.Name(), nil),
@@ -63,7 +62,7 @@ func NewCmdIssue(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *
 		cmdUnpin.NewCmdUnpin(f, nil),
 		cmdTransfer.NewCmdTransfer(f, nil),
 		cmdDelete.NewCmdDelete(f, nil),
-		cmdArtifact.NewCmdArtifact(f, telemetry),
+		cmdArtifact.NewCmdArtifact(f),
 	)
 
 	return cmd

@@ -92,8 +92,6 @@ type IOStreams struct {
 	pagerProcess *os.Process
 
 	neverPrompt                 bool
-	accessiblePrompterEnabled   bool
-	experimentalPrompterEnabled bool
 
 	TempFileOverride *os.File
 }
@@ -127,13 +125,6 @@ func (s *IOStreams) ColorLabels() bool {
 // can be reliably detected.
 func (s *IOStreams) DetectTerminalTheme() {
 	if !s.ColorEnabled() || s.pagerProcess != nil {
-		s.terminalTheme = "none"
-		return
-	}
-
-	style := os.Getenv("GLAMOUR_STYLE")
-	if style != "" && style != "auto" {
-		// ensure GLAMOUR_STYLE takes precedence over "light" and "dark" themes
 		s.terminalTheme = "none"
 		return
 	}
@@ -470,22 +461,6 @@ func (s *IOStreams) SetAccessibleColorsEnabled(enabled bool) {
 
 func (s *IOStreams) AccessibleColorsEnabled() bool {
 	return s.accessibleColorsEnabled
-}
-
-func (s *IOStreams) SetAccessiblePrompterEnabled(enabled bool) {
-	s.accessiblePrompterEnabled = enabled
-}
-
-func (s *IOStreams) AccessiblePrompterEnabled() bool {
-	return s.accessiblePrompterEnabled
-}
-
-func (s *IOStreams) SetExperimentalPrompterEnabled(enabled bool) {
-	s.experimentalPrompterEnabled = enabled
-}
-
-func (s *IOStreams) ExperimentalPrompterEnabled() bool {
-	return s.experimentalPrompterEnabled
 }
 
 // SetContentSanitization toggles ANSI escape sanitization on ContentOut.

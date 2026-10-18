@@ -94,7 +94,7 @@ that the API itself supplied, so they reach the right place today, but they
 resolve their own destination rather than asking the client to.
 
 Whole commands remain unmigrated, and none of them are covered by the harness:
-`gh codespace`, `gh agent-task` and `gh copilot` each build their own absolute
+`gh agent-task` and `gh copilot` each build their own absolute
 URLs, and the update checker does too. They are not oversights. Codespaces and
 agent-task talk to services that are not the REST API and have clients of their
 own, so whether `api_host` should apply to them is a question about what the

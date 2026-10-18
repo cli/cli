@@ -175,9 +175,6 @@ func deleteRun(opts *DeleteOptions) error {
 	return nil
 }
 
-// printFailure reports an artifact gh couldn't delete, on stderr. In a
-// terminal, it's the failure line the other artifact commands print. Piped,
-// it's "<number>: <reason>", like gh codespace delete, with the same reason.
 func printFailure(ios *iostreams.IOStreams, number int, err error) {
 	if !ios.IsStdoutTTY() {
 		fmt.Fprintf(ios.ErrOut, "%d: %s\n", number, shared.FailureReason(err))

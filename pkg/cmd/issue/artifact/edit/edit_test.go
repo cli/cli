@@ -14,9 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -35,15 +33,6 @@ const (
 )
 
 func TestNewCmdEdit(t *testing.T) {
-	attachEvent := func(count int64) []ghtelemetry.Event {
-		return []ghtelemetry.Event{{
-			Type:       "attachment_invocation",
-			Dimensions: ghtelemetry.Dimensions{"command": "edit"},
-			Measures: ghtelemetry.Measures{
-				"attach_count": count, "append_ops_count": 0, "replace_ops_count": 0,
-			},
-		}}
-	}
 
 	tests := []struct {
 		name           string
@@ -51,7 +40,6 @@ func TestNewCmdEdit(t *testing.T) {
 		ghRepo         string
 		wantOpts       EditOptions
 		wantAssetPaths []string
-		wantEvents     []ghtelemetry.Event
 		wantRepo       string
 		wantErr        string
 		wantFlagErr    bool
@@ -135,7 +123,6 @@ func TestNewCmdEdit(t *testing.T) {
 				ArtifactNumber: 2,
 			},
 			wantAssetPaths: []string{"signin-flow.png"},
-			wantEvents:     attachEvent(1),
 			wantRepo:       "OWNER/REPO",
 		},
 		{
@@ -147,7 +134,6 @@ func TestNewCmdEdit(t *testing.T) {
 				BodyFile:       "2-OAuth-callback-plan.md",
 			},
 			wantAssetPaths: []string{"signin-flow.png", "./landing-page.png"},
-			wantEvents:     attachEvent(2),
 			wantRepo:       "OWNER/REPO",
 		},
 		{
@@ -371,13 +357,11 @@ func TestNewCmdEdit(t *testing.T) {
 			name:       "--attach with a file it can't upload",
 			args:       "142 2 --attach 2-OAuth-callback-plan.md",
 			wantErr:    "2-OAuth-callback-plan.md is not a supported file type (supported: png, jpg, jpeg, gif, webp, svg, mp4, mov, webm)",
-			wantEvents: attachEvent(1),
 		},
 		{
 			name:       "--attach with an empty path",
 			args:       "142 2 --attach ''",
 			wantErr:    "cannot attach an empty path; --attach needs a file path",
-			wantEvents: attachEvent(1),
 		},
 	}
 
@@ -402,8 +386,7 @@ func TestNewCmdEdit(t *testing.T) {
 			}
 
 			var gotOpts *EditOptions
-			recorder := &telemetry.InvocationRecorderSpy{}
-			cmd := NewCmdEdit(f, recorder, func(opts *EditOptions) error {
+			cmd := NewCmdEdit(f, func(opts *EditOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -419,7 +402,6 @@ func TestNewCmdEdit(t *testing.T) {
 			_, err = cmd.ExecuteC()
 
 			assert.Equal(t, "# OAuth callback plan\n", stdin.String(), "standard input is only read by the run function")
-			assert.Equal(t, tt.wantEvents, recorder.Events())
 			assert.Equal(t, "", stdout.String())
 			assert.Equal(t, "", stderr.String())
 			if tt.wantErr != "" {
@@ -444,7 +426,6 @@ func TestNewCmdEdit(t *testing.T) {
 				assetPaths = append(assetPaths, a.Path())
 			}
 			assert.Equal(t, tt.wantAssetPaths, assetPaths)
-			assert.Equal(t, tt.wantAssetPaths != nil, gotOpts.AttachEvent != nil, "--attach use is recorded")
 
 			repo, err := gotOpts.BaseRepo()
 			require.NoError(t, err)
@@ -522,7 +503,6 @@ func TestEditRun(t *testing.T) {
 		// current value.
 		wantName   *string
 		wantBody   *string
-		wantOps    *attachments.UploadResult
 		wantStdout string
 		wantStderr string
 		wantErr    string
@@ -840,7 +820,6 @@ func TestEditRun(t *testing.T) {
 				"UploadTarget monalisa/monas-cafe#142",
 				"Get monalisa/monas-cafe#142 3",
 			},
-			wantOps: &attachments.UploadResult{},
 			wantErr: "artifact 3 is a link; `--attach` can't be used with link artifacts",
 		},
 		{
@@ -853,7 +832,6 @@ func TestEditRun(t *testing.T) {
 				"UploadTarget monalisa/monas-cafe#166",
 				"Get monalisa/monas-cafe#166 1",
 			},
-			wantOps: &attachments.UploadResult{},
 			wantErr: "`--attach` can't be used with HTML artifacts",
 		},
 		{
@@ -876,7 +854,6 @@ func TestEditRun(t *testing.T) {
 				"UploadTarget monalisa/monas-cafe#142",
 				"Get monalisa/monas-cafe#142 2",
 			},
-			wantOps: &attachments.UploadResult{},
 			wantErr: `artifact 2 has type "bad-type", which this version of gh doesn't support; upgrade gh`,
 		},
 		{
@@ -1137,7 +1114,6 @@ func TestEditRun(t *testing.T) {
 				"Update monalisa/monas-cafe#142 2",
 			},
 			wantBody:   new(planBody + "\n\n![signin-flow](https://github.com/user-attachments/assets/AAA)"),
-			wantOps:    &attachments.UploadResult{AppendOperations: 1},
 			wantStdout: "✓ Updated artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1154,7 +1130,6 @@ func TestEditRun(t *testing.T) {
 			},
 			wantName:   new("OAuth callback plan v2"),
 			wantBody:   new(planBody + "\n\n![signin-flow](https://github.com/user-attachments/assets/AAA)"),
-			wantOps:    &attachments.UploadResult{AppendOperations: 1},
 			wantStdout: "✓ Updated artifact 2 (OAuth callback plan v2) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1172,7 +1147,6 @@ func TestEditRun(t *testing.T) {
 			},
 			wantBody: new("# OAuth callback plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n\n" +
 				"![landing-page](https://github.com/user-attachments/assets/BBB)"),
-			wantOps:    &attachments.UploadResult{AppendOperations: 1, ReplaceOperations: 1},
 			wantStdout: "✓ Updated artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1189,7 +1163,6 @@ func TestEditRun(t *testing.T) {
 				"Update monalisa/monas-cafe#142 2",
 			},
 			wantBody:   new("# OAuth callback plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n"),
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Updated artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1206,7 +1179,6 @@ func TestEditRun(t *testing.T) {
 				"Update monalisa/monas-cafe#142 2",
 			},
 			wantBody:   new("# OAuth callback plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n"),
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Updated artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1223,7 +1195,6 @@ func TestEditRun(t *testing.T) {
 				"Update monalisa/monas-cafe#142 2",
 			},
 			wantBody:   new("# OAuth callback plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n"),
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Updated artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1238,7 +1209,6 @@ func TestEditRun(t *testing.T) {
 				"Update monalisa/monas-cafe#142 2",
 			},
 			wantBody:   new("# OAuth callback plan\n\n![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n"),
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "✓ Updated artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1252,7 +1222,6 @@ func TestEditRun(t *testing.T) {
 				"UploadTarget monalisa/monas-cafe#142",
 				"Get monalisa/monas-cafe#142 2",
 			},
-			wantOps: &attachments.UploadResult{},
 			wantErr: "artifact 2 is not a link; .url files can only update link artifacts",
 		},
 		{
@@ -1266,7 +1235,6 @@ func TestEditRun(t *testing.T) {
 				"UploadTarget monalisa/monas-cafe#142",
 				"Get monalisa/monas-cafe#142 2",
 			},
-			wantOps:    &attachments.UploadResult{},
 			wantStderr: "X Failed to update artifact 2: could not upload ./signin-flow.png: attaching files requires write access to the repository\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
@@ -1281,7 +1249,6 @@ func TestEditRun(t *testing.T) {
 				"UploadTarget monalisa/monas-cafe#142",
 				"Get monalisa/monas-cafe#142 2",
 			},
-			wantOps:    &attachments.UploadResult{},
 			wantStdout: "failed\t2\tOAuth callback plan\t2-OAuth-callback-plan.md\tcould not upload ./signin-flow.png: attaching files requires write access to the repository\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
@@ -1302,7 +1269,6 @@ func TestEditRun(t *testing.T) {
 				"Update monalisa/monas-cafe#142 2",
 			},
 			wantBody:   new("![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n\n![Latte art](./latte-art.png)\n"),
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStderr: "! Updated artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142, but could not upload ./latte-art.png: rate limited; wait and try again\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
@@ -1322,7 +1288,6 @@ func TestEditRun(t *testing.T) {
 				"Update monalisa/monas-cafe#142 2",
 			},
 			wantBody:   new("![Sign-in flow](https://github.com/user-attachments/assets/AAA)\n\n![Latte art](./latte-art.png)\n"),
-			wantOps:    &attachments.UploadResult{ReplaceOperations: 1},
 			wantStdout: "updated\t2\tOAuth callback plan\t2-OAuth-callback-plan.md\tcould not upload ./latte-art.png: rate limited; wait and try again\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
@@ -1339,7 +1304,6 @@ func TestEditRun(t *testing.T) {
 				"Update monalisa/monas-cafe#142 2",
 			},
 			wantBody:   new(planBody + "\n\n![signin-flow](https://github.com/user-attachments/assets/AAA)"),
-			wantOps:    &attachments.UploadResult{AppendOperations: 1},
 			wantStderr: "X Failed to update artifact 2: Not Found\n",
 			wantErrIs:  cmdutil.SilentError,
 		},
@@ -1384,7 +1348,6 @@ func TestEditRun(t *testing.T) {
 				"Update monas-cafe.ghe.com/monalisa/monas-cafe#142 2",
 			},
 			wantBody:   new(planBody + "\n\n![signin-flow](https://github.com/user-attachments/assets/AAA)"),
-			wantOps:    &attachments.UploadResult{AppendOperations: 1},
 			wantStdout: "✓ Updated artifact 2 (OAuth callback plan) on monalisa/monas-cafe#142\n",
 		},
 		{
@@ -1716,11 +1679,6 @@ func TestEditRun(t *testing.T) {
 					return &updated, nil
 				},
 			}
-
-			recorder := &telemetry.InvocationRecorderSpy{}
-			if len(tt.attach) > 0 {
-				opts.AttachEvent = attachments.BeginTelemetry(recorder, "gh test", len(tt.attach))
-			}
 			if opts.IssueNumber == 0 {
 				opts.IssueNumber = 142
 			}
@@ -1748,9 +1706,6 @@ func TestEditRun(t *testing.T) {
 			}
 			if opts.BodyFile != "-" {
 				assert.Equal(t, tt.stdin, stdin.String(), "standard input is only read with --body-file -")
-			}
-			if tt.wantOps != nil {
-				attachments.AssertTestTelemetryEvents(t, recorder.Events(), len(tt.attach), *tt.wantOps)
 			}
 			switch {
 			case tt.wantErrIs != nil:

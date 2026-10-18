@@ -5,31 +5,65 @@ import (
 	"strings"
 	"testing"
 
-	ghPrompter "github.com/cli/go-gh/v2/pkg/prompter"
 	"github.com/stretchr/testify/assert"
 )
 
 func NewMockPrompter(t *testing.T) *MockPrompter {
 	m := &MockPrompter{
 		t:                    t,
-		PrompterMock:         *ghPrompter.NewMock(t),
 		authTokenStubs:       []authTokenStub{},
 		confirmDeletionStubs: []confirmDeletionStub{},
 		inputHostnameStubs:   []inputHostnameStub{},
 		markdownEditorStubs:  []markdownEditorStub{},
+		selectStubs:          []selectStub{},
+		multiSelectStubs:     []multiSelectStub{},
+		inputStubs:           []inputStub{},
+		passwordStubs:        []passwordStub{},
+		confirmStubs:         []confirmStub{},
 	}
 	t.Cleanup(m.Verify)
 	return m
 }
 
 type MockPrompter struct {
-	t *testing.T
-	ghPrompter.PrompterMock
+	t                          *testing.T
 	authTokenStubs             []authTokenStub
 	confirmDeletionStubs       []confirmDeletionStub
 	inputHostnameStubs         []inputHostnameStub
 	markdownEditorStubs        []markdownEditorStub
 	multiSelectWithSearchStubs []multiSelectWithSearchStub
+	selectStubs                []selectStub
+	multiSelectStubs           []multiSelectStub
+	inputStubs                 []inputStub
+	passwordStubs              []passwordStub
+	confirmStubs               []confirmStub
+}
+
+type selectStub struct {
+	prompt          string
+	expectedOptions []string
+	fn              func(string, string, []string) (int, error)
+}
+
+type multiSelectStub struct {
+	prompt          string
+	expectedOptions []string
+	fn              func(string, []string, []string) ([]int, error)
+}
+
+type inputStub struct {
+	prompt string
+	fn     func(string, string) (string, error)
+}
+
+type passwordStub struct {
+	prompt string
+	fn     func(string) (string, error)
+}
+
+type confirmStub struct {
+	prompt string
+	fn     func(string, bool) (bool, error)
 }
 
 type authTokenStub struct {
@@ -107,6 +141,88 @@ func (m *MockPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaul
 	return s.fn(prompt, searchPrompt, defaults, persistentOptions, searchFunc)
 }
 
+func (m *MockPrompter) Select(prompt, defaultValue string, options []string) (int, error) {
+	if len(m.selectStubs) == 0 {
+		return -1, NoSuchPromptErr(prompt)
+	}
+	stub := m.selectStubs[0]
+	m.selectStubs = m.selectStubs[1:]
+	if stub.prompt != prompt {
+		return -1, NoSuchPromptErr(prompt)
+	}
+	AssertOptions(m.t, stub.expectedOptions, options)
+	return stub.fn(prompt, defaultValue, options)
+}
+
+func (m *MockPrompter) MultiSelect(prompt string, defaults, options []string) ([]int, error) {
+	if len(m.multiSelectStubs) == 0 {
+		return []int{}, NoSuchPromptErr(prompt)
+	}
+	stub := m.multiSelectStubs[0]
+	m.multiSelectStubs = m.multiSelectStubs[1:]
+	if stub.prompt != prompt {
+		return []int{}, NoSuchPromptErr(prompt)
+	}
+	AssertOptions(m.t, stub.expectedOptions, options)
+	return stub.fn(prompt, defaults, options)
+}
+
+func (m *MockPrompter) Input(prompt, defaultValue string) (string, error) {
+	if len(m.inputStubs) == 0 {
+		return "", NoSuchPromptErr(prompt)
+	}
+	stub := m.inputStubs[0]
+	m.inputStubs = m.inputStubs[1:]
+	if stub.prompt != prompt {
+		return "", NoSuchPromptErr(prompt)
+	}
+	return stub.fn(prompt, defaultValue)
+}
+
+func (m *MockPrompter) Password(prompt string) (string, error) {
+	if len(m.passwordStubs) == 0 {
+		return "", NoSuchPromptErr(prompt)
+	}
+	stub := m.passwordStubs[0]
+	m.passwordStubs = m.passwordStubs[1:]
+	if stub.prompt != prompt {
+		return "", NoSuchPromptErr(prompt)
+	}
+	return stub.fn(prompt)
+}
+
+func (m *MockPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
+	if len(m.confirmStubs) == 0 {
+		return false, NoSuchPromptErr(prompt)
+	}
+	stub := m.confirmStubs[0]
+	m.confirmStubs = m.confirmStubs[1:]
+	if stub.prompt != prompt {
+		return false, NoSuchPromptErr(prompt)
+	}
+	return stub.fn(prompt, defaultValue)
+}
+
+func (m *MockPrompter) RegisterSelect(prompt string, options []string, fn func(string, string, []string) (int, error)) {
+	m.selectStubs = append(m.selectStubs, selectStub{prompt: prompt, expectedOptions: options, fn: fn})
+}
+
+func (m *MockPrompter) RegisterMultiSelect(prompt string, _ []string, options []string, fn func(string, []string, []string) ([]int, error)) {
+	m.multiSelectStubs = append(m.multiSelectStubs, multiSelectStub{prompt: prompt, expectedOptions: options, fn: fn})
+}
+
+func (m *MockPrompter) RegisterInput(prompt string, fn func(string, string) (string, error)) {
+	m.inputStubs = append(m.inputStubs, inputStub{prompt: prompt, fn: fn})
+}
+
+func (m *MockPrompter) RegisterPassword(prompt string, fn func(string) (string, error)) {
+	m.passwordStubs = append(m.passwordStubs, passwordStub{prompt: prompt, fn: fn})
+}
+
+func (m *MockPrompter) RegisterConfirm(prompt string, fn func(string, bool) (bool, error)) {
+	m.confirmStubs = append(m.confirmStubs, confirmStub{prompt: prompt, fn: fn})
+}
+
 func (m *MockPrompter) RegisterAuthToken(stub func() (string, error)) {
 	m.authTokenStubs = append(m.authTokenStubs, authTokenStub{fn: stub})
 }
@@ -136,6 +252,21 @@ func (m *MockPrompter) Verify() {
 	}
 	if len(m.markdownEditorStubs) > 0 {
 		errs = append(errs, "markdownEditorStubs")
+	}
+	if len(m.selectStubs) > 0 {
+		errs = append(errs, "Select")
+	}
+	if len(m.multiSelectStubs) > 0 {
+		errs = append(errs, "MultiSelect")
+	}
+	if len(m.inputStubs) > 0 {
+		errs = append(errs, "Input")
+	}
+	if len(m.passwordStubs) > 0 {
+		errs = append(errs, "Password")
+	}
+	if len(m.confirmStubs) > 0 {
+		errs = append(errs, "Confirm")
 	}
 	if len(errs) > 0 {
 		m.t.Helper()

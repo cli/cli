@@ -71,9 +71,6 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_PAGER%[1]s, %[1]sPAGER%[1]s (in order of precedence): a terminal paging program to send standard output
 			to, e.g. %[1]sless%[1]s.
 
-			%[1]sGLAMOUR_STYLE%[1]s: the style to use for rendering Markdown. See
-			<https://github.com/charmbracelet/glamour#styles>
-
 			%[1]sNO_COLOR%[1]s: set to any value to avoid printing ANSI escape sequences for color output.
 
 			%[1]sCLICOLOR%[1]s: set to %[1]s0%[1]s to disable printing ANSI colors in output.
@@ -95,13 +92,6 @@ var HelpTopics = []helpTopic{
 			When any command is executed, gh checks for new versions once every 24 hours.
 			If a newer version was found, an upgrade notice is displayed on standard error.
 
-			%[1]sGH_NO_EXTENSION_UPDATE_NOTIFIER%[1]s: set to any value to disable GitHub CLI extension update notifications.
-			When an extension is executed, gh checks for new versions for the executed extension once every 24 hours.
-			If a newer version was found, an upgrade notice is displayed on standard error.
-
-			%[1]sGH_EXTENSION%[1]s: set to %[1]s1%[1]s by gh when it invokes an extension, allowing an extension to
-			tell whether it was run as %[1]sgh <extension>%[1]s or directly as a standalone program.
-
 			%[1]sGH_CONFIG_DIR%[1]s: the directory where gh will store configuration files. If not specified,
 			the default value will be one of the following paths (in order of precedence):
 			  - %[1]s$XDG_CONFIG_HOME/gh%[1]s (if %[1]s$XDG_CONFIG_HOME%[1]s is set),
@@ -111,35 +101,15 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_PROMPT_DISABLED%[1]s: set to any value to disable interactive prompting in the terminal.
 
 			%[1]sGH_PATH%[1]s: set the path to the gh executable, useful for when gh can not properly determine
-			its own path such as in the cygwin terminal. gh also sets this when invoking extensions so they
-			can call back into the same gh executable.
+			its own path such as in the cygwin terminal.
 
 			%[1]sGH_MDWIDTH%[1]s: default maximum width for markdown render wrapping.  The max width of lines
 			wrapped on the terminal will be taken as the lesser of the terminal width, this value, or 120 if
 			not specified.  This value is used, for example, with %[1]spr view%[1]s subcommand.
 
-			%[1]sGH_ACCESSIBLE_PROMPTER%[1]s (preview): set to a truthy value to enable prompts that are
-			more compatible with speech synthesis and braille screen readers.
-
-			%[1]sGH_TELEMETRY%[1]s: set to %[1]slog%[1]s to print telemetry data to standard error instead of sending it.
-			Set to %[1]sfalse%[1]s or %[1]s0%[1]s to disable telemetry. Takes precedence over %[1]sDO_NOT_TRACK%[1]s.
-
-			%[1]sDO_NOT_TRACK%[1]s: set to %[1]strue%[1]s or %[1]s1%[1]s to disable telemetry. Ignored when
-			%[1]sGH_TELEMETRY%[1]s is set, which takes precedence.
-
 			%[1]sGH_SPINNER_DISABLED%[1]s: set to a truthy value to replace the spinner animation with
 			a textual progress indicator.
 		`, "`"),
-	},
-	{
-		name:  "telemetry",
-		short: "Information about telemetry in gh",
-		long: heredoc.Doc(`
-			gh collects telemetry to help us understand how the CLI is being used and to improve it.
-
-			To learn more about what data is collected, how it is used, and how to opt out, see:
-			<https://cli.github.com/telemetry>
-		`),
 	},
 	{
 		name:  "reference",

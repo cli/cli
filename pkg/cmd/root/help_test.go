@@ -8,9 +8,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -69,14 +67,9 @@ func TestKramdownCompatibleDocs(t *testing.T) {
 		IOStreams: ios,
 		Config:    func() (gh.Config, error) { return config.NewMockConfig(), nil },
 		Browser:   &browser.Stub{},
-		ExtensionManager: &extensions.ExtensionManagerMock{
-			ListFunc: func() []extensions.Extension {
-				return nil
-			},
-		},
 	}
 
-	cmd, err := NewCmdRoot(f, &telemetry.NoOpService{}, "N/A", "")
+	cmd, err := NewCmdRoot(f, "N/A", "")
 	require.NoError(t, err)
 
 	var walk func(*cobra.Command)

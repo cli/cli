@@ -15,7 +15,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
@@ -43,7 +42,6 @@ type CreateOptions struct {
 	Type string
 
 	AttachFlag  *attachments.Flag
-	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
 }
 
@@ -98,7 +96,7 @@ func (s source) artifactType(typeFlag string) string {
 }
 
 // NewCmdCreate creates the gh issue artifact create command.
-func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CreateOptions) error) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
@@ -221,8 +219,6 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				}
 				return cmdutil.FlagErrorf("`--attach` can't be used with %s artifacts", kind)
 			}
-
-			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -461,7 +457,6 @@ func attach(opts *CreateOptions, uploader *attachments.Uploader, artifacts []art
 		operations.AppendOperations += r.AppendOperations
 		operations.ReplaceOperations += r.ReplaceOperations
 	}
-	opts.AttachEvent.RecordOperations(operations)
 
 	// Without results, the files were refused before anything uploaded.
 	if len(results) == 0 {

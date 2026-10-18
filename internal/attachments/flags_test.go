@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -95,101 +93,6 @@ func TestAddFlag(t *testing.T) {
 			assert.Equal(t, "Attach an image or video `file`, in '<file>#<image alt text>' format", flag.Usage)
 		})
 	}
-}
-
-func TestAttachmentTelemetry(t *testing.T) {
-	t.Parallel()
-
-	t.Run("flag not passed ignores operation updates", func(t *testing.T) {
-		t.Parallel()
-
-		// Given a command with no attachment flag
-		_, attachFlag := attachCmd(t, "")
-		recorder := &telemetry.InvocationRecorderSpy{}
-
-		// When an operation update is attempted without an attachment event
-		event := BeginTelemetry(recorder, "gh issue comment", attachFlag.Count())
-		event.RecordOperations(UploadResult{AppendOperations: 1, ReplaceOperations: 1})
-
-		// Then no event or sampling promotion occurs
-		assert.Nil(t, event)
-		assert.Empty(t, recorder.Events())
-		assert.Zero(t, recorder.LastSampleRate)
-	})
-
-	tests := []struct {
-		name      string
-		input     string
-		wantCount int64
-	}{
-		{
-			name:      "one attachment",
-			input:     "--attach ./first.png",
-			wantCount: 1,
-		},
-		{
-			name:      "several attachments before validation",
-			input:     "--attach ./first.png --attach ./second.png --attach ./third.png",
-			wantCount: 3,
-		},
-		{
-			name:      "empty path counts before validation",
-			input:     `--attach ""`,
-			wantCount: 1,
-		},
-		{
-			name:      "over limit counts before validation",
-			input:     strings.Repeat("--attach ./missing.png ", maxAttachments+1),
-			wantCount: maxAttachments + 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			// Given raw attachment inputs that have not been validated
-			_, attachFlag := attachCmd(t, tt.input)
-			recorder := &telemetry.InvocationRecorderSpy{}
-
-			// When an attachment event is recorded without any upload operations
-			BeginTelemetry(recorder, "gh issue comment", attachFlag.Count())
-
-			// Then the raw count is retained at full sampling with zero operations
-			assert.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
-			assert.Equal(t, []ghtelemetry.Event{{
-				Type: "attachment_invocation",
-				Dimensions: ghtelemetry.Dimensions{
-					"command": "gh issue comment",
-				},
-				Measures: ghtelemetry.Measures{
-					"attach_count":      tt.wantCount,
-					"append_ops_count":  0,
-					"replace_ops_count": 0,
-				},
-			}}, recorder.Events())
-		})
-	}
-
-	t.Run("completed markdown operations", func(t *testing.T) {
-		t.Parallel()
-
-		// Given a pending event for four attachments
-		recorder := &telemetry.InvocationRecorderSpy{}
-		event := BeginTelemetry(recorder, "gh issue comment", 4)
-
-		// When four uploads produce one append and three replacements
-		event.RecordOperations(UploadResult{Uploaded: 4, AppendOperations: 1, ReplaceOperations: 3})
-
-		// Then telemetry retains the attachment count and records one append and three replacements
-		events := recorder.Events()
-		require.Len(t, events, 1)
-		assert.Equal(t, ghtelemetry.Measures{
-			"attach_count":      4,
-			"append_ops_count":  1,
-			"replace_ops_count": 3,
-		}, events[0].Measures)
-	})
 }
 
 func TestFlagUserAssets(t *testing.T) {

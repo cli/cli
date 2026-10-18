@@ -149,10 +149,6 @@ func WriteHelp(w io.Writer, cs *iostreams.ColorScheme, command *cobra.Command) {
 		helpEntries = append(helpEntries, helpEntry{"ALIASES", strings.Join(BuildAliasList(command, command.Aliases), ", ") + "\n"})
 	}
 
-	// Statically calculated padding for non-extension commands,
-	// longest is `gh accessibility` with 13 characters + 1 space.
-	//
-	// Should consider novel way to calculate this in the future [AF]
 	namePadding := 14
 
 	for _, g := range GroupedCommands(command) {
@@ -168,9 +164,6 @@ func WriteHelp(w io.Writer, cs *iostreams.ColorScheme, command *cobra.Command) {
 
 	if isRootCmd(command) {
 		var helpTopics []string
-		if c := findCommand(command, "accessibility"); c != nil {
-			helpTopics = append(helpTopics, rpad(c.Name()+":", namePadding)+c.Short)
-		}
 		if c := findCommand(command, "actions"); c != nil {
 			helpTopics = append(helpTopics, rpad(c.Name()+":", namePadding)+c.Short)
 		}
@@ -206,7 +199,6 @@ func WriteHelp(w io.Writer, cs *iostreams.ColorScheme, command *cobra.Command) {
 		Use %[1]sgh <command> <subcommand> --help%[1]s for more information about a command.
 		Read the manual at https://cli.github.com/manual
 		Learn about exit codes using %[1]sgh help exit-codes%[1]s
-		Learn about accessibility experiences using %[1]sgh help accessibility%[1]s
 	`, "`")})
 
 	for _, e := range helpEntries {
@@ -336,11 +328,8 @@ func BuildAliasList(cmd *cobra.Command, aliases []string) []string {
 	sort.Strings(parentAliases)
 
 	var aliasesWithParentAliases []string
-	// e.g aliases = [ls]
 	for _, alias := range aliases {
-		// e.g parentAliases = [codespaces, cs]
 		for _, parentAlias := range parentAliases {
-			// e.g. aliasesWithParentAliases = [codespaces list, codespaces ls, cs list, cs ls]
 			aliasesWithParentAliases = append(aliasesWithParentAliases, fmt.Sprintf("%s %s", parentAlias, alias))
 		}
 	}

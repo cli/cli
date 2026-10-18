@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,11 +18,8 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/build"
-	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
@@ -70,67 +66,7 @@ func Main() exitCode {
 
 	ghExecutablePath := executablePath("gh")
 
-	additionalCommonDimensions := ghtelemetry.Dimensions{
-		"version":             strings.TrimPrefix(buildVersion, "v"),
-		"is_tty":              strconv.FormatBool(ioStreams.IsStdoutTTY()),
-		"agent":               string(invokingAgent),
-		"ci":                  strconv.FormatBool(ci.IsCI()),
-		"github_actions":      strconv.FormatBool(ci.IsGitHubActions()),
-		"accessible_colors":   strconv.FormatBool(ioStreams.AccessibleColorsEnabled()),
-		"accessible_prompter": strconv.FormatBool(ioStreams.AccessiblePrompterEnabled()),
-		"color_labels":        strconv.FormatBool(ioStreams.ColorLabels()),
-		"spinner_disabled":    strconv.FormatBool(ioStreams.GetSpinnerDisabled()),
-	}
-
-	var telemetryService ghtelemetry.Service
-	switch {
-	case cfgErr != nil:
-		// Without a valid on-disk config we can't honour user telemetry preferences, so disable it to be safe.
-		telemetryService = &telemetry.NoOpService{}
-	default:
-		telemetryState := telemetry.ParseTelemetryState(cfg.Telemetry().Value)
-		telemetryDisabled := mightBeGHESUser(cfg)
-
-		switch telemetryState {
-		case telemetry.Disabled:
-			telemetryService = &telemetry.NoOpService{}
-		case telemetry.Logged:
-			// Always construct the real service in log mode so that the log
-			// flusher runs and surfaces an explicit "Telemetry payload: none"
-			// marker when no events will be sent. This gives the user an
-			// observable signal that telemetry is wired up even when their
-			// context (e.g. GHES) causes events to be dropped.
-			telemetryService = telemetry.NewService(
-				telemetry.LogFlusher(ioStreams.ErrOut, ioStreams.ColorEnabled()),
-				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
-			)
-			if telemetryDisabled {
-				telemetryService.Disable()
-			}
-		case telemetry.Enabled:
-			if telemetryDisabled {
-				telemetryService = &telemetry.NoOpService{}
-				break
-			}
-			sampleRate := 1
-			if v, err := strconv.Atoi(os.Getenv("GH_TELEMETRY_SAMPLE_RATE")); err == nil && v >= 0 && v <= 100 {
-				sampleRate = v
-			}
-			additionalCommonDimensions["sample_rate"] = strconv.Itoa(sampleRate)
-			telemetryService = telemetry.NewService(
-				telemetry.GitHubFlusher(ghExecutablePath),
-				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
-				telemetry.WithSampleRate(sampleRate),
-			)
-		default:
-			fmt.Fprintf(stderr, "invalid telemetry configuration: %q\n", cfg.Telemetry().Value)
-			return exitError
-		}
-	}
-	// Complete and send events even when returning before Cobra reaches RunE.
-	defer telemetryService.Finish()
-
-	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
+	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath)
 
 	ctx := context.Background()
 	updateCtx, updateCancel := context.WithCancel(ctx)
@@ -165,7 +101,7 @@ func Main() exitCode {
 		cobra.MousetrapHelpText = ""
 	}
 
-	rootCmd, err := root.NewCmdRoot(cmdFactory, telemetryService, buildVersion, buildDate)
+	rootCmd, err := root.NewCmdRoot(cmdFactory, buildVersion, buildDate)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to create root command: %s\n", err)
 		return exitError
@@ -174,12 +110,6 @@ func Main() exitCode {
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
 		expandedArgs = os.Args[1:]
-	}
-
-	// translate `gh help <command>` to `gh <command> --help` for extensions.
-	if len(expandedArgs) >= 2 && expandedArgs[0] == "help" && isExtensionCommand(rootCmd, expandedArgs[1:]) {
-		expandedArgs = expandedArgs[1:]
-		expandedArgs = append(expandedArgs, "--help")
 	}
 
 	rootCmd.SetArgs(expandedArgs)
@@ -207,7 +137,6 @@ func Main() exitCode {
 			// no results is not a command failure
 			return exitOK
 		} else if extError, ok := errors.AsType[*root.ExternalCommandExitError](err); ok {
-			// pass on exit codes from extensions and shell aliases
 			return exitCode(extError.ExitCode())
 		}
 
@@ -259,12 +188,6 @@ func Main() exitCode {
 	}
 
 	return exitOK
-}
-
-// isExtensionCommand returns true if args resolve to an extension command.
-func isExtensionCommand(rootCmd *cobra.Command, args []string) bool {
-	c, _, err := rootCmd.Find(args)
-	return err == nil && c != nil && c.GroupID == "extension"
 }
 
 // printError writes err to out, followed by usage information when the error
@@ -356,22 +279,6 @@ func newIOStreams(cfg gh.Config, invokingAgent agents.AgentName) *iostreams.IOSt
 	}
 
 	falseyValues := []string{"false", "0", "no", ""}
-
-	accessiblePrompterValue, accessiblePrompterIsSet := os.LookupEnv("GH_ACCESSIBLE_PROMPTER")
-	if accessiblePrompterIsSet {
-		if !slices.Contains(falseyValues, accessiblePrompterValue) {
-			io.SetAccessiblePrompterEnabled(true)
-		}
-	} else if prompt := cfg.AccessiblePrompter(""); prompt.Value == "enabled" {
-		io.SetAccessiblePrompterEnabled(true)
-	}
-
-	experimentalPrompterValue, experimentalPrompterIsSet := os.LookupEnv("GH_EXPERIMENTAL_PROMPTER")
-	if experimentalPrompterIsSet {
-		if !slices.Contains(falseyValues, experimentalPrompterValue) {
-			io.SetExperimentalPrompterEnabled(true)
-		}
-	}
 
 	ghSpinnerDisabledValue, ghSpinnerDisabledIsSet := os.LookupEnv("GH_SPINNER_DISABLED")
 	if ghSpinnerDisabledIsSet {
@@ -478,17 +385,3 @@ func executable(fallback string) string {
 	return exe
 }
 
-func mightBeGHESUser(cfg gh.Config) bool {
-	if os.Getenv("GH_ENTERPRISE_TOKEN") != "" || os.Getenv("GITHUB_ENTERPRISE_TOKEN") != "" {
-		return true
-	}
-
-	if host := os.Getenv("GH_HOST"); host != "" && ghauth.IsEnterprise(host) {
-		return true
-	}
-
-	// If any targeted host is Enterprise, then the user is likely a GHES user.
-	return slices.ContainsFunc(cfg.Authentication().Hosts(), func(host string) bool {
-		return ghauth.IsEnterprise(host)
-	})
-}

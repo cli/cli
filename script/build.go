@@ -55,6 +55,8 @@ var tasks = map[string]func(string) error{
 
 		buildTags, _ := os.LookupEnv("GO_BUILDTAGS")
 
+		ldflags = fmt.Sprintf("-s -w %s", ldflags)
+
 		args := []string{"go", "build", "-trimpath"}
 		if buildTags != "" {
 			args = append(args, "-tags", buildTags)

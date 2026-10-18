@@ -1,7 +1,0 @@
-# requires-user-capability: false
-
-fixture-repo none
-
-# Basic REST request
-exec gh api /rate_limit --jq .rate.limit
-stdout '^[0-9]+$'

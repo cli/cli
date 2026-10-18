@@ -10,7 +10,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/attachments"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
@@ -44,12 +43,11 @@ type EditOptions struct {
 	RestoreVersion int
 
 	AttachFlag  *attachments.Flag
-	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
 }
 
 // NewCmdEdit creates the gh issue artifact edit command.
-func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*EditOptions) error) *cobra.Command {
+func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
@@ -114,8 +112,6 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			case opts.Body != nil && strings.TrimSpace(*opts.Body) == "":
 				return cmdutil.FlagErrorf("`--body` cannot be blank")
 			}
-
-			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -200,7 +196,6 @@ func editRun(opts *EditOptions) error {
 		// Other content has no directory of its own, so its references
 		// resolve against the working directory.
 		md, uploadResult, err := uploader.UploadAndAttach(context.Background(), *body, dir, opts.Assets)
-		opts.AttachEvent.RecordOperations(uploadResult)
 		// Uploads can't be undone, so the artifact is saved if any file
 		// uploaded, even when another failed. It isn't saved when none did.
 		if err != nil && uploadResult.Uploaded == 0 {

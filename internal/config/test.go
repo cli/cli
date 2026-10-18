@@ -41,9 +41,6 @@ func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	mock.WriteFunc = func() error {
 		return cfg.Write()
 	}
-	mock.MigrateFunc = func(m gh.Migration) error {
-		return cfg.Migrate(m)
-	}
 	mock.AliasesFunc = func() gh.AliasConfig {
 		return &AliasConfig{cfg: c}
 	}
@@ -66,17 +63,11 @@ func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	mock.AccessibleColorsFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.AccessibleColors(hostname)
 	}
-	mock.AccessiblePrompterFunc = func(hostname string) gh.ConfigEntry {
-		return cfg.AccessiblePrompter(hostname)
-	}
 	mock.BrowserFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Browser(hostname)
 	}
 	mock.ClipboardFunc = func() gh.ConfigEntry {
 		return cfg.Clipboard()
-	}
-	mock.TelemetryFunc = func() gh.ConfigEntry {
-		return cfg.Telemetry()
 	}
 	mock.ColorLabelsFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.ColorLabels(hostname)
@@ -101,9 +92,6 @@ func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	}
 	mock.SpinnerFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Spinner(hostname)
-	}
-	mock.VersionFunc = func() o.Option[string] {
-		return cfg.Version()
 	}
 	mock.CacheDirFunc = func() string {
 		return cfg.CacheDir()

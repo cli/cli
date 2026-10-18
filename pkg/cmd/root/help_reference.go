@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -15,19 +14,11 @@ import (
 // It is currently only used for the reference command
 func longPager(io *iostreams.IOStreams) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
-		wrapWidth := 0
 		if io.IsStdoutTTY() {
 			io.DetectTerminalTheme()
-			wrapWidth = io.TerminalWidth()
 		}
 
-		md, err := markdown.Render(cmd.Long,
-			markdown.WithTheme(io.TerminalTheme()),
-			markdown.WithWrap(wrapWidth))
-		if err != nil {
-			fmt.Fprintln(io.ErrOut, err)
-			return
-		}
+		md := cmd.Long
 
 		if !io.IsStdoutTTY() {
 			fmt.Fprint(io.Out, dedent(md))

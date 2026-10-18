@@ -18,13 +18,11 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/template"
+	"github.com/cli/cli/v2/internal/template"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -423,35 +421,6 @@ func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
 	cmd.SetArgs([]string{`C:\users\repos`})
 	_, err := cmd.ExecuteC()
 	assert.EqualError(t, err, `invalid API endpoint: "C:\users\repos". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`)
-}
-
-func TestNewCmdApiTelemetry(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, "{}")
-	}))
-	t.Cleanup(server.Close)
-
-	var payload telemetry.SendTelemetryPayload
-	recorder := telemetry.NewService(func(p telemetry.SendTelemetryPayload) {
-		payload = p
-	})
-	recorder.Record(ghtelemetry.Event{Type: "command"})
-
-	ios, _, _, _ := iostreams.Test()
-	f := &cmdutil.Factory{
-		Config:            func() (gh.Config, error) { return config.NewMockConfig(), nil },
-		IOStreams:         ios,
-		TelemetryDisabler: recorder,
-	}
-	cmd := NewCmdApi(f, nil)
-	cmd.SetArgs([]string{server.URL})
-
-	_, err := cmd.ExecuteC()
-	require.NoError(t, err)
-	recorder.Finish()
-
-	assert.Empty(t, payload.Events)
 }
 
 func Test_apiRun(t *testing.T) {

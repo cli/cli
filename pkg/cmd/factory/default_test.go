@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -353,7 +352,7 @@ func TestSSOURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := config.NewMockConfig()
 			ios, _, _, stderr := iostreams.Test()
-			client, err := HttpClientFunc(func() (gh.Config, error) { return cfg, nil }, ios, "v1.2.3", "", &telemetry.NoOpService{})()
+			client, err := HttpClientFunc(func() (gh.Config, error) { return cfg, nil }, ios, "v1.2.3", "")()
 			require.NoError(t, err)
 			req, err := http.NewRequest("GET", ts.URL, nil)
 			if tt.sso != "" {
@@ -383,7 +382,7 @@ func TestPlainHttpClient(t *testing.T) {
 	defer ts.Close()
 
 	ios, _, _, _ := iostreams.Test()
-	client, err := plainHttpClientFunc(ios, "v1.2.3", "", &telemetry.NoOpService{})()
+	client, err := plainHttpClientFunc(ios, "v1.2.3", "")()
 	require.NoError(t, err)
 
 	req, err := http.NewRequest("GET", ts.URL, nil)

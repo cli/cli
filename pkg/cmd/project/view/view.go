@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -147,13 +146,6 @@ func printResults(config viewConfig, project *queries.Project) error {
 		sb.WriteString(fmt.Sprintf("%s (%s)\n\n", f.Name(), f.Type()))
 	}
 
-	out, err := markdown.Render(sb.String(),
-		markdown.WithTheme(config.io.TerminalTheme()),
-		markdown.WithWrap(config.io.TerminalWidth()))
-
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprint(config.io.Out, out)
+	_, err := fmt.Fprint(config.io.Out, sb.String())
 	return err
 }

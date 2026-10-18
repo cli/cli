@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/markdown"
 )
 
 type Comment interface {
@@ -119,17 +118,9 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 	}
 
 	// Body
-	var md string
-	var err error
-	if comment.Content() == "" {
+	md := comment.Content()
+	if md == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Muted("No body provided"))
-	} else {
-		md, err = markdown.Render(comment.Content(),
-			markdown.WithTheme(io.TerminalTheme()),
-			markdown.WithWrap(io.TerminalWidth()))
-		if err != nil {
-			return "", err
-		}
 	}
 	fmt.Fprint(&b, md)
 

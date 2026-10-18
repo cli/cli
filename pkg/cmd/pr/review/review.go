@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -239,14 +238,7 @@ func reviewSurvey(opts *ReviewOptions) (*api.PullRequestReviewInput, error) {
 	}
 
 	if len(body) > 0 {
-		renderedBody, err := markdown.Render(body,
-			markdown.WithTheme(opts.IO.TerminalTheme()),
-			markdown.WithWrap(opts.IO.TerminalWidth()))
-		if err != nil {
-			return nil, err
-		}
-
-		fmt.Fprintf(opts.IO.Out, "Got:\n%s", renderedBody)
+		fmt.Fprintf(opts.IO.Out, "Got:\n%s", body)
 	}
 
 	confirm, err := opts.Prompter.Confirm("Submit?", true)

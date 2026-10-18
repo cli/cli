@@ -19,7 +19,6 @@ import (
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 )
@@ -306,17 +305,9 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 	}
 
 	// Body
-	var md string
-	var err error
-	if issue.Body == "" {
+	md := issue.Body
+	if md == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Muted("No description provided"))
-	} else {
-		md, err = markdown.Render(issue.Body,
-			markdown.WithTheme(opts.IO.TerminalTheme()),
-			markdown.WithWrap(opts.IO.TerminalWidth()))
-		if err != nil {
-			return err
-		}
 	}
 	fmt.Fprintf(out, "\n%s\n", md)
 

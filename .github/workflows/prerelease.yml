@@ -1,0 +1,75 @@
+name: prerelease
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: prerelease-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build (${{ matrix.asset_target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+            asset_target: aarch64-apple-darwin
+          - goos: darwin
+            goarch: amd64
+            asset_target: x86_64-apple-darwin
+          - goos: linux
+            goarch: amd64
+            asset_target: x86_64-unknown-linux-gnu
+          - goos: linux
+            goarch: arm64
+            asset_target: aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+      - name: Build
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          release_tag="release-${GITHUB_SHA}"
+          asset="gh-${{ matrix.asset_target }}"
+          go build -trimpath -ldflags "-s -w -X github.com/cli/cli/v2/internal/build.Version=${release_tag}" -o "$asset" ./cmd/gh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gh-${{ matrix.asset_target }}
+          path: gh-${{ matrix.asset_target }}
+
+  prerelease:
+    name: Create pre-release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: gh-*
+          path: dist
+          merge-multiple: true
+      - name: Zip artifacts
+        run: for f in dist/*; do zip -9 --junk-paths "$f.zip" "$f"; done
+      - name: Create pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: release-${{ github.sha }}
+        run: gh release create "$RELEASE_TAG" dist/*.zip --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "$RELEASE_TAG"

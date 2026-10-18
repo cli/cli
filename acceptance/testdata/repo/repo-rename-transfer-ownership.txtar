@@ -1,8 +1,0 @@
-# requires-user-capability: false
-
-# Create a repository with a file so it has a default branch
-fixture-repo shared REPO
-
-# Attempt to rename the repo with a slash in the name
-! exec gh repo rename $ORG/new-name --repo=$ORG/$REPO --yes
-stderr 'New repository name cannot contain \''/\'' character - to transfer a repository to a new owner, see <https://docs.github.com/en/repositories/creating-and-managing-repositories/transferring-a-repository>.'

@@ -22,14 +22,12 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/markdown"
 	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/spf13/cobra"
 )
@@ -80,7 +78,6 @@ type CreateOptions struct {
 
 	BodyDir     string
 	AttachFlag  *attachments.Flag
-	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
 }
 
@@ -199,7 +196,7 @@ type CreateContext struct {
 	GitClient          *git.Client
 }
 
-func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CreateOptions) error) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:               f.IOStreams,
 		HttpClient:       f.HttpClient,
@@ -370,8 +367,6 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			); err != nil {
 				return err
 			}
-
-			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -1128,7 +1123,6 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	var uploadErr error
 	if uploader != nil {
 		body, uploadResult, err := uploader.UploadAndAttach(context.Background(), state.Body, opts.BodyDir, opts.Assets)
-		opts.AttachEvent.RecordOperations(uploadResult)
 		// With nothing uploaded, a body that lost the files it was written
 		// around is not what the caller asked to create. The branch is already
 		// pushed by now, so the message says what was not created rather than
@@ -1217,17 +1211,9 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]any, state 
 
 	fmt.Fprintf(out, "%s\n", cs.Bold("Body:"))
 	// Body
-	var md string
-	var err error
-	if len(params["body"].(string)) == 0 {
+	md := params["body"].(string)
+	if md == "" {
 		md = fmt.Sprintf("%s\n", cs.Muted("No description provided"))
-	} else {
-		md, err = markdown.Render(params["body"].(string),
-			markdown.WithTheme(io.TerminalTheme()),
-			markdown.WithWrap(io.TerminalWidth()))
-		if err != nil {
-			return err
-		}
 	}
 	fmt.Fprintf(out, "%s", md)
 

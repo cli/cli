@@ -14,7 +14,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
@@ -148,7 +147,7 @@ func TestCommentablePreRun(t *testing.T) {
 			cmd := commentableCmd(t, opts, tt.input)
 
 			// When comment preparation validates those inputs
-			err := CommentablePreRun(cmd, opts, &telemetry.NoOpService{})
+			err := CommentablePreRun(cmd, opts)
 
 			// Then it reports the validation error or prepares the comment options
 			if tt.wantErr != "" {
@@ -191,7 +190,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 		wantStdout           string
 		wantErr              string
 		wantUploads          int
-		wantOperations       *attachments.UploadResult
 	}{
 		{
 			name:       "creating with no asset uploads nothing",
@@ -210,7 +208,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantBody:             "see below\n\n![shot](https://example.com/1)",
 			wantStdout:           "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 			wantUploads:          1,
-			wantOperations:       &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name:                 "creating rewrites a reference relative to the body file",
@@ -222,7 +219,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantBody:             "the plan ![diagram](https://example.com/1)",
 			wantStdout:           "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 			wantUploads:          1,
-			wantOperations:       &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name:                 "creating writes what uploaded when one upload fails",
@@ -238,7 +234,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			wantStdout:     "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 			wantErr:        "could not upload ./b.png: attaching files requires write access to the repository",
 			wantUploads:    2,
-			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name:                 "creating writes nothing when every upload fails",
@@ -248,7 +243,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			uploads:              []attachments.UploadStub{{Name: "a.png", Status: 404, Body: `{"message":"Not Found"}`}},
 			wantErr:              "could not upload ./a.png: attaching files requires write access to the repository\nno comment was posted",
 			wantUploads:          1,
-			wantOperations:       &attachments.UploadResult{},
 		},
 		{
 			name:                 "creating writes nothing when every upload fails and the body has text",
@@ -265,7 +259,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			attach:               []string{"repro.mp4"},
 			repositoryDatabaseID: 1234,
 			wantErr:              "cannot embed a video as a reference-style image: ./repro.mp4\nno comment was posted",
-			wantOperations:       &attachments.UploadResult{},
 		},
 		{
 			name:                 "creating reports the upload and the write when both fail",
@@ -280,7 +273,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 			writeFails:     true,
 			wantErr:        "could not upload ./b.png: attaching files requires write access to the repository\nGraphQL: the write failed",
 			wantUploads:    2,
-			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "editing keeps the comment when no body flag was given",
@@ -456,11 +448,6 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 				opts.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
 			// Given a pending event when operation counts are under test
-			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
-			if tt.wantOperations != nil {
-				opts.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
-			}
-
 			host := tt.host
 			if host == "" {
 				host = "github.com"
@@ -500,10 +487,7 @@ func TestCommentableRunUploadsAndWritesBodies(t *testing.T) {
 
 			// When comment creation or editing runs
 			err := CommentableRun(&opts)
-			if tt.wantOperations != nil {
-				// Then telemetry retains completed operations, including partial results
-				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(tt.attach), *tt.wantOperations)
-			}
+
 
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)

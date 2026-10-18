@@ -4,32 +4,28 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/utils"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
-type config interface {
+type tokenGetter interface {
 	ActiveToken(string) (string, string)
-	HostForAPIHost(string) (string, bool)
 }
 
 type HTTPClientOptions struct {
 	AppVersion         string
 	InvokingAgent      string
 	CacheTTL           time.Duration
-	Config             config
+	Config             tokenGetter
 	EnableCache        bool
 	Log                io.Writer
 	LogColorize        bool
 	LogVerboseHTTP     bool
 	SkipDefaultHeaders bool
-	TelemetryDisabler  ghtelemetry.Disabler
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
@@ -76,13 +72,6 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 
 	if opts.Config != nil {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
-	}
-
-	if opts.TelemetryDisabler != nil {
-		client.Transport = telemetryDisablerTransport{
-			wrappedTransport:  client.Transport,
-			telemetryDisabler: opts.TelemetryDisabler,
-		}
 	}
 
 	return client, nil
@@ -151,40 +140,23 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 }
 
 // AddAuthTokenHeader adds an authentication token header for the host specified by the request.
-func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
+func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
-		if req.Header.Get(authorization) != "" {
-			return rt.RoundTrip(req)
-		}
-
-		var redirectHostnameChange bool
-		if req.Response != nil && req.Response.Request != nil {
-			redirectHostnameChange = getHostname(req) != getHostname(req.Response.Request)
-		}
-
-		// Only set header if an initial request or redirect request to the same host as the initial request.
-		// If the host has changed during a redirect do not add the authentication token header.
-		if redirectHostnameChange {
-			return rt.RoundTrip(req)
-		}
-
-		hostnameInRequest := ghauth.NormalizeHostname(getHostname(req))
-		token, _ := cfg.ActiveToken(hostnameInRequest)
-		if token == "" {
-			// The request may be aimed at a host's api_host, which gh is
-			// not logged in to and so has no token of its own. Fall back
-			// to the token of the host it stands in for. This only ever
-			// adds a token where there would have been none, so hosts we
-			// already authenticate keep resolving exactly as before.
-			if canonicalHost, ok := cfg.HostForAPIHost(hostnameInRequest); ok {
-				token, _ = cfg.ActiveToken(canonicalHost)
+		if req.Header.Get(authorization) == "" {
+			var redirectHostnameChange bool
+			if req.Response != nil && req.Response.Request != nil {
+				redirectHostnameChange = getHost(req) != getHost(req.Response.Request)
+			}
+			// Only set header if an initial request or redirect request to the same host as the initial request.
+			// If the host has changed during a redirect do not add the authentication token header.
+			if !redirectHostnameChange {
+				hostname := ghauth.NormalizeHostname(getHost(req))
+				if token, _ := cfg.ActiveToken(hostname); token != "" {
+					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+				}
 			}
 		}
-		if token != "" {
-			req.Header.Set(authorization, fmt.Sprintf("token %s", token))
-		}
-
 		return rt.RoundTrip(req)
 	}}
 }
@@ -213,28 +185,9 @@ func (tr funcTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return tr.roundTrip(req)
 }
 
-// getHostname returns the hostname the request is addressed to, preferring an
-// explicit Host override and falling back to the URL host. Any port in the host
-// is stripped, so callers compare on the hostname alone.
-func getHostname(r *http.Request) string {
-	host := r.Host
-	if host == "" {
-		host = r.URL.Host
+func getHost(r *http.Request) string {
+	if r.Host != "" {
+		return r.Host
 	}
-	return (&url.URL{Host: host}).Hostname()
-}
-
-type telemetryDisablerTransport struct {
-	wrappedTransport  http.RoundTripper
-	telemetryDisabler ghtelemetry.Disabler
-}
-
-func (t telemetryDisablerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// If the request is aimed at an enterprise host, disable telemetry.
-	// Currently, requests that are sent to configured api_hosts will be treated as enterprise hosts,
-	// even though they may be GHEC with Data Residency.
-	if ghauth.IsEnterprise(getHostname(req)) {
-		t.telemetryDisabler.Disable()
-	}
-	return t.wrappedTransport.RoundTrip(req)
+	return r.URL.Host
 }
