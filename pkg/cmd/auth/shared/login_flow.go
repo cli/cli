@@ -84,13 +84,33 @@ func Login(opts *LoginOptions) error {
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
 
+	// Choose how to authenticate before anything that depends on expiring intent. A pasted token can never be
+	// expiring, so the effective intent is only known once the method is chosen.
+	var authMode int
+	if opts.Web || opts.ExpiringExplicitlyRequested {
+		// When the user explicitly passes --expiring, force the web flow so the paste option cannot silently ignore
+		// that request. A config-derived preference does not suppress paste: choosing it yields a non-expiring token.
+		authMode = 0
+	} else if opts.Interactive {
+		options := []string{"Login with a web browser", "Paste an authentication token"}
+		var err error
+		authMode, err = opts.Prompter.Select(
+			"How would you like to authenticate GitHub CLI?",
+			options[0],
+			options)
+		if err != nil {
+			return err
+		}
+	}
+	expiring := opts.Expiring && authMode == 0
+
 	// Begin the auth-state telemetry event. It is nil for disabled telemetry or enterprise hosts, and all event methods
 	// are nil-tolerant, so the calls below stay unconditional.
-	authEvent := BeginAuthTelemetry(opts.Telemetry, "login", hostname, opts.Expiring)
+	authEvent := BeginAuthTelemetry(opts.Telemetry, "login", hostname, expiring)
 
 	// A GitHub Enterprise Server host may not support expiring tokens. Surface this once the hostname is known, from
 	// interactive selection or the --hostname flag, so the user understands they may receive a non-expiring token.
-	if opts.Expiring && ghauth.IsEnterprise(hostname) {
+	if expiring && ghauth.IsEnterprise(hostname) {
 		fmt.Fprintf(opts.IO.ErrOut, "%s %s may not support expiring tokens\n", cs.WarningIcon(), hostname)
 	}
 
@@ -121,7 +141,7 @@ func Login(opts *LoginOptions) error {
 	authEvent.RecordHelperBefore(opts.CredentialFlow.DetectConfiguredHelper(hostname))
 
 	if opts.Interactive && gitProtocol == "https" {
-		err := opts.CredentialFlow.Prompt(hostname, opts.Expiring)
+		err := opts.CredentialFlow.Prompt(hostname, expiring)
 		if errors.Is(err, ErrExpiringSetupCredHelperCancelled) {
 			authEvent.RecordExpiringSetupCancelled(true)
 			return cmdutil.CancelError
@@ -184,24 +204,6 @@ func Login(opts *LoginOptions) error {
 		}
 	}
 
-	var authMode int
-	if opts.Web || opts.ExpiringExplicitlyRequested {
-		// A pasted personal access token can never be refreshable. When the user explicitly passes --expiring,
-		// force the web flow so the paste option cannot silently ignore that request. A config-derived preference
-		// does not suppress paste: choosing it simply yields a non-expiring token.
-		authMode = 0
-	} else if opts.Interactive {
-		options := []string{"Login with a web browser", "Paste an authentication token"}
-		var err error
-		authMode, err = opts.Prompter.Select(
-			"How would you like to authenticate GitHub CLI?",
-			options[0],
-			options)
-		if err != nil {
-			return err
-		}
-	}
-
 	var authToken string
 	var username string
 	var refreshableCredential *gh.Credential
@@ -211,7 +213,7 @@ func Login(opts *LoginOptions) error {
 		if authFlow == nil {
 			authFlow = authflow.AuthFlow
 		}
-		result, err := authFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard, opts.Expiring)
+		result, err := authFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard, expiring)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
@@ -286,11 +288,11 @@ func Login(opts *LoginOptions) error {
 	// Expiring tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
 	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
 	switch {
-	case refreshableCredential != nil && !opts.Expiring:
+	case refreshableCredential != nil && !expiring:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues expiring refreshable token\n", cs.WarningIcon())
 	case refreshableCredential != nil:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Received expiring refreshable token\n", cs.SuccessIcon())
-	case opts.Expiring && authMode == 0:
+	case expiring:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue an expiring refreshable token\n", cs.WarningIcon())
 	}
 

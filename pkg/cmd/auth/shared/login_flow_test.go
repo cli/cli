@@ -633,6 +633,64 @@ func TestAuthenticatingGitCredentials(t *testing.T) {
 	require.True(t, helper.IsOurs(), "expected gh to be the configured helper")
 }
 
+func TestLogin_pastedTokenIgnoresConfiguredExpiringPreference(t *testing.T) {
+	// A config-derived expiring preference must not leak into a login where the user pastes a token, which can never
+	// be expiring: no expiring credential-helper prompt and no expiring request in telemetry.
+	ios, _, _, stderr := iostreams.Test()
+	recorder := &telemetry.InvocationRecorderSpy{}
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("GET", ""),
+		httpmock.ScopesResponder("repo,read:org"))
+	reg.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{ "login": "monalisa" }}}`))
+
+	opts := &LoginOptions{
+		IO:          ios,
+		Config:      tinyConfig{},
+		HTTPClient:  &http.Client{Transport: reg},
+		Hostname:    "github.com",
+		Interactive: true,
+		GitProtocol: "https",
+		Expiring:    true,
+		Telemetry:   recorder,
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(prompt, _ string, opts []string) (int, error) {
+				if prompt == "How would you like to authenticate GitHub CLI?" {
+					return prompter.IndexFor(opts, "Paste an authentication token")
+				}
+				return -1, prompter.NoSuchPromptErr(prompt)
+			},
+			AuthTokenFunc: func() (string, error) {
+				return "ATOKEN", nil
+			},
+		},
+		CredentialFlow: &GitCredentialFlow{
+			// The non-expiring helper prompt is a Confirm. The expiring one is a Select, which is left unset so the
+			// mock panics if it is reached.
+			Prompter: &prompter.PrompterMock{
+				ConfirmFunc: func(prompt string, _ bool) (bool, error) {
+					return true, nil
+				},
+			},
+			HelperConfig: &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers:            map[string]gitcredentials.Helper{},
+			},
+		},
+	}
+
+	require.NoError(t, Login(opts))
+
+	assert.NotContains(t, stderr.String(), "expiring")
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	assert.Equal(t, "false", events[0].Dimensions["expiring_requested"])
+}
+
 func TestLogin_recordsAuthTelemetry(t *testing.T) {
 	// An interactive https login to github.com that configures gh as the credential helper should record a complete
 	// auth_invocation event.
@@ -704,7 +762,12 @@ func TestLogin_recordsExpiringSetupCancelled(t *testing.T) {
 		GitProtocol: "https",
 		Expiring:    true,
 		Telemetry:   recorder,
-		Prompter:    &prompter.PrompterMock{},
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(prompt, _ string, options []string) (int, error) {
+				require.Equal(t, "How would you like to authenticate GitHub CLI?", prompt)
+				return prompter.IndexFor(options, "Login with a web browser")
+			},
+		},
 		CredentialFlow: &GitCredentialFlow{
 			IO: ios,
 			Prompter: &prompter.PrompterMock{
