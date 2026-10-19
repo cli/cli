@@ -88,7 +88,7 @@ steps:
       PR_NUMBER_INPUT: ${{ github.event.inputs.pr_number }}
       GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
       WORKLIST_PATH: /tmp/gh-aw/dependabot-worklist.json
-    run: bash .github/scripts/dependabot-triage-worklist.sh
+    run: bash .github/scripts/dependabot-triage.sh select
 
   # Dependency reachability evidence. The agent is asked whether an upstream
   # change can reach this repository. It used to answer that by grepping our

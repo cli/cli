@@ -33,7 +33,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           WORKLIST_PATH: ${{ runner.temp }}/dependabot-triage-worklist.json
-        run: bash .github/scripts/dependabot-triage-worklist.sh
+        run: bash .github/scripts/dependabot-triage.sh select
 
       - name: Dispatch Dependabot triage
         if: steps.worklist.outputs.count != '0'
@@ -42,4 +42,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           WORKLIST_PATH: ${{ steps.worklist.outputs.worklist_path }}
-        run: bash .github/scripts/dependabot-triage-dispatch.sh
+        run: bash .github/scripts/dependabot-triage.sh dispatch
