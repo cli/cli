@@ -350,6 +350,30 @@ func Test_statusRun(t *testing.T) {
 			`),
 		},
 		{
+			name: "omits the refresh token expiry line when its lifetime is unknown",
+			opts: StatusOptions{NoRefresh: true},
+			now:  time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				future := time.Date(2000, 1, 1, 8, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_fresh", "ghr_abc", &future, nil)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", ""),
+					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", "repo, read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_*****
+				  - Expiring token that gh refreshes automatically
+				  - Token expires: 2000-01-01T08:00:00Z (in about 8 hours)
+				  - Token scopes: 'repo', 'read:org'
+			`),
+		},
+		{
 			name: "rejected refresh token surfaces a clear error without a scope request",
 			opts: StatusOptions{},
 			cfgStubs: func(t *testing.T, c gh.Config) {
@@ -711,6 +735,21 @@ func Test_statusRun(t *testing.T) {
 					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", "repo, read:org"))
 			},
 			wantOut: `{"hosts":{"github.com":[{"state":"success","active":true,"host":"github.com","login":"monalisa","tokenSource":"GH_CONFIG_DIR/hosts.yml","scopes":"repo, read:org","gitProtocol":"https","refreshable":true,"tokenExpiresAt":"2099-01-02T03:04:05Z","refreshTokenExpiresAt":"2099-06-07T08:09:10Z"}]}}` + "\n",
+		},
+		{
+			name:       "json, refreshable token with unknown refresh token expiry",
+			opts:       StatusOptions{},
+			jsonFields: []string{"hosts"},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				future := time.Date(2099, 1, 2, 3, 4, 5, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_abc123", "ghr_abc", &future, nil)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", ""),
+					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", "repo, read:org"))
+			},
+			wantOut: `{"hosts":{"github.com":[{"state":"success","active":true,"host":"github.com","login":"monalisa","tokenSource":"GH_CONFIG_DIR/hosts.yml","scopes":"repo, read:org","gitProtocol":"https","refreshable":true,"tokenExpiresAt":"2099-01-02T03:04:05Z"}]}}` + "\n",
 		},
 		{
 			name: "json, all valid tokens with hostname",
