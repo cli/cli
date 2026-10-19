@@ -56,6 +56,29 @@ func TestFuzzyAgoAbbr(t *testing.T) {
 	}
 }
 
+func TestFuzzyIn(t *testing.T) {
+	const form = "2006-Jan-02 15:04:05"
+	now, _ := time.Parse(form, "2020-Nov-22 14:00:00")
+	cases := map[string]string{
+		"2020-Nov-22 14:00:00": "in less than a minute",
+		"2020-Nov-22 14:00:30": "in less than a minute",
+		"2020-Nov-22 14:01:00": "in about 1 minute",
+		"2020-Nov-22 14:30:00": "in about 30 minutes",
+		"2020-Nov-22 15:00:00": "in about 1 hour",
+		"2020-Nov-23 02:00:00": "in about 12 hours",
+		"2020-Nov-23 14:00:00": "in about 1 day",
+		"2020-Dec-07 14:00:00": "in about 15 days",
+		"2020-Dec-22 14:00:00": "in about 1 month",
+		"2021-Nov-22 14:00:00": "in about 1 year",
+		"2025-Nov-22 14:00:00": "in about 5 years",
+	}
+	for target, expected := range cases {
+		d, err := time.Parse(form, target)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, FuzzyIn(now, d))
+	}
+}
+
 func TestFormatSlice(t *testing.T) {
 	tests := []struct {
 		name        string

@@ -47,6 +47,24 @@ func FuzzyAgo(a, b time.Time) string {
 	return text.RelativeTimeAgo(a, b)
 }
 
+func FuzzyIn(a, b time.Time) string {
+	d := b.Sub(a)
+	switch {
+	case d < time.Minute:
+		return "in less than a minute"
+	case d < time.Hour:
+		return fmt.Sprintf("in about %s", Pluralize(int(d.Minutes()), "minute"))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("in about %s", Pluralize(int(d.Hours()), "hour"))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("in about %s", Pluralize(int(d.Hours())/24, "day"))
+	case d < 365*24*time.Hour:
+		return fmt.Sprintf("in about %s", Pluralize(int(d.Hours())/24/30, "month"))
+	default:
+		return fmt.Sprintf("in about %s", Pluralize(int(d.Hours()/24/365), "year"))
+	}
+}
+
 // FuzzyAgoAbbr is an abbreviated version of FuzzyAgo. It returns a human readable string of the
 // time duration between a and b that is estimated to the nearest unit of time.
 func FuzzyAgoAbbr(a, b time.Time) string {

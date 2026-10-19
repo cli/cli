@@ -109,6 +109,7 @@ func Test_statusRun(t *testing.T) {
 		opts       StatusOptions
 		jsonFields []string
 		env        map[string]string
+		now        time.Time
 		httpStubs  func(*httpmock.Registry)
 		cfgStubs   func(*testing.T, gh.Config)
 		wantErr    error
@@ -280,16 +281,20 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "refreshes an expiring token",
 			opts: StatusOptions{},
+			now:  time.Date(2099, 1, 1, 20, 4, 5, 0, time.UTC),
 			cfgStubs: func(t *testing.T, c gh.Config) {
 				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past)
+				rtPast := time.Date(2000, 6, 1, 0, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past, &rtPast)
 				future := time.Date(2099, 1, 2, 3, 4, 5, 0, time.UTC)
+				rtFuture := time.Date(2099, 1, 11, 20, 4, 5, 0, time.UTC)
 				setRefresher(t, c, &ghmock.TokenRefresherMock{
 					RefreshFunc: func(string, string) (gh.RefreshableCredential, error) {
 						return gh.RefreshableCredential{
-							AccessToken:  "gho_fresh",
-							RefreshToken: "ghr_abc",
-							ExpiresAt:    &future,
+							AccessToken:           "gho_fresh",
+							RefreshToken:          "ghr_abc",
+							ExpiresAt:             &future,
+							RefreshTokenExpiresAt: &rtFuture,
 						}, nil
 					},
 				})
@@ -306,7 +311,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_*****
 				  - Expiring token that gh refreshes automatically
-				  - Token expires: 2099-01-02T03:04:05Z
+				  - Token expires: 2099-01-02T03:04:05Z (in about 7 hours)
+				  - Refresh token expires: 2099-01-11T20:04:05Z (in about 10 days)
 				  - Token refreshed just now
 				  - Token scopes: 'repo', 'read:org'
 			`),
@@ -314,9 +320,11 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "no-refresh leaves an expiring token untouched",
 			opts: StatusOptions{NoRefresh: true},
+			now:  time.Date(2000, 1, 3, 0, 0, 0, 0, time.UTC),
 			cfgStubs: func(t *testing.T, c gh.Config) {
 				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past)
+				rtFuture := time.Date(2000, 1, 13, 0, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past, &rtFuture)
 				setRefresher(t, c, &ghmock.TokenRefresherMock{
 					RefreshFunc: func(string, string) (gh.RefreshableCredential, error) {
 						t.Error("refresher must not be called when --no-refresh is set")
@@ -336,7 +344,8 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_*****
 				  - Expiring token that gh refreshes automatically
-				  - Token expires: 2000-01-01T00:00:00Z
+				  - Token expires: 2000-01-01T00:00:00Z (expired about 2 days ago)
+				  - Refresh token expires: 2000-01-13T00:00:00Z (in about 10 days)
 				  - Token scopes: 'repo', 'read:org'
 			`),
 		},
@@ -345,7 +354,7 @@ func Test_statusRun(t *testing.T) {
 			opts: StatusOptions{},
 			cfgStubs: func(t *testing.T, c gh.Config) {
 				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past, nil)
 				setRefresher(t, c, &ghmock.TokenRefresherMock{
 					RefreshFunc: func(string, string) (gh.RefreshableCredential, error) {
 						return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
@@ -816,7 +825,7 @@ func Test_statusRun(t *testing.T) {
 			jsonFields: []string{"hosts"},
 			cfgStubs: func(t *testing.T, c gh.Config) {
 				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past, nil)
 				setRefresher(t, c, &ghmock.TokenRefresherMock{
 					RefreshFunc: func(string, string) (gh.RefreshableCredential, error) {
 						return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
@@ -848,6 +857,10 @@ func Test_statusRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if !tt.now.IsZero() {
+				timeNow = func() time.Time { return tt.now }
+				t.Cleanup(func() { timeNow = time.Now })
+			}
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
@@ -903,13 +916,14 @@ func login(t *testing.T, c gh.Config, hostname, username, token, protocol string
 	require.NoError(t, err)
 }
 
-func loginRefreshable(t *testing.T, c gh.Config, hostname, username, accessToken, refreshToken string, expiresAt *time.Time) {
+func loginRefreshable(t *testing.T, c gh.Config, hostname, username, accessToken, refreshToken string, expiresAt, refreshTokenExpiresAt *time.Time) {
 	t.Helper()
 	authCfg := c.Authentication().(*config.AuthConfig)
 	_, err := authCfg.LoginRefreshable(hostname, username, gh.Credential{
-		Token:        accessToken,
-		RefreshToken: refreshToken,
-		ExpiresAt:    expiresAt,
+		Token:                 accessToken,
+		RefreshToken:          refreshToken,
+		ExpiresAt:             expiresAt,
+		RefreshTokenExpiresAt: refreshTokenExpiresAt,
 	}, "https", false)
 	require.NoError(t, err)
 }
