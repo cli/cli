@@ -71,6 +71,14 @@ func TestFuzzyIn(t *testing.T) {
 		"2020-Dec-22 14:00:00": "in about 1 month",
 		"2021-Nov-22 14:00:00": "in about 1 year",
 		"2025-Nov-22 14:00:00": "in about 5 years",
+		// Durations just under a unit boundary round to the nominal value instead of reading one unit short.
+		"2020-Nov-22 15:59:59": "in about 2 hours",
+		"2021-May-21 13:59:59": "in about 6 months",
+		// Durations that round up to the next unit's threshold are reported in the larger unit.
+		"2020-Nov-22 14:59:50": "in about 1 hour",
+		"2020-Nov-23 13:50:00": "in about 1 day",
+		"2020-Dec-22 04:00:00": "in about 1 month",
+		"2021-Nov-07 14:00:00": "in about 1 year",
 	}
 	for target, expected := range cases {
 		d, err := time.Parse(form, target)
