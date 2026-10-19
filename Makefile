@@ -17,10 +17,8 @@ bin/gh$(EXE): script/build$(EXE)
 	@script/build$(EXE) $@
 
 # Builds bin/gh with the ghdebug build tag, which enables the GH_INTERNAL_* overrides in internal/debug.
-# The existing binary is removed first because script/build skips rebuilding when sources are unchanged.
 .PHONY: debug
 debug: script/build$(EXE)
-	@rm -f bin/gh$(EXE)
 	@GO_BUILDTAGS=ghdebug script/build$(EXE) bin/gh$(EXE)
 
 script/build$(EXE): script/build.go
