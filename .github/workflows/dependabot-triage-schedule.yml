@@ -42,43 +42,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           WORKLIST_PATH: ${{ steps.worklist.outputs.worklist_path }}
-        run: |
-          set -euo pipefail
-          failed=false
-
-          if ! active_titles=$(
-            for status in queued in_progress waiting; do
-              gh api \
-                "repos/$GITHUB_REPOSITORY/actions/workflows/dependabot-triage.lock.yml/runs?status=$status&per_page=100" \
-                --jq '.workflow_runs[].display_title' ||
-                exit 1
-            done
-          ); then
-            echo "::error::Could not determine whether Dependabot triage runs are active"
-            exit 1
-          fi
-
-          if printf '%s\n' "$active_titles" | grep -Fxq 'Dependabot triage PR #'; then
-            echo "A broad manual triage run is active; skipping this poll"
-            exit 0
-          fi
-
-          while IFS= read -r number; do
-            if printf '%s\n' "$active_titles" | grep -Fxq "Dependabot triage PR #$number"; then
-              echo "PR #$number: triage is already queued or running, skipping"
-              continue
-            fi
-
-            echo "Dispatching Dependabot triage for PR #$number"
-            if ! gh workflow run dependabot-triage.lock.yml \
-              --repo "$GITHUB_REPOSITORY" \
-              --ref "$DEFAULT_BRANCH" \
-              -f "pr_number=$number"; then
-              echo "::error::Failed to dispatch Dependabot triage for PR #$number"
-              failed=true
-            fi
-          done < <(jq -r '.[].number' "$WORKLIST_PATH")
-
-          if [ "$failed" = true ]; then
-            exit 1
-          fi
+        run: bash .github/scripts/dependabot-triage-dispatch.sh
