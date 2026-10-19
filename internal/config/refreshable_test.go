@@ -669,6 +669,59 @@ func TestLoginPurgesRefreshableRecord(t *testing.T) {
 	require.Equal(t, "plain-token", hostToken)
 }
 
+// TestLoginFailsWhenOtherCredentialKindSurvivesPurge covers the purge post-condition checks: an OS keyring can report a
+// delete as successful while the secret remains, and the surviving credential would then outrank the new login. Login
+// must surface that instead of activating the user and reporting success.
+func TestLoginFailsWhenOtherCredentialKindSurvivesPurge(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T)
+		login   func(authCfg *AuthConfig) error
+		wantErr string
+	}{
+		{
+			name: "non-expiring keyring token survives a refreshable login",
+			setup: func(t *testing.T) {
+				require.NoError(t, keyring.Set(keyringServiceName("github.com"), "test-user", "stale-token"))
+			},
+			login: func(authCfg *AuthConfig) error {
+				credential := gh.Credential{Token: "access", RefreshToken: "refresh"}
+				_, err := authCfg.LoginRefreshable("github.com", "test-user", credential, "ssh", true)
+				return err
+			},
+			wantErr: "could not remove the existing non-expiring credential, which would shadow this login",
+		},
+		{
+			name: "refreshable keyring record survives a non-expiring login",
+			setup: func(t *testing.T) {
+				setRefreshableKeyring(t, "github.com", "test-user", gh.Credential{Token: "access", RefreshToken: "refresh"})
+			},
+			login: func(authCfg *AuthConfig) error {
+				_, err := authCfg.Login("github.com", "test-user", "plain-token", "ssh", false)
+				return err
+			},
+			wantErr: "could not remove the existing refreshable credential, which would shadow this login",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authCfg := newTestAuthConfig(t)
+			tt.setup(t)
+
+			originalKeyringDelete := keyringDelete
+			t.Cleanup(func() { keyringDelete = originalKeyringDelete })
+			keyringDelete = func(service, user string) error { return nil }
+
+			err := tt.login(authCfg)
+			require.EqualError(t, err, tt.wantErr)
+
+			// The user was never activated.
+			_, err = authCfg.ActiveUser("github.com")
+			require.Error(t, err)
+		})
+	}
+}
+
 func TestWithFreshConfigUnderLockInvokesReloadBeforeFn(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 

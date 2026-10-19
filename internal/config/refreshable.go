@@ -30,6 +30,10 @@ var errRefreshableNotFound = errors.New("no refreshable credentials found")
 // expiry-based refresh decisions.
 var timeNow = time.Now
 
+// keyringDelete removes a keyring secret during the login purges. It is a package-level indirection so tests can
+// simulate a delete that silently leaves the secret in place, which the keyring mock cannot express.
+var keyringDelete = keyring.Delete
+
 // refreshLockFile names the cross-process lock, in the state directory, that serializes credential-store
 // read-modify-writes so they cannot race a token refresh. The name is refresh-centric because protecting the
 // single-use rotating refresh token from concurrent spending is why the lock exists, but any credential mutation that
@@ -175,7 +179,7 @@ func (c *AuthConfig) loginRefreshable(hostname, username string, credential gh.C
 func (c *AuthConfig) purgeRefreshableForLogin(hostname, username string) error {
 	// Best-effort removal in both stores, matching loginRefreshable's symmetric cleanup.
 	_ = c.cfg.Remove(refreshablePath(hostname, username))
-	_ = keyring.Delete(refreshableServiceName(hostname), username)
+	_ = keyringDelete(refreshableServiceName(hostname), username)
 
 	if _, _, err := c.refreshableForUser(hostname, username); err == nil {
 		return errors.New("could not remove the existing refreshable credential, which would shadow this login")
@@ -195,7 +199,7 @@ func (c *AuthConfig) purgeRefreshableForLogin(hostname, username string) error {
 func (c *AuthConfig) purgeNonExpiringForRefreshableLogin(hostname, username string) error {
 	// Best-effort removal in both stores, matching login's symmetric cleanup.
 	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username, oauthTokenKey})
-	_ = keyring.Delete(keyringServiceName(hostname), username)
+	_ = keyringDelete(keyringServiceName(hostname), username)
 
 	if _, err := keyring.Get(keyringServiceName(hostname), username); err == nil {
 		return errors.New("could not remove the existing non-expiring credential, which would shadow this login")
