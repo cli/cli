@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -44,6 +45,17 @@ func (c tinyConfig) LoginRefreshable(host, username string, credential gh.Creden
 
 func (c tinyConfig) UsersForHost(hostname string) []string {
 	return nil
+}
+
+// failingStorageConfig is a login config whose credential storage always fails.
+type failingStorageConfig struct{ tinyConfig }
+
+func (failingStorageConfig) Login(string, string, string, string, bool) (bool, error) {
+	return false, errors.New("storage failed")
+}
+
+func (failingStorageConfig) LoginRefreshable(string, string, gh.Credential, string, bool) (bool, error) {
+	return false, errors.New("storage failed")
 }
 
 func TestShouldCopyToClipboard(t *testing.T) {
@@ -745,6 +757,108 @@ func TestLogin_recordsAuthTelemetry(t *testing.T) {
 	assert.Equal(t, "false", dims["expiring_received"])
 	assert.Equal(t, "keyring", dims["storage_type"])
 	assert.Equal(t, "true", dims["auth_success"])
+}
+
+func TestLogin_recordsAuthTelemetryOnFailure(t *testing.T) {
+	// Telemetry must reflect how far the login got: an issued expiring token is recorded even when storing it fails,
+	// and a stored credential counts as a successful sign-in even when a later side effect fails.
+	tests := []struct {
+		name        string
+		config      iconfig
+		gitProtocol string
+		helperErr   error
+		setup       func(t *testing.T, opts *LoginOptions, reg *httpmock.Registry)
+		wantSuccess string
+	}{
+		{
+			name:        "storage fails after an expiring token is issued",
+			config:      failingStorageConfig{tinyConfig{}},
+			gitProtocol: "https",
+			wantSuccess: "false",
+		},
+		{
+			name:        "credential helper setup fails after storage",
+			config:      tinyConfig{},
+			gitProtocol: "https",
+			helperErr:   errors.New("helper setup failed"),
+			wantSuccess: "true",
+		},
+		{
+			name:        "SSH key upload fails after storage",
+			config:      tinyConfig{},
+			gitProtocol: "ssh",
+			setup: func(t *testing.T, opts *LoginOptions, reg *httpmock.Registry) {
+				dir := t.TempDir()
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "id_ed25519.pub"), []byte("PUBKEY asdf"), 0600))
+				opts.sshContext = ssh.NewContextForTests(dir, "")
+				reg.Register(httpmock.REST("GET", "user/keys"), httpmock.StatusStringResponse(500, "{}"))
+			},
+			wantSuccess: "true",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			recorder := &telemetry.InvocationRecorderSpy{}
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			opts := &LoginOptions{
+				IO:          ios,
+				Config:      tt.config,
+				HTTPClient:  &http.Client{Transport: reg},
+				Hostname:    "github.com",
+				Interactive: true,
+				GitProtocol: tt.gitProtocol,
+				Telemetry:   recorder,
+				Prompter: &prompter.PrompterMock{
+					SelectFunc: func(prompt, _ string, opts []string) (int, error) {
+						switch prompt {
+						case "How would you like to authenticate GitHub CLI?":
+							return prompter.IndexFor(opts, "Login with a web browser")
+						case "Upload your SSH public key to your GitHub account?":
+							return 0, nil
+						}
+						return -1, prompter.NoSuchPromptErr(prompt)
+					},
+					InputFunc: func(_, defaultValue string) (string, error) {
+						return defaultValue, nil
+					},
+				},
+				AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _, _ bool) (*authflow.AuthResult, error) {
+					return &authflow.AuthResult{
+						Token:       "ATOKEN",
+						Username:    "monalisa",
+						Refreshable: &gh.Credential{Token: "ATOKEN", RefreshToken: "RTOKEN"},
+					}, nil
+				},
+				CredentialFlow: &GitCredentialFlow{
+					Prompter: &prompter.PrompterMock{
+						ConfirmFunc: func(_ string, _ bool) (bool, error) {
+							return true, nil
+						},
+					},
+					HelperConfig: &gitcredentials.FakeHelperConfig{
+						SelfExecutablePath: "/path/to/gh",
+						Helpers:            map[string]gitcredentials.Helper{},
+						ConfigureOursErr:   tt.helperErr,
+					},
+				},
+			}
+			if tt.setup != nil {
+				tt.setup(t, opts, reg)
+			}
+
+			require.Error(t, Login(opts))
+
+			events := recorder.Events()
+			require.Len(t, events, 1)
+			dims := events[0].Dimensions
+			assert.Equal(t, "true", dims["expiring_received"])
+			assert.Equal(t, tt.wantSuccess, dims["auth_success"])
+		})
+	}
 }
 
 func TestLogin_recordsExpiringSetupCancelled(t *testing.T) {
