@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRemoveExcessiveWhitespace(t *testing.T) {
@@ -82,7 +83,7 @@ func TestFuzzyIn(t *testing.T) {
 	}
 	for target, expected := range cases {
 		d, err := time.Parse(form, target)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, expected, FuzzyIn(now, d))
 	}
 }
