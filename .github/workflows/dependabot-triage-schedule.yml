@@ -46,13 +46,17 @@ jobs:
           set -euo pipefail
           failed=false
 
-          active_titles=$(
+          if ! active_titles=$(
             for status in queued in_progress waiting; do
               gh api \
                 "repos/$GITHUB_REPOSITORY/actions/workflows/dependabot-triage.lock.yml/runs?status=$status&per_page=100" \
-                --jq '.workflow_runs[].display_title'
+                --jq '.workflow_runs[].display_title' ||
+                exit 1
             done
-          )
+          ); then
+            echo "::error::Could not determine whether Dependabot triage runs are active"
+            exit 1
+          fi
 
           if printf '%s\n' "$active_titles" | grep -Fxq 'Dependabot triage PR #'; then
             echo "A broad manual triage run is active; skipping this poll"
