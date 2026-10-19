@@ -1,11 +1,14 @@
 ---
 description: |
-  Agentic triage for open Dependabot pull requests. Runs on a schedule as a
-  reconciler: for each open PR authored by dependabot[bot] it emits a
+  Agentic triage for open Dependabot pull requests. Runs when dispatched by a
+  deterministic scheduler or maintainer: for each selected open PR authored by
+  dependabot[bot] it emits a
   recommendation (Merge / Review before merging / Do not merge) plus confidence
   (High / Medium / Low), validating the change against the upstream source diff.
   It posts exactly one comment per PR head commit and re-comments only when that
   commit changes. It is advisory only and NEVER merges, approves, or labels a PR.
+
+run-name: "Dependabot triage PR #${{ inputs.pr_number }}"
 
 # NOTE: the dedup marker is deliberately visible markdown, not an HTML comment.
 # Two separate gh-aw layers strip HTML comments: the prompt renderer erases them
@@ -15,11 +18,9 @@ description: |
 # breaks dedup and makes this workflow re-comment on every run. Both were
 # observed in a trial run. Do not "tidy" the marker into an HTML comment.
 #
-# Scheduled reconciler ONLY. This workflow intentionally has no pull_request or
+# Dispatched reconciler ONLY. This workflow intentionally has no pull_request or
 # pull_request_target trigger: it never runs in a pull-request-authored context,
-# so it never checks out or executes untrusted PR head code, and it can hold
-# repository secrets (unlike Dependabot-triggered events, which run with a
-# read-only token and no Actions secrets).
+# so it never checks out or executes untrusted PR head code.
 #
 # That does NOT mean the agent is free of untrusted input. It deliberately reads
 # attacker-influenceable content: Dependabot PR bodies, changelogs, and upstream
@@ -33,9 +34,8 @@ description: |
 #
 # Before adding any capability here - another safe-output, a network domain, a
 # tool, or a secret in the agent job's environment - re-evaluate both. The
-# scheduled trigger does not make additions safe by itself.
+# trusted dispatch context does not make additions safe by itself.
 on:
-  schedule: every 1h # fuzzy: compiler scatters the minute to avoid load spikes
   workflow_dispatch:
     inputs:
       pr_number:
@@ -65,23 +65,20 @@ engine: copilot
 
 timeout-minutes: 30
 
-# Deterministic pre-flight gate. This replaces what used to be Steps 1-3 of the
-# triager skill (list PRs, read head SHA, check CI, dedup against the marker in
-# our own prior comment). That work is pure API calls plus string comparison, so
-# running it in the agent cost real inference: a run that ultimately posted
-# nothing still made 8 LLM calls for ~50-75 AIC, and the single most expensive
-# call was the agent re-ingesting its own accumulated triage comments. That cost
-# grew every time the workflow commented, because hide-older-comments only
-# minimizes comments in the UI - REST still returns them all.
+concurrency:
+  job-discriminator: ${{ inputs.pr_number || github.run_id }}
+
+# Deterministic pre-flight gate. The 30-minute scheduler runs the same script
+# before dispatching this workflow, and this run repeats the check to close
+# races and validate manual input before the agent starts.
 #
 # Writing a `noop` entry to $GH_AW_SAFE_OUTPUTS makes the harness exit before
 # starting the engine, so a no-work run charges zero AI Credits. Actions minutes
 # are free for this public repository.
 #
-# This also hardens scope: the set of in-scope PRs is now computed
-# deterministically rather than by the agent, so the prompt-level restriction
-# backing `add-comment: target: "*"` no longer depends on the agent searching
-# correctly.
+# This also hardens scope: the set of in-scope PRs is computed deterministically
+# rather than by the agent, so the prompt-level restriction backing
+# `add-comment: target: "*"` no longer depends on the agent searching correctly.
 steps:
   - name: Compute Dependabot triage work list
     id: worklist
@@ -89,134 +86,9 @@ steps:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_REPOSITORY: ${{ github.repository }}
       PR_NUMBER_INPUT: ${{ github.event.inputs.pr_number }}
-      # This step runs before the compiler's own safe-outputs setup, so the
-      # variable is not otherwise in scope here. Same source the generated steps
-      # use, so the path cannot drift.
       GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
-    run: |
-      set -euo pipefail
-      mkdir -p /tmp/gh-aw
-      WORKLIST=/tmp/gh-aw/dependabot-worklist.json
-
-      # The safe-outputs directory is created by a later generated step, so
-      # create it here before appending. Fall back to the compiler's own path if
-      # the variable is ever empty rather than failing under `set -u`.
-      SAFE_OUT="${GH_AW_SAFE_OUTPUTS:-${RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl}"
-      mkdir -p "$(dirname "$SAFE_OUT")"
-
-      # Treat the dispatch input as a PR number and nothing else.
-      single=""
-      if [ -n "${PR_NUMBER_INPUT:-}" ]; then
-        if printf '%s' "$PR_NUMBER_INPUT" | grep -qE '^[1-9][0-9]*$'; then
-          single="$PR_NUMBER_INPUT"
-          echo "Dispatch input restricts this run to PR #$single"
-        else
-          echo "Ignoring non-numeric pr_number input"
-          echo '[]' > "$WORKLIST"
-          echo "needs_go=false" >> "$GITHUB_OUTPUT"
-          echo '{"type":"noop","message":"pr_number input was not a positive integer"}' >> "$SAFE_OUT"
-          exit 0
-        fi
-      fi
-
-      prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
-              --author app/dependabot --limit 100 \
-              --json number,headRefOid,statusCheckRollup)
-
-      # gh truncates silently at --limit, and the listing order is stable, so
-      # anything past the cap would never be reached on a later run either. The
-      # cap is well above both the realistic number of open Dependabot PRs and
-      # the safe-output comment cap, so say so rather than paginate for a case
-      # that would already be degenerate.
-      if [ "$(printf '%s' "$prs" | jq length)" -ge 100 ]; then
-        echo "::warning::Open Dependabot PRs hit the 100 listing cap; any beyond it are not being triaged."
-      fi
-
-      if [ -n "$single" ]; then
-        prs=$(printf '%s' "$prs" | jq --argjson n "$single" '[.[] | select(.number == $n)]')
-      fi
-
-      # A PR is ready to assess only when every check has reached a terminal
-      # state. statusCheckRollup mixes CheckRun (has .status) and StatusContext
-      # (has .state) shapes, so both are handled. A null rollup means the checks
-      # could not be read at all rather than that there are none - a dropped
-      # `checks:`/`statuses:` permission would look like this - so count it as
-      # pending. Treating it as ready would silently assess PRs mid-CI.
-      jq_pending='
-        def pending:
-          if has("status") then (.status != "COMPLETED")
-          else ((.state // "SUCCESS") as $s | $s == "PENDING" or $s == "EXPECTED")
-          end;
-        def pending_names:
-          if .statusCheckRollup == null then ["<check status unreadable>"]
-          else [.statusCheckRollup[] | select(pending) | (.name // .context // "unnamed")]
-          end;
-      '
-
-      ready=$(printf '%s' "$prs" | jq -c "$jq_pending"'
-        [ .[]
-          | select((pending_names | length) == 0)
-          | {number: .number, head_sha: .headRefOid} ]')
-
-      # Name the PRs this gate excluded. A check that never reaches a terminal
-      # state would otherwise keep a PR out of triage forever, silently.
-      printf '%s' "$prs" | jq -r "$jq_pending"'
-        .[]
-        | . as $pr
-        | pending_names
-        | select(length > 0)
-        | "PR #\($pr.number): skipped, checks still pending: \(join(", "))"'
-
-      echo "PRs with terminal CI: $(printf '%s' "$ready" | jq length)"
-
-      work='[]'
-      needs_go=false
-      for row in $(printf '%s' "$ready" | jq -r '.[] | @base64'); do
-        entry=$(printf '%s' "$row" | base64 --decode)
-        n=$(printf '%s' "$entry" | jq -r '.number')
-        head=$(printf '%s' "$entry" | jq -r '.head_sha')
-
-        # Find the newest dedup marker in our own comments. This read depends on
-        # `integrity-proxy: false` in the imported envelope: the pre-agent DIFC
-        # proxy applies min-integrity but not trusted-users, so with it enabled
-        # our own comments are filtered out here and dedup silently fails open.
-        assessed=$(gh api "repos/$GITHUB_REPOSITORY/issues/$n/comments" --paginate \
-                     --jq '.[] | select(.user.login == "cli-triage[bot]") | .body' \
-                   | grep -oE '_Assessed at head commit `[0-9a-f]{40}`\._' \
-                   | tail -1 | grep -oE '[0-9a-f]{40}' || true)
-
-        if [ "$assessed" = "$head" ]; then
-          echo "PR #$n: already assessed at $head, skipping"
-        else
-          echo "PR #$n: needs assessment (head $head, last assessed '${assessed:-none}')"
-          work=$(printf '%s' "$work" | jq -c --argjson e "$entry" '. + [$e]')
-
-          # Most Dependabot traffic here bumps GitHub Actions, not Go modules,
-          # and the vendored Go artifacts are meaningless for those. Only pay
-          # for vendoring when something in scope actually moves the Go
-          # manifests. Treat an unreadable file list as "might be Go" so a
-          # transient API failure degrades to wasted work rather than to
-          # missing evidence.
-          files=$(gh pr view "$n" --repo "$GITHUB_REPOSITORY" --json files \
-                    --jq '.files[].path' 2>/dev/null) || files="go.mod"
-          if printf '%s\n' "$files" | grep -qE '^(go\.mod|go\.sum)$'; then
-            needs_go=true
-          fi
-        fi
-      done
-
-      printf '%s' "$work" > "$WORKLIST"
-      count=$(printf '%s' "$work" | jq length)
-      echo "Work list: $count PR(s) -> $WORKLIST"
-
-      # Gates the vendoring step below, so a run with no Go dependency work
-      # costs no module downloads on top of costing no AI Credits.
-      echo "needs_go=$needs_go" >> "$GITHUB_OUTPUT"
-      echo "Go reachability evidence needed: $needs_go"
-
-      if [ "$count" -eq 0 ]; then
-        echo '{"type":"noop","message":"No Dependabot PRs need triage: all open PRs are already assessed at their current head commit, or their CI is still pending."}' >> "$SAFE_OUT"
-      fi
+      WORKLIST_PATH: /tmp/gh-aw/dependabot-worklist.json
+    run: bash .github/scripts/dependabot-triage.sh select
 
   # Dependency reachability evidence. The agent is asked whether an upstream
   # change can reach this repository. It used to answer that by grepping our
