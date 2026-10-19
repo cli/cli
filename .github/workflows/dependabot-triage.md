@@ -8,6 +8,8 @@ description: |
   It posts exactly one comment per PR head commit and re-comments only when that
   commit changes. It is advisory only and NEVER merges, approves, or labels a PR.
 
+run-name: "Dependabot triage PR #${{ inputs.pr_number }}"
+
 # NOTE: the dedup marker is deliberately visible markdown, not an HTML comment.
 # Two separate gh-aw layers strip HTML comments: the prompt renderer erases them
 # from this file's body (so the agent would be told to look for an empty
