@@ -29,15 +29,18 @@
 # Usage:
 #   script/refreshable-token-gitcredential-e2e.sh
 #
+# Build with internal debug overrides before running:
+#   make debug
+#
 # Run this from a standalone terminal, not VS Code's integrated terminal: VS Code
 # injects its own GIT_ASKPASS and credential helper that intercept git credential
 # requests before gh, so gh's helper would never be exercised. The script refuses
-# to run under VS Code unless GH_E2E_ALLOW_VSCODE=1 is set.
+# to run under VS Code unless GH_INTERNAL_E2E_ALLOW_VSCODE=1 is set.
 #
 # Environment:
-#   GH_BIN              Path to the gh binary to test. Defaults to ./bin/gh, else gh on PATH.
-#   GH_E2E_HOST         Host to authenticate against. Defaults to github.com.
-#   GH_E2E_ALLOW_VSCODE Set to bypass the VS Code integrated-terminal guard.
+#   GH_INTERNAL_E2E_BIN          Path to the gh binary to test. Defaults to ./bin/gh, else gh on PATH.
+#   GH_INTERNAL_E2E_HOST         Host to authenticate against. Defaults to github.com.
+#   GH_INTERNAL_E2E_ALLOW_VSCODE Set to bypass the VS Code integrated-terminal guard.
 
 set -uo pipefail
 
@@ -193,11 +196,11 @@ next_step() {
 # ---------------------------------------------------------------------------
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-GH="${GH_BIN:-$ROOT/bin/gh}"
+GH="${GH_INTERNAL_E2E_BIN:-$ROOT/bin/gh}"
 if [ ! -x "$GH" ]; then
   GH="$(command -v gh || true)"
 fi
-HOST="${GH_E2E_HOST:-github.com}"
+HOST="${GH_INTERNAL_E2E_HOST:-github.com}"
 HELPER_KEY="credential.https://$HOST.helper"
 NONCACHEABLE_WARNING="cannot mark the expiring token as non-cacheable"
 
@@ -207,13 +210,13 @@ GH_DISPLAY="gh"
 
 require_gh() {
   if [ -z "$GH" ]; then
-    echo "No gh binary found. Build the stack (make) or set GH_BIN." >&2
+    echo "No gh binary found. Build with make debug or set GH_INTERNAL_E2E_BIN." >&2
     exit 1
   fi
-  # The scenarios rely on testing-only env hacks compiled into this build.
-  if ! grep -aq 'GH_AT_EXPIRES_IN' "$GH"; then
-    echo "This gh binary lacks the testing hacks (GH_AT_EXPIRES_IN)." >&2
-    echo "Check out and build the refreshable-token stack, then retry." >&2
+  # The scenarios require the internal overrides enabled by the ghdebug build tag.
+  if ! "$GH" version | grep -q '\[debug build\]'; then
+    echo "This gh binary is not a debug build, so the GH_INTERNAL_* overrides are unavailable." >&2
+    echo "Build with: make debug" >&2
     exit 1
   fi
 }
@@ -242,10 +245,10 @@ in_vscode() {
 # VS Code injects its own GIT_ASKPASS and credential helper, which intercept git
 # credential requests before gh is consulted, so git never exercises the gh
 # helper and instead serves or prompts for a credential VS Code manages. Run this
-# script from a standalone terminal instead. Set GH_E2E_ALLOW_VSCODE=1 to bypass
-# this guard if you are certain your VS Code is not intercepting credentials.
+# script from a standalone terminal instead. Set GH_INTERNAL_E2E_ALLOW_VSCODE=1 to
+# bypass this guard if you are certain your VS Code is not intercepting credentials.
 require_external_terminal() {
-  if [ -n "${GH_E2E_ALLOW_VSCODE:-}" ]; then
+  if [ -n "${GH_INTERNAL_E2E_ALLOW_VSCODE:-}" ]; then
     return
   fi
   if in_vscode; then
@@ -259,7 +262,7 @@ require_external_terminal() {
     note "Run this script from a standalone terminal (for example Terminal.app, iTerm2,"
     note "GNOME Terminal, Konsole, or Windows Terminal), not the VS Code panel."
     note "If you are certain VS Code is not intercepting credentials, rerun with"
-    note "GH_E2E_ALLOW_VSCODE=1 to bypass this guard."
+    note "GH_INTERNAL_E2E_ALLOW_VSCODE=1 to bypass this guard."
     exit 1
   fi
 }
@@ -418,11 +421,11 @@ label "Given" "gh is the credential helper and the access token is expired or ne
 label "When" "git asks gh for credentials"
 label "Then" "gh refreshes the token first, then hands git a working credential"
 cmdline "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_git \
   "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill" \
-  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | GH_AT_EXPIRES_IN=1 GH_DEBUG=api GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
 
 label "Expected:"
 assert_refresh "gh refreshed the token before handing it to git"
@@ -459,8 +462,8 @@ label "When" "git asks gh for credentials and gh's refresh attempt is rejected"
 label "Then" "gh clears its now-dead stored credential, hands git nothing, and tells you (through git) to run gh auth login"
 cmdline "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill"
 heading "  This step logs you out of $HOST in gh."
-note   "  (Access-token and refresh-token expiry are both forced via the GH_AT_EXPIRES_IN"
-note   "   and GH_RT_EXPIRES_IN test hacks, so gh attempts a refresh and the refresh is"
+note   "  (Access-token and refresh-token expiry are both forced via the GH_INTERNAL_AT_EXPIRES_IN"
+note   "   and GH_INTERNAL_RT_EXPIRES_IN debug overrides, so gh attempts a refresh and the refresh is"
 note   "   rejected. On rejection gh removes its locally stored credential for the host,"
 note   "   just as it would when the real server rejects a refresh token. The token is"
 note   "   not revoked server-side; only gh's local copy is cleared, so you must run"
@@ -469,7 +472,7 @@ note   "  (A non-zero exit is expected here: git gets no credential.)"
 confirm_run
 run_git \
   "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill" \
-  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | GH_AT_EXPIRES_IN=1 GH_RT_EXPIRES_IN=1 GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | GH_INTERNAL_AT_EXPIRES_IN=1 GH_INTERNAL_RT_EXPIRES_IN=1 GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
 
 label "Expected:"
 assert_err_contains "gh reports the token has expired" "has expired"

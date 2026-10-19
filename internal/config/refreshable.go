@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cli/cli/v2/internal/debug"
 	"github.com/cli/cli/v2/internal/flock"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -348,64 +349,29 @@ const refreshExpiryLeeway = 10 * time.Minute
 
 // accessTokenNeedsRefresh reports whether the credential's access token has expired or falls within refreshExpiryLeeway
 // of expiring as of now. A credential with no recorded expiry is treated as needing a refresh, since gh cannot prove
-// the token is still valid.
+// the token is still valid. A debug lifetime override is anchored at the token's original issuance.
 func accessTokenNeedsRefresh(credential gh.Credential, now time.Time) bool {
-	// TESTING-ONLY HACK: remove before release, together with applyTestingExpiryOverride.
-	credential = applyTestingExpiryOverride(credential)
 	if credential.ExpiresAt == nil {
 		return true
 	}
-	return !now.Add(refreshExpiryLeeway).Before(*credential.ExpiresAt)
-}
-
-// applyTestingExpiryOverride returns a copy of credential whose access token expiry is reinterpreted per the
-// GH_AT_EXPIRES_IN testing override, so every refresh decision (and thus the WithRefresh accessors) gates on the
-// overridden lifetime even for a credential that was acquired without the override. The lifetime is anchored at the
-// token's original issuance (stored ExpiresAt minus stored ExpiresIn), so a value of n means "expires n seconds after
-// it was issued". The refresh token lifetime is handled separately by refreshTokenExpired.
-//
-// TESTING-ONLY HACK: remove before release, together with its call site in accessTokenNeedsRefresh.
-func applyTestingExpiryOverride(credential gh.Credential) gh.Credential {
-	if n, ok := testingExpiryOverrideFromEnv("GH_AT_EXPIRES_IN"); ok && credential.ExpiresAt != nil {
+	expiresAt := *credential.ExpiresAt
+	if lifetime, ok := debug.Config().AccessTokenExpiresIn.Value(); ok {
 		issuedAt := credential.ExpiresAt.Add(-time.Duration(credential.ExpiresIn) * time.Second)
-		expiresAt := issuedAt.Add(time.Duration(n) * time.Second).UTC()
-		credential.ExpiresIn = n
-		credential.ExpiresAt = &expiresAt
+		expiresAt = issuedAt.Add(lifetime)
 	}
-	return credential
+	return !now.Add(refreshExpiryLeeway).Before(expiresAt)
 }
 
-// refreshTokenExpired reports whether the credential's refresh token has expired as of now, per the GH_RT_EXPIRES_IN
-// testing override. Without the override it always returns false: nothing in this layer otherwise gates on refresh
-// token expiry, because a real refresh token's expiry is realized only when the server rejects it. The lifetime is
-// anchored at the refresh token's original issuance (stored RefreshTokenExpiresAt minus stored RefreshTokenExpiresIn),
-// so a value of n means "expires n seconds after it was issued".
-//
-// TESTING-ONLY HACK: remove before release, together with its call site in refreshCredentialForUser.
-func refreshTokenExpired(credential gh.Credential, now time.Time) bool {
-	n, ok := testingExpiryOverrideFromEnv("GH_RT_EXPIRES_IN")
-	if !ok || credential.RefreshTokenExpiresAt == nil {
-		return false
+// simulateRefreshTokenExpired simulates refresh token expiry when a debug lifetime override is set.
+// The override is anchored at issuance, computed from the stored expiry and lifetime.
+// Without an override it always returns false; real expiry is detected from the server's rejection.
+func simulateRefreshTokenExpired(credential gh.Credential, now time.Time) bool {
+	if lifetime, ok := debug.Config().RefreshTokenExpiresIn.Value(); ok && credential.RefreshTokenExpiresAt != nil {
+		issuedAt := credential.RefreshTokenExpiresAt.Add(-time.Duration(credential.RefreshTokenExpiresIn) * time.Second)
+		expiresAt := issuedAt.Add(lifetime)
+		return !now.Before(expiresAt)
 	}
-	issuedAt := credential.RefreshTokenExpiresAt.Add(-time.Duration(credential.RefreshTokenExpiresIn) * time.Second)
-	expiresAt := issuedAt.Add(time.Duration(n) * time.Second)
-	return !now.Before(expiresAt)
-}
-
-// testingExpiryOverrideFromEnv reads a token lifetime override in seconds from the named environment variable. It
-// reports false when the variable is unset, empty, or not a valid integer.
-//
-// TESTING-ONLY HACK: remove before release, together with its call sites.
-func testingExpiryOverrideFromEnv(name string) (int, bool) {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return 0, false
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, false
-	}
-	return n, true
+	return false
 }
 
 // credentialFromRefreshable projects a renewed RefreshableCredential onto the universal gh.Credential shape, tagging it
@@ -451,11 +417,9 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 			status = gh.RefreshStatusUnnecessary
 			return nil
 		}
-		if refreshTokenExpired(current, timeNow()) {
-			// TESTING-ONLY HACK: simulate the server rejecting an expired refresh token so refresh token expiry can
-			// be exercised without waiting for the real lifetime. This mirrors the ErrRefreshTokenInvalid handling
-			// below, including gating the destructive cleanup on lockHeld. Remove before release, together with
-			// refreshTokenExpired.
+		if simulateRefreshTokenExpired(current, timeNow()) {
+			// Simulate server rejection under the debug override, mirroring the ErrRefreshTokenInvalid
+			// handling below, including gating destructive cleanup on lockHeld.
 			result = gh.Credential{}
 			status = gh.RefreshStatusExpired
 			if lockHeld {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"regexp"
 	"sync"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/debug"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -218,18 +218,20 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 }
 
 // tokenRefresherHttpClientFunc builds the HTTP client used to renew OAuth tokens. It mirrors plainHttpClientFunc but
-// sets LogHeadlineOnly so that, under GH_DEBUG=api, the refresh exchange is logged as a single head line rather than a
+// defaults to headline-only logging so that, under GH_DEBUG=api, the refresh exchange does not produce a
 // full request/response trace. A token refresh is a side-band exchange triggered from within an ordinary request's
 // round trip, so a verbose trace would interleave the refresh traffic in the middle of the request trace the user is
 // actually inspecting. Auth flows that should surface their own full traffic use f.PlainHttpClient instead.
 func tokenRefresherHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
-		// TESTING HACK ONLY: GH_DEBUG_REFRESH_TOKEN unset or "0" keeps head-line-only; any other value logs verbose refresh traffic.
-		refreshDebug := os.Getenv("GH_DEBUG_REFRESH_TOKEN")
+		logHeadlineOnly := true
+		if verbose, ok := debug.Config().VerboseTokenRefresh.Value(); ok {
+			logHeadlineOnly = !verbose
+		}
 		opts := api.HTTPClientOptions{
 			Log:             ios.ErrOut,
 			LogColorize:     ios.ColorEnabled(),
-			LogHeadlineOnly: refreshDebug == "" || refreshDebug == "0",
+			LogHeadlineOnly: logHeadlineOnly,
 			AppVersion:      appVersion,
 			InvokingAgent:   invokingAgent,
 			// This is required to prevent automatic setting of auth and other headers.
