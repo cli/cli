@@ -711,11 +711,23 @@ func TestWithFreshConfigUnderLockPropagatesError(t *testing.T) {
 	require.ErrorIs(t, err, sentinel)
 }
 
+func TestFlockRefreshLockCreatesMissingDirectory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state", "gh", refreshLockFile)
+
+	unlock, err := flockRefreshLock(t.Context(), path)
+	require.NoError(t, err)
+	defer unlock()
+
+	require.FileExists(t, path)
+}
+
 func TestWithFreshConfigUnderLockProceedsWhenStateDirCannotBeCreated(t *testing.T) {
 	// If we have reached a refresh, the environment is already set up enough to proceed. A read-only mount (or any
 	// other reason the state directory cannot be created) must not fail the user's command; we degrade to running
 	// without the lock, exactly as when the lock cannot be acquired.
 	authCfg := newTestAuthConfig(t)
+	// Use the real acquirer, since creating the state directory happens behind the lock seam.
+	authCfg.acquireRefreshLock = flockRefreshLock
 
 	// Point the state dir under a regular file so MkdirAll fails with ENOTDIR regardless of privileges (running as
 	// root would bypass a read-only directory bit, but never a non-directory path component).

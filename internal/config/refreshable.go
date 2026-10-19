@@ -43,9 +43,13 @@ const refreshLockFile = "refresh.lock"
 // unsupported lock cannot wedge gh indefinitely.
 const refreshLockTimeout = 60 * time.Second
 
-// flockRefreshLock acquires the cross-process refresh lock with flock. It is the production implementation used when
-// AuthConfig.acquireRefreshLock is nil.
+// flockRefreshLock acquires the cross-process refresh lock with flock, creating the lock file's directory first. It is
+// the production implementation used when AuthConfig.acquireRefreshLock is nil. Creating the directory here, behind the
+// seam, keeps every filesystem effect of locking out of tests that stub the seam.
 func flockRefreshLock(ctx context.Context, path string) (unlock func(), err error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0771); err != nil {
+		return nil, err
+	}
 	_, unlock, err = flock.Lock(ctx, path)
 	return unlock, err
 }
@@ -77,24 +81,21 @@ func (c *AuthConfig) withFreshConfigForRefresh(fn func(lockHeld bool) error) err
 	// and spending a rotating token twice.
 	var lockHeld bool
 	unlock := func() {}
+	ctx, cancel := context.WithTimeout(context.Background(), refreshLockTimeout)
+	defer cancel()
+
+	acquire := c.acquireRefreshLock
+	if acquire == nil {
+		acquire = flockRefreshLock
+	}
+
 	// Put the lock in the state directory, not the config directory. The config directory can be read-only: under nix
 	// home-manager and similar setups, managed config files are symlinked into the immutable nix store, so creating a
 	// lock file there always fails. The state directory is XDG's location for writable runtime state, home-manager
 	// leaves it writable, and gh already writes state there (state.yml, telemetry), so it is the safer bet.
-	dir := ghConfig.StateDir()
-	if err := os.MkdirAll(dir, 0771); err == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), refreshLockTimeout)
-		defer cancel()
-
-		acquire := c.acquireRefreshLock
-		if acquire == nil {
-			acquire = flockRefreshLock
-		}
-
-		if u, err := acquire(ctx, filepath.Join(dir, refreshLockFile)); err == nil {
-			unlock = u
-			lockHeld = true
-		}
+	if u, err := acquire(ctx, filepath.Join(ghConfig.StateDir(), refreshLockFile)); err == nil {
+		unlock = u
+		lockHeld = true
 	}
 	defer unlock()
 
