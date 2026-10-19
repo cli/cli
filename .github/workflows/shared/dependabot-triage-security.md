@@ -87,24 +87,22 @@ safe-outputs:
   # deliberately no merge, approve, or label safe-output, so the triager is
   # advisory only and can never auto-merge a pull request.
   #
-  # `target: "*"` is unavoidable here: a scheduled reconciler has no single
-  # triggering item and must address many different PR numbers in one pass. It
-  # means the safe-output layer will accept a comment aimed at ANY issue or PR
-  # in this repository, so the restriction to Dependabot PRs is enforced by the
-  # agent prompt, not by this config. `max` is the blast-radius cap if that
+  # `target: "*"` is unavoidable here: a dispatched reconciler has no single
+  # triggering item. It means the safe-output layer will accept a comment aimed
+  # at ANY issue or PR in this repository, so the restriction to Dependabot PRs
+  # is enforced by the agent prompt, not by this config. `max` is the
+  # blast-radius cap if that
   # prompt-level restriction is ever subverted - keep it just above the
   # realistic number of open Dependabot PRs, not at some large round number.
   add-comment:
-    target: "*"                 # a scheduled run has no single triggering item
+    target: "*"                 # a dispatched run has no triggering item
     max: 20                     # blast-radius cap; > typical open Dependabot PRs
     hide-older-comments: true   # collapse the superseded triage comment
     footer: true
-  # A `noop` is the normal outcome for this workflow, not an exception: the
-  # pre-flight step emits one whenever no Dependabot PR needs assessment, which
-  # on an hourly schedule is most runs. gh-aw's default handling posts a comment
-  # to a shared "no-op runs" issue every time, so leaving it on would add roughly
-  # 24 comments a day to that issue forever. The Actions run log already records
-  # why a run did nothing.
+  # A `noop` is an expected outcome when eligibility changes between the
+  # scheduler and the dispatched run, or when a manual request is invalid.
+  # gh-aw's default handling posts a comment to a shared "no-op runs" issue, but
+  # the Actions run log already records why this workflow did nothing.
   noop:
     report-as-issue: false
 ---

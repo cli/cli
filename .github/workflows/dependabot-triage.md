@@ -66,9 +66,9 @@ timeout-minutes: 30
 concurrency:
   job-discriminator: ${{ inputs.pr_number || github.run_id }}
 
-# Deterministic pre-flight gate. The hourly scheduler runs the same script before
-# dispatching this workflow, and this run repeats the check to close races and
-# validate manual input before the agent starts.
+# Deterministic pre-flight gate. The 30-minute scheduler runs the same script
+# before dispatching this workflow, and this run repeats the check to close
+# races and validate manual input before the agent starts.
 #
 # Writing a `noop` entry to $GH_AW_SAFE_OUTPUTS makes the harness exit before
 # starting the engine, so a no-work run charges zero AI Credits. Actions minutes

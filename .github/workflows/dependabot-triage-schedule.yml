@@ -3,7 +3,7 @@ name: Dependabot PR Triage Scheduler
 on:
   workflow_dispatch:
   schedule:
-    - cron: "39 * * * *"
+    - cron: "9,39 * * * *"
 
 permissions: {}
 
