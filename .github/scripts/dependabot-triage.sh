@@ -138,7 +138,7 @@ dispatch_worklist() {
 	failed=false
 
 	if ! active_titles=$(
-		for status in queued in_progress waiting; do
+		for status in queued in_progress waiting pending; do
 			gh api \
 				"repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?status=$status&per_page=100" \
 				--jq '.workflow_runs[].display_title' ||
@@ -156,7 +156,7 @@ dispatch_worklist() {
 
 	while IFS= read -r number; do
 		if printf '%s\n' "$active_titles" | grep -Fxq "Dependabot triage PR #$number"; then
-			echo "PR #$number: triage is already queued or running, skipping"
+			echo "PR #$number: triage is already queued or active, skipping"
 			continue
 		fi
 
