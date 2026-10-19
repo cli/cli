@@ -157,6 +157,120 @@ func TestAddJSONFlagsWithoutShorthand(t *testing.T) {
 	}
 }
 
+func TestAddJSONAndJQFlags(t *testing.T) {
+	tests := []struct {
+		name        string
+		fields      []string
+		args        []string
+		setupCmd    func(cmd *cobra.Command)
+		wantsExport *jsonExporter
+		wantsError  string
+	}{
+		{
+			name:        "no JSON flag",
+			fields:      []string{},
+			args:        []string{},
+			wantsExport: nil,
+		},
+		{
+			name:        "empty JSON flag",
+			fields:      []string{"one", "two"},
+			args:        []string{"--json"},
+			wantsExport: nil,
+			wantsError:  "Specify one or more comma-separated fields for `--json`:\n  one\n  two",
+		},
+		{
+			name:        "invalid JSON field",
+			fields:      []string{"id", "number"},
+			args:        []string{"--json", "idontexist"},
+			wantsExport: nil,
+			wantsError:  "Unknown JSON field: \"idontexist\"\nAvailable fields:\n  id\n  number",
+		},
+		{
+			name:        "cannot combine --json with --web",
+			fields:      []string{"id", "number", "title"},
+			args:        []string{"--json", "id", "--web"},
+			wantsExport: nil,
+			wantsError:  "cannot use `--web` with `--json`",
+		},
+		{
+			name:        "cannot use --jq without --json",
+			fields:      []string{},
+			args:        []string{"--jq", ".number"},
+			wantsExport: nil,
+			wantsError:  "cannot use `--jq` without specifying `--json`",
+		},
+		{
+			name:   "with JSON fields",
+			fields: []string{"id", "number", "title"},
+			args:   []string{"--json", "number,title"},
+			wantsExport: &jsonExporter{
+				fields:   []string{"number", "title"},
+				filter:   "",
+				template: "",
+			},
+		},
+		{
+			name:   "with jq filter without shorthand",
+			fields: []string{"id", "number", "title"},
+			args:   []string{"--json", "number", "--jq", ".number"},
+			wantsExport: &jsonExporter{
+				fields:   []string{"number"},
+				filter:   ".number",
+				template: "",
+			},
+		},
+		{
+			name:   "command template flag does not conflict or error when used with json",
+			fields: []string{"id", "number"},
+			args:   []string{"--json", "number", "--template", "mytemplate.md"},
+			setupCmd: func(cmd *cobra.Command) {
+				cmd.Flags().StringP("template", "T", "", "Template file")
+			},
+			wantsExport: &jsonExporter{
+				fields:   []string{"number"},
+				filter:   "",
+				template: "",
+			},
+		},
+		{
+			name:   "command template flag used alone does not error",
+			fields: []string{"id", "number"},
+			args:   []string{"--template", "mytemplate.md"},
+			setupCmd: func(cmd *cobra.Command) {
+				cmd.Flags().StringP("template", "T", "", "Template file")
+			},
+			wantsExport: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{Run: func(*cobra.Command, []string) {}}
+			cmd.Flags().Bool("web", false, "")
+			if tt.setupCmd != nil {
+				tt.setupCmd(cmd)
+			}
+			var exporter Exporter
+			AddJSONAndJQFlags(cmd, &exporter, tt.fields)
+			cmd.SetArgs(tt.args)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			_, err := cmd.ExecuteC()
+			if tt.wantsError == "" {
+				require.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantsError)
+				return
+			}
+			if tt.wantsExport == nil {
+				assert.Nil(t, exporter)
+			} else {
+				assert.Equal(t, tt.wantsExport, exporter)
+			}
+		})
+	}
+}
+
 // TestAddJSONFlagsSetsAnnotations asserts that `AddJSONFlags` function adds the
 // appropriate annotation to the command, which could later be used by doc
 // generator functions.

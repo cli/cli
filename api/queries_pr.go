@@ -494,6 +494,12 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]any) 
 				pullRequest {
 					id
 					url
+					number
+					title
+					body
+					state
+					headRefName
+					baseRefName
 				}
 			}
 	}`

@@ -34,8 +34,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var prRecordFields = []string{
+	"baseRefName",
+	"body",
+	"headRefName",
+	"id",
+	"number",
+	"state",
+	"title",
+	"url",
+}
+
 type CreateOptions struct {
 	// This struct stores user input and factory functions
+	Exporter         cmdutil.Exporter
 	Detector         fd.Detector
 	HttpClient       func() (*http.Client, error)
 	GitClient        *git.Client
@@ -355,6 +367,10 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
+			if opts.DryRun && opts.Exporter != nil {
+				return cmdutil.FlagErrorf("`--dry-run` is not supported with `--json`")
+			}
+
 			if err := cmdutil.MutuallyExclusive(
 				"`--attach` is not supported when using `--web`",
 				opts.AttachFlag.Changed(),
@@ -406,6 +422,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
 	opts.AttachFlag = attachments.AddFlag(cmd)
+	cmdutil.AddJSONAndJQFlags(cmd, &opts.Exporter, prRecordFields)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -424,6 +441,13 @@ func createRun(opts *CreateOptions) error {
 	ctx, err := NewCreateContext(opts)
 	if err != nil {
 		return err
+	}
+
+	if opts.DryRun && opts.Exporter != nil {
+		return cmdutil.FlagErrorf("`--dry-run` is not supported with `--json`")
+	}
+	if opts.WebMode && opts.Exporter != nil {
+		return cmdutil.FlagErrorf("cannot use `--web` with `--json`")
 	}
 
 	if isSameRef(ctx.PRRefs) {
@@ -1143,7 +1167,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.PRRefs.BaseRepo(), params)
 	opts.IO.StopProgressIndicator()
-	if pr != nil {
+	if pr != nil && opts.Exporter == nil {
 		fmt.Fprintln(opts.IO.Out, pr.URL)
 	}
 	if err != nil {
@@ -1156,6 +1180,9 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		// failed create leaves the uploaded assets referenced by nothing, so
 		// that error reads first.
 		return errors.Join(uploadErr, err)
+	}
+	if opts.Exporter != nil {
+		return errors.Join(uploadErr, opts.Exporter.Write(opts.IO, pr))
 	}
 	return uploadErr
 }

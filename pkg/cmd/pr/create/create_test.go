@@ -30,11 +30,28 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields(t, func(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
+		return NewCmdCreate(f, nil, runF)
+	}, []string{
+		"baseRefName",
+		"body",
+		"headRefName",
+		"id",
+		"number",
+		"state",
+		"title",
+		"url",
+	})
+}
 
 func TestNewCmdCreate(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
@@ -335,6 +352,47 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr:    true,
 			wantsErrMsg: "`--attach` is not supported when using `--dry-run`",
 		},
+		{
+			name:        "cannot combine --json and --web",
+			tty:         false,
+			cli:         "--title mytitle --body mybody --json number --web",
+			wantsErr:    true,
+			wantsErrMsg: "cannot use `--web` with `--json`",
+		},
+		{
+			name:        "cannot combine --json and --dry-run",
+			tty:         false,
+			cli:         "--title mytitle --body mybody --json number --dry-run",
+			wantsErr:    true,
+			wantsErrMsg: "`--dry-run` is not supported with `--json`",
+		},
+		{
+			name:        "cannot use --jq without --json",
+			tty:         false,
+			cli:         "--title mytitle --body mybody --jq .number",
+			wantsErr:    true,
+			wantsErrMsg: "cannot use `--jq` without specifying `--json`",
+		},
+		{
+			name:     "template flag with json",
+			tty:      true,
+			cli:      "-t mytitle --template bug_fix.md --json number",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "",
+				BodyProvided:        false,
+				Autofill:            false,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+				Template:            "bug_fix.md",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -454,7 +512,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 						} } } }`,
 						func(input map[string]any) {
 							assert.Equal(t, "REPOID", input["repositoryId"])
@@ -602,7 +660,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
-								"URL": "https://github.com/OWNER/REPO/pull/12"
+								"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } } }`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
@@ -649,7 +707,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
-								"URL": "https://github.com/OWNER/REPO/pull/12"
+								"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } } }`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "my title", input["title"].(string))
@@ -698,7 +756,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
 								"id": "PullRequest#1",
-								"URL": "https://github.com/OWNER/REPO/pull/12"
+								"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } } }
 							`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
@@ -760,7 +818,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
-								"URL": "https://github.com/OWNER/REPO/pull/12"
+								"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } } }
 							`, func(input map[string]any) {
 						assert.Equal(t, false, input["maintainerCanModify"].(bool))
@@ -817,7 +875,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
-								"URL": "https://github.com/OWNER/REPO/pull/12"
+								"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							}}}}`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "master", input["baseRefName"].(string))
@@ -879,7 +937,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
-								"URL": "https://github.com/OWNER/REPO/pull/12"
+								"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } } }`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
 						assert.Equal(t, "master", input["baseRefName"].(string))
@@ -910,7 +968,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 			{ "data": { "createPullRequest": { "pullRequest": {
-				"URL": "https://github.com/OWNER/REPO/pull/12"
+				"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 			} } } }
 			`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
@@ -957,7 +1015,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 				{ "data": { "createPullRequest": { "pullRequest": {
-					"URL": "https://github.com/OWNER/REPO/pull/12"
+					"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 				} } } }
 				`, func(input map[string]any) {
 						assert.Equal(t, "my title", input["title"].(string))
@@ -1034,7 +1092,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 					{ "data": { "createPullRequest": { "pullRequest": {
 						"id": "NEWPULLID",
-						"URL": "https://github.com/OWNER/REPO/pull/12"
+						"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 					} } } }
 				`, func(inputs map[string]any) {
 						assert.Equal(t, "TITLE", inputs["title"])
@@ -1189,7 +1247,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 			{ "data": { "createPullRequest": { "pullRequest": {
-				"URL": "https://github.com/OWNER/REPO/pull/12"
+				"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 			} } } }
 			`, func(input map[string]any) {
 						assert.Equal(t, true, input["draft"].(bool))
@@ -1251,7 +1309,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 						} } } }
 					`, func(input map[string]any) {
 						assert.Equal(t, "recovered title", input["title"].(string))
@@ -1379,7 +1437,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 						{
 						"data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } }
 						}
 						`,
@@ -1415,7 +1473,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 						{
 						"data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } }
 						}
 						`,
@@ -1451,7 +1509,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 						{
 						"data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } }
 						}
 						`,
@@ -1473,7 +1531,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 						{
 						"data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } }
 						}
 				`, func(inputs map[string]any) {
@@ -1527,7 +1585,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 							{ "data": { "createPullRequest": { "pullRequest": {
-								"URL": "https://github.com/OWNER/REPO/pull/12"
+								"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 							} } } }
 							`, func(input map[string]any) {
 						assert.Equal(t, "REPOID", input["repositoryId"].(string))
@@ -1558,7 +1616,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 						} } } }`,
 						func(input map[string]any) {
 							assert.Equal(t, "REPOID", input["repositoryId"])
@@ -1594,7 +1652,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12",
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12,
 							"id": "NEWPULLID"
 						} } } }`,
 						func(input map[string]any) {}))
@@ -1630,7 +1688,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12",
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12,
 							"id": "NEWPULLID"
 						} } } }`,
 						func(input map[string]any) {}))
@@ -1695,7 +1753,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 						} } } }`,
 						func(input map[string]any) {}))
 			},
@@ -1759,7 +1817,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 						} } } }`,
 						func(input map[string]any) {}))
 			},
@@ -1784,7 +1842,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 						} } } }`,
 						func(input map[string]any) {
 							assert.Equal(t, "before ![the shot](https://github.com/user-attachments/assets/ASSET) after", input["body"])
@@ -1812,7 +1870,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 						} } } }`,
 						func(input map[string]any) {
 							assert.Equal(t, "the plan ![diagram](https://github.com/user-attachments/assets/ASSET)", input["body"])
@@ -1907,7 +1965,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12"
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12
 						} } } }`,
 						func(input map[string]any) {
 							assert.Equal(t, "my body\n\n![good](https://github.com/user-attachments/assets/ASSET)", input["body"])
@@ -2013,6 +2071,175 @@ func Test_createRun(t *testing.T) {
 				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestCreate\b`))
 			},
 			wantErr: "attaching files requires write access to the repository",
+		},
+		{
+			name: "nontty json output",
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"id": "PR_123",
+							"url": "https://github.com/OWNER/REPO/pull/12",
+							"number": 12,
+							"title": "my title",
+							"body": "my body",
+							"state": "OPEN",
+							"headRefName": "feature",
+							"baseRefName": "master"
+						} } } }`,
+						func(input map[string]any) {
+							assert.Equal(t, "REPOID", input["repositoryId"])
+							assert.Equal(t, "my title", input["title"])
+							assert.Equal(t, "my body", input["body"])
+							assert.Equal(t, "master", input["baseRefName"])
+							assert.Equal(t, "feature", input["headRefName"])
+						}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields([]string{"number", "url", "title", "state"})
+				opts.Exporter = exporter
+				return func() {}
+			},
+			expectedOut: "{\"number\":12,\"state\":\"OPEN\",\"title\":\"my title\",\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
+		},
+		{
+			name: "tty json output",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"id": "PR_123",
+							"url": "https://github.com/OWNER/REPO/pull/12",
+							"number": 12,
+							"title": "my title",
+							"body": "my body",
+							"state": "OPEN",
+							"headRefName": "feature",
+							"baseRefName": "master"
+						} } } }`,
+						func(input map[string]any) {
+							assert.Equal(t, "REPOID", input["repositoryId"])
+							assert.Equal(t, "my title", input["title"])
+							assert.Equal(t, "my body", input["body"])
+							assert.Equal(t, "master", input["baseRefName"])
+							assert.Equal(t, "feature", input["headRefName"])
+						}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields([]string{"number", "url"})
+				opts.Exporter = exporter
+				return func() {}
+			},
+			expectedOut:    "{\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "json output with jq filter",
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"id": "PR_123",
+							"url": "https://github.com/OWNER/REPO/pull/12",
+							"number": 12,
+							"title": "my title",
+							"body": "my body",
+							"state": "OPEN",
+							"headRefName": "feature",
+							"baseRefName": "master"
+						} } } }`,
+						func(input map[string]any) {
+							assert.Equal(t, "REPOID", input["repositoryId"])
+						}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields([]string{"number"})
+				exporter.SetFilter(".number")
+				opts.Exporter = exporter
+				return func() {}
+			},
+			expectedOut: "12\n",
+		},
+		{
+			name: "json output with all fields",
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"id": "PR_123",
+							"url": "https://github.com/OWNER/REPO/pull/12",
+							"number": 12,
+							"title": "my title",
+							"body": "my body",
+							"state": "OPEN",
+							"headRefName": "feature",
+							"baseRefName": "master"
+						} } } }`,
+						func(input map[string]any) {}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(prRecordFields)
+				opts.Exporter = exporter
+				return func() {}
+			},
+			expectedOut: "{\"baseRefName\":\"master\",\"body\":\"my body\",\"headRefName\":\"feature\",\"id\":\"PR_123\",\"number\":12,\"state\":\"OPEN\",\"title\":\"my title\",\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
+		},
+		{
+			name: "dry-run with json errors",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.DryRun = true
+				opts.Exporter = cmdutil.NewJSONExporter()
+				return func() {}
+			},
+			wantErr: "`--dry-run` is not supported with `--json`",
+		},
+		{
+			name: "web with json errors",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.WebMode = true
+				opts.Exporter = cmdutil.NewJSONExporter()
+				return func() {}
+			},
+			wantErr: "cannot use `--web` with `--json`",
 		},
 	}
 	for _, tt := range tests {
@@ -2352,7 +2579,7 @@ func Test_createRun_GHES(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12",
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12,
 							"id": "NEWPULLID"
 						} } } }`,
 						func(input map[string]any) {}))
@@ -2415,7 +2642,7 @@ func Test_createRun_GHES(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
-							"URL": "https://github.com/OWNER/REPO/pull/12",
+							"URL": "https://github.com/OWNER/REPO/pull/12", "Number": 12,
 							"id": "NEWPULLID"
 						} } } }`,
 						func(input map[string]any) {}))
