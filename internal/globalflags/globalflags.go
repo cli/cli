@@ -93,11 +93,11 @@ func refresh(
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	_, body, err := fetch(ctx, endpoint, client)
+	snapshot, _, err := fetch(ctx, endpoint, client)
 	if err != nil {
 		return err
 	}
-	return writeCache(cacheFile, endpoint, body)
+	return writeCache(cacheFile, endpoint, snapshot.values)
 }
 
 func endpointURL(serverURL string) (string, error) {

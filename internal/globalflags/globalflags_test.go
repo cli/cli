@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -175,4 +176,27 @@ func TestRefreshAcceptsResponseAtOneMiBSizeLimit(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, fresh)
 	assert.True(t, snapshot.Enabled("released"), "a complete response at the limit is still valid")
+}
+
+func TestRefreshCachesOnlyValidatedFlagValues(t *testing.T) {
+	t.Parallel()
+
+	// Given a valid response with irrelevant top-level data
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(httpmock.MatchAny, httpmock.StringResponse(`{"flags":{"released":true},"ignored":"large service metadata"}`))
+	cacheDir := t.TempDir()
+
+	// When the worker persists the response
+	err := Refresh(t.Context(), "https://flags.example", cacheDir, &http.Client{Transport: reg})
+
+	// Then synchronous startup reads a compact normalized snapshot
+	require.NoError(t, err)
+	data, err := os.ReadFile(cachePath(cacheDir))
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "large service metadata", "cache should not preserve irrelevant response data")
+	snapshot, fresh, err := FromCache("https://flags.example", cacheDir)
+	require.NoError(t, err)
+	assert.True(t, fresh, "normalized cache should remain a fresh snapshot")
+	assert.True(t, snapshot.Enabled("released"), "normalization must preserve validated flag values")
 }

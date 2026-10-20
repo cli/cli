@@ -2,6 +2,7 @@ package ghcmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -91,6 +92,44 @@ func TestMainReportsRefreshStartFailuresOnlyInDebugMode(t *testing.T) {
 				"refresh start failures should be observable only when debugging is enabled")
 		})
 	}
+}
+
+func TestMainRunsGlobalFlagWorkerBeforeNormalStartup(t *testing.T) {
+	// Given a global endpoint and normal startup that must not run in the worker
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Empty(t, r.Header.Get("Authorization"), "the worker must remain independent of GitHub credentials")
+		_, _ = io.WriteString(w, `{"flags":{"constructor-test":true}}`)
+	}))
+	defer server.Close()
+	home := t.TempDir()
+	t.Setenv("GH_GLOBAL_FEATURE_FLAG_SERVER_URL", server.URL)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, "cache"))
+	t.Setenv("GH_CONFIG_DIR", filepath.Join(home, "config"))
+	t.Setenv("GH_TOKEN", "test-token")
+	t.Setenv("GH_TELEMETRY", "log")
+	originalArgs := os.Args
+	originalNewCmdRoot := newCmdRoot
+	t.Cleanup(func() {
+		os.Args = originalArgs
+		newCmdRoot = originalNewCmdRoot
+	})
+	os.Args = []string{"gh", "refresh-global-feature-flags"}
+	rootConstructed := false
+	newCmdRoot = func(*cmdutil.Factory, ghtelemetry.InvocationRecorder, string, string) (*cobra.Command, error) {
+		rootConstructed = true
+		return nil, errors.New("normal root construction must not run")
+	}
+
+	// When the internal worker is dispatched through Main
+	code := Main()
+
+	// Then it refreshes the cache without entering ordinary CLI startup
+	assert.Equal(t, exitOK, code)
+	assert.False(t, rootConstructed, "the worker must bypass config, telemetry, updates, and root construction")
+	snapshot, fresh, err := globalflags.FromCache(server.URL, filepath.Join(home, "cache", "gh"))
+	require.NoError(t, err)
+	assert.True(t, fresh, "the worker should persist a fresh snapshot")
+	assert.True(t, snapshot.Enabled("constructor-test"), "the worker should persist the server response")
 }
 
 // This subprocess seam observes the Factory at the real root-construction

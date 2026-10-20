@@ -52,6 +52,81 @@ func TestCacheFreshnessAndSnapshotStability(t *testing.T) {
 	})
 }
 
+func TestBeginRefreshThrottlesRepeatedAttemptsUntilRetryInterval(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		// Given one refresh attempt for an endpoint
+		cacheDir := t.TempDir()
+		first, err := BeginRefresh("https://flags.example", cacheDir)
+		require.NoError(t, err)
+		require.NotNil(t, first)
+
+		// When the same endpoint requests another refresh before and after the retry interval
+		throttled, err := BeginRefresh("https://flags.example", cacheDir)
+		require.NoError(t, err)
+		time.Sleep(refreshRetryInterval)
+		retry, err := BeginRefresh("https://flags.example", cacheDir)
+
+		// Then only the later request owns another worker launch
+		require.NoError(t, err)
+		assert.Nil(t, throttled, "repeated failures must not launch one worker per invocation")
+		assert.NotNil(t, retry, "refresh should retry after the cooldown")
+	})
+}
+
+func TestBeginRefreshDoesNotThrottleAnotherEndpoint(t *testing.T) {
+	t.Parallel()
+
+	// Given one development endpoint has recently requested a refresh
+	cacheDir := t.TempDir()
+	first, err := BeginRefresh("https://first.example", cacheDir)
+	require.NoError(t, err)
+	require.NotNil(t, first)
+
+	// When lookup switches to another endpoint override
+	second, err := BeginRefresh("https://second.example", cacheDir)
+
+	// Then the first endpoint's failure does not suppress the new context
+	require.NoError(t, err)
+	assert.NotNil(t, second, "endpoint overrides need independent retry identity")
+}
+
+func TestCancelledRefreshRequestCanRetryImmediately(t *testing.T) {
+	t.Parallel()
+
+	// Given a refresh request whose worker process never started
+	cacheDir := t.TempDir()
+	request, err := BeginRefresh("https://flags.example", cacheDir)
+	require.NoError(t, err)
+	require.NotNil(t, request)
+	require.NoError(t, request.Cancel())
+
+	// When a later invocation requests the refresh
+	retry, err := BeginRefresh("https://flags.example", cacheDir)
+
+	// Then it can launch a replacement immediately
+	require.NoError(t, err)
+	assert.NotNil(t, retry, "process launch failures must not consume the retry interval")
+}
+
+func TestRefreshFailureIsReportedDuringCooldown(t *testing.T) {
+	t.Parallel()
+
+	// Given a detached refresh that failed after its worker started
+	cacheDir := t.TempDir()
+	request, err := BeginRefresh("https://flags.example", cacheDir)
+	require.NoError(t, err)
+	require.NotNil(t, request)
+	require.NoError(t, RecordRefreshFailure("https://flags.example", cacheDir, errors.New("service unavailable")))
+
+	// When another invocation checks whether to start a worker
+	retry, err := BeginRefresh("https://flags.example", cacheDir)
+
+	// Then it avoids another process while preserving a useful debug diagnostic
+	assert.Nil(t, retry, "failed refreshes should remain throttled")
+	require.ErrorContains(t, err, "last global flag refresh failed: service unavailable")
+}
+
 func TestRefreshTimesOutWithoutErasingStaleSnapshot(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {

@@ -52,6 +52,20 @@ const (
 )
 
 func Main() exitCode {
+	if isGlobalFlagRefreshWorker(os.Args) {
+		if err := runGlobalFlagRefreshWorker(
+			context.Background(),
+			os.Getenv("GH_GLOBAL_FEATURE_FLAG_SERVER_URL"),
+			ghConfig.CacheDir(),
+			build.Version,
+			os.Stderr,
+		); err != nil {
+			fmt.Fprintf(os.Stderr, "global feature flag refresh failed: %v\n", err)
+			return exitError
+		}
+		return exitOK
+	}
+
 	buildDate := build.Date
 	buildVersion := build.Version
 	hasDebug, _ := utils.IsDebugEnabled()
@@ -137,7 +151,7 @@ func Main() exitCode {
 
 	ctx := context.Background()
 	skipGlobalFlagRefresh := len(os.Args) > 1 &&
-		(os.Args[1] == "send-telemetry" || os.Args[1] == "refresh-global-feature-flags")
+		(os.Args[1] == "send-telemetry" || os.Args[1] == globalFlagRefreshCommand)
 	globalFlagSnapshot, globalFlagErr := loadGlobalFlagSnapshot(globalFlagStartupOptions{
 		serverURL:   os.Getenv("GH_GLOBAL_FEATURE_FLAG_SERVER_URL"),
 		cacheDir:    ghConfig.CacheDir(),
