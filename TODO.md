@@ -1,15 +1,6 @@
 Prefix: GHCL
 Next: 7
 
-### GHCL-1 · P2 · Let commands that do not use config start without it
-
-- **Area:** Config
-- **Where:** `internal/ghcmd/cmd.go:53`, `pkg/cmd/root/root.go:57`, `pkg/cmdutil/factory.go:27`
-- **Problem:** `Main` loads configuration before dispatch, and `NewCmdRoot` returns an error when `f.Config()` fails. A malformed or unreadable config therefore blocks commands such as `gh version` that do not need config. Every invocation also pays the config load cost.
-- **Recommendation:** Resolve config only for the selected command paths that need it. Preserve config-backed aliases and authentication checks, and define which config errors those paths report.
-- **Fix with:** make-it-fast
-- **Effort:** M
-
 ### GHCL-2 · P2 · Skip unused GraphQL preloads for piped PR views
 
 - **Area:** Performance

@@ -52,12 +52,8 @@ func (ae *AuthError) Error() string {
 	return ae.err.Error()
 }
 
-func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, error) {
+func NewCmdRoot(f *cmdutil.Factory, version, buildDate string, args []string) (*cobra.Command, error) {
 	io := f.IOStreams
-	cfg, err := f.Config()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read configuration: %s\n", err)
-	}
 
 	cmd := &cobra.Command{
 		Use:   "gh <command> <subcommand> [flags]",
@@ -72,10 +68,15 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 			"versionInfo": versionCmd.Format(version, buildDate),
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// require that the user is authenticated before running most commands
-			if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-				fmt.Fprint(io.ErrOut, authHelp())
-				return &AuthError{}
+			if cmdutil.IsAuthCheckEnabled(cmd) {
+				cfg, err := f.Config()
+				if err != nil {
+					return fmt.Errorf("failed to read configuration: %w", err)
+				}
+				if !cmdutil.CheckAuth(cfg) {
+					fmt.Fprint(io.ErrOut, authHelp())
+					return &AuthError{}
+				}
 			}
 
 			return nil
@@ -165,7 +166,55 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 		}
 	}
 
-	// Aliases
+	cmdutil.DisableAuthCheck(cmd)
+
+	referenceCmd.Annotations["markdown:prepare-long"] = "true"
+	prepareReference := func(c *cobra.Command) {
+		if c.Long == "" {
+			c.Long = stringifyReference(cmd)
+		}
+	}
+	referenceCmd.PreRunE = func(c *cobra.Command, _ []string) error {
+		prepareReference(c)
+		return nil
+	}
+	referenceCmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		prepareReference(c)
+		longPager(f.IOStreams)(c, args)
+	})
+	if needsAliases(cmd, args) {
+		if err := addAliases(f, cmd); err != nil {
+			return nil, err
+		}
+	}
+	cmd.SetArgs(args)
+	return cmd, nil
+}
+
+func needsAliases(root *cobra.Command, args []string) bool {
+	if len(args) > 0 && args[0] == "help" {
+		args = args[1:]
+	}
+	cmd, _, err := root.Find(args)
+	if err != nil {
+		return true
+	}
+	if cmd == root {
+		if err := root.ParseFlags(args); err == nil {
+			if version, err := root.Flags().GetBool("version"); err == nil && version {
+				return false
+			}
+		}
+	}
+	return cmd.HasSubCommands() || cmd == root || cmd.Name() == "reference"
+}
+
+func addAliases(f *cmdutil.Factory, cmd *cobra.Command) error {
+	io := f.IOStreams
+	cfg, err := f.Config()
+	if err != nil {
+		return fmt.Errorf("failed to read configuration: %w", err)
+	}
 	aliases := cfg.Aliases()
 	validAliasName := shared.ValidAliasNameFunc(cmd)
 	validAliasExpansion := shared.ValidAliasExpansionFunc(cmd)
@@ -199,21 +248,5 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 		}
 	}
 
-	cmdutil.DisableAuthCheck(cmd)
-
-	referenceCmd.Annotations["markdown:prepare-long"] = "true"
-	prepareReference := func(c *cobra.Command) {
-		if c.Long == "" {
-			c.Long = stringifyReference(cmd)
-		}
-	}
-	referenceCmd.PreRunE = func(c *cobra.Command, _ []string) error {
-		prepareReference(c)
-		return nil
-	}
-	referenceCmd.SetHelpFunc(func(c *cobra.Command, args []string) {
-		prepareReference(c)
-		longPager(f.IOStreams)(c, args)
-	})
-	return cmd, nil
+	return nil
 }

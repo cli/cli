@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -549,6 +551,58 @@ func Test_authRecoveryCommand(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("authRecoveryCommand() = %q, want %q", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestMainConfigIndependent(t *testing.T) {
+	if command := os.Getenv("GHCL_TEST_CONFIG_COMMAND"); command != "" {
+		os.Args = []string{"gh", command}
+		os.Exit(int(Main()))
+	}
+	for _, unreadable := range []bool{false, true} {
+		for _, command := range []string{"version", "--version"} {
+			t.Run(fmt.Sprintf("%s/unreadable=%t", command, unreadable), func(t *testing.T) {
+				dir := t.TempDir()
+				configPath := filepath.Join(dir, "config.yml")
+				if unreadable {
+					require.NoError(t, os.Mkdir(configPath, 0700))
+				} else {
+					require.NoError(t, os.WriteFile(configPath, []byte("aliases: ["), 0600))
+				}
+				cmd := exec.Command(os.Args[0], "-test.run=^TestMainConfigIndependent$")
+				cmd.Env = append(os.Environ(), "GHCL_TEST_CONFIG_COMMAND="+command, "GH_CONFIG_DIR="+dir, "GH_NO_UPDATE_NOTIFIER=1")
+				var stdout, stderr bytes.Buffer
+				cmd.Stdout = &stdout
+				cmd.Stderr = &stderr
+				require.NoError(t, cmd.Run(), stderr.String())
+				require.Contains(t, stdout.String(), "gh version ")
+				require.Empty(t, stderr.String())
+			})
+		}
+	}
+}
+
+func Test_newIOStreams_accessibleColors(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		config  string
+		env     string
+		setEnv  bool
+		enabled bool
+	}{
+		{name: "config", config: "accessible_colors: enabled", enabled: true},
+		{name: "env disables config", config: "accessible_colors: enabled", env: "false", setEnv: true},
+		{name: "env enables", env: "1", setEnv: true, enabled: true},
+		{name: "empty env disables config", config: "accessible_colors: enabled", setEnv: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GH_ACCESSIBLE_COLORS", tt.env)
+			if !tt.setEnv {
+				require.NoError(t, os.Unsetenv("GH_ACCESSIBLE_COLORS"))
+			}
+			io := newIOStreams(config.NewMockConfigFromString(tt.config), "")
+			require.Equal(t, tt.enabled, io.AccessibleColorsEnabled())
 		})
 	}
 }

@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -441,4 +442,19 @@ func defaultConfig() *ghmock.ConfigMock {
 	cfg := config.NewMockConfigFromString("")
 	cfg.Set("nonsense.com", "oauth_token", "BLAH")
 	return cfg
+}
+
+func TestNewDefersEditorConfig(t *testing.T) {
+	t.Setenv("GH_EDITOR", "")
+	ios, _, _, _ := iostreams.Test()
+	loads := 0
+	configErr := fmt.Errorf("unreadable editor config")
+	f := New("v1.2.3", "", func() (gh.Config, error) {
+		loads++
+		return nil, configErr
+	}, ios, "gh")
+	require.Zero(t, loads)
+	_, err := f.Prompter.MarkdownEditor("Body", "", true)
+	require.ErrorIs(t, err, configErr)
+	require.Equal(t, 1, loads)
 }
