@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -42,12 +43,13 @@ func NewConfig() (gh.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &cfg{c}, nil
+	return &cfg{cfg: c, activeTokens: &activeTokenCache{}}, nil
 }
 
 // Implements Config interface
 type cfg struct {
-	cfg *ghConfig.Config
+	cfg          *ghConfig.Config
+	activeTokens *activeTokenCache
 }
 
 func (c *cfg) get(hostname, key string) o.Option[string] {
@@ -97,6 +99,9 @@ func (c *cfg) Set(hostname, key, value string) {
 	}
 
 	c.cfg.Set([]string{hostsKey, hostname, key}, value)
+	if key == oauthTokenKey && c.activeTokens != nil {
+		c.activeTokens.invalidate(hostname)
+	}
 
 	if user, _ := c.cfg.Get([]string{hostsKey, hostname, userKey}); user != "" {
 		c.cfg.Set([]string{hostsKey, hostname, usersKey, user, key}, value)
@@ -112,7 +117,7 @@ func (c *cfg) Aliases() gh.AliasConfig {
 }
 
 func (c *cfg) Authentication() gh.AuthConfig {
-	return &AuthConfig{cfg: c.cfg}
+	return &AuthConfig{cfg: c.cfg, activeTokens: c.activeTokens}
 }
 
 func (c *cfg) AccessibleColors(hostname string) gh.ConfigEntry {
@@ -188,6 +193,7 @@ func defaultFor(key string) o.Option[string] {
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig struct {
 	cfg                 *ghConfig.Config
+	activeTokens        *activeTokenCache
 	defaultHostOverride func() (string, string)
 	hostsOverride       func() []string
 	tokenOverride       func(string) (string, string)
@@ -212,25 +218,132 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	if c.tokenOverride != nil {
 		return c.tokenOverride(hostname)
 	}
-	token, source := ghauth.TokenFromEnvOrConfig(hostname)
-	if token == "" {
-		var user string
-		var err error
-		if user, err = c.ActiveUser(hostname); err == nil {
-			token, err = c.TokenFromKeyringForUser(hostname, user)
+	if token, source := tokenFromEnvironment(hostname); token != "" {
+		return token, source
+	}
+	if c.cfg == nil {
+		return ghauth.TokenFromEnvOrConfig(hostname)
+	}
+	hostname = ghauth.NormalizeHostname(hostname)
+	token, source := "", "default"
+	if configuredToken, err := c.cfg.Get([]string{hostsKey, hostname, oauthTokenKey}); err == nil {
+		token, source = configuredToken, oauthTokenKey
+	}
+	if token != "" {
+		return token, source
+	}
+	user, userErr := c.ActiveUser(hostname)
+	key := activeTokenKey{hostname: hostname, username: user, source: source}
+	resolve := func() (string, string) {
+		if userErr != nil {
+			return c.tokenFromKeyring(hostname, user, userErr, source)
 		}
-		if err != nil {
-			// We should generally be able to find a token for the active user,
-			// but in some cases such as if the keyring was set up in a very old
-			// version of the CLI, it may only have a unkeyed token, so fallback
-			// to it.
-			token, err = c.TokenFromKeyring(hostname)
+		return c.tokenFromKeyring(hostname, user, nil, source)
+	}
+	if c.activeTokens == nil {
+		return resolve()
+	}
+	return c.activeTokens.get(key, resolve)
+}
+
+func (c *AuthConfig) tokenFromKeyring(hostname, user string, userErr error, fallbackSource string) (string, string) {
+	var token string
+	var err error
+	if userErr == nil {
+		token, err = c.TokenFromKeyringForUser(hostname, user)
+	} else {
+		err = userErr
+	}
+	if err != nil {
+		token, err = c.TokenFromKeyring(hostname)
+	}
+	if err == nil {
+		return token, "keyring"
+	}
+	return token, fallbackSource
+}
+
+func tokenFromEnvironment(hostname string) (string, string) {
+	hostname = ghauth.NormalizeHostname(hostname)
+	if hostname == "github.com" || hostname == "github.localhost" || ghauth.IsTenancy(hostname) {
+		if token := os.Getenv("GH_TOKEN"); token != "" {
+			return token, "GH_TOKEN"
 		}
-		if err == nil {
-			source = "keyring"
+		if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+			return token, "GITHUB_TOKEN"
+		}
+		return "", ""
+	}
+	if token := os.Getenv("GH_ENTERPRISE_TOKEN"); token != "" {
+		return token, "GH_ENTERPRISE_TOKEN"
+	}
+	if token := os.Getenv("GITHUB_ENTERPRISE_TOKEN"); token != "" {
+		return token, "GITHUB_ENTERPRISE_TOKEN"
+	}
+	return "", ""
+}
+
+type activeTokenEntry struct {
+	once   sync.Once
+	token  string
+	source string
+}
+
+type activeTokenKey struct {
+	hostname string
+	username string
+	source   string
+}
+
+type activeTokenCache struct {
+	mu     sync.RWMutex
+	tokens map[activeTokenKey]*activeTokenEntry
+}
+
+func (c *activeTokenCache) get(key activeTokenKey, resolve func() (string, string)) (string, string) {
+	for {
+		c.mu.RLock()
+		entry := c.tokens[key]
+		c.mu.RUnlock()
+		if entry == nil {
+			c.mu.Lock()
+			if c.tokens == nil {
+				c.tokens = make(map[activeTokenKey]*activeTokenEntry)
+			}
+			entry = c.tokens[key]
+			if entry == nil {
+				entry = &activeTokenEntry{}
+				c.tokens[key] = entry
+			}
+			c.mu.Unlock()
+		}
+		entry.once.Do(func() {
+			entry.token, entry.source = resolve()
+		})
+		c.mu.RLock()
+		current := c.tokens[key] == entry
+		c.mu.RUnlock()
+		if current {
+			return entry.token, entry.source
 		}
 	}
-	return token, source
+}
+
+func (c *activeTokenCache) invalidate(hostname string) {
+	hostname = ghauth.NormalizeHostname(hostname)
+	c.mu.Lock()
+	for key := range c.tokens {
+		if key.hostname == hostname {
+			delete(c.tokens, key)
+		}
+	}
+	c.mu.Unlock()
+}
+
+func (c *activeTokenCache) clear() {
+	c.mu.Lock()
+	c.tokens = make(map[activeTokenKey]*activeTokenEntry)
+	c.mu.Unlock()
 }
 
 // HasActiveToken returns true when a token for the hostname is present.
@@ -265,6 +378,9 @@ func (c *AuthConfig) HasEnvToken() bool {
 func (c *AuthConfig) SetActiveToken(token, source string) {
 	c.tokenOverride = func(_ string) (string, string) {
 		return token, source
+	}
+	if c.activeTokens != nil {
+		c.activeTokens.clear()
 	}
 }
 
@@ -371,6 +487,7 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 // If the encrypt option is specified it will first try to store the auth token
 // in encrypted storage and will fall back to the plain text config file.
 func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secureStorage bool) (bool, error) {
+	defer c.invalidateToken(hostname)
 	// In this section we set up the users config
 	var setErr error
 	if secureStorage {
@@ -407,6 +524,7 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 }
 
 func (c *AuthConfig) SwitchUser(hostname, user string) error {
+	defer c.invalidateToken(hostname)
 	previouslyActiveUser, err := c.ActiveUser(hostname)
 	if err != nil {
 		return fmt.Errorf("failed to get active user: %s", err)
@@ -443,6 +561,7 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
 func (c *AuthConfig) Logout(hostname, username string) error {
+	defer c.invalidateToken(hostname)
 	users := c.UsersForHost(hostname)
 
 	// If there is only one (or zero) users, then we remove the host
@@ -472,6 +591,12 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 
 	// And activate them
 	return c.activateUser(hostname, users[switchUserIdx])
+}
+
+func (c *AuthConfig) invalidateToken(hostname string) {
+	if c.activeTokens != nil {
+		c.activeTokens.invalidate(hostname)
+	}
 }
 
 func (c *AuthConfig) activateUser(hostname, user string) error {

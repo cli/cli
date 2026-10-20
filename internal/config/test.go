@@ -30,7 +30,7 @@ func NewMockConfig() *ghmock.ConfigMock {
 // since none of those go through the mock.
 func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	c := ghConfig.ReadFromString(cfgString)
-	cfg := cfg{c}
+	cfg := cfg{cfg: c, activeTokens: &activeTokenCache{}}
 	mock := &ghmock.ConfigMock{}
 	mock.GetOrDefaultFunc = func(host, key string) o.Option[gh.ConfigEntry] {
 		return cfg.GetOrDefault(host, key)
@@ -46,7 +46,8 @@ func NewMockConfigFromString(cfgString string) *ghmock.ConfigMock {
 	}
 	mock.AuthenticationFunc = func() gh.AuthConfig {
 		return &AuthConfig{
-			cfg: c,
+			cfg:          c,
+			activeTokens: cfg.activeTokens,
 			defaultHostOverride: func() (string, string) {
 				return "github.com", "default"
 			},
@@ -132,7 +133,7 @@ func NewIsolatedTestConfig(t *testing.T, cfgString string) (*cfg, func(io.Writer
 	}
 
 	c := ghConfig.ReadFromString(cfgString)
-	cfg := cfg{c}
+	cfg := cfg{cfg: c, activeTokens: &activeTokenCache{}}
 
 	// The real implementation of config.Read uses a sync.Once
 	// to read config files and initialise package level variables

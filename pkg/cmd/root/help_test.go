@@ -86,6 +86,26 @@ func TestKramdownCompatibleDocs(t *testing.T) {
 	walk(cmd)
 }
 
+func TestReferenceIsGeneratedWhenHelpIsRequested(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+	f := &cmdutil.Factory{
+		IOStreams: ios,
+		Config:    func() (gh.Config, error) { return config.NewMockConfig(), nil },
+		Browser:   &browser.Stub{},
+	}
+
+	cmd, err := NewCmdRoot(f, "N/A", "")
+	require.NoError(t, err)
+	referenceCmd, _, err := cmd.Find([]string{"reference"})
+	require.NoError(t, err)
+	require.Empty(t, referenceCmd.Long)
+
+	require.NoError(t, referenceCmd.Help())
+	require.Contains(t, referenceCmd.Long, "# gh reference")
+	require.NotContains(t, referenceCmd.Long, "gh help [command]")
+	require.Contains(t, stdout.String(), "# gh reference")
+}
+
 // If not in a code block or a code span, kramdown treats pipes ("|") as table
 // column separators, even if there's no table header, or left/right table row
 // borders (i.e. lines starting and ending with a pipe).

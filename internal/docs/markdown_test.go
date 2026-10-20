@@ -116,6 +116,42 @@ func TestGenMdTree(t *testing.T) {
 	}
 }
 
+func TestGenMdTreePreparesDeferredLong(t *testing.T) {
+	rootCmd := &cobra.Command{Use: "gh"}
+	referenceCmd := &cobra.Command{
+		Use:    "reference",
+		Hidden: true,
+		Annotations: map[string]string{
+			"markdown:generate":     "true",
+			"markdown:basename":     "gh_help_reference",
+			"markdown:prepare-long": "true",
+		},
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			cmd.Long = "generated reference content"
+			return nil
+		},
+	}
+	rootCmd.AddCommand(referenceCmd)
+
+	tmpdir, err := os.MkdirTemp("", "test-gen-md-reference")
+	if err != nil {
+		t.Fatalf("Failed to create tmpdir: %v", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	if err := GenMarkdownTreeCustom(rootCmd, tmpdir, func(s string) string { return s }, func(s string) string { return s }); err != nil {
+		t.Fatalf("GenMarkdownTree failed: %v", err)
+	}
+
+	contents, err := os.ReadFile(filepath.Join(tmpdir, "gh_help_reference.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(contents, []byte("generated reference content")) {
+		t.Fatalf("expected generated reference content in docs, got %s", contents)
+	}
+}
+
 func BenchmarkGenMarkdownToFile(b *testing.B) {
 	file, err := os.CreateTemp(b.TempDir(), "")
 	if err != nil {

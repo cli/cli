@@ -179,7 +179,13 @@ func genMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 // with custom filePrepender and linkHandler.
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHandler func(string) string) error {
 	if os.Getenv("GH_COBRA") != "" {
+		if err := prepareGeneratedLongs(cmd); err != nil {
+			return err
+		}
 		return doc.GenMarkdownTreeCustom(cmd, dir, filePrepender, linkHandler)
+	}
+	if err := prepareGeneratedLong(cmd); err != nil {
+		return err
 	}
 
 	for _, c := range cmd.Commands() {
@@ -207,6 +213,28 @@ func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHa
 		return err
 	}
 	return nil
+}
+
+func prepareGeneratedLongs(cmd *cobra.Command) error {
+	if err := prepareGeneratedLong(cmd); err != nil {
+		return err
+	}
+	for _, child := range cmd.Commands() {
+		if err := prepareGeneratedLongs(child); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func prepareGeneratedLong(cmd *cobra.Command) error {
+	if _, shouldPrepareLong := cmd.Annotations["markdown:prepare-long"]; !shouldPrepareLong {
+		return nil
+	}
+	if cmd.PreRunE == nil {
+		return fmt.Errorf("%s is marked for long text preparation without a pre-run function", cmd.CommandPath())
+	}
+	return cmd.PreRunE(cmd, nil)
 }
 
 func cmdManualPath(c *cobra.Command) string {

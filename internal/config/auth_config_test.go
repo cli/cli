@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/gh"
@@ -13,7 +14,7 @@ import (
 // Note that NewIsolatedTestConfig sets up a Mock keyring as well
 func newTestAuthConfig(t *testing.T) *AuthConfig {
 	cfg, _ := NewIsolatedTestConfig(t, "")
-	return &AuthConfig{cfg: cfg.cfg}
+	return cfg.Authentication().(*AuthConfig)
 }
 
 func TestTokenFromKeyring(t *testing.T) {
@@ -104,6 +105,75 @@ func TestTokenStoredInEnv(t *testing.T) {
 	// and the source is set to the name of the env var
 	require.Equal(t, "test-token", token)
 	require.Equal(t, "GH_TOKEN", source)
+}
+
+func TestActiveTokenEnvironmentOverridesCachedConfig(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+	authCfg.cfg.Set([]string{hostsKey, "github.com", oauthTokenKey}, "config-token")
+
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "config-token", token)
+	require.Equal(t, oauthTokenKey, source)
+
+	t.Setenv("GH_TOKEN", "environment-token")
+	token, source = authCfg.ActiveToken("github.com")
+	require.Equal(t, "environment-token", token)
+	require.Equal(t, "GH_TOKEN", source)
+
+	t.Setenv("GH_TOKEN", "")
+	token, source = authCfg.ActiveToken("github.com")
+	require.Equal(t, "config-token", token)
+	require.Equal(t, oauthTokenKey, source)
+}
+
+func TestActiveTokenCacheSharedAcrossAuthConfigsAndInvalidatedByLogin(t *testing.T) {
+	cfg, _ := NewIsolatedTestConfig(t, "")
+	firstAuth := cfg.Authentication().(*AuthConfig)
+	secondAuth := cfg.Authentication().(*AuthConfig)
+	_, err := firstAuth.Login("github.com", "test-user", "first-token", "", true)
+	require.NoError(t, err)
+
+	token, source := secondAuth.ActiveToken("github.com")
+	require.Equal(t, "first-token", token)
+	require.Equal(t, "keyring", source)
+
+	_, err = firstAuth.Login("github.com", "test-user", "second-token", "", true)
+	require.NoError(t, err)
+	token, source = secondAuth.ActiveToken("github.com")
+	require.Equal(t, "second-token", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestActiveTokenCacheSharesConcurrentResolution(t *testing.T) {
+	cache := &activeTokenCache{}
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var calls atomic.Int32
+	const callers = 8
+	type result struct {
+		token  string
+		source string
+	}
+	results := make(chan result, callers)
+
+	for range callers {
+		go func() {
+			token, source := cache.get(activeTokenKey{hostname: "github.com"}, func() (string, string) {
+				calls.Add(1)
+				close(started)
+				<-release
+				return "cached-token", "keyring"
+			})
+			results <- result{token: token, source: source}
+		}()
+	}
+
+	<-started
+	close(release)
+	for range callers {
+		require.Equal(t, result{token: "cached-token", source: "keyring"}, <-results)
+	}
+	require.EqualValues(t, 1, calls.Load())
 }
 
 func TestTokenStoredInKeyring(t *testing.T) {
