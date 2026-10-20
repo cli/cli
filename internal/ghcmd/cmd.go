@@ -23,7 +23,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
-	"github.com/cli/cli/v2/internal/globalflags"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
@@ -137,17 +136,16 @@ func Main() exitCode {
 	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
 
 	ctx := context.Background()
-	// Internal telemetry delivery has no flag consumers and must not trigger
-	// another lookup. All user-facing paths need flags before root construction.
 	isTelemetrySender := len(os.Args) > 1 && os.Args[1] == "send-telemetry"
-	if serverURL := os.Getenv("GH_GLOBAL_FEATURE_FLAG_SERVER_URL"); serverURL != "" && !isTelemetrySender {
-		client, err := cmdFactory.ExternalHttpClient()
-		if err == nil {
-			cmdFactory.GlobalFlags, err = globalflags.Load(ctx, serverURL, ghConfig.CacheDir(), client)
-		}
-		if err != nil && hasDebug {
-			fmt.Fprintf(stderr, "warning: loading global feature flags failed: %v\n", err)
-		}
+	globalFlagSnapshot, globalFlagErr := loadGlobalFlagSnapshot(ctx, globalFlagStartupOptions{
+		serverURL:          os.Getenv("GH_GLOBAL_FEATURE_FLAG_SERVER_URL"),
+		cacheDir:           ghConfig.CacheDir(),
+		telemetrySender:    isTelemetrySender,
+		externalHTTPClient: cmdFactory.ExternalHttpClient,
+	})
+	cmdFactory.GlobalFlags = globalFlagSnapshot
+	if globalFlagErr != nil && hasDebug {
+		fmt.Fprintf(stderr, "warning: loading global feature flags failed: %v\n", globalFlagErr)
 	}
 
 	updateCtx, updateCancel := context.WithCancel(ctx)

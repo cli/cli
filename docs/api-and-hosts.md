@@ -81,8 +81,10 @@ the external HTTP client without tokens or an Authorization header. GitHub
 accounts, `GH_HOST`, `GH_REPO`, `api_host`, and Proxima routing do not select or
 authenticate this service.
 
-`ghcmd.Main` loads one `globalflags.Snapshot` into `Factory.GlobalFlags` **before
-root command construction**. Future constructors can read
+The `ghcmd` global-flag startup module loads one `globalflags.Snapshot` into
+`Factory.GlobalFlags` **before root command construction**. `Main` supplies
+resolved startup inputs and retains only debug diagnostic rendering. Future
+constructors can read
 `f.GlobalFlags.Enabled("example-command-released")` without doing I/O. Snapshots
 have no mutators and remain stable when the factory is copied. Tests can supply
 values using `globalflags.NewSnapshot`; the zero value disables every flag.
