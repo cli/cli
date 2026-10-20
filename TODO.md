@@ -1,15 +1,6 @@
 Prefix: GHCL
 Next: 7
 
-### GHCL-4 · P3 · Reuse the configured HTTP client within one invocation
-
-- **Area:** Performance
-- **Where:** `pkg/cmd/factory/default.go:147`, `pkg/cmd/factory/default.go:183`, `pkg/cmd/pr/list/list.go:146`
-- **Problem:** Each call to the configured `HttpClient` factory constructs a new client. `pr list` creates one before resolving its base repository, and the smart base repository resolver creates another client in the same invocation.
-- **Recommendation:** Reuse the configured client within one invocation. Define how config or authentication changes affect that client, and leave the plain and external client behavior intact.
-- **Fix with:** make-it-fast
-- **Effort:** S
-
 ### GHCL-5 · P3 · Read remote details with fewer Git processes
 
 - **Area:** Performance
