@@ -374,6 +374,49 @@ func TestSSOURL(t *testing.T) {
 	}
 }
 
+func TestHttpClientFuncReusesClientAndReadsUpdatedAuthConfig(t *testing.T) {
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
+
+	var authorizationHeaders []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorizationHeaders = append(authorizationHeaders, r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	cfg := config.NewMockConfig()
+	cfg.Set("github.com", "oauth_token", "first-token")
+	configReads := 0
+	ios, _, _, _ := iostreams.Test()
+	clientFunc := HttpClientFunc(func() (gh.Config, error) {
+		configReads++
+		return cfg, nil
+	}, ios, "v1.2.3", "")
+
+	firstClient, err := clientFunc()
+	require.NoError(t, err)
+	secondClient, err := clientFunc()
+	require.NoError(t, err)
+	assert.Same(t, firstClient, secondClient)
+	assert.Equal(t, 1, configReads)
+
+	for _, token := range []string{"first-token", "second-token"} {
+		if token == "second-token" {
+			cfg.Set("github.com", "oauth_token", token)
+		}
+		req, err := http.NewRequest("GET", ts.URL, nil)
+		require.NoError(t, err)
+		req.Host = "github.com"
+		res, err := firstClient.Do(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusNoContent, res.StatusCode)
+		assert.NoError(t, res.Body.Close())
+	}
+
+	assert.Equal(t, []string{"token first-token", "token second-token"}, authorizationHeaders)
+}
+
 func TestPlainHttpClient(t *testing.T) {
 	var receivedHeaders *http.Header
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

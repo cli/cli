@@ -189,7 +189,16 @@ func remotesFunc(f *cmdutil.Factory) func() (ghContext.Remotes, error) {
 }
 
 func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string) func() (*http.Client, error) {
+	var mu sync.Mutex
+	var client *http.Client
+
 	return func() (*http.Client, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if client != nil {
+			return client, nil
+		}
+
 		cfg, err := cfgFunc()
 		if err != nil {
 			return nil, err
@@ -201,11 +210,12 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 			AppVersion:        appVersion,
 			InvokingAgent:     invokingAgent,
 		}
-		client, err := api.NewHTTPClient(opts)
+		newClient, err := api.NewHTTPClient(opts)
 		if err != nil {
 			return nil, err
 		}
-		client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
+		newClient.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(newClient.Transport)
+		client = newClient
 		return client, nil
 	}
 }
