@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -89,15 +90,20 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
-var defaultFields = []string{
+var rawFields = []string{
 	"url", "number", "title", "state", "body", "author", "autoMergeRequest",
-	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions", "commitsCount",
-	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
+	"isDraft", "additions", "deletions",
 	"reviewRequests", "reviews", "assignees", "labels", "projectCards", "projectItems", "milestone",
-	"comments", "reactionGroups", "createdAt", "statusCheckRollup",
 }
 
+var defaultFields = slices.Concat(rawFields, []string{
+	"maintainerCanModify", "mergeable", "commitsCount",
+	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
+	"comments", "reactionGroups", "createdAt", "statusCheckRollup",
+})
+
 func viewRun(opts *ViewOptions) error {
+	connectedToTerminal := opts.IO.IsStdoutTTY()
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   defaultFields,
@@ -107,13 +113,13 @@ func viewRun(opts *ViewOptions) error {
 		findOptions.Fields = []string{"url"}
 	} else if opts.Exporter != nil {
 		findOptions.Fields = opts.Exporter.Fields()
+	} else if !connectedToTerminal && !opts.Comments {
+		findOptions.Fields = rawFields
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
-
-	connectedToTerminal := opts.IO.IsStdoutTTY()
 
 	if opts.BrowserMode {
 		openURL := pr.URL

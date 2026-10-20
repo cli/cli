@@ -1,15 +1,6 @@
 Prefix: GHCL
 Next: 7
 
-### GHCL-2 · P2 · Skip unused GraphQL preloads for piped PR views
-
-- **Area:** Performance
-- **Where:** `pkg/cmd/pr/view/view.go:92`, `pkg/cmd/pr/shared/finder.go:266`
-- **Problem:** The default field set includes `comments` and `statusCheckRollup`, which make the finder send separate preload queries. `viewRun` checks whether stdout is a terminal only after the finder returns. The default piped preview without `--comments` does not display comments or checks. The latency impact is unproven.
-- **Recommendation:** Choose the field set before calling the finder. Omit data the default piped preview does not render, while preserving the richer terminal view, `--comments`, and `--json` behavior.
-- **Fix with:** make-it-fast
-- **Effort:** S
-
 ### GHCL-3 · P3 · Build only the selected command family for normal invocations
 
 - **Area:** Performance
