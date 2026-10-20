@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
@@ -50,35 +51,32 @@ func Main() exitCode {
 	hasDebug, _ := utils.IsDebugEnabled()
 	invokingAgent := agents.Detect()
 
-	cfg, cfgErr := config.NewConfig()
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to load config: %s\n", cfgErr)
-	}
-	cfgFunc := func() (gh.Config, error) { return cfg, cfgErr }
-
-	var ioStreams *iostreams.IOStreams
-	if cfgErr == nil {
-		ioStreams = newIOStreams(cfg, invokingAgent)
-	} else {
-		ioStreams = iostreams.System()
-	}
+	ioStreams := newIOStreams(nil, invokingAgent)
 	stderr := ioStreams.ErrOut
-
-	ghExecutablePath := executablePath("gh")
-
-	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath)
-
 	ctx := context.Background()
 	updateCtx, updateCancel := context.WithCancel(ctx)
 	defer updateCancel()
-	updateMessageChan := make(chan *update.ReleaseInfo)
-	go func() {
-		rel, err := checkForUpdate(updateCtx, cmdFactory, buildVersion)
-		if err != nil && hasDebug {
-			fmt.Fprintf(stderr, "warning: checking for update failed: %v", err)
+	var updateMessageChan chan *update.ReleaseInfo
+	var cmdFactory *cmdutil.Factory
+	cfgFunc := sync.OnceValues(func() (gh.Config, error) {
+		cfg, err := config.NewConfig()
+		if err != nil {
+			return nil, err
 		}
-		updateMessageChan <- rel
-	}()
+		configureIOStreams(ioStreams, cfg, invokingAgent)
+		updateMessageChan = make(chan *update.ReleaseInfo, 1)
+		go func() {
+			rel, err := checkForUpdate(updateCtx, cmdFactory, buildVersion)
+			if err != nil && hasDebug {
+				fmt.Fprintf(stderr, "warning: checking for update failed: %v", err)
+			}
+			updateMessageChan <- rel
+		}()
+		return cfg, nil
+	})
+
+	ghExecutablePath := executablePath("gh")
+	cmdFactory = factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath)
 
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
@@ -101,18 +99,15 @@ func Main() exitCode {
 		cobra.MousetrapHelpText = ""
 	}
 
-	rootCmd, err := root.NewCmdRoot(cmdFactory, buildVersion, buildDate)
-	if err != nil {
-		fmt.Fprintf(stderr, "failed to create root command: %s\n", err)
-		return exitError
-	}
-
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
 		expandedArgs = os.Args[1:]
 	}
-
-	rootCmd.SetArgs(expandedArgs)
+	rootCmd, err := root.NewCmdRoot(cmdFactory, buildVersion, buildDate, expandedArgs)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to create root command: %s\n", err)
+		return exitError
+	}
 
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
 		if err == cmdutil.SilentError {
@@ -169,7 +164,10 @@ func Main() exitCode {
 	}
 
 	updateCancel() // if the update checker hasn't completed by now, abort it
-	newRelease := <-updateMessageChan
+	var newRelease *update.ReleaseInfo
+	if updateMessageChan != nil {
+		newRelease = <-updateMessageChan
+	}
 	if newRelease != nil {
 		isHomebrew := isUnderHomebrew(cmdFactory.ExecutablePath)
 		if isHomebrew && isRecentRelease(newRelease.PublishedAt) {
@@ -271,10 +269,14 @@ func isUnderHomebrew(ghBinary string) bool {
 
 func newIOStreams(cfg gh.Config, invokingAgent agents.AgentName) *iostreams.IOStreams {
 	io := iostreams.System()
+	configureIOStreams(io, cfg, invokingAgent)
+	return io
+}
 
+func configureIOStreams(io *iostreams.IOStreams, cfg gh.Config, invokingAgent agents.AgentName) {
 	if _, ghPromptDisabled := os.LookupEnv("GH_PROMPT_DISABLED"); ghPromptDisabled {
 		io.SetNeverPrompt(true)
-	} else if prompt := cfg.Prompt(""); prompt.Value == "disabled" {
+	} else if cfg != nil && cfg.Prompt("").Value == "disabled" {
 		io.SetNeverPrompt(true)
 	}
 
@@ -287,18 +289,13 @@ func newIOStreams(cfg gh.Config, invokingAgent agents.AgentName) *iostreams.IOSt
 		}
 	} else if invokingAgent != "" {
 		io.SetSpinnerDisabled(true)
-	} else if spinner := cfg.Spinner(""); spinner.Value == "disabled" {
+	} else if cfg != nil && cfg.Spinner("").Value == "disabled" {
 		io.SetSpinnerDisabled(true)
 	}
-
-	// Pager precedence
-	// 1. GH_PAGER
-	// 2. pager from config
-	// 3. PAGER
 	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
 		io.SetPager(ghPager)
-	} else if pager := cfg.Pager(""); pager.Value != "" {
-		io.SetPager(pager.Value)
+	} else if cfg != nil && cfg.Pager("").Value != "" {
+		io.SetPager(cfg.Pager("").Value)
 	}
 
 	if ghColorLabels, ghColorLabelsExists := os.LookupEnv("GH_COLOR_LABELS"); ghColorLabelsExists {
@@ -308,13 +305,15 @@ func newIOStreams(cfg gh.Config, invokingAgent agents.AgentName) *iostreams.IOSt
 		default:
 			io.SetColorLabels(true)
 		}
-	} else if prompt := cfg.ColorLabels(""); prompt.Value == "enabled" {
+	} else if cfg != nil && cfg.ColorLabels("").Value == "enabled" {
 		io.SetColorLabels(true)
 	}
 
-	io.SetAccessibleColorsEnabled(xcolor.IsAccessibleColorsEnabled())
-
-	return io
+	if accessibleColors, set := os.LookupEnv(xcolor.AccessibleColorsEnv); set {
+		io.SetAccessibleColorsEnabled(!slices.Contains(falseyValues, accessibleColors))
+	} else if cfg != nil {
+		io.SetAccessibleColorsEnabled(cfg.AccessibleColors("").Value == "enabled")
+	}
 }
 
 // Executable is the path to the currently invoked binary

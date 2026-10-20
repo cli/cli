@@ -49,7 +49,7 @@ func run(args []string) error {
 		Config: func() (gh.Config, error) {
 			return config.NewMockConfigFromString(""), nil
 		},
-	}, "", "")
+	}, "", "", nil)
 	rootCmd.InitDefaultHelpCmd()
 
 	if err := os.MkdirAll(*dir, 0755); err != nil {

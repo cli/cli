@@ -24,13 +24,6 @@ type Factory struct {
 
 	BaseRepo func() (ghrepo.Interface, error)
 	Branch   func() (string, error)
-	// It would be nice if Config were just loaded once at startup and an error
-	// were returned, but this would prevent commands like "gh version" from running.
-	// So for now, we eagerly load the config and don't fail if there is an error,
-	// and defer the error handling to commands that need it.
-	// HOWEVER, as an additional point, the root command setup currently DOES call
-	// this and errors, so we never get to "gh version" anyway.
-	// We need to revisit that, but I don't want to make it worse.
 	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	// PlainHttpClient is a special HTTP client that does not automatically set

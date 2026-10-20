@@ -302,9 +302,20 @@ func newBrowser(f *cmdutil.Factory) browser.Browser {
 }
 
 func newPrompter(f *cmdutil.Factory) prompter.Prompter {
-	editor, _ := cmdutil.DetermineEditor(f.Config)
-	io := f.IOStreams
-	return prompter.New(editor, io)
+	return &configEditorPrompter{Prompter: prompter.New("", f.IOStreams), factory: f}
+}
+
+type configEditorPrompter struct {
+	prompter.Prompter
+	factory *cmdutil.Factory
+}
+
+func (p *configEditorPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
+	editor, err := cmdutil.DetermineEditor(p.factory.Config)
+	if err != nil {
+		return "", err
+	}
+	return prompter.New(editor, p.factory.IOStreams).MarkdownEditor(prompt, defaultValue, blankAllowed)
 }
 
 func branchFunc(f *cmdutil.Factory) func() (string, error) {

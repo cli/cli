@@ -69,7 +69,7 @@ func TestKramdownCompatibleDocs(t *testing.T) {
 		Browser:   &browser.Stub{},
 	}
 
-	cmd, err := NewCmdRoot(f, "N/A", "")
+	cmd, err := NewCmdRoot(f, "N/A", "", nil)
 	require.NoError(t, err)
 
 	var walk func(*cobra.Command)
@@ -94,7 +94,7 @@ func TestReferenceIsGeneratedWhenHelpIsRequested(t *testing.T) {
 		Browser:   &browser.Stub{},
 	}
 
-	cmd, err := NewCmdRoot(f, "N/A", "")
+	cmd, err := NewCmdRoot(f, "N/A", "", nil)
 	require.NoError(t, err)
 	referenceCmd, _, err := cmd.Find([]string{"reference"})
 	require.NoError(t, err)
