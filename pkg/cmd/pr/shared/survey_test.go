@@ -128,8 +128,6 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	assert.Equal(t, []string{"The road to 1.0"}, state.ProjectTitles)
 }
 
-// TODO projectsV1Deprecation
-// Remove this test and projectsV1MetadataFetcherSpy
 func TestMetadataSurveyProjectV1Deprecation(t *testing.T) {
 	t.Run("when projectsV1 is supported, requests projectsV1", func(t *testing.T) {
 		ios, _, _, _ := iostreams.Test()
@@ -142,10 +140,6 @@ func TestMetadataSurveyProjectV1Deprecation(t *testing.T) {
 			require.NoError(t, err)
 			return []int{i}, nil
 		})
-		pm.RegisterMultiSelect("Projects", []string{}, []string{"Huge Refactoring"}, func(_ string, _, _ []string) ([]int, error) {
-			return []int{0}, nil
-		})
-
 		err := MetadataSurvey(pm, ios, repo, fetcher, &IssueMetadataState{}, gh.ProjectsV1Supported, nil, nil)
 		require.ErrorContains(t, err, "expected test error")
 
@@ -163,10 +157,6 @@ func TestMetadataSurveyProjectV1Deprecation(t *testing.T) {
 			require.NoError(t, err)
 			return []int{i}, nil
 		})
-		pm.RegisterMultiSelect("Projects", []string{}, []string{"Huge Refactoring"}, func(_ string, _, _ []string) ([]int, error) {
-			return []int{0}, nil
-		})
-
 		err := MetadataSurvey(pm, ios, repo, fetcher, &IssueMetadataState{}, gh.ProjectsV1Unsupported, nil, nil)
 		require.ErrorContains(t, err, "expected test error")
 

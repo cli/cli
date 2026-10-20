@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 )
 
 //go:generate moq -rm -out log_mock.go . LogRenderer
@@ -98,7 +99,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 		if len(choice.Delta.ToolCalls) == 0 {
 			if !choice.Delta.Content.Empty() && choice.Delta.Role == "assistant" {
 				// Copilot message and we should display.
-				writeRawText(choice.Delta.Content.String(), w)
+				renderRawMarkdown(choice.Delta.Content.String(), w, io)
 			}
 			continue
 		}
@@ -113,7 +114,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 		if !choice.Delta.ReasoningText.Empty() {
 			// Note that this should be formatted as a normal "thought" message,
 			// without the heading.
-			writeRawText(choice.Delta.ReasoningText.String(), w)
+			renderRawMarkdown(choice.Delta.ReasoningText.String(), w, io)
 		}
 
 		for _, tc := range choice.Delta.ToolCalls {
@@ -140,7 +141,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 
 				content := stripDiffFormat(choice.Delta.Content.String())
 
-				if err := writeFileContent(args.Path, content, w); err != nil {
+				if err := renderFileContentAsMarkdown(args.Path, content, w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render viewed file content: %v\n\n", err)
 					fmt.Fprintln(io.ErrOut, content) // raw fallback
 				}
@@ -156,7 +157,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 					if v.Command != "" {
 						contentWithCommand = fmt.Sprintf("$ %s\n%s", v.Command, choice.Delta.Content.String())
 					}
-					if err := writeFileContent("commands.sh", contentWithCommand, w); err != nil {
+					if err := renderFileContentAsMarkdown("commands.sh", contentWithCommand, w, io); err != nil {
 						fmt.Fprintf(io.ErrOut, "\nfailed to render bash command output: %v\n\n", err)
 						fmt.Fprintln(io.ErrOut, contentWithCommand)
 					}
@@ -201,7 +202,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 
 				// NOTE: omit the delta.content since it's the same as thought
 				renderToolCallTitle(w, cs, "Thought", "")
-				if err := writeRawText(args.Thought, w); err != nil {
+				if err := renderRawMarkdown(args.Thought, w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render thought: %v\n", err)
 				}
 			case "report_progress":
@@ -213,7 +214,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 
 				renderToolCallTitle(w, cs, "Progress update", cs.Bold(args.CommitMessage))
 				if args.PrDescription != "" {
-					if err := writeRawText(args.PrDescription, w); err != nil {
+					if err := renderRawMarkdown(args.PrDescription, w, io); err != nil {
 						fmt.Fprintf(io.ErrOut, "\nfailed to render PR description: %v\n", err)
 					}
 				}
@@ -221,7 +222,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 				// TODO: KW I wasn't able to get this case to populate ever.
 				if !choice.Delta.Content.Empty() {
 					// Try to treat this as JSON
-					if err := writeContentAsJSON("", choice.Delta.Content.String(), w); err != nil {
+					if err := renderContentAsJSONMarkdown("", choice.Delta.Content.String(), w, io); err != nil {
 						fmt.Fprintf(io.ErrOut, "\nfailed to render progress update content: %v\n", err)
 					}
 				}
@@ -234,7 +235,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 				}
 				renderToolCallTitle(w, cs, "Create", cs.Bold(relativeFilePath(args.Path)))
 
-				if err := writeFileContent(args.Path, args.FileText, w); err != nil {
+				if err := renderFileContentAsMarkdown(args.Path, args.FileText, w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render created file content: %v\n\n", err)
 					fmt.Fprintln(io.ErrOut, args.FileText)
 				}
@@ -246,7 +247,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 				}
 
 				renderToolCallTitle(w, cs, "Edit", cs.Bold(relativeFilePath(args.Path)))
-				if err := writeFileContent("output.diff", choice.Delta.Content.String(), w); err != nil {
+				if err := renderFileContentAsMarkdown("output.diff", choice.Delta.Content.String(), w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render str_replace diff: %v\n\n", err)
 					fmt.Fprintln(io.ErrOut, choice.Delta.Content.String())
 				}
@@ -256,18 +257,18 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 				renderGenericToolCall(w, cs, name)
 
 				// If it's JSON, treat it as such, otherwise we skip whatever the content is.
-				_ = writeContentAsJSON("Output:", choice.Delta.Content.String(), w)
+				_ = renderContentAsJSONMarkdown("Output:", choice.Delta.Content.String(), w, io)
 
 				// The entirety of the args can be treated as "input" to the tool call.
 				// We try to render it as JSON, but if that fails, just skip it.
-				_ = writeContentAsJSON("Input:", args, w)
+				_ = renderContentAsJSONMarkdown("Input:", args, w, io)
 			}
 		}
 	}
 	return stop, nil
 }
 
-func writeContentAsJSON(label, content string, w io.Writer) error {
+func renderContentAsJSONMarkdown(label, content string, w io.Writer, io *iostreams.IOStreams) error {
 	var contentAsJSON any
 	if err := json.Unmarshal([]byte(content), &contentAsJSON); err == nil {
 		marshaled, err := json.MarshalIndent(contentAsJSON, "", "  ")
@@ -276,35 +277,42 @@ func writeContentAsJSON(label, content string, w io.Writer) error {
 		}
 
 		if label != "" {
-			if err := writeRawText(label, w); err != nil {
+			if err := renderRawMarkdown(label, w, io); err != nil {
 				return fmt.Errorf("failed to render label: %w", err)
 			}
 		}
 
-		if err := writeFileContent("output.json", string(marshaled), w); err != nil {
+		if err := renderFileContentAsMarkdown("output.json", string(marshaled), w, io); err != nil {
 			return fmt.Errorf("failed to render JSON: %w", err)
 		}
 	}
 	return nil
 }
 
-func writeRawText(md string, w io.Writer) error {
+func renderRawMarkdown(md string, w io.Writer, io *iostreams.IOStreams) error {
 	// Glamour doesn't add leading newlines when content is a complete
 	// markdown document. So, we must add the leading newline.
 	formatFunc := func(s string) string {
 		return fmt.Sprintf("\n%s\n\n", s)
 	}
 
-	return writeFormattedText(md, w, formatFunc)
+	return renderMarkdownWithFormat(md, w, io, formatFunc)
 }
 
-func writeFormattedText(md string, w io.Writer, formatFunc func(string) string) error {
-	rendered := strings.TrimSpace(md)
+func renderMarkdownWithFormat(md string, w io.Writer, io *iostreams.IOStreams, formatFunc func(string) string) error {
+	rendered, err := markdown.Render(md,
+		markdown.WithTheme(io.TerminalTheme()),
+		markdown.WithWrap(io.TerminalWidth()),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to render markdown: %w", err)
+	}
+	rendered = strings.TrimSpace(rendered)
 	if formatFunc != nil {
 		rendered = formatFunc(rendered)
 	}
 
-	_, err := fmt.Fprint(w, rendered)
+	_, err = fmt.Fprint(w, rendered)
 	return err
 }
 
@@ -342,11 +350,11 @@ func stripDiffFormat(diff string) string {
 	return strings.Join(stripped, "\n")
 }
 
-func writeFileContent(path, content string, w io.Writer) error {
+func renderFileContentAsMarkdown(path, content string, w io.Writer, io *iostreams.IOStreams) error {
 	lang := filepath.Ext(filepath.ToSlash(path))
 
 	if lang == ".md" {
-		return writeRawText(content, w)
+		return renderRawMarkdown(content, w, io)
 	}
 
 	md := fmt.Sprintf("```%s\n%s\n```", lang, content)
@@ -354,7 +362,7 @@ func writeFileContent(path, content string, w io.Writer) error {
 		return fmt.Sprintf("%s\n\n", s)
 	}
 
-	return writeFormattedText(md, w, formatFunc)
+	return renderMarkdownWithFormat(md, w, io, formatFunc)
 }
 
 // relativeFilePath converts an absolute file path to a relative one.

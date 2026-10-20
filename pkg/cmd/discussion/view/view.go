@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/discussion/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -381,7 +382,13 @@ func printHumanView(opts *ViewOptions, d *client.Discussion) error {
 	if d.Body == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Muted("No description provided"))
 	} else {
-		md = d.Body
+		var err error
+		md, err = markdown.Render(d.Body,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithWrap(opts.IO.TerminalWidth()))
+		if err != nil {
+			return err
+		}
 	}
 	fmt.Fprintf(out, "\n%s\n", md)
 
@@ -513,7 +520,12 @@ func printHumanComment(opts *ViewOptions, out io.Writer, c client.DiscussionComm
 	fmt.Fprintln(out, header)
 
 	if c.Body != "" {
-		md := c.Body
+		md, err := markdown.Render(c.Body,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithWrap(opts.IO.TerminalWidth()))
+		if err != nil {
+			return err
+		}
 		if indent != "" {
 			md = text.Indent(md, indent)
 		}
