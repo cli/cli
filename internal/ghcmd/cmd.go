@@ -75,8 +75,10 @@ func Main() exitCode {
 		return cfg, nil
 	})
 
-	ghExecutablePath := executablePath("gh")
-	cmdFactory = factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath)
+	resolveExecutablePath := sync.OnceValue(func() string {
+		return executablePath("gh")
+	})
+	cmdFactory = factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, "")
 
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
@@ -108,6 +110,7 @@ func Main() exitCode {
 		fmt.Fprintf(stderr, "failed to create root command: %s\n", err)
 		return exitError
 	}
+	deferExecutablePathUntilPreRun(rootCmd, cmdFactory, resolveExecutablePath)
 
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
 		if err == cmdutil.SilentError {
@@ -169,7 +172,7 @@ func Main() exitCode {
 		newRelease = <-updateMessageChan
 	}
 	if newRelease != nil {
-		isHomebrew := isUnderHomebrew(cmdFactory.ExecutablePath)
+		isHomebrew := isUnderHomebrew(resolveExecutablePath())
 		if isHomebrew && isRecentRelease(newRelease.PublishedAt) {
 			// do not notify Homebrew users before the version bump had a chance to get merged into homebrew-core
 			return exitOK
@@ -328,6 +331,53 @@ func executablePath(executableName string) string {
 	}
 
 	return executable(executableName)
+}
+
+func setExecutablePathForCommand(cmd *cobra.Command, f *cmdutil.Factory, resolve func() string) {
+	if !commandUsesExecutablePath(cmd) {
+		return
+	}
+	path := resolve()
+	f.ExecutablePath = path
+	f.GitClient.GhPath = path
+}
+
+func deferExecutablePathUntilPreRun(rootCmd *cobra.Command, f *cmdutil.Factory, resolve func() string) {
+	rootPersistentPreRunE := rootCmd.PersistentPreRunE
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if rootPersistentPreRunE != nil {
+			if err := rootPersistentPreRunE(cmd, args); err != nil {
+				return err
+			}
+		}
+		setExecutablePathForCommand(cmd, f, resolve)
+		return nil
+	}
+}
+
+func commandUsesExecutablePath(cmd *cobra.Command) bool {
+	return commandPathIs(cmd, "auth", "login") ||
+		commandPathIs(cmd, "auth", "refresh") ||
+		commandPathIs(cmd, "auth", "setup-git") ||
+		commandPathIs(cmd, "gist", "clone") ||
+		commandPathIs(cmd, "issue", "develop") ||
+		commandPathIs(cmd, "pr", "create") ||
+		commandPathIs(cmd, "pr", "checkout") ||
+		commandPathIs(cmd, "pr", "merge") ||
+		commandPathIs(cmd, "repo", "create") ||
+		commandPathIs(cmd, "repo", "clone") ||
+		commandPathIs(cmd, "repo", "fork") ||
+		commandPathIs(cmd, "repo", "sync")
+}
+
+func commandPathIs(cmd *cobra.Command, path ...string) bool {
+	for i := len(path) - 1; i >= 0; i-- {
+		if cmd == nil || cmd.Name() != path[i] {
+			return false
+		}
+		cmd = cmd.Parent()
+	}
+	return true
 }
 
 // Finds the location of the executable for the current process as it's found in PATH, respecting symlinks.
