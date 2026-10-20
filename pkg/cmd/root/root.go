@@ -3,6 +3,7 @@ package root
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -40,12 +41,22 @@ import (
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
 	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
 
 type AuthError struct {
 	err error
+}
+
+type rootCommandBuilder struct {
+	names []string
+	build func() *cobra.Command
+}
+
+func (b rootCommandBuilder) matches(name string) bool {
+	return slices.Contains(b.names, name)
 }
 
 func (ae *AuthError) Error() string {
@@ -88,12 +99,10 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string, args []string) (*
 
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
 
-	// override Cobra's default behaviors unless an opt-out has been set
 	if os.Getenv("GH_COBRA") == "" {
 		cmd.SilenceErrors = true
 		cmd.SilenceUsage = true
 
-		// this --version flag is checked in rootHelpFunc
 		cmd.Flags().Bool("version", false, "Show gh version")
 
 		cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
@@ -114,81 +123,145 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string, args []string) (*
 		Title: "GitHub Actions commands",
 	})
 
-	// Child commands
-	cmd.AddCommand(versionCmd.NewCmdVersion(f, version, buildDate))
-	cmd.AddCommand(actionsCmd.NewCmdActions(f))
-	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
-	cmd.AddCommand(authCmd.NewCmdAuth(f))
-	cmd.AddCommand(configCmd.NewCmdConfig(f))
-	cmd.AddCommand(gistCmd.NewCmdGist(f))
-	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
-	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
-	cmd.AddCommand(searchCmd.NewCmdSearch(f))
-	cmd.AddCommand(secretCmd.NewCmdSecret(f))
-	cmd.AddCommand(variableCmd.NewCmdVariable(f))
-	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
-	cmd.AddCommand(projectCmd.NewCmdProject(f))
-
-	// Root commands with standalone functionality and no subcommands
-	cmd.AddCommand(copilotCmd.NewCmdCopilot(f, nil))
-	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
-	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
-	cmd.AddCommand(licensesCmd.NewCmdLicenses(f))
-
-	// below here at the commands that require the "intelligent" BaseRepo resolver
-	repoResolvingCmdFactory := *f
-	repoResolvingCmdFactory.BaseRepo = factory.SmartBaseRepoFunc(f)
-
-	cmd.AddCommand(agentTaskCmd.NewCmdAgentTask(&repoResolvingCmdFactory))
-	cmd.AddCommand(browseCmd.NewCmdBrowse(&repoResolvingCmdFactory, nil))
-	cmd.AddCommand(discussionCmd.NewCmdDiscussion(&repoResolvingCmdFactory))
-	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
-	cmd.AddCommand(orgCmd.NewCmdOrg(&repoResolvingCmdFactory))
-	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
-	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
-	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
-	cmd.AddCommand(rulesetCmd.NewCmdRuleset(&repoResolvingCmdFactory))
-	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
-	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
-	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
-	cmd.AddCommand(cacheCmd.NewCmdCache(&repoResolvingCmdFactory))
-	cmd.AddCommand(apiCmd.NewCmdApi(&repoResolvingCmdFactory, nil))
-
-	// Help topics
+	builders := rootCommandBuilders(f, version, buildDate)
+	dispatch := rootCommandDispatch(args, builders, os.Getenv("GH_COBRA") != "")
 	var referenceCmd *cobra.Command
-	for _, ht := range HelpTopics {
-		helpTopicCmd := NewCmdHelpTopic(f.IOStreams, ht)
-		cmd.AddCommand(helpTopicCmd)
-
-		// See bottom of the function for why we explicitly care about the reference cmd
-		if ht.name == "reference" {
-			referenceCmd = helpTopicCmd
+	aliasesNeeded := false
+	if dispatch.command != "" {
+		selectedCommand := addSelectedRootCommandBuilder(cmd, builders, dispatch.command)
+		aliasesNeeded = needsAliases(cmd, args)
+		if aliasesNeeded {
+			cmd.RemoveCommand(selectedCommand)
+			addRootCommandBuilders(cmd, builders, selectedCommand)
+			referenceCmd = addHelpTopics(cmd, f.IOStreams)
 		}
+	} else if !dispatch.versionOnly {
+		addRootCommandBuilders(cmd, builders, nil)
+		referenceCmd = addHelpTopics(cmd, f.IOStreams)
+		aliasesNeeded = needsAliases(cmd, args)
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
 
-	referenceCmd.Annotations["markdown:prepare-long"] = "true"
-	prepareReference := func(c *cobra.Command) {
-		if c.Long == "" {
-			c.Long = stringifyReference(cmd)
+	if referenceCmd != nil {
+		referenceCmd.Annotations["markdown:prepare-long"] = "true"
+		prepareReference := func(c *cobra.Command) {
+			if c.Long == "" {
+				c.Long = stringifyReference(cmd)
+			}
 		}
+		referenceCmd.PreRunE = func(c *cobra.Command, _ []string) error {
+			prepareReference(c)
+			return nil
+		}
+		referenceCmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+			prepareReference(c)
+			longPager(f.IOStreams)(c, args)
+		})
 	}
-	referenceCmd.PreRunE = func(c *cobra.Command, _ []string) error {
-		prepareReference(c)
-		return nil
-	}
-	referenceCmd.SetHelpFunc(func(c *cobra.Command, args []string) {
-		prepareReference(c)
-		longPager(f.IOStreams)(c, args)
-	})
-	if needsAliases(cmd, args) {
+	if aliasesNeeded {
 		if err := addAliases(f, cmd); err != nil {
 			return nil, err
 		}
 	}
 	cmd.SetArgs(args)
 	return cmd, nil
+}
+
+type rootCommandRoute struct {
+	command     string
+	versionOnly bool
+}
+
+func rootCommandDispatch(args []string, builders []rootCommandBuilder, cobraDefaults bool) rootCommandRoute {
+	if !cobraDefaults && slices.Equal(args, []string{"--version"}) {
+		return rootCommandRoute{versionOnly: true}
+	}
+	if cobraDefaults || len(args) == 0 || args[0] == "" || strings.HasPrefix(args[0], "-") {
+		return rootCommandRoute{}
+	}
+	switch args[0] {
+	case "help", "reference", "completion", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+		return rootCommandRoute{}
+	}
+	for _, builder := range builders {
+		if builder.matches(args[0]) {
+			return rootCommandRoute{command: builder.names[0]}
+		}
+	}
+	return rootCommandRoute{}
+}
+
+func rootCommandBuilders(f *cmdutil.Factory, version, buildDate string) []rootCommandBuilder {
+	repoResolvingCmdFactory := *f
+	repoResolvingCmdFactory.BaseRepo = factory.SmartBaseRepoFunc(f)
+
+	return []rootCommandBuilder{
+		{names: []string{"version"}, build: func() *cobra.Command { return versionCmd.NewCmdVersion(f, version, buildDate) }},
+		{names: []string{"actions"}, build: func() *cobra.Command { return actionsCmd.NewCmdActions(f) }},
+		{names: []string{"alias"}, build: func() *cobra.Command { return aliasCmd.NewCmdAlias(f) }},
+		{names: []string{"auth"}, build: func() *cobra.Command { return authCmd.NewCmdAuth(f) }},
+		{names: []string{"config"}, build: func() *cobra.Command { return configCmd.NewCmdConfig(f) }},
+		{names: []string{"gist"}, build: func() *cobra.Command { return gistCmd.NewCmdGist(f) }},
+		{names: []string{"gpg-key"}, build: func() *cobra.Command { return gpgKeyCmd.NewCmdGPGKey(f) }},
+		{names: []string{"completion"}, build: func() *cobra.Command { return completionCmd.NewCmdCompletion(f.IOStreams) }},
+		{names: []string{"search"}, build: func() *cobra.Command { return searchCmd.NewCmdSearch(f) }},
+		{names: []string{"secret"}, build: func() *cobra.Command { return secretCmd.NewCmdSecret(f) }},
+		{names: []string{"variable"}, build: func() *cobra.Command { return variableCmd.NewCmdVariable(f) }},
+		{names: []string{"ssh-key"}, build: func() *cobra.Command { return sshKeyCmd.NewCmdSSHKey(f) }},
+		{names: []string{"project"}, build: func() *cobra.Command { return projectCmd.NewCmdProject(f) }},
+		{names: []string{"copilot"}, build: func() *cobra.Command { return copilotCmd.NewCmdCopilot(f, nil) }},
+		{names: []string{"status"}, build: func() *cobra.Command { return statusCmd.NewCmdStatus(f, nil) }},
+		{names: []string{"credits"}, build: func() *cobra.Command { return creditsCmd.NewCmdCredits(f, nil) }},
+		{names: []string{"licenses"}, build: func() *cobra.Command { return licensesCmd.NewCmdLicenses(f) }},
+		{names: []string{"agent-task", "agent-tasks", "agent", "agents"}, build: func() *cobra.Command { return agentTaskCmd.NewCmdAgentTask(&repoResolvingCmdFactory) }},
+		{names: []string{"browse"}, build: func() *cobra.Command { return browseCmd.NewCmdBrowse(&repoResolvingCmdFactory, nil) }},
+		{names: []string{"discussion"}, build: func() *cobra.Command { return discussionCmd.NewCmdDiscussion(&repoResolvingCmdFactory) }},
+		{names: []string{"pr"}, build: func() *cobra.Command { return prCmd.NewCmdPR(&repoResolvingCmdFactory) }},
+		{names: []string{"org"}, build: func() *cobra.Command { return orgCmd.NewCmdOrg(&repoResolvingCmdFactory) }},
+		{names: []string{"issue"}, build: func() *cobra.Command { return issueCmd.NewCmdIssue(&repoResolvingCmdFactory) }},
+		{names: []string{"release"}, build: func() *cobra.Command { return releaseCmd.NewCmdRelease(&repoResolvingCmdFactory) }},
+		{names: []string{"repo"}, build: func() *cobra.Command { return repoCmd.NewCmdRepo(&repoResolvingCmdFactory) }},
+		{names: []string{"ruleset", "rs"}, build: func() *cobra.Command { return rulesetCmd.NewCmdRuleset(&repoResolvingCmdFactory) }},
+		{names: []string{"run"}, build: func() *cobra.Command { return runCmd.NewCmdRun(&repoResolvingCmdFactory) }},
+		{names: []string{"workflow"}, build: func() *cobra.Command { return workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory) }},
+		{names: []string{"label"}, build: func() *cobra.Command { return labelCmd.NewCmdLabel(&repoResolvingCmdFactory) }},
+		{names: []string{"cache"}, build: func() *cobra.Command { return cacheCmd.NewCmdCache(&repoResolvingCmdFactory) }},
+		{names: []string{"api"}, build: func() *cobra.Command { return apiCmd.NewCmdApi(&repoResolvingCmdFactory, nil) }},
+	}
+}
+
+func addSelectedRootCommandBuilder(root *cobra.Command, builders []rootCommandBuilder, selected string) *cobra.Command {
+	for _, builder := range builders {
+		if builder.matches(selected) {
+			cmd := builder.build()
+			root.AddCommand(cmd)
+			return cmd
+		}
+	}
+	panic("root command route has no builder")
+}
+
+func addRootCommandBuilders(root *cobra.Command, builders []rootCommandBuilder, selected *cobra.Command) {
+	for _, builder := range builders {
+		if selected != nil && builder.matches(selected.Name()) {
+			root.AddCommand(selected)
+		} else {
+			root.AddCommand(builder.build())
+		}
+	}
+}
+
+func addHelpTopics(root *cobra.Command, io *iostreams.IOStreams) *cobra.Command {
+	var referenceCmd *cobra.Command
+	for _, ht := range HelpTopics {
+		helpTopicCmd := NewCmdHelpTopic(io, ht)
+		root.AddCommand(helpTopicCmd)
+		if ht.name == "reference" {
+			referenceCmd = helpTopicCmd
+		}
+	}
+	return referenceCmd
 }
 
 func needsAliases(root *cobra.Command, args []string) bool {
