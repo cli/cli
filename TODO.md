@@ -1,16 +1,6 @@
 Prefix: GHCL
 Next: 7
 
-### GHCL-3 · P3 · Build only the selected command family for normal invocations
-
-- **Area:** Performance
-- **Where:** `pkg/cmd/root/root.go:117`
-- **Problem:** `NewCmdRoot` calls every top-level command constructor before Cobra dispatches the requested command. The lazy reference change avoids building reference text, but it does not avoid constructing unrelated command families. The startup cost is unmeasured.
-- **Recommendation:** Measure command construction, then route normal invocations to the selected family if the cost matters. Keep full-tree behavior for root help, reference output, completion, and configured aliases. Preserve Cobra flags, help, and error behavior.
-- **Fix with:** make-it-fast
-- **Effort:** L
-- **Design:** [GHCL-3 lazy command routing](docs/rfc/GHCL-3-lazy-command-routing.md)
-
 ### GHCL-4 · P3 · Reuse the configured HTTP client within one invocation
 
 - **Area:** Performance
