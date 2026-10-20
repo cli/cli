@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -181,6 +182,15 @@ func viewRun(opts *ViewOptions) error {
 	var readmeContent string
 	if readme == nil {
 		readmeContent = cs.Muted("This repository does not have a README")
+	} else if isMarkdownFile(readme.Filename) {
+		var err error
+		readmeContent, err = markdown.Render(readme.Content,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithWrap(opts.IO.TerminalWidth()),
+			markdown.WithBaseURL(readme.BaseURL))
+		if err != nil {
+			return fmt.Errorf("error rendering markdown: %w", err)
+		}
 	} else {
 		readmeContent = readme.Content
 	}
@@ -203,6 +213,13 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	return tmpl.Execute(stdout, repoData)
+}
+
+func isMarkdownFile(filename string) bool {
+	return strings.HasSuffix(filename, ".md") ||
+		strings.HasSuffix(filename, ".markdown") ||
+		strings.HasSuffix(filename, ".mdown") ||
+		strings.HasSuffix(filename, ".mkdown")
 }
 
 func generateBranchURL(r ghrepo.Interface, branch string) string {

@@ -125,6 +125,7 @@ func Test_deleteRun(t *testing.T) {
 		cancel          bool
 		httpStubs       func(*httpmock.Registry)
 		mockPromptGists bool
+		confirmPrompt   bool
 		noGists         bool
 		wantErr         bool
 		wantStdout      string
@@ -132,6 +133,7 @@ func Test_deleteRun(t *testing.T) {
 	}{
 		{
 			name: "successfully delete",
+			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "1234",
 			},
@@ -145,6 +147,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 		{
 			name: "successfully delete with prompt",
+			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "",
 			},
@@ -184,6 +187,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 		{
 			name: "cancel delete with id",
+			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "1234",
 			},
@@ -196,6 +200,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 		{
 			name: "cancel delete with url",
+			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "https://gist.github.com/myrepo/1234",
 			},
@@ -208,6 +213,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 		{
 			name: "cancel delete with prompt",
+			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "",
 			},
@@ -218,6 +224,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 		{
 			name: "not owned by you",
+			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "1234",
 			},
@@ -256,7 +263,7 @@ func Test_deleteRun(t *testing.T) {
 
 	for _, tt := range tests {
 		pm := prompter.NewMockPrompter(t)
-		if !tt.opts.Confirmed {
+		if tt.confirmPrompt {
 			pm.RegisterConfirm("Delete \"cool.txt\" gist?", func(_ string, _ bool) (bool, error) {
 				return !tt.cancel, nil
 			})

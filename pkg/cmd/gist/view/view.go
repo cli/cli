@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -166,7 +167,13 @@ func viewRun(opts *ViewOptions) error {
 		}
 
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
-			_, err := fmt.Fprint(opts.IO.Out, content.String())
+			rendered, err := markdown.Render(content.String(),
+				markdown.WithTheme(opts.IO.TerminalTheme()),
+				markdown.WithWrap(opts.IO.TerminalWidth()))
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprint(opts.IO.Out, rendered)
 			return err
 		}
 

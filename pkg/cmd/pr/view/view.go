@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -272,6 +273,14 @@ func printHumanPrPreview(opts *ViewOptions, baseRepo ghrepo.Interface, pr *api.P
 	md := pr.Body
 	if md == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Muted("No description provided"))
+	} else {
+		var err error
+		md, err = markdown.Render(md,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithWrap(opts.IO.TerminalWidth()))
+		if err != nil {
+			return err
+		}
 	}
 	fmt.Fprintf(out, "\n%s\n", md)
 

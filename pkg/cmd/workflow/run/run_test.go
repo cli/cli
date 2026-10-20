@@ -1100,9 +1100,6 @@ jobs:
 				pm.RegisterSelect("Select a workflow", []string{"choice missing inputs (workflow.yml)"}, func(_, _ string, opts []string) (int, error) {
 					return 0, nil
 				})
-				pm.RegisterSelect("name", []string{}, func(_, _ string, opts []string) (int, error) {
-					return 0, nil
-				})
 			},
 			wantErr: true,
 			errOut:  "workflow input \"name\" is of type choice, but has no options",

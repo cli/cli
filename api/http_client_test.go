@@ -21,7 +21,7 @@ import (
 
 func TestNewHTTPClient(t *testing.T) {
 	type args struct {
-		config             config
+		config             tokenGetter
 		appVersion         string
 		invokingAgent      string
 		logVerboseHTTP     bool

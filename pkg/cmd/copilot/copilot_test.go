@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -339,7 +340,7 @@ func TestFetchExpectedChecksum(t *testing.T) {
 		)
 
 		client := &http.Client{Transport: reg}
-		checksum, err := fetchExpectedChecksum(client, "https://example.com/checksums", "copilot-linux-x64.tar.gz")
+		checksum, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-linux-x64.tar.gz")
 		require.NoError(t, err, "unexpected error")
 		require.Equal(t, "abc123def456", checksum, "checksum mismatch")
 	})
@@ -353,7 +354,7 @@ func TestFetchExpectedChecksum(t *testing.T) {
 		)
 
 		client := &http.Client{Transport: reg}
-		_, err := fetchExpectedChecksum(client, "https://example.com/checksums", "copilot-win32-x64.zip")
+		_, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-win32-x64.zip")
 		require.Error(t, err, "expected error for missing archive")
 		require.Equal(t, "checksum not found for copilot-win32-x64.zip", err.Error(), "unexpected error")
 	})
@@ -367,7 +368,7 @@ func TestFetchExpectedChecksum(t *testing.T) {
 		)
 
 		client := &http.Client{Transport: reg}
-		checksum, err := fetchExpectedChecksum(client, "https://example.com/checksums", "copilot-darwin-x64.tar.gz")
+		checksum, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-darwin-x64.tar.gz")
 		require.NoError(t, err, "unexpected error")
 		require.Equal(t, "abc123", checksum, "checksum mismatch")
 	})
@@ -380,7 +381,7 @@ func TestFetchExpectedChecksum(t *testing.T) {
 		)
 
 		client := &http.Client{Transport: reg}
-		_, err := fetchExpectedChecksum(client, "https://example.com/checksums", "copilot-linux-x64.tar.gz")
+		_, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-linux-x64.tar.gz")
 		require.Error(t, err, "expected error for HTTP 404")
 	})
 }

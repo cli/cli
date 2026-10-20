@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 type tokenGetter interface {
 	ActiveToken(string) (string, string)
+	HostForAPIHost(string) (string, bool)
 }
 
 type HTTPClientOptions struct {
@@ -143,18 +145,25 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
-		if req.Header.Get(authorization) == "" {
-			var redirectHostnameChange bool
-			if req.Response != nil && req.Response.Request != nil {
-				redirectHostnameChange = getHost(req) != getHost(req.Response.Request)
-			}
-			// Only set header if an initial request or redirect request to the same host as the initial request.
-			// If the host has changed during a redirect do not add the authentication token header.
-			if !redirectHostnameChange {
-				hostname := ghauth.NormalizeHostname(getHost(req))
-				if token, _ := cfg.ActiveToken(hostname); token != "" {
-					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+		if req.Header.Get(authorization) != "" {
+			return rt.RoundTrip(req)
+		}
+
+		var redirectHostnameChange bool
+		if req.Response != nil && req.Response.Request != nil {
+			redirectHostnameChange = getHostname(req) != getHostname(req.Response.Request)
+		}
+
+		if !redirectHostnameChange {
+			hostname := ghauth.NormalizeHostname(getHostname(req))
+			token, _ := cfg.ActiveToken(hostname)
+			if token == "" {
+				if canonicalHost, ok := cfg.HostForAPIHost(hostname); ok {
+					token, _ = cfg.ActiveToken(canonicalHost)
 				}
+			}
+			if token != "" {
+				req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 			}
 		}
 		return rt.RoundTrip(req)
@@ -185,9 +194,10 @@ func (tr funcTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return tr.roundTrip(req)
 }
 
-func getHost(r *http.Request) string {
-	if r.Host != "" {
-		return r.Host
+func getHostname(r *http.Request) string {
+	host := r.Host
+	if host == "" {
+		host = r.URL.Host
 	}
-	return r.URL.Host
+	return (&url.URL{Host: host}).Hostname()
 }

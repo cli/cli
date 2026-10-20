@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -143,7 +144,13 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 		fmt.Fprintln(w, cs.Mutedf("%s released this %s", release.Author.Login, text.FuzzyAgo(time.Now(), *release.PublishedAt)))
 	}
 
-	fmt.Fprintln(w, release.Body)
+	renderedDescription, err := markdown.Render(release.Body,
+		markdown.WithTheme(io.TerminalTheme()),
+		markdown.WithWrap(io.TerminalWidth()))
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(w, renderedDescription)
 
 	if len(release.Assets) > 0 {
 		fmt.Fprintln(w, cs.Bold("Assets"))

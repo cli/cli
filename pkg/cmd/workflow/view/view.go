@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -178,7 +179,14 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Inte
 		fmt.Fprintf(out, "ID: %s", cs.Cyanf("%d", workflow.ID))
 
 		codeBlock := fmt.Sprintf("```yaml\n%s\n```", yaml)
-		_, err := fmt.Fprint(opts.IO.Out, codeBlock)
+		rendered, err := markdown.Render(codeBlock,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithoutIndentation(),
+			markdown.WithWrap(0))
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprint(opts.IO.Out, rendered)
 		return err
 	}
 

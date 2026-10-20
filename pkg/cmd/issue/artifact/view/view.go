@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -238,7 +239,13 @@ func printHumanArtifact(opts *ViewOptions, repo ghrepo.Interface, a *client.Arti
 		}
 		fmt.Fprintln(out)
 	default:
-		fmt.Fprintf(out, "\n%s\n", body)
+		md, err := markdown.Render(body,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithWrap(opts.IO.TerminalWidth()))
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "\n%s\n", md)
 	}
 
 	if len(a.Versions) > 0 {

@@ -53,6 +53,7 @@ func TestHelperProcess(t *testing.T) {
 }
 
 func Test_GhEditor_Prompt_skip(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
 	pty := newTerminal(t)
 
 	e := &GhEditor{
@@ -86,6 +87,7 @@ func Test_GhEditor_Prompt_skip(t *testing.T) {
 }
 
 func Test_GhEditor_Prompt_editorAppend(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
 	pty := newTerminal(t)
 
 	e := &GhEditor{
@@ -117,6 +119,7 @@ func Test_GhEditor_Prompt_editorAppend(t *testing.T) {
 }
 
 func Test_GhEditor_Prompt_editorTruncate(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
 	pty := newTerminal(t)
 
 	e := &GhEditor{
