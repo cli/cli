@@ -11,9 +11,12 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/cli/cli/v2/internal/flock"
 )
 
 const (
@@ -37,35 +40,78 @@ func (s Snapshot) Enabled(name string) bool {
 	return s.values[name]
 }
 
-// Load obtains a snapshot from the provisional global Twirp service, reusing a
-// cache for thirty minutes. An empty serverURL disables lookup and cache access.
-// Refreshes have a two-second deadline. On failure, the last valid snapshot (or
-// defaults) is returned alongside the error. Cache failures do not prevent
-// obtaining server flags. The HTTP client must not attach credentials.
-func Load(ctx context.Context, serverURL, cacheDir string, client *http.Client) (Snapshot, error) {
+// FromCache returns the cached snapshot and whether it remains fresh. Missing
+// cache data returns disabled defaults with fresh set to false.
+func FromCache(serverURL, cacheDir string) (Snapshot, bool, error) {
 	if serverURL == "" {
-		return Snapshot{}, nil
+		return Snapshot{}, true, nil
 	}
+	endpoint, err := endpointURL(serverURL)
+	if err != nil {
+		return Snapshot{}, false, err
+	}
+	cached, fetchedAt, err := readCache(cachePath(cacheDir), endpoint)
+	if err != nil {
+		return Snapshot{}, false, err
+	}
+	return cached, !fetchedAt.IsZero() && time.Since(fetchedAt) < 30*time.Minute, nil
+}
+
+// Refresh fetches and atomically persists a complete snapshot for a later
+// invocation. The request has a two-second deadline.
+func Refresh(ctx context.Context, serverURL, cacheDir string, client *http.Client) error {
+	return refresh(ctx, serverURL, cacheDir, client, flock.TryLock, flock.IsUnsupported)
+}
+
+type tryLockFunc func(string) (*os.File, func(), error)
+
+func refresh(
+	ctx context.Context,
+	serverURL string,
+	cacheDir string,
+	client *http.Client,
+	tryLock tryLockFunc,
+	isLockUnsupported func(error) bool,
+) error {
+	endpoint, err := endpointURL(serverURL)
+	if err != nil {
+		return err
+	}
+	cacheFile := cachePath(cacheDir)
+	if err := os.MkdirAll(filepath.Dir(cacheFile), 0o700); err != nil {
+		return fmt.Errorf("create global flag cache directory: %w", err)
+	}
+	_, unlock, err := tryLock(cacheFile + ".lock")
+	if errors.Is(err, flock.ErrLocked) {
+		return nil
+	}
+	if err != nil && !isLockUnsupported(err) {
+		return fmt.Errorf("lock global flag refresh: %w", err)
+	}
+	if err == nil {
+		defer unlock()
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	_, body, err := fetch(ctx, endpoint, client)
+	if err != nil {
+		return err
+	}
+	return writeCache(cacheFile, endpoint, body)
+}
+
+func endpointURL(serverURL string) (string, error) {
 	baseURL, err := url.Parse(serverURL)
 	if err != nil || (baseURL.Scheme != "http" && baseURL.Scheme != "https") ||
 		baseURL.Hostname() == "" || baseURL.User != nil || baseURL.RawQuery != "" ||
 		baseURL.ForceQuery || baseURL.Fragment != "" {
-		return Snapshot{}, errors.New("global flag server URL must be an absolute HTTP(S) URL without credentials, query, or fragment")
+		return "", errors.New("global flag server URL must be an absolute HTTP(S) URL without credentials, query, or fragment")
 	}
-	endpoint := strings.TrimRight(baseURL.String(), "/") + rpcPath
-	cachePath := filepath.Join(cacheDir, "global-feature-flags", "development-v1.json")
-	cached, fetchedAt, cacheErr := readCache(cachePath, endpoint)
-	if cacheErr == nil && !fetchedAt.IsZero() && time.Since(fetchedAt) < 30*time.Minute {
-		return cached, nil
-	}
+	return strings.TrimRight(baseURL.String(), "/") + rpcPath, nil
+}
 
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-	snapshot, body, err := fetch(ctx, endpoint, client)
-	if err != nil {
-		return cached, errors.Join(cacheErr, err)
-	}
-	return snapshot, errors.Join(cacheErr, writeCache(cachePath, endpoint, body))
+func cachePath(cacheDir string) string {
+	return filepath.Join(cacheDir, "global-feature-flags", "development-v1.json")
 }
 
 func fetch(ctx context.Context, endpoint string, client *http.Client) (Snapshot, []byte, error) {

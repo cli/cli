@@ -1,7 +1,6 @@
 package globalflags
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadGlobalSnapshotFromProvisionalTwirpServer(t *testing.T) {
+func TestRefreshUsesProvisionalTwirpContract(t *testing.T) {
 	t.Parallel()
 
 	// Given an unauthenticated global flag service
@@ -35,11 +34,15 @@ func TestLoadGlobalSnapshotFromProvisionalTwirpServer(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// When a snapshot is loaded from the proposed API
-	snapshot, err := Load(t.Context(), server.URL, t.TempDir(), server.Client())
+	// When the cache worker refreshes from the proposed API
+	cacheDir := t.TempDir()
+	err := Refresh(t.Context(), server.URL, cacheDir, server.Client())
 
-	// Then callers can distinguish enabled flags without any user context
+	// Then the next invocation can distinguish enabled flags without user context
 	require.NoError(t, err)
+	snapshot, fresh, err := FromCache(server.URL, cacheDir)
+	require.NoError(t, err)
+	assert.True(t, fresh)
 	assert.True(t, snapshot.Enabled("released"), "the server enabled this flag globally")
 	assert.False(t, snapshot.Enabled("unreleased"), "the server disabled this flag globally")
 	assert.False(t, snapshot.Enabled("unknown"), "unknown flags default to disabled")
@@ -62,22 +65,54 @@ func TestSnapshotOwnsItsValues(t *testing.T) {
 	assert.False(t, copied.Enabled("later"), "an existing snapshot must not acquire new values")
 }
 
-func TestLoadWithoutEndpointIsOffline(t *testing.T) {
+func TestFromCacheWithoutEndpointIsOffline(t *testing.T) {
 	t.Parallel()
 
-	// Given no opted-in development endpoint or usable dependencies
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-
-	// When flags are loaded
-	snapshot, err := Load(ctx, "", "", nil)
+	// When startup has no opted-in development endpoint
+	snapshot, fresh, err := FromCache("", "")
 
 	// Then defaults require neither the network nor a cache
 	require.NoError(t, err)
+	assert.True(t, fresh, "disabled lookup must not request a refresh")
 	assert.False(t, snapshot.Enabled("released"), "flags default to disabled before activation")
 }
 
-func TestLoadRejectsAmbiguousServerURLsBeforeIO(t *testing.T) {
+func TestFromCacheWithoutEntryRequestsRefresh(t *testing.T) {
+	t.Parallel()
+
+	// Given an opted-in endpoint without a cached snapshot
+	// When startup reads global flags
+	snapshot, fresh, err := FromCache("https://flags.example", t.TempDir())
+
+	// Then defaults are immediately available and a refresh is requested
+	require.NoError(t, err)
+	assert.False(t, fresh, "a missing cache must request an asynchronous refresh")
+	assert.False(t, snapshot.Enabled("released"), "a missing cache uses disabled defaults")
+}
+
+func TestRefreshWritesSnapshotForNextInvocation(t *testing.T) {
+	t.Parallel()
+
+	// Given an unauthenticated global flag service and an empty cache
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Empty(t, r.Header.Get("Authorization"))
+		_, _ = io.WriteString(w, `{"flags":{"released":true}}`)
+	}))
+	defer server.Close()
+	cacheDir := t.TempDir()
+
+	// When the refresh worker fetches the complete snapshot
+	err := Refresh(t.Context(), server.URL, cacheDir, server.Client())
+
+	// Then the next invocation reads it without contacting the service
+	require.NoError(t, err)
+	snapshot, fresh, err := FromCache(server.URL, cacheDir)
+	require.NoError(t, err)
+	assert.True(t, fresh, "a completed refresh produces a fresh cache")
+	assert.True(t, snapshot.Enabled("released"), "the refreshed flag applies to the next invocation")
+}
+
+func TestFromCacheRejectsAmbiguousServerURLsBeforeIO(t *testing.T) {
 	t.Parallel()
 	for _, endpoint := range []string{
 		"flags.example",
@@ -90,22 +125,18 @@ func TestLoadRejectsAmbiguousServerURLsBeforeIO(t *testing.T) {
 		t.Run(endpoint, func(t *testing.T) {
 			t.Parallel()
 
-			// Given an endpoint which is not an unambiguous unauthenticated HTTP base URL
-			reg := &httpmock.Registry{}
-			defer reg.Verify(t)
-			reg.Exclude(t, httpmock.MatchAny)
-
-			// When the development lookup is configured
-			snapshot, err := Load(t.Context(), endpoint, t.TempDir(), &http.Client{Transport: reg})
+			// When development lookup uses an ambiguous or authenticated URL
+			snapshot, fresh, err := FromCache(endpoint, t.TempDir())
 
 			// Then invalid configuration is reported without contacting any server
 			require.ErrorContains(t, err, "global flag server URL")
+			assert.False(t, fresh)
 			assert.False(t, snapshot.Enabled("released"), "invalid endpoints must use default flag values")
 		})
 	}
 }
 
-func TestLoadDoesNotFollowRedirects(t *testing.T) {
+func TestRefreshDoesNotFollowRedirects(t *testing.T) {
 	t.Parallel()
 
 	// Given a development service redirecting outside its configured endpoint
@@ -117,15 +148,14 @@ func TestLoadDoesNotFollowRedirects(t *testing.T) {
 	client := &http.Client{Transport: reg}
 
 	// When flags are fetched
-	snapshot, err := Load(t.Context(), "https://flags.example", t.TempDir(), client)
+	err := Refresh(t.Context(), "https://flags.example", t.TempDir(), client)
 
 	// Then the redirect is reported rather than becoming part of this cache's identity
 	require.ErrorContains(t, err, "HTTP 302")
-	assert.False(t, snapshot.Enabled("released"), "redirect responses cannot supply global flags")
 	assert.Nil(t, client.CheckRedirect, "the shared client must not be reconfigured")
 }
 
-func TestLoadAcceptsResponseAtOneMiBSizeLimit(t *testing.T) {
+func TestRefreshAcceptsResponseAtOneMiBSizeLimit(t *testing.T) {
 	t.Parallel()
 
 	// Given a valid response exactly at the supported size limit
@@ -135,10 +165,14 @@ func TestLoadAcceptsResponseAtOneMiBSizeLimit(t *testing.T) {
 	defer reg.Verify(t)
 	reg.Register(httpmock.MatchAny, httpmock.StringResponse(body))
 
-	// When the global snapshot is loaded
-	snapshot, err := Load(t.Context(), "https://flags.example", t.TempDir(), &http.Client{Transport: reg})
+	// When the global snapshot is refreshed
+	cacheDir := t.TempDir()
+	err := Refresh(t.Context(), "https://flags.example", cacheDir, &http.Client{Transport: reg})
 
 	// Then the inclusive size boundary permits its flag values
 	require.NoError(t, err)
+	snapshot, fresh, err := FromCache("https://flags.example", cacheDir)
+	require.NoError(t, err)
+	assert.True(t, fresh)
 	assert.True(t, snapshot.Enabled("released"), "a complete response at the limit is still valid")
 }

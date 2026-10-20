@@ -1,26 +1,39 @@
 package ghcmd
 
 import (
-	"context"
-	"net/http"
+	"errors"
+	"os/exec"
 
+	"github.com/cli/cli/v2/internal/detach"
 	"github.com/cli/cli/v2/internal/globalflags"
 )
 
-type globalFlagStartupOptions struct {
-	serverURL          string
-	cacheDir           string
-	telemetrySender    bool
-	externalHTTPClient func() (*http.Client, error)
+func startGlobalFlagRefresh(executable string) error {
+	cmd := exec.Command(executable, "refresh-global-feature-flags")
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	cmd.SysProcAttr = detach.SysProcAttr()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	return cmd.Process.Release()
 }
 
-func loadGlobalFlagSnapshot(ctx context.Context, opts globalFlagStartupOptions) (globalflags.Snapshot, error) {
-	if opts.serverURL == "" || opts.telemetrySender {
+type globalFlagStartupOptions struct {
+	serverURL    string
+	cacheDir     string
+	skipRefresh  bool
+	startRefresh func() error
+}
+
+func loadGlobalFlagSnapshot(opts globalFlagStartupOptions) (globalflags.Snapshot, error) {
+	if opts.serverURL == "" || opts.skipRefresh {
 		return globalflags.Snapshot{}, nil
 	}
-	client, err := opts.externalHTTPClient()
-	if err != nil {
-		return globalflags.Snapshot{}, err
+	snapshot, fresh, cacheErr := globalflags.FromCache(opts.serverURL, opts.cacheDir)
+	if fresh {
+		return snapshot, cacheErr
 	}
-	return globalflags.Load(ctx, opts.serverURL, opts.cacheDir, client)
+	return snapshot, errors.Join(cacheErr, opts.startRefresh())
 }

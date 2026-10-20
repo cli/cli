@@ -2,13 +2,16 @@ package globalflags
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -18,42 +21,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadReusesSnapshotUntilThirtyMinuteExpiry(t *testing.T) {
+func TestCacheFreshnessAndSnapshotStability(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		// Given a cached global snapshot and a server that subsequently removes its flag
 		cacheDir := t.TempDir()
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
 		reg.Register(httpmock.MatchAny, httpmock.StringResponse(`{"flags":{"released":true}}`))
 		reg.Register(httpmock.MatchAny, httpmock.StringResponse(`{"flags":{}}`))
 		client := &http.Client{Transport: reg}
-		original, err := Load(t.Context(), "https://flags.example", cacheDir, client)
+		require.NoError(t, Refresh(t.Context(), "https://flags.example", cacheDir, client))
+
+		original, fresh, err := FromCache("https://flags.example", cacheDir)
 		require.NoError(t, err)
+		assert.True(t, fresh)
+		assert.True(t, original.Enabled("released"))
 
-		// When another invocation starts just before expiry
-		time.Sleep(30*time.Minute - time.Nanosecond)
-		fresh, err := Load(t.Context(), "https://flags.example", cacheDir, client)
-
-		// Then it reuses the cache without contacting the server
+		time.Sleep(30 * time.Minute)
+		stale, fresh, err := FromCache("https://flags.example", cacheDir)
 		require.NoError(t, err)
-		assert.True(t, fresh.Enabled("released"), "the cached snapshot is fresh for thirty minutes")
+		assert.False(t, fresh)
+		assert.True(t, stale.Enabled("released"))
 
-		// When the cache reaches its expiry boundary
-		time.Sleep(time.Nanosecond)
-		refreshed, err := Load(t.Context(), "https://flags.example", cacheDir, client)
-
-		// Then the new response replaces the cache without changing an earlier snapshot
+		require.NoError(t, Refresh(t.Context(), "https://flags.example", cacheDir, client))
+		refreshed, fresh, err := FromCache("https://flags.example", cacheDir)
 		require.NoError(t, err)
+		assert.True(t, fresh)
 		assert.False(t, refreshed.Enabled("released"), "removed flags must not survive a successful refresh")
 		assert.True(t, original.Enabled("released"), "running invocations retain their original snapshot")
 	})
 }
 
-func TestLoadFallsBackToStaleSnapshotAfterTwoSeconds(t *testing.T) {
+func TestRefreshTimesOutWithoutErasingStaleSnapshot(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		// Given a stale snapshot and a server taking ten seconds to answer
 		cacheDir := t.TempDir()
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
@@ -67,22 +68,22 @@ func TestLoadFallsBackToStaleSnapshotAfterTwoSeconds(t *testing.T) {
 			}
 		})
 		client := &http.Client{Transport: reg}
-		_, err := Load(t.Context(), "https://flags.example", cacheDir, client)
-		require.NoError(t, err)
+		require.NoError(t, Refresh(t.Context(), "https://flags.example", cacheDir, client))
 		time.Sleep(30 * time.Minute)
 
-		// When startup refreshes the flags
 		start := time.Now()
-		snapshot, err := Load(t.Context(), "https://flags.example", cacheDir, client)
+		err := Refresh(t.Context(), "https://flags.example", cacheDir, client)
 
-		// Then the request is cancelled at two seconds and stale values remain usable
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.Equal(t, 2*time.Second, time.Since(start))
+		snapshot, fresh, err := FromCache("https://flags.example", cacheDir)
+		require.NoError(t, err)
+		assert.False(t, fresh)
 		assert.True(t, snapshot.Enabled("released"), "a slow server must not erase the last valid snapshot")
 	})
 }
 
-func TestLoadRejectsInvalidRefreshWithoutPoisoningCache(t *testing.T) {
+func TestRefreshRejectsInvalidResponseWithoutPoisoningCache(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name   string
@@ -104,91 +105,78 @@ func TestLoadRejectsInvalidRefreshWithoutPoisoningCache(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				// Given a stale snapshot and an invalid server response
 				cacheDir := t.TempDir()
 				reg := &httpmock.Registry{}
 				defer reg.Verify(t)
 				reg.Register(httpmock.MatchAny, httpmock.StringResponse(`{"flags":{"released":true}}`))
 				reg.Register(httpmock.MatchAny, httpmock.StatusStringResponse(tt.status, tt.body))
+				reg.Register(httpmock.MatchAny, httpmock.StringResponse(`{"flags":{"recovered":true}}`))
 				client := &http.Client{Transport: reg}
-				_, err := Load(t.Context(), "https://flags.example", cacheDir, client)
-				require.NoError(t, err)
+				require.NoError(t, Refresh(t.Context(), "https://flags.example", cacheDir, client))
 				time.Sleep(30 * time.Minute)
 
-				// When the response is rejected
-				snapshot, err := Load(t.Context(), "https://flags.example", cacheDir, client)
-
-				// Then the entire old snapshot is retained and the next invocation can retry
-				require.Error(t, err)
-				assert.True(t, snapshot.Enabled("released"), "invalid responses must not replace valid flags")
-				reg.Register(httpmock.MatchAny, httpmock.StringResponse(`{"flags":{"recovered":true}}`))
-				recovered, err := Load(t.Context(), "https://flags.example", cacheDir, client)
+				require.Error(t, Refresh(t.Context(), "https://flags.example", cacheDir, client))
+				snapshot, fresh, err := FromCache("https://flags.example", cacheDir)
 				require.NoError(t, err)
-				assert.True(t, recovered.Enabled("recovered"), "a rejected refresh must not mark the cache fresh")
+				assert.False(t, fresh)
+				assert.True(t, snapshot.Enabled("released"), "invalid responses must not replace valid flags")
+
+				require.NoError(t, Refresh(t.Context(), "https://flags.example", cacheDir, client))
+				recovered, fresh, err := FromCache("https://flags.example", cacheDir)
+				require.NoError(t, err)
+				assert.True(t, fresh)
+				assert.True(t, recovered.Enabled("recovered"))
 			})
 		})
 	}
 }
 
-func TestLoadIsolatesEndpointsInOneDevelopmentCacheSlot(t *testing.T) {
+func TestCacheIsolatesDevelopmentEndpoints(t *testing.T) {
 	t.Parallel()
-
-	// Given cached flags belonging to one development server
 	cacheDir := t.TempDir()
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
 	reg.Register(httpmock.WithHost(httpmock.MatchAny, "first.example"),
 		httpmock.StringResponse(`{"flags":{"first":true}}`))
 	reg.Register(httpmock.WithHost(httpmock.MatchAny, "second.example"),
-		httpmock.StatusStringResponse(503, ""))
-	reg.Register(httpmock.WithHost(httpmock.MatchAny, "second.example"),
 		httpmock.StringResponse(`{"flags":{"second":true}}`))
 	client := &http.Client{Transport: reg}
-	_, err := Load(t.Context(), "https://first.example", cacheDir, client)
-	require.NoError(t, err)
+	require.NoError(t, Refresh(t.Context(), "https://first.example", cacheDir, client))
 
-	// When another endpoint is unavailable, or lookup is disabled
-	failed, err := Load(t.Context(), "https://second.example", cacheDir, client)
-	require.ErrorContains(t, err, "HTTP 503")
-	disabled, err := Load(t.Context(), "", cacheDir, client)
-
-	// Then neither can inherit the first server's flags
+	second, fresh, err := FromCache("https://second.example", cacheDir)
 	require.NoError(t, err)
-	assert.False(t, failed.Enabled("first"), "fallback must not cross endpoint identities")
+	assert.False(t, fresh)
+	assert.False(t, second.Enabled("first"), "fallback must not cross endpoint identities")
+	disabled, fresh, err := FromCache("", cacheDir)
+	require.NoError(t, err)
+	assert.True(t, fresh)
 	assert.False(t, disabled.Enabled("first"), "the default context must never read development flags")
 
-	// When the second endpoint recovers
-	recovered, err := Load(t.Context(), "https://second.example", cacheDir, client)
-
-	// Then it replaces the single development slot rather than accumulating per-endpoint files
+	require.NoError(t, Refresh(t.Context(), "https://second.example", cacheDir, client))
+	second, fresh, err = FromCache("https://second.example", cacheDir)
 	require.NoError(t, err)
-	assert.True(t, recovered.Enabled("second"), "the new endpoint supplies its own snapshot")
-	assert.False(t, recovered.Enabled("first"), "snapshots from different endpoints must never be merged")
+	assert.True(t, fresh)
+	assert.True(t, second.Enabled("second"))
+	assert.False(t, second.Enabled("first"))
 	entries, err := os.ReadDir(filepath.Join(cacheDir, "global-feature-flags"))
 	require.NoError(t, err)
-	assert.Len(t, entries, 1, "completed refreshes leave only one bounded development cache file")
+	assert.Len(t, entries, 2, "the bounded development cache contains one snapshot and one lock file")
 }
 
-func TestLoadReturnsServerFlagsWhenCacheIsUnwritable(t *testing.T) {
+func TestRefreshReportsUnwritableCache(t *testing.T) {
 	t.Parallel()
-
-	// Given a file where the cache directory should be
 	cacheDir := filepath.Join(t.TempDir(), "not-a-directory")
-	require.NoError(t, os.WriteFile(cacheDir, nil, 0600))
+	require.NoError(t, os.WriteFile(cacheDir, nil, 0o600))
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
-	reg.Register(httpmock.MatchAny, httpmock.StringResponse(`{"flags":{"released":true}}`))
 
-	// When the server successfully returns flags
-	snapshot, err := Load(t.Context(), "https://flags.example", cacheDir, &http.Client{Transport: reg})
+	err := Refresh(t.Context(), "https://flags.example", cacheDir, &http.Client{Transport: reg})
 
-	// Then a distinguishable filesystem error accompanies the usable server snapshot
 	var pathErr *os.PathError
 	require.ErrorAs(t, err, &pathErr)
-	assert.True(t, snapshot.Enabled("released"), "cache persistence is not a prerequisite for obtaining flags")
 }
 
-func TestLoadReportsAndRepairsInvalidCache(t *testing.T) {
+func TestInvalidCacheCanBeRepairedByRefresh(t *testing.T) {
 	t.Parallel()
 	validEntry := fmt.Sprintf(`{"endpoint":"https://flags.example/twirp/github.cli.globalflags.v1.GlobalFeatureFlags/GetFlags","fetched_at":%q,"response":{"flags":{"untrusted":true}}}`,
 		time.Now().UTC().Format(time.RFC3339Nano))
@@ -206,57 +194,121 @@ func TestLoadReportsAndRepairsInvalidCache(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			// Given a corrupt development cache
 			cacheDir := t.TempDir()
 			flagsDir := filepath.Join(cacheDir, "global-feature-flags")
-			require.NoError(t, os.Mkdir(flagsDir, 0700))
-			require.NoError(t, os.WriteFile(filepath.Join(flagsDir, "development-v1.json"), []byte(tt.data), 0600))
+			require.NoError(t, os.Mkdir(flagsDir, 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(flagsDir, "development-v1.json"), []byte(tt.data), 0o600))
+
+			snapshot, fresh, err := FromCache("https://flags.example", cacheDir)
+			require.ErrorContains(t, err, tt.err)
+			assert.False(t, fresh)
+			assert.False(t, snapshot.Enabled("untrusted"))
+
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			reg.Register(httpmock.MatchAny, httpmock.StringResponse(`{"flags":{"recovered":true}}`))
-			client := &http.Client{Transport: reg}
-
-			// When flags are loaded
-			snapshot, err := Load(t.Context(), "https://flags.example", cacheDir, client)
-
-			// Then corruption is reported, but valid server flags repair the cache
-			require.ErrorContains(t, err, tt.err)
-			assert.True(t, snapshot.Enabled("recovered"), "invalid storage must not prevent a server lookup")
-			assert.False(t, snapshot.Enabled("untrusted"), "invalid cache entries must not supply flag values")
-			repaired, err := Load(t.Context(), "https://flags.example", cacheDir, client)
+			require.NoError(t, Refresh(t.Context(), "https://flags.example", cacheDir, &http.Client{Transport: reg}))
+			repaired, fresh, err := FromCache("https://flags.example", cacheDir)
 			require.NoError(t, err)
-			assert.True(t, repaired.Enabled("recovered"), "later invocations use the repaired cache")
+			assert.True(t, fresh)
+			assert.True(t, repaired.Enabled("recovered"))
 		})
 	}
 }
 
-func TestConcurrentLoadsOnlyObserveCompleteSnapshots(t *testing.T) {
+func TestRefreshDeduplicatesConcurrentWorkers(t *testing.T) {
 	t.Parallel()
+	var requests atomic.Int32
+	requestStarted := make(chan struct{})
+	releaseRequest := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		close(requestStarted)
+		<-releaseRequest
+		_, _ = io.WriteString(w, `{"flags":{"released":true}}`)
+	}))
+	defer server.Close()
+	cacheDir := t.TempDir()
 
-	// Given several invocations sharing a cache and a sizable server snapshot
+	done := make(chan error)
+	go func() {
+		done <- Refresh(t.Context(), server.URL, cacheDir, server.Client())
+	}()
+	<-requestStarted
+
+	require.NoError(t, Refresh(t.Context(), server.URL, cacheDir, server.Client()))
+	assert.Equal(t, int32(1), requests.Load(), "a second worker must not duplicate the in-flight fetch")
+	close(releaseRequest)
+	require.NoError(t, <-done)
+}
+
+func TestRefreshContinuesWhenLockingIsUnsupported(t *testing.T) {
+	t.Parallel()
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(httpmock.MatchAny, httpmock.StringResponse(`{"flags":{"released":true}}`))
+	unsupported := errors.New("unsupported locking")
+
+	err := refresh(
+		t.Context(),
+		"https://flags.example",
+		t.TempDir(),
+		&http.Client{Transport: reg},
+		func(string) (*os.File, func(), error) { return nil, nil, unsupported },
+		func(err error) bool { return errors.Is(err, unsupported) },
+	)
+
+	require.NoError(t, err)
+}
+
+func TestRefreshReportsUnexpectedLockFailure(t *testing.T) {
+	t.Parallel()
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	lockErr := errors.New("lock storage failed")
+
+	err := refresh(
+		t.Context(),
+		"https://flags.example",
+		t.TempDir(),
+		&http.Client{Transport: reg},
+		func(string) (*os.File, func(), error) { return nil, nil, lockErr },
+		func(error) bool { return false },
+	)
+
+	require.ErrorIs(t, err, lockErr)
+	require.ErrorContains(t, err, "lock global flag refresh")
+}
+
+type cacheResult struct {
+	snapshot Snapshot
+	err      error
+}
+
+func TestConcurrentRefreshAndCacheReadsOnlyObserveCompleteSnapshots(t *testing.T) {
+	t.Parallel()
 	cacheDir := t.TempDir()
 	body := `{"flags":{"released":true,"` + strings.Repeat("padding", 20000) + `":false}}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(body))
 	}))
 	defer server.Close()
-	client := server.Client()
-	type result struct {
-		snapshot Snapshot
-		err      error
-	}
-	results := make(chan result, 64)
+	require.NoError(t, Refresh(t.Context(), server.URL, cacheDir, server.Client()))
+
+	results := make(chan cacheResult, 64)
 	start := make(chan struct{})
 	var workers sync.WaitGroup
-
-	// When startup reads and refreshes race with each other
-	for range 16 {
+	for range 8 {
 		workers.Go(func() {
 			<-start
 			for range 4 {
-				snapshot, err := Load(t.Context(), server.URL, cacheDir, client)
-				results <- result{snapshot, err}
+				results <- resultFromCache(server.URL, cacheDir)
+			}
+		})
+		workers.Go(func() {
+			<-start
+			for range 4 {
+				_ = Refresh(t.Context(), server.URL, cacheDir, server.Client())
 			}
 		})
 	}
@@ -264,13 +316,13 @@ func TestConcurrentLoadsOnlyObserveCompleteSnapshots(t *testing.T) {
 	workers.Wait()
 	close(results)
 
-	// Then every invocation gets complete values, including a later offline invocation
 	for result := range results {
 		require.NoError(t, result.err)
 		assert.True(t, result.snapshot.Enabled("released"), "readers must not observe a partial cache write")
 	}
-	server.Close()
-	cached, err := Load(t.Context(), server.URL, cacheDir, client)
-	require.NoError(t, err)
-	assert.True(t, cached.Enabled("released"), "a complete snapshot must remain persisted after concurrent refreshes")
+}
+
+func resultFromCache(serverURL, cacheDir string) cacheResult {
+	snapshot, _, err := FromCache(serverURL, cacheDir)
+	return cacheResult{snapshot: snapshot, err: err}
 }

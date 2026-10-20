@@ -136,16 +136,19 @@ func Main() exitCode {
 	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
 
 	ctx := context.Background()
-	isTelemetrySender := len(os.Args) > 1 && os.Args[1] == "send-telemetry"
-	globalFlagSnapshot, globalFlagErr := loadGlobalFlagSnapshot(ctx, globalFlagStartupOptions{
-		serverURL:          os.Getenv("GH_GLOBAL_FEATURE_FLAG_SERVER_URL"),
-		cacheDir:           ghConfig.CacheDir(),
-		telemetrySender:    isTelemetrySender,
-		externalHTTPClient: cmdFactory.ExternalHttpClient,
+	skipGlobalFlagRefresh := len(os.Args) > 1 &&
+		(os.Args[1] == "send-telemetry" || os.Args[1] == "refresh-global-feature-flags")
+	globalFlagSnapshot, globalFlagErr := loadGlobalFlagSnapshot(globalFlagStartupOptions{
+		serverURL:   os.Getenv("GH_GLOBAL_FEATURE_FLAG_SERVER_URL"),
+		cacheDir:    ghConfig.CacheDir(),
+		skipRefresh: skipGlobalFlagRefresh,
+		startRefresh: func() error {
+			return startGlobalFlagRefresh(cmdFactory.ExecutablePath)
+		},
 	})
 	cmdFactory.GlobalFlags = globalFlagSnapshot
 	if globalFlagErr != nil && hasDebug {
-		fmt.Fprintf(stderr, "warning: loading global feature flags failed: %v\n", globalFlagErr)
+		fmt.Fprintf(stderr, "warning: global feature flag startup failed: %v\n", globalFlagErr)
 	}
 
 	updateCtx, updateCancel := context.WithCancel(ctx)

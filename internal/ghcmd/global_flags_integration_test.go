@@ -9,10 +9,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/globalflags"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -30,10 +32,12 @@ func TestMainLoadsGlobalFlagsBeforeConstructingCommands(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// When the real CLI startup constructs its complete command tree for help
-	stdout, stderr := runGlobalFlagMain(t, []string{"--help"}, []string{
+	// When an earlier refresh has populated the cache and the real CLI starts
+	stdout, stderr := runGlobalFlagMainWithSetup(t, []string{"--help"}, []string{
 		"GH_GLOBAL_FEATURE_FLAG_SERVER_URL=" + server.URL,
 		"GH_TEST_EXPECT_GLOBAL_FLAG=1",
+	}, func(cacheDir string) {
+		require.NoError(t, globalflags.Refresh(t.Context(), server.URL, cacheDir, server.Client()))
 	})
 
 	// Then the constructor probe saw the snapshot before eager root construction
@@ -61,7 +65,7 @@ func TestMainSkipsGlobalLookupForTelemetrySubprocess(t *testing.T) {
 	assert.Empty(t, stderr)
 }
 
-func TestMainReportsGlobalFlagFailuresOnlyInDebugMode(t *testing.T) {
+func TestMainReportsRefreshStartFailuresOnlyInDebugMode(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
 		debug       string
@@ -73,24 +77,18 @@ func TestMainReportsGlobalFlagFailuresOnlyInDebugMode(t *testing.T) {
 		t.Run("GH_DEBUG="+tt.debug, func(t *testing.T) {
 			t.Parallel()
 
-			// Given an unavailable global service
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = io.WriteString(w, `{"code":"unavailable","msg":"try later"}`)
-			}))
-			defer server.Close()
-
-			// When startup falls back to defaults
+			// Given an opted-in endpoint whose refresh process cannot start
 			stdout, stderr := runGlobalFlagMain(t, []string{"--help"}, []string{
-				"GH_GLOBAL_FEATURE_FLAG_SERVER_URL=" + server.URL,
+				"GH_GLOBAL_FEATURE_FLAG_SERVER_URL=https://flags.example",
+				"GH_PATH=" + filepath.Join(t.TempDir(), "missing-gh"),
 				"GH_DEBUG=" + tt.debug,
 			})
 
 			// Then commands remain usable and diagnostics follow the existing debug policy
 			assert.Contains(t, stdout, "USAGE")
 			assert.Equal(t, tt.wantWarning, strings.Contains(stderr,
-				"warning: loading global feature flags failed: global flags: HTTP 503"),
-				"lookup failures should be observable only when debugging is enabled")
+				"warning: global feature flag startup failed:"),
+				"refresh start failures should be observable only when debugging is enabled")
 		})
 	}
 }
@@ -113,19 +111,27 @@ func TestMainGlobalFlagsProcess(t *testing.T) {
 }
 
 func runGlobalFlagMain(t *testing.T, args, env []string) (string, string) {
+	return runGlobalFlagMainWithSetup(t, args, env, nil)
+}
+
+func runGlobalFlagMainWithSetup(t *testing.T, args, env []string, setup func(string)) (string, string) {
 	t.Helper()
 	home := t.TempDir()
+	cacheDir := filepath.Join(home, "cache", "gh")
+	if setup != nil {
+		setup(cacheDir)
+	}
 	executable, err := os.Executable()
 	require.NoError(t, err)
 	cmd := exec.Command(executable, append([]string{"-test.run=^TestMainGlobalFlagsProcess$", "--"}, args...)...)
-	cmd.Env = append(os.Environ(),
+	overrides := append([]string{
 		"GH_TEST_GLOBAL_FLAGS_PROCESS=1",
 		"GH_TEST_EXPECT_GLOBAL_FLAG=",
-		"HOME="+home,
-		"USERPROFILE="+home,
-		"GH_CONFIG_DIR="+filepath.Join(home, "config"),
-		"XDG_DATA_HOME="+filepath.Join(home, "data"),
-		"XDG_CACHE_HOME="+filepath.Join(home, "cache"),
+		"HOME=" + home,
+		"USERPROFILE=" + home,
+		"GH_CONFIG_DIR=" + filepath.Join(home, "config"),
+		"XDG_DATA_HOME=" + filepath.Join(home, "data"),
+		"XDG_CACHE_HOME=" + filepath.Join(home, "cache"),
 		"GH_GLOBAL_FEATURE_FLAG_SERVER_URL=",
 		"GH_TELEMETRY=disabled",
 		"GH_NO_UPDATE_NOTIFIER=1",
@@ -138,8 +144,22 @@ func runGlobalFlagMain(t *testing.T, args, env []string) (string, string) {
 		"GITHUB_ENTERPRISE_TOKEN=test-enterprise-token",
 		"GH_DEBUG=", "DEBUG=", "GH_COBRA=", "GH_PATH=",
 		"GH_PAGER=", "PAGER=", "GH_FORCE_TTY=", "NO_COLOR=1",
-	)
-	cmd.Env = append(cmd.Env, env...)
+	}, env...)
+	envMap := map[string]string{}
+	for _, entry := range append(os.Environ(), overrides...) {
+		key, value, found := strings.Cut(entry, "=")
+		if found {
+			envMap[key] = value
+		}
+	}
+	keys := make([]string, 0, len(envMap))
+	for key := range envMap {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		cmd.Env = append(cmd.Env, key+"="+envMap[key])
+	}
 	cmd.Stdin = strings.NewReader(`{"events":[]}`)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

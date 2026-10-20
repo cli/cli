@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/globalflags"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,19 +16,19 @@ func TestLoadGlobalFlagSnapshotSkipsLookupWithoutEndpoint(t *testing.T) {
 	t.Parallel()
 
 	// Given startup without an opted-in development endpoint
-	clientCalled := false
+	refreshStarted := false
 
 	// When the global snapshot is loaded
-	snapshot, err := loadGlobalFlagSnapshot(t.Context(), globalFlagStartupOptions{
-		externalHTTPClient: func() (*http.Client, error) {
-			clientCalled = true
-			return nil, nil
+	snapshot, err := loadGlobalFlagSnapshot(globalFlagStartupOptions{
+		startRefresh: func() error {
+			refreshStarted = true
+			return nil
 		},
 	})
 
 	// Then startup stays offline with disabled defaults
 	require.NoError(t, err)
-	assert.False(t, clientCalled, "disabled lookup must not construct an HTTP client")
+	assert.False(t, refreshStarted, "disabled lookup must not start a refresh")
 	assert.False(t, snapshot.Enabled("released"), "flags default to disabled")
 }
 
@@ -35,64 +36,90 @@ func TestLoadGlobalFlagSnapshotSkipsTelemetrySender(t *testing.T) {
 	t.Parallel()
 
 	// Given an opted-in endpoint for the internal telemetry sender
-	clientCalled := false
+	refreshStarted := false
 
 	// When the global snapshot is loaded
-	snapshot, err := loadGlobalFlagSnapshot(t.Context(), globalFlagStartupOptions{
-		serverURL:       "https://flags.example",
-		telemetrySender: true,
-		externalHTTPClient: func() (*http.Client, error) {
-			clientCalled = true
-			return nil, nil
+	snapshot, err := loadGlobalFlagSnapshot(globalFlagStartupOptions{
+		serverURL:   "https://flags.example",
+		skipRefresh: true,
+		startRefresh: func() error {
+			refreshStarted = true
+			return nil
 		},
 	})
 
 	// Then the internal subprocess cannot recurse into feature flag lookup
 	require.NoError(t, err)
-	assert.False(t, clientCalled, "telemetry delivery must not construct an HTTP client")
+	assert.False(t, refreshStarted, "telemetry delivery must not start a refresh")
 	assert.False(t, snapshot.Enabled("released"), "the telemetry sender uses disabled defaults")
 }
 
-func TestLoadGlobalFlagSnapshotReturnsServerSnapshot(t *testing.T) {
+func TestLoadGlobalFlagSnapshotReturnsFreshCacheWithoutRefresh(t *testing.T) {
 	t.Parallel()
 
-	// Given an opted-in unauthenticated development endpoint
+	// Given a fresh global snapshot from an earlier refresh
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Empty(t, r.Header.Get("Authorization"), "startup must not attach GitHub credentials")
 		_, _ = io.WriteString(w, `{"flags":{"released":true}}`)
 	}))
 	defer server.Close()
+	cacheDir := t.TempDir()
+	require.NoError(t, globalflags.Refresh(t.Context(), server.URL, cacheDir, server.Client()))
+	refreshStarted := false
 
-	// When the global snapshot is loaded
-	snapshot, err := loadGlobalFlagSnapshot(t.Context(), globalFlagStartupOptions{
+	// When the next invocation loads its global snapshot
+	snapshot, err := loadGlobalFlagSnapshot(globalFlagStartupOptions{
 		serverURL: server.URL,
-		cacheDir:  t.TempDir(),
-		externalHTTPClient: func() (*http.Client, error) {
-			return server.Client(), nil
+		cacheDir:  cacheDir,
+		startRefresh: func() error {
+			refreshStarted = true
+			return nil
 		},
 	})
 
-	// Then callers receive the immutable server snapshot
+	// Then it returns immediately without starting another refresh
 	require.NoError(t, err)
-	assert.True(t, snapshot.Enabled("released"), "the server enabled this flag globally")
+	assert.False(t, refreshStarted, "fresh cached flags need no refresh")
+	assert.True(t, snapshot.Enabled("released"), "the cached flag applies to this invocation")
 }
 
-func TestLoadGlobalFlagSnapshotReturnsClientError(t *testing.T) {
+func TestLoadGlobalFlagSnapshotStartsRefreshForMissingCache(t *testing.T) {
 	t.Parallel()
 
-	// Given an opted-in endpoint whose external client cannot be constructed
-	wantErr := errors.New("client unavailable")
+	// Given an opted-in endpoint without a cached snapshot
+	refreshStarted := false
 
-	// When the global snapshot is loaded
-	snapshot, err := loadGlobalFlagSnapshot(t.Context(), globalFlagStartupOptions{
+	// When startup loads its global snapshot
+	snapshot, err := loadGlobalFlagSnapshot(globalFlagStartupOptions{
 		serverURL: "https://flags.example",
 		cacheDir:  t.TempDir(),
-		externalHTTPClient: func() (*http.Client, error) {
-			return nil, wantErr
+		startRefresh: func() error {
+			refreshStarted = true
+			return nil
 		},
 	})
 
-	// Then the dependency error accompanies disabled defaults
+	// Then it immediately uses defaults while refreshing for the next invocation
+	require.NoError(t, err)
+	assert.True(t, refreshStarted, "a missing cache must start a detached refresh")
+	assert.False(t, snapshot.Enabled("released"), "the current invocation uses disabled defaults")
+}
+
+func TestLoadGlobalFlagSnapshotReturnsRefreshStartError(t *testing.T) {
+	t.Parallel()
+
+	// Given an opted-in endpoint whose refresh worker cannot be started
+	wantErr := errors.New("start refresh")
+
+	// When the global snapshot is loaded
+	snapshot, err := loadGlobalFlagSnapshot(globalFlagStartupOptions{
+		serverURL: "https://flags.example",
+		cacheDir:  t.TempDir(),
+		startRefresh: func() error {
+			return wantErr
+		},
+	})
+
+	// Then the start error accompanies immediately available defaults
 	require.ErrorIs(t, err, wantErr)
-	assert.False(t, snapshot.Enabled("released"), "failed client construction uses disabled defaults")
+	assert.False(t, snapshot.Enabled("released"), "failed refresh startup uses disabled defaults")
 }

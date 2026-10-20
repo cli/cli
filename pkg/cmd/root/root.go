@@ -33,6 +33,7 @@ import (
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
 	previewCmd "github.com/cli/cli/v2/pkg/cmd/preview"
 	projectCmd "github.com/cli/cli/v2/pkg/cmd/project"
+	refreshGlobalFeatureFlagsCmd "github.com/cli/cli/v2/pkg/cmd/refresh-global-feature-flags"
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
@@ -158,6 +159,7 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(licensesCmd.NewCmdLicenses(f))
 	cmd.AddCommand(sendTelemetryCmd.NewCmdSendTelemetry(f))
+	cmd.AddCommand(refreshGlobalFeatureFlagsCmd.NewCmdRefreshGlobalFeatureFlags(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
