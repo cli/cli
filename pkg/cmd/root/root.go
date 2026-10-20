@@ -231,12 +231,19 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 
 	cmdutil.DisableAuthCheck(cmd)
 
-	// The reference command produces paged output that displays information on every other command.
-	// Therefore, we explicitly set the Long text and HelpFunc here after all other commands are registered.
-	// We experimented with producing the paged output dynamically when the HelpFunc is called but since
-	// doc generation makes use of the Long text, it is simpler to just be explicit here that this command
-	// is special.
-	referenceCmd.Long = stringifyReference(cmd)
-	referenceCmd.SetHelpFunc(longPager(f.IOStreams))
+	referenceCmd.Annotations["markdown:prepare-long"] = "true"
+	prepareReference := func(c *cobra.Command) {
+		if c.Long == "" {
+			c.Long = stringifyReference(cmd)
+		}
+	}
+	referenceCmd.PreRunE = func(c *cobra.Command, _ []string) error {
+		prepareReference(c)
+		return nil
+	}
+	referenceCmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		prepareReference(c)
+		longPager(f.IOStreams)(c, args)
+	})
 	return cmd, nil
 }
