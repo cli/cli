@@ -60,6 +60,10 @@ func stubPR(repo, prHead string) (ghrepo.Interface, *api.PullRequest) {
 }
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithBaseRepo(rt, isTTY, cli, ghrepo.New("OWNER", "REPO"))
+}
+
+func runCommandWithBaseRepo(rt http.RoundTripper, isTTY bool, cli string, baseRepo ghrepo.Interface) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -72,6 +76,9 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		},
 		Branch: func() (string, error) {
 			return "trunk", nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return baseRepo, nil
 		},
 		GitClient: &git.Client{GitPath: "some/path/git"},
 	}
@@ -145,9 +152,10 @@ func TestPrClose_deleteBranch_sameRepo(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
+	selector := "https://github.com/OWNER/REPO/pull/96"
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:blueberries")
 	pr.Title = "The title of the PR"
-	shared.StubFinderForRunCommandStyleTests(t, "96", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, selector, pr, baseRepo)
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
@@ -166,7 +174,42 @@ func TestPrClose_deleteBranch_sameRepo(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
 
-	output, err := runCommand(http, true, `96 --delete-branch`)
+	output, err := runCommand(http, true, selector+` --delete-branch`)
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Closed pull request OWNER/REPO#96 (The title of the PR)
+		✓ Deleted branch blueberries
+	`), output.Stderr())
+}
+
+func TestPrClose_deleteBranch_URLFromUnrelatedRepo(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	selector := "https://github.com/OWNER/REPO/pull/96"
+	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:blueberries")
+	pr.Title = "The title of the PR"
+	shared.StubFinderForRunCommandStyleTests(t, selector, pr, baseRepo)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestClose\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`, func(inputs map[string]any) {
+			assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+		}),
+	)
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads%2Fblueberries"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	// The matching local branch exists, but belongs to the unrelated current
+	// repository. The command must not force-delete it.
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+
+	output, err := runCommandWithBaseRepo(http, true, selector+` --delete-branch`, ghrepo.New("OTHER", "WORKSPACE"))
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`

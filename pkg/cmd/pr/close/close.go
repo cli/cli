@@ -48,6 +48,19 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 			}
 
 			opts.DeleteLocalBranch = !cmd.Flags().Changed("repo")
+			if opts.DeleteLocalBranch {
+				// A PR URL can refer to a repository unrelated to the current
+				// working directory. Only delete a local branch when the URL's
+				// repository matches the repository configured for this directory.
+				if prRepo, _, _, err := shared.ParseURL(opts.SelectorArg); err == nil {
+					if f.BaseRepo == nil {
+						opts.DeleteLocalBranch = false
+					} else {
+						currentRepo, err := f.BaseRepo()
+						opts.DeleteLocalBranch = err == nil && currentRepo != nil && ghrepo.IsSame(prRepo, currentRepo)
+					}
+				}
+			}
 
 			if runF != nil {
 				return runF(opts)
