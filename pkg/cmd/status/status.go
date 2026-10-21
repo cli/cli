@@ -675,7 +675,8 @@ func statusRun(opts *StatusOptions) error {
 	halfWidth := (fullWidth / 2) - 2
 
 	idStyle := cs.Cyan
-	leftHalfStyle := lipgloss.NewStyle().Width(halfWidth).Padding(0).MarginRight(1).BorderRight(true).BorderStyle(lipgloss.NormalBorder())
+	// Lip Gloss v2 counts the right border within Width, so add a cell to keep the content as wide as the right half.
+	leftHalfStyle := lipgloss.NewStyle().Width(halfWidth + 1).Padding(0).MarginRight(1).BorderRight(true).BorderStyle(lipgloss.NormalBorder())
 	rightHalfStyle := lipgloss.NewStyle().Width(halfWidth).Padding(0)
 
 	section := func(header string, items []StatusItem, width, rowLimit int) (string, error) {
