@@ -109,7 +109,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.StringResponse(`[]`))
 			},
 			opts:    &StatusOptions{},
-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nNothing here ^_^                     │ Nothing here ^_^                      \n                                     │                                       \nReview Requests                      │ Mentions                              \nNothing here ^_^                     │ Nothing here ^_^                      \n                                     │                                       \nRepository Activity\nNothing here ^_^\n\n",
+			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nReview Requests                       │ Mentions                              \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nRepository Activity\nNothing here ^_^\n\n",
 		},
 		{
 			name: "notifications 404 is tolerated",
@@ -128,7 +128,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.StringResponse(`[]`))
 			},
 			opts:    &StatusOptions{},
-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nNothing here ^_^                     │ Nothing here ^_^                      \n                                     │                                       \nReview Requests                      │ Mentions                              \nNothing here ^_^                     │ Nothing here ^_^                      \n                                     │                                       \nRepository Activity\nNothing here ^_^\n\n",
+			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nReview Requests                       │ Mentions                              \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nRepository Activity\nNothing here ^_^\n\n",
 		},
 		{
 			name: "something",
@@ -162,7 +162,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/events.json"))
 			},
 			opts:    &StatusOptions{},
-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nvilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    \ngarden...                            │ cli/cli#4768  Issue Frecency          \nrpd/todo#514            Reducing     │                                       \nzo...                                │                                       \nvilmibm/testing#74      welp         │                                       \nadreyer/arkestrator#22  complete     │                                       \nmo...                                │                                       \n                                     │                                       \nReview Requests                      │ Mentions                              \ncli/cli#5272          Pin extensions │ rpd/todo#110               hello @j...\nvilmibm/testing#1234  Foobar         │ cli/cli#1096               @jillval...\nrpd/todo#50           Welcome        │ vilmibm/gh-screensaver#15  a messag...\nparty...                             │                                       \ncli/cli#4671          This pull      │                                       \nreq...                               │                                       \nrpd/todo#49           Haircut for    │                                       \nLeon                                 │                                       \n                                     │                                       \nRepository Activity\nrpd/todo#5326         new PR                        Only write UTF-8 BOM on W...\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\ncli/cli#5319          comment on [Codespaces] D...  Wondering if we shouldn't...\ncli/cli#5300          new issue                     Terminal bell when a runn...\n\n",
+			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nvilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    \nrpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          \nvilmibm/testing#74      welp          │                                       \nadreyer/arkestrator#22  complete mo...│                                       \n                                      │                                       \nReview Requests                       │ Mentions                              \ncli/cli#5272          Pin extensions  │ rpd/todo#110               hello @j...\nvilmibm/testing#1234  Foobar          │ cli/cli#1096               @jillval...\nrpd/todo#50           Welcome party...│ vilmibm/gh-screensaver#15  a messag...\ncli/cli#4671          This pull req...│                                       \nrpd/todo#49           Haircut for Leon│                                       \n                                      │                                       \nRepository Activity\nrpd/todo#5326         new PR                        Only write UTF-8 BOM on W...\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\ncli/cli#5319          comment on [Codespaces] D...  Wondering if we shouldn't...\ncli/cli#5300          new issue                     Terminal bell when a runn...\n\n",
 		},
 		{
 			name: "exclude a repository",
@@ -197,7 +197,7 @@ func TestStatusRun(t *testing.T) {
 			},
 			// NOTA BENE: you'll see cli/cli in search results because that happens
 			// server side and the fixture doesn't account for that
-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nvilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    \ngarden...                            │ cli/cli#4768  Issue Frecency          \nrpd/todo#514            Reducing     │                                       \nzo...                                │                                       \nvilmibm/testing#74      welp         │                                       \nadreyer/arkestrator#22  complete     │                                       \nmo...                                │                                       \n                                     │                                       \nReview Requests                      │ Mentions                              \ncli/cli#5272          Pin extensions │ rpd/todo#110               hello @j...\nvilmibm/testing#1234  Foobar         │ vilmibm/gh-screensaver#15  a messag...\nrpd/todo#50           Welcome        │                                       \nparty...                             │                                       \ncli/cli#4671          This pull      │                                       \nreq...                               │                                       \nrpd/todo#49           Haircut for    │                                       \nLeon                                 │                                       \n                                     │                                       \nRepository Activity\nrpd/todo#5326         new PR                        Only write UTF-8 BOM on W...\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\n\n",
+			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nvilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    \nrpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          \nvilmibm/testing#74      welp          │                                       \nadreyer/arkestrator#22  complete mo...│                                       \n                                      │                                       \nReview Requests                       │ Mentions                              \ncli/cli#5272          Pin extensions  │ rpd/todo#110               hello @j...\nvilmibm/testing#1234  Foobar          │ vilmibm/gh-screensaver#15  a messag...\nrpd/todo#50           Welcome party...│                                       \ncli/cli#4671          This pull req...│                                       \nrpd/todo#49           Haircut for Leon│                                       \n                                      │                                       \nRepository Activity\nrpd/todo#5326         new PR                        Only write UTF-8 BOM on W...\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\n\n",
 		},
 		{
 			name: "exclude repositories",
@@ -223,7 +223,7 @@ func TestStatusRun(t *testing.T) {
 			},
 			// NOTA BENE: you'll see cli/cli in search results because that happens
 			// server side and the fixture doesn't account for that
-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nvilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    \ngarden...                            │ cli/cli#4768  Issue Frecency          \nrpd/todo#514            Reducing     │                                       \nzo...                                │                                       \nvilmibm/testing#74      welp         │                                       \nadreyer/arkestrator#22  complete     │                                       \nmo...                                │                                       \n                                     │                                       \nReview Requests                      │ Mentions                              \ncli/cli#5272          Pin extensions │ vilmibm/gh-screensaver#15  a messag...\nvilmibm/testing#1234  Foobar         │                                       \nrpd/todo#50           Welcome        │                                       \nparty...                             │                                       \ncli/cli#4671          This pull      │                                       \nreq...                               │                                       \nrpd/todo#49           Haircut for    │                                       \nLeon                                 │                                       \n                                     │                                       \nRepository Activity\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\n\n",
+			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nvilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    \nrpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          \nvilmibm/testing#74      welp          │                                       \nadreyer/arkestrator#22  complete mo...│                                       \n                                      │                                       \nReview Requests                       │ Mentions                              \ncli/cli#5272          Pin extensions  │ vilmibm/gh-screensaver#15  a messag...\nvilmibm/testing#1234  Foobar          │                                       \nrpd/todo#50           Welcome party...│                                       \ncli/cli#4671          This pull req...│                                       \nrpd/todo#49           Haircut for Leon│                                       \n                                      │                                       \nRepository Activity\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\n\n",
 		},
 		{
 			name: "filter to an org",
@@ -253,7 +253,7 @@ func TestStatusRun(t *testing.T) {
 			opts: &StatusOptions{
 				Org: "rpd",
 			},
-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nvilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    \ngarden...                            │ cli/cli#4768  Issue Frecency          \nrpd/todo#514            Reducing     │                                       \nzo...                                │                                       \nvilmibm/testing#74      welp         │                                       \nadreyer/arkestrator#22  complete     │                                       \nmo...                                │                                       \n                                     │                                       \nReview Requests                      │ Mentions                              \ncli/cli#5272          Pin extensions │ rpd/todo#110  hello @jillvalentine ...\nvilmibm/testing#1234  Foobar         │                                       \nrpd/todo#50           Welcome        │                                       \nparty...                             │                                       \ncli/cli#4671          This pull      │                                       \nreq...                               │                                       \nrpd/todo#49           Haircut for    │                                       \nLeon                                 │                                       \n                                     │                                       \nRepository Activity\nrpd/todo#5326  new PR  Only write UTF-8 BOM on Windows where it is needed\n\n",
+			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nvilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    \nrpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          \nvilmibm/testing#74      welp          │                                       \nadreyer/arkestrator#22  complete mo...│                                       \n                                      │                                       \nReview Requests                       │ Mentions                              \ncli/cli#5272          Pin extensions  │ rpd/todo#110  hello @jillvalentine ...\nvilmibm/testing#1234  Foobar          │                                       \nrpd/todo#50           Welcome party...│                                       \ncli/cli#4671          This pull req...│                                       \nrpd/todo#49           Haircut for Leon│                                       \n                                      │                                       \nRepository Activity\nrpd/todo#5326  new PR  Only write UTF-8 BOM on Windows where it is needed\n\n",
 		},
 		{
 			name: "forbidden errors",
@@ -298,13 +298,13 @@ func TestStatusRun(t *testing.T) {
 			},
 			opts: &StatusOptions{},
 			wantOut: heredoc.Doc(`
-				Assigned Issues                      │ Assigned Pull Requests                
-				vilmibm/testing#157  yolo            │ cli/cli#5272  Pin extensions          
-				                                     │                                       
-				Review Requests                      │ Mentions                              
-				cli/cli#5272  Pin extensions         │ cli/cli#1096               @jillval...
-				                                     │ vilmibm/gh-screensaver#15  a messag...
-				                                                                             
+				Assigned Issues                       │ Assigned Pull Requests                
+				vilmibm/testing#157  yolo             │ cli/cli#5272  Pin extensions          
+				                                      │                                       
+				Review Requests                       │ Mentions                              
+				cli/cli#5272  Pin extensions          │ cli/cli#1096               @jillval...
+				                                      │ vilmibm/gh-screensaver#15  a messag...
+				                                                                              
 				Repository Activity
 				rpd/todo#5326         new PR                        Only write UTF-8 BOM on W...
 				vilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...
@@ -350,26 +350,20 @@ func TestStatusRun(t *testing.T) {
 			},
 			opts: &StatusOptions{},
 			wantOut: heredoc.Doc(`
-				Assigned Issues                      │ Assigned Pull Requests                
-				vilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          
-				cli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    
-				garden...                            │ cli/cli#4768  Issue Frecency          
-				rpd/todo#514            Reducing     │                                       
-				zo...                                │                                       
-				vilmibm/testing#74      welp         │                                       
-				adreyer/arkestrator#22  complete     │                                       
-				mo...                                │                                       
-				                                     │                                       
-				Review Requests                      │ Mentions                              
-				cli/cli#5272          Pin extensions │ rpd/todo#110               hello @j...
-				vilmibm/testing#1234  Foobar         │ cli/cli#1096               @jillval...
-				rpd/todo#50           Welcome        │ vilmibm/gh-screensaver#15  a messag...
-				party...                             │                                       
-				cli/cli#4671          This pull      │                                       
-				req...                               │                                       
-				rpd/todo#49           Haircut for    │                                       
-				Leon                                 │                                       
-				                                     │                                       
+				Assigned Issues                       │ Assigned Pull Requests                
+				vilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          
+				cli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    
+				rpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          
+				vilmibm/testing#74      welp          │                                       
+				adreyer/arkestrator#22  complete mo...│                                       
+				                                      │                                       
+				Review Requests                       │ Mentions                              
+				cli/cli#5272          Pin extensions  │ rpd/todo#110               hello @j...
+				vilmibm/testing#1234  Foobar          │ cli/cli#1096               @jillval...
+				rpd/todo#50           Welcome party...│ vilmibm/gh-screensaver#15  a messag...
+				cli/cli#4671          This pull req...│                                       
+				rpd/todo#49           Haircut for Leon│                                       
+				                                      │                                       
 				Repository Activity
 				rpd/todo#5326         new PR                        Only write UTF-8 BOM on W...
 				vilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...

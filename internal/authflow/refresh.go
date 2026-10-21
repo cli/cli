@@ -41,8 +41,7 @@ func NewTokenRefresher(httpClient *http.Client) *TokenRefresher {
 // Refresh exchanges refreshToken for a renewed credential on hostname. A refresh token the server rejects surfaces as
 // an error wrapping gh.ErrRefreshTokenInvalid, so callers can distinguish an unusable refresh token from a transient
 // failure without depending on the underlying OAuth library. When the server omits a new refresh token, the returned
-// credential's RefreshToken is left empty rather than reusing refreshToken, so the response is reported exactly as
-// received.
+// credential keeps refreshToken, since RFC 6749 treats the previous refresh token as still valid in that case.
 func (r *TokenRefresher) Refresh(refreshToken, hostname string) (gh.RefreshableCredential, error) {
 	host, err := oauth.NewGitHubHost(ghinstance.HostPrefix(hostname))
 	if err != nil {
@@ -88,14 +87,14 @@ func refreshableCredentialFromAccessToken(token *oauthapi.AccessToken, requested
 	credential := gh.RefreshableCredential{
 		AccessToken:           token.Token,
 		RefreshToken:          token.RefreshToken,
-		ExpiresIn:             token.ExpiresIn,
-		RefreshTokenExpiresIn: token.RefreshTokenExpiresIn,
+		ExpiresIn:             int(token.ExpiresIn / time.Second),
+		RefreshTokenExpiresIn: int(token.RefreshTokenExpiresIn / time.Second),
 	}
 	if token.ExpiresIn > 0 {
-		credential.ExpiresAt = new(requestedAt.Add(time.Duration(token.ExpiresIn) * time.Second))
+		credential.ExpiresAt = new(requestedAt.Add(token.ExpiresIn))
 	}
 	if token.RefreshTokenExpiresIn > 0 {
-		credential.RefreshTokenExpiresAt = new(requestedAt.Add(time.Duration(token.RefreshTokenExpiresIn) * time.Second))
+		credential.RefreshTokenExpiresAt = new(requestedAt.Add(token.RefreshTokenExpiresIn))
 	}
 	return credential
 }

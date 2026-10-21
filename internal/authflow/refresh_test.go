@@ -107,9 +107,9 @@ func TestTokenRefresherRefreshOmittedRefreshToken(t *testing.T) {
 	credential, err := refresher.Refresh("ghr_OLD", "github.com")
 	require.NoError(t, err)
 
-	// When the server omits a refresh token we report it as received rather than reusing the old one.
+	// RFC 6749 lets a server omit a new refresh token, meaning the previous one stays valid, so the old one is reused.
 	require.Equal(t, "gho_NEW", credential.AccessToken)
-	require.Empty(t, credential.RefreshToken)
+	require.Equal(t, "ghr_OLD", credential.RefreshToken)
 }
 
 func TestTokenRefresherRefreshRejected(t *testing.T) {
@@ -134,8 +134,8 @@ func TestAuthResultFromToken(t *testing.T) {
 		token := &oauthapi.AccessToken{
 			Token:                 "gho_NEW",
 			RefreshToken:          "ghr_NEW",
-			ExpiresIn:             28800,
-			RefreshTokenExpiresIn: 15897600,
+			ExpiresIn:             28800 * time.Second,
+			RefreshTokenExpiresIn: 15897600 * time.Second,
 		}
 
 		result := authResultFromToken(token, "monalisa", requestedAt)
@@ -155,7 +155,7 @@ func TestAuthResultFromToken(t *testing.T) {
 	t.Run("without refresh token yields a plain token", func(t *testing.T) {
 		token := &oauthapi.AccessToken{
 			Token:     "gho_NEW",
-			ExpiresIn: 28800,
+			ExpiresIn: 28800 * time.Second,
 		}
 
 		result := authResultFromToken(token, "monalisa", requestedAt)
