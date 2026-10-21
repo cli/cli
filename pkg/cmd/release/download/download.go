@@ -356,6 +356,9 @@ func downloadVerified(dest *destinationWriter, httpClient *http.Client, targets 
 	if len(pending) == 0 {
 		return nil
 	}
+	if err := checkHardLinkedDestinations(dest, pending); err != nil {
+		return err
+	}
 
 	stagingDir, err := os.MkdirTemp("", "gh-release-download-")
 	if err != nil {
@@ -373,6 +376,33 @@ func downloadVerified(dest *destinationWriter, httpClient *http.Client, targets 
 		if err := publishStaged(dest, staging, t.name); err != nil && !errors.Is(err, errSkipped) {
 			return err
 		}
+	}
+	return nil
+}
+
+// checkHardLinkedDestinations rejects existing destination files that are the
+// same file on disk, since overwriting one would also overwrite the other with
+// a different asset's content.
+func checkHardLinkedDestinations(dest *destinationWriter, targets []downloadTarget) error {
+	if dest.isStdout() {
+		return nil
+	}
+	type existing struct {
+		name string
+		info os.FileInfo
+	}
+	var seen []existing
+	for _, t := range targets {
+		info, err := os.Lstat(dest.makePath(t.name))
+		if err != nil {
+			continue
+		}
+		for _, e := range seen {
+			if os.SameFile(e.info, info) {
+				return fmt.Errorf("%s and %s are the same file on disk (hard links), so one asset would overwrite the other", dest.makePath(e.name), dest.makePath(t.name))
+			}
+		}
+		seen = append(seen, existing{t.name, info})
 	}
 	return nil
 }

@@ -503,6 +503,7 @@ func Test_downloadRun_verifyMultipleAssets(t *testing.T) {
 		assets    []string // asset names, served with content "<name>-content"
 		served    map[string]string
 		existing  map[string]string
+		link      [2]string // hard-link link[1] to link[0] before running
 		clobber   bool
 		wantErr   string
 		wantFiles map[string]string // nil value means the file must not exist
@@ -530,12 +531,27 @@ func Test_downloadRun_verifyMultipleAssets(t *testing.T) {
 			assets:  []string{"App.zip", "app.zip"},
 			wantErr: `assets "App.zip" and "app.zip" differ only in case`,
 		},
+		{
+			name:     "hard-linked destinations are rejected",
+			assets:   []string{"a.zip", "b.zip"},
+			existing: map[string]string{"a.zip": "old"},
+			link:     [2]string{"a.zip", "b.zip"},
+			clobber:  true,
+			wantErr:  "are the same file on disk (hard links)",
+			wantFiles: map[string]string{
+				"a.zip": "old",
+				"b.zip": "old",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 			for name, content := range tt.existing {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644))
+			}
+			if tt.link[0] != "" {
+				require.NoError(t, os.Link(filepath.Join(dir, tt.link[0]), filepath.Join(dir, tt.link[1])))
 			}
 			ios, _, _, _ := iostreams.Test()
 
