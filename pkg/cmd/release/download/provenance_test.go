@@ -1,6 +1,8 @@
 package download
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -488,4 +490,124 @@ func Test_downloadRun_verifyUnsupportedHost(t *testing.T) {
 		Verify:      true,
 	})
 	assert.EqualError(t, err, "`--verify` is not supported for ghes.example.com: artifact attestations are not available on GitHub Enterprise Server")
+}
+
+func Test_downloadRun_verifyMultipleAssets(t *testing.T) {
+	sum := func(s string) string {
+		h := sha256.Sum256([]byte(s))
+		return hex.EncodeToString(h[:])
+	}
+
+	tests := []struct {
+		name      string
+		assets    []string // asset names, served with content "<name>-content"
+		served    map[string]string
+		existing  map[string]string
+		clobber   bool
+		wantErr   string
+		wantFiles map[string]string // nil value means the file must not exist
+	}{
+		{
+			name:      "all assets verified are written",
+			assets:    []string{"a.zip", "b.zip"},
+			served:    map[string]string{"a.zip": "a.zip-content", "b.zip": "b.zip-content"},
+			wantFiles: map[string]string{"a.zip": "a.zip-content", "b.zip": "b.zip-content"},
+		},
+		{
+			name:     "one tampered asset leaves the destination untouched",
+			assets:   []string{"a.zip", "b.zip"},
+			served:   map[string]string{"a.zip": "a.zip-content", "b.zip": "tampered"},
+			existing: map[string]string{"a.zip": "old"},
+			clobber:  true,
+			wantErr:  "downloaded b.zip does not match its attested digest",
+			wantFiles: map[string]string{
+				"a.zip": "old",
+				"b.zip": "",
+			},
+		},
+		{
+			name:    "assets differing only in case are rejected",
+			assets:  []string{"App.zip", "app.zip"},
+			wantErr: `assets "App.zip" and "app.zip" differ only in case`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for name, content := range tt.existing {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644))
+			}
+			ios, _, _, _ := iostreams.Test()
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			var assetsJSON []string
+			for i, name := range tt.assets {
+				assetsJSON = append(assetsJSON, fmt.Sprintf(`{ "name": %q, "digest": "sha256:%s", "url": "https://api.github.com/assets/%d" }`,
+					name, sum(name+"-content"), i))
+				if body, ok := tt.served[name]; ok {
+					reg.Register(httpmock.REST("GET", fmt.Sprintf("assets/%d", i)), httpmock.StringResponse(body))
+				}
+			}
+			shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3",
+				fmt.Sprintf(`{ "id": 1, "tag_name": "v1.2.3", "assets": [%s] }`, strings.Join(assetsJSON, ",")))
+
+			err := downloadRun(&DownloadOptions{
+				IO:                ios,
+				HttpClient:        func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+				BaseRepo:          func() (ghrepo.Interface, error) { return ghrepo.FromFullName("OWNER/REPO") },
+				TagName:           "v1.2.3",
+				Destination:       dir,
+				OverwriteExisting: tt.clobber,
+				Concurrency:       2,
+				Verify:            true,
+				AttClient: attapi.MockClient{OnGetByDigest: func(attapi.FetchParams) ([]*attapi.Attestation, error) {
+					return []*attapi.Attestation{{}}, nil
+				}},
+				SigstoreVerifier: stubVerifier{results: []*verification.AttestationProcessingResult{verifiedResult("https://github.com/OWNER/REPO")}},
+				ReleaseVerifier:  stubReleaseVerifier{err: errors.New("not immutable")},
+			})
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			for name, want := range tt.wantFiles {
+				got, readErr := os.ReadFile(filepath.Join(dir, name))
+				if want == "" {
+					assert.True(t, os.IsNotExist(readErr), "expected %s not to exist", name)
+				} else {
+					require.NoError(t, readErr)
+					assert.Equal(t, want, string(got))
+				}
+			}
+		})
+	}
+}
+
+func Test_downloadRun_assetNamedDashIsAFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	ios, _, stdout, _ := iostreams.Test()
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+		"assets": [ { "name": "-", "url": "https://api.github.com/assets/1" } ]
+	}`)
+	reg.Register(httpmock.REST("GET", "assets/1"), httpmock.StringResponse("content"))
+
+	err := downloadRun(&DownloadOptions{
+		IO:          ios,
+		HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		BaseRepo:    func() (ghrepo.Interface, error) { return ghrepo.FromFullName("OWNER/REPO") },
+		TagName:     "v1.2.3",
+		Destination: ".",
+		Concurrency: 1,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, stdout.String())
+	got, err := os.ReadFile(filepath.Join(dir, "-"))
+	require.NoError(t, err)
+	assert.Equal(t, "content", string(got))
 }

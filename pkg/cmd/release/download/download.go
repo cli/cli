@@ -314,21 +314,6 @@ func downloadRun(opts *DownloadOptions) error {
 		allowEscapes: opts.AllowEscapeSequences,
 		isTTY:        opts.IO.IsStdoutTTY(),
 	}
-
-	// A digest mismatch is only found once the whole asset has been read, by
-	// which point bytes streamed to standard output can't be taken back. So a
-	// verified download for standard output is staged in a temporary directory
-	// and only written out once it has been checked.
-	stdoutDest := dest
-	var stagingDir string
-	if opts.Verify && opts.OutputFile == "-" {
-		stagingDir, err = os.MkdirTemp("", "gh-release-download-")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(stagingDir)
-		dest = &destinationWriter{dir: stagingDir}
-	}
 	defer dest.Close()
 
 	targets := make([]downloadTarget, len(toDownload))
@@ -340,20 +325,65 @@ func downloadRun(opts *DownloadOptions) error {
 		}
 	}
 
-	if err := downloadAssets(dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO); err != nil {
-		return err
+	if !opts.Verify {
+		return downloadAssets(dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO)
 	}
-	if stagingDir == "" {
+	return downloadVerified(dest, httpClient, targets, opts)
+}
+
+// downloadVerified downloads assets into a private staging directory and
+// checks each one against its expected digest there. Only once every asset
+// has passed are they written to the destination, one at a time. A failed
+// check therefore leaves the destination untouched, nothing unchecked reaches
+// standard output, and concurrent workers never share a destination file.
+func downloadVerified(dest *destinationWriter, httpClient *http.Client, targets []downloadTarget, opts *DownloadOptions) error {
+	seen := make(map[string]string, len(targets))
+	pending := targets[:0:0]
+	for _, t := range targets {
+		folded := strings.ToLower(t.name)
+		if other, ok := seen[folded]; ok {
+			return fmt.Errorf("assets %q and %q differ only in case and cannot both be downloaded with `--verify`", other, t.name)
+		}
+		seen[folded] = t.name
+
+		if err := dest.Check(t.name); errors.Is(err, errSkipped) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		pending = append(pending, t)
+	}
+	if len(pending) == 0 {
 		return nil
 	}
 
-	name := toDownload[0].Name
-	f, err := os.Open(filepath.Join(stagingDir, name))
+	stagingDir, err := os.MkdirTemp("", "gh-release-download-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stagingDir)
+	staging := &destinationWriter{dir: stagingDir}
+	defer staging.Close()
+
+	if err := downloadAssets(staging, httpClient, pending, opts.Concurrency, false, opts.IO); err != nil {
+		return err
+	}
+
+	for _, t := range pending {
+		if err := publishStaged(dest, staging, t.name); err != nil && !errors.Is(err, errSkipped) {
+			return err
+		}
+	}
+	return nil
+}
+
+func publishStaged(dest, staging *destinationWriter, name string) error {
+	f, err := os.Open(staging.makePath(name))
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	return stdoutDest.Copy(name, f)
+	return dest.Copy(name, f)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -476,8 +506,7 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL sa
 		return err
 	}
 	if actual := hex.EncodeToString(hasher.Sum(nil)); actual != expectedDigest {
-		_ = os.Remove(dest.makePath(fileName))
-		return fmt.Errorf("downloaded %s does not match its attested digest (expected sha256:%s, got sha256:%s); the file was removed", fileName, expectedDigest, actual)
+		return fmt.Errorf("downloaded %s does not match its attested digest (expected sha256:%s, got sha256:%s); nothing was saved", fileName, expectedDigest, actual)
 	}
 	return nil
 }
@@ -535,17 +564,23 @@ func (w *destinationWriter) makePath(name string) string {
 	return w.file
 }
 
+// isStdout reports whether output goes to standard output. Only an explicit
+// "--output -" means that; an asset that happens to be named "-" is a file.
+func (w *destinationWriter) isStdout() bool {
+	return w.file == "-"
+}
+
 // Check returns an error if a file already exists at destination
 func (w *destinationWriter) Check(name string) error {
 	if name == "" {
 		// skip check as file name will only be known after the API request
 		return nil
 	}
-	fp := w.makePath(name)
-	if fp == "-" {
+	if w.isStdout() {
 		// writing to stdout should always proceed
 		return nil
 	}
+	fp := w.makePath(name)
 	if err := w.validateName(name); err != nil {
 		return err
 	}
@@ -580,7 +615,7 @@ func (w *destinationWriter) check(fp string) error {
 // Copy writes the data from r into a file specified by name.
 func (w *destinationWriter) Copy(name string, r io.Reader) (copyErr error) {
 	fp := w.makePath(name)
-	if fp == "-" {
+	if w.isStdout() {
 		if w.allowEscapes {
 			_, copyErr = io.Copy(w.stdout, r)
 			return
