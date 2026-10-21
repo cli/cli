@@ -12,9 +12,12 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
@@ -426,6 +429,25 @@ func TestLogin(t *testing.T) {
 			},
 		},
 		{
+			name: "web flow, expiring on an enterprise host warns the token may not be expiring",
+			opts: LoginOptions{
+				Hostname: "example.com",
+				Web:      true,
+				Expiring: true,
+				AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, _ bool) (*authflow.AuthResult, error) {
+					return &authflow.AuthResult{Token: "gho_plain", Username: "monalisa"}, nil
+				},
+			},
+			wantsConfig: map[string]string{
+				"example.com:user":         "monalisa",
+				"example.com:oauth_token":  "gho_plain",
+				"example.com:git_protocol": "",
+			},
+			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
+				assert.Contains(t, stderr, "example.com may not support expiring tokens")
+			},
+		},
+		{
 			name: "interactive, expiring forces the web flow instead of offering token paste",
 			opts: LoginOptions{
 				Hostname:         "example.com",
@@ -479,9 +501,13 @@ func TestLogin(t *testing.T) {
 			tt.opts.Config = &cfg
 			tt.opts.HTTPClient = &http.Client{Transport: reg}
 			tt.opts.CredentialFlow = &GitCredentialFlow{
-				// Intentionally not instantiating anything in here because the tests do not hit this code path.
-				// Right now it's better to panic if we write a test that hits the code than say, start calling
-				// out to git unintentionally.
+				IO: ios,
+				// Helper detection now runs for every sign-in, including the non-interactive and SSH cases in this
+				// table, so provide a fake helper config to keep the read hermetic instead of shelling out to git.
+				HelperConfig: &gitcredentials.FakeHelperConfig{
+					SelfExecutablePath: "/path/to/gh",
+					Helpers:            map[string]gitcredentials.Helper{},
+				},
 			}
 
 			if tt.runStubs != nil {
@@ -563,6 +589,140 @@ func TestAuthenticatingGitCredentials(t *testing.T) {
 	helper, err := opts.CredentialFlow.HelperConfig.ConfiguredHelper("example.com")
 	require.NoError(t, err)
 	require.True(t, helper.IsOurs(), "expected gh to be the configured helper")
+}
+
+func TestLogin_recordsAuthTelemetry(t *testing.T) {
+	// An interactive https login to github.com that configures gh as the credential helper should record a complete
+	// auth_invocation event.
+	ios, _, _, _ := iostreams.Test()
+	recorder := &telemetry.InvocationRecorderSpy{}
+
+	opts := &LoginOptions{
+		IO:          ios,
+		Config:      tinyConfig{},
+		HTTPClient:  &http.Client{},
+		Hostname:    "github.com",
+		Interactive: true,
+		GitProtocol: "https",
+		Telemetry:   recorder,
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(prompt, _ string, opts []string) (int, error) {
+				if prompt == "How would you like to authenticate GitHub CLI?" {
+					return prompter.IndexFor(opts, "Login with a web browser")
+				}
+				return -1, prompter.NoSuchPromptErr(prompt)
+			},
+		},
+		AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _, _ bool) (*authflow.AuthResult, error) {
+			return &authflow.AuthResult{Token: "ATOKEN", Username: "monalisa"}, nil
+		},
+		CredentialFlow: &GitCredentialFlow{
+			Prompter: &prompter.PrompterMock{
+				ConfirmFunc: func(prompt string, _ bool) (bool, error) {
+					return true, nil
+				},
+			},
+			HelperConfig: &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers:            map[string]gitcredentials.Helper{},
+			},
+		},
+	}
+
+	require.NoError(t, Login(opts))
+
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	assert.Equal(t, ghtelemetry.SAMPLE_ALL, recorder.LastSampleRate)
+	dims := events[0].Dimensions
+	assert.Equal(t, "auth_invocation", events[0].Type)
+	assert.Equal(t, "login", dims["auth_command"])
+	assert.Equal(t, "false", dims["expiring_requested"])
+	assert.Equal(t, "false", dims["expiring_setup_cred_helper_cancelled"])
+	assert.Equal(t, "https", dims["git_protocol"])
+	assert.Equal(t, "none", dims["git_credential_helper_before"])
+	assert.Equal(t, "ours", dims["git_credential_helper_after"])
+	assert.Equal(t, "false", dims["expiring_received"])
+	assert.Equal(t, "keyring", dims["storage_type"])
+	assert.Equal(t, "true", dims["auth_success"])
+}
+
+func TestLogin_recordsExpiringSetupCancelled(t *testing.T) {
+	// An interactive https login that asks for an expiring token and then cancels at the credential-helper prompt
+	// should record expiring_setup_cred_helper_cancelled=true and surface the warning.
+	ios, _, _, stderr := iostreams.Test()
+	recorder := &telemetry.InvocationRecorderSpy{}
+
+	opts := &LoginOptions{
+		IO:          ios,
+		Config:      tinyConfig{},
+		HTTPClient:  &http.Client{},
+		Hostname:    "github.com",
+		Interactive: true,
+		GitProtocol: "https",
+		Expiring:    true,
+		Telemetry:   recorder,
+		Prompter:    &prompter.PrompterMock{},
+		CredentialFlow: &GitCredentialFlow{
+			IO: ios,
+			Prompter: &prompter.PrompterMock{
+				SelectFunc: func(_, _ string, options []string) (int, error) {
+					return prompter.IndexFor(options, "Cancel")
+				},
+			},
+			HelperConfig: &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers: map[string]gitcredentials.Helper{
+					"github.com": {Cmd: "osxkeychain"},
+				},
+			},
+		},
+	}
+
+	err := Login(opts)
+	assert.ErrorIs(t, err, cmdutil.CancelError)
+
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	dims := events[0].Dimensions
+	assert.Equal(t, "true", dims["expiring_requested"])
+	assert.Equal(t, "true", dims["expiring_setup_cred_helper_cancelled"])
+	assert.Equal(t, "false", dims["auth_success"])
+	assert.Contains(t, stderr.String(), "expiring token")
+}
+
+func TestLogin_doesNotRecordAuthTelemetryForEnterprise(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	recorder := &telemetry.InvocationRecorderSpy{}
+
+	opts := &LoginOptions{
+		IO:          ios,
+		Config:      tinyConfig{},
+		HTTPClient:  &http.Client{},
+		Hostname:    "ghe.example.com",
+		Interactive: true,
+		GitProtocol: "https",
+		Web:         true,
+		Telemetry:   recorder,
+		AuthFlow: func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _, _ bool) (*authflow.AuthResult, error) {
+			return &authflow.AuthResult{Token: "ATOKEN", Username: "monalisa"}, nil
+		},
+		CredentialFlow: &GitCredentialFlow{
+			Prompter: &prompter.PrompterMock{
+				ConfirmFunc: func(prompt string, _ bool) (bool, error) {
+					return false, nil
+				},
+			},
+			HelperConfig: &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers:            map[string]gitcredentials.Helper{},
+			},
+		},
+	}
+
+	require.NoError(t, Login(opts))
+
+	assert.Empty(t, recorder.Events())
 }
 
 func Test_scopesSentence(t *testing.T) {

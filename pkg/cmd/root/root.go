@@ -136,7 +136,7 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 	cmd.AddCommand(accessibilityCmd.NewCmdAccessibility(f))
 	cmd.AddCommand(actionsCmd.NewCmdActions(f))
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
-	cmd.AddCommand(authCmd.NewCmdAuth(f))
+	cmd.AddCommand(authCmd.NewCmdAuth(f, telemetry))
 	cmd.AddCommand(attestationCmd.NewCmdAttestation(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))

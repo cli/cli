@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,9 +13,12 @@ import (
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const defaultSSHKeyTitle = "GitHub CLI"
@@ -42,6 +46,7 @@ type LoginOptions struct {
 	SkipSSHKeyPrompt bool
 	CopyToClipboard  bool
 	Expiring         bool
+	Telemetry        ghtelemetry.InvocationRecorder
 
 	// AuthFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
 	AuthFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
@@ -73,6 +78,16 @@ func Login(opts *LoginOptions) error {
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
 
+	// Begin the auth-state telemetry event. It is nil for disabled telemetry or enterprise hosts, and all event methods
+	// are nil-tolerant, so the calls below stay unconditional.
+	authEvent := BeginAuthTelemetry(opts.Telemetry, "login", hostname, opts.Expiring)
+
+	// A GitHub Enterprise Server host may not support expiring tokens. Surface this once the hostname is known, from
+	// interactive selection or the --hostname flag, so the user understands they may receive a non-expiring token.
+	if opts.Expiring && ghauth.IsEnterprise(hostname) {
+		fmt.Fprintf(opts.IO.ErrOut, "%s %s may not support expiring tokens\n", cs.WarningIcon(), hostname)
+	}
+
 	gitProtocol := strings.ToLower(opts.GitProtocol)
 	if opts.Interactive && gitProtocol == "" {
 		options := []string{
@@ -92,8 +107,20 @@ func Login(opts *LoginOptions) error {
 
 	var additionalScopes []string
 
+	// Record the selected git operations protocol for every sign-in, before any prompt.
+	authEvent.RecordGitProtocol(gitProtocol)
+
+	// Record the configured credential helper up front, before any prompt, so this telemetry is captured for every
+	// sign-in, including non-interactive and SSH flows that never reach the prompt.
+	authEvent.RecordHelperBefore(opts.CredentialFlow.DetectConfiguredHelper(hostname))
+
 	if opts.Interactive && gitProtocol == "https" {
-		if err := opts.CredentialFlow.Prompt(hostname); err != nil {
+		err := opts.CredentialFlow.Prompt(hostname, opts.Expiring)
+		if errors.Is(err, ErrExpiringSetupCredHelperCancelled) {
+			authEvent.RecordExpiringSetupCancelled(true)
+			return cmdutil.CancelError
+		}
+		if err != nil {
 			return err
 		}
 		additionalScopes = append(additionalScopes, opts.CredentialFlow.Scopes()...)
@@ -239,6 +266,9 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication credentials saved in plain text\n", cs.Yellow("!"))
 	}
 
+	authEvent.RecordStorage(insecureStorageUsed)
+	authEvent.RecordExpiringReceived(refreshableCredential != nil)
+
 	// Expiring tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
 	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
 	switch {
@@ -260,6 +290,11 @@ func Login(opts *LoginOptions) error {
 		}
 	}
 
+	// Record the final helper state for every sign-in. For non-interactive and SSH flows no setup runs, so this equals
+	// the before value (gh observed the helper and changed nothing); for interactive HTTPS it reflects any setup. It is
+	// derived from the flow's decisions rather than re-reading git configuration.
+	authEvent.RecordHelperAfter(opts.CredentialFlow.ResultingHelperCategory())
+
 	if keyToUpload != "" {
 		uploaded, err := sshKeyUpload(httpClient, hostname, keyToUpload, keyTitle)
 		if err != nil {
@@ -277,6 +312,8 @@ func Login(opts *LoginOptions) error {
 	if userWasAlreadyLoggedIn {
 		fmt.Fprintf(opts.IO.ErrOut, "%s You were already logged in to this account\n", cs.WarningIcon())
 	}
+
+	authEvent.RecordSuccess()
 
 	return nil
 }
