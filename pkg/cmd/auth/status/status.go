@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -65,6 +66,21 @@ func (a authStatus) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(a, fields)
 }
 
+// timeNow is the clock used to render relative token-expiry times. It is a package variable so tests can pin it for
+// deterministic output.
+var timeNow = time.Now
+
+// relativeToNow renders a fuzzy, human readable description of when t occurs relative to the current time, for
+// annotating the absolute expiry timestamp. Future times read as "in about 7 hours" and already-elapsed times as
+// "expired about 2 days ago".
+func relativeToNow(t time.Time) string {
+	now := timeNow()
+	if t.After(now) {
+		return text.FuzzyIn(now, t)
+	}
+	return "expired " + text.FuzzyAgo(now, t)
+}
+
 func (e authEntry) String(cs *iostreams.ColorScheme) string {
 	var sb strings.Builder
 
@@ -81,7 +97,14 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		if e.Refreshable {
 			sb.WriteString("  - Expiring token that gh refreshes automatically\n")
 			if e.TokenExpiresAt != nil {
-				sb.WriteString(fmt.Sprintf("  - Token expires: %s\n", cs.Bold(e.TokenExpiresAt.UTC().Format(time.RFC3339))))
+				expiresAt := e.TokenExpiresAt.UTC()
+				sb.WriteString(fmt.Sprintf("  - Token expires: %s (%s)\n",
+					cs.Bold(expiresAt.Format(time.RFC3339)), relativeToNow(expiresAt)))
+			}
+			if e.RefreshTokenExpiresAt != nil {
+				refreshExpiresAt := e.RefreshTokenExpiresAt.UTC()
+				sb.WriteString(fmt.Sprintf("  - Refresh token expires: %s (%s)\n",
+					cs.Bold(refreshExpiresAt.Format(time.RFC3339)), relativeToNow(refreshExpiresAt)))
 			}
 			if e.justRefreshed {
 				sb.WriteString("  - Token refreshed just now\n")
