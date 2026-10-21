@@ -32,7 +32,6 @@ func CapiClientFunc(f *cmdutil.Factory) func() (capi.CapiClient, error) {
 
 		authCfg := cfg.Authentication()
 		host, _ := authCfg.DefaultHost()
-		token := authCfg.ActiveToken(host).Token
 
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Minute*10)
 		capiBaseURL, err := resolveCapiURL(cachedClient, host)
@@ -40,7 +39,9 @@ func CapiClientFunc(f *cmdutil.Factory) func() (capi.CapiClient, error) {
 			return nil, fmt.Errorf("failed to resolve Copilot API URL: %w", err)
 		}
 
-		return capi.NewCAPIClient(httpClient, token, host, capiBaseURL), nil
+		// The CAPI client authenticates by setting the token header itself, which bypasses the base HTTP client's
+		// auto-refresh. Pass authCfg so the CAPI transport can refresh a short-lived token on each request.
+		return capi.NewCAPIClient(httpClient, authCfg, host, capiBaseURL), nil
 	}
 }
 
