@@ -171,9 +171,9 @@ func TestTokenForUserResolution(t *testing.T) {
 		{
 			// This state should not occur in practice: logging in with a non-refreshable token deletes any
 			// refreshable record for that account, and logging in with a refreshable token deletes the non-expiring
-			// tokens. The case documents the resolution precedence regardless: the managed refreshable credential
-			// wins, matching setActiveCredential so activation and resolution never disagree.
-			name: "prefers refreshable over non-expiring token",
+			// tokens. The case documents the resolution precedence regardless: the non-expiring config token is probed
+			// last, so the managed refreshable credential still wins over it, matching setActiveCredential.
+			name: "prefers refreshable over non-expiring config token",
 			setup: func(t *testing.T, authCfg *AuthConfig) {
 				authCfg.cfg.Set([]string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey}, "plain-token")
 				setRefreshableConfigField(t, authCfg, "github.com", "test-user", "access_token", "access")
@@ -181,6 +181,18 @@ func TestTokenForUserResolution(t *testing.T) {
 			},
 			wantToken:  "access",
 			wantSource: "refreshable_oauth_token",
+		},
+		{
+			// Also a mixed state the write paths keep unreachable; documents that the non-expiring keyring token is
+			// probed before the refreshable credential, so it wins here, matching setActiveCredential.
+			name: "prefers non-expiring keyring over refreshable",
+			setup: func(t *testing.T, authCfg *AuthConfig) {
+				require.NoError(t, keyring.Set(keyringServiceName("github.com"), "test-user", "plain-token"))
+				setRefreshableConfigField(t, authCfg, "github.com", "test-user", "access_token", "access")
+				setRefreshableConfigField(t, authCfg, "github.com", "test-user", "refresh_token", "refresh")
+			},
+			wantToken:  "plain-token",
+			wantSource: "keyring",
 		},
 	}
 	for _, tt := range tests {
@@ -239,7 +251,12 @@ func TestSetActiveCredential(t *testing.T) {
 		assertActive func(t *testing.T, authCfg *AuthConfig)
 	}{
 		{
-			name: "prefers refreshable over non-expiring",
+			// This mixed state should not occur in practice: the write paths keep the two credential forms mutually
+			// exclusive, and loginRefreshable verifies removal of any non-expiring token before storing a refreshable
+			// one. The case documents the resolution precedence regardless: the non-expiring keyring token is probed
+			// first, so it is activated ahead of the refreshable credential, matching TokenForUser so activation and
+			// resolution agree.
+			name: "prefers non-expiring keyring over refreshable",
 			setup: func(t *testing.T, authCfg *AuthConfig) {
 				require.NoError(t, keyring.Set(keyringServiceName("github.com"), "test-user", "plain-token"))
 				setRefreshableConfigField(t, authCfg, "github.com", "test-user", "access_token", "access")
@@ -247,13 +264,10 @@ func TestSetActiveCredential(t *testing.T) {
 			},
 			wantFound: true,
 			assertActive: func(t *testing.T, authCfg *AuthConfig) {
-				// The refreshable credential stays in its per-user slot; there is no host-level active copy.
-				got, err := authCfg.cfg.Get(append(refreshablePath("github.com", "test-user"), "access_token"))
+				// The non-expiring keyring token is moved into the host active slot ahead of the refreshable credential.
+				got, err := keyring.Get(keyringServiceName("github.com"), "")
 				require.NoError(t, err)
-				require.Equal(t, "access", got)
-				// The non-expiring host active keyring slot is cleared so it cannot outrank the refreshable credential.
-				_, err = keyring.Get(keyringServiceName("github.com"), "")
-				require.Error(t, err)
+				require.Equal(t, "plain-token", got)
 			},
 		},
 		{
@@ -600,6 +614,28 @@ func TestLoginRefreshablePurgesNonExpiringLogin(t *testing.T) {
 	require.Equal(t, "access", cred.Token)
 }
 
+// TestLoginRefreshablePurgesNonExpiringKeyringLogin covers the keyring arm of the non-expiring purge. Resolution now
+// probes the ordinary keyring before the refreshable credential, so a stale per-user keyring token left behind would
+// outrank the refreshable one; the purge must clear it for the refreshable credential to resolve.
+func TestLoginRefreshablePurgesNonExpiringKeyringLogin(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+
+	// A prior non-expiring login stores a token in the keyring per-user slot.
+	_, err := authCfg.Login("github.com", "test-user", "stale-token", "ssh", true)
+	require.NoError(t, err)
+
+	credential := gh.Credential{Token: "access", RefreshToken: "refresh"}
+	_, err = authCfg.LoginRefreshable("github.com", "test-user", credential, "ssh", true)
+	require.NoError(t, err)
+
+	// The stale keyring token is gone and the refreshable credential resolves instead.
+	_, err = keyring.Get(keyringServiceName("github.com"), "test-user")
+	require.Error(t, err)
+	cred, err := authCfg.TokenForUser("github.com", "test-user")
+	require.NoError(t, err)
+	require.Equal(t, "access", cred.Token)
+}
+
 // TestLoginPurgesRefreshableRecord is the inverse of TestLoginRefreshablePurgesNonExpiringLogin: logging in with a
 // non-refreshable token must remove the user's refreshable record so the two kinds never coexist. The regression it
 // guards (cli/cli#14451 review): a leftover refreshable record short-circuits activateUser, so the new token is never
@@ -631,6 +667,59 @@ func TestLoginPurgesRefreshableRecord(t *testing.T) {
 	hostToken, err := authCfg.cfg.Get([]string{hostsKey, "github.com", oauthTokenKey})
 	require.NoError(t, err)
 	require.Equal(t, "plain-token", hostToken)
+}
+
+// TestLoginFailsWhenOtherCredentialKindSurvivesPurge covers the purge post-condition checks: an OS keyring can report a
+// delete as successful while the secret remains, and the surviving credential would then outrank the new login. Login
+// must surface that instead of activating the user and reporting success.
+func TestLoginFailsWhenOtherCredentialKindSurvivesPurge(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T)
+		login   func(authCfg *AuthConfig) error
+		wantErr string
+	}{
+		{
+			name: "non-expiring keyring token survives a refreshable login",
+			setup: func(t *testing.T) {
+				require.NoError(t, keyring.Set(keyringServiceName("github.com"), "test-user", "stale-token"))
+			},
+			login: func(authCfg *AuthConfig) error {
+				credential := gh.Credential{Token: "access", RefreshToken: "refresh"}
+				_, err := authCfg.LoginRefreshable("github.com", "test-user", credential, "ssh", true)
+				return err
+			},
+			wantErr: "could not remove the existing non-expiring credential, which would shadow this login",
+		},
+		{
+			name: "refreshable keyring record survives a non-expiring login",
+			setup: func(t *testing.T) {
+				setRefreshableKeyring(t, "github.com", "test-user", gh.Credential{Token: "access", RefreshToken: "refresh"})
+			},
+			login: func(authCfg *AuthConfig) error {
+				_, err := authCfg.Login("github.com", "test-user", "plain-token", "ssh", false)
+				return err
+			},
+			wantErr: "could not remove the existing refreshable credential, which would shadow this login",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authCfg := newTestAuthConfig(t)
+			tt.setup(t)
+
+			originalKeyringDelete := keyringDelete
+			t.Cleanup(func() { keyringDelete = originalKeyringDelete })
+			keyringDelete = func(service, user string) error { return nil }
+
+			err := tt.login(authCfg)
+			require.EqualError(t, err, tt.wantErr)
+
+			// The user was never activated.
+			_, err = authCfg.ActiveUser("github.com")
+			require.Error(t, err)
+		})
+	}
 }
 
 func TestWithFreshConfigUnderLockInvokesReloadBeforeFn(t *testing.T) {
@@ -675,17 +764,31 @@ func TestWithFreshConfigUnderLockPropagatesError(t *testing.T) {
 	require.ErrorIs(t, err, sentinel)
 }
 
-func TestWithFreshConfigUnderLockProceedsWhenConfigDirCannotBeCreated(t *testing.T) {
+func TestFlockRefreshLockCreatesMissingDirectory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state", "gh", refreshLockFile)
+
+	unlock, err := flockRefreshLock(t.Context(), path)
+	require.NoError(t, err)
+	defer unlock()
+
+	require.FileExists(t, path)
+}
+
+func TestWithFreshConfigUnderLockProceedsWhenStateDirCannotBeCreated(t *testing.T) {
 	// If we have reached a refresh, the environment is already set up enough to proceed. A read-only mount (or any
-	// other reason the config directory cannot be created) must not fail the user's command; we degrade to running
+	// other reason the state directory cannot be created) must not fail the user's command; we degrade to running
 	// without the lock, exactly as when the lock cannot be acquired.
 	authCfg := newTestAuthConfig(t)
+	// Use the real acquirer, since creating the state directory happens behind the lock seam.
+	authCfg.acquireRefreshLock = flockRefreshLock
 
-	// Point the config dir under a regular file so MkdirAll fails with ENOTDIR regardless of privileges (running as
+	// Point the state dir under a regular file so MkdirAll fails with ENOTDIR regardless of privileges (running as
 	// root would bypass a read-only directory bit, but never a non-directory path component).
 	file := filepath.Join(t.TempDir(), "not-a-dir")
 	require.NoError(t, os.WriteFile(file, nil, 0600))
-	t.Setenv("GH_CONFIG_DIR", filepath.Join(file, "config"))
+	// go-gh checks XDG_STATE_HOME first on every platform (before the Windows-only LocalAppData), so this overrides
+	// the state dir regardless of the OS the test runs on.
+	t.Setenv("XDG_STATE_HOME", filepath.Join(file, "state"))
 
 	ran := false
 	observedLockHeld := true
@@ -696,7 +799,7 @@ func TestWithFreshConfigUnderLockProceedsWhenConfigDirCannotBeCreated(t *testing
 	})
 
 	require.NoError(t, err)
-	require.True(t, ran, "fn must still run when the config directory cannot be created")
+	require.True(t, ran, "fn must still run when the state directory cannot be created")
 	require.False(t, observedLockHeld, "the lock cannot be held when its directory cannot be created")
 }
 

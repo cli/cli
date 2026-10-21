@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -260,13 +262,14 @@ func Test_refreshRun(t *testing.T) {
 		authOut                authOut
 		oldScopes              string
 		clipboard              string
-		preferExpiringCfg      string
+		expiringCredentialsCfg string
 		wantErr                string
 		nontty                 bool
 		wantAuthArgs           authArgs
 		wantStoredToken        string
 		wantStoredRefreshToken string
 		wantStderrContains     string
+		wantStderrOmits        string
 	}{
 		{
 			name:    "no hosts configured",
@@ -570,35 +573,29 @@ func Test_refreshRun(t *testing.T) {
 			wantStoredRefreshToken: "ghr_refresh",
 		},
 		{
-			name: "prefer_expiring_credentials config requests expiring without the flag",
+			name: "expiring_credentials config is not consulted by refresh without the flag",
 			cfgHosts: []string{
 				"github.com",
 			},
-			preferExpiringCfg: "enabled",
+			expiringCredentialsCfg: "enabled",
 			opts: &RefreshOptions{
 				Hostname: "github.com",
-			},
-			authOut: authOut{
-				username:    "test-user",
-				token:       "gho_access",
-				refreshable: &gh.Credential{Token: "gho_access", RefreshToken: "ghr_refresh"},
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
 				scopes:        []string{},
 				secureStorage: true,
 				clipboard:     true,
-				expiring:      true,
+				expiring:      false,
 			},
-			wantStoredToken:        "gho_access",
-			wantStoredRefreshToken: "ghr_refresh",
+			wantStoredToken: "xyz456",
 		},
 		{
-			name: "--expiring=false overrides prefer_expiring_credentials config",
+			name: "--expiring=false requests a non-expiring token",
 			cfgHosts: []string{
 				"github.com",
 			},
-			preferExpiringCfg: "enabled",
+			expiringCredentialsCfg: "enabled",
 			opts: &RefreshOptions{
 				Hostname: "github.com",
 				Expiring: new(false),
@@ -613,12 +610,37 @@ func Test_refreshRun(t *testing.T) {
 			wantStoredToken: "xyz456",
 		},
 		{
-			name: "existing refreshable credential without --expiring warns about downgrade",
+			name: "existing refreshable credential without --expiring keeps expiring",
 			cfgHosts: []string{
 				"github.com",
 			},
 			cfgRefreshable: true,
 			opts:           &RefreshOptions{},
+			authOut: authOut{
+				username:    "test-user",
+				token:       "gho_access",
+				refreshable: &gh.Credential{Token: "gho_access", RefreshToken: "ghr_refresh"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+				clipboard:     true,
+				expiring:      true,
+			},
+			wantStoredToken:        "gho_access",
+			wantStoredRefreshToken: "ghr_refresh",
+			wantStderrOmits:        "Original token was an expiring token",
+		},
+		{
+			name: "existing refreshable credential with --expiring=false downgrades to non-expiring",
+			cfgHosts: []string{
+				"github.com",
+			},
+			cfgRefreshable: true,
+			opts: &RefreshOptions{
+				Expiring: new(false),
+			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
 				scopes:        []string{},
@@ -628,7 +650,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantStoredToken:        "xyz456",
 			wantStoredRefreshToken: "",
-			wantStderrContains:     "Original token was expiring; pass --expiring to preserve it\n",
+			wantStderrOmits:        "Original token was an expiring token",
 		},
 		{
 			name: "expired refreshable token is refreshed so its scopes are preserved",
@@ -644,7 +666,7 @@ func Test_refreshRun(t *testing.T) {
 				scopes:        []string{"repo", "read:org"},
 				secureStorage: true,
 				clipboard:     true,
-				expiring:      false,
+				expiring:      true,
 			},
 			wantStoredToken:        "xyz456",
 			wantStoredRefreshToken: "",
@@ -662,7 +684,7 @@ func Test_refreshRun(t *testing.T) {
 				scopes:        []string{},
 				secureStorage: true,
 				clipboard:     true,
-				expiring:      false,
+				expiring:      true,
 			},
 			wantStoredToken:        "xyz456",
 			wantStoredRefreshToken: "",
@@ -707,8 +729,8 @@ func Test_refreshRun(t *testing.T) {
 			if tt.clipboard != "" {
 				cfg.Set("", "clipboard", tt.clipboard)
 			}
-			if tt.preferExpiringCfg != "" {
-				cfg.Set("", "prefer_expiring_credentials", tt.preferExpiringCfg)
+			if tt.expiringCredentialsCfg != "" {
+				cfg.Set("", "expiring_credentials", tt.expiringCredentialsCfg)
 			}
 			for _, hostname := range tt.cfgHosts {
 				switch {
@@ -802,6 +824,9 @@ func Test_refreshRun(t *testing.T) {
 			if tt.wantStderrContains != "" {
 				require.Contains(t, stderr.String(), tt.wantStderrContains)
 			}
+			if tt.wantStderrOmits != "" {
+				require.NotContains(t, stderr.String(), tt.wantStderrOmits)
+			}
 		})
 	}
 }
@@ -855,6 +880,88 @@ func Test_refreshRun_recordsTelemetry(t *testing.T) {
 	assert.Equal(t, "none", dims["git_credential_helper_before"])
 	assert.Equal(t, "none", dims["git_credential_helper_after"])
 	assert.Contains(t, []string{"keyring", "plaintext"}, dims["storage_type"])
+}
+
+func Test_refreshRun_recordsTelemetryOnFailure(t *testing.T) {
+	// Telemetry must reflect how far the refresh got: an issued expiring token is recorded even when storing it fails,
+	// and a stored credential counts as a successful refresh even when the credential-helper setup fails afterwards.
+	tests := []struct {
+		name         string
+		interactive  bool
+		breakStorage bool
+		helperErr    error
+		wantSuccess  string
+	}{
+		{
+			name:         "storage fails after an expiring token is issued",
+			breakStorage: true,
+			wantSuccess:  "false",
+		},
+		{
+			name:        "credential helper setup fails after storage",
+			interactive: true,
+			helperErr:   errors.New("helper setup failed"),
+			wantSuccess: "true",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, _ := config.NewIsolatedTestConfig(t, "")
+			_, err := cfg.Authentication().Login("github.com", "test-user", "abc123", "https", false)
+			require.NoError(t, err)
+
+			if tt.breakStorage {
+				// Point the config directory under a regular file so persisting the refreshed credential fails
+				// regardless of privileges.
+				file := filepath.Join(t.TempDir(), "not-a-dir")
+				require.NoError(t, os.WriteFile(file, nil, 0600))
+				t.Setenv("GH_CONFIG_DIR", filepath.Join(file, "config"))
+			}
+
+			recorder := &telemetry.InvocationRecorderSpy{}
+			ios, _, _, _ := iostreams.Test()
+
+			opts := &RefreshOptions{
+				IO:          ios,
+				Hostname:    "github.com",
+				Interactive: tt.interactive,
+				Telemetry:   recorder,
+				ResetScopes: true,
+				Config: func() (gh.Config, error) {
+					return cfg, nil
+				},
+				AuthFlow: func(_ *http.Client, _ *iostreams.IOStreams, _ string, _ []string, _, _, _ bool) (*authflow.AuthResult, error) {
+					return &authflow.AuthResult{
+						Token:       "xyz456",
+						Username:    "test-user",
+						Refreshable: &gh.Credential{Token: "xyz456", RefreshToken: "rt456"},
+					}, nil
+				},
+				PlainHttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: &httpmock.Registry{}}, nil
+				},
+				Prompter: &prompter.PrompterMock{
+					ConfirmFunc: func(_ string, _ bool) (bool, error) {
+						return true, nil
+					},
+				},
+				helperConfig: &gitcredentials.FakeHelperConfig{
+					SelfExecutablePath: "/path/to/gh",
+					Helpers:            map[string]gitcredentials.Helper{},
+					ConfigureOursErr:   tt.helperErr,
+				},
+			}
+
+			require.Error(t, refreshRun(opts))
+
+			events := recorder.Events()
+			require.Len(t, events, 1)
+			dims := events[0].Dimensions
+			assert.Equal(t, "true", dims["expiring_received"])
+			assert.Equal(t, tt.wantSuccess, dims["auth_success"])
+		})
+	}
 }
 
 func Test_refreshRun_doesNotRecordTelemetryForEnterprise(t *testing.T) {

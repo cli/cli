@@ -61,8 +61,8 @@ type Config interface {
 	Prompt(hostname string) ConfigEntry
 	// PreferEditorPrompt returns the configured editor-based prompt, optionally scoped by host.
 	PreferEditorPrompt(hostname string) ConfigEntry
-	// PreferExpiringCredentials returns the configured prefer_expiring_credentials setting, optionally scoped by host.
-	PreferExpiringCredentials(hostname string) ConfigEntry
+	// ExpiringCredentials returns the configured expiring_credentials setting, optionally scoped by host.
+	ExpiringCredentials(hostname string) ConfigEntry
 	// Spinner returns the configured spinner setting, optionally scoped by host.
 	Spinner(hostname string) ConfigEntry
 	// Telemetry returns the configured telemetry setting, ignoring host scoping since telemetry is a global setting.

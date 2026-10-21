@@ -46,7 +46,13 @@ type LoginOptions struct {
 	SkipSSHKeyPrompt bool
 	CopyToClipboard  bool
 	Expiring         bool
-	Telemetry        ghtelemetry.InvocationRecorder
+
+	// ExpiringExplicitlyRequested reports that the user passed --expiring to force expiring credentials. A pasted
+	// token can never be expiring, so the paste option is suppressed only in this case. A config-derived preference
+	// (expiring_credentials enabled) does not suppress paste: choosing it simply yields a non-expiring token.
+	ExpiringExplicitlyRequested bool
+
+	Telemetry ghtelemetry.InvocationRecorder
 
 	// AuthFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
 	AuthFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
@@ -62,14 +68,14 @@ func ShouldCopyToClipboard(cfg gh.Config, flagValue *bool) bool {
 	return cfg.Clipboard().Value == "enabled"
 }
 
-// ShouldPreferExpiring resolves whether to prefer expiring credentials that gh refreshes automatically. An explicit
-// --expiring flag value wins; when the flag is unset it falls back to the prefer_expiring_credentials config setting
+// ShouldUseExpiring resolves whether to prefer expiring credentials that gh refreshes automatically. An explicit
+// --expiring flag value wins; when the flag is unset it falls back to the expiring_credentials config setting
 // for the host.
-func ShouldPreferExpiring(cfg gh.Config, flagValue *bool, hostname string) bool {
+func ShouldUseExpiring(cfg gh.Config, flagValue *bool, hostname string) bool {
 	if flagValue != nil {
 		return *flagValue
 	}
-	return cfg.PreferExpiringCredentials(hostname).Value == "enabled"
+	return cfg.ExpiringCredentials(hostname).Value == "enabled"
 }
 
 func Login(opts *LoginOptions) error {
@@ -78,13 +84,33 @@ func Login(opts *LoginOptions) error {
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
 
+	// Choose how to authenticate before anything that depends on expiring intent. A pasted token can never be
+	// expiring, so the effective intent is only known once the method is chosen.
+	var authMode int
+	if opts.Web || opts.ExpiringExplicitlyRequested {
+		// When the user explicitly passes --expiring, force the web flow so the paste option cannot silently ignore
+		// that request. A config-derived preference does not suppress paste: choosing it yields a non-expiring token.
+		authMode = 0
+	} else if opts.Interactive {
+		options := []string{"Login with a web browser", "Paste an authentication token"}
+		var err error
+		authMode, err = opts.Prompter.Select(
+			"How would you like to authenticate GitHub CLI?",
+			options[0],
+			options)
+		if err != nil {
+			return err
+		}
+	}
+	expiring := opts.Expiring && authMode == 0
+
 	// Begin the auth-state telemetry event. It is nil for disabled telemetry or enterprise hosts, and all event methods
 	// are nil-tolerant, so the calls below stay unconditional.
-	authEvent := BeginAuthTelemetry(opts.Telemetry, "login", hostname, opts.Expiring)
+	authEvent := BeginAuthTelemetry(opts.Telemetry, "login", hostname, expiring)
 
 	// A GitHub Enterprise Server host may not support expiring tokens. Surface this once the hostname is known, from
 	// interactive selection or the --hostname flag, so the user understands they may receive a non-expiring token.
-	if opts.Expiring && ghauth.IsEnterprise(hostname) {
+	if expiring && ghauth.IsEnterprise(hostname) {
 		fmt.Fprintf(opts.IO.ErrOut, "%s %s may not support expiring tokens\n", cs.WarningIcon(), hostname)
 	}
 
@@ -115,7 +141,7 @@ func Login(opts *LoginOptions) error {
 	authEvent.RecordHelperBefore(opts.CredentialFlow.DetectConfiguredHelper(hostname))
 
 	if opts.Interactive && gitProtocol == "https" {
-		err := opts.CredentialFlow.Prompt(hostname, opts.Expiring)
+		err := opts.CredentialFlow.Prompt(hostname, expiring)
 		if errors.Is(err, ErrExpiringSetupCredHelperCancelled) {
 			authEvent.RecordExpiringSetupCancelled(true)
 			return cmdutil.CancelError
@@ -178,23 +204,6 @@ func Login(opts *LoginOptions) error {
 		}
 	}
 
-	var authMode int
-	if opts.Web || opts.Expiring {
-		// A pasted personal access token can never be refreshable, so an expiring login must use the web flow.
-		// Forcing it here avoids offering a token-paste option that would silently ignore --expiring.
-		authMode = 0
-	} else if opts.Interactive {
-		options := []string{"Login with a web browser", "Paste an authentication token"}
-		var err error
-		authMode, err = opts.Prompter.Select(
-			"How would you like to authenticate GitHub CLI?",
-			options[0],
-			options)
-		if err != nil {
-			return err
-		}
-	}
-
 	var authToken string
 	var username string
 	var refreshableCredential *gh.Credential
@@ -204,7 +213,7 @@ func Login(opts *LoginOptions) error {
 		if authFlow == nil {
 			authFlow = authflow.AuthFlow
 		}
-		result, err := authFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard, opts.Expiring)
+		result, err := authFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard, expiring)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
@@ -229,6 +238,10 @@ func Login(opts *LoginOptions) error {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 	}
+
+	// Record the server's issuance outcome as soon as the auth flow returns. It is independent of local persistence, so
+	// a later storage failure must not hide that an expiring, refreshable token was issued.
+	authEvent.RecordExpiringReceived(refreshableCredential != nil)
 
 	if username == "" {
 		var err error
@@ -267,16 +280,19 @@ func Login(opts *LoginOptions) error {
 	}
 
 	authEvent.RecordStorage(insecureStorageUsed)
-	authEvent.RecordExpiringReceived(refreshableCredential != nil)
+
+	// Record success as soon as the credential is persisted. The git credential-helper setup and SSH key upload below
+	// are separate side effects whose failure must not retract a credential that was already stored successfully.
+	authEvent.RecordSuccess()
 
 	// Expiring tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
 	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
 	switch {
-	case refreshableCredential != nil && !opts.Expiring:
+	case refreshableCredential != nil && !expiring:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues expiring refreshable token\n", cs.WarningIcon())
 	case refreshableCredential != nil:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Received expiring refreshable token\n", cs.SuccessIcon())
-	case opts.Expiring && authMode == 0:
+	case expiring:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue an expiring refreshable token\n", cs.WarningIcon())
 	}
 
@@ -312,8 +328,6 @@ func Login(opts *LoginOptions) error {
 	if userWasAlreadyLoggedIn {
 		fmt.Fprintf(opts.IO.ErrOut, "%s You were already logged in to this account\n", cs.WarningIcon())
 	}
-
-	authEvent.RecordSuccess()
 
 	return nil
 }

@@ -80,13 +80,12 @@ func NewCmdRefresh(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder,
 			inactive account, you will have to use %[1]sgh auth switch%[1]s to that account first before using
 			this command, and then switch back when you are done.
 
-			Use %[1]s--expiring%[1]s to prefer expiring credentials that gh refreshes automatically.
-			This is a preference, not a guarantee: whether expiring tokens are issued depends on the
-			host and the OAuth app configuration. A host without support issues a non-expiring token
-			instead, and a host configured for them may issue expiring tokens even without the flag.
-			Enable the %[1]sprefer_expiring_credentials%[1]s configuration to prefer expiring credentials
-			without passing %[1]s--expiring%[1]s every time, and pass %[1]s--expiring=false%[1]s to request a
-			non-expiring token even when that configuration is enabled.
+			Use %[1]s--expiring%[1]s to prefer expiring credentials that gh refreshes automatically, or
+			%[1]s--expiring=false%[1]s to prefer a non-expiring token. This is a preference, not a guarantee:
+			whether expiring tokens are issued depends on the host and the OAuth app configuration. A host
+			without support issues a non-expiring token instead, and a host configured for them may issue
+			expiring tokens even without the flag. Without the flag, refresh keeps the current token's kind,
+			so an expiring token stays expiring and a non-expiring token stays non-expiring.
 			When using expiring credentials for git operations, git 2.46 or newer is recommended so
 			gh can mark the token as non-cacheable; with older git a credential caching helper may store
 			and reuse an expired token.
@@ -178,7 +177,16 @@ func refreshRun(opts *RefreshOptions) error {
 		return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
 	}
 
-	expiring := shared.ShouldPreferExpiring(cfg, opts.Expiring, hostname)
+	// Resolve whether to request an expiring token. An explicit --expiring or --expiring=false wins; otherwise refresh
+	// keeps the current token's kind, so an expiring token stays expiring and a non-expiring one stays non-expiring
+	// without the user restating the preference on every refresh. The expiring_credentials configuration is a
+	// login-time preference and is deliberately not consulted here.
+	var expiring bool
+	if opts.Expiring != nil {
+		expiring = *opts.Expiring
+	} else {
+		expiring = authCfg.ActiveToken(hostname).IsRefreshable()
+	}
 
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
@@ -191,14 +199,6 @@ func refreshRun(opts *RefreshOptions) error {
 	// Begin the auth-state telemetry event. It is nil for disabled telemetry or enterprise hosts, and all event methods
 	// are nil-tolerant, so the calls below stay unconditional.
 	authEvent := shared.BeginAuthTelemetry(opts.Telemetry, "refresh", hostname, expiring)
-
-	// Capture whether the stored credential is refreshable before it is replaced. Warn up front (before the credential
-	// and browser prompts) so the user can abort rather than discover only afterwards that refreshing without
-	// --expiring downgrades it to a non-expiring token.
-	wasRefreshable := authCfg.ActiveToken(hostname).IsRefreshable()
-	if wasRefreshable && !expiring {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was expiring; pass --expiring to preserve it\n", cs.WarningIcon())
-	}
 
 	additionalScopes := set.NewStringSet()
 
@@ -271,6 +271,11 @@ func refreshRun(opts *RefreshOptions) error {
 	if err != nil {
 		return err
 	}
+
+	// Record the server's issuance outcome as soon as the auth flow returns. It is independent of local persistence, so
+	// a later storage failure must not hide that an expiring, refreshable token was issued.
+	authEvent.RecordExpiringReceived(result.Refreshable != nil)
+
 	activeUser, _ := authCfg.ActiveUser(hostname)
 	if activeUser != "" && activeUser != result.Username {
 		return fmt.Errorf("error refreshing credentials for %s, received credentials for %s, did you use the correct account in the browser?", activeUser, result.Username)
@@ -288,14 +293,15 @@ func refreshRun(opts *RefreshOptions) error {
 			authEvent.RecordStorage(insecureStorageUsed)
 		}
 	}
-	authEvent.RecordExpiringReceived(result.Refreshable != nil)
+
+	// Record success as soon as the credential is persisted. The git credential-helper setup below is a separate side
+	// effect whose failure must not retract a credential that was already stored successfully.
+	authEvent.RecordSuccess()
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 
 	// Expiring tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
 	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
-	// The wasRefreshable downgrade is intentionally not reported here: it is already warned about up front (before the
-	// browser prompt) so the user can abort, and repeating it after completion is redundant.
 	switch {
 	case result.Refreshable != nil && !expiring:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues expiring refreshable token\n", cs.WarningIcon())
@@ -323,8 +329,6 @@ func refreshRun(opts *RefreshOptions) error {
 	// before value (gh observed the helper and changed nothing); for interactive HTTPS it reflects any setup. It is
 	// derived from the flow's decisions rather than re-reading git configuration.
 	authEvent.RecordHelperAfter(credentialFlow.ResultingHelperCategory())
-
-	authEvent.RecordSuccess()
 
 	return nil
 }
