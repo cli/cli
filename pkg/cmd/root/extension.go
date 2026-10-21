@@ -83,7 +83,7 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 	// organization names), so we must not record telemetry for them by
 	// default. Official GitHub-owned extensions are a known, fixed set and
 	// can safely contribute their command name to telemetry.
-	if !extensions.IsOfficial(ext.Name(), ext.Owner()) {
+	if !extensions.IsOfficial(ext) {
 		cmdutil.DisableTelemetry(cmd)
 	}
 

@@ -395,3 +395,71 @@ func TestFlagUserAssets(t *testing.T) {
 		assert.Len(t, NewTestAssets(t, names...), maxAttachments)
 	})
 }
+
+func TestSplitFileArg(t *testing.T) {
+	tests := []struct {
+		name     string
+		arg      string
+		wantPath string
+		wantText string
+	}{
+		{
+			name:     "no hash",
+			arg:      "./shot.png",
+			wantPath: "./shot.png",
+		},
+		{
+			name:     "text after a hash",
+			arg:      "./shot.png#The login error state",
+			wantPath: "./shot.png",
+			wantText: "The login error state",
+		},
+		{
+			name:     "an existing path containing a hash stays whole",
+			arg:      "./shot#dark.png",
+			wantPath: "./shot#dark.png",
+		},
+		{
+			name:     "the text can contain a hash",
+			arg:      "./shot.png#first#second",
+			wantPath: "./shot.png",
+			wantText: "first#second",
+		},
+		{
+			name:     "the longest existing path wins",
+			arg:      "./shot#dark.png#first.png#second",
+			wantPath: "./shot#dark.png#first.png",
+			wantText: "second",
+		},
+		{
+			name:     "a hash with nothing after it",
+			arg:      "./shot.png#",
+			wantPath: "./shot.png",
+		},
+		{
+			name:     "a missing path splits at the last hash",
+			arg:      "./gone.png#first#second",
+			wantPath: "./gone.png#first",
+			wantText: "second",
+		},
+		{
+			name:     "a hash at the start isn't a split",
+			arg:      "#second",
+			wantPath: "#second",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			for _, name := range []string{"shot.png", "shot#dark.png", "shot#dark.png#first.png"} {
+				require.NoError(t, os.WriteFile(name, []byte("the bytes"), 0o600))
+			}
+
+			path, text := SplitFileArg(tt.arg)
+
+			assert.Equal(t, tt.wantPath, path)
+			assert.Equal(t, tt.wantText, text)
+		})
+	}
+}

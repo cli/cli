@@ -204,26 +204,35 @@ func formatMatch(t string, matches []search.Match, io *iostreams.IOStreams) []st
 
 	var lines []string
 	var b strings.Builder
-	var found bool
+	var found, highlighting bool
+	// A match can end at a newline or at the end of the fragment, where no
+	// character carries the end index, so close any open highlight here.
+	endLine := func() {
+		if highlighting {
+			b.WriteString(cs.Reset())
+			highlighting = false
+		}
+		if found {
+			lines = append(lines, b.String())
+		}
+		found = false
+		b.Reset()
+	}
 	for i, c := range t {
 		if c == '\n' {
-			if found {
-				lines = append(lines, b.String())
-			}
-			found = false
-			b.Reset()
+			endLine()
 			continue
 		}
 		if _, ok := startIndices[i]; ok {
 			b.WriteString(cs.HighlightStart())
 			found = true
+			highlighting = true
 		} else if _, ok := endIndices[i]; ok {
 			b.WriteString(cs.Reset())
+			highlighting = false
 		}
 		b.WriteRune(c)
 	}
-	if found {
-		lines = append(lines, b.String())
-	}
+	endLine()
 	return lines
 }

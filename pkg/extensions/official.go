@@ -41,13 +41,16 @@ var OfficialExtensions = []OfficialExtension{
 // `gh-STACK`), and we must not treat that as official. Owner comparison
 // is case-insensitive because GitHub usernames and organization names
 // are themselves case-insensitive.
-func IsOfficial(name, owner string) bool {
-	if owner == "" {
-		return false
-	}
-	for _, ext := range OfficialExtensions {
-		if ext.Name == name && strings.EqualFold(ext.Owner, owner) {
-			return true
+//
+// The owner is resolved only after a name match because resolving it for a
+// git-installed extension spawns git, and this is called for every installed
+// extension on every gh invocation. Official extension names are unique.
+func IsOfficial(ext Extension) bool {
+	name := ext.Name()
+	for _, official := range OfficialExtensions {
+		if official.Name == name {
+			owner := ext.Owner()
+			return owner != "" && strings.EqualFold(official.Owner, owner)
 		}
 	}
 	return false

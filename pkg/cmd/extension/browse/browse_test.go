@@ -1,386 +1,169 @@
 package browse
 
 import (
-	"encoding/base64"
-	"io"
-	"log"
 	"net/http"
 	"net/url"
-	"sync"
 	"testing"
-	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/rivo/tview"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func Test_getSelectedReadme(t *testing.T) {
+func TestGetExtensionsReturnsBrowsableMetadata(t *testing.T) {
+	t.Parallel()
+
+	// Given GitHub repositories tagged as extensions and locally installed extensions
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
-
-	content := base64.StdEncoding.EncodeToString([]byte("lol"))
-
-	reg.Register(
-		httpmock.REST("GET", "repos/cli/gh-cool/readme"),
-		httpmock.JSONResponse(view.RepoReadme{Content: content}))
-
 	client := &http.Client{Transport: &reg}
-
-	rg := newReadmeGetter(client, time.Second)
-	opts := ExtBrowseOpts{
-		Rg: rg,
-	}
-	readme := tview.NewTextView()
-	ui := uiRegistry{
-		List: tview.NewList(),
-	}
-	extEntries := []extEntry{
-		{
-			Name:        "gh-cool",
-			FullName:    "cli/gh-cool",
-			Installed:   false,
-			Official:    true,
-			description: "it's just cool ok",
-		},
-		{
-			Name:        "gh-screensaver",
-			FullName:    "vilmibm/gh-screensaver",
-			Installed:   true,
-			Official:    false,
-			description: "animations in your terminal",
-		},
-	}
-	el := newExtList(opts, ui, extEntries)
-
-	content, err := getSelectedReadme(opts, readme, el)
-	assert.NoError(t, err)
-	assert.Contains(t, content, "lol")
-}
-
-func Test_getExtensionRepos(t *testing.T) {
-	reg := httpmock.Registry{}
-	defer reg.Verify(t)
-
-	client := &http.Client{Transport: &reg}
-
 	values := url.Values{
 		"page":     []string{"1"},
 		"per_page": []string{"100"},
 		"q":        []string{"topic:gh-extension"},
 	}
-	cfg := config.NewMockConfig()
-
-	cfg.AuthenticationFunc = func() gh.AuthConfig {
-		authCfg := &config.AuthConfig{}
-		authCfg.SetDefaultHost("github.com", "")
-		return authCfg
-	}
-
 	reg.Register(
 		httpmock.QueryMatcher("GET", "search/repositories", values),
 		httpmock.JSONResponse(map[string]any{
 			"incomplete_results": false,
-			"total_count":        4,
+			"total_count":        3,
 			"items": []any{
 				map[string]any{
 					"name":        "gh-screensaver",
 					"full_name":   "vilmibm/gh-screensaver",
 					"description": "terminal animations",
-					"owner": map[string]any{
-						"login": "vilmibm",
-					},
+					"owner":       map[string]any{"login": "vilmibm"},
 				},
 				map[string]any{
 					"name":        "gh-cool",
 					"full_name":   "cli/gh-cool",
 					"description": "it's just cool ok",
-					"owner": map[string]any{
-						"login": "cli",
-					},
+					"owner":       map[string]any{"login": "cli"},
 				},
 				map[string]any{
-					"name":        "gh-triage",
-					"full_name":   "samcoe/gh-triage",
-					"description": "helps with triage",
-					"owner": map[string]any{
-						"login": "samcoe",
-					},
-				},
-				map[string]any{
-					"name":        "gh-gei",
-					"full_name":   "github/gh-gei",
-					"description": "something something enterprise",
-					"owner": map[string]any{
-						"login": "github",
-					},
+					"name":        "not-an-extension",
+					"full_name":   "octo/not-an-extension",
+					"description": "wrong prefix",
+					"owner":       map[string]any{"login": "octo"},
 				},
 			},
 		}),
 	)
-
-	searcher := search.NewSearcher(client, "github.com", &fd.DisabledDetectorMock{})
-	emMock := &extensions.ExtensionManagerMock{}
-	emMock.ListFunc = func() []extensions.Extension {
-		return []extensions.Extension{
-			&extensions.ExtensionMock{
-				URLFunc: func() string {
-					return "https://github.com/vilmibm/gh-screensaver"
+	cfg := config.NewMockConfig()
+	cfg.AuthenticationFunc = func() gh.AuthConfig {
+		authCfg := &config.AuthConfig{}
+		authCfg.SetDefaultHost("github.com", "")
+		return authCfg
+	}
+	manager := &extensions.ExtensionManagerMock{
+		ListFunc: func() []extensions.Extension {
+			return []extensions.Extension{
+				&extensions.ExtensionMock{
+					URLFunc: func() string {
+						return "https://github.com/vilmibm/gh-screensaver"
+					},
 				},
-			},
-			&extensions.ExtensionMock{
-				URLFunc: func() string {
-					return "https://github.com/github/gh-gei"
-				},
-			},
-		}
+			}
+		},
 	}
 
-	opts := ExtBrowseOpts{
-		Searcher: searcher,
-		Em:       emMock,
+	// When extension metadata is loaded
+	entries, err := getExtensions(ExtBrowseOpts{
+		Searcher: search.NewSearcher(client, "github.com", &fd.DisabledDetectorMock{}),
+		Em:       manager,
 		Cfg:      cfg,
-	}
+	})
 
-	extEntries, err := getExtensions(opts)
-	assert.NoError(t, err)
-
-	expectedEntries := []extEntry{
-		{
-			URL:         "https://github.com/vilmibm/gh-screensaver",
-			Name:        "gh-screensaver",
-			FullName:    "vilmibm/gh-screensaver",
-			Installed:   true,
-			Official:    false,
-			description: "terminal animations",
-		},
-		{
-			URL:         "https://github.com/cli/gh-cool",
-			Name:        "gh-cool",
-			FullName:    "cli/gh-cool",
-			Installed:   false,
-			Official:    true,
-			description: "it's just cool ok",
-		},
-		{
-			URL:         "https://github.com/samcoe/gh-triage",
-			Name:        "gh-triage",
-			FullName:    "samcoe/gh-triage",
-			Installed:   false,
-			Official:    false,
-			description: "helps with triage",
-		},
-		{
-			URL:         "https://github.com/github/gh-gei",
-			Name:        "gh-gei",
-			FullName:    "github/gh-gei",
-			Installed:   true,
-			Official:    true,
-			description: "something something enterprise",
-		},
-	}
-
-	assert.Equal(t, expectedEntries, extEntries)
+	// Then only extension repositories are returned with visible status metadata
+	require.NoError(t, err)
+	require.Len(t, entries, 2)
+	assert.Equal(t, extEntry{
+		URL:         "https://github.com/vilmibm/gh-screensaver",
+		Name:        "gh-screensaver",
+		FullName:    "vilmibm/gh-screensaver",
+		Installed:   true,
+		description: "terminal animations",
+	}, entries[0])
+	assert.Equal(t, extEntry{
+		URL:         "https://github.com/cli/gh-cool",
+		Name:        "gh-cool",
+		FullName:    "cli/gh-cool",
+		Official:    true,
+		description: "it's just cool ok",
+	}, entries[1])
 }
 
-func Test_extEntry(t *testing.T) {
-	cases := []struct {
-		name          string
-		ee            extEntry
-		expectedTitle string
-		expectedDesc  string
-	}{
-		{
-			name: "official",
-			ee: extEntry{
-				Name:        "gh-cool",
-				FullName:    "cli/gh-cool",
-				Installed:   false,
-				Official:    true,
-				description: "it's just cool ok",
-			},
-			expectedTitle: "cli/gh-cool [yellow](official)",
-			expectedDesc:  "it's just cool ok",
-		},
-		{
-			name: "no description",
-			ee: extEntry{
-				Name:        "gh-nodesc",
-				FullName:    "barryburton/gh-nodesc",
-				Installed:   false,
-				Official:    false,
-				description: "",
-			},
-			expectedTitle: "barryburton/gh-nodesc",
-			expectedDesc:  "no description provided",
-		},
-		{
-			name: "installed",
-			ee: extEntry{
-				Name:        "gh-screensaver",
-				FullName:    "vilmibm/gh-screensaver",
-				Installed:   true,
-				Official:    false,
-				description: "animations in your terminal",
-			},
-			expectedTitle: "vilmibm/gh-screensaver [green](installed)",
-			expectedDesc:  "animations in your terminal",
-		},
-		{
-			name: "neither",
-			ee: extEntry{
-				Name:        "gh-triage",
-				FullName:    "samcoe/gh-triage",
-				Installed:   false,
-				Official:    false,
-				description: "help with triage",
-			},
-			expectedTitle: "samcoe/gh-triage",
-			expectedDesc:  "help with triage",
-		},
-		{
-			name: "both",
-			ee: extEntry{
-				Name:        "gh-gei",
-				FullName:    "github/gh-gei",
-				Installed:   true,
-				Official:    true,
-				description: "something something enterprise",
-			},
-			expectedTitle: "github/gh-gei [yellow](official) [green](installed)",
-			expectedDesc:  "something something enterprise",
-		},
-	}
+func TestExtBrowseRunsBubbleTeaModel(t *testing.T) {
+	t.Parallel()
 
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expectedTitle, tt.ee.Title())
-			assert.Equal(t, tt.expectedDesc, tt.ee.Description())
-		})
+	// Given one extension is available to browse
+	ios, _, _, _ := iostreams.Test()
+	cfg := config.NewMockConfig()
+	cfg.AuthenticationFunc = func() gh.AuthConfig {
+		authCfg := &config.AuthConfig{}
+		authCfg.SetDefaultHost("github.com", "")
+		return authCfg
 	}
+	searcher := &search.SearcherMock{
+		RepositoriesFunc: func(search.Query) (search.RepositoriesResult, error) {
+			return search.RepositoriesResult{
+				Items: []search.Repository{
+					{
+						Name:        "gh-cool",
+						FullName:    "cli/gh-cool",
+						Description: "terminal tools",
+						Owner:       search.User{Login: "cli"},
+					},
+				},
+			}, nil
+		},
+	}
+	manager := &extensions.ExtensionManagerMock{
+		ListFunc: func() []extensions.Extension {
+			return nil
+		},
+	}
+	var ranModel *browseModel
+
+	// When the extension browser starts
+	err := ExtBrowse(ExtBrowseOpts{
+		IO:       ios,
+		Searcher: searcher,
+		Em:       manager,
+		Client:   http.DefaultClient,
+		Cfg:      cfg,
+		runProgram: func(model tea.Model, _ ...tea.ProgramOption) error {
+			var ok bool
+			ranModel, ok = model.(*browseModel)
+			require.True(t, ok, "expected ExtBrowse to run a Bubble Tea browse model")
+			return nil
+		},
+	})
+
+	// Then the Bubble Tea model contains the loaded extension
+	require.NoError(t, err)
+	require.NotNil(t, ranModel)
+	selected, ok := ranModel.selectedEntry()
+	require.True(t, ok, "expected the available extension to be selected")
+	assert.Equal(t, "cli/gh-cool", selected.FullName)
 }
 
-func Test_extList(t *testing.T) {
-	opts := ExtBrowseOpts{
-		Logger: log.New(io.Discard, "", 0),
-		Em: &extensions.ExtensionManagerMock{
-			InstallFunc: func(repo ghrepo.Interface, _ string) error {
-				assert.Equal(t, "cli/gh-cool", ghrepo.FullName(repo))
-				return nil
-			},
-			RemoveFunc: func(name string) error {
-				assert.Equal(t, "cool", name)
-				return nil
-			},
-		},
-	}
-	cmdFlex := tview.NewFlex()
-	app := tview.NewApplication()
-	list := tview.NewList()
-	pages := tview.NewPages()
-	ui := uiRegistry{
-		List:    list,
-		App:     app,
-		CmdFlex: cmdFlex,
-		Pages:   pages,
-	}
-	extEntries := []extEntry{
-		{
-			Name:        "gh-cool",
-			FullName:    "cli/gh-cool",
-			Installed:   false,
-			Official:    true,
-			description: "it's just cool ok",
-		},
-		{
-			Name:        "gh-screensaver",
-			FullName:    "vilmibm/gh-screensaver",
-			Installed:   true,
-			Official:    false,
-			description: "animations in your terminal",
-		},
-		{
-			Name:        "gh-triage",
-			FullName:    "samcoe/gh-triage",
-			Installed:   false,
-			Official:    false,
-			description: "help with triage",
-		},
-		{
-			Name:        "gh-gei",
-			FullName:    "github/gh-gei",
-			Installed:   true,
-			Official:    true,
-			description: "something something enterprise",
-		},
-	}
+func TestExtensionDescriptionFallback(t *testing.T) {
+	t.Parallel()
 
-	extList := newExtList(opts, ui, extEntries)
+	// Given an extension has no repository description
+	entry := extEntry{FullName: "octo/gh-example"}
 
-	extList.QueueUpdateDraw = func(f func()) *tview.Application {
-		f()
-		return app
-	}
+	// When its display description is requested
+	description := entry.Description()
 
-	extList.WaitGroup = &sync.WaitGroup{}
-
-	extList.Filter("cool")
-	assert.Equal(t, 1, extList.ui.List.GetItemCount())
-
-	title, _ := extList.ui.List.GetItemText(0)
-	assert.Equal(t, "cli/gh-cool [yellow](official)", title)
-
-	extList.InstallSelected()
-	assert.True(t, extList.extEntries[0].Installed)
-
-	// so I think the goroutines are causing a later failure because the toggleInstalled isn't seen.
-
-	extList.Refresh()
-	assert.Equal(t, 1, extList.ui.List.GetItemCount())
-
-	title, _ = extList.ui.List.GetItemText(0)
-	assert.Equal(t, "cli/gh-cool [yellow](official) [green](installed)", title)
-
-	extList.RemoveSelected()
-	assert.False(t, extList.extEntries[0].Installed)
-
-	extList.Refresh()
-	assert.Equal(t, 1, extList.ui.List.GetItemCount())
-
-	title, _ = extList.ui.List.GetItemText(0)
-	assert.Equal(t, "cli/gh-cool [yellow](official)", title)
-
-	extList.Reset()
-	assert.Equal(t, 4, extList.ui.List.GetItemCount())
-
-	ee, ix := extList.FindSelected()
-	assert.Equal(t, 0, ix)
-	assert.Equal(t, "cli/gh-cool [yellow](official)", ee.Title())
-
-	extList.ScrollDown()
-	ee, ix = extList.FindSelected()
-	assert.Equal(t, 1, ix)
-	assert.Equal(t, "vilmibm/gh-screensaver [green](installed)", ee.Title())
-
-	extList.ScrollUp()
-	ee, ix = extList.FindSelected()
-	assert.Equal(t, 0, ix)
-	assert.Equal(t, "cli/gh-cool [yellow](official)", ee.Title())
-
-	extList.PageDown()
-	ee, ix = extList.FindSelected()
-	assert.Equal(t, 3, ix)
-	assert.Equal(t, "github/gh-gei [yellow](official) [green](installed)", ee.Title())
-
-	extList.PageUp()
-	ee, ix = extList.FindSelected()
-	assert.Equal(t, 0, ix)
-	assert.Equal(t, "cli/gh-cool [yellow](official)", ee.Title())
+	// Then a concrete fallback is returned
+	assert.Equal(t, "no description provided", description)
 }

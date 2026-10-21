@@ -74,8 +74,8 @@ GO_DIRECTIVE_VERSION="$(cut -d. -f1-2 <<< "$TOOLCHAIN_VERSION").0"
 echo "  → go directive : $GO_DIRECTIVE_VERSION"
 echo "  → toolchain    : go$TOOLCHAIN_VERSION"
 
-# Keep regular CI reproducibly pinned to the linter release used to validate
-# this bump.
+# Keep regular CI reproducibly pinned to the installed linter release, which
+# PR CI then uses to validate this bump.
 LINTER_VERSION=$(golangci-lint version --short)
 if [[ ! "$LINTER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Error: unexpected golangci-lint version '$LINTER_VERSION'" >&2
@@ -140,8 +140,10 @@ go mod edit -go="$GO_DIRECTIVE_VERSION" -toolchain="go$TOOLCHAIN_VERSION" "$GO_M
 echo "  • set go directive → $GO_DIRECTIVE_VERSION"
 echo "  • set toolchain    → go$TOOLCHAIN_VERSION"
 
-# Reconcile the module, apply source migrations, and verify the result before
-# creating a pull request.
+# Reconcile the module and apply source migrations. This script only generates
+# changes: tests, lint, and govulncheck are intentionally left to PR CI so that
+# a failure (such as a dependency advisory a Go bump cannot fix) does not block
+# the PR from opening. Maintainers can instead push fixes onto the bump PR.
 echo "  • running go mod tidy..."
 pushd "$MODULE_DIR" > /dev/null
 go mod tidy
@@ -165,16 +167,6 @@ else
 fi
 echo "  • running go fix..."
 go fix ./...
-status=0
-echo "  • running tests..."
-go test ./... || status=$?
-echo "  • running golangci-lint..."
-golangci-lint run ./... || status=$?
-echo "  • running govulncheck..."
-go run "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION" ./... || status=$?
-if [[ $status -ne 0 ]]; then
-  exit "$status"
-fi
 popd > /dev/null
 
 # ---- Check if anything actually changed -------------------------------------

@@ -142,6 +142,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				BodyDir: filepath.Dir(tmpFile),
 			},
 			wantsErr: false,
 		},
@@ -409,6 +410,7 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.Equal(t, tt.output.SelectorArg, gotOpts.SelectorArg)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.Editable, gotOpts.Editable)
+			assert.Equal(t, tt.output.BodyDir, gotOpts.BodyDir)
 
 			var assetPaths []string
 			for _, a := range gotOpts.Assets {
@@ -1315,6 +1317,32 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdateWithBody(t, reg, "![shot](https://example.com/1)")
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
+			name: "attaching rewrites a reference relative to the body file",
+			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL:        "https://github.com/OWNER/REPO/pull/123",
+					Body:       "the original body",
+					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive: false,
+				Body: shared.EditableString{
+					Value:  "the plan ![diagram](./diagram.png)",
+					Edited: true,
+				},
+				BodyDir: "docs",
+				Fetcher: testFetcher{},
+			},
+			attach:  []string{"docs/diagram.png"},
+			uploads: []attachments.UploadStub{{Name: "diagram.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockPullRequestUpdateWithBody(t, reg, "the plan ![diagram](https://example.com/1)")
+			},
+			stdout:         "https://github.com/OWNER/REPO/pull/123\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name: "attaching does not double what the editor already carried",

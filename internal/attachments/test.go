@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -19,7 +20,7 @@ import (
 //
 // It writes each name into a temporary directory and changes the working
 // directory to it for the rest of the test, so the names are relative paths
-// that resolve.
+// that resolve. A name may include directories, which are created.
 func NewTestAssets(t *testing.T, names ...string) []UserAsset {
 	t.Helper()
 
@@ -27,6 +28,7 @@ func NewTestAssets(t *testing.T, names ...string) []UserAsset {
 
 	argv := make([]string, 0, len(names)*2)
 	for _, name := range names {
+		require.NoError(t, os.MkdirAll(filepath.Dir(name), 0o755))
 		require.NoError(t, os.WriteFile(name, []byte("the bytes"), 0o600))
 		argv = append(argv, "--attach", "./"+name)
 	}
