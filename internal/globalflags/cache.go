@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/cli/cli/v2/internal/atomicfile"
 	"github.com/cli/cli/v2/internal/flock"
 )
 
@@ -147,7 +148,7 @@ func writeRefreshState(path string, state refreshState) error {
 	if err != nil {
 		return fmt.Errorf("encode global flag refresh state: %w", err)
 	}
-	if err := writeAtomic(path, data); err != nil {
+	if err := atomicfile.Write(path, data); err != nil {
 		return fmt.Errorf("write global flag refresh state: %w", err)
 	}
 	return nil
@@ -227,24 +228,8 @@ func writeCache(path, endpoint string, values map[string]bool) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("create global flag cache directory: %w", err)
 	}
-	return writeAtomic(path, data)
-}
-
-func writeAtomic(path string, data []byte) error {
-	file, err := os.CreateTemp(filepath.Dir(path), ".global-flags-*")
-	if err != nil {
-		return fmt.Errorf("create temporary file: %w", err)
-	}
-	defer os.Remove(file.Name())
-	if _, err := file.Write(data); err != nil {
-		file.Close()
-		return fmt.Errorf("write temporary file: %w", err)
-	}
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("close temporary file: %w", err)
-	}
-	if err := os.Rename(file.Name(), path); err != nil {
-		return fmt.Errorf("replace file: %w", err)
+	if err := atomicfile.Write(path, data); err != nil {
+		return fmt.Errorf("write global flag cache: %w", err)
 	}
 	return nil
 }
