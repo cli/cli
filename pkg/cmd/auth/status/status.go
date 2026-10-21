@@ -23,9 +23,10 @@ import (
 type authEntryState string
 
 const (
-	authEntryStateSuccess = "success"
-	authEntryStateTimeout = "timeout"
-	authEntryStateError   = "error"
+	authEntryStateSuccess        = "success"
+	authEntryStateTimeout        = "timeout"
+	authEntryStateError          = "error"
+	authEntryStateRefreshExpired = "refresh_expired"
 )
 
 type authEntry struct {
@@ -128,6 +129,18 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		}
 		activeStr := fmt.Sprintf("%v", e.Active)
 		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+
+	case authEntryStateRefreshExpired:
+		if e.Login != "" {
+			sb.WriteString(fmt.Sprintf("  %s Refresh token for %s account %s was rejected\n", cs.Red("X"), e.Host, cs.Bold(e.Login)))
+		} else {
+			sb.WriteString(fmt.Sprintf("  %s Refresh token for %s was rejected\n", cs.Red("X"), e.Host))
+		}
+		activeStr := fmt.Sprintf("%v", e.Active)
+		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+		sb.WriteString("  - The stored short-lived credential was removed because its refresh token is no longer valid.\n")
+		loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
+		sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
 	}
 
 	return sb.String()
@@ -411,6 +424,16 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 		TokenExpiresAt:        opts.credential.ExpiresAt,
 		RefreshTokenExpiresAt: opts.credential.RefreshTokenExpiresAt,
 		justRefreshed:         opts.refreshStatus == gh.RefreshStatusDone,
+	}
+
+	// A rejected refresh token means the stored credential was already removed during resolution, leaving an empty
+	// token behind. Sending a scope request with it would produce a misleading generic failure, so surface the real
+	// reason and stop here. The token source is left empty on purpose: the credential is gone, so where it used to
+	// live is of no use to the user now.
+	if opts.refreshStatus == gh.RefreshStatusExpired {
+		entry.State = authEntryStateRefreshExpired
+		entry.Error = fmt.Sprintf("refresh token for %s was rejected; the stored credential was removed", opts.hostname)
+		return entry
 	}
 
 	// If token is not writeable, then it came from an environment variable and

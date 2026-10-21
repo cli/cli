@@ -13,6 +13,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/cli/cli/v2/pkg/auth"
 	o "github.com/cli/cli/v2/pkg/option"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
@@ -136,21 +137,24 @@ var TokenTypes = []TokenType{
 }
 
 // RefreshStatus describes the outcome of attempting to refresh an authentication token.
-type RefreshStatus string
+//
+// It is an alias for auth.RefreshStatus so the type is identical to the one gh exposes through the public auth package,
+// while existing gh.RefreshStatus references keep compiling.
+type RefreshStatus = auth.RefreshStatus
 
 const (
 	// RefreshStatusDone indicates that the token was refreshed.
-	RefreshStatusDone RefreshStatus = "refresh-done"
+	RefreshStatusDone = auth.RefreshStatusDone
 	// RefreshStatusInapplicable indicates that the token cannot be refreshed.
-	RefreshStatusInapplicable RefreshStatus = "refresh-inapplicable"
+	RefreshStatusInapplicable = auth.RefreshStatusInapplicable
 	// RefreshStatusFailed indicates that the token refresh failed for a transient reason, such as a network or
 	// storage error, so a later retry may succeed.
-	RefreshStatusFailed RefreshStatus = "refresh-failed"
+	RefreshStatusFailed = auth.RefreshStatusFailed
 	// RefreshStatusExpired indicates that the refresh token itself was rejected by the server, so refreshing cannot
 	// succeed and the user must re-authenticate.
-	RefreshStatusExpired RefreshStatus = "refresh-expired"
+	RefreshStatusExpired = auth.RefreshStatusExpired
 	// RefreshStatusUnnecessary indicates that the token does not need to be refreshed.
-	RefreshStatusUnnecessary RefreshStatus = "refresh-unnecessary"
+	RefreshStatusUnnecessary = auth.RefreshStatusUnnecessary
 )
 
 // RefreshableCredential is an OAuth token pair that gh can renew, together with the expiration metadata returned by its
@@ -172,27 +176,10 @@ type RefreshableCredential struct {
 // refresh metadata. It is a single universal shape so a caller can inspect a resolved token without needing to know in
 // advance whether it is refreshable: Token and Source are always meaningful, while the refresh fields are zero for a
 // non-refreshable token.
-type Credential struct {
-	// Source identifies where the token came from, such as an environment variable, the config file, or the keyring.
-	Source string
-	// Token is the token gh would present to the API. For a refreshable credential it is the current access token.
-	Token string
-	// RefreshToken is the OAuth refresh token, set only for a refreshable credential.
-	RefreshToken string
-	// ExpiresIn is the access token lifetime in seconds as reported by the issuer, or zero when unknown.
-	ExpiresIn int
-	// RefreshTokenExpiresIn is the refresh token lifetime in seconds as reported by the issuer, or zero when unknown.
-	RefreshTokenExpiresIn int
-	// ExpiresAt is the absolute access token expiry, or nil when unknown or non-expiring.
-	ExpiresAt *time.Time
-	// RefreshTokenExpiresAt is the absolute refresh token expiry, or nil when unknown or non-expiring.
-	RefreshTokenExpiresAt *time.Time
-}
-
-// IsRefreshable reports whether the credential carries a refresh token and can therefore be renewed by gh.
-func (c Credential) IsRefreshable() bool {
-	return c.RefreshToken != ""
-}
+//
+// It is an alias for auth.Credential so the type is identical to the one gh exposes through the public auth package,
+// while existing gh.Credential references keep compiling.
+type Credential = auth.Credential
 
 // Token source values name the origins that gh itself records in a Credential's Source. Tokens supplied through
 // environment variables are labeled dynamically by go-gh (for example GH_TOKEN) and are intentionally not enumerated

@@ -48,42 +48,47 @@ func flockRefreshLock(ctx context.Context, path string) (unlock func(), err erro
 	return unlock, err
 }
 
-// withFreshConfigForRefresh runs fn, a token-refresh read-modify-write, while holding both an in-process mutex and a
-// cross-process advisory lock, and reloads the configuration from disk before running fn so it observes any credential
-// another process persisted. The mutex serializes goroutines sharing this AuthConfig; the file lock serializes
-// separate gh processes. Together they prevent concurrent refreshes from each spending a rotating refresh token based
-// on stale state. fn runs with both locks held and should perform the credential read, token exchange, and write as
-// one unit.
+// withFreshConfigForRefresh runs fn, a credential-store read-modify-write (a token refresh, or a logout that must not
+// race one), while holding both an in-process mutex and a cross-process advisory lock, and reloads the configuration
+// from disk before running fn so it observes any credential another process persisted. The mutex serializes goroutines
+// sharing this AuthConfig; the file lock serializes separate gh processes. Together they prevent concurrent refreshes
+// from each spending a rotating refresh token based on stale state, and ensure logout cannot be overwritten by a
+// refresh that finishes after it. fn runs with both locks held and should perform the credential read and write as one
+// unit.
 //
-// The file lock is best effort: if it cannot be acquired (for example on a filesystem without advisory locking, or if
-// another process holds it past refreshLockTimeout), fn still runs so a filesystem limitation never blocks the user.
+// The file lock is best effort: fn still runs so a filesystem limitation never blocks the user. This tolerates both
+// being unable to create the config directory that holds the lock file (for example a read-only mount) and being
+// unable to acquire the lock itself (a filesystem without advisory locking, or another process holding it past
+// refreshLockTimeout). fn receives lockHeld reporting whether the cross-process lock was actually acquired, so it can
+// skip destructive cleanup that is only safe when peers are serialized; see refreshCredentialForUser for why cleanup
+// is gated on it.
 //
 // The reload refreshes the shared configuration in place, so any config changes not yet written to disk are discarded.
 // That is acceptable on the refresh path because mutations are persisted as they happen.
-func (c *AuthConfig) withFreshConfigForRefresh(fn func() error) error {
+func (c *AuthConfig) withFreshConfigForRefresh(fn func(lockHeld bool) error) error {
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
+	// Best-effort cross-process lock; see the godoc. We proceed without it rather than fail the user's refresh when
+	// the config directory cannot be created or the lock cannot be acquired. lockHeld then tells fn to skip cleanup
+	// that is unsafe without serialized peers. The residual risk without the lock is two processes refreshing at once
+	// and spending a rotating token twice.
+	var lockHeld bool
+	unlock := func() {}
 	dir := ghConfig.ConfigDir()
-	if err := os.MkdirAll(dir, 0771); err != nil {
-		return fmt.Errorf("could not create config directory for the refresh lock: %w", err)
-	}
+	if err := os.MkdirAll(dir, 0771); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), refreshLockTimeout)
+		defer cancel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), refreshLockTimeout)
-	defer cancel()
+		acquire := c.acquireRefreshLock
+		if acquire == nil {
+			acquire = flockRefreshLock
+		}
 
-	acquire := c.acquireRefreshLock
-	if acquire == nil {
-		acquire = flockRefreshLock
-	}
-
-	unlock, err := acquire(ctx, filepath.Join(dir, refreshLockFile))
-	if err != nil {
-		// We could not acquire the cross-process lock, either because the filesystem does not support advisory
-		// locking (some network or FUSE mounts) or because another process held it past refreshLockTimeout. We
-		// deliberately ignore the error and proceed rather than fail the user's command over a filesystem
-		// limitation. The residual risk is two processes refreshing at once and spending a rotating token twice.
-		unlock = func() {}
+		if u, err := acquire(ctx, filepath.Join(dir, refreshLockFile)); err == nil {
+			unlock = u
+			lockHeld = true
+		}
 	}
 	defer unlock()
 
@@ -91,7 +96,7 @@ func (c *AuthConfig) withFreshConfigForRefresh(fn func() error) error {
 		return fmt.Errorf("could not reload configuration: %w", err)
 	}
 
-	return fn()
+	return fn(lockHeld)
 }
 
 // reload re-reads the config from disk into the shared config, using the reloadConfig seam when set and the real
@@ -111,7 +116,7 @@ func (c *AuthConfig) reload() error {
 // concurrent configuration read-modify-write in another gh process.
 func (c *AuthConfig) LoginRefreshable(hostname, username string, credential gh.Credential, gitProtocol string, secureStorage bool) (bool, error) {
 	var insecureStorageUsed bool
-	err := c.withFreshConfigForRefresh(func() error {
+	err := c.withFreshConfigForRefresh(func(lockHeld bool) error {
 		var err error
 		insecureStorageUsed, err = c.loginRefreshable(hostname, username, credential, gitProtocol, secureStorage)
 		return err
@@ -147,6 +152,26 @@ func (c *AuthConfig) loginRefreshable(hostname, username string, credential gh.C
 	_ = keyring.Delete(keyringServiceName(hostname), username)
 
 	return insecureStorageUsed, c.completeLogin(hostname, username, gitProtocol)
+}
+
+// purgeRefreshableForLogin removes any refreshable credential for the user during a non-refreshable login so the two
+// credential forms cannot coexist. A surviving refreshable record outranks the freshly stored token during
+// activation, so a removal that silently failed would let login report success while the old credential stays active.
+//
+// Rather than infer success from the delete error (which an OS keyring reports inconsistently), it verifies the
+// post-condition by re-reading. Surfacing must not break environments without a working keyring, where a delete
+// reports the keyring is unavailable even though nothing is stored: an unavailable keyring resolves to
+// errRefreshableNotFound here, so the check stays silent exactly where a delete error would be spurious. Only a record
+// that genuinely survives removal resolves without error and is surfaced.
+func (c *AuthConfig) purgeRefreshableForLogin(hostname, username string) error {
+	// Best-effort removal in both stores, matching loginRefreshable's symmetric cleanup.
+	_ = c.cfg.Remove(refreshablePath(hostname, username))
+	_ = keyring.Delete(refreshableServiceName(hostname), username)
+
+	if _, _, err := c.refreshableForUser(hostname, username); err == nil {
+		return errors.New("could not remove the existing refreshable credential, which would shadow this login")
+	}
+	return nil
 }
 
 // refreshableForUser returns the refreshable credential stored for the user along with whether it came from secure
@@ -379,7 +404,7 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 
 	result := credential
 	status := gh.RefreshStatusFailed
-	err := c.withFreshConfigForRefresh(func() error {
+	err := c.withFreshConfigForRefresh(func(lockHeld bool) error {
 		// Re-read under the lock: another gh process may have refreshed the credential while we waited for it.
 		current, secure, err := c.refreshableForUser(hostname, username)
 		if err != nil {
@@ -393,11 +418,13 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 		if refreshTokenExpired(current, timeNow()) {
 			// TESTING-ONLY HACK: simulate the server rejecting an expired refresh token so refresh token expiry can
 			// be exercised without waiting for the real lifetime. This mirrors the ErrRefreshTokenInvalid handling
-			// below: wipe the now-useless stored credential and report RefreshStatusExpired. Remove before release,
-			// together with refreshTokenExpired.
+			// below, including gating the destructive cleanup on lockHeld. Remove before release, together with
+			// refreshTokenExpired.
 			result = gh.Credential{}
 			status = gh.RefreshStatusExpired
-			_ = c.removeCredentialForUser(hostname, username)
+			if lockHeld {
+				_ = c.removeCredentialForUser(hostname, username)
+			}
 			return gh.ErrRefreshTokenInvalid
 		}
 		renewed, err := c.refresher.Refresh(current.RefreshToken, hostname)
@@ -420,10 +447,17 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 				// dangerous behaviour. Leaving a dangling active user with no token is a deliberately broken state:
 				// gh treats it as unauthenticated and the user must run 'gh auth login' again before using gh.
 				//
-				// Removal is best effort. Even if it fails we still report the rejection so the caller can classify
-				// it, and we return an empty credential because the stored one is gone.
+				// The removal only runs when the cross-process lock was held. Without the lock a rejection is
+				// ambiguous: a peer may have already spent this same single-use refresh token and be about to
+				// persist the replacement. Deleting here could race that peer and discard its valid credential,
+				// forcing a needless re-authentication. When the lock is unavailable we therefore leave storage
+				// untouched and let the peer's write stand, while still reporting the rejection so the caller can
+				// advise re-authentication. Removal is best effort even when attempted: a failure does not change
+				// the reported status, and we return an empty credential because the stored one is being discarded.
 				result = gh.Credential{}
-				_ = c.removeCredentialForUser(hostname, username)
+				if lockHeld {
+					_ = c.removeCredentialForUser(hostname, username)
+				}
 			}
 			return err
 		}

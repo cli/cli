@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
+	"github.com/cli/cli/v2/internal/keyring"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
@@ -344,6 +345,17 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			wantErr:    true,
 			wantErrMsg: "no oauth token found for ghe.io account test-user",
 		},
+		{
+			// Regression guard: with --user omitted but an active user recorded, the non-refreshable keyring
+			// fallback must read the legacy unkeyed slot (keyed on the empty flag value), not the active user's
+			// per-user slot. See the deleted per-user slot below.
+			name: "state 3: legacy unkeyed keyring token is returned when --user is omitted",
+			opts: TokenOptions{},
+			cfgStubs: func(t *testing.T, cfg gh.Config) {
+				setupLegacyUnkeyedKeyringState(t, cfg)
+			},
+			wantStdout: "gho_LEGACY\n",
+		},
 
 		// State 4: --secure-storage with --no-refresh (rare; return only keyring-sourced tokens).
 		{
@@ -405,6 +417,16 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			},
 			wantStdout: "gho_ABCDEFG\n",
 		},
+		{
+			// Regression guard, as in state 3 but with --no-refresh: the keyring fallback must key on the flag
+			// value, so an omitted --user reads the legacy unkeyed slot rather than the active user's per-user slot.
+			name: "state 4: legacy unkeyed keyring token is returned when --user is omitted",
+			opts: TokenOptions{NoRefresh: true},
+			cfgStubs: func(t *testing.T, cfg gh.Config) {
+				setupLegacyUnkeyedKeyringState(t, cfg)
+			},
+			wantStdout: "gho_LEGACY\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -444,6 +466,17 @@ func login(t *testing.T, c gh.Config, hostname, username, token, gitProtocol str
 	t.Helper()
 	_, err := c.Authentication().Login(hostname, username, token, gitProtocol, secureStorage)
 	require.NoError(t, err)
+}
+
+// setupLegacyUnkeyedKeyringState recreates the state a very old gh install leaves behind: an active user is recorded
+// for github.com, but the only keyring token lives in the legacy unkeyed slot rather than a per-user slot. It logs in
+// to record the active user, deletes the per-user keyring slot that login writes, and sets the unkeyed slot. The
+// keyring service name mirrors config.keyringServiceName, which is unexported.
+func setupLegacyUnkeyedKeyringState(t *testing.T, c gh.Config) {
+	t.Helper()
+	login(t, c, "github.com", "test-user", "gho_PERUSER", "https", true)
+	require.NoError(t, keyring.Delete("gh:github.com", "test-user"))
+	require.NoError(t, keyring.Set("gh:github.com", "", "gho_LEGACY"))
 }
 
 func loginRefreshable(t *testing.T, c gh.Config, hostname, username, accessToken, refreshToken string, secureStorage bool) {

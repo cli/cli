@@ -183,8 +183,19 @@ func refreshRun(opts *RefreshOptions) error {
 	additionalScopes := set.NewStringSet()
 
 	if !opts.ResetScopes {
-		if oldToken := authCfg.ActiveToken(hostname).Token; oldToken != "" {
-			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken); err == nil {
+		// Carry the current token's scopes into the refreshed credential so a refresh never silently narrows them.
+		// GetScopes reads the scopes from a live API call, which needs a valid token, and a refreshable access token
+		// may already be expired here. Use ActiveTokenWithRefresh so an expiring one is renewed first; calling
+		// GetScopes with an expired token would 401 and drop the scopes. Every failure below is non-fatal: we warn and
+		// continue without carrying scopes forward, leaving the user to re-request any they still need. Cases:
+		//   - Non-refreshable or still-valid token: returned unchanged with no network call, so this stays a plain read.
+		//   - Refresh token rejected (expired or revoked): the dead credential is cleared and we proceed to re-auth,
+		//     which re-establishes the credential from scratch.
+		//   - Transient refresh failure or no refresher configured: the token stays as-is and GetScopes may fail.
+		var scopesPreserved bool
+		if oldCredential, _, err := authCfg.ActiveTokenWithRefresh(hostname); err == nil && oldCredential.Token != "" {
+			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldCredential.Token); err == nil {
+				scopesPreserved = true
 				for s := range strings.SplitSeq(oldScopes, ",") {
 					s = strings.TrimSpace(s)
 					if s != "" {
@@ -192,6 +203,9 @@ func refreshRun(opts *RefreshOptions) error {
 					}
 				}
 			}
+		}
+		if !scopesPreserved {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Could not read the current token's scopes, so the refreshed token may not retain them. Re-add any you still need with --scopes.\n", cs.WarningIcon())
 		}
 	}
 
@@ -239,13 +253,13 @@ func refreshRun(opts *RefreshOptions) error {
 
 	// Short-lived tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
 	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
+	// The wasRefreshable downgrade is intentionally not reported here: it is already warned about up front (before the
+	// browser prompt) so the user can abort, and repeating it after completion is redundant.
 	switch {
 	case result.Refreshable != nil && !opts.ShortLived:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues short-lived refreshable token\n", cs.WarningIcon())
 	case result.Refreshable != nil:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Received short-lived refreshable token\n", cs.SuccessIcon())
-	case wasRefreshable && !opts.ShortLived:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Original token was short-lived; pass --short-lived to preserve it\n", cs.WarningIcon())
 	case opts.ShortLived:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue a short-lived refreshable token\n", cs.WarningIcon())
 	}

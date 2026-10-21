@@ -1,9 +1,12 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -166,17 +169,18 @@ func TestTokenForUserResolution(t *testing.T) {
 			wantSource: "keyring",
 		},
 		{
-			// This state should not occur in practice: logging in with a refreshable token deletes or replaces any
-			// non-refreshable user and host tokens for that account. The case documents the resolution precedence
-			// regardless, so a stale non-expiring token still wins if one is ever present.
-			name: "prefers non-expiring token over refreshable",
+			// This state should not occur in practice: logging in with a non-refreshable token deletes any
+			// refreshable record for that account, and logging in with a refreshable token deletes the non-expiring
+			// tokens. The case documents the resolution precedence regardless: the managed refreshable credential
+			// wins, matching setActiveCredential so activation and resolution never disagree.
+			name: "prefers refreshable over non-expiring token",
 			setup: func(t *testing.T, authCfg *AuthConfig) {
 				authCfg.cfg.Set([]string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey}, "plain-token")
 				setRefreshableConfigField(t, authCfg, "github.com", "test-user", "access_token", "access")
 				setRefreshableConfigField(t, authCfg, "github.com", "test-user", "refresh_token", "refresh")
 			},
-			wantToken:  "plain-token",
-			wantSource: "oauth_token",
+			wantToken:  "access",
+			wantSource: "refreshable_oauth_token",
 		},
 	}
 	for _, tt := range tests {
@@ -347,6 +351,134 @@ func TestLogoutRemovesAllUserCredentialRecords(t *testing.T) {
 	require.Empty(t, authCfg.UsersForHost("github.com"))
 }
 
+func TestLogoutAcquiresRefreshLock(t *testing.T) {
+	// Logout must run under the same lock the refresh path uses so it wins any race with an in-flight refresh. Pin
+	// that it acquires and releases the shared refresh lock; without the fix Logout mutates the config without ever
+	// touching the lock and this fails.
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "gho_token", "https", false)
+	require.NoError(t, err)
+
+	var locked, unlocked bool
+	authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+		locked = true
+		return func() { unlocked = true }, nil
+	}
+
+	require.NoError(t, authCfg.Logout("github.com", "test-user"))
+	require.True(t, locked, "logout must acquire the shared refresh lock")
+	require.True(t, unlocked, "logout must release the shared refresh lock")
+}
+
+func TestLogoutReloadsFreshConfigBeforeRemovingCredentials(t *testing.T) {
+	// A concurrent refresh can persist a rotated credential while logout is in flight. Because logout reloads the
+	// freshest config under the lock before deleting, it sees and removes whatever the refresh just wrote. Pin that
+	// reload happens, and that it happens before the deletion, so logout never leaves a freshly persisted credential
+	// behind. Without the fix Logout never reloads and this fails.
+	authCfg := newTestAuthConfig(t)
+	setRefreshableConfigField(t, authCfg, "github.com", "test-user", "access_token", "access")
+	setRefreshableConfigField(t, authCfg, "github.com", "test-user", "refresh_token", "refresh")
+	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "test-user")
+
+	reloaded := false
+	authCfg.reloadConfig = func() error {
+		reloaded = true
+		// Reload runs under the lock before any deletion, so the credential is still present at this point.
+		_, err := authCfg.cfg.Get(append(refreshablePath("github.com", "test-user"), "access_token"))
+		require.NoError(t, err, "reload must run before logout removes the credential")
+		return nil
+	}
+
+	require.NoError(t, authCfg.Logout("github.com", "test-user"))
+	require.True(t, reloaded, "logout must reload the config under the refresh lock")
+
+	_, err := authCfg.cfg.Get([]string{hostsKey, "github.com"})
+	require.Error(t, err)
+	require.Empty(t, authCfg.UsersForHost("github.com"))
+}
+
+func TestLoginAcquiresRefreshLock(t *testing.T) {
+	// Login must run under the same lock the refresh path uses so it serializes against an in-flight refresh and wins
+	// either ordering. Pin that it acquires and releases the shared refresh lock; without the fix Login mutates the
+	// config without ever touching the lock and this fails.
+	authCfg := newTestAuthConfig(t)
+
+	var locked, unlocked bool
+	authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+		locked = true
+		return func() { unlocked = true }, nil
+	}
+
+	_, err := authCfg.Login("github.com", "test-user", "gho_token", "https", false)
+	require.NoError(t, err)
+	require.True(t, locked, "login must acquire the shared refresh lock")
+	require.True(t, unlocked, "login must release the shared refresh lock")
+}
+
+func TestLoginProceedsWhenRefreshLockCannotBeAcquired(t *testing.T) {
+	// The cross-process lock is best effort: a filesystem without advisory locking (or a peer holding the lock past
+	// the timeout) must not block an otherwise valid login. When acquisition fails the helper reports lockHeld=false
+	// and still runs the body, so login proceeds and stores the credential. Without that, login would be unusable
+	// wherever flock is unavailable.
+	authCfg := newTestAuthConfig(t)
+
+	var released bool
+	authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+		return func() { released = true }, errors.New("advisory locking unavailable")
+	}
+
+	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "gho_token", "https", false)
+	require.NoError(t, err)
+	require.True(t, insecureStorageUsed)
+	require.False(t, released, "no release func should run when the lock was never acquired")
+
+	token, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey})
+	require.NoError(t, err)
+	require.Equal(t, "gho_token", token)
+}
+
+func TestLoginReloadsFreshConfigBeforeMutating(t *testing.T) {
+	// A concurrent refresh can persist a rotated credential while login is in flight. Because login reloads the
+	// freshest config under the lock before it stores the new credential and purges the refreshable record, it sees
+	// and supersedes whatever the refresh just wrote. Pin that reload happens, and that it happens before the
+	// mutation, so login wins the race. Without the wrap Login never reloads and this fails.
+	authCfg := newTestAuthConfig(t)
+
+	reloaded := false
+	authCfg.reloadConfig = func() error {
+		reloaded = true
+		// Reload runs under the lock before any mutation, so the user's token slot is still empty at this point.
+		_, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey})
+		require.Error(t, err, "reload must run before login stores the credential")
+		return nil
+	}
+
+	_, err := authCfg.Login("github.com", "test-user", "gho_token", "https", false)
+	require.NoError(t, err)
+	require.True(t, reloaded, "login must reload the config under the refresh lock")
+
+	token, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey})
+	require.NoError(t, err)
+	require.Equal(t, "gho_token", token)
+}
+
+func TestLoginSucceedsWhenKeyringUnavailable(t *testing.T) {
+	// The refreshable-record purge is best effort against capability loss: an unavailable keyring must not fail an
+	// otherwise valid insecure login. refreshableFromKeyring collapses an unavailable keyring to "not found", so the
+	// purge's post-condition check resolves no surviving record and login stays silent. Without that, surfacing the
+	// keyring delete error would break login wherever the keyring is absent.
+	authCfg := newTestAuthConfig(t)
+	keyring.MockInitWithError(errors.New("keyring is unavailable"))
+
+	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "gho_token", "https", false)
+	require.NoError(t, err)
+	require.True(t, insecureStorageUsed)
+
+	token, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey})
+	require.NoError(t, err)
+	require.Equal(t, "gho_token", token)
+}
+
 func TestSwitchUserActivatesRefreshableCredential(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", false)
@@ -468,6 +600,39 @@ func TestLoginRefreshablePurgesNonExpiringLogin(t *testing.T) {
 	require.Equal(t, "access", cred.Token)
 }
 
+// TestLoginPurgesRefreshableRecord is the inverse of TestLoginRefreshablePurgesNonExpiringLogin: logging in with a
+// non-refreshable token must remove the user's refreshable record so the two kinds never coexist. The regression it
+// guards (cli/cli#14451 review): a leftover refreshable record short-circuits activateUser, so the new token is never
+// copied into the host-level oauth_token slot and go-gh extensions can no longer read a token.
+func TestLoginPurgesRefreshableRecord(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+
+	// A prior short-lived login stores a refreshable credential in the keyring.
+	credential := gh.Credential{Token: "access", RefreshToken: "refresh"}
+	_, err := authCfg.LoginRefreshable("github.com", "test-user", credential, "ssh", true)
+	require.NoError(t, err)
+
+	// Switching back to a non-refreshable token with insecure storage must purge the refreshable record.
+	_, err = authCfg.Login("github.com", "test-user", "plain-token", "ssh", false)
+	require.NoError(t, err)
+
+	// The refreshable record is gone from both storage forms.
+	_, err = refreshableFromKeyring("github.com", "test-user")
+	require.ErrorIs(t, err, errRefreshableNotFound)
+	requireNoKey(t, authCfg.cfg, refreshablePath("github.com", "test-user"))
+
+	// TokenForUser resolves the new non-refreshable token.
+	cred, err := authCfg.TokenForUser("github.com", "test-user")
+	require.NoError(t, err)
+	require.Equal(t, "plain-token", cred.Token)
+
+	// And it was copied into the host-level oauth_token slot that go-gh reads for extensions, which regressed before
+	// this fix because the stale refreshable record short-circuited activation.
+	hostToken, err := authCfg.cfg.Get([]string{hostsKey, "github.com", oauthTokenKey})
+	require.NoError(t, err)
+	require.Equal(t, "plain-token", hostToken)
+}
+
 func TestWithFreshConfigUnderLockInvokesReloadBeforeFn(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
@@ -477,7 +642,7 @@ func TestWithFreshConfigUnderLockInvokesReloadBeforeFn(t *testing.T) {
 		return nil
 	}
 
-	err := authCfg.withFreshConfigForRefresh(func() error {
+	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
 		order = append(order, "fn")
 		return nil
 	})
@@ -492,7 +657,7 @@ func TestWithFreshConfigUnderLockPropagatesReloadError(t *testing.T) {
 	authCfg.reloadConfig = func() error { return sentinel }
 
 	fnRan := false
-	err := authCfg.withFreshConfigForRefresh(func() error {
+	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
 		fnRan = true
 		return nil
 	})
@@ -505,9 +670,34 @@ func TestWithFreshConfigUnderLockPropagatesError(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 	sentinel := errors.New("boom")
 
-	err := authCfg.withFreshConfigForRefresh(func() error { return sentinel })
+	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error { return sentinel })
 
 	require.ErrorIs(t, err, sentinel)
+}
+
+func TestWithFreshConfigUnderLockProceedsWhenConfigDirCannotBeCreated(t *testing.T) {
+	// If we have reached a refresh, the environment is already set up enough to proceed. A read-only mount (or any
+	// other reason the config directory cannot be created) must not fail the user's command; we degrade to running
+	// without the lock, exactly as when the lock cannot be acquired.
+	authCfg := newTestAuthConfig(t)
+
+	// Point the config dir under a regular file so MkdirAll fails with ENOTDIR regardless of privileges (running as
+	// root would bypass a read-only directory bit, but never a non-directory path component).
+	file := filepath.Join(t.TempDir(), "not-a-dir")
+	require.NoError(t, os.WriteFile(file, nil, 0600))
+	t.Setenv("GH_CONFIG_DIR", filepath.Join(file, "config"))
+
+	ran := false
+	observedLockHeld := true
+	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
+		ran = true
+		observedLockHeld = lockHeld
+		return nil
+	})
+
+	require.NoError(t, err)
+	require.True(t, ran, "fn must still run when the config directory cannot be created")
+	require.False(t, observedLockHeld, "the lock cannot be held when its directory cannot be created")
 }
 
 func TestWithFreshConfigUnderLockSerializesInProcess(t *testing.T) {
@@ -523,7 +713,7 @@ func TestWithFreshConfigUnderLockSerializesInProcess(t *testing.T) {
 
 	for range goroutines {
 		wg.Go(func() {
-			_ = authCfg.withFreshConfigForRefresh(func() error {
+			_ = authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
 				n := active.Add(1)
 				for {
 					m := maxActive.Load()
@@ -670,6 +860,41 @@ func TestActiveTokenWithRefresh(t *testing.T) {
 		require.Equal(t, gh.RefreshStatusInapplicable, status)
 		require.Empty(t, credential.Token)
 		require.Len(t, refresher.RefreshCalls(), 1)
+	})
+
+	t.Run("reports expiry but leaves the credential when the refresh token is rejected without the lock", func(t *testing.T) {
+		// Without the cross-process lock a rejection is ambiguous: a peer may have already spent this single-use
+		// refresh token and be about to persist the replacement. Destroying storage here could race that peer and
+		// discard a valid credential, so the rejected process must leave storage untouched while still reporting the
+		// rejection. Contrast with the lock-held case above, which does remove the credential.
+		authCfg := newTestAuthConfig(t)
+		authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+			return nil, errors.New("advisory locking unavailable")
+		}
+		refresher := &ghmock.TokenRefresherMock{
+			RefreshFunc: func(refreshToken string, hostname string) (gh.RefreshableCredential, error) {
+				return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
+			},
+		}
+		authCfg.SetTokenRefresher(refresher)
+		loginRefreshableWithExpiry(t, authCfg, host, user, "old-access", "old-refresh", time.Now().Add(-time.Hour), false)
+
+		credential, status, err := authCfg.ActiveTokenWithRefresh(host)
+
+		require.ErrorIs(t, err, gh.ErrRefreshTokenInvalid)
+		require.Equal(t, gh.RefreshStatusExpired, status)
+		require.Empty(t, credential.Token)
+
+		// The stored credential is untouched, so it still resolves and a peer's replacement write (or a retry once
+		// the lock is available) can still land.
+		stored, _, err := authCfg.refreshableForUser(host, user)
+		require.NoError(t, err)
+		require.Equal(t, "old-refresh", stored.RefreshToken)
+
+		// Because the credential was not removed, a subsequent attempt still reaches the refresher rather than
+		// short-circuiting on a missing credential.
+		_, _, _ = authCfg.ActiveTokenWithRefresh(host)
+		require.Len(t, refresher.RefreshCalls(), 2)
 	})
 
 	t.Run("cannot refresh when no refresher is configured", func(t *testing.T) {

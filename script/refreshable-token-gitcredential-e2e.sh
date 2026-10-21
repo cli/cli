@@ -63,6 +63,10 @@ label() { # label <word> <rest...>
 
 note() { printf "%s%s%s\n" "$DIM" "$*" "$RESET"; }
 
+# note_bold prints a bold reviewer-action note, used when the reviewer must do
+# something during the step rather than just read passive context.
+note_bold() { printf "%s%s%s\n" "$BOLD" "$*" "$RESET"; }
+
 # cmdline prints the exact command that is about to run, highlighted and set
 # apart from the dim explanatory notes.
 cmdline() { printf "  %s%s%s\n" "$YELLOW" "$*" "$RESET"; }
@@ -279,6 +283,14 @@ if [ -n "$GIT_VER" ]; then
   fi
 fi
 
+# git credential fill only forwards capabilities to helpers when the caller
+# declares them on stdin (real fetch/push declare authtype themselves), so
+# declare authtype on git 2.46+ to exercise the same path as real git traffic.
+CAPA=""
+if [ "$GIT_NEW" -eq 1 ]; then
+  CAPA='capability[]=authtype\n'
+fi
+
 # ---------------------------------------------------------------------------
 # Intro
 # ---------------------------------------------------------------------------
@@ -340,6 +352,7 @@ cmdline "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --short-li
 note   "  (HTTPS is required: the git credential helper only applies to https remotes.)"
 note   "  (--clipboard copies the one-time code, so you can just paste it into the browser.)"
 note   "  (Storage is left at the default; this flow does not depend on the storage type.)"
+note_bold "  ACTION: during login gh asks \"Authenticate Git with your GitHub credentials?\". Confirm it (answer Yes) so gh configures git to use this build as the credential helper for $HOST."
 confirm_run
 run_interactive \
   "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --short-lived --clipboard" \
@@ -347,7 +360,6 @@ run_interactive \
 
 label "Expected:"
 assert_err_contains "login reports a short-lived refreshable token" "refreshable token"
-manual "you selected HTTPS as the git protocol"
 next_step
 
 # --- Step: make this build gh's git credential helper -------------------------
@@ -389,12 +401,12 @@ next_step
 label "Given" "gh is the credential helper and the access token is still valid"
 label "When" "git asks gh for credentials for https://$HOST"
 label "Then" "gh returns a working credential without refreshing it"
-cmdline "printf 'protocol=https\\nhost=$HOST\\n' | git credential fill"
+cmdline "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill"
 note   "  (git prints the resolved credential, including the token.)"
 confirm_run
 run_git \
-  "printf 'protocol=https\\nhost=$HOST\\n' | git credential fill" \
-  "printf 'protocol=https\\nhost=$HOST\\n' | GH_DEBUG=api GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill" \
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | GH_DEBUG=api GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
 
 label "Expected:"
 assert_out_contains "git received a username from the helper" "username="
@@ -405,12 +417,12 @@ next_step
 label "Given" "gh is the credential helper and the access token is expired or near expiry"
 label "When" "git asks gh for credentials"
 label "Then" "gh refreshes the token first, then hands git a working credential"
-cmdline "printf 'protocol=https\\nhost=$HOST\\n' | git credential fill"
+cmdline "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill"
 note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
 confirm_run
 run_git \
-  "printf 'protocol=https\\nhost=$HOST\\n' | git credential fill" \
-  "printf 'protocol=https\\nhost=$HOST\\n' | GH_AT_EXPIRES_IN=1 GH_DEBUG=api GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill" \
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | GH_AT_EXPIRES_IN=1 GH_DEBUG=api GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
 
 label "Expected:"
 assert_refresh "gh refreshed the token before handing it to git"
@@ -425,16 +437,16 @@ if [ "$GIT_NEW" -eq 1 ]; then
 else
   label "Then" "gh warns on stderr that it cannot mark the token non-cacheable, and git surfaces the warning"
 fi
-cmdline "printf 'protocol=https\\nhost=$HOST\\n' | git credential fill"
+cmdline "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill"
 confirm_run
 run_git \
-  "printf 'protocol=https\\nhost=$HOST\\n' | git credential fill" \
-  "printf 'protocol=https\\nhost=$HOST\\n' | GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill" \
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
 
 label "Expected:"
 if [ "$GIT_NEW" -eq 1 ]; then
   assert_err_absent "no non-cacheable warning on git 2.46 or newer" "$NONCACHEABLE_WARNING"
-  manual "git shows authtype/ephemeral fields (gh marked the credential non-cacheable)"
+  assert_out_contains "gh marked the credential ephemeral (non-cacheable)" "ephemeral=1"
 else
   assert_err_contains "gh warns it cannot mark the token non-cacheable" "$NONCACHEABLE_WARNING"
   manual "git surfaced gh's warning above"
@@ -445,7 +457,7 @@ next_step
 label "Given" "a refreshable credential whose refresh token the server rejects"
 label "When" "git asks gh for credentials and gh's refresh attempt is rejected"
 label "Then" "gh clears its now-dead stored credential, hands git nothing, and tells you (through git) to run gh auth login"
-cmdline "printf 'protocol=https\\nhost=$HOST\\n' | git credential fill"
+cmdline "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill"
 heading "  This step logs you out of $HOST in gh."
 note   "  (Access-token and refresh-token expiry are both forced via the GH_AT_EXPIRES_IN"
 note   "   and GH_RT_EXPIRES_IN test hacks, so gh attempts a refresh and the refresh is"
@@ -456,8 +468,8 @@ note   "   gh auth login again to keep using gh for $HOST.)"
 note   "  (A non-zero exit is expected here: git gets no credential.)"
 confirm_run
 run_git \
-  "printf 'protocol=https\\nhost=$HOST\\n' | git credential fill" \
-  "printf 'protocol=https\\nhost=$HOST\\n' | GH_AT_EXPIRES_IN=1 GH_RT_EXPIRES_IN=1 GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | git credential fill" \
+  "printf '${CAPA}protocol=https\\nhost=$HOST\\n' | GH_AT_EXPIRES_IN=1 GH_RT_EXPIRES_IN=1 GIT_TERMINAL_PROMPT=0 $GIT_NEUTRAL credential fill"
 
 label "Expected:"
 assert_err_contains "gh reports the token has expired" "has expired"
