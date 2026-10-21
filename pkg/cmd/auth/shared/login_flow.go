@@ -21,6 +21,7 @@ const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
 	Login(string, string, string, string, bool) (bool, error)
+	LoginRefreshable(string, string, gh.Credential, string, bool) (bool, error)
 	UsersForHost(string) []string
 }
 
@@ -40,6 +41,10 @@ type LoginOptions struct {
 	SecureStorage    bool
 	SkipSSHKeyPrompt bool
 	CopyToClipboard  bool
+	ShortLived       bool
+
+	// authFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
+	authFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
 
 	sshContext ssh.Context
 }
@@ -153,13 +158,20 @@ func Login(opts *LoginOptions) error {
 
 	var authToken string
 	var username string
+	var refreshableCredential *gh.Credential
 
 	if authMode == 0 {
-		var err error
-		authToken, username, err = authflow.AuthFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard)
+		authFlow := opts.authFlow
+		if authFlow == nil {
+			authFlow = authflow.AuthFlow
+		}
+		result, err := authFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard, opts.ShortLived)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
+		authToken = result.Token
+		username = result.Username
+		refreshableCredential = result.Refreshable
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 	} else {
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
@@ -201,7 +213,13 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	insecureStorageUsed, err := cfg.Login(hostname, username, authToken, gitProtocol, opts.SecureStorage)
+	var insecureStorageUsed bool
+	var err error
+	if refreshableCredential != nil {
+		insecureStorageUsed, err = cfg.LoginRefreshable(hostname, username, *refreshableCredential, gitProtocol, opts.SecureStorage)
+	} else {
+		insecureStorageUsed, err = cfg.Login(hostname, username, authToken, gitProtocol, opts.SecureStorage)
+	}
 	if err != nil {
 		return err
 	}
@@ -209,10 +227,24 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication credentials saved in plain text\n", cs.Yellow("!"))
 	}
 
+	// Short-lived tokens are a preference, not a guarantee: the server decides based on its own and the OAuth app
+	// configuration, so it may issue a refreshable token without being asked or a non-expiring one despite the request.
+	switch {
+	case refreshableCredential != nil && !opts.ShortLived:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Host issues short-lived refreshable token\n", cs.WarningIcon())
+	case refreshableCredential != nil:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Received short-lived refreshable token\n", cs.SuccessIcon())
+	case opts.ShortLived && authMode == 0:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Host did not issue a short-lived refreshable token\n", cs.WarningIcon())
+	}
+
 	if opts.CredentialFlow.ShouldSetup() {
-		err := opts.CredentialFlow.Setup(hostname, username, authToken)
+		warning, err := opts.CredentialFlow.Setup(hostname, username, authToken, refreshableCredential != nil)
 		if err != nil {
 			return err
+		}
+		if warning != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "%s %s\n", cs.WarningIcon(), warning)
 		}
 	}
 

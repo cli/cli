@@ -182,6 +182,11 @@ func Test_NewCmdLogin(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:     "short-lived and with-token",
+			cli:      "--short-lived --with-token",
+			wantsErr: true,
+		},
+		{
 			name:     "tty one scope",
 			stdinTTY: true,
 			cli:      "--scopes repo:invite",
