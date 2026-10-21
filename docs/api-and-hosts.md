@@ -58,7 +58,7 @@ RPC is implemented or assumed to exist**. For trusted development only, set
 Twirp JSON contract:
 
 ```text
-POST /twirp/github.cli.globalflags.v1.GlobalFeatureFlags/GetFlags
+POST /twirp/clientappsfe.cli.v1.GlobalFeatureFlags/GetFlags
 Content-Type: application/json
 
 {}

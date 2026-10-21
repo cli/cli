@@ -19,7 +19,7 @@ func TestRefreshUsesProvisionalTwirpContract(t *testing.T) {
 	// Given an unauthenticated global flag service
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "/twirp/github.cli.globalflags.v1.GlobalFeatureFlags/GetFlags", r.URL.Path)
+		assert.Equal(t, "/twirp/clientappsfe.cli.v1.GlobalFeatureFlags/GetFlags", r.URL.Path)
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		assert.Empty(t, r.Header.Get("Authorization"))
 		body, err := io.ReadAll(r.Body)

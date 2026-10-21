@@ -253,7 +253,7 @@ func TestRefreshReportsUnwritableCache(t *testing.T) {
 
 func TestInvalidCacheCanBeRepairedByRefresh(t *testing.T) {
 	t.Parallel()
-	validEntry := fmt.Sprintf(`{"endpoint":"https://flags.example/twirp/github.cli.globalflags.v1.GlobalFeatureFlags/GetFlags","fetched_at":%q,"response":{"flags":{"untrusted":true}}}`,
+	validEntry := fmt.Sprintf(`{"endpoint":"https://flags.example/twirp/clientappsfe.cli.v1.GlobalFeatureFlags/GetFlags","fetched_at":%q,"response":{"flags":{"untrusted":true}}}`,
 		time.Now().UTC().Format(time.RFC3339Nano))
 	tests := []struct {
 		name string
@@ -262,8 +262,8 @@ func TestInvalidCacheCanBeRepairedByRefresh(t *testing.T) {
 	}{
 		{name: "truncated JSON", data: `{"endpoint":`, err: "decode global flag cache"},
 		{name: "missing endpoint", data: `{}`, err: "no endpoint"},
-		{name: "future timestamp", data: `{"endpoint":"https://flags.example/twirp/github.cli.globalflags.v1.GlobalFeatureFlags/GetFlags","fetched_at":"2999-01-01T00:00:00Z","response":{"flags":{"untrusted":true}}}`, err: "fetch time"},
-		{name: "missing timestamp", data: `{"endpoint":"https://flags.example/twirp/github.cli.globalflags.v1.GlobalFeatureFlags/GetFlags","response":{"flags":{}}}`, err: "fetch time"},
+		{name: "future timestamp", data: `{"endpoint":"https://flags.example/twirp/clientappsfe.cli.v1.GlobalFeatureFlags/GetFlags","fetched_at":"2999-01-01T00:00:00Z","response":{"flags":{"untrusted":true}}}`, err: "fetch time"},
+		{name: "missing timestamp", data: `{"endpoint":"https://flags.example/twirp/clientappsfe.cli.v1.GlobalFeatureFlags/GetFlags","response":{"flags":{}}}`, err: "fetch time"},
 		{name: "oversized cache", data: validEntry + strings.Repeat(" ", 2<<20), err: "byte limit"},
 	}
 	for _, tt := range tests {

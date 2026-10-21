@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	rpcPath         = "/twirp/github.cli.globalflags.v1.GlobalFeatureFlags/GetFlags"
+	rpcPath         = "/twirp/clientappsfe.cli.v1.GlobalFeatureFlags/GetFlags"
 	maxResponseSize = 1 << 20
 )
 
