@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -338,6 +339,8 @@ func Test_logoutRun_tty(t *testing.T) {
 			}
 			tt.opts.Prompter = pm
 
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+
 			err := logoutRun(tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
@@ -525,6 +528,8 @@ func Test_logoutRun_nontty(t *testing.T) {
 			ios.SetStdinTTY(false)
 			ios.SetStdoutTTY(false)
 			tt.opts.IO = ios
+
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
 			err := logoutRun(tt.opts)
 			if tt.wantErr != "" {
