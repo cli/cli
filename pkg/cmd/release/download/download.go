@@ -2,6 +2,8 @@ package download
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -18,8 +20,11 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/safeurl"
+	attapi "github.com/cli/cli/v2/pkg/cmd/attestation/api"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -27,15 +32,22 @@ import (
 )
 
 type DownloadOptions struct {
-	HttpClient        func() (*http.Client, error)
-	IO                *iostreams.IOStreams
-	BaseRepo          func() (ghrepo.Interface, error)
-	OverwriteExisting bool
-	SkipExisting      bool
-	TagName           string
-	FilePatterns      []string
-	Destination       string
-	OutputFile        string
+	HttpClient         func() (*http.Client, error)
+	ExternalHttpClient func() (*http.Client, error)
+	IO                 *iostreams.IOStreams
+	Prompter           prompter.Prompter
+	BaseRepo           func() (ghrepo.Interface, error)
+	OverwriteExisting  bool
+	SkipExisting       bool
+	TagName            string
+	AssetName          string
+	FilePatterns       []string
+	Destination        string
+	OutputFile         string
+
+	Verify           bool
+	AttClient        attapi.Client
+	SigstoreVerifier verification.SigstoreVerifier
 
 	// maximum number of simultaneous downloads
 	Concurrency int
@@ -47,12 +59,14 @@ type DownloadOptions struct {
 
 func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobra.Command {
 	opts := &DownloadOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		IO:                 f.IOStreams,
+		HttpClient:         f.HttpClient,
+		ExternalHttpClient: f.ExternalHttpClient,
+		Prompter:           f.Prompter,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "download [<tag>]",
+		Use:   "download [<tag> | <asset-url>]",
 		Short: "Download release assets",
 		Long: heredoc.Docf(`
 			Download assets from a GitHub release.
@@ -60,6 +74,17 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			Without an explicit tag name argument, assets are downloaded from the
 			latest release in the project. In this case, %[1]s--pattern%[1]s or %[1]s--archive%[1]s
 			is required.
+
+			A release asset URL, such as one copied from a release page, can be given
+			instead of a tag name to download that single asset.
+
+			With %[1]s--verify%[1]s, before anything is downloaded, the command reports whether
+			the release is immutable and verifies each asset's SLSA build provenance
+			attestation, showing the workflow, source commit, and ref that built it. The
+			attestation must be signed by GitHub Actions and built from the release's
+			repository. You are then asked to confirm the download; when not running
+			interactively, the command fails unless every asset has verified provenance.
+			After downloading, each file is checked against its attested digest.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Download all assets from a specific release
@@ -73,6 +98,9 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 
 			# Download the archive of the source code for a release
 			$ gh release download v1.2.3 --archive=zip
+
+			# Check provenance before downloading an asset by its URL
+			$ gh release download --verify https://github.com/OWNER/REPO/releases/download/v1.2.3/app.tar.gz
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -83,8 +111,31 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				if len(opts.FilePatterns) == 0 && opts.ArchiveType == "" {
 					return cmdutil.FlagErrorf("`--pattern` or `--archive` is required when downloading the latest release")
 				}
+			} else if isURLArg(args[0]) {
+				repo, tag, asset, err := parseReleaseAssetURL(args[0])
+				if err != nil {
+					return cmdutil.FlagErrorWrap(err)
+				}
+				if cmd.Flags().Changed("repo") {
+					return cmdutil.FlagErrorf("`--repo` cannot be used with a release asset URL")
+				}
+				if len(opts.FilePatterns) > 0 || opts.ArchiveType != "" {
+					return cmdutil.FlagErrorf("`--pattern` and `--archive` cannot be used with a release asset URL")
+				}
+				opts.BaseRepo = func() (ghrepo.Interface, error) { return repo, nil }
+				opts.TagName = tag
+				opts.AssetName = asset
 			} else {
 				opts.TagName = args[0]
+			}
+
+			if opts.Verify {
+				if opts.ArchiveType != "" {
+					return cmdutil.FlagErrorf("`--verify` cannot be used with `--archive`")
+				}
+				if opts.OutputFile == "-" {
+					return cmdutil.FlagErrorf("`--verify` cannot be used when writing to standard output")
+				}
 			}
 
 			if err := cmdutil.MutuallyExclusive("specify only one of `--clobber` or `--skip-existing`", opts.OverwriteExisting, opts.SkipExisting); err != nil {
@@ -116,6 +167,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing files of the same name")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip downloading when files of the same name exist")
 	cmd.Flags().BoolVar(&opts.AllowEscapeSequences, "allow-escape-sequences", false, "Allow printing terminal escape sequences when writing an asset to standard output")
+	cmd.Flags().BoolVar(&opts.Verify, "verify", false, "Check release immutability and verify build provenance before downloading")
 
 	cmdutil.DisableAuthCheck(cmd)
 
@@ -196,6 +248,9 @@ func downloadRun(opts *DownloadOptions) error {
 		isArchive = true
 	} else {
 		for _, a := range release.Assets {
+			if opts.AssetName != "" && a.Name != opts.AssetName {
+				continue
+			}
 			if len(opts.FilePatterns) > 0 && !matchAny(opts.FilePatterns, a.Name) {
 				continue
 			}
@@ -210,6 +265,9 @@ func downloadRun(opts *DownloadOptions) error {
 	}
 
 	if len(toDownload) == 0 {
+		if opts.AssetName != "" {
+			return fmt.Errorf("release %s has no asset named %q", release.TagName, opts.AssetName)
+		}
 		if len(release.Assets) > 0 {
 			return errors.New("no assets match the file pattern")
 		}
@@ -218,6 +276,15 @@ func downloadRun(opts *DownloadOptions) error {
 
 	if len(toDownload) > 1 && opts.OutputFile != "" {
 		return fmt.Errorf("unable to write more than one asset with `--output`, got %d assets", len(toDownload))
+	}
+
+	var verifiedDigests map[string]string
+	if opts.Verify {
+		opts.IO.StopProgressIndicator()
+		verifiedDigests, err = confirmProvenance(opts, httpClient, baseRepo, release, toDownload)
+		if err != nil {
+			return err
+		}
 	}
 
 	// An asset written to standard output is external content. It funnels through
@@ -240,8 +307,9 @@ func downloadRun(opts *DownloadOptions) error {
 	targets := make([]downloadTarget, len(toDownload))
 	for i, a := range toDownload {
 		targets[i] = downloadTarget{
-			url:  safeurl.NewImmutableSafeURL(a.APIURL),
-			name: a.Name,
+			url:            safeurl.NewImmutableSafeURL(a.APIURL),
+			name:           a.Name,
+			expectedDigest: verifiedDigests[a.Name],
 		}
 	}
 
@@ -260,6 +328,9 @@ func matchAny(patterns []string, name string) bool {
 type downloadTarget struct {
 	url  safeurl.SafeURL
 	name string
+	// expectedDigest is the hex-encoded sha256 the downloaded content must
+	// match; empty means no check.
+	expectedDigest string
 }
 
 func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []downloadTarget, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
@@ -278,7 +349,7 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 		go func() {
 			for a := range jobs {
 				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.name))
-				results <- downloadAsset(dest, httpClient, a.url, a.name, isArchive)
+				results <- downloadAsset(dest, httpClient, a.url, a.name, isArchive, a.expectedDigest)
 			}
 		}()
 	}
@@ -300,7 +371,7 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	return downloadError
 }
 
-func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL safeurl.SafeURL, fileName string, isArchive bool) error {
+func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL safeurl.SafeURL, fileName string, isArchive bool, expectedDigest string) error {
 	if err := dest.Check(fileName); err != nil {
 		return err
 	}
@@ -356,7 +427,19 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL sa
 		}
 	}
 
-	return dest.Copy(fileName, resp.Body)
+	if expectedDigest == "" {
+		return dest.Copy(fileName, resp.Body)
+	}
+
+	hasher := sha256.New()
+	if err := dest.Copy(fileName, io.TeeReader(resp.Body, hasher)); err != nil {
+		return err
+	}
+	if actual := hex.EncodeToString(hasher.Sum(nil)); actual != expectedDigest {
+		_ = os.Remove(dest.makePath(fileName))
+		return fmt.Errorf("downloaded %s does not match its attested digest (expected sha256:%s, got sha256:%s); the file was removed", fileName, expectedDigest, actual)
+	}
+	return nil
 }
 
 var codeloadLegacyRE = regexp.MustCompile(`^(/[^/]+/[^/]+/)legacy\.`)
