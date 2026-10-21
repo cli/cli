@@ -120,8 +120,8 @@ type cfg struct {
 	token string
 }
 
-func (c cfg) ActiveToken(hostname string) gh.Credential {
-	return gh.Credential{Source: gh.TokenSourceOAuthToken, Token: c.token}
+func (c cfg) ActiveTokenWithRefresh(hostname string) (gh.Credential, gh.RefreshStatus, error) {
+	return gh.Credential{Token: c.token}, gh.RefreshStatusInapplicable, nil
 }
 
 // HostForAPIHost never resolves, because the token here is supplied directly by
