@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -39,8 +40,12 @@ type LoginOptions struct {
 	GitProtocol      string
 	InsecureStorage  bool
 	SkipSSHKeyPrompt bool
-	Expiring         bool
+	Expiring         *bool
 	Clipboard        *bool
+
+	// AuthFlow is indirected so tests can stub the interactive authorization. When nil, the shared login flow uses
+	// the real authflow.AuthFlow.
+	AuthFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -96,6 +101,9 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			This is a preference, not a guarantee: whether expiring tokens are issued depends on the
 			host and the OAuth app configuration. A host without support issues a non-expiring token
 			instead, and a host configured for them may issue expiring tokens even without the flag.
+			Enable the %[1]sprefer_expiring_credentials%[1]s configuration to prefer expiring credentials
+			without passing %[1]s--expiring%[1]s every time, and pass %[1]s--expiring=false%[1]s to request a
+			non-expiring token even when that configuration is enabled.
 			When using expiring credentials for git operations, git 2.46 or newer is recommended so
 			gh can mark the token as non-cacheable; with older git a credential caching helper may store
 			and reuse an expired token.
@@ -123,7 +131,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			if tokenStdin && len(opts.Scopes) > 0 {
 				return cmdutil.FlagErrorf("specify only one of `--scopes` or `--with-token`")
 			}
-			if tokenStdin && opts.Expiring {
+			if tokenStdin && opts.Expiring != nil && *opts.Expiring {
 				return cmdutil.FlagErrorf("specify only one of `--expiring` or `--with-token`")
 			}
 
@@ -173,7 +181,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
 	cmd.Flags().BoolVar(&opts.SkipSSHKeyPrompt, "skip-ssh-key", false, "Skip generate/upload SSH key prompt")
-	cmd.Flags().BoolVar(&opts.Expiring, "expiring", false, "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
+	cmdutil.NilBoolFlag(cmd, &opts.Expiring, "expiring", "", "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
 
 	return cmd
 }
@@ -255,7 +263,8 @@ func loginRun(opts *LoginOptions) error {
 		SecureStorage:    !opts.InsecureStorage,
 		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
 		CopyToClipboard:  copyToClipboard,
-		Expiring:         opts.Expiring,
+		Expiring:         shared.ShouldPreferExpiring(cfg, opts.Expiring, hostname),
+		AuthFlow:         opts.AuthFlow,
 	})
 }
 

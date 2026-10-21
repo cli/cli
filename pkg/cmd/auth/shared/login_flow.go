@@ -43,8 +43,8 @@ type LoginOptions struct {
 	CopyToClipboard  bool
 	Expiring         bool
 
-	// authFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
-	authFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
+	// AuthFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
+	AuthFlow func(*http.Client, string, *iostreams.IOStreams, string, []string, bool, browser.Browser, bool, bool) (*authflow.AuthResult, error)
 
 	sshContext ssh.Context
 }
@@ -55,6 +55,16 @@ func ShouldCopyToClipboard(cfg gh.Config, flagValue *bool) bool {
 		return *flagValue
 	}
 	return cfg.Clipboard().Value == "enabled"
+}
+
+// ShouldPreferExpiring resolves whether to prefer expiring credentials that gh refreshes automatically. An explicit
+// --expiring flag value wins; when the flag is unset it falls back to the prefer_expiring_credentials config setting
+// for the host.
+func ShouldPreferExpiring(cfg gh.Config, flagValue *bool, hostname string) bool {
+	if flagValue != nil {
+		return *flagValue
+	}
+	return cfg.PreferExpiringCredentials(hostname).Value == "enabled"
 }
 
 func Login(opts *LoginOptions) error {
@@ -163,7 +173,7 @@ func Login(opts *LoginOptions) error {
 	var refreshableCredential *gh.Credential
 
 	if authMode == 0 {
-		authFlow := opts.authFlow
+		authFlow := opts.AuthFlow
 		if authFlow == nil {
 			authFlow = authflow.AuthFlow
 		}

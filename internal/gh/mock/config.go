@@ -64,6 +64,9 @@ var _ gh.Config = &ConfigMock{}
 //			PreferEditorPromptFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the PreferEditorPrompt method")
 //			},
+//			PreferExpiringCredentialsFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the PreferExpiringCredentials method")
+//			},
 //			PromptFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Prompt method")
 //			},
@@ -133,6 +136,9 @@ type ConfigMock struct {
 
 	// PreferEditorPromptFunc mocks the PreferEditorPrompt method.
 	PreferEditorPromptFunc func(hostname string) gh.ConfigEntry
+
+	// PreferExpiringCredentialsFunc mocks the PreferExpiringCredentials method.
+	PreferExpiringCredentialsFunc func(hostname string) gh.ConfigEntry
 
 	// PromptFunc mocks the Prompt method.
 	PromptFunc func(hostname string) gh.ConfigEntry
@@ -223,6 +229,11 @@ type ConfigMock struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
+		// PreferExpiringCredentials holds details about calls to the PreferExpiringCredentials method.
+		PreferExpiringCredentials []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
 		// Prompt holds details about calls to the Prompt method.
 		Prompt []struct {
 			// Hostname is the hostname argument value.
@@ -252,27 +263,28 @@ type ConfigMock struct {
 		Write []struct {
 		}
 	}
-	lockAccessibleColors   sync.RWMutex
-	lockAccessiblePrompter sync.RWMutex
-	lockAliases            sync.RWMutex
-	lockAuthentication     sync.RWMutex
-	lockBrowser            sync.RWMutex
-	lockCacheDir           sync.RWMutex
-	lockClipboard          sync.RWMutex
-	lockColorLabels        sync.RWMutex
-	lockEditor             sync.RWMutex
-	lockGetOrDefault       sync.RWMutex
-	lockGitProtocol        sync.RWMutex
-	lockHTTPUnixSocket     sync.RWMutex
-	lockMigrate            sync.RWMutex
-	lockPager              sync.RWMutex
-	lockPreferEditorPrompt sync.RWMutex
-	lockPrompt             sync.RWMutex
-	lockSet                sync.RWMutex
-	lockSpinner            sync.RWMutex
-	lockTelemetry          sync.RWMutex
-	lockVersion            sync.RWMutex
-	lockWrite              sync.RWMutex
+	lockAccessibleColors          sync.RWMutex
+	lockAccessiblePrompter        sync.RWMutex
+	lockAliases                   sync.RWMutex
+	lockAuthentication            sync.RWMutex
+	lockBrowser                   sync.RWMutex
+	lockCacheDir                  sync.RWMutex
+	lockClipboard                 sync.RWMutex
+	lockColorLabels               sync.RWMutex
+	lockEditor                    sync.RWMutex
+	lockGetOrDefault              sync.RWMutex
+	lockGitProtocol               sync.RWMutex
+	lockHTTPUnixSocket            sync.RWMutex
+	lockMigrate                   sync.RWMutex
+	lockPager                     sync.RWMutex
+	lockPreferEditorPrompt        sync.RWMutex
+	lockPreferExpiringCredentials sync.RWMutex
+	lockPrompt                    sync.RWMutex
+	lockSet                       sync.RWMutex
+	lockSpinner                   sync.RWMutex
+	lockTelemetry                 sync.RWMutex
+	lockVersion                   sync.RWMutex
+	lockWrite                     sync.RWMutex
 }
 
 // AccessibleColors calls AccessibleColorsFunc.
@@ -737,6 +749,38 @@ func (mock *ConfigMock) PreferEditorPromptCalls() []struct {
 	calls = mock.calls.PreferEditorPrompt
 	mock.lockPreferEditorPrompt.RUnlock()
 	return calls
+}
+
+// PreferExpiringCredentialsCalls gets all the calls that were made to PreferExpiringCredentials.
+// Check the length with:
+//
+//	len(mockedConfig.PreferExpiringCredentialsCalls())
+func (mock *ConfigMock) PreferExpiringCredentialsCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockPreferExpiringCredentials.RLock()
+	calls = mock.calls.PreferExpiringCredentials
+	mock.lockPreferExpiringCredentials.RUnlock()
+	return calls
+}
+
+// PreferExpiringCredentials calls PreferExpiringCredentialsFunc.
+func (mock *ConfigMock) PreferExpiringCredentials(hostname string) gh.ConfigEntry {
+	if mock.PreferExpiringCredentialsFunc == nil {
+		panic("ConfigMock.PreferExpiringCredentialsFunc: method is nil but Config.PreferExpiringCredentials was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockPreferExpiringCredentials.Lock()
+	mock.calls.PreferExpiringCredentials = append(mock.calls.PreferExpiringCredentials, callInfo)
+	mock.lockPreferExpiringCredentials.Unlock()
+	return mock.PreferExpiringCredentialsFunc(hostname)
 }
 
 // Prompt calls PromptFunc.
