@@ -242,7 +242,7 @@ type AuthConfig struct {
 // ActiveTokenType reports what kind of credential the active token is, so a
 // caller that only needs to know that can avoid handling the token.
 func (c *AuthConfig) ActiveTokenType(hostname string) gh.TokenType {
-	token, _ := c.ActiveToken(hostname)
+	token := c.ActiveToken(hostname).Token
 	for _, tokenType := range gh.TokenTypes {
 		if strings.HasPrefix(token, string(tokenType)) {
 			return tokenType
@@ -251,38 +251,39 @@ func (c *AuthConfig) ActiveTokenType(hostname string) gh.TokenType {
 	return gh.TokenTypeUnknown
 }
 
-// ActiveToken will retrieve the active auth token for the given hostname,
-// searching environment variables, plain text config, and
-// lastly encrypted storage.
-func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
+// ActiveToken retrieves the active credential for the given hostname, searching environment variables, plain text
+// config, and lastly encrypted storage. It returns the last stored token as-is, including the current access token of
+// a refreshable credential, and never contacts the token endpoint to refresh it. Callers that need a token valid for
+// API calls should use ActiveTokenWithRefresh.
+func (c *AuthConfig) ActiveToken(hostname string) gh.Credential {
 	if c.tokenOverride != nil {
-		return c.tokenOverride(hostname)
+		token, source := c.tokenOverride(hostname)
+		return gh.Credential{Source: source, Token: token}
 	}
+
 	token, source := ghauth.TokenFromEnvOrConfig(hostname)
-	if token == "" {
-		var user string
-		var err error
-		if user, err = c.ActiveUser(hostname); err == nil {
-			token, err = c.TokenFromKeyringForUser(hostname, user)
-		}
-		if err != nil {
-			// We should generally be able to find a token for the active user,
-			// but in some cases such as if the keyring was set up in a very old
-			// version of the CLI, it may only have a unkeyed token, so fallback
-			// to it.
-			token, err = c.TokenFromKeyring(hostname)
-		}
-		if err == nil {
-			source = "keyring"
+	if token != "" {
+		return gh.Credential{Source: source, Token: token}
+	}
+
+	if user, err := c.ActiveUser(hostname); err == nil {
+		if credential, err := c.TokenForUser(hostname, user); err == nil {
+			return credential
 		}
 	}
-	return token, source
+
+	// We should generally be able to find a token for the active user, but in some cases such as if the keyring was
+	// set up in a very old version of the CLI, it may only have an unkeyed token, so fall back to it.
+	if token, err := c.TokenFromKeyring(hostname); err == nil {
+		return gh.Credential{Source: gh.TokenSourceKeyring, Token: token}
+	}
+
+	return gh.Credential{Source: source, Token: token}
 }
 
 // HasActiveToken returns true when a token for the hostname is present.
 func (c *AuthConfig) HasActiveToken(hostname string) bool {
-	token, _ := c.ActiveToken(hostname)
-	return token != ""
+	return c.ActiveToken(hostname).Token != ""
 }
 
 // HasEnvToken returns true when a token has been specified in an
@@ -458,7 +459,8 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 		return fmt.Errorf("failed to get active user: %s", err)
 	}
 
-	previouslyActiveToken, previousSource := c.ActiveToken(hostname)
+	cred := c.ActiveToken(hostname)
+	previouslyActiveToken, previousSource := cred.Token, cred.Source
 	if previousSource != "keyring" && previousSource != "oauth_token" {
 		return fmt.Errorf("currently active token for %s is from %s", hostname, previousSource)
 	}
@@ -562,16 +564,19 @@ func (c *AuthConfig) UsersForHost(hostname string) []string {
 	return users
 }
 
-func (c *AuthConfig) TokenForUser(hostname, user string) (string, string, error) {
+// TokenForUser retrieves the credential for the given user and hostname. Like ActiveToken it returns the last stored
+// token as-is, including the current access token of a refreshable credential, and never refreshes it; use
+// TokenForUserWithRefresh when the token must be valid for API calls.
+func (c *AuthConfig) TokenForUser(hostname, user string) (gh.Credential, error) {
 	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
-		return token, "keyring", nil
+		return gh.Credential{Source: gh.TokenSourceKeyring, Token: token}, nil
 	}
 
 	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
-		return token, "oauth_token", nil
+		return gh.Credential{Source: gh.TokenSourceOAuthToken, Token: token}, nil
 	}
 
-	return "", "default", fmt.Errorf("no token found for '%s'", user)
+	return gh.Credential{Source: gh.TokenSourceDefault}, fmt.Errorf("no token found for '%s'", user)
 }
 
 func keyringServiceName(hostname string) string {

@@ -10,6 +10,7 @@ import (
 	"github.com/atotto/clipboard"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/oauth"
@@ -119,8 +120,8 @@ type cfg struct {
 	token string
 }
 
-func (c cfg) ActiveToken(hostname string) (string, string) {
-	return c.token, "oauth_token"
+func (c cfg) ActiveToken(hostname string) gh.Credential {
+	return gh.Credential{Source: gh.TokenSourceOAuthToken, Token: c.token}
 }
 
 // HostForAPIHost never resolves, because the token here is supplied directly by
