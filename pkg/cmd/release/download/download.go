@@ -48,6 +48,7 @@ type DownloadOptions struct {
 	Verify           bool
 	AttClient        attapi.Client
 	SigstoreVerifier verification.SigstoreVerifier
+	ReleaseVerifier  shared.Verifier
 
 	// maximum number of simultaneous downloads
 	Concurrency int
@@ -78,13 +79,21 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			A release asset URL, such as one copied from a release page, can be given
 			instead of a tag name to download that single asset.
 
-			With %[1]s--verify%[1]s, before anything is downloaded, the command reports whether
-			the release is immutable and verifies each asset's SLSA build provenance
-			attestation, showing the workflow, source commit, and ref that built it. The
-			attestation must be signed by GitHub Actions and built from the release's
-			repository. You are then asked to confirm the download; when not running
-			interactively, the command fails unless every asset has verified provenance.
-			After downloading, each file is checked against its attested digest.
+			With %[1]s--verify%[1]s, before anything is downloaded, the command checks the
+			release and each asset:
+
+			- An immutable release must have a release attestation signed by GitHub
+			  that lists each asset's name and digest.
+			- Each asset's SLSA build provenance attestation must be signed by GitHub
+			  Actions and built from the release's repository. The workflow, source
+			  commit, and ref that built it are shown.
+
+			You are then asked to confirm the download; when not running interactively,
+			the command fails if any check fails. After downloading, each file is checked
+			against its digest. When writing to standard output, the asset is checked
+			before any of it is written.
+
+			%[1]s--verify%[1]s cannot be used with %[1]s--archive%[1]s or on GitHub Enterprise Server.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Download all assets from a specific release
@@ -131,10 +140,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 
 			if opts.Verify {
 				if opts.ArchiveType != "" {
-					return cmdutil.FlagErrorf("`--verify` cannot be used with `--archive`")
-				}
-				if opts.OutputFile == "-" {
-					return cmdutil.FlagErrorf("`--verify` cannot be used when writing to standard output")
+					return cmdutil.FlagErrorf("`--verify` cannot be used with `--archive`: source archives are generated on demand and have no attestations")
 				}
 			}
 
@@ -202,6 +208,12 @@ func downloadRun(opts *DownloadOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
+	}
+
+	if opts.Verify {
+		if err := checkVerifySupported(baseRepo); err != nil {
+			return err
+		}
 	}
 
 	opts.IO.StartProgressIndicatorWithLabel("Finding assets to download")
@@ -302,6 +314,21 @@ func downloadRun(opts *DownloadOptions) error {
 		allowEscapes: opts.AllowEscapeSequences,
 		isTTY:        opts.IO.IsStdoutTTY(),
 	}
+
+	// A digest mismatch is only found once the whole asset has been read, by
+	// which point bytes streamed to standard output can't be taken back. So a
+	// verified download for standard output is staged in a temporary directory
+	// and only written out once it has been checked.
+	stdoutDest := dest
+	var stagingDir string
+	if opts.Verify && opts.OutputFile == "-" {
+		stagingDir, err = os.MkdirTemp("", "gh-release-download-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(stagingDir)
+		dest = &destinationWriter{dir: stagingDir}
+	}
 	defer dest.Close()
 
 	targets := make([]downloadTarget, len(toDownload))
@@ -313,7 +340,20 @@ func downloadRun(opts *DownloadOptions) error {
 		}
 	}
 
-	return downloadAssets(dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO)
+	if err := downloadAssets(dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO); err != nil {
+		return err
+	}
+	if stagingDir == "" {
+		return nil
+	}
+
+	name := toDownload[0].Name
+	f, err := os.Open(filepath.Join(stagingDir, name))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return stdoutDest.Copy(name, f)
 }
 
 func matchAny(patterns []string, name string) bool {

@@ -1,11 +1,13 @@
 package download
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -60,29 +62,39 @@ type provenanceResult struct {
 }
 
 type provenanceChecker struct {
-	attClient attapi.Client
-	verifier  verification.SigstoreVerifier
-	repo      ghrepo.Interface
-	tenant    string
+	httpClient      *http.Client
+	attClient       attapi.Client
+	verifier        verification.SigstoreVerifier
+	releaseVerifier shared.Verifier
+	repo            ghrepo.Interface
+	tenant          string
+}
+
+// checkVerifySupported fails before any network request when the host has no
+// attestation support, i.e. GitHub Enterprise Server.
+func checkVerifySupported(repo ghrepo.Interface) error {
+	host := repo.RepoHost()
+	if err := auth.IsHostSupported(host); err != nil {
+		return fmt.Errorf("`--verify` is not supported for %s: artifact attestations are not available on GitHub Enterprise Server", host)
+	}
+	return nil
 }
 
 func newProvenanceChecker(opts *DownloadOptions, httpClient *http.Client, repo ghrepo.Interface) (*provenanceChecker, error) {
 	host := repo.RepoHost()
-	if err := auth.IsHostSupported(host); err != nil {
-		return nil, fmt.Errorf("`--verify` is not supported for %s: %w", host, err)
-	}
-
 	tenant, isTenant := ghinstance.TenantName(host)
 	if !isTenant {
 		tenant = ""
 	}
 	c := &provenanceChecker{
-		attClient: opts.AttClient,
-		verifier:  opts.SigstoreVerifier,
-		repo:      repo,
-		tenant:    tenant,
+		httpClient:      httpClient,
+		attClient:       opts.AttClient,
+		verifier:        opts.SigstoreVerifier,
+		releaseVerifier: opts.ReleaseVerifier,
+		repo:            repo,
+		tenant:          tenant,
 	}
-	if c.attClient != nil && c.verifier != nil {
+	if c.attClient != nil && c.verifier != nil && c.releaseVerifier != nil {
 		return c, nil
 	}
 
@@ -93,6 +105,13 @@ func newProvenanceChecker(opts *DownloadOptions, httpClient *http.Client, repo g
 	logger := att_io.NewHandler(opts.IO)
 	if c.attClient == nil {
 		c.attClient = attapi.NewLiveClient(httpClient, externalClient, host, logger)
+	}
+	if c.releaseVerifier == nil {
+		c.releaseVerifier = &shared.AttestationVerifier{
+			AttClient:          c.attClient,
+			ExternalHttpClient: externalClient,
+			IO:                 opts.IO,
+		}
 	}
 	if c.verifier == nil {
 		config := verification.SigstoreConfig{
@@ -121,6 +140,76 @@ func (c *provenanceChecker) hostURL() string {
 	return fmt.Sprintf("https://%s.ghe.com", c.tenant)
 }
 
+type releaseCheck struct {
+	// subjects maps asset name to the hex-encoded sha256 GitHub signed for it.
+	subjects map[string]string
+	err      error
+}
+
+// checkRelease verifies the attestation GitHub signs when an immutable release
+// is published, and returns the asset digests it records.
+func (c *provenanceChecker) checkRelease(release *shared.Release) releaseCheck {
+	tag := release.TagName
+	ref, err := shared.FetchRefSHA(context.Background(), c.httpClient, c.repo, tag)
+	if err != nil {
+		return releaseCheck{err: fmt.Errorf("failed to resolve tag %s: %w", tag, err)}
+	}
+	refArt := artifact.NewDigestedArtifactForRelease(ref, shared.DigestAlgForRef(ref))
+
+	attestations, err := c.attClient.GetByDigest(attapi.FetchParams{
+		Digest:        refArt.DigestWithAlg(),
+		PredicateType: "release",
+		Repo:          ghrepo.FullName(c.repo),
+		Initiator:     "github",
+		Limit:         100,
+	})
+	if err != nil && !isNotFoundErr(err) {
+		return releaseCheck{err: fmt.Errorf("failed to fetch release attestation: %w", err)}
+	}
+	if err == nil {
+		attestations, err = shared.FilterAttestationsByTag(attestations, tag)
+		if err != nil {
+			return releaseCheck{err: fmt.Errorf("failed to parse release attestation: %w", err)}
+		}
+	}
+	if len(attestations) == 0 {
+		return releaseCheck{err: errors.New("no signed release attestation found")}
+	}
+
+	verified, err := c.releaseVerifier.VerifyAttestation(refArt, attestations[0])
+	if err != nil {
+		return releaseCheck{err: fmt.Errorf("release attestation verification failed: %w", err)}
+	}
+
+	statement := verified.VerificationResult.Statement
+	fields := statement.GetPredicate().GetFields()
+	if got := fields["tag"].GetStringValue(); got != tag {
+		return releaseCheck{err: fmt.Errorf("release attestation is for tag %q, not %q", got, tag)}
+	}
+	// Release predicate v0.1 records the release ID as "releaseId"; v0.2 as "databaseId".
+	releaseID := fields["databaseId"].GetStringValue()
+	if releaseID == "" {
+		releaseID = fields["releaseId"].GetStringValue()
+	}
+	if releaseID != strconv.FormatInt(release.DatabaseID, 10) {
+		return releaseCheck{err: fmt.Errorf("release attestation is for release ID %q, not %d", releaseID, release.DatabaseID)}
+	}
+
+	subjects := make(map[string]string)
+	for _, s := range statement.GetSubject() {
+		if d := s.GetDigest()["sha256"]; s.GetName() != "" && d != "" {
+			subjects[s.GetName()] = d
+		}
+	}
+	return releaseCheck{subjects: subjects}
+}
+
+func isNotFoundErr(err error) bool {
+	var httpErr api.HTTPError
+	return errors.Is(err, attapi.ErrNoAttestationsFound) ||
+		(errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound)
+}
+
 // check verifies the SLSA build provenance for an asset using the digest
 // reported by the API, so it can run before the asset is downloaded. The
 // downloaded bytes are compared against the same digest afterwards.
@@ -141,8 +230,7 @@ func (c *provenanceChecker) check(asset shared.ReleaseAsset) provenanceResult {
 		Limit:         attapi.DefaultLimit,
 	})
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.Is(err, attapi.ErrNoAttestationsFound) || (errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound) {
+		if isNotFoundErr(err) {
 			res.err = errNoProvenance
 		} else {
 			res.err = fmt.Errorf("failed to fetch attestations: %w", err)
@@ -224,6 +312,11 @@ func confirmProvenance(opts *DownloadOptions, httpClient *http.Client, repo ghre
 		return nil, err
 	}
 
+	var rel releaseCheck
+	if release.IsImmutable {
+		opts.IO.StartProgressIndicatorWithLabel("Verifying release attestation")
+		rel = checker.checkRelease(release)
+	}
 	results := make([]provenanceResult, len(assets))
 	for i, a := range assets {
 		opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Verifying provenance of %s", a.Name))
@@ -234,32 +327,57 @@ func confirmProvenance(opts *DownloadOptions, httpClient *http.Client, repo ghre
 	out := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()
 
+	var problems []string
 	fmt.Fprintf(out, "%s %s\n", cs.Bold(ghrepo.FullName(repo)), cs.Bold(release.TagName))
-	if release.IsImmutable {
-		fmt.Fprintf(out, "%s Immutable release\n", cs.SuccessIcon())
-	} else {
+	switch {
+	case !release.IsImmutable:
 		fmt.Fprintf(out, "%s Not an immutable release; assets can be replaced after publishing\n", cs.WarningIcon())
+	case rel.err != nil:
+		problems = append(problems, "the release attestation could not be verified")
+		fmt.Fprintf(out, "%s Release is marked immutable, but %s\n", cs.FailureIcon(), rel.err)
+	default:
+		fmt.Fprintf(out, "%s Immutable release, verified by GitHub's signed release attestation\n", cs.SuccessIcon())
 	}
 
 	digests := make(map[string]string, len(results))
 	var unverified int
 	for _, r := range results {
 		fmt.Fprintf(out, "\n%s\n", cs.Bold(r.asset.Name))
-		if r.err != nil {
-			unverified++
-			fmt.Fprintf(out, "%s %s\n", cs.FailureIcon(), capitalize(r.err.Error()))
-			continue
+		ok := true
+		if release.IsImmutable && rel.err == nil {
+			if signed, listed := rel.subjects[r.asset.Name]; !listed {
+				ok = false
+				fmt.Fprintf(out, "%s Not listed in the signed release attestation\n", cs.FailureIcon())
+			} else if r.asset.Digest == nil || *r.asset.Digest != "sha256:"+signed {
+				ok = false
+				fmt.Fprintf(out, "%s Digest differs from the signed release attestation (sha256:%s)\n", cs.FailureIcon(), signed)
+			} else {
+				fmt.Fprintf(out, "%s Listed in the signed release attestation\n", cs.SuccessIcon())
+			}
 		}
-		digests[r.asset.Name] = r.digest
-		fmt.Fprintf(out, "%s Verified SLSA build provenance\n", cs.SuccessIcon())
-		printProvenanceDetails(opts, r)
+		if r.err != nil {
+			ok = false
+			fmt.Fprintf(out, "%s %s\n", cs.FailureIcon(), capitalize(r.err.Error()))
+		} else {
+			fmt.Fprintf(out, "%s Verified SLSA build provenance\n", cs.SuccessIcon())
+			printProvenanceDetails(opts, r)
+		}
+		if r.digest != "" {
+			digests[r.asset.Name] = r.digest
+		}
+		if !ok {
+			unverified++
+		}
 	}
 	fmt.Fprintln(out)
+	if unverified > 0 {
+		problems = append(problems, fmt.Sprintf("%s failed verification", text.Pluralize(unverified, "asset")))
+	}
 
 	if !opts.IO.CanPrompt() {
-		if unverified > 0 {
-			return nil, fmt.Errorf("refusing to download: %s lacking verified build provenance; run without `--verify` to download anyway",
-				text.Pluralize(unverified, "asset"))
+		if len(problems) > 0 {
+			return nil, fmt.Errorf("refusing to download: %s; run without `--verify` to download anyway",
+				strings.Join(problems, " and "))
 		}
 		return digests, nil
 	}
@@ -268,7 +386,7 @@ func confirmProvenance(opts *DownloadOptions, httpClient *http.Client, repo ghre
 	if len(assets) == 1 {
 		question = fmt.Sprintf("Download %s?", assets[0].Name)
 	}
-	ok, err := opts.Prompter.Confirm(question, unverified == 0)
+	ok, err := opts.Prompter.Confirm(question, len(problems) == 0)
 	if err != nil {
 		return nil, err
 	}
