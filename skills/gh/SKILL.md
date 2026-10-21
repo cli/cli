@@ -315,7 +315,7 @@ Sometimes useful data isn't on the typed commands. Examples:
   any) is being honored.
 - `gh auth status --json` is supported.
 - Stored credentials may be expiring tokens that gh refreshes automatically.
-  `gh auth status --json` reports these with `"refreshable": true` and a
+  `gh auth status --json hosts` reports these with `"refreshable": true` and a
   `tokenExpiresAt` timestamp.
 - Expiring tokens are not available on every host. So far only github.com
   and GHE.com (`*.ghe.com`) hosts support them; other hosts keep using
@@ -324,8 +324,8 @@ Sometimes useful data isn't on the typed commands. Examples:
   working at any time because gh rotates it on refresh. Run `gh auth token`
   again each time you need one, or prefer `gh api` over raw HTTP calls so gh
   handles the refresh for you.
-- A `refresh_expired` state in `gh auth status --json` means the refresh token
-  was rejected. Recovery needs an interactive `gh auth login` or
+- A `refresh_expired` state in `gh auth status --json hosts` means the refresh
+  token was rejected. Recovery needs an interactive `gh auth login` or
   `gh auth refresh`, so ask the user to run it instead of retrying.
 - Tokens from `GH_TOKEN` or `GITHUB_TOKEN` are used as is and never refreshed.
 
