@@ -21,9 +21,12 @@
 # Usage:
 #   script/refreshable-token-e2e.sh [--keyring | --config]
 #
+# Build with internal debug overrides before running:
+#   make debug
+#
 # Environment:
-#   GH_BIN     Path to the gh binary to test. Defaults to ./bin/gh, else gh on PATH.
-#   GH_E2E_HOST  Host to authenticate against. Defaults to github.com.
+#   GH_INTERNAL_E2E_BIN   Path to the gh binary to test. Defaults to ./bin/gh, else gh on PATH.
+#   GH_INTERNAL_E2E_HOST  Host to authenticate against. Defaults to github.com.
 
 set -uo pipefail
 
@@ -121,6 +124,9 @@ assert_err_contains() { # assert_err_contains <desc> <substr>
 assert_out_absent() { # assert_out_absent <desc> <substr>
   if grep -qiF -- "$2" "$OUT"; then fail "$1"; else pass "$1"; fi
 }
+assert_err_absent() { # assert_err_absent <desc> <substr>
+  if grep -qiF -- "$2" "$ERR"; then fail "$1"; else pass "$1"; fi
+}
 assert_out_nonempty() { # assert_out_nonempty <desc>
   if [ -s "$OUT" ]; then pass "$1"; else fail "$1"; fi
 }
@@ -154,11 +160,11 @@ next_step() {
 # ---------------------------------------------------------------------------
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-GH="${GH_BIN:-$ROOT/bin/gh}"
+GH="${GH_INTERNAL_E2E_BIN:-$ROOT/bin/gh}"
 if [ ! -x "$GH" ]; then
   GH="$(command -v gh || true)"
 fi
-HOST="${GH_E2E_HOST:-github.com}"
+HOST="${GH_INTERNAL_E2E_HOST:-github.com}"
 
 # GH_DISPLAY is the name shown in the command echoes. Commands still execute
 # with the resolved GH binary; the echoes just read as plain `gh`.
@@ -166,13 +172,13 @@ GH_DISPLAY="gh"
 
 require_gh() {
   if [ -z "$GH" ]; then
-    echo "No gh binary found. Build the stack (make) or set GH_BIN." >&2
+    echo "No gh binary found. Build with make debug or set GH_INTERNAL_E2E_BIN." >&2
     exit 1
   fi
-  # The scenarios rely on testing-only env hacks compiled into this build.
-  if ! grep -aq 'GH_AT_EXPIRES_IN' "$GH"; then
-    echo "This gh binary lacks the testing hacks (GH_AT_EXPIRES_IN)." >&2
-    echo "Check out and build the refreshable-token stack, then retry." >&2
+  # The scenarios require the internal overrides enabled by the ghdebug build tag.
+  if ! "$GH" version | grep -q '\[debug build\]'; then
+    echo "This gh binary is not a debug build, so the GH_INTERNAL_* overrides are unavailable." >&2
+    echo "Build with: make debug" >&2
     exit 1
   fi
 }
@@ -219,7 +225,7 @@ divider
 echo
 note "This drives real gh auth commands and will clobber stored credentials for $HOST."
 note "To trigger refreshes on demand, expiry is forced with a test-only env hack"
-note "(GH_AT_EXPIRES_IN); whether a refresh happened is detected from gh's debug"
+note "(GH_INTERNAL_AT_EXPIRES_IN); whether a refresh happened is detected from gh's debug"
 note "logs, and for auth status from its own output."
 echo
 printf "%sReady? Press Enter to begin%s (q to quit): " "$BOLD" "$RESET"
@@ -247,11 +253,11 @@ label "Given" "a signed-in expiring credential"
 label "When" "an ordinary command runs while the access token is expired or near expiry"
 label "Then" "the command succeeds and gh refreshes the token first"
 cmdline "$GH_DISPLAY api repos/cli/cli/contents/.gitattributes"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "$GH_DISPLAY api repos/cli/cli/contents/.gitattributes" \
-  "GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" api repos/cli/cli/contents/.gitattributes"
+  "GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" api repos/cli/cli/contents/.gitattributes"
 
 label "Expected:"
 assert_out_contains "the file contents are returned" "\"name\""
@@ -278,11 +284,11 @@ label "Given" "a token supplied through the GH_TOKEN environment variable"
 label "When" "a command runs while the token in storage is expired or near expiry"
 label "Then" "the command succeeds and no refresh happens, because an environment token is never refreshed"
 cmdline "GH_TOKEN=\$($GH_DISPLAY auth token --no-refresh) $GH_DISPLAY api repos/cli/cli/contents/.gitattributes"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "GH_TOKEN=\$($GH_DISPLAY auth token --no-refresh) $GH_DISPLAY api repos/cli/cli/contents/.gitattributes" \
-  "GH_TOKEN=\$(\"$GH\" auth token --no-refresh) GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" api repos/cli/cli/contents/.gitattributes"
+  "GH_TOKEN=\$(\"$GH\" auth token --no-refresh 2>/dev/null) GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" api repos/cli/cli/contents/.gitattributes"
 
 label "Expected:"
 assert_out_contains "the file contents are returned" "\"name\""
@@ -303,11 +309,11 @@ label "Given" "a signed-in expiring credential"
 label "When" "auth status runs while the access token is expired or near expiry"
 label "Then" "status refreshes the token and shows it as an expiring refreshable credential"
 cmdline "$GH_DISPLAY auth status"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "$GH_DISPLAY auth status" \
-  "GH_AT_EXPIRES_IN=1 \"$GH\" auth status"
+  "GH_INTERNAL_AT_EXPIRES_IN=1 \"$GH\" auth status"
 
 label "Expected:"
 assert_out_contains "the account is shown as an expiring refreshable credential" "Expiring token that gh refreshes automatically"
@@ -319,11 +325,11 @@ label "Given" "the same expiring credential"
 label "When" "auth status --json hosts runs while the access token is expired or near expiry"
 label "Then" "status refreshes the token and the JSON carries the refreshable fields"
 cmdline "$GH_DISPLAY auth status --json hosts"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "$GH_DISPLAY auth status --json hosts" \
-  "GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth status --json hosts"
+  "GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth status --json hosts"
 
 label "Expected:"
 assert_out_contains "the JSON includes the refreshable fields" "\"refreshable\""
@@ -365,11 +371,11 @@ label "Given" "a signed-in expiring credential"
 label "When" "auth status --no-refresh runs while the access token is expired or near expiry"
 label "Then" "status still shows the refreshable credential but does not refresh it"
 cmdline "$GH_DISPLAY auth status --no-refresh"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "$GH_DISPLAY auth status --no-refresh" \
-  "GH_AT_EXPIRES_IN=1 \"$GH\" auth status --no-refresh"
+  "GH_INTERNAL_AT_EXPIRES_IN=1 \"$GH\" auth status --no-refresh"
 
 label "Expected:"
 assert_out_contains "the account is shown as an expiring refreshable credential" "Expiring token that gh refreshes automatically"
@@ -381,11 +387,11 @@ label "Given" "a signed-in expiring credential"
 label "When" "auth status --json hosts --no-refresh runs while the access token is expired or near expiry"
 label "Then" "the JSON carries the refreshable fields and no refresh happens"
 cmdline "$GH_DISPLAY auth status --json hosts --no-refresh"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "$GH_DISPLAY auth status --json hosts --no-refresh" \
-  "GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth status --json hosts --no-refresh"
+  "GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth status --json hosts --no-refresh"
 
 label "Expected:"
 assert_out_contains "the JSON includes the refreshable fields" "\"refreshable\""
@@ -430,22 +436,26 @@ next_step
 # ---------------------------------------------------------------------------
 #
 # auth token prints only the token, so a refresh is detected from the
-# GH_DEBUG=api log (a POST to the OAuth token endpoint).
+# GH_DEBUG=api log (a POST to the OAuth token endpoint). Whenever it prints a
+# stored expiring token, it also warns on stderr that the token will expire.
+# The GH_TOKEN steps silence the stderr of the inner auth token call, so its own
+# warning does not leak into the captured stderr of the command under test.
 
 # --- Step: token refreshes an expired token -----------------------------------
 label "Given" "a signed-in expiring credential"
 label "When" "auth token runs while the access token is expired or near expiry"
 label "Then" "gh refreshes the token and prints the refreshed value"
 cmdline "$GH_DISPLAY auth token"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "$GH_DISPLAY auth token" \
-  "GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token"
+  "GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token"
 
 label "Expected:"
 assert_out_nonempty "a token is printed"
 assert_refresh      "a refresh happened"
+assert_err_contains "a warning that the token will expire is printed to stderr" "This token will expire"
 next_step
 
 # --- Step: token does not refresh a valid token -------------------------------
@@ -461,6 +471,7 @@ run_batch \
 label "Expected:"
 assert_out_nonempty "a token is printed"
 assert_no_refresh   "no refresh happened"
+assert_err_contains "a warning that the token will expire is printed to stderr" "This token will expire"
 next_step
 
 # --- Step: token --no-refresh never refreshes ---------------------------------
@@ -468,15 +479,16 @@ label "Given" "a signed-in expiring credential"
 label "When" "auth token --no-refresh runs while the access token is expired or near expiry"
 label "Then" "gh prints the stored token as-is without refreshing it"
 cmdline "$GH_DISPLAY auth token --no-refresh"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "$GH_DISPLAY auth token --no-refresh" \
-  "GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token --no-refresh"
+  "GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token --no-refresh"
 
 label "Expected:"
 assert_out_nonempty "the stored token is printed as-is"
 assert_no_refresh   "no refresh happened despite forced expiry"
+assert_err_contains "a warning that the token will expire is printed to stderr" "This token will expire"
 next_step
 
 # --- Step: an environment token is printed, never refreshed -------------------
@@ -484,15 +496,16 @@ label "Given" "a token supplied through the GH_TOKEN environment variable"
 label "When" "auth token runs while the token in storage is expired or near expiry"
 label "Then" "gh prints the environment token without refreshing it"
 cmdline "GH_TOKEN=\$($GH_DISPLAY auth token --no-refresh) $GH_DISPLAY auth token"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "GH_TOKEN=\$($GH_DISPLAY auth token --no-refresh) $GH_DISPLAY auth token" \
-  "GH_TOKEN=\$(\"$GH\" auth token --no-refresh) GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token"
+  "GH_TOKEN=\$(\"$GH\" auth token --no-refresh 2>/dev/null) GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token"
 
 label "Expected:"
 assert_out_nonempty "the environment token is printed"
 assert_no_refresh   "no refresh happened (an environment token is never refreshed)"
+assert_err_absent   "no expiry warning is printed, because an environment token is not an expiring stored token" "This token will expire"
 next_step
 
 # --- Step: token --secure-storage refreshes an expired token ------------------
@@ -500,15 +513,16 @@ label "Given" "a signed-in expiring credential"
 label "When" "auth token --secure-storage runs while the access token is expired or near expiry"
 label "Then" "gh refreshes the token and prints the refreshed value"
 cmdline "$GH_DISPLAY auth token --secure-storage"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "$GH_DISPLAY auth token --secure-storage" \
-  "GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token --secure-storage"
+  "GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token --secure-storage"
 
 label "Expected:"
 assert_out_nonempty "a token is printed"
 assert_refresh      "a refresh happened"
+assert_err_contains "a warning that the token will expire is printed to stderr" "This token will expire"
 next_step
 
 # --- Step: token --secure-storage does not refresh a valid token --------------
@@ -524,6 +538,7 @@ run_batch \
 label "Expected:"
 assert_out_nonempty "a token is printed"
 assert_no_refresh   "no refresh happened"
+assert_err_contains "a warning that the token will expire is printed to stderr" "This token will expire"
 next_step
 
 # --- Step: token --secure-storage --no-refresh never refreshes ----------------
@@ -535,19 +550,21 @@ else
   label "Then" "no refresh happens and gh prints the token straight from the keyring"
 fi
 cmdline "$GH_DISPLAY auth token --secure-storage --no-refresh"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 confirm_run
 run_batch \
   "$GH_DISPLAY auth token --secure-storage --no-refresh" \
-  "GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token --secure-storage --no-refresh"
+  "GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token --secure-storage --no-refresh"
 
 label "Expected:"
 assert_no_refresh "no refresh happened despite forced expiry"
 if [ "$THEME" = "config" ]; then
   assert_out_empty    "no token is printed (keyring-only lookup, token is in config)"
   assert_err_contains "gh reports no token found" "no oauth token found"
+  assert_err_absent   "no expiry warning is printed, because no token is printed" "This token will expire"
 else
   assert_out_nonempty "the token is printed from the keyring"
+  assert_err_contains "a warning that the token will expire is printed to stderr" "This token will expire"
 fi
 next_step
 
@@ -556,16 +573,17 @@ label "Given" "a token supplied through the GH_TOKEN environment variable"
 label "When" "auth token --secure-storage --hostname $HOST runs while the access token is expired or near expiry"
 label "Then" "gh ignores GH_TOKEN, refreshes the stored credential, and prints that value"
 cmdline "GH_TOKEN=\$($GH_DISPLAY auth token --no-refresh) $GH_DISPLAY auth token --secure-storage --hostname $HOST"
-note   "  (Expiry is forced here via the GH_AT_EXPIRES_IN test hack.)"
+note   "  (Expiry is forced here via the GH_INTERNAL_AT_EXPIRES_IN debug override.)"
 note   "  (Dropping --hostname behaves identically, since the default host resolves to $HOST.)"
 confirm_run
 run_batch \
   "GH_TOKEN=\$($GH_DISPLAY auth token --no-refresh) $GH_DISPLAY auth token --secure-storage --hostname $HOST" \
-  "GH_TOKEN=\$(\"$GH\" auth token --no-refresh) GH_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token --secure-storage --hostname \"$HOST\""
+  "GH_TOKEN=\$(\"$GH\" auth token --no-refresh 2>/dev/null) GH_INTERNAL_AT_EXPIRES_IN=1 GH_DEBUG=api \"$GH\" auth token --secure-storage --hostname \"$HOST\""
 
 label "Expected:"
 assert_out_nonempty "the stored token is printed, not the environment token"
 assert_refresh      "a refresh happened (the environment token is ignored for secure storage)"
+assert_err_contains "a warning that the token will expire is printed to stderr" "This token will expire"
 next_step
 
 # ---------------------------------------------------------------------------
@@ -585,6 +603,24 @@ run_interactive \
 
 label "Expected:"
 manual "the refresh flow completes without error"
+assert_err_contains "gh requested and received an expiring refreshable token" "Received expiring refreshable token"
+next_step
+
+# --- Step: refresh without --expiring keeps the credential refreshable ------
+label "Given" "a signed-in expiring credential"
+label "When" "we run auth refresh without --expiring"
+label "Then" "the flow completes and gh still requests an expiring token, keeping the kind of the current credential"
+cmdline "$GH_DISPLAY auth refresh --hostname $HOST --clipboard $STORE_FLAG"
+note   "  (--clipboard copies the one-time code, so you can just paste it into the browser.)"
+note   "  (With --expiring unset, refresh keeps the kind of the current token, so it asks for an expiring one.)"
+confirm_run
+run_interactive \
+  "$GH_DISPLAY auth refresh --hostname $HOST --clipboard $STORE_FLAG" \
+  "\"$GH\" auth refresh --hostname \"$HOST\" --clipboard $STORE_FLAG"
+
+label "Expected:"
+manual "the refresh flow completes without error"
+assert_err_contains "gh requested and received an expiring refreshable token" "Received expiring refreshable token"
 next_step
 
 # ---------------------------------------------------------------------------

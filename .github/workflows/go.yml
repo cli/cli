@@ -34,6 +34,10 @@ jobs:
       - name: Build
         run: go build -v ./cmd/gh
 
+      - name: Build with debug overrides
+        if: matrix.os == 'ubuntu-latest'
+        run: go build -v -tags=ghdebug ./cmd/gh
+
   integration-tests:
     env:
       GH_TOKEN: ${{ github.token }}
