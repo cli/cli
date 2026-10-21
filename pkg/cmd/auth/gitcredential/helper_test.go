@@ -281,7 +281,7 @@ func Test_helperRun(t *testing.T) {
 				username=monalisa
 				password=OTOKEN
 			`),
-			wantStderr: "WARNING: gh: this git version cannot mark the short-lived token as non-cacheable; upgrade to git 2.46 or newer, or avoid a credential caching helper, to prevent a stale token being reused\n",
+			wantStderr: "WARNING: gh: this git version cannot mark the expiring token as non-cacheable; upgrade to git 2.46 or newer, or avoid a credential caching helper, to prevent a stale token being reused\n",
 		},
 		{
 			name: "non-refreshable token, authtype capability present",

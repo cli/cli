@@ -118,7 +118,7 @@ func helperRun(opts *CredentialOptions) error {
 
 	lookupHost := wants["host"]
 	var gotUser string
-	// ActiveTokenWithRefresh refreshes an expired or near-expiry short-lived token before
+	// ActiveTokenWithRefresh refreshes an expired or near-expiry token before
 	// handing it to git; for non-refreshable tokens it is a no-op that just returns them.
 	cred, refreshStatus, _ := cfg.ActiveTokenWithRefresh(lookupHost)
 	if cred.Token == "" && strings.HasPrefix(lookupHost, "gist.") {
@@ -152,7 +152,7 @@ func helperRun(opts *CredentialOptions) error {
 		return cmdutil.SilentError
 	}
 
-	// For a short-lived, refreshable token we want to stop a caching helper chained in front of gh
+	// For an expiring, refreshable token we want to stop a caching helper chained in front of gh
 	// from persisting it, since a cached copy goes stale as soon as the token is refreshed or
 	// replaced out of band (for example by gh auth refresh or gh auth login). git offers exactly
 	// one mechanism for this: under the authtype capability (git 2.46 and newer) a helper may mark a
@@ -184,7 +184,7 @@ func helperRun(opts *CredentialOptions) error {
 	if cred.IsRefreshable() {
 		// Older git does not offer the authtype capability, so we cannot mark the token ephemeral.
 		// Warn in case a caching helper is chained in front of gh and would serve a stale token.
-		fmt.Fprint(opts.IO.ErrOut, "WARNING: gh: this git version cannot mark the short-lived token as non-cacheable; upgrade to git 2.46 or newer, or avoid a credential caching helper, to prevent a stale token being reused\n")
+		fmt.Fprint(opts.IO.ErrOut, "WARNING: gh: this git version cannot mark the expiring token as non-cacheable; upgrade to git 2.46 or newer, or avoid a credential caching helper, to prevent a stale token being reused\n")
 	}
 
 	fmt.Fprint(opts.IO.Out, "protocol=https\n")

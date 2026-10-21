@@ -42,7 +42,7 @@ type authEntry struct {
 	Refreshable           bool           `json:"refreshable,omitempty"`
 	TokenExpiresAt        *time.Time     `json:"tokenExpiresAt,omitempty"`
 	RefreshTokenExpiresAt *time.Time     `json:"refreshTokenExpiresAt,omitempty"`
-	// justRefreshed reports whether gh renewed this account's short-lived token during this run. It drives a
+	// justRefreshed reports whether gh renewed this account's expiring token during this run. It drives a
 	// display-only notice and is never serialized.
 	justRefreshed bool
 }
@@ -79,7 +79,7 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		sb.WriteString(fmt.Sprintf("  - Token: %s\n", cs.Bold(e.Token)))
 
 		if e.Refreshable {
-			sb.WriteString("  - Short-lived token that gh refreshes automatically\n")
+			sb.WriteString("  - Expiring token that gh refreshes automatically\n")
 			if e.TokenExpiresAt != nil {
 				sb.WriteString(fmt.Sprintf("  - Token expires: %s\n", cs.Bold(e.TokenExpiresAt.UTC().Format(time.RFC3339))))
 			}
@@ -138,7 +138,7 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		}
 		activeStr := fmt.Sprintf("%v", e.Active)
 		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
-		sb.WriteString("  - The stored short-lived credential was removed because its refresh token is no longer valid.\n")
+		sb.WriteString("  - The stored expiring credential was removed because its refresh token is no longer valid.\n")
 		loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
 		sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
 	}
@@ -179,7 +179,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			the command will exit with 1 and output to stderr. Note that when using the %[1]s--json%[1]s option, the command
 			will always exit with zero regardless of any authentication issues, unless there is a fatal error.
 
-			Any expired or near-expiry short-lived token that supports refreshing is refreshed automatically, unless %[1]s--no-refresh%[1]s is given.
+			Any expired or near-expiry token that supports refreshing is refreshed automatically, unless %[1]s--no-refresh%[1]s is given.
 
 			To change the active account for a host, see %[1]sgh auth switch%[1]s.
 		`, "`"),
@@ -214,7 +214,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check only a specific hostname's auth status")
 	cmd.Flags().BoolVarP(&opts.ShowToken, "show-token", "t", false, "Display the auth token")
 	cmd.Flags().BoolVarP(&opts.Active, "active", "a", false, "Display the active account only")
-	cmd.Flags().BoolVar(&opts.NoRefresh, "no-refresh", false, "Do not automatically refresh expired short-lived tokens")
+	cmd.Flags().BoolVar(&opts.NoRefresh, "no-refresh", false, "Do not automatically refresh expired tokens")
 
 	// the json flags are intentionally not given a shorthand to avoid conflict with -t/--show-token
 	cmdutil.AddJSONFlagsWithoutShorthand(cmd, &opts.Exporter, authStatusFields)
@@ -476,7 +476,7 @@ func authTokenWriteable(src string) bool {
 }
 
 // resolveCredential returns the credential gh should present for the host and optional user (an empty username means the
-// active account), refreshing an expiring short-lived token unless noRefresh is set. Refresh is best effort: a failed
+// active account), refreshing an expiring token unless noRefresh is set. Refresh is best effort: a failed
 // refresh yields the last stored credential, which the caller still validates via the scope check. The returned status
 // reports whether a refresh happened.
 func resolveCredential(authCfg gh.AuthConfig, hostname, username string, noRefresh bool) (gh.Credential, gh.RefreshStatus) {
