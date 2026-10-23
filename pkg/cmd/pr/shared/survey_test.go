@@ -195,7 +195,7 @@ editedBody
 ------------------------ >8 ------------------------
 
 Please Enter the title on the first line and the body on subsequent lines.
-Lines below dotted lines will be ignored, and an empty title aborts the creation process.`, nil
+Lines below dotted lines will be ignored, and an empty title aborts the process.`, nil
 		},
 	}
 
@@ -207,7 +207,7 @@ initialBody
 ------------------------ >8 ------------------------
 
 Please Enter the title on the first line and the body on subsequent lines.
-Lines below dotted lines will be ignored, and an empty title aborts the creation process.`, editorInitialText)
+Lines below dotted lines will be ignored, and an empty title aborts the process.`, editorInitialText)
 	assert.Equal(t, "editedTitle", title)
 	assert.Equal(t, "editedBody", body)
 }
