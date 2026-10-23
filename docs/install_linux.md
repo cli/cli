@@ -264,6 +264,9 @@ sudo apt update
 sudo apt install gh
 ```
 
+> [!WARNING]
+> The keyring downloaded by `extrepo` may differ from our published keyring, so the checksums listed at the top of this document may not apply.
+
 ### Debian Community
 
 The [GitHub CLI package](https://packages.debian.org/stable/gh) is supported by the Debian community with updates powered by [Debian Go Packaging Team](https://salsa.debian.org/go-team/packages/gh).
