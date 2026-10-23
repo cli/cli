@@ -65,7 +65,6 @@ type CommentableOptions struct {
 	AttachFlag       *attachments.Flag
 	AttachEvent      *attachments.TelemetryEvent
 	Assets           []attachments.UserAsset
-	Config           func() (gh.Config, error)
 }
 
 func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions, telemetry ghtelemetry.InvocationRecorder) error {
@@ -171,14 +170,7 @@ func CommentableRun(opts *CommentableOptions) error {
 		if err != nil {
 			return err
 		}
-		cfg, err := opts.Config()
-		if err != nil {
-			return err
-		}
-		// Asked of opts.Host, so the answer is about the host the commentable
-		// was actually fetched from.
-		tokenType := cfg.Authentication().ActiveTokenType(opts.Host)
-		uploader, err = attachments.NewUploader(httpClient, tokenType, opts.Host, commentable.RepositoryDatabaseID(), commentable.RepositoryViewerPermission())
+		uploader, err = attachments.NewUploader(httpClient, opts.Host, commentable.RepositoryDatabaseID(), commentable.RepositoryViewerPermission())
 		if err != nil {
 			return err
 		}

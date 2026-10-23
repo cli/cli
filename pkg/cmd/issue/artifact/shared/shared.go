@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/attachments"
-	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -260,7 +259,7 @@ func CheckUploadTarget(c client.ArtifactClient, repo ghrepo.Interface, number in
 // refuses a pull request like CheckIssue, from the one lookup that also
 // returns the repository ID and permission an upload needs, so a caller makes
 // no other lookup.
-func NewUploader(c client.ArtifactClient, repo ghrepo.Interface, issueNumber int, httpClient func() (*http.Client, error), config func() (gh.Config, error)) (*attachments.Uploader, error) {
+func NewUploader(c client.ArtifactClient, repo ghrepo.Interface, issueNumber int, httpClient func() (*http.Client, error)) (*attachments.Uploader, error) {
 	target, err := CheckUploadTarget(c, repo, issueNumber)
 	if err != nil {
 		return nil, err
@@ -269,12 +268,7 @@ func NewUploader(c client.ArtifactClient, repo ghrepo.Interface, issueNumber int
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := config()
-	if err != nil {
-		return nil, err
-	}
-	host := repo.RepoHost()
-	return attachments.NewUploader(hc, cfg.Authentication().ActiveTokenType(host), host, target.RepositoryID, target.ViewerPermission)
+	return attachments.NewUploader(hc, repo.RepoHost(), target.RepositoryID, target.ViewerPermission)
 }
 
 func pullRequestError(repo ghrepo.Interface, number int) error {

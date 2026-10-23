@@ -532,15 +532,8 @@ func createRun(opts *CreateOptions) error {
 	// Built before the prompts, so a run that cannot upload stops early.
 	var uploader *attachments.Uploader
 	if len(opts.Assets) > 0 {
-		cfg, err := opts.Config()
-		if err != nil {
-			return err
-		}
 		baseRepo := ctx.PRRefs.BaseRepo()
-		host := baseRepo.RepoHost()
-		tokenType := cfg.Authentication().ActiveTokenType(host)
-
-		uploader, err = attachments.NewUploader(httpClient, tokenType, host, baseRepo.DatabaseID, baseRepo.ViewerPermission)
+		uploader, err = attachments.NewUploader(httpClient, baseRepo.RepoHost(), baseRepo.DatabaseID, baseRepo.ViewerPermission)
 		if err != nil {
 			return err
 		}
