@@ -249,6 +249,14 @@ func loginRun(opts *LoginOptions) error {
 		return loginErr
 	}
 
+	// Nudge users towards expiring tokens unless they have already expressed a preference, either with the flag or
+	// the config. Enterprise Server hosts are skipped because they may not support expiring tokens.
+	if opts.IO.IsStderrTTY() && opts.Expiring == nil && !ghauth.IsEnterprise(hostname) && !shared.ShouldUseExpiring(cfg, nil, hostname) {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.ErrOut, "%s Did you know that expiring tokens can be requested with %s? Read more at %s\n",
+			cs.WarningIcon(), cs.Bold("--expiring"), "https://gh.io/gh-expiring-tokens")
+	}
+
 	helperConfig := opts.helperConfig
 	if helperConfig == nil {
 		helperConfig = &gitcredentials.HelperConfig{

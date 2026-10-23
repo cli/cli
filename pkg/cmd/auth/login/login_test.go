@@ -937,6 +937,112 @@ func Test_loginRun_Survey(t *testing.T) {
 	}
 }
 
+func Test_loginRun_expiringHint(t *testing.T) {
+	stubHomeDir(t, t.TempDir())
+
+	const hint = "! Did you know that expiring tokens can be requested with --expiring? Read more at https://gh.io/gh-expiring-tokens\n"
+
+	tests := []struct {
+		name                   string
+		hostname               string
+		stderrTTY              bool
+		expiring               *bool
+		expiringCredentialsCfg string
+		wantHint               bool
+	}{
+		{
+			name:      "shown when no preference is set",
+			hostname:  "github.com",
+			stderrTTY: true,
+			wantHint:  true,
+		},
+		{
+			name:      "not shown when stderr is not a TTY",
+			hostname:  "github.com",
+			stderrTTY: false,
+		},
+		{
+			name:      "not shown when --expiring=false is passed",
+			hostname:  "github.com",
+			stderrTTY: true,
+			expiring:  new(false),
+		},
+		{
+			name:                   "not shown when expiring_credentials is enabled",
+			hostname:               "github.com",
+			stderrTTY:              true,
+			expiringCredentialsCfg: "enabled",
+		},
+		{
+			name:      "not shown for an enterprise host",
+			hostname:  "rebecca.chambers",
+			stderrTTY: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, stderr := iostreams.Test()
+			ios.SetStderrTTY(tt.stderrTTY)
+
+			cfg, _ := config.NewIsolatedTestConfig(t, "")
+			if tt.expiringCredentialsCfg != "" {
+				cfg.Set("", "expiring_credentials", tt.expiringCredentialsCfg)
+			}
+
+			scopesPath := ""
+			if tt.hostname != "github.com" {
+				scopesPath = "api/v3/"
+			}
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(httpmock.REST("GET", scopesPath), httpmock.ScopesResponder("repo,read:org"))
+			reg.Register(
+				httpmock.GraphQL(`query UserCurrent\b`),
+				httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
+
+			pm := &prompter.PrompterMock{
+				SelectFunc: func(prompt, _ string, opts []string) (int, error) {
+					switch prompt {
+					case "What is your preferred protocol for Git operations on this host?":
+						return prompter.IndexFor(opts, "HTTPS")
+					case "How would you like to authenticate GitHub CLI?":
+						return prompter.IndexFor(opts, "Paste an authentication token")
+					}
+					return -1, prompter.NoSuchPromptErr(prompt)
+				},
+				AuthTokenFunc: func() (string, error) { return "def456", nil },
+				ConfirmFunc:   func(_ string, _ bool) (bool, error) { return false, nil },
+			}
+
+			opts := &LoginOptions{
+				IO:              ios,
+				Config:          func() (gh.Config, error) { return cfg, nil },
+				HttpClient:      func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+				PlainHttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+				Prompter:        pm,
+				GitClient:       &git.Client{GitPath: "some/path/git"},
+				Hostname:        tt.hostname,
+				Interactive:     true,
+				InsecureStorage: true,
+				Expiring:        tt.expiring,
+				helperConfig: &gitcredentials.FakeHelperConfig{
+					SelfExecutablePath: "/path/to/gh",
+					Helpers:            map[string]gitcredentials.Helper{},
+				},
+			}
+
+			require.NoError(t, loginRun(opts))
+
+			if tt.wantHint {
+				assert.Regexp(t, "^"+regexp.QuoteMeta(hint), stderr.String())
+			} else {
+				assert.NotContains(t, stderr.String(), "Did you know")
+			}
+		})
+	}
+}
+
 func Test_promptForHostname(t *testing.T) {
 	tests := []struct {
 		name          string
