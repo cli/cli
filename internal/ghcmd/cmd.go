@@ -32,6 +32,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
+	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 	xcolor "github.com/cli/go-gh/v2/pkg/x/color"
 	"github.com/cli/safeexec"
 	"github.com/mgutz/ansi"
@@ -39,6 +40,8 @@ import (
 )
 
 type exitCode int
+
+var newCmdRoot = root.NewCmdRoot
 
 const (
 	exitOK      exitCode = 0
@@ -49,6 +52,20 @@ const (
 )
 
 func Main() exitCode {
+	if isGlobalFlagRefreshWorker(os.Args) {
+		if err := runGlobalFlagRefreshWorker(
+			context.Background(),
+			os.Getenv("GH_GLOBAL_FEATURE_FLAG_SERVER_URL"),
+			ghConfig.CacheDir(),
+			build.Version,
+			os.Stderr,
+		); err != nil {
+			fmt.Fprintf(os.Stderr, "global feature flag refresh failed: %v\n", err)
+			return exitError
+		}
+		return exitOK
+	}
+
 	buildDate := build.Date
 	buildVersion := build.Version
 	hasDebug, _ := utils.IsDebugEnabled()
@@ -133,6 +150,21 @@ func Main() exitCode {
 	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
 
 	ctx := context.Background()
+	skipGlobalFlagRefresh := len(os.Args) > 1 &&
+		(os.Args[1] == "send-telemetry" || os.Args[1] == globalFlagRefreshCommand)
+	globalFlagSnapshot, globalFlagErr := loadGlobalFlagSnapshot(globalFlagStartupOptions{
+		serverURL:   os.Getenv("GH_GLOBAL_FEATURE_FLAG_SERVER_URL"),
+		cacheDir:    ghConfig.CacheDir(),
+		skipRefresh: skipGlobalFlagRefresh,
+		startRefresh: func() error {
+			return startGlobalFlagRefresh(cmdFactory.ExecutablePath)
+		},
+	})
+	cmdFactory.GlobalFlags = globalFlagSnapshot
+	if globalFlagErr != nil && hasDebug {
+		fmt.Fprintf(stderr, "warning: global feature flag startup failed: %v\n", globalFlagErr)
+	}
+
 	updateCtx, updateCancel := context.WithCancel(ctx)
 	defer updateCancel()
 	updateMessageChan := make(chan *update.ReleaseInfo)
@@ -165,7 +197,7 @@ func Main() exitCode {
 		cobra.MousetrapHelpText = ""
 	}
 
-	rootCmd, err := root.NewCmdRoot(cmdFactory, telemetryService, buildVersion, buildDate)
+	rootCmd, err := newCmdRoot(cmdFactory, telemetryService, buildVersion, buildDate)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to create root command: %s\n", err)
 		return exitError

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/detach"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/google/uuid"
@@ -464,7 +465,7 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 
 	// Configure the child process to be detached from the parent so that it can continue running
 	// after the parent exits, and so that it doesn't receive any signals sent to the parent.
-	cmd.SysProcAttr = detachAttrs()
+	cmd.SysProcAttr = detach.SysProcAttr()
 
 	// Get the write end of the stdin pipe before starting.
 	stdin, err := cmd.StdinPipe()
