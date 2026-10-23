@@ -47,6 +47,31 @@ func FuzzyAgo(a, b time.Time) string {
 	return text.RelativeTimeAgo(a, b)
 }
 
+// FuzzyIn returns a human readable description of how far b lies in the future relative to a, such as "in about 7
+// hours". Each unit is rounded to the nearest whole value rather than truncated, so a duration a hair under a round
+// boundary (for example a 6 month lifetime a second after issuance) is not reported one unit short. A value that
+// rounds up to the next unit's threshold is reported in that larger unit instead, so it never reads "60 minutes".
+func FuzzyIn(a, b time.Time) string {
+	d := b.Sub(a)
+	if d < time.Minute {
+		return "in less than a minute"
+	}
+	if minutes := int(math.Round(d.Minutes())); minutes < 60 {
+		return fmt.Sprintf("in about %s", Pluralize(minutes, "minute"))
+	}
+	if hours := int(math.Round(d.Hours())); hours < 24 {
+		return fmt.Sprintf("in about %s", Pluralize(hours, "hour"))
+	}
+	if days := int(math.Round(d.Hours() / 24)); days < 30 {
+		return fmt.Sprintf("in about %s", Pluralize(days, "day"))
+	}
+	if months := int(math.Round(d.Hours() / 24 / 30)); months < 12 {
+		return fmt.Sprintf("in about %s", Pluralize(months, "month"))
+	}
+	years := max(int(math.Round(d.Hours()/24/365)), 1)
+	return fmt.Sprintf("in about %s", Pluralize(years, "year"))
+}
+
 // FuzzyAgoAbbr is an abbreviated version of FuzzyAgo. It returns a human readable string of the
 // time duration between a and b that is estimated to the nearest unit of time.
 func FuzzyAgoAbbr(a, b time.Time) string {

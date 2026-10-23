@@ -8,7 +8,9 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -167,6 +169,8 @@ func Test_readFileRun(t *testing.T) {
 		opts       ReadFileOptions
 		httpStubs  func(*httpmock.Registry)
 		jsonFields []string
+		setup      func(t *testing.T)
+		verify     func(t *testing.T)
 		wantOut    string
 		wantStderr string
 		wantErrMsg string
@@ -195,6 +199,41 @@ func Test_readFileRun(t *testing.T) {
 				)
 			},
 			wantOut: "hello world\n",
+		},
+		{
+			name: "directory output saves only the remote basename",
+			opts: ReadFileOptions{Output: "out/"},
+			setup: func(t *testing.T) {
+				t.Helper()
+				t.Chdir(t.TempDir())
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/README.md"),
+					httpmock.JSONResponse(fileContentResponse(filepath.Join("nested", "notes.txt"), "hello world\n")),
+				)
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				entries, err := os.ReadDir("out")
+				require.NoError(t, err)
+				require.Len(t, entries, 1)
+				assert.Equal(t, "notes.txt", entries[0].Name())
+				content, err := os.ReadFile(filepath.Join("out", "notes.txt"))
+				require.NoError(t, err)
+				assert.Equal(t, "hello world\n", string(content))
+			},
+		},
+		{
+			name: "json preserves the original remote name",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/README.md"),
+					httpmock.JSONResponse(fileContentResponse(`nested\notes.txt`, "hello world\n")),
+				)
+			},
+			jsonFields: []string{"name"},
+			wantOut:    "{\"name\":\"nested\\\\notes.txt\"}\n",
 		},
 		{
 			name: "writes file content through pager (tty)",
@@ -255,7 +294,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/meta.md"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":         "file",
 						"name":         "meta.md",
 						"path":         "meta.md",
@@ -305,7 +344,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/src"),
-					httpmock.JSONResponse(map[string]interface{}{"type": "dir", "path": "src"}),
+					httpmock.JSONResponse(map[string]any{"type": "dir", "path": "src"}),
 				)
 			},
 			opts:       ReadFileOptions{Path: "src"},
@@ -317,7 +356,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/link"),
-					httpmock.JSONResponse(map[string]interface{}{"type": "symlink", "path": "link", "target": "missing.txt"}),
+					httpmock.JSONResponse(map[string]any{"type": "symlink", "path": "link", "target": "missing.txt"}),
 				)
 			},
 			opts:       ReadFileOptions{Path: "link"},
@@ -329,7 +368,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/sub"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":              "submodule",
 						"path":              "sub",
 						"submodule_git_url": "https://github.com/OWNER/sub",
@@ -418,7 +457,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/big.txt"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":     "file",
 						"name":     "big.txt",
 						"path":     "big.txt",
@@ -444,7 +483,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/big.txt"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":     "file",
 						"name":     "big.txt",
 						"path":     "big.txt",
@@ -480,7 +519,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/big.txt"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":     "file",
 						"name":     "big.txt",
 						"path":     "big.txt",
@@ -500,7 +539,7 @@ func Test_readFileRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/big.txt"),
-					httpmock.JSONResponse(map[string]interface{}{
+					httpmock.JSONResponse(map[string]any{
 						"type":     "file",
 						"name":     "big.txt",
 						"path":     "big.txt",
@@ -522,6 +561,9 @@ func Test_readFileRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup(t)
+			}
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			if tt.httpStubs != nil {
@@ -560,21 +602,40 @@ func Test_readFileRun(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantOut, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
+			if tt.verify != nil {
+				tt.verify(t)
+			}
 		})
 	}
 }
 
 func Test_writeToOutput(t *testing.T) {
+	var clobberTarget string
+	var danglingTarget string
+	var ancestorTarget string
+	var outputDirTarget string
+	var regularMode os.FileMode
+	backslashBasename := `nested\README.md`
+	backslashTraversalBasename := `..\..\README.md`
+	if runtime.GOOS == "windows" {
+		backslashBasename = "README.md"
+		backslashTraversalBasename = "README.md"
+	}
+
 	tests := []struct {
-		name      string
-		file      *repoFile
-		output    string
-		clobber   bool
-		lstat     func(path string) (*lstatResult, error)
-		wantDest  string
-		wantWrite string
-		wantDir   string
-		wantErr   string
+		name           string
+		file           *repoFile
+		output         string
+		clobber        bool
+		lstat          func(path string) (*lstatResult, error)
+		setup          func(t *testing.T)
+		useRealFS      bool
+		verify         func(t *testing.T)
+		wantDest       string
+		wantWrite      string
+		wantDir        string
+		wantLstatPaths []string
+		wantErr        string
 	}{
 		{
 			name:      "writes to a new file path",
@@ -587,17 +648,109 @@ func Test_writeToOutput(t *testing.T) {
 		},
 		{
 			name:   "directory target uses remote basename",
-			file:   &repoFile{Name: "README.md", Content: []byte("hi")},
+			file:   &repoFile{Name: "nested/README.md", Content: []byte("hi")},
 			output: "out/",
 			lstat: func(path string) (*lstatResult, error) {
-				if path == "out/" {
+				if path == "out" {
 					return &lstatResult{isDir: true}, nil
 				}
 				return nil, fs.ErrNotExist
 			},
-			wantDest:  filepath.Join("out", "README.md"),
+			wantDest:       filepath.Join("out", "README.md"),
+			wantWrite:      "hi",
+			wantDir:        "out",
+			wantLstatPaths: []string{"out", filepath.Join("out", "README.md")},
+		},
+		{
+			name:   "existing directory without separator uses remote basename",
+			file:   &repoFile{Name: "nested/README.md", Content: []byte("hi")},
+			output: "out",
+			lstat: func(path string) (*lstatResult, error) {
+				if path == "out" {
+					return &lstatResult{isDir: true}, nil
+				}
+				return nil, fs.ErrNotExist
+			},
+			wantDest:       filepath.Join("out", "README.md"),
+			wantWrite:      "hi",
+			wantDir:        "out",
+			wantLstatPaths: []string{"out", filepath.Join("out", "README.md")},
+		},
+		{
+			name:           "directory target handles native backslash separators",
+			file:           &repoFile{Name: `nested\README.md`, Content: []byte("hi")},
+			output:         "out/",
+			lstat:          func(string) (*lstatResult, error) { return nil, fs.ErrNotExist },
+			wantDest:       filepath.Join("out", backslashBasename),
+			wantWrite:      "hi",
+			wantDir:        "out",
+			wantLstatPaths: []string{"out", filepath.Join("out", backslashBasename)},
+		},
+		{
+			name:           "directory target handles native backslash parent components",
+			file:           &repoFile{Name: `..\..\README.md`, Content: []byte("hi")},
+			output:         "out/",
+			lstat:          func(string) (*lstatResult, error) { return nil, fs.ErrNotExist },
+			wantDest:       filepath.Join("out", backslashTraversalBasename),
+			wantWrite:      "hi",
+			wantDir:        "out",
+			wantLstatPaths: []string{"out", filepath.Join("out", backslashTraversalBasename)},
+		},
+		{
+			name:           "directory target uses basename of absolute remote name",
+			file:           &repoFile{Name: filepath.Join(string(os.PathSeparator), "nested", "README.md"), Content: []byte("hi")},
+			output:         "out/",
+			lstat:          func(string) (*lstatResult, error) { return nil, fs.ErrNotExist },
+			wantDest:       filepath.Join("out", "README.md"),
+			wantWrite:      "hi",
+			wantDir:        "out",
+			wantLstatPaths: []string{"out", filepath.Join("out", "README.md")},
+		},
+		{
+			name:      "explicit output retains user selected path",
+			file:      &repoFile{Name: "../remote.md", Content: []byte("hi")},
+			output:    filepath.Join("out", "nested", "local.md"),
+			lstat:     func(string) (*lstatResult, error) { return nil, fs.ErrNotExist },
+			wantDest:  filepath.Join("out", "nested", "local.md"),
 			wantWrite: "hi",
-			wantDir:   "out",
+			wantDir:   filepath.Join("out", "nested"),
+		},
+		{
+			name:   "basename collision without clobber errors",
+			file:   &repoFile{Name: "nested/README.md", Content: []byte("hi")},
+			output: "out/",
+			lstat: func(path string) (*lstatResult, error) {
+				if path == "out" {
+					return &lstatResult{isDir: true}, nil
+				}
+				return &lstatResult{}, nil
+			},
+			wantLstatPaths: []string{"out", filepath.Join("out", "README.md")},
+			wantErr:        fmt.Sprintf("output path already exists: %q (use --clobber to overwrite)", filepath.Join("out", "README.md")),
+		},
+		{
+			name:           "directory target rejects empty remote name",
+			file:           &repoFile{Name: "", Content: []byte("hi")},
+			output:         "out/",
+			lstat:          func(string) (*lstatResult, error) { return nil, fs.ErrNotExist },
+			wantLstatPaths: []string{"out"},
+			wantErr:        `invalid output filename ""`,
+		},
+		{
+			name:           "directory target rejects parent-only remote name",
+			file:           &repoFile{Name: "..", Content: []byte("hi")},
+			output:         "out/",
+			lstat:          func(string) (*lstatResult, error) { return nil, fs.ErrNotExist },
+			wantLstatPaths: []string{"out"},
+			wantErr:        `invalid output filename ".."`,
+		},
+		{
+			name:           "directory target rejects root-only remote name",
+			file:           &repoFile{Name: string(os.PathSeparator), Content: []byte("hi")},
+			output:         "out/",
+			lstat:          func(string) (*lstatResult, error) { return nil, fs.ErrNotExist },
+			wantLstatPaths: []string{"out"},
+			wantErr:        fmt.Sprintf("invalid output filename %q", string(os.PathSeparator)),
 		},
 		{
 			name:    "existing file without clobber errors",
@@ -641,41 +794,237 @@ func Test_writeToOutput(t *testing.T) {
 			},
 			wantErr: "something went wrong",
 		},
+		{
+			name:      "clobber rejects output symlink",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "README.md",
+			clobber:   true,
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				clobberTarget = filepath.Join(t.TempDir(), "target.md")
+				require.NoError(t, os.WriteFile(clobberTarget, []byte("old"), 0o644))
+				require.NoError(t, os.Symlink(clobberTarget, "README.md"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Lstat("README.md")
+				require.NoError(t, err)
+				assert.NotZero(t, info.Mode()&os.ModeSymlink)
+				content, err := os.ReadFile(clobberTarget)
+				require.NoError(t, err)
+				assert.Equal(t, "old", string(content))
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "no clobber rejects dangling final symlink",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "README.md",
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				danglingTarget = filepath.Join(t.TempDir(), "missing.md")
+				require.NoError(t, os.Symlink(danglingTarget, "README.md"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoFileExists(t, danglingTarget)
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "trailing separator rejects output symlink",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "linked/",
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				outputDirTarget = t.TempDir()
+				require.NoError(t, os.Symlink(outputDirTarget, "linked"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoFileExists(t, filepath.Join(outputDirTarget, "README.md"))
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "trailing separator clobber rejects output symlink",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "linked/",
+			clobber:   true,
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				outputDirTarget = t.TempDir()
+				require.NoError(t, os.Symlink(outputDirTarget, "linked"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Lstat("linked")
+				require.NoError(t, err)
+				assert.NotZero(t, info.Mode()&os.ModeSymlink)
+				assert.NoFileExists(t, filepath.Join(outputDirTarget, "README.md"))
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "directory output clobber rejects basename symlink",
+			file:      &repoFile{Name: "nested/README.md", Content: []byte("hi")},
+			output:    "out/",
+			clobber:   true,
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				require.NoError(t, os.Mkdir("out", 0o755))
+				clobberTarget = filepath.Join(t.TempDir(), "target.md")
+				require.NoError(t, os.WriteFile(clobberTarget, []byte("old"), 0o644))
+				require.NoError(t, os.Symlink(clobberTarget, filepath.Join("out", "README.md")))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Lstat(filepath.Join("out", "README.md"))
+				require.NoError(t, err)
+				assert.NotZero(t, info.Mode()&os.ModeSymlink)
+				content, err := os.ReadFile(clobberTarget)
+				require.NoError(t, err)
+				assert.Equal(t, "old", string(content))
+			},
+			wantErr: "output path is a symlink",
+		},
+		{
+			name:      "clobber preserves regular file mode",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    "README.md",
+			clobber:   true,
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				require.NoError(t, os.WriteFile("README.md", []byte("old"), 0o600))
+				info, err := os.Stat("README.md")
+				require.NoError(t, err)
+				regularMode = info.Mode().Perm()
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				info, err := os.Stat("README.md")
+				require.NoError(t, err)
+				assert.Equal(t, regularMode, info.Mode().Perm())
+				content, err := os.ReadFile("README.md")
+				require.NoError(t, err)
+				assert.Equal(t, "hi", string(content))
+			},
+			wantDest: "README.md",
+		},
+		{
+			name:      "allows ancestor symlink in explicit output parent",
+			file:      &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:    filepath.Join("out", "nested", "README.md"),
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				ancestorTarget = t.TempDir()
+				require.NoError(t, os.Symlink(ancestorTarget, "out"))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				content, err := os.ReadFile(filepath.Join(ancestorTarget, "nested", "README.md"))
+				require.NoError(t, err)
+				assert.Equal(t, "hi", string(content))
+			},
+			wantDest: filepath.Join("out", "nested", "README.md"),
+		},
+		{
+			name:      "directory target flattens remote parent components",
+			file:      &repoFile{Name: "../README.md", Content: []byte("hi")},
+			output:    "out/",
+			lstat:     lstat,
+			useRealFS: true,
+			setup: func(t *testing.T) {
+				t.Helper()
+				require.NoError(t, os.Mkdir("out", 0o755))
+			},
+			verify: func(t *testing.T) {
+				t.Helper()
+				assert.NoFileExists(t, "README.md")
+				content, err := os.ReadFile(filepath.Join("out", "README.md"))
+				require.NoError(t, err)
+				assert.Equal(t, "hi", string(content))
+			},
+			wantDest:       filepath.Join("out", "README.md"),
+			wantLstatPaths: []string{"out", filepath.Join("out", "README.md")},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if tt.setup != nil {
+				tt.setup(t)
+			}
+
 			var gotDir string
 			var gotWritePath string
 			var gotWriteContent []byte
+			var gotLstatPaths []string
 
-			origLstat, origMkdir, origWrite := lstatF, mkdirAllF, writeFileF
+			origLstat, origWrite := lstatF, writeOutputFile
 			defer func() {
-				lstatF, mkdirAllF, writeFileF = origLstat, origMkdir, origWrite
+				lstatF, writeOutputFile = origLstat, origWrite
 			}()
 
-			lstatF = tt.lstat
-			mkdirAllF = func(path string, _ fs.FileMode) error {
-				gotDir = path
-				return nil
+			lstatF = func(path string) (*lstatResult, error) {
+				gotLstatPaths = append(gotLstatPaths, path)
+				return tt.lstat(path)
 			}
-			writeFileF = func(path string, data []byte, _ fs.FileMode) error {
-				gotWritePath = path
-				gotWriteContent = data
-				return nil
+			if !tt.useRealFS {
+				writeOutputFile = func(dir, name string, data []byte, _ fs.FileMode, _ bool) error {
+					gotDir = dir
+					if dir == "" {
+						gotDir = filepath.Dir(name)
+						gotWritePath = name
+					} else {
+						gotDir = filepath.Clean(dir)
+						gotWritePath = filepath.Join(dir, name)
+					}
+					gotWriteContent = data
+					return nil
+				}
 			}
 
+			originalName := tt.file.Name
 			dest, err := writeToOutput(tt.file, tt.output, tt.clobber)
+			assert.Equal(t, originalName, tt.file.Name)
+			if tt.wantLstatPaths != nil {
+				assert.Equal(t, tt.wantLstatPaths, gotLstatPaths)
+			}
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
+				assert.Empty(t, gotWritePath)
+				if tt.verify != nil {
+					tt.verify(t)
+				}
 				return
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantDest, dest)
-			assert.Equal(t, tt.wantDest, gotWritePath)
-			assert.Equal(t, tt.wantWrite, string(gotWriteContent))
-			if tt.wantDir != "" {
-				assert.Equal(t, tt.wantDir, gotDir)
+			if !tt.useRealFS {
+				assert.Equal(t, tt.wantDest, gotWritePath)
+				assert.Equal(t, tt.wantWrite, string(gotWriteContent))
+				if tt.wantDir != "" {
+					assert.Equal(t, tt.wantDir, gotDir)
+				}
+			}
+			if tt.verify != nil {
+				tt.verify(t)
 			}
 		})
 	}
@@ -683,12 +1032,12 @@ func Test_writeToOutput(t *testing.T) {
 
 // fileContentResponse builds a Contents API object response for a regular file
 // with base64-encoded inline content.
-func fileContentResponse(name, content string) map[string]interface{} {
+func fileContentResponse(name, content string) map[string]any {
 	return fileContentResponseBytes(name, []byte(content))
 }
 
-func fileContentResponseBytes(name string, content []byte) map[string]interface{} {
-	return map[string]interface{}{
+func fileContentResponseBytes(name string, content []byte) map[string]any {
+	return map[string]any{
 		"type":         "file",
 		"name":         name,
 		"path":         name,
@@ -700,7 +1049,7 @@ func fileContentResponseBytes(name string, content []byte) map[string]interface{
 		"git_url":      "https://api.github.com/repos/OWNER/REPO/git/blobs/deadbeef",
 		"html_url":     "https://github.com/OWNER/REPO/blob/main/" + name,
 		"download_url": "https://raw.githubusercontent.com/OWNER/REPO/main/" + name,
-		"_links": map[string]interface{}{
+		"_links": map[string]any{
 			"self": "https://api.github.com/repos/OWNER/REPO/contents/" + name,
 			"git":  "https://api.github.com/repos/OWNER/REPO/git/blobs/deadbeef",
 			"html": "https://github.com/OWNER/REPO/blob/main/" + name,
@@ -724,28 +1073,28 @@ func Test_contentsAPIPath(t *testing.T) {
 		{
 			name:     "simple path",
 			filePath: "README.md",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+			want:     "repos/OWNER/REPO/contents/README.md",
 		},
 		{
 			name:     "leading slash trimmed",
 			filePath: "/README.md",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md",
+			want:     "repos/OWNER/REPO/contents/README.md",
 		},
 		{
 			name:     "nested path encodes separators",
 			filePath: "pkg/cmd/create.go",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/pkg%2Fcmd%2Fcreate.go",
+			want:     "repos/OWNER/REPO/contents/pkg%2Fcmd%2Fcreate.go",
 		},
 		{
 			name:     "spaces are encoded",
 			filePath: "dir with spaces/file.txt",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/dir%20with%20spaces%2Ffile.txt",
+			want:     "repos/OWNER/REPO/contents/dir%20with%20spaces%2Ffile.txt",
 		},
 		{
 			name:     "ref is appended",
 			filePath: "README.md",
 			ref:      "feature/branch",
-			want:     "https://api.github.com/repos/OWNER/REPO/contents/README.md?ref=feature%2Fbranch",
+			want:     "repos/OWNER/REPO/contents/README.md?ref=feature%2Fbranch",
 		},
 	}
 

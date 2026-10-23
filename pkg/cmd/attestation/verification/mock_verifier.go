@@ -34,12 +34,10 @@ func (v *MockSigstoreVerifier) Verify([]*api.Attestation, verify.PolicyBuilder) 
 			Statement: statement,
 			Signature: &verify.SignatureVerificationResult{
 				Certificate: &certificate.Summary{
-					Extensions: certificate.Extensions{
-						BuildSignerURI:           "https://github.com/github/example/.github/workflows/release.yml@refs/heads/main",
-						SourceRepositoryOwnerURI: "https://github.com/sigstore",
-						SourceRepositoryURI:      "https://github.com/sigstore/sigstore-js",
-						Issuer:                   "https://token.actions.githubusercontent.com",
-					},
+					BuildSignerURI:           "https://github.com/github/example/.github/workflows/release.yml@refs/heads/main",
+					SourceRepositoryOwnerURI: "https://github.com/sigstore",
+					SourceRepositoryURI:      "https://github.com/sigstore/sigstore-js",
+					Issuer:                   "https://token.actions.githubusercontent.com",
 				},
 			},
 		},
@@ -79,13 +77,11 @@ func BuildMockResult(b *bundle.Bundle, buildConfigURI, buildSignerURI, sourceRep
 			Statement: statement,
 			Signature: &verify.SignatureVerificationResult{
 				Certificate: &certificate.Summary{
-					Extensions: certificate.Extensions{
-						BuildConfigURI:           buildConfigURI,
-						BuildSignerURI:           buildSignerURI,
-						Issuer:                   issuer,
-						SourceRepositoryOwnerURI: sourceRepoOwnerURI,
-						SourceRepositoryURI:      sourceRepoURI,
-					},
+					BuildConfigURI:           buildConfigURI,
+					BuildSignerURI:           buildSignerURI,
+					Issuer:                   issuer,
+					SourceRepositoryOwnerURI: sourceRepoOwnerURI,
+					SourceRepositoryURI:      sourceRepoURI,
 				},
 			},
 		},

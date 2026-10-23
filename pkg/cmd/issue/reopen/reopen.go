@@ -128,7 +128,7 @@ func apiReopen(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue)
 		} `graphql:"reopenIssue(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.ReopenIssueInput{
 			IssueID: issue.ID,
 		},

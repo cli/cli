@@ -151,8 +151,8 @@ var portFields = []string{
 	"browseUrl",
 }
 
-func (pi *portInfo) ExportData(fields []string) map[string]interface{} {
-	data := map[string]interface{}{}
+func (pi *portInfo) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
 
 	for _, f := range fields {
 		switch f {

@@ -251,6 +251,22 @@ To upgrade:
 conda update gh --channel conda-forge
 ```
 
+### Debian (extrepo)
+
+The [extrepo tool](https://packages.debian.org/stable/extrepo) and [GitHub CLI repository metadata](https://salsa.debian.org/extrepo-team/extrepo-data/-/blob/master/repos/debian/github-cli.yaml) are supported by the Debian community. The packages installed from the configured repository are the [official GitHub CLI packages](#debian).
+
+To install:
+
+```shell
+sudo apt install extrepo
+sudo extrepo enable github-cli
+sudo apt update
+sudo apt install gh
+```
+
+> [!WARNING]
+> The keyring downloaded by `extrepo` may differ from our published keyring, so the checksums listed at the top of this document may not apply.
+
 ### Debian Community
 
 The [GitHub CLI package](https://packages.debian.org/stable/gh) is supported by the Debian community with updates powered by [Debian Go Packaging Team](https://salsa.debian.org/go-team/packages/gh).
@@ -380,11 +396,13 @@ pkgin install gh
 
 The [GitHub CLI package](https://search.nixos.org/packages?query=gh&sort=relevance&show=gh) is supported by the NixOS community with updates powered by [NixOS/nixpkgs](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name/gh/gh).
 
-To install:
+For temporary use:
 
 ```bash
-nix-env -iA nixos.gh
+nix-shell -p gh
 ```
+
+For permanent installation, see the [NixOS package instructions](https://search.nixos.org/packages?query=gh&sort=relevance&show=gh) to declare `pkgs.gh` in your NixOS configuration or Home Manager.
 
 ### OpenBSD
 

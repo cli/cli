@@ -3,10 +3,13 @@ package extension
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -78,7 +81,8 @@ func TestRepoExists(t *testing.T) {
 			exists, err := repoExists(client, repo)
 
 			assert.False(t, exists)
-			requireExtensionHTTPError(t, err, status)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), fmt.Sprintf("unexpected HTTP %d", status))
 		})
 	}
 }
@@ -229,4 +233,85 @@ func TestFetchReleaseFromTag(t *testing.T) {
 			require.EqualError(t, err, "unexpected end of JSON input")
 		})
 	}
+}
+
+// TestFetchCommitSHA covers the two things that kept this site on the raw client: the custom
+// Accept media type that makes the API answer with a bare SHA, and the 422 sentinel.
+func TestFetchCommitSHA(t *testing.T) {
+	repo := ghrepo.New("OWNER", "REPO")
+
+	t.Run("sends the sha media type and returns the bare body", func(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+
+		reg.Register(
+			func(req *http.Request) bool {
+				return req.URL.Path == "/repos/OWNER/REPO/commits/main" &&
+					req.Header.Get("Accept") == "application/vnd.github.v3.sha"
+			},
+			httpmock.StatusStringResponse(http.StatusOK, "0123456789abcdef"),
+		)
+
+		sha, err := fetchCommitSHA(&http.Client{Transport: reg}, repo, "main")
+
+		require.NoError(t, err)
+		assert.Equal(t, "0123456789abcdef", sha)
+	})
+
+	t.Run("unprocessable entity means the commit was not found", func(t *testing.T) {
+		client := extensionHTTPClient(t, "repos/OWNER/REPO/commits/nope", http.StatusUnprocessableEntity, `{"message":"No commit found"}`)
+
+		_, err := fetchCommitSHA(client, repo, "nope")
+
+		require.ErrorIs(t, err, commitNotFoundErr)
+	})
+
+	t.Run("other errors are reported", func(t *testing.T) {
+		client := extensionHTTPClient(t, "repos/OWNER/REPO/commits/main", http.StatusInternalServerError, `{"message":"Internal Server Error"}`)
+
+		_, err := fetchCommitSHA(client, repo, "main")
+
+		requireExtensionHTTPError(t, err, http.StatusInternalServerError)
+	})
+}
+
+// TestDownloadAsset pins the octet-stream media type, without which the API returns asset
+// metadata as JSON rather than the binary itself.
+func TestDownloadAsset(t *testing.T) {
+	t.Run("sends the octet-stream media type and writes the body", func(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+
+		reg.Register(
+			func(req *http.Request) bool {
+				return req.URL.String() == "https://example.com/release/cool" &&
+					req.Header.Get("Accept") == "application/octet-stream"
+			},
+			httpmock.StatusStringResponse(http.StatusOK, "BINARY"),
+		)
+
+		destPath := filepath.Join(t.TempDir(), "gh-cool")
+		err := downloadAsset(&http.Client{Transport: reg}, "github.com", safeurl.NewImmutableSafeURL("https://example.com/release/cool"), destPath)
+
+		require.NoError(t, err)
+		contents, err := os.ReadFile(destPath)
+		require.NoError(t, err)
+		assert.Equal(t, "BINARY", string(contents))
+	})
+
+	t.Run("errors are reported", func(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+
+		reg.Register(
+			httpmock.REST(http.MethodGet, "release/cool"),
+			httpmock.StatusStringResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+		)
+
+		destPath := filepath.Join(t.TempDir(), "gh-cool")
+		err := downloadAsset(&http.Client{Transport: reg}, "github.com", safeurl.NewImmutableSafeURL("https://example.com/release/cool"), destPath)
+
+		requireExtensionHTTPError(t, err, http.StatusNotFound)
+		assert.NoFileExists(t, destPath)
+	})
 }

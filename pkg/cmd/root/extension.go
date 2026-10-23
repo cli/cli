@@ -43,8 +43,7 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 		RunE: func(c *cobra.Command, args []string) error {
 			args = append([]string{ext.Name()}, args...)
 			if _, err := em.Dispatch(args, io.In, io.Out, io.ErrOut); err != nil {
-				var execError *exec.ExitError
-				if errors.As(err, &execError) {
+				if execError, ok := errors.AsType[*exec.ExitError](err); ok {
 					return &ExternalCommandExitError{execError}
 				}
 				return fmt.Errorf("failed to run extension: %w\n", err)
@@ -84,7 +83,7 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 	// organization names), so we must not record telemetry for them by
 	// default. Official GitHub-owned extensions are a known, fixed set and
 	// can safely contribute their command name to telemetry.
-	if !extensions.IsOfficial(ext.Name(), ext.Owner()) {
+	if !extensions.IsOfficial(ext) {
 		cmdutil.DisableTelemetry(cmd)
 	}
 

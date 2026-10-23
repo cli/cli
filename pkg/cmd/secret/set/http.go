@@ -72,7 +72,7 @@ func getEnvPubKey(client *api.Client, repo ghrepo.Interface, envName string) (*P
 	return getPubKey(client, repo.RepoHost(), u)
 }
 
-func putSecret(client *api.Client, host string, path safeurl.SafeURL, payload interface{}) error {
+func putSecret(client *api.Client, host string, path safeurl.SafeURL, payload any) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)

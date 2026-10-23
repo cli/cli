@@ -556,7 +556,7 @@ func hasNoToken(hostname string) tokenAssertion {
 	return func(t *testing.T, cfg gh.Config) {
 		t.Helper()
 
-		token, _ := cfg.Authentication().ActiveToken(hostname)
+		token := cfg.Authentication().ActiveToken(hostname).Token
 		require.Empty(t, token)
 	}
 }
@@ -565,7 +565,7 @@ func hasActiveToken(hostname string, expectedToken string) tokenAssertion {
 	return func(t *testing.T, cfg gh.Config) {
 		t.Helper()
 
-		token, _ := cfg.Authentication().ActiveToken(hostname)
+		token := cfg.Authentication().ActiveToken(hostname).Token
 		require.Equal(t, expectedToken, token)
 	}
 }

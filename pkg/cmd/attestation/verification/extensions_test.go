@@ -13,11 +13,10 @@ func createSampleResult() *AttestationProcessingResult {
 		VerificationResult: &verify.VerificationResult{
 			Signature: &verify.SignatureVerificationResult{
 				Certificate: &certificate.Summary{
-					Extensions: certificate.Extensions{
-						SourceRepositoryOwnerURI: "https://github.com/owner",
-						SourceRepositoryURI:      "https://github.com/owner/repo",
-						Issuer:                   "https://token.actions.githubusercontent.com",
-					},
+					SourceRepositoryOwnerURI: "https://github.com/owner",
+					SourceRepositoryURI:      "https://github.com/owner/repo",
+					Issuer:                   "https://token.actions.githubusercontent.com",
+					SourceRepositoryRef:      "refs/heads/main",
 				},
 			},
 		},
@@ -27,10 +26,12 @@ func createSampleResult() *AttestationProcessingResult {
 func TestVerifyCertExtensions(t *testing.T) {
 	results := []*AttestationProcessingResult{createSampleResult()}
 
-	certSummary := certificate.Summary{}
-	certSummary.SourceRepositoryOwnerURI = "https://github.com/owner"
-	certSummary.SourceRepositoryURI = "https://github.com/owner/repo"
-	certSummary.Issuer = GitHubOIDCIssuer
+	certSummary := certificate.Summary{
+		SourceRepositoryOwnerURI: "https://github.com/owner",
+		SourceRepositoryURI:      "https://github.com/owner/repo",
+		Issuer:                   GitHubOIDCIssuer,
+		SourceRepositoryRef:      "refs/heads/main",
+	}
 
 	c := EnforcementCriteria{
 		Certificate: certSummary,
@@ -88,10 +89,18 @@ func TestVerifyCertExtensions(t *testing.T) {
 	})
 
 	t.Run("with partial OIDCIssuer match", func(t *testing.T) {
-		expectedResults := results
+		expectedResults := []*AttestationProcessingResult{createSampleResult()}
 		expectedResults[0].VerificationResult.Signature.Certificate.Extensions.Issuer = "https://token.actions.githubusercontent.com/foo-bar"
 		verified, err := VerifyCertExtensions(expectedResults, c)
 		require.ErrorContains(t, err, "expected Issuer to be https://token.actions.githubusercontent.com, got https://token.actions.githubusercontent.com/foo-bar -- if you have a custom OIDC issuer")
+		require.Nil(t, verified)
+	})
+
+	t.Run("with wrong case-sensitive SourceRepositoryRef", func(t *testing.T) {
+		expectedResults := []*AttestationProcessingResult{createSampleResult()}
+		expectedResults[0].VerificationResult.Signature.Certificate.Extensions.SourceRepositoryRef = "refs/heads/MAIN"
+		verified, err := VerifyCertExtensions(expectedResults, c)
+		require.ErrorContains(t, err, "expected SourceRepositoryRef to be refs/heads/main, got refs/heads/MAIN")
 		require.Nil(t, verified)
 	})
 }

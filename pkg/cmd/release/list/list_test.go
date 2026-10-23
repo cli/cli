@@ -172,7 +172,7 @@ func Test_listRun(t *testing.T) {
 								}
 							]
 						} } } }`, createdAt.Format(time.RFC3339)),
-					func(s string, m map[string]interface{}) {
+					func(s string, m map[string]any) {
 						// Assert "immutable" field is requested
 						assert.Regexp(t, `\bimmutable\b`, s)
 					},
@@ -229,7 +229,7 @@ func Test_listRun(t *testing.T) {
 								}
 							]
 						} } } }`, createdAt.Format(time.RFC3339)),
-					func(s string, m map[string]interface{}) {
+					func(s string, m map[string]any) {
 						// Assert "immutable" field is NOT requested
 						assert.NotRegexp(t, `\bimmutable\b`, s)
 					},

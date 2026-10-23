@@ -173,8 +173,7 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 		}
 
 		if err != nil {
-			var httpErr api.HTTPError
-			if errors.As(err, &httpErr) {
+			if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
 				if httpErr.StatusCode == http.StatusNotFound {
 					if opts.Ref == "" {
 						err = fmt.Errorf("%s Could not find a cache matching %s in %s", cs.FailureIcon(), cache, repoName)

@@ -260,7 +260,7 @@ func Test_readDirRun(t *testing.T) {
 									]
 								}}}
 							}`),
-						func(_ string, vars map[string]interface{}) {
+						func(_ string, vars map[string]any) {
 							assert.Equal(t, "HEAD:foo/bar", vars["expression"])
 						},
 					),
@@ -294,7 +294,7 @@ func Test_readDirRun(t *testing.T) {
 									]
 								}}}
 							}`),
-						func(_ string, vars map[string]interface{}) {
+						func(_ string, vars map[string]any) {
 							assert.Equal(t, "v1.2.3:docs", vars["expression"])
 						},
 					),

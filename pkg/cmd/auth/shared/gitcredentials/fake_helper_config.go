@@ -10,11 +10,18 @@ import (
 type FakeHelperConfig struct {
 	SelfExecutablePath string
 	Helpers            map[string]Helper
+
+	// ConfigureOursErr, when set, is returned by ConfigureOurs without configuring anything.
+	ConfigureOursErr error
 }
 
 // ConfigureOurs sets up the git credential helper chain to use the GitHub CLI credential helper for git repositories
 // including gists.
 func (hc *FakeHelperConfig) ConfigureOurs(hostname string) error {
+	if hc.ConfigureOursErr != nil {
+		return hc.ConfigureOursErr
+	}
+
 	credHelperKeys := []string{
 		keyFor(hostname),
 	}

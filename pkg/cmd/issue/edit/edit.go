@@ -1,6 +1,8 @@
 package edit
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -10,8 +12,10 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/attachments"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -49,13 +53,20 @@ type EditOptions struct {
 	AddBlocking     []string
 	RemoveBlocking  []string
 
+	BodyDir     string
+	AttachFlag  *attachments.Flag
+	AttachEvent *attachments.TelemetryEvent
+	Assets      []attachments.UserAsset
+	Config      func() (gh.Config, error)
+
 	prShared.Editable
 }
 
-func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
+func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
 		IO:                 f.IOStreams,
 		HttpClient:         f.HttpClient,
+		Config:             f.Config,
 		DetermineEditor:    func() (string, error) { return cmdutil.DetermineEditor(f.Config) },
 		FieldsToEditSurvey: prShared.FieldsToEditSurvey,
 		EditFieldsSurvey:   prShared.EditFieldsSurvey,
@@ -76,6 +87,22 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			Editing issues' projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 
+			Use %[1]s--attach%[1]s to upload an image or video to a single issue. Without a body
+			flag the issue keeps the body it already has and the attachment is appended to it.
+			If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
+			reference is rewritten to point at the uploaded asset instead. Paths in a
+			%[1]s--body-file%[1]s are relative to its directory, falling back to the working directory.
+			You can attach up to 50 files per command.
+
+			Alt text for an image follows the path after %[1]s#%[1]s, as in
+			%[1]s--attach './login.png#The login error state'%[1]s. Without it the filename is used.
+			A reference already in the body keeps the alt text written there. Video renders
+			as a player and has no alt text, so it cannot be given any.
+
+			If some attachments upload and others fail, the issue is still updated with the
+			ones that succeeded. The command then exits with a non-zero status, but the edited
+			issue URLs are still printed to stdout.
+
 			The %[1]s--add-assignee%[1]s and %[1]s--remove-assignee%[1]s flags both support
 			the following special values:
 			- %[1]s@me%[1]s: assign or unassign yourself
@@ -90,6 +117,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --milestone "Version 1"
 			$ gh issue edit 23 --remove-milestone
 			$ gh issue edit 23 --body-file body.txt
+			$ gh issue edit 23 --attach './login.png#The login error state'
+			$ gh issue edit 23 --attach ./before.png --attach ./after.png
 			$ gh issue edit 23 34 --add-label "help wanted"
 			$ gh issue edit 23 --type Bug
 			$ gh issue edit 23 --remove-type
@@ -133,11 +162,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if bodyProvided || bodyFileProvided {
 				opts.Editable.Body.Edited = true
 				if bodyFileProvided {
-					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					opts.Editable.Body.Value, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 					if err != nil {
 						return err
 					}
-					opts.Editable.Body.Value = string(b)
 				}
 			}
 
@@ -189,22 +217,20 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				opts.Editable.IssueType.Edited = true
 			}
 
-			// hasDeferredFlags covers edit flags that flow through the
-			// deferred update path rather than the prShared.Editable struct,
-			// so they would otherwise be invisible to Editable.Dirty() below.
-			// Note that --type (set) is intentionally absent: it lights up
-			// opts.Editable.IssueType.Edited above, which Editable.Dirty()
-			// already picks up. Only --remove-type needs to be listed here.
-			hasDeferredFlags := opts.RemoveIssueType ||
-				flags.Changed("parent") || opts.RemoveParent ||
-				len(opts.AddSubIssues) > 0 || len(opts.RemoveSubIssues) > 0 ||
-				len(opts.AddBlockedBy) > 0 || len(opts.RemoveBlockedBy) > 0 ||
-				len(opts.AddBlocking) > 0 || len(opts.RemoveBlocking) > 0
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
+			opts.Assets, err = opts.AttachFlag.UserAssets()
+			if err != nil {
+				return err
+			}
+
+			// An empty --parent resolves to no work, so it counts as an edit
+			// only here, where passing the flag at all suppresses the survey.
+			hasDeferredFlags := opts.hasDeferredEdits() || flags.Changed("parent")
 
 			editorFlagChanged := flags.Changed("editor")
 			editorModeExplicit := editorFlagChanged && opts.EditorMode
-			hasExplicitEdit := opts.Editable.Dirty() || hasDeferredFlags
-			if editorModeExplicit || (!editorFlagChanged && !hasExplicitEdit) {
+			hasExplicitEdit := opts.Editable.Dirty() || hasDeferredFlags || len(opts.Assets) > 0
+			if editorModeExplicit || (!editorFlagChanged && !hasExplicitEdit && f.Config != nil) {
 				opts.EditorMode, err = prShared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
 				if err != nil {
 					return err
@@ -216,7 +242,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			}
 
 			// Drop into interactive mode only if the user passed no edit flags at all.
-			if !opts.Editable.Dirty() && !hasDeferredFlags && !opts.EditorMode {
+			if !opts.Editable.Dirty() && !hasDeferredFlags && len(opts.Assets) == 0 && !opts.EditorMode {
 				opts.Interactive = true
 			}
 
@@ -234,6 +260,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			if opts.EditorMode && len(opts.IssueNumbers) > 1 {
 				return cmdutil.FlagErrorf("multiple issues cannot be edited with --editor")
+			}
+
+			if len(opts.IssueNumbers) > 1 && len(opts.Assets) > 0 {
+				return cmdutil.FlagErrorf("`--attach` cannot be used when editing multiple issues")
 			}
 
 			if runF != nil {
@@ -266,8 +296,21 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.AddBlocking, "add-blocking", nil, "Add 'blocking' relationships by issue `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.RemoveBlocking, "remove-blocking", nil, "Remove 'blocking' relationships by issue `number` or URL")
 	cmd.Flags().BoolVarP(&opts.EditorMode, "editor", "e", false, "Skip prompts and open the text editor to write the title and body in. The first line is the title and the remaining text is the body.")
+	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	return cmd
+}
+
+// hasDeferredEdits reports whether the run asks for an edit that the deferred
+// update path applies, which Editable.Dirty() cannot see. Setting --type is
+// absent because it sets Editable.IssueType.Edited, which Dirty() already
+// covers; only --remove-type arrives here.
+func (opts *EditOptions) hasDeferredEdits() bool {
+	return opts.RemoveIssueType ||
+		opts.Parent != "" || opts.RemoveParent ||
+		len(opts.AddSubIssues) > 0 || len(opts.RemoveSubIssues) > 0 ||
+		len(opts.AddBlockedBy) > 0 || len(opts.RemoveBlockedBy) > 0 ||
+		len(opts.AddBlocking) > 0 || len(opts.RemoveBlocking) > 0
 }
 
 func editRun(opts *EditOptions) error {
@@ -283,17 +326,12 @@ func editRun(opts *EditOptions) error {
 
 	// Prompt the user which fields they'd like to edit.
 	editable := opts.Editable
-	editorTitle, editorTitleProvided := editable.Title.Value, editable.Title.Edited
 	editable.IssueType.Selectable = true
 	if opts.Interactive {
 		err = opts.FieldsToEditSurvey(opts.Prompter, &editable)
 		if err != nil {
 			return err
 		}
-	}
-	if opts.EditorMode {
-		editable.Title.Edited = true
-		editable.Body.Edited = true
 	}
 
 	if opts.Detector == nil {
@@ -338,11 +376,47 @@ func editRun(opts *EditOptions) error {
 	if opts.Parent != "" || opts.RemoveParent {
 		lookupFields = append(lookupFields, "parent")
 	}
+	if len(opts.Assets) > 0 {
+		lookupFields = append(lookupFields, "repository")
+	}
 
 	// Get all specified issues and make sure they are within the same repo.
 	issues, err := issueShared.FindIssuesOrPRs(httpClient, baseRepo, opts.IssueNumbers, lookupFields)
 	if err != nil {
 		return err
+	}
+
+	// NewCmdEdit rejects --attach for more than one issue, so issues[0] is the
+	// only issue. This is the earliest its repository id and permission exist,
+	// so a run that cannot upload stops before any write.
+	var uploader *attachments.Uploader
+	if len(opts.Assets) > 0 {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+		host := baseRepo.RepoHost()
+		tokenType := cfg.Authentication().ActiveTokenType(host)
+		uploader, err = attachments.NewUploader(httpClient, tokenType, host, issues[0].RepositoryDatabaseID(), issues[0].RepositoryViewerPermission())
+		if err != nil {
+			return err
+		}
+	}
+
+	if opts.EditorMode {
+		initialTitle := issues[0].Title
+		if editable.Title.Edited {
+			initialTitle = editable.Title.Value
+		}
+		editable.Title.Edited = true
+		editable.Body.Edited = true
+		editable.Title.Value, editable.Body.Value, err = opts.TitledEditSurvey(initialTitle, issues[0].Body)
+		if err != nil {
+			return err
+		}
+		if editable.Title.Value == "" {
+			return fmt.Errorf("title can't be blank")
+		}
 	}
 
 	// Fetch editable shared fields once for all issues.
@@ -368,6 +442,43 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
+	// Resolve issue type ID before uploading in non-interactive mode.
+	// Interactive mode resolves after the survey sets the value.
+	var issueTypeID string
+	if !opts.Interactive {
+		issueTypeID, err = lookupIssueTypeID(&editable)
+		if err != nil {
+			return err
+		}
+	}
+
+	var uploadErr error
+	if uploader != nil {
+		// A body the caller supplied replaces the issue's, including an empty
+		// one.
+		body := editable.Body.Value
+		if !editable.Body.Edited {
+			body = issues[0].Body
+		}
+
+		// This sits outside the loop below so each file uploads once, and
+		// Clone carries the merged body into the issue. Nothing that can
+		// prompt or cancel may follow an upload.
+		var uploadResult attachments.UploadResult
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.BodyDir, opts.Assets)
+		opts.AttachEvent.RecordOperations(uploadResult)
+
+		if uploadResult.Uploaded > 0 {
+			editable.Body.Value = body
+			editable.Body.Edited = true
+		} else {
+			// The caller's body was written to carry an attachment that never
+			// arrived, so it does not replace what the issue has. Every other
+			// field the caller asked for still applies.
+			editable.Body.Edited = false
+		}
+	}
+
 	// Update all issues in parallel.
 	editedIssueChan := make(chan string, len(issues))
 	failedIssueChan := make(chan string, len(issues))
@@ -376,16 +487,6 @@ func editRun(opts *EditOptions) error {
 	// Only show progress if we will not prompt below or the survey will break up the progress indicator.
 	if !opts.Interactive && !opts.EditorMode {
 		opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
-	}
-
-	// Resolve issue type ID up front for non-interactive mode; interactive
-	// mode resolves after the survey sets the value (inside the loop).
-	var issueTypeID string
-	if !opts.Interactive {
-		issueTypeID, err = lookupIssueTypeID(&editable)
-		if err != nil {
-			return err
-		}
 	}
 
 	for _, issue := range issues {
@@ -418,19 +519,7 @@ func editRun(opts *EditOptions) error {
 		}
 
 		// Allow interactive prompts for one issue; failed earlier if multiple issues specified.
-		if opts.EditorMode {
-			initialTitle := issue.Title
-			if editorTitleProvided {
-				initialTitle = editorTitle
-			}
-			editable.Title.Value, editable.Body.Value, err = opts.TitledEditSurvey(initialTitle, issue.Body)
-			if err != nil {
-				return err
-			}
-			if editable.Title.Value == "" {
-				return fmt.Errorf("title can't be blank")
-			}
-		} else if opts.Interactive {
+		if opts.Interactive {
 			editorCommand, err := opts.DetermineEditor()
 			if err != nil {
 				return err
@@ -482,8 +571,14 @@ func editRun(opts *EditOptions) error {
 	}
 
 	sort.Strings(editedIssueURLs)
-	for _, editedIssueURL := range editedIssueURLs {
-		fmt.Fprintln(opts.IO.Out, editedIssueURL)
+	// Attaching is the only edit this command drops after parsing the flags,
+	// so it is the only way to reach here with nothing written. An upload that
+	// placed a file sets the body edited, so a dirty editable means a write.
+	nothingWritten := len(opts.Assets) > 0 && !editable.Dirty() && !opts.hasDeferredEdits()
+	if !nothingWritten {
+		for _, editedIssueURL := range editedIssueURLs {
+			fmt.Fprintln(opts.IO.Out, editedIssueURL)
+		}
 	}
 
 	// Print a sorted list of failures to stderr.
@@ -498,10 +593,12 @@ func editRun(opts *EditOptions) error {
 	}
 
 	if len(failedIssueErrors) > 0 {
-		return fmt.Errorf("failed to update %s", text.Pluralize(len(failedIssueErrors), "issue"))
+		// A failed upload and a failed write have different remedies, so the
+		// write failure cannot stand in for both.
+		return errors.Join(uploadErr, fmt.Errorf("failed to update %s", text.Pluralize(len(failedIssueErrors), "issue")))
 	}
 
-	return nil
+	return uploadErr
 }
 
 // lookupIssueTypeID resolves the chosen issue type to its node ID using the

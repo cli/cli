@@ -44,6 +44,7 @@ func TestFindByID(t *testing.T) {
 
 func TestInstallDir(t *testing.T) {
 	t.Setenv(claudeConfigDirEnv, "")
+	t.Setenv(piCodingAgentDirEnv, "")
 
 	tests := []struct {
 		name    string
@@ -90,13 +91,32 @@ func TestInstallDir(t *testing.T) {
 		{
 			name: "claude code user scope, respect env var",
 			setup: func(t *testing.T) {
-				t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join("/home", "monalisa", ".config", "claude"))
+				t.Setenv(claudeConfigDirEnv, filepath.Join("/home", "monalisa", ".config", "claude"))
 			},
 			hostID:  "claude-code",
 			scope:   ScopeUser,
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
 			wantDir: filepath.Join("/home", "monalisa", ".config", "claude", "skills"),
+		},
+		{
+			name:    "pi user scope",
+			hostID:  "pi",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".pi", "agent", "skills"),
+		},
+		{
+			name: "pi user scope, respect env var",
+			setup: func(t *testing.T) {
+				t.Setenv(piCodingAgentDirEnv, filepath.Join("/home", "monalisa", ".config", "pi", "agent"))
+			},
+			hostID:  "pi",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home", "monalisa", ".config", "pi", "agent", "skills"),
 		},
 		{
 			name:    "cursor project scope",
@@ -113,6 +133,14 @@ func TestInstallDir(t *testing.T) {
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
 			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
+		},
+		{
+			name:    "codex user scope",
+			hostID:  "codex",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".agents", "skills"),
 		},
 		{
 			name:    "gemini project scope",

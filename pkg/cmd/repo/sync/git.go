@@ -2,7 +2,6 @@ package sync
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cli/cli/v2/git"
 )
@@ -10,6 +9,7 @@ import (
 type gitClient interface {
 	CurrentBranch() (string, error)
 	UpdateBranch(string, string) error
+	Worktrees() ([]git.Worktree, error)
 	CreateBranch(string, string, string) error
 	Fetch(string, string) error
 	HasLocalBranch(string) bool
@@ -23,13 +23,20 @@ type gitExecuter struct {
 	client *git.Client
 }
 
+// UpdateBranch moves branch to ref. It uses `git branch --force` rather than
+// `git update-ref` because update-ref will happily move a branch that is checked out in
+// another worktree, leaving that worktree's index and working tree stale.
 func (g *gitExecuter) UpdateBranch(branch, ref string) error {
-	cmd, err := g.client.Command(context.Background(), "update-ref", fmt.Sprintf("refs/heads/%s", branch), ref)
+	cmd, err := g.client.Command(context.Background(), "branch", "--force", "--", branch, ref)
 	if err != nil {
 		return err
 	}
 	_, err = cmd.Output()
 	return err
+}
+
+func (g *gitExecuter) Worktrees() ([]git.Worktree, error) {
+	return g.client.Worktrees(context.Background())
 }
 
 func (g *gitExecuter) CreateBranch(branch, ref, upstream string) error {

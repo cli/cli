@@ -136,7 +136,7 @@ func TestCloseRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation IssueClose\b`),
 					httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "THE-ID", inputs["issueId"])
 						}),
 				)
@@ -164,7 +164,7 @@ func TestCloseRun(t *testing.T) {
             { "data": { "addComment": { "commentEdge": { "node": {
               "url": "https://github.com/OWNER/REPO/issues/123#issuecomment-456"
             } } } } }`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "THE-ID", inputs["subjectId"])
 							assert.Equal(t, "closing comment", inputs["body"])
 						}),
@@ -172,7 +172,7 @@ func TestCloseRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation IssueClose\b`),
 					httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, "THE-ID", inputs["issueId"])
 						}),
 				)
@@ -197,7 +197,7 @@ func TestCloseRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation IssueClose\b`),
 					httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, 2, len(inputs))
 							assert.Equal(t, "THE-ID", inputs["issueId"])
 							assert.Equal(t, "NOT_PLANNED", inputs["stateReason"])
@@ -224,7 +224,7 @@ func TestCloseRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation IssueClose\b`),
 					httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, 2, len(inputs))
 							assert.Equal(t, "THE-ID", inputs["issueId"])
 							assert.Equal(t, "DUPLICATE", inputs["stateReason"])
@@ -259,7 +259,7 @@ func TestCloseRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation IssueClose\b`),
 					httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
-						func(inputs map[string]interface{}) {
+						func(inputs map[string]any) {
 							assert.Equal(t, 3, len(inputs))
 							assert.Equal(t, "THE-ID", inputs["issueId"])
 							assert.Equal(t, "DUPLICATE", inputs["stateReason"])

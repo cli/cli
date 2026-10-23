@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/telemetry"
+	"github.com/cli/cli/v2/pkg/cmd/skills/install"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -104,7 +105,7 @@ func TestNewCmdSearch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{}
 			var gotOpts *SearchOptions
-			cmd := NewCmdSearch(f, &telemetry.NoOpService{}, func(opts *SearchOptions) error {
+			cmd := NewCmdSearch(f, &telemetry.EventRecorderSpy{}, func(opts *SearchOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -463,6 +464,70 @@ func TestExtractSkillInfo(t *testing.T) {
 	}
 }
 
+func TestInstallCommandArgs(t *testing.T) {
+	tests := []struct {
+		name       string
+		resultPath string
+		wantSkill  string
+		want       []string
+	}{
+		{
+			name:       "namespaced skill",
+			resultPath: "skills/monalisa/code-review/SKILL.md",
+			wantSkill:  "skills/monalisa/code-review",
+			want: []string{
+				"skills", "install",
+				"--agent", "github-copilot",
+				"--scope", "project",
+				"--",
+				"org/repo", "skills/monalisa/code-review",
+			},
+		},
+		{
+			name:       "flag-like result path",
+			resultPath: "--option/skills/monalisa/code-review/SKILL.md",
+			wantSkill:  "--option/skills/monalisa/code-review",
+			want: []string{
+				"skills", "install",
+				"--agent", "github-copilot",
+				"--scope", "project",
+				"--",
+				"org/repo", "--option/skills/monalisa/code-review",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := deduplicateResults([]codeSearchItem{{
+				Path:       tt.resultPath,
+				Repository: codeSearchRepository{FullName: "org/repo"},
+			}})
+			require.Len(t, results, 1)
+
+			args := installCommandArgs(results[0], "github-copilot", "project")
+			assert.Equal(t, tt.want, args)
+
+			var installOpts *install.InstallOptions
+			cmd := install.NewCmdInstall(&cmdutil.Factory{}, &telemetry.NoOpService{}, func(opts *install.InstallOptions) error {
+				installOpts = opts
+				return nil
+			})
+			cmd.SetArgs(args[2:])
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+
+			_, err := cmd.ExecuteC()
+			require.NoError(t, err)
+			require.NotNil(t, installOpts)
+			assert.Equal(t, "org/repo", installOpts.SkillSource)
+			assert.Equal(t, tt.wantSkill, installOpts.SkillName)
+			assert.Equal(t, "github-copilot", installOpts.Agent)
+			assert.Equal(t, "project", installOpts.Scope)
+		})
+	}
+}
+
 func TestFilterByRelevance(t *testing.T) {
 	skills := []skillResult{
 		{Repo: "org/repo1", Owner: "org", RepoName: "repo1", SkillName: "terraform"},
@@ -636,9 +701,10 @@ func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 	// The search command no longer records a separate skill_search event;
 	// only the follow-up skill_search_install event fires when the user
 	// proceeds to install from the results.
-	require.Len(t, recorder.Events, 1)
+	events := recorder.Events()
+	require.Len(t, events, 1)
 
-	installEvent := recorder.Events[0]
+	installEvent := events[0]
 	assert.Equal(t, "skill_search_install", installEvent.Type,
 		"an install triggered from search results should be recorded as a distinct event")
 	assert.Equal(t, int64(1), installEvent.Measures["install_count"],

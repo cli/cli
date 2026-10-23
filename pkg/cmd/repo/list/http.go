@@ -34,12 +34,9 @@ func listRepos(client *http.Client, hostname string, limit int, owner string, fi
 		return searchRepos(client, hostname, limit, owner, filter)
 	}
 
-	perPage := limit
-	if perPage > 100 {
-		perPage = 100
-	}
+	perPage := min(limit, 100)
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"perPage": githubv4.Int(perPage),
 	}
 
@@ -138,12 +135,9 @@ func searchRepos(client *http.Client, hostname string, limit int, owner string, 
 		}
 	}`, api.RepositoryGraphQL(filter.Fields))
 
-	perPage := limit
-	if perPage > 100 {
-		perPage = 100
-	}
+	perPage := min(limit, 100)
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"query":   githubv4.String(searchQuery(owner, filter)),
 		"perPage": githubv4.Int(perPage),
 	}

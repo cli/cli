@@ -7,10 +7,21 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// stubAuthConfig is a test double for the transport's token source. It returns a fixed credential and never
+// simulates a refresh.
+type stubAuthConfig struct {
+	cred gh.Credential
+}
+
+func (s stubAuthConfig) ActiveTokenWithRefresh(string) (gh.Credential, gh.RefreshStatus, error) {
+	return s.cred, gh.RefreshStatusUnnecessary, nil
+}
 
 func TestGetJobRequiresRepoAndJobID(t *testing.T) {
 	client := &CAPIClient{}
@@ -167,7 +178,7 @@ func TestGetJob(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			capiClient := NewCAPIClient(httpClient, "", "github.com", "https://api.githubcopilot.com")
+			capiClient := NewCAPIClient(httpClient, stubAuthConfig{}, "github.com", "https://api.githubcopilot.com")
 
 			job, err := capiClient.GetJob(context.Background(), "OWNER", "REPO", "job123")
 
@@ -233,7 +244,7 @@ func TestCreateJob(t *testing.T) {
 								"updated_at": "%[1]s"
 							}
 						`, sampleDateString),
-						func(payload map[string]interface{}) {
+						func(payload map[string]any) {
 							assert.Equal(t, "Do the thing", payload["problem_statement"])
 							assert.Equal(t, "gh_cli", payload["event_type"])
 						},
@@ -280,10 +291,10 @@ func TestCreateJob(t *testing.T) {
 								"updated_at": "%[1]s"
 							}
 						`, sampleDateString),
-						func(payload map[string]interface{}) {
+						func(payload map[string]any) {
 							assert.Equal(t, "Do the thing", payload["problem_statement"])
 							assert.Equal(t, "gh_cli", payload["event_type"])
-							assert.Equal(t, "refs/heads/some-branch", payload["pull_request"].(map[string]interface{})["base_ref"])
+							assert.Equal(t, "refs/heads/some-branch", payload["pull_request"].(map[string]any)["base_ref"])
 						},
 					),
 				)
@@ -329,7 +340,7 @@ func TestCreateJob(t *testing.T) {
 								"updated_at": "%[1]s"
 							}
 						`, sampleDateString),
-						func(payload map[string]interface{}) {
+						func(payload map[string]any) {
 							assert.Equal(t, "Do the thing", payload["problem_statement"])
 							assert.Equal(t, "gh_cli", payload["event_type"])
 							assert.Equal(t, "my-custom-agent", payload["custom_agent"])
@@ -410,7 +421,7 @@ func TestCreateJob(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			capiClient := NewCAPIClient(httpClient, "", "github.com", "https://api.githubcopilot.com")
+			capiClient := NewCAPIClient(httpClient, stubAuthConfig{}, "github.com", "https://api.githubcopilot.com")
 
 			job, err := capiClient.CreateJob(context.Background(), "OWNER", "REPO", "Do the thing", tt.baseBranch, tt.customAgent)
 

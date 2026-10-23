@@ -2,6 +2,12 @@
 Thank you for contributing to GitHub CLI!
 
 If you are proposing a fix for a security issue, STOP and follow .github/SECURITY.md instead.
+
+Keep the entire pull request self-contained, reviewer-facing, and diegetic: describe the
+change, rationale, and evidence within the context of the repository and pull request. Do not
+narrate how the pull request was produced or refer to private conversations, prior agent work,
+or other behind-the-scenes context. Omit those details unless they materially affect review;
+if they do, state the relevant fact and its significance directly.
 -->
 
 <!-- List related issues here. Use `fixes` or `closes` keywords to associate an issue number. -->
@@ -18,19 +24,23 @@ background they need before the problem makes sense, and avoid jargon.
 ### How did you test this change?
 
 <!--
-Show how you exercised the change yourself, as a user of `gh` would.
+Report only actions you actually performed and results you actually observed, using factual
+first-person language (for example, "I ran..." and "I saw..."). Do not present planned,
+hypothetical, inferred, or merely expected scenarios as testing.
 
 Automated test results do not belong here. Passing unit tests, `go test ./...` output, and
 coverage numbers tell a reviewer nothing they cannot see from CI, so do not paste them.
+
+If you did not exercise the changed behavior, write `Not tested` and explain why.
 
 Use one or more of these, whichever communicates best:
 
 1. Screenshots or GIFs of the real command running. Preferred whenever the change is visible
    in terminal output. If output changed, show it before and after.
-2. Given/When/Then scenarios. For example:
-   Given I am in a repo with no open pull requests
-   When I run `gh pr list`
-   Then I see "no open pull requests in cli/cli"
+2. Given/When/Then scenarios, but only when you actually executed the steps. For example:
+   Given I was in a repo with no open pull requests
+   When I ran `gh pr list`
+   Then I saw "no open pull requests in cli/cli"
 3. A natural language walkthrough of what you did by hand, the states you covered, and what
    you saw, including error and edge cases.
 

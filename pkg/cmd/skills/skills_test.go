@@ -11,7 +11,7 @@ import (
 )
 
 func TestSkillCommandsAreSampledAt100(t *testing.T) {
-	spy := &telemetry.CommandRecorderSpy{}
+	spy := &telemetry.InvocationRecorderSpy{}
 	factory := &cmdutil.Factory{}
 	cmd := skills.NewCmdSkills(factory, spy)
 	cmd.PersistentPreRunE(nil, []string{})

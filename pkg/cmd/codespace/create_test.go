@@ -104,7 +104,7 @@ func TestApp_Create(t *testing.T) {
 				machine:         "GIGA",
 				showStatus:      false,
 				idleTimeout:     30 * time.Minute,
-				retentionPeriod: NullableDuration{durationPtr(48 * time.Hour)},
+				retentionPeriod: NullableDuration{new(48 * time.Hour)},
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
@@ -710,10 +710,10 @@ func TestBuildDisplayName(t *testing.T) {
 }
 
 type MockSurveyPrompter struct {
-	AskFunc func(qs []*survey.Question, response interface{}) error
+	AskFunc func(qs []*survey.Question, response any) error
 }
 
-func (m *MockSurveyPrompter) Ask(qs []*survey.Question, response interface{}) error {
+func (m *MockSurveyPrompter) Ask(qs []*survey.Question, response any) error {
 	return m.AskFunc(qs, response)
 }
 
@@ -815,7 +815,7 @@ func TestHandleAdditionalPermissions(t *testing.T) {
 
 			params := &api.CreateCodespaceParams{}
 			_, err := a.handleAdditionalPermissions(context.Background(), &MockSurveyPrompter{
-				AskFunc: func(qs []*survey.Question, response interface{}) error {
+				AskFunc: func(qs []*survey.Question, response any) error {
 					*response.(*struct{ Accept string }) = struct{ Accept string }{Accept: tt.accept}
 					return nil
 				},
@@ -864,8 +864,4 @@ func apiCreateDefaults(c *apiClientMock) *apiClientMock {
 		}
 	}
 	return c
-}
-
-func durationPtr(d time.Duration) *time.Duration {
-	return &d
 }

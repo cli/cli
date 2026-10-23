@@ -96,7 +96,7 @@ func statusRun(opts *StatusOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		data := map[string]interface{}{
+		data := map[string]any{
 			"createdBy": issuePayload.Authored.Issues,
 			"assigned":  issuePayload.Assigned.Issues,
 			"mentioned": issuePayload.Mentioned.Issues,

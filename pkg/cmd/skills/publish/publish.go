@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -262,7 +263,7 @@ func publishRun(opts *PublishOptions) error {
 
 		// Validate allowed-tools is string, not array
 		if raw, ok := result.RawYAML["allowed-tools"]; ok {
-			if _, isSlice := raw.([]interface{}); isSlice {
+			if _, isSlice := raw.([]any); isSlice {
 				diagnostics = append(diagnostics, publishDiagnostic{
 					skill:    skill.DisplayName(),
 					severity: "error",
@@ -272,7 +273,7 @@ func publishRun(opts *PublishOptions) error {
 		}
 
 		// Check for install metadata that should be stripped
-		if meta, ok := result.RawYAML["metadata"].(map[string]interface{}); ok {
+		if meta, ok := result.RawYAML["metadata"].(map[string]any); ok {
 			githubKeys := findGitHubMetadataKeys(meta)
 			if len(githubKeys) > 0 {
 				if opts.Fix {
@@ -452,12 +453,7 @@ func repoHasTopic(client *api.Client, host, owner, repo string) bool {
 	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
 		return false
 	}
-	for _, t := range resp.Names {
-		if t == "agent-skills" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(resp.Names, "agent-skills")
 }
 
 // fetchTags returns the most recent tags from the repo.
@@ -605,7 +601,7 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 	}
 
 	// Create release via REST API
-	releaseBody := map[string]interface{}{
+	releaseBody := map[string]any{
 		"tag_name":               tag,
 		"generate_release_notes": true,
 	}
@@ -718,10 +714,8 @@ func addAgentSkillsTopic(client *api.Client, host, owner, repo string) error {
 	}
 
 	// Deduplicate: only add if not already present
-	for _, t := range resp.Names {
-		if t == "agent-skills" {
-			return nil
-		}
+	if slices.Contains(resp.Names, "agent-skills") {
+		return nil
 	}
 
 	topics := append(resp.Names, "agent-skills")
@@ -827,7 +821,7 @@ func checkSecuritySettings(client *api.Client, host, owner, repo string, skillDi
 		if u, err := safeurl.JoinPath("repos", owner, repo, "code-scanning", "alerts"); err == nil {
 			u.SetQuery("per_page", "1")
 			u.SetQuery("state", "open")
-			if err := client.REST(host, "GET", u.String(), nil, new([]interface{})); err != nil {
+			if err := client.REST(host, "GET", u.String(), nil, new([]any)); err != nil {
 				diagnostics = append(diagnostics, publishDiagnostic{
 					severity: "info",
 					message:  "skills include code files but code scanning does not appear to be configured (Settings > Code security > Code scanning)",
@@ -1128,7 +1122,7 @@ func renderDiagnosticsPlain(opts *PublishOptions, diagnostics []publishDiagnosti
 }
 
 // findGitHubMetadataKeys returns metadata keys with the "github-" prefix.
-func findGitHubMetadataKeys(meta map[string]interface{}) []string {
+func findGitHubMetadataKeys(meta map[string]any) []string {
 	var keys []string
 	for k := range meta {
 		if strings.HasPrefix(k, "github-") {
@@ -1146,7 +1140,7 @@ func stripGitHubMetadata(content string) (string, error) {
 		return "", err
 	}
 
-	meta, ok := result.RawYAML["metadata"].(map[string]interface{})
+	meta, ok := result.RawYAML["metadata"].(map[string]any)
 	if !ok {
 		return content, nil
 	}

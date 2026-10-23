@@ -148,14 +148,14 @@ func safeClose(closer io.Closer, err *error) {
 var hasTTY = term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 
 type SurveyPrompter interface {
-	Ask(qs []*survey.Question, response interface{}) error
+	Ask(qs []*survey.Question, response any) error
 }
 
 type Prompter struct{}
 
 // ask asks survey questions on the terminal, using standard options.
 // It fails unless hasTTY, but ideally callers should avoid calling it in that case.
-func (p *Prompter) Ask(qs []*survey.Question, response interface{}) error {
+func (p *Prompter) Ask(qs []*survey.Question, response any) error {
 	if !hasTTY {
 		return fmt.Errorf("no terminal")
 	}

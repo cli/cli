@@ -220,7 +220,7 @@ func (c *discussionClient) List(repo ghrepo.Interface, filters ListFilters, afte
 		}
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":      githubv4.String(repo.RepoOwner()),
 		"name":       githubv4.String(repo.RepoName()),
 		"after":      (*githubv4.String)(nil),
@@ -364,7 +364,7 @@ func (c *discussionClient) Search(repo ghrepo.Interface, filters SearchFilters, 
 		searchQuery += " " + filters.Keywords
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"query": githubv4.String(searchQuery),
 		"after": (*githubv4.String)(nil),
 	}
@@ -421,7 +421,7 @@ func (c *discussionClient) GetByNumber(repo ghrepo.Interface, number int32) (*Di
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  githubv4.String(repo.RepoOwner()),
 		"name":   githubv4.String(repo.RepoName()),
 		"number": githubv4.Int(number),
@@ -562,7 +562,7 @@ func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int32, 
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  githubv4.String(repo.RepoOwner()),
 		"name":   githubv4.String(repo.RepoName()),
 		"number": githubv4.Int(number),
@@ -675,7 +675,7 @@ func (c *discussionClient) GetCommentReplies(host string, commentID string, limi
 		} `graphql:"node(id: $commentID)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"commentID": githubv4.ID(commentID),
 		"first":     (*githubv4.Int)(nil),
 		"last":      (*githubv4.Int)(nil),
@@ -794,7 +794,7 @@ func (c *discussionClient) ListCategories(repo ghrepo.Interface) ([]DiscussionCa
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),
 	}
@@ -838,7 +838,7 @@ func (c *discussionClient) getRepositoryMeta(repo ghrepo.Interface) (*repository
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repo.RepoOwner()),
 		"name":  githubv4.String(repo.RepoName()),
 	}
@@ -872,7 +872,7 @@ func (c *discussionClient) ListLabels(repo ghrepo.Interface) ([]DiscussionLabel,
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
@@ -917,7 +917,7 @@ func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussio
 			} `graphql:"removeLabelsFromLabelable(input: $input)"`
 		}
 
-		variables := map[string]interface{}{
+		variables := map[string]any{
 			"input": githubv4.RemoveLabelsFromLabelableInput{
 				LabelableID: githubv4.ID(discussionID),
 				LabelIDs:    ids,
@@ -946,7 +946,7 @@ func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussio
 			} `graphql:"addLabelsToLabelable(input: $input)"`
 		}
 
-		variables := map[string]interface{}{
+		variables := map[string]any{
 			"input": githubv4.AddLabelsToLabelableInput{
 				LabelableID: githubv4.ID(discussionID),
 				LabelIDs:    ids,
@@ -983,7 +983,7 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 		} `graphql:"createDiscussion(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.CreateDiscussionInput{
 			RepositoryID: githubv4.ID(meta.ID),
 			CategoryID:   githubv4.ID(input.CategoryID),
@@ -1041,10 +1041,10 @@ func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionI
 			DiscussionID: githubv4.ID(input.DiscussionID),
 		}
 		if input.Title != nil {
-			gqlInput.Title = githubv4.NewString(githubv4.String(*input.Title))
+			gqlInput.Title = new(githubv4.String(*input.Title))
 		}
 		if input.Body != nil {
-			gqlInput.Body = githubv4.NewString(githubv4.String(*input.Body))
+			gqlInput.Body = new(githubv4.String(*input.Body))
 		}
 		if input.CategoryID != nil {
 			id := githubv4.ID(*input.CategoryID)
@@ -1059,7 +1059,7 @@ func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionI
 			} `graphql:"updateDiscussion(input: $input)"`
 		}
 
-		variables := map[string]interface{}{
+		variables := map[string]any{
 			"input": gqlInput,
 		}
 
@@ -1131,7 +1131,7 @@ func (c *discussionClient) AddComment(repo ghrepo.Interface, discussionID, body,
 		input.ReplyToID = &id
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": input,
 	}
 
@@ -1180,7 +1180,7 @@ func (c *discussionClient) UpdateComment(repo ghrepo.Interface, commentID, body 
 		} `graphql:"updateDiscussionComment(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.UpdateDiscussionCommentInput{
 			CommentID: githubv4.ID(commentID),
 			Body:      githubv4.String(body),
@@ -1220,7 +1220,7 @@ func (c *discussionClient) DeleteComment(repo ghrepo.Interface, commentID string
 		} `graphql:"deleteDiscussionComment(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": githubv4.DeleteDiscussionCommentInput{
 			ID: githubv4.ID(commentID),
 		},
@@ -1255,7 +1255,7 @@ func (c *discussionClient) GetComment(host string, commentID string) (*Discussio
 		} `graphql:"node(id: $id)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"id": githubv4.ID(commentID),
 	}
 

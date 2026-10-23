@@ -57,7 +57,7 @@ func listOrgs(httpClient *http.Client, hostname string, limit int) (*Organizatio
 	listResult := OrganizationList{}
 	listResult.User = user
 	pageLimit := min(limit, 100)
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"user": user,
 	}
 
@@ -88,11 +88,4 @@ loop:
 	}
 
 	return &listResult, nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

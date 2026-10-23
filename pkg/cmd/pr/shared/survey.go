@@ -156,12 +156,7 @@ type RepoMetadataFetcher interface {
 
 func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState, projectsV1Support gh.ProjectsV1Support, reviewerSearchFunc func(string) prompter.MultiSelectSearchResult, assigneeSearchFunc func(string) prompter.MultiSelectSearchResult) error {
 	isChosen := func(m string) bool {
-		for _, c := range state.Metadata {
-			if m == c {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(state.Metadata, m)
 	}
 
 	allowReviewers := state.Type == PRMetadata

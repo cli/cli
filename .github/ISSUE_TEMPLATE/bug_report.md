@@ -7,6 +7,14 @@ assignees: ''
 
 ---
 
+<!--
+For security vulnerabilities, first report through GitHub's bug bounty program:
+https://hackerone.com/github
+For other security-related concerns or questions, report privately through GitHub
+Security Advisories: https://github.com/cli/cli/security/advisories
+Do not use public issues for security reports or questions.
+-->
+
 ### Describe the bug
 
 A clear and concise description of what the bug is. 

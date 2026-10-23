@@ -96,7 +96,7 @@ func TestRenameRun(t *testing.T) {
 		nontty     bool
 		stdin      string
 		wantOut    string
-		wantParams map[string]interface{}
+		wantParams map[string]any
 	}{
 		{
 			name:    "no such gist",
@@ -123,9 +123,9 @@ func TestRenameRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantParams: map[string]interface{}{
-				"files": map[string]interface{}{
-					"new.txt": map[string]interface{}{
+			wantParams: map[string]any{
+				"files": map[string]any{
+					"new.txt": map[string]any{
 						"filename": "new.txt",
 						"type":     "text/plain",
 					},

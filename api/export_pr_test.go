@@ -414,10 +414,10 @@ func TestIssue_ExportData(t *testing.T) {
 			enc.SetIndent("", "\t")
 			require.NoError(t, enc.Encode(exported))
 
-			var gotData interface{}
+			var gotData any
 			dec = json.NewDecoder(&buf)
 			require.NoError(t, dec.Decode(&gotData))
-			var expectData interface{}
+			var expectData any
 			require.NoError(t, json.Unmarshal([]byte(tt.outputJSON), &expectData))
 
 			assert.Equal(t, expectData, gotData)
@@ -460,6 +460,26 @@ func TestPullRequest_ExportData(t *testing.T) {
 						"dueOn": null
 					},
 					"number": 2345
+				}
+			`),
+		},
+		{
+			// The upload path needs a numeric id and a viewer permission,
+			// which this selection cannot provide. Sharing one Go type with
+			// that path once put both keys here, always zero. This row fails
+			// if that happens again.
+			name:   "head repository",
+			fields: []string{"headRepository"},
+			inputJSON: heredoc.Doc(`
+				{ "headRepository": {"id": "R_kgDOAAA", "name": "REPO", "nameWithOwner": "OWNER/REPO"} }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"headRepository": {
+						"id": "R_kgDOAAA",
+						"name": "REPO",
+						"nameWithOwner": "OWNER/REPO"
+					}
 				}
 			`),
 		},
@@ -649,10 +669,10 @@ func TestPullRequest_ExportData(t *testing.T) {
 			enc.SetIndent("", "\t")
 			require.NoError(t, enc.Encode(exported))
 
-			var gotData interface{}
+			var gotData any
 			dec = json.NewDecoder(&buf)
 			require.NoError(t, dec.Decode(&gotData))
-			var expectData interface{}
+			var expectData any
 			require.NoError(t, json.Unmarshal([]byte(tt.outputJSON), &expectData))
 
 			assert.Equal(t, expectData, gotData)

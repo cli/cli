@@ -14,7 +14,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
@@ -567,25 +566,24 @@ func parseTopics(s string) []string {
 }
 
 func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "topics")
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "topics")
 	if err != nil {
 		return nil, err
 	}
 
 	// "mercy-preview" is still needed for some GitHub Enterprise versions
-	req.Header.Set("Accept", "application/vnd.github.mercy-preview+json")
-	res, err := httpClient.Do(req)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	res, err := api.NewClientFromHTTP(httpClient).RequestWithContext(ctx, repo.RepoHost(), http.MethodGet, path.String(), nil,
+		api.WithHeader("Accept", "application/vnd.github.mercy-preview+json"))
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, api.HandleHTTPError(res)
+		return nil, api.UnexpectedStatusError(res)
 	}
 
 	var responseData struct {
@@ -608,26 +606,25 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 		return err
 	}
 
-	url, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "topics")
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, "PUT", url.String(), body)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "topics")
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("Content-type", "application/json")
 	// "mercy-preview" is still needed for some GitHub Enterprise versions
-	req.Header.Set("Accept", "application/vnd.github.mercy-preview+json")
-	res, err := httpClient.Do(req)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	res, err := api.NewClientFromHTTP(httpClient).RequestWithContext(ctx, repo.RepoHost(), http.MethodPut, path.String(), body,
+		api.WithHeader("Content-Type", "application/json"),
+		api.WithHeader("Accept", "application/vnd.github.mercy-preview+json"))
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return api.HandleHTTPError(res)
+		return api.UnexpectedStatusError(res)
 	}
 
 	if res.Body != nil {

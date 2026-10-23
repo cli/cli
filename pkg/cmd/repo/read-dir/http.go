@@ -60,8 +60,8 @@ func (e dirEntry) modeOctal() string {
 }
 
 // ExportData implements the cmdutil exportable interface for a single entry.
-func (e dirEntry) ExportData(fields []string) map[string]interface{} {
-	data := map[string]interface{}{}
+func (e dirEntry) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
 	for _, field := range fields {
 		switch field {
 		case "name":
@@ -88,7 +88,7 @@ func (e dirEntry) ExportData(fields []string) map[string]interface{} {
 			if e.Submodule == nil {
 				data[field] = nil
 			} else {
-				data[field] = map[string]interface{}{
+				data[field] = map[string]any{
 					"gitUrl":              e.Submodule.GitURL,
 					"branch":              e.Submodule.Branch,
 					"subprojectCommitOid": e.Submodule.SubprojectCommitOid,
@@ -103,12 +103,12 @@ func (e dirEntry) ExportData(fields []string) map[string]interface{} {
 //
 // gitSHA and id are structural and always present; the requested fields select
 // which properties appear on each entry.
-func (d *repoDir) ExportData(fields []string) map[string]interface{} {
-	entries := make([]interface{}, 0, len(d.Entries))
+func (d *repoDir) ExportData(fields []string) map[string]any {
+	entries := make([]any, 0, len(d.Entries))
 	for _, e := range d.Entries {
 		entries = append(entries, e.ExportData(fields))
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"gitSHA":  d.GitSHA,
 		"id":      d.ID,
 		"entries": entries,
@@ -162,7 +162,7 @@ func fetchTree(httpClient *http.Client, repo ghrepo.Interface, dirPath, ref stri
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":      githubv4.String(repo.RepoOwner()),
 		"name":       githubv4.String(repo.RepoName()),
 		"expression": githubv4.String(expression),

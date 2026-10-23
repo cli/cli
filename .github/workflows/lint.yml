@@ -7,6 +7,8 @@ on:
       - "**.go"
       - go.mod
       - go.sum
+      - ".github/golangci-lint-version"
+      - ".github/govulncheck-version"
       - ".github/licenses.tmpl"
       - ".github/workflows/lint.yml"
       - "script/licenses"
@@ -15,6 +17,8 @@ on:
       - "**.go"
       - go.mod
       - go.sum
+      - ".github/golangci-lint-version"
+      - ".github/govulncheck-version"
       - ".github/licenses.tmpl"
       - ".github/workflows/lint.yml"
       - "script/licenses"
@@ -32,25 +36,15 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Ensure go.mod and go.sum are up to date
+      - name: Ensure Go source and modules are up to date
         run: |
-          STATUS=0
-          assert-nothing-changed() {
-            local diff
-            "$@" >/dev/null || return 1
-            if ! diff="$(git diff -U1 --color --exit-code)"; then
-              printf '\e[31mError: running `\e[1m%s\e[22m` results in modifications that you must check into version control:\e[0m\n%s\n\n' "$*" "$diff" >&2
-              git checkout -- .
-              STATUS=1
-            fi
-          }
-          assert-nothing-changed go mod tidy
-          exit $STATUS
+          go mod tidy -diff
+          go fix -diff ./...
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.12.2
+          version-file: .github/golangci-lint-version
 
       # Verify that license generation succeeds for all release platforms (GOOS/GOARCH).
       # This catches issues like new dependencies with unrecognized licenses before release time.
@@ -83,4 +77,5 @@ jobs:
       # Since our builds do not use `-buildvcs=false`, we run in source mode here instead.
       - name: Check Go vulnerabilities
         run: |
-          go run golang.org/x/vuln/cmd/govulncheck@d1f380186385b4f64e00313f31743df8e4b89a77 ./...
+          govulncheck_version=$(grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' .github/govulncheck-version)
+          go run "golang.org/x/vuln/cmd/govulncheck@$govulncheck_version" ./...

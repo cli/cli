@@ -93,6 +93,94 @@ func TestFetchRefSHA(t *testing.T) {
 	}
 }
 
+func TestFetchLatestRelease(t *testing.T) {
+	tests := []struct {
+		name           string
+		responseStatus int
+		responseBody   string
+		expectedTag    string
+		expectedErr    error
+		errorMessage   string
+	}{
+		{
+			name:           "found (200)",
+			responseStatus: 200,
+			responseBody:   `{"tag_name": "v1.2.3"}`,
+			expectedTag:    "v1.2.3",
+		},
+		{
+			name:           "not found (404)",
+			responseStatus: 404,
+			expectedErr:    ErrReleaseNotFound,
+		},
+		{
+			name:           "server error (500)",
+			responseStatus: 500,
+			errorMessage:   "HTTP 500",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeHTTP := &httpmock.Registry{}
+			defer fakeHTTP.Verify(t)
+
+			repo, err := ghrepo.FromFullName("owner/repo")
+			require.NoError(t, err)
+
+			if tt.responseStatus > 299 {
+				fakeHTTP.Register(
+					httpmock.REST("GET", "repos/owner/repo/releases/latest"),
+					httpmock.JSONErrorResponse(tt.responseStatus, api.HTTPError{
+						StatusCode: tt.responseStatus,
+						Message:    "some error",
+					}),
+				)
+			} else {
+				fakeHTTP.Register(
+					httpmock.REST("GET", "repos/owner/repo/releases/latest"),
+					httpmock.StatusStringResponse(tt.responseStatus, tt.responseBody),
+				)
+			}
+
+			release, err := FetchLatestRelease(context.Background(), &http.Client{Transport: fakeHTTP}, repo)
+
+			switch {
+			case tt.expectedErr != nil:
+				require.ErrorIs(t, err, tt.expectedErr)
+			case tt.errorMessage != "":
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMessage)
+			default:
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedTag, release.TagName)
+			}
+		})
+	}
+}
+
+// TestFetchReleaseNotFoundWhenBothLookupsMiss pins the sentinel that FetchRelease reports when
+// neither the published nor the draft lookup finds a release, since the published lookup now
+// recognises a miss from an HTTPError rather than from the response status directly.
+func TestFetchReleaseNotFoundWhenBothLookupsMiss(t *testing.T) {
+	fakeHTTP := &httpmock.Registry{}
+
+	repo, err := ghrepo.FromFullName("owner/repo")
+	require.NoError(t, err)
+
+	fakeHTTP.Register(
+		httpmock.REST("GET", "repos/owner/repo/releases/tags/v9.9.9"),
+		httpmock.JSONErrorResponse(404, api.HTTPError{StatusCode: 404, Message: "Not Found"}),
+	)
+	fakeHTTP.Register(
+		httpmock.GraphQL(`query RepositoryReleaseByTag\b`),
+		httpmock.StringResponse(`{"data": {"repository": {"release": null}}}`),
+	)
+
+	_, err = FetchRelease(context.Background(), &http.Client{Transport: fakeHTTP}, repo, "v9.9.9")
+	require.ErrorIs(t, err, ErrReleaseNotFound)
+}
+
 func TestDigestAlgForRef(t *testing.T) {
 	tests := []struct {
 		name     string

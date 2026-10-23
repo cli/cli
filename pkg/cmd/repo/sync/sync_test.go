@@ -2,8 +2,13 @@ package sync
 
 import (
 	"bytes"
+	stdctx "context"
+	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/context"
@@ -14,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdSync(t *testing.T) {
@@ -98,6 +104,156 @@ func TestNewCmdSync(t *testing.T) {
 			assert.Equal(t, tt.output.Force, gotOpts.Force)
 		})
 	}
+}
+
+// initSyncTestRepo creates a fresh git repository on branch "trunk" with an
+// isolated config and a configured identity, returning its directory.
+func initSyncTestRepo(t *testing.T) string {
+	t.Helper()
+	git.IsolateConfig(t)
+	repoDir := t.TempDir()
+	runGit(t, repoDir, "init", "--quiet", "--initial-branch=trunk")
+	runGit(t, repoDir, "config", "user.name", "Test User")
+	runGit(t, repoDir, "config", "user.email", "test@example.com")
+	return repoDir
+}
+
+func TestExecuteLocalRepoSyncNonCurrentBranch(t *testing.T) {
+	t.Run("branch checked out in another worktree", func(t *testing.T) {
+		repoDir := initSyncTestRepo(t)
+		worktreeDir := filepath.Join(t.TempDir(), "trunk-worktree")
+
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("old\n"), 0o600))
+		runGit(t, repoDir, "add", "file.txt")
+		runGit(t, repoDir, "commit", "--quiet", "--message=initial")
+		runGit(t, repoDir, "switch", "--quiet", "--create", "test")
+		runGit(t, repoDir, "worktree", "add", "--quiet", worktreeDir, "trunk")
+		originalBranch := runGit(t, repoDir, "rev-parse", "trunk")
+
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("new\n"), 0o600))
+		runGit(t, repoDir, "commit", "--quiet", "--all", "--message=upstream")
+		runGit(t, repoDir, "fetch", "--quiet", ".", "test")
+
+		opts := &SyncOptions{
+			Branch: "trunk",
+			Git:    &gitExecuter{client: &git.Client{RepoDir: repoDir}},
+		}
+
+		err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
+		require.ErrorContains(t, err, `can't sync "trunk" because it's checked out in another worktree at `)
+		// Assert on the directory name rather than the full path because git reports the
+		// symlink-resolved path, which differs from t.TempDir() on macOS.
+		require.ErrorContains(t, err, filepath.Base(worktreeDir))
+		require.ErrorContains(t, err, "tip: run `gh repo sync` from that worktree instead")
+		require.Equal(t, originalBranch, runGit(t, repoDir, "rev-parse", "trunk"))
+		require.Empty(t, runGit(t, worktreeDir, "status", "--porcelain"))
+	})
+
+	t.Run("branch associated with prunable worktree", func(t *testing.T) {
+		repoDir := initSyncTestRepo(t)
+		worktreeDir := filepath.Join(t.TempDir(), "missing-trunk-worktree")
+
+		runGit(t, repoDir, "commit", "--quiet", "--allow-empty", "--message=initial")
+		runGit(t, repoDir, "switch", "--quiet", "--create", "test")
+		runGit(t, repoDir, "worktree", "add", "--quiet", worktreeDir, "trunk")
+		require.NoError(t, os.RemoveAll(worktreeDir))
+		runGit(t, repoDir, "commit", "--quiet", "--allow-empty", "--message=upstream")
+		runGit(t, repoDir, "fetch", "--quiet", ".", "test")
+
+		opts := &SyncOptions{
+			Branch: "trunk",
+			Git:    &gitExecuter{client: &git.Client{RepoDir: repoDir}},
+		}
+
+		err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
+		require.ErrorContains(t, err, `can't sync "trunk" because stale worktree metadata still associates it with `)
+		require.ErrorContains(t, err, filepath.Base(worktreeDir))
+		require.ErrorContains(t, err, "tip: run `git worktree prune` and retry")
+	})
+
+	t.Run("fast-forwards non-current branch", func(t *testing.T) {
+		repoDir := initSyncTestRepo(t)
+
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("old\n"), 0o600))
+		runGit(t, repoDir, "add", "file.txt")
+		runGit(t, repoDir, "commit", "--quiet", "--message=initial")
+		runGit(t, repoDir, "switch", "--quiet", "--create", "test")
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("new\n"), 0o600))
+		runGit(t, repoDir, "commit", "--quiet", "--all", "--message=upstream")
+		runGit(t, repoDir, "fetch", "--quiet", ".", "test")
+
+		opts := &SyncOptions{
+			Branch: "trunk",
+			Git:    &gitExecuter{client: &git.Client{RepoDir: repoDir}},
+		}
+
+		err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
+		require.NoError(t, err)
+		require.Equal(t, runGit(t, repoDir, "rev-parse", "FETCH_HEAD"), runGit(t, repoDir, "rev-parse", "trunk"))
+		require.Equal(t, "test", runGit(t, repoDir, "branch", "--show-current"))
+	})
+
+	t.Run("force-updates diverged non-current branch", func(t *testing.T) {
+		repoDir := initSyncTestRepo(t)
+
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("initial\n"), 0o600))
+		runGit(t, repoDir, "add", "file.txt")
+		runGit(t, repoDir, "commit", "--quiet", "--message=initial")
+		runGit(t, repoDir, "branch", "test")
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("local\n"), 0o600))
+		runGit(t, repoDir, "commit", "--quiet", "--all", "--message=local")
+		runGit(t, repoDir, "switch", "--quiet", "test")
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("upstream\n"), 0o600))
+		runGit(t, repoDir, "commit", "--quiet", "--all", "--message=upstream")
+		runGit(t, repoDir, "fetch", "--quiet", ".", "test")
+
+		opts := &SyncOptions{
+			Branch: "trunk",
+			Force:  true,
+			Git:    &gitExecuter{client: &git.Client{RepoDir: repoDir}},
+		}
+
+		err := executeLocalRepoSync(ghrepo.New("OWNER", "REPO"), "origin", opts)
+		require.NoError(t, err)
+		require.Equal(t, runGit(t, repoDir, "rev-parse", "FETCH_HEAD"), runGit(t, repoDir, "rev-parse", "trunk"))
+		require.Equal(t, "test", runGit(t, repoDir, "branch", "--show-current"))
+	})
+}
+
+func TestUpdateBranchInSingleWorktreeRepository(t *testing.T) {
+	git.IsolateConfig(t)
+
+	repoDir := t.TempDir()
+
+	runGit(t, repoDir, "init", "--quiet", "--initial-branch=trunk")
+	runGit(t, repoDir, "config", "user.name", "Test User")
+	runGit(t, repoDir, "config", "user.email", "test@example.com")
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("old\n"), 0o600))
+	runGit(t, repoDir, "add", "file.txt")
+	runGit(t, repoDir, "commit", "--quiet", "--message=initial")
+	runGit(t, repoDir, "switch", "--quiet", "--create", "test")
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("new\n"), 0o600))
+	runGit(t, repoDir, "commit", "--quiet", "--all", "--message=upstream")
+	runGit(t, repoDir, "fetch", "--quiet", ".", "test")
+
+	gitClient := &git.Client{RepoDir: repoDir}
+	executer := &gitExecuter{client: gitClient}
+
+	err := executer.UpdateBranch("trunk", "FETCH_HEAD")
+	require.NoError(t, err)
+	require.Equal(t, runGit(t, repoDir, "rev-parse", "FETCH_HEAD"), runGit(t, repoDir, "rev-parse", "trunk"))
+	require.Equal(t, "test", runGit(t, repoDir, "branch", "--show-current"))
+	require.Empty(t, runGit(t, repoDir, "status", "--porcelain"))
+}
+
+func runGit(t *testing.T, repoDir string, args ...string) string {
+	t.Helper()
+	client := &git.Client{RepoDir: repoDir}
+	cmd, err := client.Command(stdctx.Background(), args...)
+	require.NoError(t, err)
+	output, err := cmd.Output()
+	require.NoErrorf(t, err, "git %s failed", strings.Join(args, " "))
+	return strings.TrimSpace(string(output))
 }
 
 func Test_SyncRun(t *testing.T) {
@@ -258,6 +414,40 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(nil).Once()
 			},
 			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
+		},
+		{
+			name: "sync local repo with parent - existing branch checked out in another worktree",
+			tty:  true,
+			opts: &SyncOptions{
+				Branch: "trunk",
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
+				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
+				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(errors.New("branch is checked out in another worktree")).Once()
+				mgc.On("Worktrees").Return([]git.Worktree{{Path: "/path/to/worktree", Ref: "refs/heads/trunk"}}, nil).Once()
+			},
+			wantErr: true,
+			errMsg:  "can't sync \"trunk\" because it's checked out in another worktree at /path/to/worktree\ntip: run `gh repo sync` from that worktree instead",
+		},
+		{
+			name: "sync local repo with parent - existing branch associated with prunable worktree",
+			tty:  true,
+			opts: &SyncOptions{
+				Branch: "trunk",
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
+				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
+				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(errors.New("branch is checked out in another worktree")).Once()
+				mgc.On("Worktrees").Return([]git.Worktree{{Path: "/path/to/missing-worktree", Ref: "refs/heads/trunk", Prunable: true}}, nil).Once()
+			},
+			wantErr: true,
+			errMsg:  "can't sync \"trunk\" because stale worktree metadata still associates it with /path/to/missing-worktree\ntip: run `git worktree prune` and retry",
 		},
 		{
 			name: "sync local repo with parent - create new branch",

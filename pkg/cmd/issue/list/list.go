@@ -269,7 +269,7 @@ func milestoneByNumber(client *http.Client, repo ghrepo.Interface, number int32)
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  githubv4.String(repo.RepoOwner()),
 		"name":   githubv4.String(repo.RepoName()),
 		"number": githubv4.Int(number),

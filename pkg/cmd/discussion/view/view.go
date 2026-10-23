@@ -108,6 +108,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			To see the comments on a discussion, pass %[1]s--comments%[1]s. A few latest replies
 			of each comment will also be retrieved regardless of the selected ordering.
+			When %[1]s--comments%[1]s is used, terminal output includes the discussion details and comments.
+			When output is piped or redirected, only the comments are printed.
 
 			To see the full reply thread of a single comment, pass a comment node ID or
 			comment URL as the argument instead of a discussion
@@ -151,6 +153,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
+
+			if err := cmdutil.MutuallyExclusive("specify only one of --comments or --json",
+				opts.Comments, opts.Exporter != nil); err != nil {
+				return err
+			}
 
 			if err := cmdutil.MutuallyExclusive("specify only one of --comments or --web",
 				opts.Comments, opts.WebMode); err != nil {

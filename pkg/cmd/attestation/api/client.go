@@ -54,8 +54,8 @@ func (p *FetchParams) Validate() error {
 
 // githubApiClient makes REST calls to the GitHub API
 type githubApiClient interface {
-	REST(hostname, method, p string, body io.Reader, data interface{}) error
-	RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error)
+	REST(hostname, method, p string, body io.Reader, data any) error
+	RESTWithNext(hostname, method, p string, body io.Reader, data any) (string, error)
 }
 
 // httpClient makes HTTP calls to all non-GitHub API endpoints
@@ -126,10 +126,7 @@ func (c *LiveClient) buildRequestURL(params FetchParams) (safeurl.SafeURL, error
 		}
 	}
 
-	perPage := params.Limit
-	if perPage > maxLimitForFetch {
-		perPage = maxLimitForFetch
-	}
+	perPage := min(params.Limit, maxLimitForFetch)
 
 	// ref: https://github.com/cli/go-gh/blob/d32c104a9a25c9de3d7c7b07a43ae0091441c858/example_gh_test.go#L96
 	u.SetQuery("per_page", strconv.Itoa(perPage))
@@ -280,8 +277,7 @@ func (c *LiveClient) getBundle(url safeurl.SafeURL) (*bundle.Bundle, error) {
 }
 
 func shouldRetry(err error) bool {
-	var httpError api.HTTPError
-	if errors.As(err, &httpError) {
+	if httpError, ok := errors.AsType[api.HTTPError](err); ok {
 		if httpError.StatusCode >= 500 && httpError.StatusCode <= 599 {
 			return true
 		}

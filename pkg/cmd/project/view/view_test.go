@@ -98,21 +98,21 @@ func TestRunView_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -170,13 +170,13 @@ func TestRunView_Viewer(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"id": "an ID",
 				},
 			},
@@ -233,21 +233,21 @@ func TestRunView_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -305,21 +305,21 @@ func TestRunViewWeb_User(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "monalisa",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"organization"},
 				},
@@ -383,21 +383,21 @@ func TestRunViewWeb_Org(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query UserOrgOwner.*",
-			"variables": map[string]interface{}{
+			"variables": map[string]any{
 				"login": "github",
 			},
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"organization": map[string]any{
 					"id": "an ID",
 				},
 			},
-			"errors": []interface{}{
-				map[string]interface{}{
+			"errors": []any{
+				map[string]any{
 					"type": "NOT_FOUND",
 					"path": []string{"user"},
 				},
@@ -461,13 +461,13 @@ func TestRunViewWeb_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query": "query Viewer.*",
 		}).
 		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"viewer": map[string]interface{}{
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
 					"id":    "an ID",
 					"login": "theviewer",
 				},
@@ -477,9 +477,9 @@ func TestRunViewWeb_Me(t *testing.T) {
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"query":     "query ViewerProject.*",
-			"variables": map[string]interface{}{"afterFields": nil, "afterItems": nil, "firstFields": 100, "firstItems": 0, "number": 8},
+			"variables": map[string]any{"afterFields": nil, "afterItems": nil, "firstFields": 100, "firstItems": 0, "number": 8},
 		}).
 		Reply(200).
 		JSON(`
@@ -550,21 +550,21 @@ func TestRunViewWeb_TTY(t *testing.T) {
 				gock.New("https://api.github.com").
 					Post("/graphql").
 					MatchType("json").
-					JSON(map[string]interface{}{
+					JSON(map[string]any{
 						"query": "query ViewerLoginAndOrgs.*",
-						"variables": map[string]interface{}{
+						"variables": map[string]any{
 							"after": nil,
 						},
 					}).
 					Reply(200).
-					JSON(map[string]interface{}{
-						"data": map[string]interface{}{
-							"viewer": map[string]interface{}{
+					JSON(map[string]any{
+						"data": map[string]any{
+							"viewer": map[string]any{
 								"id":    "monalisa-ID",
 								"login": "monalisa",
-								"organizations": map[string]interface{}{
-									"nodes": []interface{}{
-										map[string]interface{}{
+								"organizations": map[string]any{
+									"nodes": []any{
+										map[string]any{
 											"login":                   "github",
 											"viewerCanCreateProjects": true,
 										},
@@ -577,9 +577,9 @@ func TestRunViewWeb_TTY(t *testing.T) {
 				gock.New("https://api.github.com").
 					Post("/graphql").
 					MatchType("json").
-					JSON(map[string]interface{}{
+					JSON(map[string]any{
 						"query": "query OrgProjects.*",
-						"variables": map[string]interface{}{
+						"variables": map[string]any{
 							"after":       nil,
 							"afterFields": nil,
 							"afterItems":  nil,
@@ -590,13 +590,13 @@ func TestRunViewWeb_TTY(t *testing.T) {
 						},
 					}).
 					Reply(200).
-					JSON(map[string]interface{}{
-						"data": map[string]interface{}{
-							"organization": map[string]interface{}{
+					JSON(map[string]any{
+						"data": map[string]any{
+							"organization": map[string]any{
 								"login": "github",
-								"projectsV2": map[string]interface{}{
-									"nodes": []interface{}{
-										map[string]interface{}{
+								"projectsV2": map[string]any{
+									"nodes": []any{
+										map[string]any{
 											"id":     "a-project-ID",
 											"title":  "Get it done!",
 											"url":    "https://github.com/orgs/github/projects/1",
@@ -634,21 +634,21 @@ func TestRunViewWeb_TTY(t *testing.T) {
 				gock.New("https://api.github.com").
 					Post("/graphql").
 					MatchType("json").
-					JSON(map[string]interface{}{
+					JSON(map[string]any{
 						"query": "query ViewerLoginAndOrgs.*",
-						"variables": map[string]interface{}{
+						"variables": map[string]any{
 							"after": nil,
 						},
 					}).
 					Reply(200).
-					JSON(map[string]interface{}{
-						"data": map[string]interface{}{
-							"viewer": map[string]interface{}{
+					JSON(map[string]any{
+						"data": map[string]any{
+							"viewer": map[string]any{
 								"id":    "monalisa-ID",
 								"login": "monalisa",
-								"organizations": map[string]interface{}{
-									"nodes": []interface{}{
-										map[string]interface{}{
+								"organizations": map[string]any{
+									"nodes": []any{
+										map[string]any{
 											"login":                   "github",
 											"viewerCanCreateProjects": true,
 										},
@@ -661,21 +661,21 @@ func TestRunViewWeb_TTY(t *testing.T) {
 				gock.New("https://api.github.com").
 					Post("/graphql").
 					MatchType("json").
-					JSON(map[string]interface{}{
+					JSON(map[string]any{
 						"query": "query ViewerProjects.*",
-						"variables": map[string]interface{}{
+						"variables": map[string]any{
 							"after": nil, "afterFields": nil, "afterItems": nil, "first": 30, "firstFields": 100, "firstItems": 0,
 						},
 					}).
 					Reply(200).
-					JSON(map[string]interface{}{
-						"data": map[string]interface{}{
-							"viewer": map[string]interface{}{
+					JSON(map[string]any{
+						"data": map[string]any{
+							"viewer": map[string]any{
 								"login": "monalisa",
-								"projectsV2": map[string]interface{}{
+								"projectsV2": map[string]any{
 									"totalCount": 1,
-									"nodes": []interface{}{
-										map[string]interface{}{
+									"nodes": []any{
+										map[string]any{
 											"id":     "a-project-ID",
 											"number": 1,
 											"title":  "@monalia's first project",

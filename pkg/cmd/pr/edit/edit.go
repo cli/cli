@@ -1,6 +1,8 @@
 package edit
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -9,8 +11,10 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/attachments"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -38,13 +42,20 @@ type EditOptions struct {
 	Interactive bool
 	EditorMode  bool
 
+	BodyDir     string
+	AttachFlag  *attachments.Flag
+	AttachEvent *attachments.TelemetryEvent
+	Assets      []attachments.UserAsset
+	Config      func() (gh.Config, error)
+
 	shared.Editable
 }
 
-func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
+func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
 		IO:               f.IOStreams,
 		HttpClient:       f.HttpClient,
+		Config:           f.Config,
 		Surveyor:         surveyor{P: f.Prompter},
 		Fetcher:          fetcher{},
 		EditorRetriever:  editorRetriever{config: f.Config},
@@ -67,6 +78,22 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			Editing a pull request's projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 
+			Use %[1]s--attach%[1]s to upload an image or video. Without a body flag the pull
+			request keeps the body it already has and the attachment is appended to it. If the
+			body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that reference
+			is rewritten to point at the uploaded asset instead. Paths in a %[1]s--body-file%[1]s are
+			relative to its directory, falling back to the working directory.
+			You can attach up to 50 files per command.
+
+			Alt text for an image follows the path after %[1]s#%[1]s, as in
+			%[1]s--attach './login.png#The login error state'%[1]s. Without it the filename is used.
+			A reference already in the body keeps the alt text written there. Video renders
+			as a player and has no alt text, so it cannot be given any.
+
+			If some attachments upload and others fail, the pull request is still updated with the
+			ones that succeeded. The command then exits with a non-zero status, but the pull
+			request's URL is still printed to stdout.
+
 			The %[1]s--add-assignee%[1]s and %[1]s--remove-assignee%[1]s flags both support
 			the following special values:
 			- %[1]s@me%[1]s: assign or unassign yourself
@@ -82,6 +109,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			# Use a file as the body
 			$ gh pr edit 23 --body-file body.txt
+
+			# Append a screenshot to the body, with alt text after "#"
+			$ gh pr edit 23 --attach './login.png#The login error state'
+
+			# Append multiple files by repeating the flag
+			$ gh pr edit 23 --attach ./before.png --attach ./after.png
 
 			# Manage labels
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"
@@ -147,11 +180,11 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if bodyProvided || bodyFileProvided {
 				opts.Editable.Body.Edited = true
 				if bodyFileProvided {
-					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					var err error
+					opts.Editable.Body.Value, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 					if err != nil {
 						return err
 					}
-					opts.Editable.Body.Value = string(b)
 				}
 			}
 
@@ -195,7 +228,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			editorFlagChanged := flags.Changed("editor")
 			editorModeExplicit := editorFlagChanged && opts.EditorMode
-			if editorModeExplicit || (!editorFlagChanged && !opts.Editable.Dirty()) {
+			if editorModeExplicit || (!editorFlagChanged && !opts.Editable.Dirty() && f.Config != nil) {
 				editorMode, err := shared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
 				if err != nil {
 					return err
@@ -207,7 +240,14 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, or `--editor`")
 			}
 
-			if !opts.Editable.Dirty() && !opts.EditorMode {
+			var err error
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
+			opts.Assets, err = opts.AttachFlag.UserAssets()
+			if err != nil {
+				return err
+			}
+
+			if !opts.Editable.Dirty() && len(opts.Assets) == 0 && !opts.EditorMode {
 				opts.Interactive = true
 			}
 
@@ -238,6 +278,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the pull request belongs to by `name`")
 	cmd.Flags().BoolVar(&removeMilestone, "remove-milestone", false, "Remove the milestone association from the pull request")
 	cmd.Flags().BoolVarP(&opts.EditorMode, "editor", "e", false, "Skip prompts and open the text editor to write the title and body in. The first line is the title and the remaining text is the body.")
+	opts.AttachFlag = attachments.AddFlag(cmd)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base")
 
@@ -284,6 +325,10 @@ func editRun(opts *EditOptions) error {
 		Detector: opts.Detector,
 	}
 
+	if len(opts.Assets) > 0 {
+		findOptions.Fields = append(findOptions.Fields, "repository")
+	}
+
 	issueFeatures, err := opts.Detector.IssueFeatures()
 	if err != nil {
 		return err
@@ -299,6 +344,23 @@ func editRun(opts *EditOptions) error {
 	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
+	}
+
+	// Built before the prompts, so a run that cannot upload stops early.
+	var uploader *attachments.Uploader
+	if len(opts.Assets) > 0 {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+		// A URL selector names its own host, so this can differ from the
+		// default host.
+		host := repo.RepoHost()
+		tokenType := cfg.Authentication().ActiveTokenType(host)
+		uploader, err = attachments.NewUploader(httpClient, tokenType, host, pr.RepositoryDatabaseID(), pr.RepositoryViewerPermission())
+		if err != nil {
+			return err
+		}
 	}
 
 	editable := opts.Editable
@@ -393,16 +455,46 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
+	var uploadErr error
+	if uploader != nil {
+		// A body the caller supplied replaces the pull request's, including an
+		// empty one.
+		body := editable.Body.Value
+		if !editable.Body.Edited {
+			body = editable.Body.Default
+		}
+
+		// Nothing that can prompt or cancel may follow this.
+		var uploadResult attachments.UploadResult
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.BodyDir, opts.Assets)
+		opts.AttachEvent.RecordOperations(uploadResult)
+
+		// With nothing uploaded, even a body the caller typed goes unwritten:
+		// its references are still local paths, which render broken. The other
+		// fields are innocent of the upload, so they proceed either way.
+		editable.Body.Edited = uploadResult.Uploaded > 0
+		if uploadResult.Uploaded > 0 {
+			editable.Body.Value = body
+		}
+
+		// The URL below is this command's success signal, so a run that writes
+		// nothing at all must not print it.
+		if !editable.Dirty() {
+			return errors.Join(uploadErr, errors.New("the pull request was not changed"))
+		}
+	}
+
 	opts.IO.StartProgressIndicator()
 	err = updatePullRequest(httpClient, repo, pr.ID, pr.Number, editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		return err
+		// A failed write does not undo an upload, so both are reported.
+		return errors.Join(uploadErr, err)
 	}
 
 	fmt.Fprintln(opts.IO.Out, pr.URL)
 
-	return nil
+	return uploadErr
 }
 
 // reviewerSearchFunc is intended to be an arg for MultiSelectWithSearch

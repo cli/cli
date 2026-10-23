@@ -412,7 +412,7 @@ func TestGetWorkflows(t *testing.T) {
 func generateWorkflows(t *testing.T, workflowCount int, pageNum int) []Workflow {
 	t.Helper()
 	workflows := []Workflow{}
-	for i := 0; i < workflowCount; i++ {
+	for i := range workflowCount {
 		workflows = append(workflows, Workflow{
 			Name: fmt.Sprintf("Workflow-%d-%d", pageNum, i),
 			ID:   int64(i) + int64(pageNum-1)*100,

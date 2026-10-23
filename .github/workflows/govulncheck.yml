@@ -23,9 +23,10 @@ jobs:
       # See https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck#hdr-Exit_codes for more information on exit codes.
       - name: Check Go vulnerabilities
         run: |
-          go run golang.org/x/vuln/cmd/govulncheck@d1f380186385b4f64e00313f31743df8e4b89a77 -format sarif ./... > gh.sarif
+          govulncheck_version=$(grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' .github/govulncheck-version)
+          go run "golang.org/x/vuln/cmd/govulncheck@$govulncheck_version" -format sarif ./... > gh.sarif
 
       - name: Upload SARIF report
-        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: gh.sarif
