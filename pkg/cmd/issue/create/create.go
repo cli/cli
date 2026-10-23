@@ -27,7 +27,6 @@ import (
 
 type CreateOptions struct {
 	HttpClient       func() (*http.Client, error)
-	Config           func() (gh.Config, error)
 	IO               *iostreams.IOStreams
 	BaseRepo         func() (ghrepo.Interface, error)
 	Browser          browser.Browser
@@ -68,7 +67,6 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
 		Browser:    f.Browser,
 		Prompter:   f.Prompter,
 
@@ -300,15 +298,7 @@ func createRun(opts *CreateOptions) (err error) {
 	// Built before the first survey, so a run that cannot upload stops early.
 	var uploader *attachments.Uploader
 	if len(opts.Assets) > 0 {
-		var cfg gh.Config
-		cfg, err = opts.Config()
-		if err != nil {
-			return
-		}
-		host := baseRepo.RepoHost()
-		tokenType := cfg.Authentication().ActiveTokenType(host)
-
-		uploader, err = attachments.NewUploader(httpClient, tokenType, host, repo.DatabaseID, repo.ViewerPermission)
+		uploader, err = attachments.NewUploader(httpClient, baseRepo.RepoHost(), repo.DatabaseID, repo.ViewerPermission)
 		if err != nil {
 			return
 		}
