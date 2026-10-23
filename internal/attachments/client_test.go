@@ -436,12 +436,11 @@ func TestNewUploader(t *testing.T) {
 			wantErr:          "attaching files is not supported on GitHub Enterprise Server",
 		},
 		{
-			name:             "rejects an App server-to-server token",
+			name:             "App server-to-server token",
 			tokenType:        gh.TokenTypeServerToServer,
 			host:             "github.com",
 			targetRepository: 42,
 			viewerPermission: "WRITE",
-			wantErr:          badTokenErr,
 		},
 		{
 			name:             "rejects a refresh token",

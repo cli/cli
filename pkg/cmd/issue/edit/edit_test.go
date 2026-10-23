@@ -1698,7 +1698,7 @@ func Test_editRun(t *testing.T) {
 			// A ghe.com tenant rather than a GHES host, which NewUploader
 			// refuses before it looks at the token at all.
 			host:       "acme.ghe.com",
-			hostTokens: map[string]string{"github.com": "ghs_anactionstoken", "acme.ghe.com": "gho_atenanttoken"},
+			hostTokens: map[string]string{"github.com": "ghr_arefreshtoken", "acme.ghe.com": "gho_atenanttoken"},
 			uploads:    []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")

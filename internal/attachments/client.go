@@ -69,12 +69,14 @@ func checkHost(host string) error {
 }
 
 // uploadTokenTypes lists the credentials that can attach a file. Some GitHub
-// App user-to-server tokens are supported, so the endpoint decides which.
+// App user-to-server and installation tokens are supported, so the endpoint
+// decides which.
 var uploadTokenTypes = []gh.TokenType{
 	gh.TokenTypeOAuth,
 	gh.TokenTypePersonalAccess,
 	gh.TokenTypeFineGrainedPAT,
 	gh.TokenTypeUserToServer,
+	gh.TokenTypeServerToServer,
 }
 
 // checkUploadTokenType rejects a credential that cannot upload. It is an

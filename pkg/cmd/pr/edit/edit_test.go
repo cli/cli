@@ -1270,7 +1270,7 @@ func Test_editRun(t *testing.T) {
 				EditorRetriever: testEditorRetriever{},
 			},
 			attach:  []string{"shot.png"},
-			token:   "ghs_anactionstoken",
+			token:   "ghr_arefreshtoken",
 			wantErr: "unsupported authentication type",
 		},
 		{
@@ -1551,7 +1551,7 @@ func Test_editRun(t *testing.T) {
 				Fetcher:     testFetcher{},
 			},
 			attach:         []string{"shot.png"},
-			hostTokens:     map[string]string{"github.com": "ghs_anactionstoken", "acme.ghe.com": "gho_atenanttoken"},
+			hostTokens:     map[string]string{"github.com": "ghr_arefreshtoken", "acme.ghe.com": "gho_atenanttoken"},
 			uploads:        []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
 			wantUploadHost: "uploads.acme.ghe.com",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
