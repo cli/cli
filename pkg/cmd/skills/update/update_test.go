@@ -37,6 +37,8 @@ func TestNewCmdUpdate_Help(t *testing.T) {
 	assert.Equal(t, "update [<skill>...] [flags]", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
+	assert.Contains(t, cmd.Long, "discarding local modifications and additional files")
+	assert.NotContains(t, cmd.Long, "does not remove extra files")
 	assert.NotEmpty(t, cmd.Example)
 }
 
