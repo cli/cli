@@ -42,8 +42,7 @@ func (c cmdWithStderr) Output() ([]byte, error) {
 		Args: c.Cmd.Args,
 		Err:  err,
 	}
-	var exitError *exec.ExitError
-	if errors.As(err, &exitError) {
+	if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 		cmdErr.Stderr = bytes.NewBuffer(exitError.Stderr)
 	}
 	return out, cmdErr

@@ -1,0 +1,26 @@
+# requires-user-capability: false
+
+fixture-repo none
+
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+env FORK=${REPO}-fork
+
+# Create an upstream repository and an organization-owned fork
+# Register cleanup first because cleanup-repo ignores missing repositories if setup fails.
+defer cleanup-repo ${REPO}
+defer cleanup-repo ${FORK}
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+exec gh repo fork ${ORG}/${REPO} --org ${ORG} --fork-name ${FORK} --clone
+
+# Leave only the remote that points to the fork
+cd ${FORK}
+exec git remote remove upstream
+
+# Set the upstream repository as the default through the fork network
+exec gh repo set-default ${ORG}/${REPO}
+exec git config --get remote.origin.gh-resolved
+stdout ^${ORG}/${REPO}$
+
+# Verify that the explicit resolution is used as the default repository
+exec gh repo set-default --view
+stdout ^${ORG}/${REPO}$

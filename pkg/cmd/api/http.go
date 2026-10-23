@@ -13,17 +13,26 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
-func httpRequest(client *http.Client, hostname string, method string, p string, params any, headers []string) (*http.Response, error) {
+func httpRequest(client *http.Client, hostname string, apiHost string, method string, p string, params any, headers []string) (*http.Response, error) {
 	isGraphQL := p == "graphql"
 	var requestURL string
 	if strings.Contains(p, "://") {
+		// Absolute URLs are used as-is; api_host is never applied to them.
 		requestURL = p
 	} else if isGraphQL {
+		// First we determine the GQL endpoint for the canonical host, which depends on what type of host it is
+		// e.g github.com will be at https://api.github.com/graphql and GHES myghes.com will be at https://myghes.com/api/graphql.
 		requestURL = ghinstance.GraphQLEndpoint(hostname)
+		if apiHost != "" {
+			requestURL = swapURLHost(requestURL, apiHost)
+		}
 	} else {
 		// Note that the gh api command takes the path verbatim from the user, so we
 		// intentionally do not route it through safeurl and do not escape it here.
 		requestURL = ghinstance.RESTPrefix(hostname) + strings.TrimPrefix(p, "/")
+		if apiHost != "" {
+			requestURL = swapURLHost(requestURL, apiHost)
+		}
 	}
 
 	var body io.Reader
@@ -148,4 +157,19 @@ func addQueryParam(query url.Values, key string, value any) error {
 		return fmt.Errorf("unknown type %v", v)
 	}
 	return nil
+}
+
+// swapURLHost replaces the host component of rawURL with newHost, preserving
+// scheme, port (if already present in rawURL), path, and query unchanged.
+func swapURLHost(rawURL, newHost string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		// rawURL is always a well-formed URL built by ghinstance.GraphQLEndpoint
+		// or ghinstance.RESTPrefix, so this error is unreachable in practice. If it
+		// did occur, returning the input unchanged leaves the request pointed at the
+		// original host, which is safe (no host swap, but request still succeeds).
+		return rawURL
+	}
+	u.Host = newHost
+	return u.String()
 }

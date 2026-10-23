@@ -106,7 +106,7 @@ func (s listedSkill) ExportData(fields []string) map[string]any {
 }
 
 // NewCmdList creates the "skills list" command.
-func NewCmdList(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*ListOptions) error) *cobra.Command {
+func NewCmdList(f *cmdutil.Factory, telemetry ghtelemetry.EventRecorder, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:        f.IOStreams,
 		Telemetry: telemetry,
@@ -459,8 +459,8 @@ func skillNameFromSourcePath(sourcePath string) string {
 	}
 
 	parts := strings.Split(sourcePath, "/")
-	for i := len(parts) - 1; i >= 0; i-- {
-		if parts[i] != "skills" {
+	for i, part := range slices.Backward(parts) {
+		if part != "skills" {
 			continue
 		}
 

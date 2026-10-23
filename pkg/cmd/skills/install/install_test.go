@@ -157,7 +157,7 @@ func TestNewCmdInstall(t *testing.T) {
 			}
 
 			var gotOpts *InstallOptions
-			cmd := NewCmdInstall(f, &telemetry.NoOpService{}, func(opts *InstallOptions) error {
+			cmd := NewCmdInstall(f, &telemetry.EventRecorderSpy{}, func(opts *InstallOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -198,7 +198,7 @@ func TestNewCmdInstall(t *testing.T) {
 	t.Run("command metadata", func(t *testing.T) {
 		ios, _, _, _ := iostreams.Test()
 		f := &cmdutil.Factory{IOStreams: ios, Prompter: &prompter.PrompterMock{}, GitClient: &git.Client{}}
-		cmd := NewCmdInstall(f, &telemetry.NoOpService{}, nil)
+		cmd := NewCmdInstall(f, &telemetry.EventRecorderSpy{}, nil)
 
 		assert.Equal(t, "install <repository> [<skill[@version]>] [flags]", cmd.Use)
 		assert.NotEmpty(t, cmd.Short)
@@ -1589,6 +1589,37 @@ func TestInstallRun(t *testing.T) {
 			},
 			wantStdout: "Installed git-commit",
 		},
+		{
+			name: "respect pi coding agent dir env var for user scope",
+			setup: func(t *testing.T) {
+				t.Setenv("PI_CODING_AGENT_DIR", t.TempDir())
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "git-commit",
+					Agent:        "pi",
+					Scope:        "user",
+					ScopeChanged: true,
+					Telemetry:    &telemetry.NoOpService{},
+				}
+			},
+			assert: func(t *testing.T) {
+				assert.FileExists(t, filepath.Join(os.Getenv("PI_CODING_AGENT_DIR"), "skills", "git-commit", "SKILL.md"))
+				assert.NoFileExists(t, filepath.Join(os.Getenv("HOME"), ".pi", "agent", "skills", "git-commit", "SKILL.md"))
+			},
+			wantStdout: "Installed git-commit",
+		},
 	}
 
 	for _, tt := range tests {
@@ -2288,6 +2319,68 @@ func TestRunLocalInstall(t *testing.T) {
 	}
 }
 
+func TestInstallRun_ReviewGuidance(t *testing.T) {
+	tests := []struct {
+		name  string
+		local bool
+		isTTY bool
+	}{
+		{name: "remote TTY", isTTY: true},
+		{name: "remote non-TTY"},
+		{name: "local TTY", local: true, isTTY: true},
+		{name: "local non-TTY", local: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			homeDir := t.TempDir()
+			t.Setenv("HOME", homeDir)
+			t.Setenv("USERPROFILE", homeDir)
+
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
+
+			opts := &InstallOptions{
+				IO:          ios,
+				GitClient:   &git.Client{RepoDir: t.TempDir()},
+				Telemetry:   &telemetry.NoOpService{},
+				SkillSource: "monalisa/skills-repo",
+				SkillName:   "git-commit",
+				Dir:         t.TempDir(),
+			}
+
+			wantReview := "Review installed content before use:\n\n    gh skill preview monalisa/skills-repo git-commit@abc123"
+			if tt.local {
+				sourceDir := t.TempDir()
+				writeLocalTestSkill(t, sourceDir, filepath.Join("skills", "git-commit"), gitCommitContent)
+				opts.SkillSource = sourceDir
+				opts.localPath = sourceDir
+				wantReview = "Review the installed files before use."
+			} else {
+				reg := &httpmock.Registry{}
+				defer reg.Verify(t)
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+				opts.HttpClient = func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				}
+			}
+
+			require.NoError(t, installRun(opts))
+			assert.Contains(t, stdout.String(), "Installed git-commit")
+			assert.NotContains(t, stdout.String(), "prompt injections")
+			assert.NotContains(t, stdout.String(), wantReview)
+			assert.Equal(t, 1, strings.Count(stderr.String(), "prompt injections"))
+			assert.Contains(t, stderr.String(), "Skills are not verified by GitHub")
+			assert.Contains(t, stderr.String(), "\n"+wantReview)
+		})
+	}
+}
+
 func Test_printReviewHint(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -2302,28 +2395,28 @@ func Test_printReviewHint(t *testing.T) {
 			repo:       "owner/repo",
 			sha:        "abc123def456",
 			skillNames: []string{"my-skill"},
-			wantOutput: "gh skill preview owner/repo my-skill@abc123def456",
+			wantOutput: "\nReview installed content before use:\n\n    gh skill preview owner/repo my-skill@abc123def456\n\n",
 		},
 		{
 			name:       "remote install without SHA omits SHA from preview command",
 			repo:       "owner/repo",
 			sha:        "",
 			skillNames: []string{"my-skill"},
-			wantOutput: "gh skill preview owner/repo my-skill\n",
+			wantOutput: "\nReview installed content before use:\n\n    gh skill preview owner/repo my-skill\n\n",
 		},
 		{
 			name:       "multiple skills with SHA",
 			repo:       "owner/repo",
 			sha:        "deadbeef",
 			skillNames: []string{"skill-a", "skill-b"},
-			wantOutput: "skill-a@deadbeef",
+			wantOutput: "\nReview installed content before use:\n\n    gh skill preview owner/repo skill-a@deadbeef\n    gh skill preview owner/repo skill-b@deadbeef\n\n",
 		},
 		{
 			name:       "local install shows generic message",
 			repo:       "",
 			sha:        "",
 			skillNames: []string{"my-skill"},
-			wantOutput: "Review the installed files before use",
+			wantOutput: "\nReview the installed files before use.\n",
 		},
 		{
 			name:       "no skills produces no output",
@@ -2338,7 +2431,7 @@ func Test_printReviewHint(t *testing.T) {
 			sha:             "abc123",
 			skillNames:      []string{"hidden-skill"},
 			allowHiddenDirs: true,
-			wantOutput:      "gh skill preview owner/repo hidden-skill@abc123 --allow-hidden-dirs",
+			wantOutput:      "\nReview installed content before use:\n\n    gh skill preview owner/repo hidden-skill@abc123 --allow-hidden-dirs\n\n",
 		},
 		{
 			name:            "allow-hidden-dirs without SHA",
@@ -2346,21 +2439,15 @@ func Test_printReviewHint(t *testing.T) {
 			sha:             "",
 			skillNames:      []string{"hidden-skill"},
 			allowHiddenDirs: true,
-			wantOutput:      "gh skill preview owner/repo hidden-skill --allow-hidden-dirs",
+			wantOutput:      "\nReview installed content before use:\n\n    gh skill preview owner/repo hidden-skill --allow-hidden-dirs\n\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, _, _ := iostreams.Test()
-			cs := ios.ColorScheme()
 			var buf strings.Builder
-			printReviewHint(&buf, cs, tt.repo, tt.sha, tt.skillNames, tt.allowHiddenDirs)
-			if tt.wantOutput == "" {
-				assert.Empty(t, buf.String())
-			} else {
-				assert.Contains(t, buf.String(), tt.wantOutput)
-			}
+			printReviewHint(&buf, tt.repo, tt.sha, tt.skillNames, tt.allowHiddenDirs)
+			assert.Equal(t, tt.wantOutput, buf.String())
 		})
 	}
 }
@@ -2593,8 +2680,9 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Len(t, recorder.Events, 1)
-			event := recorder.Events[0]
+			events := recorder.Events()
+			require.Len(t, events, 1)
+			event := events[0]
 			assert.Equal(t, "skill_install", event.Type)
 			assert.NotEmpty(t, event.Dimensions["agent_hosts"], "agent_hosts should always be present")
 
@@ -2689,8 +2777,9 @@ func TestInstallRun_TelemetryMultipleSkills(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Len(t, recorder.Events, 1)
-	event := recorder.Events[0]
+	events := recorder.Events()
+	require.Len(t, events, 1)
+	event := events[0]
 	assert.Equal(t, "skill_install", event.Type)
 	assert.Equal(t, "public", event.Dimensions["repo_visibility"])
 

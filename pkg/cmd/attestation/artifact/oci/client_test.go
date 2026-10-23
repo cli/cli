@@ -23,8 +23,8 @@ func TestGetImageDigest_Success(t *testing.T) {
 			return name.Tag{}, nil
 		},
 		get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
-			d := remote.Descriptor{}
-			d.Digest = expectedDigest
+			d := remote.Descriptor{
+				Digest: expectedDigest}
 
 			return &d, nil
 		},

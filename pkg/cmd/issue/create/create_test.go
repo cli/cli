@@ -18,9 +18,11 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/telemetry"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -39,6 +41,14 @@ func TestNewCmdCreate(t *testing.T) {
 	tmpImage := filepath.Join(t.TempDir(), "shot.png")
 	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
 
+	attachmentEvent := []ghtelemetry.Event{{
+		Type:       "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "create"},
+		Measures: ghtelemetry.Measures{
+			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
+		},
+	}}
+
 	tests := []struct {
 		name        string
 		tty         bool
@@ -52,6 +62,8 @@ func TestNewCmdCreate(t *testing.T) {
 		wantErrIsNotExist bool
 		wantsOpts         CreateOptions
 		wantAssetPaths    []string
+		wantEvents        []ghtelemetry.Event
+		wantSampleRate    int
 	}{
 		{
 			name:     "empty non-tty",
@@ -100,6 +112,7 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsOpts: CreateOptions{
 				Title:       "mytitle",
 				Body:        "a body from file",
+				BodyDir:     filepath.Dir(tmpFile),
 				RecoverFile: "",
 				WebMode:     false,
 				Interactive: false,
@@ -273,6 +286,14 @@ func TestNewCmdCreate(t *testing.T) {
 				Body:  "mybody",
 			},
 			wantAssetPaths: []string{tmpImage},
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+		},
+		{
+			name:     "argument validation skips attachment telemetry",
+			tty:      false,
+			cli:      fmt.Sprintf(`unexpected --attach '%s'`, tmpImage),
+			wantsErr: true,
 		},
 		{
 			name:        "attach conflict is reported before a missing file",
@@ -288,10 +309,13 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr:          true,
 			wantsErrMsg:       "./nope.png: ",
 			wantErrIsNotExist: true,
+			wantEvents:        attachmentEvent,
+			wantSampleRate:    ghtelemetry.SAMPLE_ALL,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given command inputs and an invocation recorder
 			ios, stdin, stdout, stderr := iostreams.Test()
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
@@ -311,7 +335,8 @@ func TestNewCmdCreate(t *testing.T) {
 			}
 
 			var opts *CreateOptions
-			cmd := NewCmdCreate(f, func(o *CreateOptions) error {
+			recorder := &telemetry.InvocationRecorderSpy{}
+			cmd := NewCmdCreate(f, recorder, func(o *CreateOptions) error {
 				opts = o
 				return nil
 			})
@@ -321,7 +346,11 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetArgs(args)
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)
+			// When the command executes
 			_, err = cmd.ExecuteC()
+			// Then telemetry starts only if execution reaches attachment validation
+			assert.Equal(t, tt.wantEvents, recorder.Events())
+			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
 				require.Error(t, err)
 				if tt.wantsErrMsg != "" {
@@ -340,6 +369,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, "", stderr.String())
 
 			assert.Equal(t, tt.wantsOpts.Body, opts.Body)
+			assert.Equal(t, tt.wantsOpts.BodyDir, opts.BodyDir)
 			assert.Equal(t, tt.wantsOpts.Title, opts.Title)
 			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
 			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
@@ -361,17 +391,18 @@ func TestNewCmdCreate(t *testing.T) {
 
 func Test_createRun(t *testing.T) {
 	tests := []struct {
-		name        string
-		opts        CreateOptions
-		attach      []string
-		host        string
-		config      string
-		httpStubs   func(*testing.T, *httpmock.Registry)
-		promptStubs func(*testing.T, *prompter.PrompterMock)
-		wantsStdout string
-		wantsStderr string
-		wantsBrowse string
-		wantsErr    string
+		name           string
+		opts           CreateOptions
+		attach         []string
+		host           string
+		config         string
+		httpStubs      func(*testing.T, *httpmock.Registry)
+		promptStubs    func(*testing.T, *prompter.PrompterMock)
+		wantsStdout    string
+		wantsStderr    string
+		wantsBrowse    string
+		wantsErr       string
+		wantOperations *attachments.UploadResult
 	}{
 		{
 			name: "no args",
@@ -578,9 +609,10 @@ func Test_createRun(t *testing.T) {
 					return "title", "from editor ![shot](./shot.png)", nil
 				},
 			},
-			attach:      []string{"shot.png"},
-			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
-			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+			attach:         []string{"shot.png"},
+			wantsStdout:    "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr:    "\nCreating issue in OWNER/REPO\n\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name: "editor and template",
@@ -1047,6 +1079,40 @@ func Test_createRun(t *testing.T) {
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
 		},
 		{
+			name: "attaching rewrites a reference relative to the body file",
+			opts: CreateOptions{
+				Detector: &fd.EnabledDetectorMock{},
+				Title:    "mytitle",
+				Body:     "the plan ![diagram](./diagram.png)",
+				BodyDir:  "docs",
+			},
+			attach: []string{"docs/diagram.png"},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"databaseId": 1234,
+							"hasIssuesEnabled": true,
+							"viewerPermission": "WRITE"
+						} } }`))
+				attachments.StubUpload(r, 1234, "diagram.png", 200, `{ "url": "https://github.com/user-attachments/assets/AAA" }`)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createIssue": { "issue": {
+							"URL": "https://github.com/OWNER/REPO/issues/12"
+						} } } }`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "the plan ![diagram](https://github.com/user-attachments/assets/AAA)", inputs["body"])
+						}))
+			},
+			wantsStdout:    "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr:    "\nCreating issue in OWNER/REPO\n\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
+		},
+		{
 			name: "attaching sends the repository id the lookup returned",
 			opts: CreateOptions{
 				Detector: &fd.EnabledDetectorMock{},
@@ -1170,7 +1236,8 @@ func Test_createRun(t *testing.T) {
 							assert.Equal(t, "a body\n\n![first](https://github.com/user-attachments/assets/AAA)", inputs["body"])
 						}))
 			},
-			wantsErr: "could not upload ./second.png: attaching files requires write access to the repository",
+			wantsErr:       "could not upload ./second.png: attaching files requires write access to the repository",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a create that fails after an upload failed reports both",
@@ -1196,7 +1263,8 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation IssueCreate\b`),
 					httpmock.StringResponse(`{ "errors": [{ "message": "the create failed" }] }`))
 			},
-			wantsErr: "could not upload ./second.png: attaching files requires write access to the repository\nGraphQL: the create failed",
+			wantsErr:       "could not upload ./second.png: attaching files requires write access to the repository\nGraphQL: the create failed",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a body the attachment cannot be written into creates no issue",
@@ -1400,6 +1468,11 @@ func Test_createRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				opts.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
+			// Given a pending event when operation counts are under test
+			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
+			if tt.wantOperations != nil {
+				opts.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
+			}
 			opts.Config = func() (gh.Config, error) {
 				cfg := tt.config
 				if cfg == "" {
@@ -1408,7 +1481,12 @@ func Test_createRun(t *testing.T) {
 				return config.NewMockConfigFromString(cfg), nil
 			}
 
+			// When issue creation runs
 			err := createRun(opts)
+			if tt.wantOperations != nil {
+				// Then telemetry retains completed operations, including partial results
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(tt.attach), *tt.wantOperations)
+			}
 			if tt.wantsErr == "" {
 				require.NoError(t, err)
 			} else {
@@ -1450,7 +1528,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 		Prompter: pm,
 	}
 
-	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
+	cmd := NewCmdCreate(factory, &telemetry.NoOpService{}, func(opts *CreateOptions) error {
 		opts.RootDirOverride = rootDir
 		opts.Detector = &fd.EnabledDetectorMock{}
 		return createRun(opts)

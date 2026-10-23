@@ -70,5 +70,12 @@ type PathTraversalError struct {
 }
 
 func (e PathTraversalError) Error() string {
+	if e.Base.path == "" {
+		path := filepath.Join(e.Elems...)
+		if len(e.Elems) == 1 {
+			path = e.Elems[0]
+		}
+		return fmt.Sprintf("path %q is not a local child path", path)
+	}
 	return fmt.Sprintf("joining %s and %s would be a traversal", e.Base, filepath.Join(e.Elems...))
 }

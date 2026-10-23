@@ -25,16 +25,26 @@
 //
 //	// Every reasonable cancellation possible belongs here.
 //
-//	md, uploaded, err := uploader.UploadAndAttach(ctx, md, attachmentArgs)
-//	if uploaded == 0 {
+//	// bodyDir is the directory of the --body-file md was read from, or ""
+//	// when md came from no file.
+//	md, result, err := uploader.UploadAndAttach(ctx, md, bodyDir, attachmentArgs)
+//	if result.Uploaded == 0 {
 //		return err
 //	}
 //
 //	// Write md to target, then report err alongside whatever the write
 //	// returned.
 //
-// UploadAndAttach reports how many assets were successfully uploaded. The
-// caller must write the markdown when that count is above zero, including after
-// a partial failure, because what did upload must be referenced by something.
-// At zero nothing is stranded and nothing is written.
+// UploadAndAttach reports how many assets were successfully uploaded and how
+// they changed the markdown. The caller must write the markdown when Uploaded
+// is above zero, including after a partial failure, because what did upload must
+// be referenced by something. At zero nothing is stranded and nothing is
+// written.
+//
+// UploadAndAttachDocuments attaches the same files to several documents at
+// once. Each file uploads once, and every document that references it gets its
+// URL. With several documents, a file that no document references is refused
+// before anything uploads, since no document is the place to append it. Each
+// document gets its own result, and the rule above applies to each one: a
+// document with anything in Uploaded must be written, even when its Err is set.
 package attachments

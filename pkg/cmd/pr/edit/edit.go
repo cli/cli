@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/attachments"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -39,14 +40,16 @@ type EditOptions struct {
 	SelectorArg string
 	Interactive bool
 
-	AttachFlag *attachments.Flag
-	Assets     []attachments.UserAsset
-	Config     func() (gh.Config, error)
+	BodyDir     string
+	AttachFlag  *attachments.Flag
+	AttachEvent *attachments.TelemetryEvent
+	Assets      []attachments.UserAsset
+	Config      func() (gh.Config, error)
 
 	shared.Editable
 }
 
-func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
+func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
 		IO:              f.IOStreams,
 		HttpClient:      f.HttpClient,
@@ -75,7 +78,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			Use %[1]s--attach%[1]s to upload an image or video. Without a body flag the pull
 			request keeps the body it already has and the attachment is appended to it. If the
 			body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that reference
-			is rewritten to point at the uploaded asset instead.
+			is rewritten to point at the uploaded asset instead. Paths in a %[1]s--body-file%[1]s are
+			relative to its directory, falling back to the working directory.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -172,11 +176,11 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if bodyProvided || bodyFileProvided {
 				opts.Editable.Body.Edited = true
 				if bodyFileProvided {
-					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					var err error
+					opts.Editable.Body.Value, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 					if err != nil {
 						return err
 					}
-					opts.Editable.Body.Value = string(b)
 				}
 			}
 
@@ -218,11 +222,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				// see the `Editable.MilestoneId` method.
 			}
 
-			resolved, err := opts.AttachFlag.UserAssets()
+			var err error
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
+			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
 			}
-			opts.Assets = resolved
 
 			if !opts.Editable.Dirty() && len(opts.Assets) == 0 {
 				opts.Interactive = true
@@ -420,14 +425,15 @@ func editRun(opts *EditOptions) error {
 		}
 
 		// Nothing that can prompt or cancel may follow this.
-		var uploaded int
-		body, uploaded, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		var uploadResult attachments.UploadResult
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.BodyDir, opts.Assets)
+		opts.AttachEvent.RecordOperations(uploadResult)
 
 		// With nothing uploaded, even a body the caller typed goes unwritten:
 		// its references are still local paths, which render broken. The other
 		// fields are innocent of the upload, so they proceed either way.
-		editable.Body.Edited = uploaded > 0
-		if uploaded > 0 {
+		editable.Body.Edited = uploadResult.Uploaded > 0
+		if uploadResult.Uploaded > 0 {
 			editable.Body.Value = body
 		}
 

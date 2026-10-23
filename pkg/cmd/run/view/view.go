@@ -17,7 +17,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
@@ -469,23 +468,22 @@ func shouldFetchJobs(opts *ViewOptions) bool {
 	return false
 }
 
-func getLog(httpClient *http.Client, logURL safeurl.SafeURL) (io.ReadCloser, error) {
+func getLog(httpClient *http.Client, hostname string, logPath safeurl.SafeURL) (io.ReadCloser, error) {
+	// The response body is the log archive, which is handed to the caller rather than decoded.
 	// TODO(api-client-rollout)
-	// This has been deferred from moving to api.Client due to streaming the run log ZIP response body for archive processing instead of decoding JSON.
-	req, err := http.NewRequest("GET", logURL.String(), nil)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).Request(hostname, http.MethodGet, logPath.String(), nil)
 	if err != nil {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok && httpErr.StatusCode == http.StatusNotFound {
+			return nil, errors.New("log not found")
+		}
 		return nil, err
 	}
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode == 404 {
-		return nil, errors.New("log not found")
-	} else if resp.StatusCode != 200 {
-		return nil, api.HandleHTTPError(resp)
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		return nil, api.UnexpectedStatusError(resp)
 	}
 
 	return resp.Body, nil
@@ -500,19 +498,19 @@ func getRunLog(cache RunLogCache, httpClient *http.Client, repo ghrepo.Interface
 
 	if !isCached {
 		// Run log does not exist in cache so retrieve and store it
-		logURL, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", strconv.FormatInt(run.ID, 10), "logs")
+		logPath, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", strconv.FormatInt(run.ID, 10), "logs")
 		if err != nil {
 			return nil, err
 		}
 
 		if attempt > 0 {
-			logURL, err = safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(repo.RepoHost()), "repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", strconv.FormatInt(run.ID, 10), "attempts", strconv.FormatUint(attempt, 10), "logs")
+			logPath, err = safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "runs", strconv.FormatInt(run.ID, 10), "attempts", strconv.FormatUint(attempt, 10), "logs")
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		resp, err := getLog(httpClient, logURL)
+		resp, err := getLog(httpClient, repo.RepoHost(), logPath)
 		if err != nil {
 			return nil, err
 		}

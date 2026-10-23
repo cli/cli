@@ -1,15 +1,25 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Create a repository with a file so it has a default branch
 exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+# Register both possible names so failures before or after the rename cannot leak the repository.
+defer cleanup-repo $SCRIPT_NAME-$RANDOM_STRING
+defer cleanup-repo $SCRIPT_NAME-$RANDOM_STRING-renamed
+
+# Wait for default-branch initialization to finish before renaming the repository
+wait-for-repository-ready $ORG/$SCRIPT_NAME-$RANDOM_STRING
 
 # List the repos and check for the new repo
 exec gh repo list $ORG --json=name --jq='.[].name'
 stdout $SCRIPT_NAME-$RANDOM_STRING
 
+# GitHub can retain the repository creation lock after the default branch becomes readable.
+sleep 10
+
 # Rename the repo
 exec gh repo rename $SCRIPT_NAME-$RANDOM_STRING-renamed --repo=$ORG/$SCRIPT_NAME-$RANDOM_STRING --yes
-
-# Defer repo deletion
-defer gh repo delete $ORG/$SCRIPT_NAME-$RANDOM_STRING-renamed --yes
 
 # List the repos and check for the renamed repo
 exec gh repo list $ORG --json=name --jq='.[].name'

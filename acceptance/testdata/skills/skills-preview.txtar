@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Preview renders skill content and file tree
 exec gh skill preview github/awesome-copilot git-commit
 stdout 'SKILL.md'

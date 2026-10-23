@@ -16,6 +16,11 @@ endif
 bin/gh$(EXE): script/build$(EXE)
 	@script/build$(EXE) $@
 
+# Builds bin/gh with the ghdebug build tag, which enables the GH_INTERNAL_* overrides in internal/debug.
+.PHONY: debug
+debug: script/build$(EXE)
+	@GO_BUILDTAGS=ghdebug script/build$(EXE) bin/gh$(EXE)
+
 script/build$(EXE): script/build.go
 ifeq ($(EXE),)
 	GOOS= GOARCH= GOARM= GOFLAGS= CGO_ENABLED= go build -o $@ $<

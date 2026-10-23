@@ -54,7 +54,7 @@ _Tip: To get a better sense of what feels right, try writing out the commands in
 
 **When designing your command’s language system:**
 
-- Use [GitHub language](/getting-started/principles#make-it-feel-like-github)
+- Use [GitHub language](/docs/primer/getting-started#make-it-feel-like-github)
 - Use unambiguous language that can’t be confused for something else
 - Use shorter phrases if possible and appropriate
 

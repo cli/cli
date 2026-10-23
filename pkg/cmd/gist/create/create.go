@@ -17,7 +17,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
@@ -157,8 +156,7 @@ func createRun(opts *CreateOptions) error {
 	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		var httpError api.HTTPError
-		if errors.As(err, &httpError) {
+		if httpError, ok := errors.AsType[api.HTTPError](err); ok {
 			if httpError.StatusCode == http.StatusUnprocessableEntity {
 				if detectEmptyFiles(files) {
 					fmt.Fprintf(errOut, "%s Failed to create gist: %s\n", cs.FailureIcon(), "a gist file cannot be blank")
@@ -273,26 +271,20 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 		return nil, err
 	}
 
-	u, err := safeurl.JoinPathWithHostPrefix(ghinstance.RESTPrefix(hostname), "gists")
+	path, err := safeurl.JoinPath("gists")
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, u.String(), requestBody)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
-	resp, err := client.Do(req)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(client).Request(hostname, http.MethodPost, path.String(), requestBody,
+		api.WithEndpointScopes("gist"))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		api.EndpointNeedsScopes(resp, "gist")
-		return nil, api.HandleHTTPError(resp)
-	}
 
 	result := &shared.Gist{}
 	dec := json.NewDecoder(resp.Body)

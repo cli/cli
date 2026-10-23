@@ -52,8 +52,12 @@ func newTestUploader(t *testing.T, reg *httpmock.Registry, host string, targetRe
 
 type staticTokenConfig map[string]string
 
-func (c staticTokenConfig) ActiveToken(host string) (string, string) {
-	return c[host], "oauth_token"
+func (c staticTokenConfig) ActiveTokenWithRefresh(host string) (gh.Credential, gh.RefreshStatus, error) {
+	return gh.Credential{Token: c[host]}, gh.RefreshStatusUnnecessary, nil
+}
+
+func (c staticTokenConfig) HostForAPIHost(apiHost string) (string, bool) {
+	return "", false
 }
 
 func TestUpload(t *testing.T) {
@@ -140,7 +144,7 @@ func TestUploadAuthentication(t *testing.T) {
 			)
 
 			client := &http.Client{
-				Transport: api.AddAuthTokenHeader(
+				Transport: api.AddAuthTokenHeaderWithRefresh(
 					reg,
 					staticTokenConfig{tt.configuredHost: tt.configuredToken},
 				),
@@ -406,6 +410,13 @@ func TestNewUploader(t *testing.T) {
 			viewerPermission: "WRITE",
 		},
 		{
+			name:             "App user-to-server token",
+			tokenType:        gh.TokenTypeUserToServer,
+			host:             "github.com",
+			targetRepository: 42,
+			viewerPermission: "WRITE",
+		},
+		{
 			name:             "rejects an enterprise server host",
 			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.example.com",
@@ -423,14 +434,6 @@ func TestNewUploader(t *testing.T) {
 			targetRepository: 42,
 			viewerPermission: "WRITE",
 			wantErr:          "attaching files is not supported on GitHub Enterprise Server",
-		},
-		{
-			name:             "rejects an App user-to-server token",
-			tokenType:        gh.TokenTypeUserToServer,
-			host:             "github.com",
-			targetRepository: 42,
-			viewerPermission: "WRITE",
-			wantErr:          badTokenErr,
 		},
 		{
 			name:             "rejects an App server-to-server token",

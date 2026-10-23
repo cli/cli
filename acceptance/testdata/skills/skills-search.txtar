@@ -1,11 +1,17 @@
-# Search for skills matching a query
-exec gh skill search --owner github copilot
-stdout 'copilot'
+# requires-user-capability: false
 
-# Search with JSON output
-exec gh skill search copilot --json skillName,repo --limit 1
+fixture-repo none
+
+# Keep these two live searches in one script and within the five-request budget.
+# Search for skills from an owner with JSON output and a result limit
+exec gh skill search --owner github copilot --json skillName,repo --limit 1
+stdout 'copilot'
 stdout '"skillName"'
 stdout '"repo"'
+
+# Pagination returns table results on page 2
+exec gh skill search --owner github copilot --page 2
+stdout 'copilot'
 
 # Search with a short query should error
 ! exec gh skill search a

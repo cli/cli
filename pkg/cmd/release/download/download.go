@@ -13,10 +13,12 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -224,7 +226,7 @@ func downloadRun(opts *DownloadOptions) error {
 	// is made per copy below. Writing to a file keeps the raw bytes.
 	opts.IO.SetContentSanitization(false)
 
-	dest := destinationWriter{
+	dest := &destinationWriter{
 		file:         opts.OutputFile,
 		dir:          opts.Destination,
 		skipExisting: opts.SkipExisting,
@@ -233,6 +235,7 @@ func downloadRun(opts *DownloadOptions) error {
 		allowEscapes: opts.AllowEscapeSequences,
 		isTTY:        opts.IO.IsStdoutTTY(),
 	}
+	defer dest.Close()
 
 	targets := make([]downloadTarget, len(toDownload))
 	for i, a := range toDownload {
@@ -242,7 +245,7 @@ func downloadRun(opts *DownloadOptions) error {
 		}
 	}
 
-	return downloadAssets(&dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO)
+	return downloadAssets(dest, httpClient, targets, opts.Concurrency, isArchive, opts.IO)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -302,7 +305,7 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL sa
 		return err
 	}
 
-	req, err := http.NewRequest("GET", assetURL.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, assetURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -312,7 +315,9 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL sa
 		// adding application/json to Accept header due to a bug in the zipball/tarball API endpoint that makes it mandatory
 		req.Header.Set("Accept", "application/octet-stream, application/json")
 
-		// override HTTP redirect logic to avoid "legacy" Codeload resources
+		// override HTTP redirect logic to avoid "legacy" Codeload resources. This is client
+		// level rather than request level, so the client is copied before being handed over
+		// rather than mutating the one shared with every other caller.
 		oldClient := *httpClient
 		httpClient = &oldClient
 		httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
@@ -323,15 +328,19 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL sa
 		}
 	}
 
-	resp, err := httpClient.Do(req)
+	// The asset URL is supplied by the API, so it is absolute and requested as given. DoRequest
+	// rather than Request because the CheckRedirect above is a property of the client, and
+	// Request delegates to go-gh, which builds a client of its own from the transport alone and
+	// so silently drops it. Without it the "legacy" Codeload path is never rewritten and the
+	// archive is saved under the wrong name.
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).DoRequest(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
 
 	if len(fileName) == 0 {
 		contentDisposition := resp.Header.Get("Content-Disposition")
@@ -374,9 +383,29 @@ type destinationWriter struct {
 	stdout       io.Writer
 	allowEscapes bool
 	isTTY        bool
+	root         *safepaths.Root
+	rootOnce     sync.Once
+	rootErr      error
 }
 
-func (w destinationWriter) makePath(name string) string {
+func (w *destinationWriter) ensureRoot() error {
+	if w.file != "" {
+		return nil
+	}
+	w.rootOnce.Do(func() {
+		w.root, w.rootErr = safepaths.OpenRootDir(w.dir, 0o755)
+	})
+	return w.rootErr
+}
+
+func (w *destinationWriter) Close() error {
+	if w.root == nil {
+		return nil
+	}
+	return w.root.Close()
+}
+
+func (w *destinationWriter) makePath(name string) string {
 	if w.file == "" {
 		return filepath.Join(w.dir, name)
 	}
@@ -384,7 +413,7 @@ func (w destinationWriter) makePath(name string) string {
 }
 
 // Check returns an error if a file already exists at destination
-func (w destinationWriter) Check(name string) error {
+func (w *destinationWriter) Check(name string) error {
 	if name == "" {
 		// skip check as file name will only be known after the API request
 		return nil
@@ -394,11 +423,22 @@ func (w destinationWriter) Check(name string) error {
 		// writing to stdout should always proceed
 		return nil
 	}
+	if err := w.validateName(name); err != nil {
+		return err
+	}
 	return w.check(fp)
 }
 
-func (w destinationWriter) check(fp string) error {
-	if _, err := os.Stat(fp); err == nil {
+func (w *destinationWriter) validateName(name string) error {
+	if w.file != "" {
+		return nil
+	}
+	return safepaths.ValidateChild(name)
+}
+
+func (w *destinationWriter) check(fp string) error {
+	_, err := os.Lstat(fp)
+	if err == nil {
 		if w.skipExisting {
 			return errSkipped
 		}
@@ -408,12 +448,14 @@ func (w destinationWriter) check(fp string) error {
 				fp,
 			)
 		}
+	} else if !os.IsNotExist(err) {
+		return err
 	}
 	return nil
 }
 
 // Copy writes the data from r into a file specified by name.
-func (w destinationWriter) Copy(name string, r io.Reader) (copyErr error) {
+func (w *destinationWriter) Copy(name string, r io.Reader) (copyErr error) {
 	fp := w.makePath(name)
 	if fp == "-" {
 		if w.allowEscapes {
@@ -428,18 +470,34 @@ func (w destinationWriter) Copy(name string, r io.Reader) (copyErr error) {
 		}
 		return
 	}
+	if copyErr = w.validateName(name); copyErr != nil {
+		return
+	}
 	if copyErr = w.check(fp); copyErr != nil {
 		return
 	}
 
-	if dir := filepath.Dir(fp); dir != "." {
-		if copyErr = os.MkdirAll(dir, 0755); copyErr != nil {
+	var f *os.File
+	if w.file == "" {
+		if copyErr = w.ensureRoot(); copyErr != nil {
 			return
 		}
+		f, copyErr = w.root.Create(name, 0o644, 0o755, w.overwrite)
+	} else {
+		f, copyErr = safepaths.OpenFile(fp, 0o644, 0o755, w.overwrite)
 	}
-
-	var f *os.File
-	if f, copyErr = os.OpenFile(fp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644); copyErr != nil {
+	if copyErr != nil {
+		if os.IsExist(copyErr) {
+			if w.skipExisting {
+				return errSkipped
+			}
+			if !w.overwrite {
+				return fmt.Errorf(
+					"%s already exists (use `--clobber` to overwrite file or `--skip-existing` to skip file)",
+					fp,
+				)
+			}
+		}
 		return
 	}
 

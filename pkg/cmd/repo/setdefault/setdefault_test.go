@@ -24,6 +24,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		remotes  func() (context.Remotes, error)
 		input    string
 		output   SetDefaultOptions
+		nonTTY   bool
 		wantErr  bool
 		errMsg   string
 	}{
@@ -59,6 +60,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 			},
 			input:  "--view",
 			output: SetDefaultOptions{ViewMode: true},
+			nonTTY: true,
 		},
 		{
 			name: "unset flag",
@@ -67,6 +69,17 @@ func TestNewCmdSetDefault(t *testing.T) {
 			},
 			input:  "--unset",
 			output: SetDefaultOptions{UnsetMode: true},
+			nonTTY: true,
+		},
+		{
+			name: "no argument when not running interactively",
+			gitStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
+			},
+			input:   "",
+			nonTTY:  true,
+			wantErr: true,
+			errMsg:  "repository required when not running interactively",
 		},
 		{
 			name: "run from non-git directory",
@@ -114,7 +127,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 	for _, tt := range tests {
 		io, _, _, _ := iostreams.Test()
 		io.SetStdoutTTY(true)
-		io.SetStdinTTY(true)
+		io.SetStdinTTY(!tt.nonTTY)
 		io.SetStderrTTY(true)
 		remotesFunc := tt.remotes
 		if remotesFunc == nil {
@@ -157,6 +170,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.output.Repo, gotOpts.Repo)
 			assert.Equal(t, tt.output.ViewMode, gotOpts.ViewMode)
+			assert.Equal(t, tt.output.UnsetMode, gotOpts.UnsetMode)
 		})
 	}
 }

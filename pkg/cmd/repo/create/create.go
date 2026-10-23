@@ -26,6 +26,7 @@ import (
 )
 
 type errWithExitCode interface {
+	error
 	ExitCode() int
 }
 
@@ -760,8 +761,7 @@ func hasCommits(gitClient *git.Client) (bool, error) {
 		return true, nil
 	}
 
-	var execError *exec.ExitError
-	if errors.As(err, &execError) {
+	if execError, ok := errors.AsType[*exec.ExitError](err); ok {
 		exitCode := int(execError.ExitCode())
 		if exitCode == 128 {
 			return false, nil
@@ -782,8 +782,7 @@ const (
 func localRepoType(gitClient *git.Client) (repoType, error) {
 	projectDir, projectDirErr := gitClient.GitDir(context.Background())
 	if projectDirErr != nil {
-		var execError errWithExitCode
-		if errors.As(projectDirErr, &execError) {
+		if execError, ok := errors.AsType[errWithExitCode](projectDirErr); ok {
 			if exitCode := int(execError.ExitCode()); exitCode == 128 {
 				return unknown, nil
 			}
@@ -929,6 +928,9 @@ func interactiveRepoNameAndOwner(client *http.Client, hostname string, prompter 
 	name, err := prompter.Input("Repository name", defaultName)
 	if err != nil {
 		return "", "", err
+	}
+	if strings.TrimSpace(name) == "" {
+		return "", "", errors.New("repository name cannot be blank")
 	}
 
 	name, owner, err := splitNameAndOwner(name)

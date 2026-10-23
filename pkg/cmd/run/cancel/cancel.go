@@ -109,8 +109,7 @@ func runCancel(opts *CancelOptions) error {
 	} else {
 		run, err = shared.GetRun(client, repo, runID, 0)
 		if err != nil {
-			var httpErr api.HTTPError
-			if errors.As(err, &httpErr) {
+			if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
 				if httpErr.StatusCode == http.StatusNotFound {
 					err = fmt.Errorf("Could not find any workflow run with ID %s", opts.RunID)
 				}
@@ -123,8 +122,7 @@ func runCancel(opts *CancelOptions) error {
 
 	err = cancelWorkflowRun(client, repo, fmt.Sprintf("%d", run.ID), force)
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
 			if httpErr.StatusCode == http.StatusConflict {
 				err = fmt.Errorf("Cannot cancel a workflow run that is completed")
 			}

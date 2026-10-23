@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +20,7 @@ import (
 //
 // It writes each name into a temporary directory and changes the working
 // directory to it for the rest of the test, so the names are relative paths
-// that resolve.
+// that resolve. A name may include directories, which are created.
 func NewTestAssets(t *testing.T, names ...string) []UserAsset {
 	t.Helper()
 
@@ -26,6 +28,7 @@ func NewTestAssets(t *testing.T, names ...string) []UserAsset {
 
 	argv := make([]string, 0, len(names)*2)
 	for _, name := range names {
+		require.NoError(t, os.MkdirAll(filepath.Dir(name), 0o755))
 		require.NoError(t, os.WriteFile(name, []byte("the bytes"), 0o600))
 		argv = append(argv, "--attach", "./"+name)
 	}
@@ -37,6 +40,23 @@ func NewTestAssets(t *testing.T, names ...string) []UserAsset {
 	assets, err := attachFlag.UserAssets()
 	require.NoError(t, err)
 	return assets
+}
+
+// AssertTestTelemetryEvents verifies the completed invocation event shape.
+func AssertTestTelemetryEvents(t *testing.T, events []ghtelemetry.Event, attachCount int, result UploadResult) {
+	t.Helper()
+
+	require.Equal(t, []ghtelemetry.Event{
+		{
+			Type:       "attachment_invocation",
+			Dimensions: ghtelemetry.Dimensions{"command": "gh test"},
+			Measures: ghtelemetry.Measures{
+				"attach_count":      int64(attachCount),
+				"append_ops_count":  int64(result.AppendOperations),
+				"replace_ops_count": int64(result.ReplaceOperations),
+			},
+		},
+	}, events)
 }
 
 // StubUpload registers one upload of name against repositoryID, answering with

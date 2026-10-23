@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Install from a local directory using --from-local
 exec gh skill install --from-local $WORK/local-repo git-commit --dir $WORK/output --force
 stdout 'Installed git-commit'

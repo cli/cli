@@ -298,10 +298,9 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 		}
 	}
 
-	var apiErr upstreamMergeErr
 	if baseBranch, err := triggerUpstreamMerge(client, destRepo, branchName); err == nil {
 		return baseBranch, nil
-	} else if !errors.As(err, &apiErr) {
+	} else if _, ok := errors.AsType[upstreamMergeErr](err); !ok {
 		return "", err
 	}
 
@@ -325,9 +324,8 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 	// endpoint but unfortunately the API returns 422 for many reasons so we must
 	// interpret the message provide better error messaging for our users.
 	err = syncFork(client, destRepo, branchName, commit.Object.SHA, opts.Force)
-	var httpErr api.HTTPError
 	if err != nil {
-		if errors.As(err, &httpErr) {
+		if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
 			switch httpErr.Message {
 			case notFastForwardErrorMessage:
 				return "", divergingError

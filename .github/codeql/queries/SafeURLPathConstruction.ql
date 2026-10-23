@@ -21,15 +21,39 @@ import go
  *
  * Covered entry points:
  *   - (github.com/cli/cli/v2/api.Client).REST and .RESTWithNext, where the path is argument 2.
+ *   - (github.com/cli/cli/v2/api.Client).Request, where the path is argument 2.
+ *   - (github.com/cli/cli/v2/api.Client).RequestWithContext, where the path is argument 3.
  *   - net/http.NewRequest, where the URL is argument 1.
  *   - net/http.NewRequestWithContext, where the URL is argument 2.
  *   - (net/http.Client).Get, .Head, .Post and .PostForm, where the URL is argument 0.
  */
+/**
+ * Holds when `call` is one api.Client request method delegating to another from inside the client
+ * itself, such as Request forwarding its path to RequestWithContext. The forwarded path is the
+ * caller's own argument, already checked at the real call site, so treating this internal plumbing
+ * as a sink would only report the client's implementation rather than a hand built URL.
+ */
+predicate isApiClientForwarding(DataFlow::CallNode call) {
+  exists(Method enclosing |
+    enclosing.hasQualifiedName("github.com/cli/cli/v2/api", "Client",
+      ["REST", "RESTWithNext", "Request", "RequestWithContext"]) and
+    call.asExpr().getEnclosingFunction() = enclosing.getFuncDecl()
+  )
+}
+
 predicate isHttpUrlArgument(DataFlow::Node node) {
   exists(Method m, DataFlow::CallNode call |
-    m.hasQualifiedName("github.com/cli/cli/v2/api", "Client", ["REST", "RESTWithNext"]) and
+    m.hasQualifiedName("github.com/cli/cli/v2/api", "Client", ["REST", "RESTWithNext", "Request"]) and
     call = m.getACall() and
+    not isApiClientForwarding(call) and
     node = call.getArgument(2)
+  )
+  or
+  exists(Method m, DataFlow::CallNode call |
+    m.hasQualifiedName("github.com/cli/cli/v2/api", "Client", "RequestWithContext") and
+    call = m.getACall() and
+    not isApiClientForwarding(call) and
+    node = call.getArgument(3)
   )
   or
   exists(Function f, DataFlow::CallNode call |

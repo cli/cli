@@ -15,7 +15,9 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/telemetry"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -33,6 +35,14 @@ func TestNewCmdEdit(t *testing.T) {
 	tmpImage := filepath.Join(t.TempDir(), "shot.png")
 	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
 
+	attachmentEvent := []ghtelemetry.Event{{
+		Type:       "attachment_invocation",
+		Dimensions: ghtelemetry.Dimensions{"command": "edit"},
+		Measures: ghtelemetry.Measures{
+			"attach_count": 1, "append_ops_count": 0, "replace_ops_count": 0,
+		},
+	}}
+
 	tests := []struct {
 		name             string
 		input            string
@@ -41,6 +51,8 @@ func TestNewCmdEdit(t *testing.T) {
 		wantAssetPaths   []string
 		expectedBaseRepo ghrepo.Interface
 		wantsErr         bool
+		wantEvents       []ghtelemetry.Event
+		wantSampleRate   int
 	}{
 		{
 			name:  "no argument",
@@ -130,6 +142,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				BodyDir: filepath.Dir(tmpFile),
 			},
 			wantsErr: false,
 		},
@@ -313,6 +326,13 @@ func TestNewCmdEdit(t *testing.T) {
 				Interactive: false,
 			},
 			wantAssetPaths: []string{tmpImage},
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+		},
+		{
+			name:     "argument validation skips attachment telemetry",
+			input:    fmt.Sprintf("23 24 --attach '%s'", tmpImage),
+			wantsErr: true,
 		},
 		{
 			name:  "attach with body records the body that replaces the old one",
@@ -328,15 +348,25 @@ func TestNewCmdEdit(t *testing.T) {
 				},
 			},
 			wantAssetPaths: []string{tmpImage},
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
 		},
 		{
-			name:     "attach rejects a missing file",
-			input:    "23 --attach ./nope.png",
+			name:           "attach rejects a missing file",
+			input:          "23 --attach ./nope.png",
+			wantsErr:       true,
+			wantEvents:     attachmentEvent,
+			wantSampleRate: ghtelemetry.SAMPLE_ALL,
+		},
+		{
+			name:     "body flag conflict skips attachment telemetry",
+			input:    fmt.Sprintf("23 --body test --body-file '%s' --attach '%s'", tmpFile, tmpImage),
 			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given command inputs and an invocation recorder
 			ios, stdin, _, _ := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
@@ -351,10 +381,11 @@ func TestNewCmdEdit(t *testing.T) {
 			}
 
 			argv, err := shlex.Split(tt.input)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var gotOpts *EditOptions
-			cmd := NewCmdEdit(f, func(opts *EditOptions) error {
+			recorder := &telemetry.InvocationRecorderSpy{}
+			cmd := NewCmdEdit(f, recorder, func(opts *EditOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -365,16 +396,21 @@ func TestNewCmdEdit(t *testing.T) {
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
 
+			// When the command executes
 			_, err = cmd.ExecuteC()
+			// Then telemetry starts only if execution reaches attachment validation
+			assert.Equal(t, tt.wantEvents, recorder.Events())
+			assert.Equal(t, tt.wantSampleRate, recorder.LastSampleRate)
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.output.SelectorArg, gotOpts.SelectorArg)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.Editable, gotOpts.Editable)
+			assert.Equal(t, tt.output.BodyDir, gotOpts.BodyDir)
 
 			var assetPaths []string
 			for _, a := range gotOpts.Assets {
@@ -413,6 +449,7 @@ func Test_editRun(t *testing.T) {
 		stdout             string
 		stderr             string
 		wantErr            string
+		wantOperations     *attachments.UploadResult
 	}{
 		{
 			name: "non-interactive",
@@ -423,47 +460,45 @@ func Test_editRun(t *testing.T) {
 					URL: "https://github.com/OWNER/REPO/pull/123",
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Title: shared.EditableString{
-						Value:  "new title",
+				Title: shared.EditableString{
+					Value:  "new title",
+					Edited: true,
+				},
+				Body: shared.EditableString{
+					Value:  "new body",
+					Edited: true,
+				},
+				Base: shared.EditableString{
+					Value:  "base-branch-name",
+					Edited: true,
+				},
+				Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{
+					Add:    []string{"OWNER/core", "OWNER/external", "monalisa", "hubot"},
+					Remove: []string{"dependabot"},
+					Edited: true,
+				}},
+				Assignees: shared.EditableAssignees{
+					EditableSlice: shared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
 						Edited: true,
 					},
-					Body: shared.EditableString{
-						Value:  "new body",
+				},
+				Labels: shared.EditableSlice{
+					Add:    []string{"feature", "TODO", "bug"},
+					Remove: []string{"docs"},
+					Edited: true,
+				},
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{
+						Add:    []string{"Cleanup", "CleanupV2"},
+						Remove: []string{"Roadmap", "RoadmapV2"},
 						Edited: true,
 					},
-					Base: shared.EditableString{
-						Value:  "base-branch-name",
-						Edited: true,
-					},
-					Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{
-						Add:    []string{"OWNER/core", "OWNER/external", "monalisa", "hubot"},
-						Remove: []string{"dependabot"},
-						Edited: true,
-					}},
-					Assignees: shared.EditableAssignees{
-						EditableSlice: shared.EditableSlice{
-							Add:    []string{"monalisa", "hubot"},
-							Remove: []string{"octocat"},
-							Edited: true,
-						},
-					},
-					Labels: shared.EditableSlice{
-						Add:    []string{"feature", "TODO", "bug"},
-						Remove: []string{"docs"},
-						Edited: true,
-					},
-					Projects: shared.EditableProjects{
-						EditableSlice: shared.EditableSlice{
-							Add:    []string{"Cleanup", "CleanupV2"},
-							Remove: []string{"Roadmap", "RoadmapV2"},
-							Edited: true,
-						},
-					},
-					Milestone: shared.EditableString{
-						Value:  "GA",
-						Edited: true,
-					},
+				},
+				Milestone: shared.EditableString{
+					Value:  "GA",
+					Edited: true,
 				},
 				Fetcher: testFetcher{},
 			},
@@ -488,42 +523,40 @@ func Test_editRun(t *testing.T) {
 					URL: "https://github.com/OWNER/REPO/pull/123",
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Title: shared.EditableString{
-						Value:  "new title",
+				Title: shared.EditableString{
+					Value:  "new title",
+					Edited: true,
+				},
+				Body: shared.EditableString{
+					Value:  "new body",
+					Edited: true,
+				},
+				Base: shared.EditableString{
+					Value:  "base-branch-name",
+					Edited: true,
+				},
+				Assignees: shared.EditableAssignees{
+					EditableSlice: shared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
 						Edited: true,
 					},
-					Body: shared.EditableString{
-						Value:  "new body",
+				},
+				Labels: shared.EditableSlice{
+					Add:    []string{"feature", "TODO", "bug"},
+					Remove: []string{"docs"},
+					Edited: true,
+				},
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{
+						Add:    []string{"Cleanup", "CleanupV2"},
+						Remove: []string{"Roadmap", "RoadmapV2"},
 						Edited: true,
 					},
-					Base: shared.EditableString{
-						Value:  "base-branch-name",
-						Edited: true,
-					},
-					Assignees: shared.EditableAssignees{
-						EditableSlice: shared.EditableSlice{
-							Add:    []string{"monalisa", "hubot"},
-							Remove: []string{"octocat"},
-							Edited: true,
-						},
-					},
-					Labels: shared.EditableSlice{
-						Add:    []string{"feature", "TODO", "bug"},
-						Remove: []string{"docs"},
-						Edited: true,
-					},
-					Projects: shared.EditableProjects{
-						EditableSlice: shared.EditableSlice{
-							Add:    []string{"Cleanup", "CleanupV2"},
-							Remove: []string{"Roadmap", "RoadmapV2"},
-							Edited: true,
-						},
-					},
-					Milestone: shared.EditableString{
-						Value:  "GA",
-						Edited: true,
-					},
+				},
+				Milestone: shared.EditableString{
+					Value:  "GA",
+					Edited: true,
 				},
 				Fetcher: testFetcher{},
 			},
@@ -556,47 +589,45 @@ func Test_editRun(t *testing.T) {
 					}},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Title: shared.EditableString{
-						Value:  "new title",
+				Title: shared.EditableString{
+					Value:  "new title",
+					Edited: true,
+				},
+				Body: shared.EditableString{
+					Value:  "new body",
+					Edited: true,
+				},
+				Base: shared.EditableString{
+					Value:  "base-branch-name",
+					Edited: true,
+				},
+				Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{
+					Default: []string{"OWNER/core", "OWNER/external", "monalisa", "hubot", "dependabot"},
+					Remove:  []string{"OWNER/core", "OWNER/external", "monalisa", "hubot", "dependabot"},
+					Edited:  true,
+				}},
+				Assignees: shared.EditableAssignees{
+					EditableSlice: shared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
 						Edited: true,
 					},
-					Body: shared.EditableString{
-						Value:  "new body",
+				},
+				Labels: shared.EditableSlice{
+					Add:    []string{"feature", "TODO", "bug"},
+					Remove: []string{"docs"},
+					Edited: true,
+				},
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{
+						Add:    []string{"Cleanup", "CleanupV2"},
+						Remove: []string{"Roadmap", "RoadmapV2"},
 						Edited: true,
 					},
-					Base: shared.EditableString{
-						Value:  "base-branch-name",
-						Edited: true,
-					},
-					Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{
-						Default: []string{"OWNER/core", "OWNER/external", "monalisa", "hubot", "dependabot"},
-						Remove:  []string{"OWNER/core", "OWNER/external", "monalisa", "hubot", "dependabot"},
-						Edited:  true,
-					}},
-					Assignees: shared.EditableAssignees{
-						EditableSlice: shared.EditableSlice{
-							Add:    []string{"monalisa", "hubot"},
-							Remove: []string{"octocat"},
-							Edited: true,
-						},
-					},
-					Labels: shared.EditableSlice{
-						Add:    []string{"feature", "TODO", "bug"},
-						Remove: []string{"docs"},
-						Edited: true,
-					},
-					Projects: shared.EditableProjects{
-						EditableSlice: shared.EditableSlice{
-							Add:    []string{"Cleanup", "CleanupV2"},
-							Remove: []string{"Roadmap", "RoadmapV2"},
-							Edited: true,
-						},
-					},
-					Milestone: shared.EditableString{
-						Value:  "GA",
-						Edited: true,
-					},
+				},
+				Milestone: shared.EditableString{
+					Value:  "GA",
+					Edited: true,
 				},
 				Fetcher: testFetcher{},
 			},
@@ -639,13 +670,11 @@ func Test_editRun(t *testing.T) {
 					},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{
-						Default: []string{"OWNER/core", "monalisa"},
-						Remove:  []string{"OWNER/core", "monalisa"},
-						Edited:  true,
-					}},
-				},
+				Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{
+					Default: []string{"OWNER/core", "monalisa"},
+					Remove:  []string{"OWNER/core", "monalisa"},
+					Edited:  true,
+				}},
 				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -674,10 +703,8 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Finder:      shared.NewMockFinder("123", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{Add: []string{"monalisa", "hubot"}, Edited: true}},
-				},
-				Fetcher: testFetcher{},
+				Reviewers:   shared.EditableReviewers{EditableSlice: shared.EditableSlice{Add: []string{"monalisa", "hubot"}, Edited: true}},
+				Fetcher:     testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Non-interactive with Add/Remove doesn't need reviewer metadata
@@ -696,10 +723,8 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Finder:      shared.NewMockFinder("123", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{Add: []string{"monalisa", "OWNER/core"}, Edited: true}},
-				},
-				Fetcher: testFetcher{},
+				Reviewers:   shared.EditableReviewers{EditableSlice: shared.EditableSlice{Add: []string{"monalisa", "OWNER/core"}, Edited: true}},
+				Fetcher:     testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Non-interactive with Add/Remove doesn't need reviewer metadata
@@ -723,10 +748,8 @@ func Test_editRun(t *testing.T) {
 					{RequestedReviewer: api.RequestedReviewer{TypeName: "User", Login: "monalisa"}},
 				}}}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{Remove: []string{"monalisa", "OWNER/core"}, Edited: true}},
-				},
-				Fetcher: testFetcher{},
+				Reviewers:   shared.EditableReviewers{EditableSlice: shared.EditableSlice{Remove: []string{"monalisa", "OWNER/core"}, Edited: true}},
+				Fetcher:     testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Non-interactive with Add/Remove doesn't need reviewer metadata
@@ -745,10 +768,8 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Finder:      shared.NewMockFinder("123", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{Add: []string{"monalisa"}, Remove: []string{"hubot"}, Default: []string{"OWNER/core"}, Edited: true}},
-				},
-				Fetcher: testFetcher{},
+				Reviewers:   shared.EditableReviewers{EditableSlice: shared.EditableSlice{Add: []string{"monalisa"}, Remove: []string{"hubot"}, Default: []string{"OWNER/core"}, Edited: true}},
+				Fetcher:     testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Non-interactive with Add/Remove doesn't need reviewer metadata
@@ -997,13 +1018,11 @@ func Test_editRun(t *testing.T) {
 					URL: "https://github.com/OWNER/REPO/pull/123",
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Assignees: shared.EditableAssignees{
-						EditableSlice: shared.EditableSlice{
-							Add:    []string{"monalisa", "hubot"},
-							Remove: []string{"octocat"},
-							Edited: true,
-						},
+				Assignees: shared.EditableAssignees{
+					EditableSlice: shared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
+						Edited: true,
 					},
 				},
 				Fetcher: testFetcher{},
@@ -1156,13 +1175,11 @@ func Test_editRun(t *testing.T) {
 					URL: "https://github.com/OWNER/REPO/pull/123",
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Projects: shared.EditableProjects{
-						EditableSlice: shared.EditableSlice{
-							Add:    []string{"CleanupV2"},
-							Remove: []string{"RoadmapV2"},
-							Edited: true,
-						},
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{
+						Add:    []string{"CleanupV2"},
+						Remove: []string{"RoadmapV2"},
+						Edited: true,
 					},
 				},
 				Fetcher: testFetcher{},
@@ -1274,7 +1291,8 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockPullRequestUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
 			},
-			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+			stdout:         "https://github.com/OWNER/REPO/pull/123\n",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "an empty body flag clears the body and leaves the attachment",
@@ -1287,11 +1305,9 @@ func Test_editRun(t *testing.T) {
 					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Body: shared.EditableString{
-						Value:  "",
-						Edited: true,
-					},
+				Body: shared.EditableString{
+					Value:  "",
+					Edited: true,
 				},
 				Fetcher: testFetcher{},
 			},
@@ -1301,6 +1317,32 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdateWithBody(t, reg, "![shot](https://example.com/1)")
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
+			name: "attaching rewrites a reference relative to the body file",
+			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL:        "https://github.com/OWNER/REPO/pull/123",
+					Body:       "the original body",
+					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive: false,
+				Body: shared.EditableString{
+					Value:  "the plan ![diagram](./diagram.png)",
+					Edited: true,
+				},
+				BodyDir: "docs",
+				Fetcher: testFetcher{},
+			},
+			attach:  []string{"docs/diagram.png"},
+			uploads: []attachments.UploadStub{{Name: "diagram.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockPullRequestUpdateWithBody(t, reg, "the plan ![diagram](https://example.com/1)")
+			},
+			stdout:         "https://github.com/OWNER/REPO/pull/123\n",
+			wantOperations: &attachments.UploadResult{ReplaceOperations: 1},
 		},
 		{
 			name: "attaching does not double what the editor already carried",
@@ -1354,8 +1396,9 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockPullRequestUpdateWithBody(t, reg, "the original body\n\n![a](https://example.com/1)")
 			},
-			stdout:  "https://github.com/OWNER/REPO/pull/123\n",
-			wantErr: "could not upload ./b.png: attaching files requires write access to the repository",
+			stdout:         "https://github.com/OWNER/REPO/pull/123\n",
+			wantErr:        "could not upload ./b.png: attaching files requires write access to the repository",
+			wantOperations: &attachments.UploadResult{AppendOperations: 1},
 		},
 		{
 			name: "a sole failed upload leaves the body alone and still edits the title",
@@ -1368,10 +1411,8 @@ func Test_editRun(t *testing.T) {
 					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Title: shared.EditableString{Value: "new title", Edited: true},
-				},
-				Fetcher: testFetcher{},
+				Title:       shared.EditableString{Value: "new title", Edited: true},
+				Fetcher:     testFetcher{},
 			},
 			attach:  []string{"a.png"},
 			uploads: []attachments.UploadStub{{Name: "a.png", Status: 404, Body: `{"message":"Not Found"}`}},
@@ -1392,10 +1433,8 @@ func Test_editRun(t *testing.T) {
 					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Title: shared.EditableString{Value: "new title", Edited: true},
-				},
-				Fetcher: testFetcher{},
+				Title:       shared.EditableString{Value: "new title", Edited: true},
+				Fetcher:     testFetcher{},
 			},
 			attach: []string{"demo.mp4"},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -1436,10 +1475,8 @@ func Test_editRun(t *testing.T) {
 					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Title: shared.EditableString{Value: "new title", Edited: true},
-				},
-				Fetcher: testFetcher{},
+				Title:       shared.EditableString{Value: "new title", Edited: true},
+				Fetcher:     testFetcher{},
 			},
 			attach:  []string{"a.png"},
 			uploads: []attachments.UploadStub{{Name: "a.png", Status: 404, Body: `{"message":"Not Found"}`}},
@@ -1486,11 +1523,9 @@ func Test_editRun(t *testing.T) {
 					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Title: shared.EditableString{Value: "new title", Edited: true},
-					Body:  shared.EditableString{Value: "see ![a](./a.png)", Edited: true},
-				},
-				Fetcher: testFetcher{},
+				Title:       shared.EditableString{Value: "new title", Edited: true},
+				Body:        shared.EditableString{Value: "see ![a](./a.png)", Edited: true},
+				Fetcher:     testFetcher{},
 			},
 			attach:  []string{"a.png"},
 			uploads: []attachments.UploadStub{{Name: "a.png", Status: 404, Body: `{"message":"Not Found"}`}},
@@ -1586,12 +1621,10 @@ func Test_editRun(t *testing.T) {
 					Body: "the original body",
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Labels: shared.EditableSlice{
-						Add:    []string{"bug"},
-						Remove: []string{"docs"},
-						Edited: true,
-					},
+				Labels: shared.EditableSlice{
+					Add:    []string{"bug"},
+					Remove: []string{"docs"},
+					Edited: true,
 				},
 				Fetcher: testFetcher{},
 			},
@@ -1612,11 +1645,9 @@ func Test_editRun(t *testing.T) {
 					Body: "the original body",
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
-				Editable: shared.Editable{
-					Title: shared.EditableString{
-						Value:  "new title",
-						Edited: true,
-					},
+				Title: shared.EditableString{
+					Value:  "new title",
+					Edited: true,
 				},
 				Fetcher: testFetcher{},
 			},
@@ -1659,6 +1690,11 @@ func Test_editRun(t *testing.T) {
 			if len(tt.attach) > 0 {
 				tt.input.Assets = attachments.NewTestAssets(t, tt.attach...)
 			}
+			// Given a pending event when operation counts are under test
+			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
+			if tt.wantOperations != nil {
+				tt.input.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
+			}
 
 			// The host comes from the pull request the row's finder returns, so
 			// a row can hold a token for a host the config's default is not.
@@ -1677,7 +1713,12 @@ func Test_editRun(t *testing.T) {
 			var lookupFields []string
 			tt.input.Finder = fieldCapturingFinder{PRFinder: tt.input.Finder, fields: &lookupFields}
 
+			// When pull request editing runs
 			err := editRun(tt.input)
+			if tt.wantOperations != nil {
+				// Then telemetry retains completed operations, including partial results
+				attachments.AssertTestTelemetryEvents(t, attachmentRecorder.Events(), len(tt.attach), *tt.wantOperations)
+			}
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 			} else {

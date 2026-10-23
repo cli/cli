@@ -65,7 +65,8 @@ func verifyCertExtensions(given, expected certificate.Summary) error {
 	if expected.SourceRepositoryDigest != "" && !strings.EqualFold(expected.SourceRepositoryDigest, given.SourceRepositoryDigest) {
 		return fmt.Errorf("expected SourceRepositoryDigest to be %s, got %s", expected.SourceRepositoryDigest, given.SourceRepositoryDigest)
 	}
-	if expected.SourceRepositoryRef != "" && !strings.EqualFold(expected.SourceRepositoryRef, given.SourceRepositoryRef) {
+	// SourceRepositoryRef must be a case-sensitive comparison
+	if expected.SourceRepositoryRef != "" && expected.SourceRepositoryRef != given.SourceRepositoryRef {
 		return fmt.Errorf("expected SourceRepositoryRef to be %s, got %s", expected.SourceRepositoryRef, given.SourceRepositoryRef)
 	}
 

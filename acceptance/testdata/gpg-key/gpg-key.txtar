@@ -1,4 +1,8 @@
+# requires-user-capability: true
+
 skip 'it modifies the user''s personal GitHub account GPG keys'
+
+fixture-repo none
 
 # This test requires the admin:gpg_key scope to add and delete GPG keys to and
 # from the user's personal GitHub account. 

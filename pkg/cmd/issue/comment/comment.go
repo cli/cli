@@ -3,6 +3,7 @@ package comment
 import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/attachments"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -11,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) error) *cobra.Command {
+func NewCmdComment(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*prShared.CommentableOptions) error) *cobra.Command {
 	opts := &prShared.CommentableOptions{
 		IO:                        f.IOStreams,
 		HttpClient:                f.HttpClient,
@@ -37,8 +38,9 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 
 			Use %[1]s--attach%[1]s to upload an image or video. If the body already references an
 			attached file, such as %[1]s![alt](./login.png)%[1]s, that reference is rewritten to point
-			at the uploaded asset. Any attached file the body does not reference is appended
-			to the end of the comment.
+			at the uploaded asset. Paths in a %[1]s--body-file%[1]s are relative to its directory,
+			falling back to the working directory. Any attached file the body does not reference
+			is appended to the end of the comment.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -98,7 +100,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 
 				return issue, baseRepo, nil
 			}
-			if err := prShared.CommentablePreRun(cmd, opts); err != nil {
+			if err := prShared.CommentablePreRun(cmd, opts, telemetry); err != nil {
 				return err
 			}
 
@@ -110,11 +112,11 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		},
 		RunE: func(_ *cobra.Command, args []string) error {
 			if bodyFile != "" {
-				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				var err error
+				opts.Body, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 				if err != nil {
 					return err
 				}
-				opts.Body = string(b)
 			}
 
 			if runF != nil {

@@ -670,6 +670,60 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	`), output.Stderr())
 }
 
+func TestDeleteRemoteBranchTreatsOwnerCaseAsSameRepository(t *testing.T) {
+	t.Parallel()
+
+	// Given a same-repository pull request whose canonical owner casing differs
+	// from the owner casing parsed from the Git remote.
+	reg := initFakeHTTP()
+	reg.Register(
+		httpmock.REST("DELETE", "repos/SomeCoolProject/some-cool-repo/git/refs/heads%2Ftopic"),
+		httpmock.StringResponse(`{}`))
+
+	ios, _, _, _ := iostreams.Test()
+	finder := shared.NewMockFinder("", &api.PullRequest{
+		State:               "OPEN",
+		HeadRefName:         "topic",
+		HeadRepositoryOwner: api.Owner{Login: "somecoolproject"},
+		IsCrossRepository:   false,
+	}, baseRepo("SomeCoolProject", "some-cool-repo", "main"))
+	finder.ExpectFields([]string{
+		"id",
+		"number",
+		"state",
+		"title",
+		"lastCommit",
+		"mergeStateStatus",
+		"headRefName",
+		"baseRefName",
+		"headRefOid",
+		"isCrossRepository",
+		"isInMergeQueue",
+		"isMergeQueueEnabled",
+	})
+
+	opts := &MergeOptions{
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		IO:           ios,
+		Finder:       finder,
+		DeleteBranch: true,
+	}
+
+	ctx, err := NewMergeContext(opts)
+	require.NoError(t, err)
+
+	// When the remote branch is deleted.
+	err = ctx.deleteRemoteBranch()
+
+	// Then the same-repository branch deletion request is sent.
+	require.NoError(t, err)
+	require.Len(t, reg.Requests, 1)
+	assert.Equal(t, http.MethodDelete, reg.Requests[0].Method)
+	assert.Equal(t, "/repos/SomeCoolProject/some-cool-repo/git/refs/heads%2Ftopic", reg.Requests[0].URL.RequestURI())
+}
+
 func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -860,6 +914,7 @@ func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
 			BaseRefName:         "main",
 			MergeStateStatus:    "CLEAN",
 			HeadRepositoryOwner: api.Owner{Login: "HEAD"}, // Not the same owner as the base repo
+			IsCrossRepository:   true,
 		},
 		baseRepo("OWNER", "REPO", "main"),
 	)

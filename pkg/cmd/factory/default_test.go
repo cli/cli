@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -400,6 +401,44 @@ func TestPlainHttpClient(t *testing.T) {
 	assert.Nil(t, receivedHeaders.Values("Time-Zone"))
 }
 
+func TestTokenRefresherHttpClient(t *testing.T) {
+	// The token refresher client renews tokens from within an ordinary request. Under GH_DEBUG=api it must log only a
+	// head line, never a full request/response trace, so a refresh does not interleave a verbose trace in the middle
+	// of the request the user is inspecting.
+	t.Setenv("GH_DEBUG", "api")
+
+	var receivedHeaders *http.Header
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = &r.Header
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	ios, _, _, stderr := iostreams.Test()
+
+	client, err := tokenRefresherHttpClientFunc(ios, "v1.2.3", "", &telemetry.NoOpService{})()
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("POST", ts.URL, nil)
+	require.NoError(t, err)
+	res, err := client.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, 204, res.StatusCode)
+	assert.Equal(t, []string{"GitHub CLI v1.2.3"}, receivedHeaders.Values("User-Agent"))
+	assert.Equal(t, []string{"2022-11-28"}, receivedHeaders.Values("X-GitHub-Api-Version"))
+	assert.Nil(t, receivedHeaders.Values("Authorization"))
+	assert.Nil(t, receivedHeaders.Values("Content-Type"))
+	assert.Nil(t, receivedHeaders.Values("Accept"))
+	assert.Nil(t, receivedHeaders.Values("Time-Zone"))
+
+	// Head lines are present, but the verbose request/response header lines are not.
+	logOutput := stderr.String()
+	assert.Contains(t, logOutput, "* Request to "+ts.URL)
+	assert.NotContains(t, logOutput, "> POST")
+	assert.NotContains(t, logOutput, "< HTTP")
+}
+
 func TestNewGitClient(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -442,4 +481,70 @@ func defaultConfig() *ghmock.ConfigMock {
 	cfg := config.NewMockConfigFromString("")
 	cfg.Set("nonsense.com", "oauth_token", "BLAH")
 	return cfg
+}
+
+// recordingAuthConfig is a gh.AuthConfig that records SetTokenRefresher calls. It embeds the interface so it satisfies
+// gh.AuthConfig without implementing every method; only SetTokenRefresher is exercised by these tests.
+type recordingAuthConfig struct {
+	gh.AuthConfig
+	setCalls      int
+	lastRefresher gh.TokenRefresher
+}
+
+func (r *recordingAuthConfig) SetTokenRefresher(refresher gh.TokenRefresher) {
+	r.setCalls++
+	r.lastRefresher = refresher
+}
+
+func TestConfigWithTokenRefresher(t *testing.T) {
+	t.Run("injects a refresher once across multiple config resolutions", func(t *testing.T) {
+		authCfg := &recordingAuthConfig{}
+		cfg := &ghmock.ConfigMock{AuthenticationFunc: func() gh.AuthConfig { return authCfg }}
+		plainCalls := 0
+		plainClientFunc := func() (*http.Client, error) {
+			plainCalls++
+			return &http.Client{}, nil
+		}
+
+		wrapped := configWithTokenRefresher(func() (gh.Config, error) { return cfg, nil }, plainClientFunc)
+
+		got, err := wrapped()
+		require.NoError(t, err)
+		require.Same(t, cfg, got)
+		require.Equal(t, 1, authCfg.setCalls)
+		require.NotNil(t, authCfg.lastRefresher)
+
+		// A second resolution reuses the already-injected refresher rather than building another.
+		_, err = wrapped()
+		require.NoError(t, err)
+		require.Equal(t, 1, authCfg.setCalls)
+		require.Equal(t, 1, plainCalls)
+	})
+
+	t.Run("skips injection when the plain client cannot be built", func(t *testing.T) {
+		authCfg := &recordingAuthConfig{}
+		cfg := &ghmock.ConfigMock{AuthenticationFunc: func() gh.AuthConfig { return authCfg }}
+		plainClientFunc := func() (*http.Client, error) { return nil, errors.New("no client") }
+
+		wrapped := configWithTokenRefresher(func() (gh.Config, error) { return cfg, nil }, plainClientFunc)
+
+		got, err := wrapped()
+		require.NoError(t, err)
+		require.Same(t, cfg, got)
+		require.Equal(t, 0, authCfg.setCalls)
+	})
+
+	t.Run("propagates a configuration error without injecting", func(t *testing.T) {
+		plainCalls := 0
+		plainClientFunc := func() (*http.Client, error) {
+			plainCalls++
+			return &http.Client{}, nil
+		}
+
+		wrapped := configWithTokenRefresher(func() (gh.Config, error) { return nil, errors.New("config boom") }, plainClientFunc)
+
+		_, err := wrapped()
+		require.EqualError(t, err, "config boom")
+		require.Equal(t, 0, plainCalls)
+	})
 }

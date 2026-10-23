@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
@@ -57,11 +58,13 @@ type CreateOptions struct {
 	BlockedBy   []string
 	Blocking    []string
 
-	AttachFlag *attachments.Flag
-	Assets     []attachments.UserAsset
+	BodyDir     string
+	AttachFlag  *attachments.Flag
+	AttachEvent *attachments.TelemetryEvent
+	Assets      []attachments.UserAsset
 }
 
-func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
@@ -82,7 +85,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Use %[1]s--attach%[1]s to upload an image or video. The attachment is appended to the
 			body. If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
-			reference is rewritten to point at the uploaded asset instead.
+			reference is rewritten to point at the uploaded asset instead. Paths in a
+			%[1]s--body-file%[1]s are relative to its directory, falling back to the working directory.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -133,11 +137,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			titleProvided := cmd.Flags().Changed("title")
 			bodyProvided := cmd.Flags().Changed("body")
 			if bodyFile != "" {
-				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				opts.Body, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 				if err != nil {
 					return err
 				}
-				opts.Body = string(b)
 				bodyProvided = true
 			}
 
@@ -163,6 +166,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return err
 			}
 
+			opts.AttachEvent = attachments.BeginTelemetry(telemetry, cmd.CommandPath(), opts.AttachFlag.Count())
 			opts.Assets, err = opts.AttachFlag.UserAssets()
 			if err != nil {
 				return err
@@ -463,8 +467,9 @@ func createRun(opts *CreateOptions) (err error) {
 		// not exist, so no issue is created. Once anything has uploaded the
 		// issue is created and the failures are reported.
 		if uploader != nil {
-			body, uploaded, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.Assets)
-			if uploadErr != nil && uploaded == 0 {
+			body, uploadResult, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.BodyDir, opts.Assets)
+			opts.AttachEvent.RecordOperations(uploadResult)
+			if uploadErr != nil && uploadResult.Uploaded == 0 {
 				err = uploadErr
 				return
 			}

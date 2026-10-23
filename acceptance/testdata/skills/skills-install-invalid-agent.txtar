@@ -1,3 +1,7 @@
+# requires-user-capability: false
+
+fixture-repo none
+
 # Invalid agent ID should error with valid options
 ! exec gh skill install github/awesome-copilot git-commit --agent bogus-agent --force
 stderr 'invalid argument'

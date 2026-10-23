@@ -252,13 +252,13 @@ func PromptGists(prompter prompter.Prompter, client *http.Client, host string, c
 // GetRawGistFile fetches the full content of a gist file from its raw URL. The
 // bytes are external content, so they are returned as iostreams.Untrusted to
 // force callers to choose between sanitized display and raw round-tripping.
-func GetRawGistFile(httpClient *http.Client, rawURL safeurl.SafeURL) (iostreams.Untrusted, error) {
-	req, err := http.NewRequest("GET", rawURL.String(), nil)
-	if err != nil {
-		return iostreams.Untrusted{}, err
-	}
-
-	resp, err := httpClient.Do(req)
+// The rawURL is supplied by the API and points at gist.githubusercontent.com rather than the
+// API host, so it is requested as an absolute URL. The hostname only configures the client.
+func GetRawGistFile(httpClient *http.Client, hostname string, rawURL safeurl.SafeURL) (iostreams.Untrusted, error) {
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).Request(hostname, http.MethodGet, rawURL.String(), nil)
 	if err != nil {
 		return iostreams.Untrusted{}, err
 	}
@@ -266,7 +266,7 @@ func GetRawGistFile(httpClient *http.Client, rawURL safeurl.SafeURL) (iostreams.
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return iostreams.Untrusted{}, api.HandleHTTPError(resp)
+		return iostreams.Untrusted{}, api.UnexpectedStatusError(resp)
 	}
 
 	body, err := io.ReadAll(resp.Body)
