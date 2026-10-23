@@ -1367,7 +1367,7 @@ func TestEditRun(t *testing.T) {
 			attach:    []string{"signin-flow.png"},
 			artifact:  plan,
 			tty:       true,
-			token:     "ghs_aninstallationtoken",
+			token:     "ghr_arefreshtoken",
 			wantCalls: []string{"UploadTarget monalisa/monas-cafe#142"},
 			wantErr:   "unsupported authentication type",
 		},

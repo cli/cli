@@ -1305,7 +1305,7 @@ func Test_createRun(t *testing.T) {
 				hosts:
 				  github.com:
 				    user: monalisa
-				    oauth_token: ghs_anactionstoken
+				    oauth_token: ghr_arefreshtoken
 				  acme.ghe.com:
 				    user: monalisa
 				    oauth_token: gho_atenanttoken

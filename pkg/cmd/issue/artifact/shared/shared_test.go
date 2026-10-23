@@ -832,7 +832,7 @@ func TestNewUploader(t *testing.T) {
 			repo:    ghrepo.New("monalisa", "monas-cafe"),
 			number:  142,
 			target:  &client.UploadTarget{RepositoryID: 1234, ViewerPermission: "WRITE"},
-			token:   "ghs_aninstallationtoken",
+			token:   "ghr_arefreshtoken",
 			wantErr: "unsupported authentication type",
 		},
 		{

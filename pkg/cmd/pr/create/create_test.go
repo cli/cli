@@ -1835,7 +1835,7 @@ func Test_createRun(t *testing.T) {
 				// both usable and this row passes against a command that reads
 				// the wrong host.
 				opts.Config = uploadTokenConfigForHosts(map[string]string{
-					"github.com":   "ghs_anactionstoken",
+					"github.com":   "ghr_arefreshtoken",
 					"acme.ghe.com": "gho_atenanttoken",
 				})
 				opts.Remotes = func() (context.Remotes, error) {
