@@ -509,10 +509,13 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 
 		entry.State = authEntryStateError
 		entry.Error = err.Error()
-		// Without a refresh, an expiring token past its expiry time is bound to fail the scope check. Flag it so the
-		// output can explain the failure instead of reporting the token as invalid. The expiry check runs only after
-		// a failure, so a server that still accepts the token (for example, under clock skew) reports success.
+		// Without a refresh, an expiring token past its expiry time is bound to be rejected with HTTP 401. Flag it so
+		// the output can explain the failure instead of reporting the token as invalid. The expiry check runs only
+		// after a rejection, so a server that still accepts the token (for example, under clock skew) reports success,
+		// and unrelated failures (for example, HTTP 503) keep the generic error output.
+		httpErr, isHTTPErr := errors.AsType[api.HTTPError](err)
 		entry.expiredWithoutRefresh = opts.noRefresh && entry.Refreshable &&
+			isHTTPErr && httpErr.StatusCode == http.StatusUnauthorized &&
 			entry.TokenExpiresAt != nil && !entry.TokenExpiresAt.After(timeNow())
 		return entry
 	}
