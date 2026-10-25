@@ -6,8 +6,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
-  cancel-in-progress: true
+  group: "release-${{ github.sha }}"
+  cancel-in-progress: false
 
 defaults:
   run:
