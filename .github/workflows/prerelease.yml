@@ -33,10 +33,10 @@ jobs:
             asset_target: x86_64-apple-darwin
           - goos: linux
             goarch: amd64
-            asset_target: x86_64-unknown-linux-gnu
+            asset_target: x86_64-unknown-linux-musl
           - goos: linux
             goarch: arm64
-            asset_target: aarch64-unknown-linux-gnu
+            asset_target: aarch64-unknown-linux-musl
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -72,6 +72,41 @@ jobs:
           pattern: gh-*
           path: dist
           merge-multiple: true
+
+      - name: Verify Linux ELF artifacts are fully static
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          command -v readelf >/dev/null
+          X86_64_COUNT=0
+          AARCH64_COUNT=0
+          for binary in dist/**/*; do
+            [[ -f "$binary" ]] || continue
+            if ! readelf -h "$binary" >/dev/null 2>&1; then
+              continue
+            fi
+            machine=$(readelf -h "$binary" | sed -n 's/^[[:space:]]*Machine:[[:space:]]*//p')
+            case "$machine" in
+              "Advanced Micro Devices X86-64") X86_64_COUNT=$((X86_64_COUNT + 1)) ;;
+              AArch64) AARCH64_COUNT=$((AARCH64_COUNT + 1)) ;;
+              *) printf '%s has unsupported ELF machine %s\n' "$binary" "$machine" >&2; exit 1 ;;
+            esac
+            program_headers=$(readelf -lW "$binary")
+            if [[ "$program_headers" == *INTERP* ]]; then
+              printf '%s has a dynamic ELF interpreter\n' "$binary" >&2
+              exit 1
+            fi
+            dynamic_section=$(readelf -dW "$binary")
+            if [[ "$dynamic_section" == *NEEDED* ]]; then
+              printf '%s has a dynamic library dependency\n' "$binary" >&2
+              exit 1
+            fi
+          done
+          if [[ "$X86_64_COUNT" -ne 1 || "$AARCH64_COUNT" -ne 1 ]]; then
+            printf 'Expected one x86_64 and one aarch64 Linux ELF artifact, found x86_64=%s aarch64=%s\n' "$X86_64_COUNT" "$AARCH64_COUNT" >&2
+            exit 1
+          fi
+
       - name: Zip artifacts
         run: for f in dist/*; do zip -9 --junk-paths "$f.zip" "$f"; done
       - name: Create pre-release
