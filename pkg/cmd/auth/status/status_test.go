@@ -974,8 +974,6 @@ func setRefresher(t *testing.T, c gh.Config, r gh.TokenRefresher) {
 
 // replaceAll replaces all instances of old with new in s, as well as all instances
 // of the JSON-escaped version of old with the JSON-escaped version of new.
-// This is because when the test is run on Windows the paths will have backslashes
-// escaped in JSON and a simple strings.ReplaceAll won't catch them.
 func replaceAll(s string, old string, new string) string {
 	jsonEscapedOld, _ := json.Marshal(old)
 	jsonEscapedOld = jsonEscapedOld[1 : len(jsonEscapedOld)-1]

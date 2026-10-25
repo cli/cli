@@ -19,26 +19,6 @@ type helpTopic struct {
 
 var HelpTopics = []helpTopic{
 	{
-		name:  "mintty",
-		short: "Information about using gh with MinTTY",
-		long: heredoc.Docf(`
-			MinTTY is the terminal emulator that comes by default with Git
-			for Windows. It has known issues with gh's ability to prompt a
-			user for input.
-
-			There are a few workarounds to make gh work with MinTTY:
-
-			- Reinstall Git for Windows, checking "Enable experimental support for pseudo consoles".
-
-			- Use a different terminal emulator with Git for Windows like Windows Terminal.
-			  You can run %[1]sC:\Program Files\Git\bin\bash.exe%[1]s from any terminal emulator to continue
-			  using all of the tooling in Git For Windows without MinTTY.
-
-			- Prefix invocations of gh with %[1]swinpty%[1]s, eg: %[1]swinpty gh auth login%[1]s.
-			  NOTE: this can lead to some UI bugs.
-		`, "`"),
-	},
-	{
 		name:  "environment",
 		short: "Environment variables that can be used with gh",
 		long: heredoc.Docf(`
@@ -95,7 +75,6 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_CONFIG_DIR%[1]s: the directory where gh will store configuration files. If not specified,
 			the default value will be one of the following paths (in order of precedence):
 			  - %[1]s$XDG_CONFIG_HOME/gh%[1]s (if %[1]s$XDG_CONFIG_HOME%[1]s is set),
-			  - %[1]s$AppData/GitHub CLI%[1]s (on Windows if %[1]s$AppData%[1]s is set), or
 			  - %[1]s$HOME/.config/gh%[1]s.
 
 			%[1]sGH_PROMPT_DISABLED%[1]s: set to any value to disable interactive prompting in the terminal.

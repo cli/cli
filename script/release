@@ -4,13 +4,13 @@ set -e
 print_help() {
     cat <<EOF
 To tag a new release:
-  script/release [--staging] [--dry-run] <tag-name> [--platform {linux|macos|windows}] [--branch <branch>]
+  script/release [--staging] [--dry-run] <tag-name> [--platform {linux|macos}] [--branch <branch>]
 
 To build staging binaries from the current branch:
-  script/release --current [--platform {linux|macos|windows}]
+  script/release --current [--platform {linux|macos}]
 
 To build binaries locally with goreleaser:
-  script/release --local --platform {linux|macos|windows}
+  script/release --local --platform {linux|macos}
 EOF
 }
 
@@ -86,15 +86,11 @@ build_local() {
   local goreleaser_config=".goreleaser.yml"
   case "$platform" in
   linux )
-    sed '/#build:windows/,/^$/d; /#build:macos/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
+    sed '/#build:macos/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
     goreleaser_config=".goreleaser.generated.yml"
     ;;
   macos )
-    sed '/#build:windows/,/^$/d; /#build:linux/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
-    goreleaser_config=".goreleaser.generated.yml"
-    ;;
-  windows )
-    sed '/#build:linux/,/^$/d; /#build:macos/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
+    sed '/#build:linux/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
     goreleaser_config=".goreleaser.generated.yml"
     ;;
   esac

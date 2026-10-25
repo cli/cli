@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/run"
@@ -105,15 +104,6 @@ func (c *Context) findKeygen() (string, error) {
 	}
 
 	keygenExe, err := safeexec.LookPath("ssh-keygen")
-	if err != nil && runtime.GOOS == "windows" {
-		// We can try and find ssh-keygen in a Git for Windows install
-		if gitPath, err := safeexec.LookPath("git"); err == nil {
-			gitKeygen := filepath.Join(filepath.Dir(gitPath), "..", "usr", "bin", "ssh-keygen.exe")
-			if _, err = os.Stat(gitKeygen); err == nil {
-				return gitKeygen, nil
-			}
-		}
-	}
 
 	if err == nil {
 		c.keygenExe = keygenExe

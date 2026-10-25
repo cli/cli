@@ -4,7 +4,7 @@ set -euo pipefail
 
 readonly repository="cli/cli"
 readonly workflow="acceptance.yml"
-readonly operating_systems="all ubuntu-latest windows-latest macos-latest"
+readonly operating_systems="all ubuntu-latest macos-latest"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly repo_root
 readonly testdata_dir="$repo_root/acceptance/testdata"

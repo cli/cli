@@ -6,7 +6,8 @@ The current release workflow and associated scripts were created before the curr
 
 From a high level, the [release workflow](https://github.com/cli/cli/blob/537a22228cd6b42b740d7f1c09f47c45bb1dab30/.github/workflows/deployment.yml):
  * Is triggered by a `workflow_dispatch` event (typically a result of running `./script/release`)
- * Builds, packages and signs artifacts in parallel for Linux, MacOS and Windows
+ * Builds, packages and signs artifacts in parallel for Linux and MacOS
+   (this fork does not build Windows artifacts; Windows is not supported)
  * GPG signs Debian and Red Hat repository artifacts
  * Builds and updates the [manual](https://cli.github.com/manual) and repository packages
  * Creates GitHub Attestations for the artifacts
@@ -20,14 +21,13 @@ This section will deep dive into each job in the [`deployment.yml` workflow](htt
 - [OS Specific Builds](#os-builds)
   - [linux](#linux)
   - [macos](#macos)
-  - [windows](#windows)
 - [release](#release)
 
-Although this workflow is used to do our production releases for Linux, MacOS and Windows, it is also possible to run subsets of the workflow. Specifically:
+Although this workflow is used to do our production releases for Linux and MacOS, it is also possible to run subsets of the workflow. Specifically:
  * The workflow can be triggered with `inputs.release` set to `false`, resulting in the entire [release job](#release) being skipped. This is not exposed via `./script/release`.
  * Many sections are guarded by `if: inputs.environment == 'production'`. These guards protect sections that require secrets (e.g. signing) or that result in mutations (e.g. creating a GitHub release). `./script/release` accepts the `--staging` flag for this purpose. This differs from the previous bullet point as some steps in the [release job](#release) print debug information such as [`git` diffs](https://github.com/cli/cli/blob/5d2eadef8cccf2671f68aad05cd93215a4c01b48/.github/workflows/deployment.yml#L380-L384).
  * The workflow can be triggered with `inputs.dry_run` set to `true` (the default for the `workflow_dispatch` form). Unlike `inputs.environment`, a dry run still exercises the `production` signing and packaging steps, but it does **not** publish anything: creating GitHub attestations, creating the GitHub Release, and pushing to the `cli.github.com` site repository are all skipped. This makes it possible to validate a full production build, including signing, without mutating anything externally visible. See [Publishing behaviour and dry runs](#dry-run) for details.
- * The workflow can be triggered for only `linux`, `MacOS` or `Windows` which allows for debugging single jobs. This is not exposed via `./script/release`. The [release job](#release) should not run in this case as it [requires all OS specific builds.](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L252)
+ * The workflow can be triggered for only `linux` or `MacOS` which allows for debugging single jobs. This is not exposed via `./script/release`. The [release job](#release) should not run in this case as it [requires all OS specific builds.](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L252)
 
 ## <a id="validate-tag-name">[validate-tag-name](https://github.com/cli/cli/blob/537a22228cd6b42b740d7f1c09f47c45bb1dab30/.github/workflows/deployment.yml#L31-L39)</a>
 
@@ -51,11 +51,11 @@ Although this workflow is used to do our production releases for Linux, MacOS an
 The purpose of this job is to [prevent incorrectly tagged releases](https://github.com/cli/cli/pull/10121), by ensuring they conform to the `major.minor.patch` form of semantic versioning, preceded by a `v`. An optional pre-release suffix such as `-rc.1` is allowed. Build metadata after a `+` is not, because the rest of the workflow identifies a pre-release by looking for a hyphen.
 
 > [!NOTE]
-> A hyphen in the tag name changes three things: the `release` job [creates the GitHub release as a pre-release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L362-L364), the site is not published, and the Windows MSI drops the suffix so its `ProductVersion` stays numeric.
+> A hyphen in the tag name changes two things: the `release` job [creates the GitHub release as a pre-release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L362-L364) and the site is not published.
 
 ## <a id="os-builds">[OS Builds](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L40-L248)</a>
 
-After validating the tag name, the workflow parallelises across `ubuntu`, `macos` and `windows` runners. The primary purpose of these jobs is to build and sign release artifacts. These artifacts are made available to the `release` job via `actions/upload-artifact` and `actions/download-artifact` respectively. Each of these jobs (as well as `release`) checks out the ref that triggered the `workflow_dispatch` (i.e. the `--ref` passed to `gh workflow run`, which `./script/release` sets from `--branch`) and sets `timeout-minutes: 20` so a hung build (for example, a code-signing step waiting on a remote service) fails fast rather than consuming the full default job timeout.
+After validating the tag name, the workflow parallelises across `ubuntu` and `macos` runners. The primary purpose of these jobs is to build and sign release artifacts. These artifacts are made available to the `release` job via `actions/upload-artifact` and `actions/download-artifact` respectively. Each of these jobs (as well as `release`) checks out the ref that triggered the `workflow_dispatch` (i.e. the `--ref` passed to `gh workflow run`, which `./script/release` sets from `--branch`) and sets `timeout-minutes: 20` so a hung build (for example, a code-signing step waiting on a remote service) fails fast rather than consuming the full default job timeout.
 
 ### <a id="linux">[linux](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L40-L73)</a>
 
@@ -292,7 +292,7 @@ rm "$RUNNER_TEMP/cert.p12"
 
 When we execute `codesign --timestamp --options=runtime -s "${DEVELOPER_ID_CERT_IDENTIFIER?}" -v "$1"` in `./script/sign`, `codesign` searches the keychain for a certificate that matches the `DEVELOPER_ID_CERT_IDENTIFIER` environment variable (sourced from the `MAC_APP_SIGNING_IDENTITY` repository variable). The `--timestamp` and `--options=runtime` flags are required for Notarization, described below.
 
-`./script/sign` only signs when `DO_SIGN_ARTIFACTS` is set to a value other than `false`; the `Build release binaries` and `Notarize macOS archives` steps set `DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}` (mirroring the Windows job). This ensures non-production (staging) macOS builds skip signing gracefully rather than failing when `codesign` runs against a keychain that was never provisioned, regardless of whether `MAC_APP_SIGNING_IDENTITY` happens to be defined at repository scope.
+`./script/sign` only signs when `DO_SIGN_ARTIFACTS` is set to a value other than `false`; the `Build release binaries` and `Notarize macOS archives` steps set `DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}`. This ensures non-production (staging) macOS builds skip signing gracefully rather than failing when `codesign` runs against a keychain that was never provisioned, regardless of whether `MAC_APP_SIGNING_IDENTITY` happens to be defined at repository scope.
 
 > [!TIP]
 > A `***: no identity found` failure from `codesign` means the value of `DEVELOPER_ID_CERT_IDENTIFIER` (i.e. `vars.MAC_APP_SIGNING_IDENTITY`) does not match any identity imported into the keychain. Run `security find-identity -v -p codesigning "$KEYCHAIN"` to list the available identities and their common names, then update the repository variable to match exactly.
@@ -303,178 +303,9 @@ When we execute `codesign --timestamp --options=runtime -s "${DEVELOPER_ID_CERT_
 
 When we execute `xcrun notarytool submit "$1" --keychain "$KEYCHAIN" --keychain-profile "notarytool-password" --wait` in `./script/sign`, `notarytool` authenticates using the App Store Connect API key stored under the `notarytool-password` profile by the earlier `Configure notarization credentials` step. This replaces the previous Apple ID / app-specific password flow (`--apple-id` / `--team-id` / `--password`).
 
-### <a id="windows">[windows](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L147-L248)</a>
+### Windows
 
-<details>
-
-```yml
-windows:
-    needs: validate-tag-name
-    runs-on: windows-latest
-    environment: ${{ inputs.environment }}
-    if: contains(inputs.platforms, 'windows')
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-      - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          version: "~1.17.1"
-          install-only: true
-      - name: Install Azure Code Signing Client
-        shell: pwsh
-        env:
-          ACS_DIR: ${{ runner.temp }}\acs
-          ACS_ZIP: ${{ runner.temp }}\acs.zip
-          CORRELATION_ID: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
-        run: |
-          # Download Azure Code Signing client containing the DLL needed for signtool in script/sign
-          Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.43 -OutFile $Env:ACS_ZIP -Verbose
-          Expand-Archive $Env:ACS_ZIP -Destination $Env:ACS_DIR -Force -Verbose
-
-          # Generate metadata file for signtool, used in signing box .exe and .msi
-          @{
-            CertificateProfileName = "GitHubInc"
-            CodeSigningAccountName = "GitHubInc"
-            CorrelationId = $Env:CORRELATION_ID
-            Endpoint =  "https://wus.codesigning.azure.net/"
-          } | ConvertTo-Json | Out-File -FilePath $Env:METADATA_PATH
-
-      # Azure Code Signing leverages the environment variables for secrets that complement the metadata.json
-      # file generated above (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
-      # For more information, see https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential?view=azure-dotnet
-      - name: Build release binaries
-        shell: bash
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
-          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
-          DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
-          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
-          TAG_NAME: ${{ inputs.tag_name }}
-          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
-        run: script/release --local "$TAG_NAME" --platform windows
-      - name: Set up MSBuild
-        id: setupmsbuild
-        uses: microsoft/setup-msbuild@v2.0.0
-      - name: Build MSI
-        shell: bash
-        env:
-          MSBUILD_PATH: ${{ steps.setupmsbuild.outputs.msbuildPath }}
-        run: |
-          for ZIP_FILE in dist/gh_*_windows_*.zip; do
-            MSI_NAME="$(basename "$ZIP_FILE" ".zip")"
-            MSI_VERSION="$(cut -d_ -f2 <<<"$MSI_NAME" | cut -d- -f1)"
-            case "$MSI_NAME" in
-            *_386 )
-              source_dir="$PWD/dist/windows_windows_386"
-              platform="x86"
-              ;;
-            *_amd64 )
-              source_dir="$PWD/dist/windows_windows_amd64_v1"
-              platform="x64"
-              ;;
-            *_arm64 )
-              source_dir="$PWD/dist/windows_windows_arm64"
-              platform="arm64"
-              ;;
-            * )
-              printf "unsupported architecture: %s\n" "$MSI_NAME" >&2
-              exit 1
-              ;;
-            esac
-            "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$source_dir" -p:OutputPath="$PWD/dist" -p:OutputName="$MSI_NAME" -p:ProductVersion="${MSI_VERSION#v}" -p:Platform="$platform"
-          done
-      - name: Sign .msi release binaries
-        if: inputs.environment == 'production'
-        shell: pwsh
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
-          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
-          DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
-          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
-          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
-        run: |
-          Get-ChildItem -Path .\dist -Filter *.msi | ForEach-Object {
-            .\script\sign.ps1 $_.FullName
-          }
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          if-no-files-found: error
-          retention-days: 7
-          path: |
-            dist/*.zip
-            dist/*.msi
-```
-</details>
-
-#### Building
-
-This job executes `script/release --local "$TAG_NAME" --platform windows` to use `GoReleaser` to create the Go executables and `.zip` archives. See [how ./script/release works](#how-script-release-works) for further information.
-
-This job also executes `MSBuild.exe` to build MSI Installers, wrapping each architecture dependent `.zip` produced by GoReleaser. This is done via the command:
-
-```pwsh
-"${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$source_dir" -p:OutputPath="$PWD/dist" -p:OutputName="$MSI_NAME" -p:ProductVersion="${MSI_VERSION#v}" -p:Platform="$platform"
-```
-
-This references a number of [pretty inscrutable files](https://github.com/cli/cli/tree/817eeb26e567de11007c8a82c25e61c7e20e4337/build/windows) in our repository that form a kind of manifest. Some of the details and motivation for the contents of these files is described in the [PR](https://github.com/cli/cli/pull/4276) that introduced them.
-
-#### Signing
-
-There are two levels of signing that occur in this job:
- * Signing of Go executables created by `GoReleaser` is performed in a [`GoReleaser` hook](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L43).
- * Signing of the MSI installers by executing `.\script\sign.ps1 $_.FullName`
-
-Both the `Build release binaries` and `Sign .msi release binaries` steps set `DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}`, which the signing scripts consult to skip Azure Code Signing outside of production deploys. The value is passed to both steps for consistency, even though the `Sign .msi release binaries` step is already guarded by `if: inputs.environment == 'production'`.
-
-Signing of the Windows artifacts uses `signtool.exe` to request signing from [Azure HSM](https://azure.microsoft.com/en-us/products/azure-dedicated-hsm). This takes the following steps:
-
-Firstly, a package is downloaded that contains a DLL to allow `signtool.exe` to interact with Azure HSM.
-
-```pwsh
-# Download Azure Code Signing client containing the DLL needed for signtool in script/sign
-Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.43 -OutFile $Env:ACS_ZIP -Verbose
-Expand-Archive $Env:ACS_ZIP -Destination $Env:ACS_DIR -Force -Verbose
-```
-
-Secondly, we create a JSON file containing metadata required by HSM:
-
-```pwsh
-# Generate metadata file for signtool, used in signing box .exe and .msi
-@{
-  CertificateProfileName = "GitHubInc"
-  CodeSigningAccountName = "GitHubInc"
-  CorrelationId = $Env:CORRELATION_ID
-  Endpoint =  "https://wus.codesigning.azure.net/"
-} | ConvertTo-Json | Out-File -FilePath $Env:METADATA_PATH
-```
-
-Thirdly, in `./script/sign.ps1` we look for the `signtool` executable:
-
-```pwsh
-$signtool = Resolve-Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -Last 1
-```
-
-Finally, in `./script/sign.ps`, we execute `signtool`:
-
-```pwsh
-& $signtool sign /d "GitHub CLI" /fd sha256 /td sha256 /tr http://timestamp.acs.microsoft.com /v /dlib "$Env:DLIB_PATH" /dmdf "$Env:METADATA_PATH" $Args[0]
-```
-
-Breaking this command down:
- * `/fd` is the file digest algorithm
- * `/td` is the timestamp digest algorithm
- * `/tr` indicates the timestamp server so a timestamp can be added to the signature, proving when it was signed
- * `/dlib` points to the previously extracted DLL
- * `/dmdf` points to the previously created metadata file
+This fork does not build, sign, or publish Windows artifacts. Windows is not supported.
 
 ## <a id="release">[release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L250-L395)</a>
 
@@ -483,7 +314,7 @@ Breaking this command down:
 ```yml
 release:
     runs-on: ubuntu-latest
-    needs: [linux, macos, windows]
+    needs: [linux, macos]
     environment: ${{ inputs.environment }}
     if: inputs.release
     steps:
@@ -531,7 +362,7 @@ release:
           shopt -s failglob
           rm -rf dist
           mkdir dist
-          mv -v {linux,macos,windows}/gh_* dist/
+          mv -v {linux,macos}/gh_* dist/
       - name: Install packaging dependencies
         run: sudo apt-get install -y rpm reprepro
       - name: Set up GPG

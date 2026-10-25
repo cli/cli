@@ -31,7 +31,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -89,11 +88,7 @@ func main() {
 	}
 
 	if len(args) < 2 {
-		if isWindowsTarget() {
-			args = append(args, filepath.Join("bin", "gh.exe"))
-		} else {
-			args = append(args, "bin/gh")
-		}
+		args = append(args, filepath.Join("bin", "gh"))
 	}
 
 	self = filepath.Base(args[0])
@@ -138,16 +133,6 @@ func normalizeBuildTags(tags string) string {
 	fields := strings.FieldsFunc(tags, func(r rune) bool { return r == ',' || r == ' ' })
 	slices.Sort(fields)
 	return strings.Join(slices.Compact(fields), ",")
-}
-
-func isWindowsTarget() bool {
-	if os.Getenv("GOOS") == "windows" {
-		return true
-	}
-	if runtime.GOOS == "windows" {
-		return true
-	}
-	return false
 }
 
 func version() string {

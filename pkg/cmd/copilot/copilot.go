@@ -2,7 +2,6 @@ package copilot
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"bufio"
 	"compress/gzip"
 	"crypto/sha256"
@@ -23,7 +22,6 @@ import (
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/safeurl"
-	ghzip "github.com/cli/cli/v2/internal/zip"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -58,7 +56,7 @@ func NewCmdCopilot(f *cmdutil.Factory, runF func(*CopilotOptions) error) *cobra.
 
 			Use %[1]s--remove%[1]s to remove the downloaded Copilot CLI.
 
-			This command is only supported on Windows, Linux, and Darwin, on amd64/x64
+			This command is only supported on Linux and macOS (Darwin), on amd64/x64
 			or arm64 architectures.
 
 			To prevent %[1]sgh%[1]s from interpreting flags intended for Copilot,
@@ -199,11 +197,7 @@ func copilotInstallDir() string {
 }
 
 func copilotBinaryPath() string {
-	binaryName := copilotBinaryName
-	if runtime.GOOS == "windows" {
-		binaryName += ".exe"
-	}
-	return filepath.Join(copilotInstallDir(), binaryName)
+	return filepath.Join(copilotInstallDir(), copilotBinaryName)
 }
 
 var runExternalCmdFunc = runExternalCmd
@@ -236,9 +230,6 @@ func findCopilotBinary() string {
 // It returns the path to the installed Copilot binary.
 func downloadCopilot(httpClient *http.Client, ios *iostreams.IOStreams, installDir, localPath string) (string, error) {
 	platform := runtime.GOOS
-	if platform == "windows" {
-		platform = "win32"
-	}
 
 	arch := runtime.GOARCH
 	if arch == "amd64" {
@@ -250,15 +241,11 @@ func downloadCopilot(httpClient *http.Client, ios *iostreams.IOStreams, installD
 	}
 
 	var archiveName string
-	var isZip bool
 	switch platform {
-	case "win32":
-		archiveName = fmt.Sprintf("copilot-%s-%s.zip", platform, arch)
-		isZip = true
 	case "linux", "darwin":
 		archiveName = fmt.Sprintf("copilot-%s-%s.tar.gz", platform, arch)
 	default:
-		return "", fmt.Errorf("unsupported platform: %s (supported: linux, darwin, windows)", platform)
+		return "", fmt.Errorf("unsupported platform: %s (supported: linux, darwin)", platform)
 	}
 
 	archiveURL, err := safeurl.JoinPathWithHostPrefix("https://github.com/", "github", "copilot-cli", "releases", "latest", "download", archiveName)
@@ -319,12 +306,7 @@ func downloadCopilot(httpClient *http.Client, ios *iostreams.IOStreams, installD
 	}
 
 	// Extract from the downloaded data
-	if isZip {
-		err = extractZip(tmpFile.Name(), installDir)
-	} else {
-		err = extractTarGz(tmpFile, installDir)
-	}
-	if err != nil {
+	if err := extractTarGz(tmpFile, installDir); err != nil {
 		return "", err
 	}
 
@@ -368,41 +350,6 @@ func fetchExpectedChecksum(httpClient *http.Client, checksumsURL safeurl.SafeURL
 	}
 
 	return "", fmt.Errorf("checksum not found for %s", archiveName)
-}
-
-// extractZip reads a ZIP archive at path and extracts its contents into destDir.
-// It returns an error if the archive cannot be read,
-// or if any file or directory within the archive cannot be created or written.
-func extractZip(path, destDir string) error {
-	zipReader, err := zip.OpenReader(path)
-	if err != nil {
-		return fmt.Errorf("failed to open zip: %w", err)
-	}
-	defer zipReader.Close()
-
-	root, err := safepaths.OpenRoot(destDir)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
-
-	// As of the time of writing, ghzip.ExtractZip will safely skip files that
-	// would result in path traversal. This is an issue for our use-case because
-	// we want to error out before extracting if there's any such file.
-	// To avoid breaking the shared ghzip.ExtractZip code that expects unsafe
-	// paths to be ignored and no error produced, we pre-validate here,
-	// producing an error if any such file is found.
-	for _, file := range zipReader.File {
-		if err := root.Validate(file.Name); err != nil {
-			return err
-		}
-	}
-
-	if err := ghzip.ExtractZip(&zipReader.Reader, root); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // extractTarGz reads a TAR.GZ archive from r and extracts its contents into destDir.

@@ -29,7 +29,7 @@ func isPossibleProtocol(u string) bool {
 func ParseURL(rawURL string) (*url.URL, error) {
 	if !isPossibleProtocol(rawURL) &&
 		strings.ContainsRune(rawURL, ':') &&
-		// not a Windows path
+		// not a drive-letter path
 		!strings.ContainsRune(rawURL, '\\') {
 		// support scp-like syntax for ssh protocol
 		rawURL = "ssh://" + strings.Replace(rawURL, ":", "/", 1)

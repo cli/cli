@@ -95,12 +95,6 @@ func Main() exitCode {
 		}
 	}
 
-	// Enable running gh from Windows File Explorer's address bar. Without this, the user is told to stop and run from a
-	// terminal. With this, a user can clone a repo (or take other actions) directly from explorer.
-	if len(os.Args) > 1 && os.Args[1] != "" {
-		cobra.MousetrapHelpText = ""
-	}
-
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
 		expandedArgs = os.Args[1:]
@@ -139,12 +133,6 @@ func Main() exitCode {
 		}
 
 		printError(stderr, ioStreams.ColorScheme(), err, cmd, hasDebug, invokingAgent != "")
-
-		if strings.Contains(err.Error(), "Incorrect function") {
-			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
-			fmt.Fprintln(stderr, "To learn about workarounds for this error, run:  gh help mintty")
-			return exitError
-		}
 
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {

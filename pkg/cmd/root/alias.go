@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"github.com/cli/cli/v2/internal/run"
@@ -124,9 +123,6 @@ func findSh() (string, error) {
 	shPath, err := findsh.Find()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
-			if runtime.GOOS == "windows" {
-				return "", errors.New("unable to locate sh to execute the shell alias with. The sh.exe interpreter is typically distributed with Git for Windows.")
-			}
 			return "", errors.New("unable to locate sh to execute shell alias with")
 		}
 		return "", err

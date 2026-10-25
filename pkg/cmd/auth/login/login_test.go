@@ -27,10 +27,7 @@ import (
 
 func stubHomeDir(t *testing.T, dir string) {
 	homeEnv := "HOME"
-	switch runtime.GOOS {
-	case "windows":
-		homeEnv = "USERPROFILE"
-	case "plan9":
+	if runtime.GOOS == "plan9" {
 		homeEnv = "home"
 	}
 	t.Setenv(homeEnv, dir)

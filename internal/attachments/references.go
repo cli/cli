@@ -3,7 +3,6 @@ package attachments
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -390,21 +389,16 @@ func attachmentArgForDestination(dest, markdownDir string, byPath map[string]int
 }
 
 // isRelativePath reports whether path is relative to a directory, and so can
-// be placed inside the one the markdown was read from. filepath.IsAbs is not
-// enough on Windows, where "\x" is rooted on the current drive and "C:x" names
-// a drive of its own, though neither is absolute.
+// be placed inside the one the markdown was read from.
 func isRelativePath(path string) bool {
-	if path == "" || filepath.IsAbs(path) || filepath.VolumeName(path) != "" {
-		return false
-	}
-	return !os.IsPathSeparator(path[0])
+	return path != "" && !filepath.IsAbs(path)
 }
 
 // isRemoteDestination reports whether a destination addresses somewhere other
 // than the filesystem, so that an attached file is never confused with a URI.
 //
-// A one letter scheme is a Windows volume rather than a scheme, which keeps
-// "C:\pictures\login.png" a path. A host with no scheme is the protocol
+// A one letter scheme is a drive letter rather than a scheme, which keeps
+// "C:/pictures/login.png" a path. A host with no scheme is the protocol
 // relative form, which inherits the scheme of the page it sits on. Anything too
 // malformed to parse is left to the path lookup, which will not match it.
 func isRemoteDestination(dest string) bool {

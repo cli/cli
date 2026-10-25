@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 
 	"github.com/cli/safeexec"
 	shellquote "github.com/kballard/go-shellquote"
@@ -27,19 +26,6 @@ func defaultLookPath(name string) ([]string, []string, error) {
 	return []string{exe}, nil, nil
 }
 
-func needsBom() bool {
-	// The reason why we do this is because notepad.exe on Windows determines the
-	// encoding of an "empty" text file by the locale, for example, GBK in China,
-	// while golang string only handles utf8 well. However, a text file with utf8
-	// BOM header is not considered "empty" on Windows, and the encoding will then
-	// be determined utf8 by notepad.exe, instead of GBK or other encodings.
-
-	// This could be enhanced in the future by doing this only when a non-utf8
-	// locale is in use, and possibly doing that for any OS, not just windows.
-
-	return runtime.GOOS == "windows"
-}
-
 func edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cursor showable, lookPath func(string) ([]string, []string, error)) (string, error) {
 	// prepare the temp file
 	pattern := fn
@@ -51,13 +37,6 @@ func edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Wri
 		return "", err
 	}
 	defer os.Remove(f.Name())
-
-	// write utf8 BOM header if necessary for the current platform and/or locale
-	if needsBom() {
-		if _, err := f.Write(bom); err != nil {
-			return "", err
-		}
-	}
 
 	// write initial value
 	if _, err := f.WriteString(initialValue); err != nil {

@@ -2,7 +2,6 @@ package gitcredentials_test
 
 import (
 	"context"
-	"runtime"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
@@ -59,10 +58,9 @@ func TestSetsCorrectCommandInGitConfig(t *testing.T) {
 
 func TestHelperIsOurs(t *testing.T) {
 	tests := []struct {
-		name        string
-		cmd         string
-		want        bool
-		windowsOnly bool
+		name string
+		cmd  string
+		want bool
 	}{
 		{
 			name: "blank",
@@ -90,18 +88,13 @@ func TestHelperIsOurs(t *testing.T) {
 			want: true,
 		},
 		{
-			name:        "ours - Windows edition",
-			cmd:         `!'C:\Program Files\GitHub CLI\gh.exe' auth git-credential`,
-			want:        true,
-			windowsOnly: true,
+			name: "ours - quoted executable path with .exe suffix",
+			cmd:  `!'/path/to/GitHub CLI/gh.exe' auth git-credential`,
+			want: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.windowsOnly && runtime.GOOS != "windows" {
-				t.Skip("skipping test on non-Windows platform")
-			}
-
 			h := gitcredentials.Helper{Cmd: tt.cmd}
 			if got := h.IsOurs(); got != tt.want {
 				t.Errorf("IsOurs() = %v, want %v", got, tt.want)

@@ -185,8 +185,8 @@ func TestFlagUserAssets(t *testing.T) {
 		{
 			name: "a symlink and the file it points at",
 			setup: func(t *testing.T) {
-				// Creating one needs a privilege Windows does not grant by
-				// default, so a machine that cannot make a symlink cannot run
+				// Creating one needs a privilege a machine may not grant,
+				// so a machine that cannot make a symlink cannot run
 				// this case either.
 				if err := os.Symlink("a.png", "link.png"); err != nil {
 					t.Skipf("cannot create a symlink here: %v", err)

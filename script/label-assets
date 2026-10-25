@@ -12,7 +12,6 @@ for asset; do
   label="${label%.tar}"
   label="GitHub CLI $(tr '_' ' ' <<<"${label#gh_}")"
   case "$asset" in
-  *.msi ) label="${label} installer" ;;
   *.deb ) label="${label} deb" ;;
   *.rpm ) label="${label} RPM" ;;
   esac

@@ -3,7 +3,6 @@ package safepaths_test
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/safepaths"
@@ -228,12 +227,6 @@ func TestValidateChild(t *testing.T) {
 		{name: "nested parent escape", path: "nested/../../file.txt", wantErr: true},
 		{name: "absolute", path: filepath.Join(string(os.PathSeparator), "file.txt"), wantErr: true},
 		{name: "backslash child", path: `nested\file.txt`},
-		{name: "backslash parent escape", path: `..\..\file.txt`, wantErr: runtime.GOOS == "windows"},
-		{name: "mixed separator escape", path: `nested/..\..\file.txt`, wantErr: runtime.GOOS == "windows"},
-		{name: "drive relative path", path: `C:file.txt`, wantErr: runtime.GOOS == "windows"},
-		{name: "drive absolute path", path: `C:\file.txt`, wantErr: runtime.GOOS == "windows"},
-		{name: "UNC path", path: `\\server\share\file.txt`, wantErr: runtime.GOOS == "windows"},
-		{name: "reserved Windows name", path: "NUL", wantErr: runtime.GOOS == "windows"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
