@@ -7,7 +7,7 @@
 // An upload cannot be undone. Callers must ensure that the returned markdown
 // is written to a resource (issue, PR, etc.).
 //
-// A caller must build the Uploader before it prompts for anything, so a token
+// A caller must build the Uploader before it prompts for anything, so a host
 // or permission that cannot upload stops the command before an editor opens.
 // It must call UploadAndAttach after every possible prompt has been exercised,
 // not before, because nothing that can cancel may follow an upload.
@@ -20,7 +20,7 @@
 //	// repositoryID and viewerPermission come from the lookup the command
 //	// already makes.
 //	uploader, err := attachments.NewUploader(
-//		httpClient, token, host, repositoryID, viewerPermission)
+//		httpClient, host, repositoryID, viewerPermission)
 //	...
 //
 //	// Every reasonable cancellation possible belongs here.

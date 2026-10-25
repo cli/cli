@@ -135,10 +135,10 @@ blocked-by/blocking relationships.
   document that references it at the upload, and a file that no document
   references is an error before anything uploads. `edit` with only
   `--attach` appends the files to the artifact's current content.
-- Uploads require GitHub.com or a GHE.com tenant, an OAuth token, classic PAT,
-  or fine-grained PAT, and `WRITE`, `MAINTAIN`, or `ADMIN` repository
-  permission. GitHub Enterprise Server and most GitHub App tokens are
-  unsupported.
+- Uploads require GitHub.com or a GHE.com tenant and `WRITE`, `MAINTAIN`, or
+  `ADMIN` repository permission. GitHub Enterprise Server is unsupported. The
+  upload endpoint accepts tokens from only some GitHub Apps, and refuses the
+  rest with the same error as missing write access.
 - Uploads stop at the first failure. If earlier files uploaded, `gh` still
   writes those attachments and exits non-zero. `gh issue create`,
   `gh issue edit`, `gh pr create`, and `gh pr edit` also print the issue or
@@ -314,6 +314,20 @@ Sometimes useful data isn't on the typed commands. Examples:
 - `gh auth status` prints the active host(s), user, and which env var (if
   any) is being honored.
 - `gh auth status --json` is supported.
+- Stored credentials may be expiring tokens that gh refreshes automatically.
+  `gh auth status --json hosts` reports these with `"refreshable": true` and a
+  `tokenExpiresAt` timestamp.
+- Expiring tokens are not available on every host. So far only github.com
+  and GHE.com (`*.ghe.com`) hosts support them; other hosts keep using
+  regular tokens.
+- Do not cache the output of `gh auth token`: an expiring token can stop
+  working at any time because gh rotates it on refresh. Run `gh auth token`
+  again each time you need one, or prefer `gh api` over raw HTTP calls so gh
+  handles the refresh for you.
+- A `refresh_expired` state in `gh auth status --json hosts` means the refresh
+  token was rejected. Recovery needs an interactive `gh auth login` or
+  `gh auth refresh`, so ask the user to run it instead of retrying.
+- Tokens from `GH_TOKEN` or `GITHUB_TOKEN` are used as is and never refreshed.
 
 ## Other notes
 

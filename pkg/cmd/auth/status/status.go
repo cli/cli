@@ -8,11 +8,13 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -22,21 +24,28 @@ import (
 type authEntryState string
 
 const (
-	authEntryStateSuccess = "success"
-	authEntryStateTimeout = "timeout"
-	authEntryStateError   = "error"
+	authEntryStateSuccess        = "success"
+	authEntryStateTimeout        = "timeout"
+	authEntryStateError          = "error"
+	authEntryStateRefreshExpired = "refresh_expired"
 )
 
 type authEntry struct {
-	State       authEntryState `json:"state"`
-	Error       string         `json:"error,omitempty"`
-	Active      bool           `json:"active"`
-	Host        string         `json:"host"`
-	Login       string         `json:"login"`
-	TokenSource string         `json:"tokenSource"`
-	Token       string         `json:"token,omitempty"`
-	Scopes      string         `json:"scopes,omitempty"`
-	GitProtocol string         `json:"gitProtocol"`
+	State                 authEntryState `json:"state"`
+	Error                 string         `json:"error,omitempty"`
+	Active                bool           `json:"active"`
+	Host                  string         `json:"host"`
+	Login                 string         `json:"login"`
+	TokenSource           string         `json:"tokenSource"`
+	Token                 string         `json:"token,omitempty"`
+	Scopes                string         `json:"scopes,omitempty"`
+	GitProtocol           string         `json:"gitProtocol"`
+	Refreshable           bool           `json:"refreshable,omitempty"`
+	TokenExpiresAt        *time.Time     `json:"tokenExpiresAt,omitempty"`
+	RefreshTokenExpiresAt *time.Time     `json:"refreshTokenExpiresAt,omitempty"`
+	// justRefreshed reports whether gh renewed this account's expiring token during this run. It drives a
+	// display-only notice and is never serialized.
+	justRefreshed bool
 }
 
 type authStatus struct {
@@ -57,6 +66,21 @@ func (a authStatus) ExportData(fields []string) map[string]any {
 	return cmdutil.StructExportData(a, fields)
 }
 
+// timeNow is the clock used to render relative token-expiry times. It is a package variable so tests can pin it for
+// deterministic output.
+var timeNow = time.Now
+
+// relativeToNow renders a fuzzy, human readable description of when t occurs relative to the current time, for
+// annotating the absolute expiry timestamp. Future times read as "in about 7 hours" and already-elapsed times as
+// "expired about 2 days ago".
+func relativeToNow(t time.Time) string {
+	now := timeNow()
+	if t.After(now) {
+		return text.FuzzyIn(now, t)
+	}
+	return "expired " + text.FuzzyAgo(now, t)
+}
+
 func (e authEntry) String(cs *iostreams.ColorScheme) string {
 	var sb strings.Builder
 
@@ -69,6 +93,23 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
 		sb.WriteString(fmt.Sprintf("  - Git operations protocol: %s\n", cs.Bold(e.GitProtocol)))
 		sb.WriteString(fmt.Sprintf("  - Token: %s\n", cs.Bold(e.Token)))
+
+		if e.Refreshable {
+			sb.WriteString("  - Expiring token that gh refreshes automatically\n")
+			if e.TokenExpiresAt != nil {
+				expiresAt := e.TokenExpiresAt.UTC()
+				sb.WriteString(fmt.Sprintf("  - Token expires: %s (%s)\n",
+					cs.Bold(expiresAt.Format(time.RFC3339)), relativeToNow(expiresAt)))
+			}
+			if e.RefreshTokenExpiresAt != nil {
+				refreshExpiresAt := e.RefreshTokenExpiresAt.UTC()
+				sb.WriteString(fmt.Sprintf("  - Refresh token expires: %s (%s)\n",
+					cs.Bold(refreshExpiresAt.Format(time.RFC3339)), relativeToNow(refreshExpiresAt)))
+			}
+			if e.justRefreshed {
+				sb.WriteString("  - Token refreshed just now\n")
+			}
+		}
 
 		if expectScopes(e.Token) {
 			sb.WriteString(fmt.Sprintf("  - Token scopes: %s\n", cs.Bold(displayScopes(e.Scopes))))
@@ -111,6 +152,18 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		}
 		activeStr := fmt.Sprintf("%v", e.Active)
 		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+
+	case authEntryStateRefreshExpired:
+		if e.Login != "" {
+			sb.WriteString(fmt.Sprintf("  %s Refresh token for %s account %s was rejected\n", cs.Red("X"), e.Host, cs.Bold(e.Login)))
+		} else {
+			sb.WriteString(fmt.Sprintf("  %s Refresh token for %s was rejected\n", cs.Red("X"), e.Host))
+		}
+		activeStr := fmt.Sprintf("%v", e.Active)
+		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+		sb.WriteString("  - The stored expiring credential was removed because its refresh token is no longer valid.\n")
+		loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
+		sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
 	}
 
 	return sb.String()
@@ -125,6 +178,7 @@ type StatusOptions struct {
 	Hostname  string
 	ShowToken bool
 	Active    bool
+	NoRefresh bool
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -147,6 +201,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			If an account on any host (or only the one given via %[1]s--hostname%[1]s) has authentication issues,
 			the command will exit with 1 and output to stderr. Note that when using the %[1]s--json%[1]s option, the command
 			will always exit with zero regardless of any authentication issues, unless there is a fatal error.
+
+			Any expired or near-expiry token that supports refreshing is refreshed automatically, unless %[1]s--no-refresh%[1]s is given.
 
 			To change the active account for a host, see %[1]sgh auth switch%[1]s.
 		`, "`"),
@@ -181,6 +237,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check only a specific hostname's auth status")
 	cmd.Flags().BoolVarP(&opts.ShowToken, "show-token", "t", false, "Display the auth token")
 	cmd.Flags().BoolVarP(&opts.Active, "active", "a", false, "Display the active account only")
+	cmd.Flags().BoolVar(&opts.NoRefresh, "no-refresh", false, "Do not automatically refresh expired tokens")
 
 	// the json flags are intentionally not given a shorthand to avoid conflict with -t/--show-token
 	cmdutil.AddJSONFlagsWithoutShorthand(cmd, &opts.Exporter, authStatusFields)
@@ -237,17 +294,17 @@ func statusRun(opts *StatusOptions) error {
 
 		var activeUser string
 		gitProtocol := cfg.GitProtocol(hostname).Value
-		activeUserToken, activeUserTokenSource := authCfg.ActiveToken(hostname)
-		if authTokenWriteable(activeUserTokenSource) {
+		activeCred, activeRefreshStatus := resolveCredential(authCfg, hostname, "", opts.NoRefresh)
+		if authTokenWriteable(activeCred.Source) {
 			activeUser, _ = authCfg.ActiveUser(hostname)
 		}
 		entry := buildEntry(httpClient, buildEntryOptions{
-			active:      true,
-			gitProtocol: gitProtocol,
-			hostname:    hostname,
-			token:       activeUserToken,
-			tokenSource: activeUserTokenSource,
-			username:    activeUser,
+			active:        true,
+			gitProtocol:   gitProtocol,
+			hostname:      hostname,
+			credential:    activeCred,
+			refreshStatus: activeRefreshStatus,
+			username:      activeUser,
 		})
 		statuses.Hosts[hostname] = append(statuses.Hosts[hostname], entry)
 
@@ -264,14 +321,14 @@ func statusRun(opts *StatusOptions) error {
 			if username == activeUser {
 				continue
 			}
-			token, tokenSource, _ := authCfg.TokenForUser(hostname, username)
+			cred, refreshStatus := resolveCredential(authCfg, hostname, username, opts.NoRefresh)
 			entry := buildEntry(httpClient, buildEntryOptions{
-				active:      false,
-				gitProtocol: gitProtocol,
-				hostname:    hostname,
-				token:       token,
-				tokenSource: tokenSource,
-				username:    username,
+				active:        false,
+				gitProtocol:   gitProtocol,
+				hostname:      hostname,
+				credential:    cred,
+				refreshStatus: refreshStatus,
+				username:      username,
 			})
 			statuses.Hosts[hostname] = append(statuses.Hosts[hostname], entry)
 
@@ -364,28 +421,42 @@ func expectScopes(token string) bool {
 }
 
 type buildEntryOptions struct {
-	active      bool
-	gitProtocol string
-	hostname    string
-	token       string
-	tokenSource string
-	username    string
+	active        bool
+	gitProtocol   string
+	hostname      string
+	credential    gh.Credential
+	refreshStatus gh.RefreshStatus
+	username      string
 }
 
 func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
-	tokenSource := opts.tokenSource
-	if tokenSource == "oauth_token" {
+	tokenSource := opts.credential.Source
+	if tokenSource == gh.TokenSourceOAuthToken || tokenSource == gh.TokenSourceRefreshableOAuthToken {
 		// The go-gh function TokenForHost returns this value as source for tokens read from the
 		// config file, but we want the file path instead. This attempts to reconstruct it.
 		tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
 	}
 	entry := authEntry{
-		Active:      opts.active,
-		Host:        opts.hostname,
-		Login:       opts.username,
-		TokenSource: tokenSource,
-		Token:       opts.token,
-		GitProtocol: opts.gitProtocol,
+		Active:                opts.active,
+		Host:                  opts.hostname,
+		Login:                 opts.username,
+		TokenSource:           tokenSource,
+		Token:                 opts.credential.Token,
+		GitProtocol:           opts.gitProtocol,
+		Refreshable:           opts.credential.IsRefreshable(),
+		TokenExpiresAt:        opts.credential.ExpiresAt,
+		RefreshTokenExpiresAt: opts.credential.RefreshTokenExpiresAt,
+		justRefreshed:         opts.refreshStatus == gh.RefreshStatusDone,
+	}
+
+	// A rejected refresh token means the stored credential was already removed during resolution, leaving an empty
+	// token behind. Sending a scope request with it would produce a misleading generic failure, so surface the real
+	// reason and stop here. The token source is left empty on purpose: the credential is gone, so where it used to
+	// live is of no use to the user now.
+	if opts.refreshStatus == gh.RefreshStatusExpired {
+		entry.State = authEntryStateRefreshExpired
+		entry.Error = fmt.Sprintf("refresh token for %s was rejected; the stored credential was removed", opts.hostname)
+		return entry
 	}
 
 	// If token is not writeable, then it came from an environment variable and
@@ -404,7 +475,7 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 	}
 
 	// Get scopes for token.
-	scopesHeader, err := shared.GetScopes(httpClient, opts.hostname, opts.token)
+	scopesHeader, err := shared.GetScopes(httpClient, opts.hostname, opts.credential.Token)
 	if err != nil {
 		var networkError net.Error
 		if errors.As(err, &networkError) && networkError.Timeout() {
@@ -425,4 +496,24 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 
 func authTokenWriteable(src string) bool {
 	return !strings.HasSuffix(src, "_TOKEN")
+}
+
+// resolveCredential returns the credential gh should present for the host and optional user (an empty username means the
+// active account), refreshing an expiring token unless noRefresh is set. Refresh is best effort: a failed
+// refresh yields the last stored credential, which the caller still validates via the scope check. The returned status
+// reports whether a refresh happened.
+func resolveCredential(authCfg gh.AuthConfig, hostname, username string, noRefresh bool) (gh.Credential, gh.RefreshStatus) {
+	if noRefresh {
+		if username == "" {
+			return authCfg.ActiveToken(hostname), gh.RefreshStatusInapplicable
+		}
+		credential, _ := authCfg.TokenForUser(hostname, username)
+		return credential, gh.RefreshStatusInapplicable
+	}
+	if username == "" {
+		credential, status, _ := authCfg.ActiveTokenWithRefresh(hostname)
+		return credential, status
+	}
+	credential, status, _ := authCfg.TokenForUserWithRefresh(hostname, username)
+	return credential, status
 }

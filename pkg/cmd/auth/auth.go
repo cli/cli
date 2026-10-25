@@ -22,10 +22,13 @@ func NewCmdAuth(f *cmdutil.Factory) *cobra.Command {
 
 	cmdutil.DisableAuthCheck(cmd)
 
-	cmd.AddCommand(authLoginCmd.NewCmdLogin(f, nil))
+	loginCmd := authLoginCmd.NewCmdLogin(f, nil)
+	refreshCmd := authRefreshCmd.NewCmdRefresh(f, nil)
+
+	cmd.AddCommand(loginCmd)
 	cmd.AddCommand(authLogoutCmd.NewCmdLogout(f, nil))
 	cmd.AddCommand(authStatusCmd.NewCmdStatus(f, nil))
-	cmd.AddCommand(authRefreshCmd.NewCmdRefresh(f, nil))
+	cmd.AddCommand(refreshCmd)
 	cmd.AddCommand(gitCredentialCmd.NewCmdCredential(f, nil))
 	cmd.AddCommand(authSetupGitCmd.NewCmdSetupGit(f, nil))
 	cmd.AddCommand(authTokenCmd.NewCmdToken(f, nil))

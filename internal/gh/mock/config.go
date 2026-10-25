@@ -22,9 +22,6 @@ var _ gh.Config = &ConfigMock{}
 //			AccessibleColorsFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the AccessibleColors method")
 //			},
-//			AccessiblePrompterFunc: func(hostname string) gh.ConfigEntry {
-//				panic("mock out the AccessiblePrompter method")
-//			},
 //			AliasesFunc: func() gh.AliasConfig {
 //				panic("mock out the Aliases method")
 //			},
@@ -46,6 +43,9 @@ var _ gh.Config = &ConfigMock{}
 //			EditorFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Editor method")
 //			},
+//			ExpiringCredentialsFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the ExpiringCredentials method")
+//			},
 //			GetOrDefaultFunc: func(hostname string, key string) o.Option[gh.ConfigEntry] {
 //				panic("mock out the GetOrDefault method")
 //			},
@@ -54,7 +54,6 @@ var _ gh.Config = &ConfigMock{}
 //			},
 //			HTTPUnixSocketFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the HTTPUnixSocket method")
-//			},
 //			},
 //			PagerFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Pager method")
@@ -70,7 +69,6 @@ var _ gh.Config = &ConfigMock{}
 //			},
 //			SpinnerFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Spinner method")
-//			},
 //			},
 //			WriteFunc: func() error {
 //				panic("mock out the Write method")
@@ -106,6 +104,9 @@ type ConfigMock struct {
 	// EditorFunc mocks the Editor method.
 	EditorFunc func(hostname string) gh.ConfigEntry
 
+	// ExpiringCredentialsFunc mocks the ExpiringCredentials method.
+	ExpiringCredentialsFunc func(hostname string) gh.ConfigEntry
+
 	// GetOrDefaultFunc mocks the GetOrDefault method.
 	GetOrDefaultFunc func(hostname string, key string) o.Option[gh.ConfigEntry]
 
@@ -114,7 +115,6 @@ type ConfigMock struct {
 
 	// HTTPUnixSocketFunc mocks the HTTPUnixSocket method.
 	HTTPUnixSocketFunc func(hostname string) gh.ConfigEntry
-
 
 	// PagerFunc mocks the Pager method.
 	PagerFunc func(hostname string) gh.ConfigEntry
@@ -130,7 +130,6 @@ type ConfigMock struct {
 
 	// SpinnerFunc mocks the Spinner method.
 	SpinnerFunc func(hostname string) gh.ConfigEntry
-
 
 	// WriteFunc mocks the Write method.
 	WriteFunc func() error
@@ -166,6 +165,11 @@ type ConfigMock struct {
 		}
 		// Editor holds details about calls to the Editor method.
 		Editor []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
+		// ExpiringCredentials holds details about calls to the ExpiringCredentials method.
+		ExpiringCredentials []struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
@@ -219,23 +223,24 @@ type ConfigMock struct {
 		Write []struct {
 		}
 	}
-	lockAccessibleColors   sync.RWMutex
-	lockAliases            sync.RWMutex
-	lockAuthentication     sync.RWMutex
-	lockBrowser            sync.RWMutex
-	lockCacheDir           sync.RWMutex
-	lockClipboard          sync.RWMutex
-	lockColorLabels        sync.RWMutex
-	lockEditor             sync.RWMutex
-	lockGetOrDefault       sync.RWMutex
-	lockGitProtocol        sync.RWMutex
-	lockHTTPUnixSocket     sync.RWMutex
-	lockPager              sync.RWMutex
-	lockPreferEditorPrompt sync.RWMutex
-	lockPrompt             sync.RWMutex
-	lockSet                sync.RWMutex
-	lockSpinner            sync.RWMutex
-	lockWrite              sync.RWMutex
+	lockAccessibleColors    sync.RWMutex
+	lockAliases             sync.RWMutex
+	lockAuthentication      sync.RWMutex
+	lockBrowser             sync.RWMutex
+	lockCacheDir            sync.RWMutex
+	lockClipboard           sync.RWMutex
+	lockColorLabels         sync.RWMutex
+	lockEditor              sync.RWMutex
+	lockExpiringCredentials sync.RWMutex
+	lockGetOrDefault        sync.RWMutex
+	lockGitProtocol         sync.RWMutex
+	lockHTTPUnixSocket      sync.RWMutex
+	lockPager               sync.RWMutex
+	lockPreferEditorPrompt  sync.RWMutex
+	lockPrompt              sync.RWMutex
+	lockSet                 sync.RWMutex
+	lockSpinner             sync.RWMutex
+	lockWrite               sync.RWMutex
 }
 
 // AccessibleColors calls AccessibleColorsFunc.
@@ -471,6 +476,38 @@ func (mock *ConfigMock) EditorCalls() []struct {
 	mock.lockEditor.RLock()
 	calls = mock.calls.Editor
 	mock.lockEditor.RUnlock()
+	return calls
+}
+
+// ExpiringCredentials calls ExpiringCredentialsFunc.
+func (mock *ConfigMock) ExpiringCredentials(hostname string) gh.ConfigEntry {
+	if mock.ExpiringCredentialsFunc == nil {
+		panic("ConfigMock.ExpiringCredentialsFunc: method is nil but Config.ExpiringCredentials was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockExpiringCredentials.Lock()
+	mock.calls.ExpiringCredentials = append(mock.calls.ExpiringCredentials, callInfo)
+	mock.lockExpiringCredentials.Unlock()
+	return mock.ExpiringCredentialsFunc(hostname)
+}
+
+// ExpiringCredentialsCalls gets all the calls that were made to ExpiringCredentials.
+// Check the length with:
+//
+//	len(mockedConfig.ExpiringCredentialsCalls())
+func (mock *ConfigMock) ExpiringCredentialsCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockExpiringCredentials.RLock()
+	calls = mock.calls.ExpiringCredentials
+	mock.lockExpiringCredentials.RUnlock()
 	return calls
 }
 

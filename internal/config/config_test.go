@@ -13,7 +13,6 @@ import (
 func newTestConfig() *cfg {
 	return &cfg{
 		cfg:          ghConfig.ReadFromString(""),
-		activeTokens: &activeTokenCache{},
 	}
 }
 
@@ -205,4 +204,23 @@ func TestClipboard(t *testing.T) {
 		require.Equal(t, "disabled", entry.Value)
 		require.Equal(t, gh.ConfigUserProvided, entry.Source)
 	})
+}
+
+func requireKeyWithValue(t *testing.T, cfg *ghConfig.Config, keys []string, value string) {
+	t.Helper()
+	actual, err := cfg.Get(keys)
+	require.NoError(t, err)
+	require.Equal(t, value, actual)
+}
+
+func requireNoKey(t *testing.T, cfg *ghConfig.Config, keys []string) {
+	t.Helper()
+	_, err := cfg.Get(keys)
+	var keyNotFoundError *ghConfig.KeyNotFoundError
+	require.ErrorAs(t, err, &keyNotFoundError)
+}
+
+func newTestAuthConfig(t *testing.T) *AuthConfig {
+	cfg, _ := NewIsolatedTestConfig(t, "")
+	return cfg.Authentication().(*AuthConfig)
 }

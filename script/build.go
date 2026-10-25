@@ -12,6 +12,7 @@
 //     - GH_OAUTH_CLIENT_SECRET
 //     - SOURCE_DATE_EPOCH: enables reproducible builds
 //     - GO_LDFLAGS
+//     - GO_BUILDTAGS: rebuilds an up to date binary if it was built with different tags
 //
 //   manpages:
 //     Builds the man pages under `share/man/man1/`.
@@ -23,12 +24,14 @@
 package main
 
 import (
+	"debug/buildinfo"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -38,8 +41,10 @@ import (
 
 var tasks = map[string]func(string) error{
 	"bin/gh": func(exe string) error {
+		buildTags, _ := os.LookupEnv("GO_BUILDTAGS")
+
 		info, err := os.Stat(exe)
-		if err == nil && !sourceFilesLaterThan(info.ModTime()) {
+		if err == nil && !sourceFilesLaterThan(info.ModTime()) && builtWithTags(exe, buildTags) {
 			fmt.Printf("%s: `%s` is up to date.\n", self, exe)
 			return nil
 		}
@@ -52,7 +57,7 @@ var tasks = map[string]func(string) error{
 			ldflags = fmt.Sprintf("-X github.com/cli/cli/v2/internal/authflow.oauthClientID=%s %s", os.Getenv("GH_OAUTH_CLIENT_ID"), ldflags)
 		}
 
-		buildTags, _ := os.LookupEnv("GO_BUILDTAGS")
+		ldflags = fmt.Sprintf("-s -w %s", ldflags)
 
 		ldflags = fmt.Sprintf("-s -w %s", ldflags)
 
@@ -107,6 +112,29 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+// builtWithTags reports whether the binary at exe was built with the given build tags, so switching tags (for
+// example between `make debug` and `make`) forces a rebuild even when sources have not changed.
+func builtWithTags(exe, tags string) bool {
+	info, err := buildinfo.ReadFile(exe)
+	if err != nil {
+		return false
+	}
+	var builtTags string
+	for _, s := range info.Settings {
+		if s.Key == "-tags" {
+			builtTags = s.Value
+			break
+		}
+	}
+	return normalizeBuildTags(builtTags) == normalizeBuildTags(tags)
+}
+
+func normalizeBuildTags(tags string) string {
+	fields := strings.FieldsFunc(tags, func(r rune) bool { return r == ',' || r == ' ' })
+	slices.Sort(fields)
+	return strings.Join(slices.Compact(fields), ",")
 }
 
 func version() string {

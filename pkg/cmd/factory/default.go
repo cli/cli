@@ -10,7 +10,9 @@ import (
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/debug"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -22,6 +24,11 @@ var ssoHeader string
 var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
 
 func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, executablePath string) *cmdutil.Factory {
+	// Inject the OAuth token refresher into the AuthConfig so refreshable credentials can be renewed during ordinary
+	// commands. It is wrapped around cfgFunc before anything else so every consumer resolves the same refresher-aware
+	// configuration.
+	cfgFunc = configWithTokenRefresher(cfgFunc, tokenRefresherHttpClientFunc(ios, appVersion, invokingAgent))
+
 	f := &cmdutil.Factory{
 		AppVersion:     appVersion,
 		InvokingAgent:  invokingAgent,
@@ -35,9 +42,9 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
 	f.Remotes = remotesFunc(f)    // Depends on Config, and GitClient
 	f.BaseRepo = BaseRepoFunc(f.Remotes)
-	f.Prompter = newPrompter(f) // Depends on Config and IOStreams
-	f.Browser = newBrowser(f)   // Depends on Config, and IOStreams
-	f.Branch = branchFunc(f)    // Depends on GitClient
+	f.Prompter = newPrompter(f)              // Depends on Config and IOStreams
+	f.Browser = newBrowser(f)                // Depends on Config, and IOStreams
+	f.Branch = branchFunc(f)                 // Depends on GitClient
 
 	return f
 }
@@ -197,11 +204,11 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			Config:        cfg.Authentication(),
-			Log:           ios.ErrOut,
-			LogColorize:   ios.ColorEnabled(),
-			AppVersion:    appVersion,
-			InvokingAgent: invokingAgent,
+			RefreshingConfig:  cfg.Authentication(),
+			Log:               ios.ErrOut,
+			LogColorize:       ios.ColorEnabled(),
+			AppVersion:        appVersion,
+			InvokingAgent:     invokingAgent,
 		}
 		newClient, err := api.NewHTTPClient(opts)
 		if err != nil {
@@ -210,6 +217,30 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 		newClient.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(newClient.Transport)
 		client = newClient
 		return client, nil
+	}
+}
+
+// tokenRefresherHttpClientFunc builds the HTTP client used to renew OAuth tokens. It mirrors plainHttpClientFunc but
+// defaults to headline-only logging so that, under GH_DEBUG=api, the refresh exchange does not produce a
+// full request/response trace. A token refresh is a side-band exchange triggered from within an ordinary request's
+// round trip, so a verbose trace would interleave the refresh traffic in the middle of the request trace the user is
+// actually inspecting. Auth flows that should surface their own full traffic use f.PlainHttpClient instead.
+func tokenRefresherHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAgent string) func() (*http.Client, error) {
+	return func() (*http.Client, error) {
+		logHeadlineOnly := true
+		if verbose, ok := debug.Config().VerboseTokenRefresh.Value(); ok {
+			logHeadlineOnly = !verbose
+		}
+		opts := api.HTTPClientOptions{
+			Log:             ios.ErrOut,
+			LogColorize:     ios.ColorEnabled(),
+			LogHeadlineOnly: logHeadlineOnly,
+			AppVersion:      appVersion,
+			InvokingAgent:   invokingAgent,
+			// This is required to prevent automatic setting of auth and other headers.
+			SkipDefaultHeaders: true,
+		}
+		return api.NewHTTPClient(opts)
 	}
 }
 
@@ -228,6 +259,29 @@ func plainHttpClientFunc(ios *iostreams.IOStreams, appVersion string, invokingAg
 			return nil, err
 		}
 		return client, nil
+	}
+}
+
+// configWithTokenRefresher returns a config accessor that injects the OAuth token refresher into the AuthConfig the
+// first time the configuration is resolved, so refreshable credentials can be renewed during ordinary commands. The
+// refresher uses a plain HTTP client that sets no auth headers, since the token endpoint is reached without an
+// existing token. Injection runs once because Authentication returns a single shared AuthConfig; if the plain client
+// cannot be built, injection is skipped and token refresh simply stays inapplicable rather than failing the command.
+func configWithTokenRefresher(cfgFunc func() (gh.Config, error), plainClientFunc func() (*http.Client, error)) func() (gh.Config, error) {
+	var once sync.Once
+	return func() (gh.Config, error) {
+		cfg, err := cfgFunc()
+		if err != nil {
+			return nil, err
+		}
+		once.Do(func() {
+			plainClient, err := plainClientFunc()
+			if err != nil {
+				return
+			}
+			cfg.Authentication().SetTokenRefresher(authflow.NewTokenRefresher(plainClient))
+		})
+		return cfg, nil
 	}
 }
 

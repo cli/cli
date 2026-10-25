@@ -13,7 +13,6 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 	opts := &shared.CommentableOptions{
 		IO:                        f.IOStreams,
 		HttpClient:                f.HttpClient,
-		Config:                    f.Config,
 		EditSurvey:                shared.CommentableEditSurvey(f.Config, f.IOStreams),
 		InteractiveEditSurvey:     shared.CommentableInteractiveEditSurvey(f.Config, f.IOStreams),
 		ConfirmSubmitSurvey:       shared.CommentableConfirmSubmitSurvey(f.Prompter),

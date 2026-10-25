@@ -14,7 +14,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/attachments"
-	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
@@ -28,7 +27,6 @@ import (
 type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
-	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Client     func() (client.ArtifactClient, error)
 
@@ -100,7 +98,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
 	}
 
 	var body, bodyFile, name string
@@ -307,7 +304,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if len(opts.Assets) > 0 {
-		uploader, err := shared.NewUploader(c, repo, opts.IssueNumber, opts.HttpClient, opts.Config)
+		uploader, err := shared.NewUploader(c, repo, opts.IssueNumber, opts.HttpClient)
 		if err != nil {
 			return err
 		}

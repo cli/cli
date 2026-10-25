@@ -42,7 +42,6 @@ type EditOptions struct {
 	BodyDir     string
 	AttachFlag  *attachments.Flag
 	Assets      []attachments.UserAsset
-	Config      func() (gh.Config, error)
 
 	shared.Editable
 }
@@ -51,7 +50,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := &EditOptions{
 		IO:              f.IOStreams,
 		HttpClient:      f.HttpClient,
-		Config:          f.Config,
 		Surveyor:        surveyor{P: f.Prompter},
 		Fetcher:         fetcher{},
 		EditorRetriever: editorRetriever{config: f.Config},
@@ -327,15 +325,9 @@ func editRun(opts *EditOptions) error {
 	// Built before the prompts, so a run that cannot upload stops early.
 	var uploader *attachments.Uploader
 	if len(opts.Assets) > 0 {
-		cfg, err := opts.Config()
-		if err != nil {
-			return err
-		}
 		// A URL selector names its own host, so this can differ from the
 		// default host.
-		host := repo.RepoHost()
-		tokenType := cfg.Authentication().ActiveTokenType(host)
-		uploader, err = attachments.NewUploader(httpClient, tokenType, host, pr.RepositoryDatabaseID(), pr.RepositoryViewerPermission())
+		uploader, err = attachments.NewUploader(httpClient, repo.RepoHost(), pr.RepositoryDatabaseID(), pr.RepositoryViewerPermission())
 		if err != nil {
 			return err
 		}

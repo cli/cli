@@ -9,7 +9,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/attachments"
-	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
@@ -23,7 +22,6 @@ import (
 type EditOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
-	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Client     func() (client.ArtifactClient, error)
 
@@ -51,7 +49,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := &EditOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -157,7 +154,7 @@ func editRun(opts *EditOptions) error {
 
 	var uploader *attachments.Uploader
 	if len(opts.Assets) > 0 {
-		uploader, err = shared.NewUploader(c, repo, opts.IssueNumber, opts.HttpClient, opts.Config)
+		uploader, err = shared.NewUploader(c, repo, opts.IssueNumber, opts.HttpClient)
 		if err != nil {
 			return err
 		}

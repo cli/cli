@@ -251,6 +251,22 @@ To upgrade:
 conda update gh --channel conda-forge
 ```
 
+### Debian (extrepo)
+
+The [extrepo tool](https://packages.debian.org/stable/extrepo) and [GitHub CLI repository metadata](https://salsa.debian.org/extrepo-team/extrepo-data/-/blob/master/repos/debian/github-cli.yaml) are supported by the Debian community. The packages installed from the configured repository are the [official GitHub CLI packages](#debian).
+
+To install:
+
+```shell
+sudo apt install extrepo
+sudo extrepo enable github-cli
+sudo apt update
+sudo apt install gh
+```
+
+> [!WARNING]
+> The keyring downloaded by `extrepo` may differ from our published keyring, so the checksums listed at the top of this document may not apply.
+
 ### Debian Community
 
 The [GitHub CLI package](https://packages.debian.org/stable/gh) is supported by the Debian community with updates powered by [Debian Go Packaging Team](https://salsa.debian.org/go-team/packages/gh).

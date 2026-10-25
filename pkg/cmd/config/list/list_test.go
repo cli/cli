@@ -100,6 +100,7 @@ func Test_listRun(t *testing.T) {
 				editor=/usr/bin/vim
 				prompt=disabled
 				prefer_editor_prompt=enabled
+				expiring_credentials=disabled
 				pager=less
 				http_unix_socket=
 				browser=brave

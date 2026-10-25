@@ -11,6 +11,11 @@ export CGO_LDFLAGS
 bin/gh: script/build
 	@script/build $@
 
+# Builds bin/gh with the ghdebug build tag, which enables the GH_INTERNAL_* overrides in internal/debug.
+.PHONY: debug
+debug: script/build
+	@GO_BUILDTAGS=ghdebug script/build bin/gh
+
 script/build: script/build.go
 	GOOS= GOARCH= GOARM= GOFLAGS= CGO_ENABLED= go build -o $@ $<
 
