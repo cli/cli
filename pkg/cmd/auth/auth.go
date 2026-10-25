@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	gitCredentialCmd "github.com/cli/cli/v2/pkg/cmd/auth/gitcredential"
 	authLoginCmd "github.com/cli/cli/v2/pkg/cmd/auth/login"
 	authLogoutCmd "github.com/cli/cli/v2/pkg/cmd/auth/logout"
@@ -14,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdAuth(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *cobra.Command {
+func NewCmdAuth(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "auth <command>",
 		Short:   "Authenticate gh and git with GitHub",
@@ -23,8 +22,8 @@ func NewCmdAuth(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *c
 
 	cmdutil.DisableAuthCheck(cmd)
 
-	loginCmd := authLoginCmd.NewCmdLogin(f, telemetry, nil)
-	refreshCmd := authRefreshCmd.NewCmdRefresh(f, telemetry, nil)
+	loginCmd := authLoginCmd.NewCmdLogin(f, nil)
+	refreshCmd := authRefreshCmd.NewCmdRefresh(f, nil)
 
 	cmd.AddCommand(loginCmd)
 	cmd.AddCommand(authLogoutCmd.NewCmdLogout(f, nil))
