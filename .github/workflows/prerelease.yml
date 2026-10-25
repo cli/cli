@@ -6,8 +6,12 @@ on:
 permissions: {}
 
 concurrency:
-  group: prerelease-${{ github.sha }}
-  cancel-in-progress: false
+  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
 
 jobs:
   build:
