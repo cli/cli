@@ -270,9 +270,6 @@ func (tr funcTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return tr.roundTrip(req)
 }
 
-// getHostname returns the hostname the request is addressed to, preferring an
-// explicit Host override and falling back to the URL host. Any port in the host
-// is stripped, so callers compare on the hostname alone.
 func getHostname(r *http.Request) string {
 	host := r.Host
 	if host == "" {

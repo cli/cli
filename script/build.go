@@ -59,6 +59,8 @@ var tasks = map[string]func(string) error{
 
 		ldflags = fmt.Sprintf("-s -w %s", ldflags)
 
+		ldflags = fmt.Sprintf("-s -w %s", ldflags)
+
 		args := []string{"go", "build", "-trimpath"}
 		if buildTags != "" {
 			args = append(args, "-tags", buildTags)
@@ -161,7 +163,7 @@ func sourceFilesLaterThan(t time.Time) bool {
 	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			// Ignore errors that occur when the project contains a symlink to a filesystem or volume that
-			// Windows doesn't have access to.
+			// cannot be accessed.
 			if path != "." && isAccessDenied(err) {
 				fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
 				return nil
@@ -254,5 +256,5 @@ func shellInspect(args []string) string {
 }
 
 func normalizeTask(t string) string {
-	return filepath.ToSlash(strings.TrimSuffix(t, ".exe"))
+	return filepath.ToSlash(t)
 }
