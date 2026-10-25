@@ -1,5 +1,3 @@
-//go:build !windows
-
 package flock
 
 import (
@@ -10,8 +8,7 @@ import (
 
 // TryLock attempts to acquire an exclusive, non-blocking flock on the given path.
 // Returns the locked file and an unlock function on success. The caller should
-// read/write through the returned file to avoid platform differences with
-// mandatory locking on Windows.
+// read/write through the returned file.
 // Returns ErrLocked if the file is already locked by another process.
 func TryLock(path string) (f *os.File, unlock func(), err error) {
 	f, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)

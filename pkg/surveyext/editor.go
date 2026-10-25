@@ -7,7 +7,6 @@ package surveyext
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -26,8 +25,6 @@ func init() {
 		defaultEditor = v
 	} else if e := os.Getenv("EDITOR"); e != "" {
 		defaultEditor = e
-	} else if runtime.GOOS == "windows" {
-		defaultEditor = "notepad"
 	}
 }
 

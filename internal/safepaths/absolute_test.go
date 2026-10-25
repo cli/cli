@@ -2,9 +2,7 @@ package safepaths_test
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/safepaths"
@@ -119,18 +117,5 @@ func mustParseAbsolute(s string) safepaths.Absolute {
 }
 
 func rootDir() string {
-	// Get the current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
-	// For Windows, extract the volume and add back the root
-	if runtime.GOOS == "windows" {
-		volume := filepath.VolumeName(cwd)
-		return volume + "\\"
-	}
-
-	// For Unix-based systems, the root is always "/"
 	return "/"
 }

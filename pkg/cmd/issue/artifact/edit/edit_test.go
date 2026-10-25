@@ -1733,7 +1733,7 @@ func writeTestFile(t *testing.T, path, content string) {
 }
 
 // symlinkTestFile creates a symlink, or skips the test where that needs a
-// privilege the system doesn't grant, as on Windows by default.
+// privilege the system doesn't grant.
 func symlinkTestFile(t *testing.T, target, path string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))

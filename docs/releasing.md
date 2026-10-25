@@ -16,7 +16,6 @@ See `script/release --help` for more information.
 What this does is:
 
 - Builds Linux binaries on Ubuntu;
-- Builds and signs Windows binaries on Windows;
 - Builds, signs, and notarizes macOS binaries on macOS;
 - Uploads all release artifacts to a new GitHub Release;
 - A new git tag `vX.Y.Z` is created in the remote repository;

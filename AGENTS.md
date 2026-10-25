@@ -14,6 +14,7 @@ This fork tracks `cli/cli` and removes selected features to keep the GitHub CLI 
 | Skills | Skill commands and supporting packages | No skill commands or packages |
 | Tests | Unit, acceptance, and integration tests and fixtures | The test files and fixtures removed by the debloat change stay removed |
 | Documentation | Upstream README and acceptance documentation | Those documents stay removed |
+| Platforms | Linux, macOS, and Windows builds, installers, and runtime branches | Linux and macOS only. Windows is not supported: no Windows builds, installers, or runtime branches |
 
 ## When updating from upstream
 

@@ -39,8 +39,8 @@ and talk through which code gets run in order.
 
 1. `go run script/build.go` - Makes sure all external Go dependencies are fetched, then compiles the
    `cmd/gh/main.go` file into a `bin/gh` binary.
-2. `bin/gh issue list --limit 5` - Runs the newly built `bin/gh` binary (note: on Windows you must use
-   backslashes like `bin\gh`) and passes the following arguments to the process: `["issue", "list", "--limit", "5"]`.
+2. `bin/gh issue list --limit 5` - Runs the newly built `bin/gh` binary
+   and passes the following arguments to the process: `["issue", "list", "--limit", "5"]`.
 3. `func main()` inside `cmd/gh/main.go` is the first Go function that runs. The arguments passed to the
    process are available through `os.Args`.
 4. The `main` package initializes the "root" command with `root.NewCmdRoot()` and dispatches execution to it

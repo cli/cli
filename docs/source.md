@@ -17,8 +17,6 @@
 
 3. Build and install
 
-   #### Unix-like systems
-
    ```sh
    # installs to '/usr/local' by default; sudo may be required, or sudo -E for configured go environments
    $ make install
@@ -27,20 +25,9 @@
    $ make install prefix=/path/to/gh
    ```
 
-   #### Windows
-
-   ```pwsh
-   # build the `bin\gh.exe` binary
-   > go run script\build.go
-   ```
-
-   There is no install step available on Windows.
+   Windows is not supported.
 
 4. Run `gh version` to check if it worked.
-
-   #### Windows
-
-   Run `bin\gh version` to check if it worked.
 
 ## Cross-compiling binaries for different platforms
 
@@ -50,13 +37,7 @@ or CPU architecture. This is achieved by setting environment variables such as G
 For example, to compile the `gh` binary for the 32-bit Raspberry Pi OS:
 
 ```sh
-# on a Unix-like system:
 $ GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 make clean bin/gh
-```
-
-```pwsh
-# on Windows, pass environment variables as arguments to the build script:
-> go run script\build.go clean bin\gh GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0
 ```
 
 Run `go tool dist list` to list all supported values of GOOS/GOARCH.

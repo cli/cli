@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -1074,87 +1073,6 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			assert.Equal(t, tt.wantArchiveSize, as.Size())
 			assert.Equal(t, fileBefore.Mode().Perm(), fs.Mode().Perm())
 			assert.Equal(t, archiveBefore.Mode().Perm(), as.Mode().Perm())
-		})
-	}
-}
-
-func Test_downloadRun_windowsReservedFilename(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.SkipNow()
-	}
-
-	tagName := "v1.2.3"
-
-	ios, _, _, _ := iostreams.Test()
-
-	reg := &httpmock.Registry{}
-	defer reg.Verify(t)
-
-	shared.StubFetchRelease(t, reg, "OWNER", "REPO", tagName, `{
-		"assets": [
-			{ "name": "valid-asset.zip", "size": 12,
-			  "url": "https://api.github.com/assets/1234" },
-			{ "name": "valid-asset-2.zip", "size": 34,
-			  "url": "https://api.github.com/assets/3456" },
-			{ "name": "CON.tgz", "size": 56,
-			  "url": "https://api.github.com/assets/5678" }
-		],
-		"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
-		"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
-	}`)
-
-	opts := &DownloadOptions{
-		IO: ios,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("OWNER/REPO")
-		},
-		TagName: tagName,
-	}
-
-	err := downloadRun(opts)
-
-	assert.EqualError(t, err, `unable to download release due to asset with reserved filename "CON.tgz"`)
-}
-
-func TestIsWindowsReservedFilename(t *testing.T) {
-	tests := []struct {
-		name     string
-		filename string
-		want     bool
-	}{
-		{
-			name:     "non-reserved filename",
-			filename: "test",
-			want:     false,
-		},
-		{
-			name:     "non-reserved filename with file type extension",
-			filename: "test.tar.gz",
-			want:     false,
-		},
-		{
-			name:     "reserved filename",
-			filename: "NUL",
-			want:     true,
-		},
-		{
-			name:     "reserved filename with file type extension",
-			filename: "NUL.tar.gz",
-			want:     true,
-		},
-		{
-			name:     "reserved filename with mixed type case",
-			filename: "NuL",
-			want:     true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, isWindowsReservedFilename(tt.filename))
 		})
 	}
 }

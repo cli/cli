@@ -210,7 +210,7 @@ func TestParseURL(t *testing.T) {
 			},
 		},
 		{
-			name: "Windows file path",
+			name: "drive-letter path",
 			url:  "C:\\example.com\\owner\\repo.git",
 			want: url{
 				Scheme: "c",

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
@@ -113,7 +112,6 @@ func NewCmdRepoCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *co
 }
 
 func creditsRun(opts *CreditsOptions) error {
-	isWindows := runtime.GOOS == "windows"
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -155,7 +153,7 @@ func creditsRun(opts *CreditsOptions) error {
 
 	isTTY := opts.IO.IsStdoutTTY()
 
-	static := opts.Static || isWindows
+	static := opts.Static
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
@@ -297,8 +295,6 @@ func getColor(x int) string {
 }
 
 func clear() {
-	// on windows we'd do cmd := exec.Command("cmd", "/c", "cls"); unfortunately the draw speed is so
-	// slow that the animation is very jerky, flashy, and painful to look at.
 	cmd := exec.Command("clear")
 	cmd.Stdout = os.Stdout
 	_ = cmd.Run()

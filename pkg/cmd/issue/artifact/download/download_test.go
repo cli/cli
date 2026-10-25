@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -433,7 +432,6 @@ func TestDownloadRun(t *testing.T) {
 		tty           bool
 		color         bool
 		setup         func(t *testing.T)
-		skipOnWindows string
 		// changeAfterCheck changes the working directory after download
 		// checks a file's path and before it writes the file, as another
 		// process could.
@@ -903,7 +901,6 @@ func TestDownloadRun(t *testing.T) {
 			name:          "a --dir that can't be opened fails the file and names the directory",
 			opts:          DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Dir: "notes"},
 			tty:           true,
-			skipOnWindows: "Windows words a file in the way of a directory differently",
 			changeAfterCheck: func(t *testing.T) {
 				writeTestFile(t, "notes", "not a directory\n")
 			},
@@ -918,7 +915,6 @@ func TestDownloadRun(t *testing.T) {
 			name:          "a --dir that is a dangling symlink fails every file, even with --skip-existing",
 			opts:          DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 5}, Dir: "notes", SkipExisting: true},
 			tty:           true,
-			skipOnWindows: "Windows reports a dangling symlink in the path differently",
 			setup: func(t *testing.T) {
 				symlinkTestFile(t, "missing", "notes")
 			},
@@ -939,7 +935,6 @@ func TestDownloadRun(t *testing.T) {
 		{
 			name:          "a dangling symlink in --output's path fails the file, even with --skip-existing",
 			opts:          DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Output: "notes/plan.md", SkipExisting: true},
-			skipOnWindows: "Windows reports a dangling symlink in the path differently",
 			setup: func(t *testing.T) {
 				symlinkTestFile(t, "missing", "notes")
 			},
@@ -954,7 +949,6 @@ func TestDownloadRun(t *testing.T) {
 			name:          "an error from the file system names the file once",
 			opts:          DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Dir: "notes"},
 			tty:           true,
-			skipOnWindows: "Windows reports a file in the way of a directory differently",
 			setup: func(t *testing.T) {
 				writeTestFile(t, "notes", "not a directory\n")
 			},
@@ -1435,9 +1429,6 @@ func TestDownloadRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.skipOnWindows != "" && runtime.GOOS == "windows" {
-				t.Skip(tt.skipOnWindows)
-			}
 			t.Chdir(t.TempDir())
 			if tt.setup != nil {
 				tt.setup(t)

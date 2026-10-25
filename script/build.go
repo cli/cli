@@ -29,7 +29,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -86,11 +85,7 @@ func main() {
 	}
 
 	if len(args) < 2 {
-		if isWindowsTarget() {
-			args = append(args, filepath.Join("bin", "gh.exe"))
-		} else {
-			args = append(args, "bin/gh")
-		}
+		args = append(args, filepath.Join("bin", "gh"))
 	}
 
 	self = filepath.Base(args[0])
@@ -112,16 +107,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-}
-
-func isWindowsTarget() bool {
-	if os.Getenv("GOOS") == "windows" {
-		return true
-	}
-	if runtime.GOOS == "windows" {
-		return true
-	}
-	return false
 }
 
 func version() string {
@@ -150,7 +135,7 @@ func sourceFilesLaterThan(t time.Time) bool {
 	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			// Ignore errors that occur when the project contains a symlink to a filesystem or volume that
-			// Windows doesn't have access to.
+			// cannot be accessed.
 			if path != "." && isAccessDenied(err) {
 				fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
 				return nil
@@ -243,5 +228,5 @@ func shellInspect(args []string) string {
 }
 
 func normalizeTask(t string) string {
-	return filepath.ToSlash(strings.TrimSuffix(t, ".exe"))
+	return filepath.ToSlash(t)
 }

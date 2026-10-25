@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -69,9 +68,6 @@ func createMockExecutable(t *testing.T, stdout string, stderr string, exitCode i
 	tmpDir := t.TempDir()
 	sourcePath := filepath.Join(tmpDir, "main.go")
 	binaryPath := filepath.Join(tmpDir, "mockexec")
-	if runtime.GOOS == "windows" {
-		binaryPath += ".exe"
-	}
 
 	// Create Go source
 	source := buildCommandSourceCode(exitCode, stdout, stderr)

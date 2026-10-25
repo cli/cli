@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -960,12 +959,8 @@ func resolveGitPath() (string, error) {
 	path, err := safeexec.LookPath("git")
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
-			programName := "git"
-			if runtime.GOOS == "windows" {
-				programName = "Git for Windows"
-			}
 			return "", &NotInstalled{
-				message: fmt.Sprintf("unable to find git executable in PATH; please install %s before retrying", programName),
+				message: "unable to find git executable in PATH; please install git before retrying",
 				err:     err,
 			}
 		}

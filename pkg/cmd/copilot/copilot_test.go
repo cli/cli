@@ -2,7 +2,6 @@ package copilot
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -188,23 +187,6 @@ func createTarGzBuffer(t *testing.T, files map[string][]byte) []byte {
 	return buf.Bytes()
 }
 
-// createZipBuffer creates a zip archive in memory with the given files.
-func createZipBuffer(t *testing.T, files map[string][]byte) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-
-	for name, content := range files {
-		fw, err := zw.Create(name)
-		require.NoError(t, err, "failed to create zip entry")
-		_, err = fw.Write(content)
-		require.NoError(t, err, "failed to write zip content")
-	}
-
-	require.NoError(t, zw.Close(), "failed to close zip writer")
-	return buf.Bytes()
-}
-
 func TestExtractTarGz(t *testing.T) {
 	t.Run("extracts files correctly", func(t *testing.T) {
 		content := []byte("hello world")
@@ -268,68 +250,6 @@ func TestExtractTarGz(t *testing.T) {
 	})
 }
 
-func TestExtractZip(t *testing.T) {
-	t.Run("extracts files correctly", func(t *testing.T) {
-		zipDir := t.TempDir()
-		zipPath := filepath.Join(zipDir, "archive.zip")
-		content := []byte("hello world")
-		archive := createZipBuffer(t, map[string][]byte{
-			"copilot.exe": content,
-		})
-		require.NoError(t, os.WriteFile(zipPath, archive, 0x755))
-
-		destDir := t.TempDir()
-
-		err := extractZip(zipPath, destDir)
-		require.NoError(t, err, "extractZip() error")
-
-		extracted, err := os.ReadFile(filepath.Join(destDir, "copilot.exe"))
-		require.NoError(t, err, "failed to read extracted file")
-		require.Equal(t, content, extracted, "extracted content mismatch")
-	})
-
-	t.Run("extracts nested files", func(t *testing.T) {
-		zipDir := t.TempDir()
-		zipPath := filepath.Join(zipDir, "archive.zip")
-		content := []byte("hello world")
-		archive := createZipBuffer(t, map[string][]byte{
-			"subdir/file.txt": content,
-		})
-		require.NoError(t, os.WriteFile(zipPath, archive, 0x755))
-
-		destDir := t.TempDir()
-
-		err := extractZip(zipPath, destDir)
-		require.NoError(t, err, "extractZip() error")
-
-		extracted, err := os.ReadFile(filepath.Join(destDir, "subdir", "file.txt"))
-		require.NoError(t, err, "failed to read extracted file")
-		require.Equal(t, content, extracted, "extracted content mismatch")
-	})
-
-	t.Run("rejects path traversal", func(t *testing.T) {
-		zipDir := t.TempDir()
-		zipPath := filepath.Join(zipDir, "archive.zip")
-
-		var buf bytes.Buffer
-		zw := zip.NewWriter(&buf)
-
-		fh := &zip.FileHeader{
-			Name:   "../evil.txt",
-			Method: zip.Store,
-		}
-		fw, _ := zw.CreateHeader(fh)
-		_, _ = fw.Write([]byte("evil"))
-		_ = zw.Close()
-
-		require.NoError(t, os.WriteFile(zipPath, buf.Bytes(), 0x755))
-		destDir := t.TempDir()
-
-		err := extractZip(zipPath, destDir)
-		require.Error(t, err, "expected error for path traversal, got nil")
-	})
-}
-
 func TestFetchExpectedChecksum(t *testing.T) {
 	t.Run("parses checksums file correctly", func(t *testing.T) {
 		reg := &httpmock.Registry{}
@@ -354,9 +274,9 @@ func TestFetchExpectedChecksum(t *testing.T) {
 		)
 
 		client := &http.Client{Transport: reg}
-		_, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-win32-x64.zip")
+		_, err := fetchExpectedChecksum(client, safeurl.NewImmutableSafeURL("https://example.com/checksums"), "copilot-linux-x64.zip")
 		require.Error(t, err, "expected error for missing archive")
-		require.Equal(t, "checksum not found for copilot-win32-x64.zip", err.Error(), "unexpected error")
+		require.Equal(t, "checksum not found for copilot-linux-x64.zip", err.Error(), "unexpected error")
 	})
 
 	t.Run("handles single space separator", func(t *testing.T) {
@@ -401,9 +321,6 @@ func TestDownloadCopilot(t *testing.T) {
 	}
 
 	t.Run("downloads and extracts tar.gz with valid checksum", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("skipping tar.gz test on windows")
-		}
 
 		ios, _, _, stderr := iostreams.Test()
 		tmpDir := t.TempDir()
@@ -450,9 +367,6 @@ func TestDownloadCopilot(t *testing.T) {
 	})
 
 	t.Run("fails with checksum mismatch", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("skipping tar.gz test on windows")
-		}
 
 		ios, _, _, _ := iostreams.Test()
 		tmpDir := t.TempDir()
@@ -486,9 +400,6 @@ func TestDownloadCopilot(t *testing.T) {
 	})
 
 	t.Run("handles HTTP error on archive download", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("skipping tar.gz test on windows")
-		}
 
 		ios, _, _, _ := iostreams.Test()
 		tmpDir := t.TempDir()
@@ -516,9 +427,6 @@ func TestDownloadCopilot(t *testing.T) {
 	})
 
 	t.Run("handles missing binary after extraction", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("skipping tar.gz test on windows")
-		}
 
 		ios, _, _, _ := iostreams.Test()
 		tmpDir := t.TempDir()
@@ -549,43 +457,6 @@ func TestDownloadCopilot(t *testing.T) {
 
 		_, err := downloadCopilot(httpClient, ios, installDir, localPath)
 		assert.ErrorContains(t, err, "copilot binary unavailable")
-	})
-
-	t.Run("downloads and extracts zip on windows", func(t *testing.T) {
-		if runtime.GOOS != "windows" {
-			t.Skip("skipping zip test on non-windows")
-		}
-
-		ios, _, _, _ := iostreams.Test()
-		tmpDir := t.TempDir()
-		installDir := filepath.Join(tmpDir, "copilot")
-		localPath := filepath.Join(installDir, "copilot.exe")
-
-		binaryContent := []byte("MZ fake exe content")
-		archive := createZipBuffer(t, map[string][]byte{
-			"copilot.exe": binaryContent,
-		})
-
-		checksum := sha256.Sum256(archive)
-		checksumHex := hex.EncodeToString(checksum[:])
-		archiveName := fmt.Sprintf("copilot-%s-%s.zip", "win32", archString())
-		checksumFile := fmt.Sprintf("%s  %s\n", checksumHex, archiveName)
-
-		reg := &httpmock.Registry{}
-		reg.Register(
-			httpmock.REST("GET", "github/copilot-cli/releases/latest/download/SHA256SUMS.txt"),
-			httpmock.StringResponse(checksumFile),
-		)
-		reg.Register(
-			httpmock.REST("GET", fmt.Sprintf("github/copilot-cli/releases/latest/download/%s", archiveName)),
-			httpmock.BinaryResponse(archive),
-		)
-
-		httpClient := &http.Client{Transport: reg}
-
-		path, err := downloadCopilot(httpClient, ios, installDir, localPath)
-		require.NoError(t, err, "downloadCopilot() error")
-		require.Equal(t, localPath, path, "downloadCopilot() path mismatch")
 	})
 }
 

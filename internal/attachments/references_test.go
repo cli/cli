@@ -2,7 +2,6 @@ package attachments
 
 import (
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -207,9 +206,9 @@ func TestAttachAssetsToMarkdown(t *testing.T) {
 			wantToAppend:   []attachmentArg{{Path: "/example.com/login.png", URL: pngURL}},
 		},
 		{
-			// The one letter that a scheme test has to let through, since it is
-			// how Windows names a volume.
-			name:           "a windows volume path is treated as a path",
+			// The one letter that a scheme test has to let through, since it
+			// can be a drive letter rather than a scheme.
+			name:           "a single-letter scheme is treated as a path",
 			markdown:       `![the login screen](C:/Users/me/login.png)`,
 			attachmentArgs: []attachmentArg{{Path: "C:/Users/me/login.png", URL: pngURL}},
 			wantMarkdown:   "![the login screen](" + pngURL + ")",
@@ -1034,10 +1033,9 @@ func TestIsSingleImage(t *testing.T) {
 
 func TestIsRelativePath(t *testing.T) {
 	tests := []struct {
-		name        string
-		path        string
-		want        bool
-		windowsOnly bool
+		name string
+		path string
+		want bool
 	}{
 		{
 			name: "a file name",
@@ -1069,31 +1067,10 @@ func TestIsRelativePath(t *testing.T) {
 			path: "/login.png",
 			want: false,
 		},
-		{
-			name:        "a drive-relative path names a drive of its own",
-			path:        `C:x`,
-			want:        false,
-			windowsOnly: true,
-		},
-		{
-			name:        "a path rooted on the current drive",
-			path:        `\x`,
-			want:        false,
-			windowsOnly: true,
-		},
-		{
-			name:        "an absolute path with a drive",
-			path:        `C:\x`,
-			want:        false,
-			windowsOnly: true,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.windowsOnly && runtime.GOOS != "windows" {
-				t.Skip("a Windows path")
-			}
 			assert.Equal(t, tt.want, isRelativePath(tt.path))
 		})
 	}

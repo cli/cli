@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -617,10 +616,6 @@ func Test_writeToOutput(t *testing.T) {
 	var regularMode os.FileMode
 	backslashBasename := `nested\README.md`
 	backslashTraversalBasename := `..\..\README.md`
-	if runtime.GOOS == "windows" {
-		backslashBasename = "README.md"
-		backslashTraversalBasename = "README.md"
-	}
 
 	tests := []struct {
 		name           string

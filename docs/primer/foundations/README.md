@@ -136,8 +136,6 @@ Since graphical image support in terminal emulators is unreliable, we rely on Un
 - People use different fonts that will have varying Unicode support
 - Only use iconography to [enhance meaning](https://primer.style/design/global/accessibility#visual-accessibility), not to communicate meaning
 
-_Note: In Windows, Powershell’s default font (Lucida Console) has poor Unicode support. Microsoft suggests changing it for more Unicode support._
-
 **Symbols currently used:**
 
 ```

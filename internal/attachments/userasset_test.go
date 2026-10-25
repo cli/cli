@@ -3,7 +3,6 @@ package attachments
 import (
 	"io/fs"
 	"os"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -197,12 +196,7 @@ func TestNewAsset(t *testing.T) {
 			wantErr: "./shots.png is a directory",
 		},
 		{
-			name: "not a regular file",
-			setup: func(t *testing.T) {
-				if runtime.GOOS == "windows" {
-					t.Skip("no stable path to a non-regular file on Windows")
-				}
-			},
+			name:    "not a regular file",
 			path:    "/dev/null",
 			wantErr: "/dev/null is not a regular file",
 		},

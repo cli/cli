@@ -4,17 +4,15 @@ project_name: gh
 
 release:
   prerelease: auto
-  draft: true # we only publish after the Windows MSI gets uploaded
+  draft: true
   name_template: "GitHub CLI {{.Version}}"
 
 before:
   hooks:
-    - >- # The linux and windows archives package the manpages below
-      {{ if eq .Runtime.Goos "windows" }}echo{{ end }} make manpages GH_VERSION={{.Version}}
+    - >- # The linux archives package the manpages below
+      make manpages GH_VERSION={{.Version}}
     - >- # On linux the completions are used in nfpms below, but on macos they are used outside in the deployment build.
-      {{ if eq .Runtime.Goos "windows" }}echo{{ end }} make completions
-    - >- # We need to create the `.syso` files (per architecture) to embed Windows resources (version info)
-      {{ if ne .Runtime.Goos "windows" }}echo{{ end }} pwsh '.\script\gen-winres.ps1' '{{ .Version }} ({{time "2006-01-02"}})' '{{ .Version }}' '.\script\versioninfo.template.json' '.\cmd\gh\'
+      make completions
 builds:
   - id: macos #build:macos
     goos: [darwin]
@@ -45,21 +43,6 @@ builds:
     ldflags:
       - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
 
-  - id: windows #build:windows
-    goos: [windows]
-    goarch: ["386", amd64, arm64]
-    hooks:
-      pre:
-        - cmd: bash ./script/licenses {{ .Os }} {{ .Arch }}
-          output: true
-      post:
-        - cmd: pwsh .\script\sign.ps1 '{{ .Path }}'
-          output: true
-    binary: bin/gh
-    main: ./cmd/gh
-    ldflags:
-      - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
-
 archives:
   - id: linux-archive
     ids: [linux]
@@ -77,14 +60,6 @@ archives:
     files:
       - LICENSE
       - ./share/man/man1/gh*.1
-  - id: windows-archive
-    ids: [windows]
-    name_template: "gh_{{ .Version }}_windows_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
-    wrap_in_directory: false
-    formats: [zip]
-    files:
-      - LICENSE
-
 nfpms: #build:linux
   - ids: [linux]
     license: MIT

@@ -5,38 +5,29 @@ export CGO_CFLAGS
 CGO_LDFLAGS ?= $(filter -g -L% -l% -O%,${LDFLAGS})
 export CGO_LDFLAGS
 
-EXE =
-ifeq ($(shell go env GOOS),windows)
-EXE = .exe
-endif
+## The following tasks delegate to `script/build.go`.
 
-## The following tasks delegate to `script/build.go` so they can be run cross-platform.
+.PHONY: bin/gh
+bin/gh: script/build
+	@script/build $@
 
-.PHONY: bin/gh$(EXE)
-bin/gh$(EXE): script/build$(EXE)
-	@script/build$(EXE) $@
-
-script/build$(EXE): script/build.go
-ifeq ($(EXE),)
+script/build: script/build.go
 	GOOS= GOARCH= GOARM= GOFLAGS= CGO_ENABLED= go build -o $@ $<
-else
-	go build -o $@ $<
-endif
 
 .PHONY: clean
-clean: script/build$(EXE)
+clean: script/build
 	@$< $@
 
 .PHONY: manpages
-manpages: script/build$(EXE)
+manpages: script/build
 	@$< $@
 
 .PHONY: completions
-completions: bin/gh$(EXE)
+completions: bin/gh
 	mkdir -p ./share/bash-completion/completions ./share/fish/vendor_completions.d ./share/zsh/site-functions ./share/zsh/vendor-completions
-	bin/gh$(EXE) completion -s bash > ./share/bash-completion/completions/gh
-	bin/gh$(EXE) completion -s fish > ./share/fish/vendor_completions.d/gh.fish
-	bin/gh$(EXE) completion -s zsh > ./share/zsh/site-functions/_gh
+	bin/gh completion -s bash > ./share/bash-completion/completions/gh
+	bin/gh completion -s fish > ./share/fish/vendor_completions.d/gh.fish
+	bin/gh completion -s zsh > ./share/zsh/site-functions/_gh
 	# On Debian/Ubuntu the default zsh fpath does not include /usr/share/zsh/site-functions
 	# but does include /usr/share/zsh/vendor-completions, so we ship both paths in our
 	# .deb and .rpm packages. See https://github.com/cli/cli/issues/13166
@@ -79,7 +70,7 @@ endif
 	rm -f site/index.html.bak
 	git -C site commit -m '$(GITHUB_REF:refs/tags/v%=%)' index.html
 
-## Install/uninstall tasks are here for use on *nix platform. On Windows, there is no equivalent.
+## Install/uninstall tasks install to Unix-style prefixes.
 
 DESTDIR :=
 prefix  ?= /usr/local

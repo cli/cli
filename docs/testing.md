@@ -106,7 +106,7 @@ root and inspect the generated diff. Broaden only for actual dependent mocks.
 [Lint CI](../.github/workflows/lint.yml) also checks `go mod tidy -diff`,
 `go fix -diff ./...`, license generation, and vulnerabilities.
 [Go CI](../.github/workflows/go.yml) runs `go test -race -tags=integration ./...`
-on Linux, Windows, and macOS, plus a separate attestation integration job with
+on Linux and macOS, plus a separate attestation integration job with
 its own environment. Inspect the relevant workflow/setup before reproducing
 environment-dependent checks; an ordinary test run is not evidence of CI parity.
 
