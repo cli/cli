@@ -52,8 +52,9 @@ func NewConfig() (gh.Config, error) {
 
 // Implements Config interface
 type cfg struct {
-	cfg  *ghConfig.Config
-	auth *AuthConfig
+	cfg          *ghConfig.Config
+	auth         *AuthConfig
+	activeTokens *activeTokenCache
 }
 
 func (c *cfg) get(hostname, key string) o.Option[string] {
@@ -209,6 +210,7 @@ func defaultFor(key string) o.Option[string] {
 type AuthConfig struct {
 	cfg                 *ghConfig.Config
 	refresher           gh.TokenRefresher
+	activeTokens        *activeTokenCache
 	defaultHostOverride func() (string, string)
 	hostsOverride       func() []string
 	tokenOverride       func(string) (string, string)
@@ -919,4 +921,67 @@ func DataDir() string {
 
 func ConfigDir() string {
 	return ghConfig.ConfigDir()
+}
+
+type activeTokenEntry struct {
+	once   sync.Once
+	token  string
+	source string
+}
+
+type activeTokenKey struct {
+	hostname string
+	username string
+	source   string
+}
+
+type activeTokenCache struct {
+	mu     sync.RWMutex
+	tokens map[activeTokenKey]*activeTokenEntry
+}
+
+func (c *activeTokenCache) get(key activeTokenKey, resolve func() (string, string)) (string, string) {
+	for {
+		c.mu.RLock()
+		entry := c.tokens[key]
+		c.mu.RUnlock()
+		if entry == nil {
+			c.mu.Lock()
+			if c.tokens == nil {
+				c.tokens = make(map[activeTokenKey]*activeTokenEntry)
+			}
+			entry = c.tokens[key]
+			if entry == nil {
+				entry = &activeTokenEntry{}
+				c.tokens[key] = entry
+			}
+			c.mu.Unlock()
+		}
+		entry.once.Do(func() {
+			entry.token, entry.source = resolve()
+		})
+		c.mu.RLock()
+		current := c.tokens[key] == entry
+		c.mu.RUnlock()
+		if current {
+			return entry.token, entry.source
+		}
+	}
+}
+
+func (c *activeTokenCache) invalidate(hostname string) {
+	hostname = ghauth.NormalizeHostname(hostname)
+	c.mu.Lock()
+	for key := range c.tokens {
+		if key.hostname == hostname {
+			delete(c.tokens, key)
+		}
+	}
+	c.mu.Unlock()
+}
+
+func (c *activeTokenCache) clear() {
+	c.mu.Lock()
+	c.tokens = make(map[activeTokenKey]*activeTokenEntry)
+	c.mu.Unlock()
 }
