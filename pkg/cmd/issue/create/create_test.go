@@ -906,6 +906,36 @@ func Test_createRun(t *testing.T) {
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
 		},
 		{
+			name: "assignee failure outputs issue URL and error",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "bug title",
+				Body:      "bug body",
+				Assignees: []string{"unauthorized_user"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+					httpmock.StringResponse(`{ "errors": [{ "message": "user unauthorized_user does not have permission to be assigned" }] }`))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsErr:    "GraphQL: user unauthorized_user does not have permission to be assigned",
+		},
+		{
 			name: "create with type not found",
 			opts: CreateOptions{
 				Detector:  &fd.EnabledDetectorMock{},
@@ -1472,6 +1502,9 @@ func Test_createRun(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				assert.EqualError(t, err, tt.wantsErr)
+				if tt.wantsStdout != "" {
+					assert.Equal(t, tt.wantsStdout, stdout.String())
+				}
 				return
 			}
 
