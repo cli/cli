@@ -46,6 +46,9 @@ type authEntry struct {
 	// justRefreshed reports whether gh renewed this account's expiring token during this run. It drives a
 	// display-only notice and is never serialized.
 	justRefreshed bool
+	// expiredWithoutRefresh reports whether the token check failed because the expiring token had already expired
+	// and --no-refresh kept gh from renewing it. It drives a display-only hint and is never serialized.
+	expiredWithoutRefresh bool
 }
 
 type authStatus struct {
@@ -95,17 +98,7 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		sb.WriteString(fmt.Sprintf("  - Token: %s\n", cs.Bold(e.Token)))
 
 		if e.Refreshable {
-			sb.WriteString("  - Expiring token that gh refreshes automatically\n")
-			if e.TokenExpiresAt != nil {
-				expiresAt := e.TokenExpiresAt.UTC()
-				sb.WriteString(fmt.Sprintf("  - Token expires: %s (%s)\n",
-					cs.Bold(expiresAt.Format(time.RFC3339)), relativeToNow(expiresAt)))
-			}
-			if e.RefreshTokenExpiresAt != nil {
-				refreshExpiresAt := e.RefreshTokenExpiresAt.UTC()
-				sb.WriteString(fmt.Sprintf("  - Refresh token expires: %s (%s)\n",
-					cs.Bold(refreshExpiresAt.Format(time.RFC3339)), relativeToNow(refreshExpiresAt)))
-			}
+			e.writeExpiry(&sb, cs)
 			if e.justRefreshed {
 				sb.WriteString("  - Token refreshed just now\n")
 			}
@@ -126,6 +119,19 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		}
 
 	case authEntryStateError:
+		if e.expiredWithoutRefresh {
+			sb.WriteString(fmt.Sprintf("  %s Token for %s account %s (%s) has expired\n", cs.Red("X"), e.Host, cs.Bold(e.Login), e.TokenSource))
+			activeStr := fmt.Sprintf("%v", e.Active)
+			sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+			e.writeExpiry(&sb, cs)
+			if e.RefreshTokenExpiresAt != nil && !e.RefreshTokenExpiresAt.After(timeNow()) {
+				loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
+				sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
+			} else {
+				sb.WriteString(fmt.Sprintf("  - To refresh it, run %s (without %s)\n", cs.Bold("gh auth status"), cs.Bold("--no-refresh")))
+			}
+			break
+		}
 		if e.Login != "" {
 			sb.WriteString(fmt.Sprintf("  %s Failed to log in to %s account %s (%s)\n", cs.Red("X"), e.Host, cs.Bold(e.Login), e.TokenSource))
 		} else {
@@ -167,6 +173,20 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 	}
 
 	return sb.String()
+}
+
+func (e authEntry) writeExpiry(sb *strings.Builder, cs *iostreams.ColorScheme) {
+	sb.WriteString("  - Expiring token that gh refreshes automatically\n")
+	if e.TokenExpiresAt != nil {
+		expiresAt := e.TokenExpiresAt.UTC()
+		sb.WriteString(fmt.Sprintf("  - Token expires: %s (%s)\n",
+			cs.Bold(expiresAt.Format(time.RFC3339)), relativeToNow(expiresAt)))
+	}
+	if e.RefreshTokenExpiresAt != nil {
+		refreshExpiresAt := e.RefreshTokenExpiresAt.UTC()
+		sb.WriteString(fmt.Sprintf("  - Refresh token expires: %s (%s)\n",
+			cs.Bold(refreshExpiresAt.Format(time.RFC3339)), relativeToNow(refreshExpiresAt)))
+	}
 }
 
 type StatusOptions struct {
@@ -304,6 +324,7 @@ func statusRun(opts *StatusOptions) error {
 			hostname:      hostname,
 			credential:    activeCred,
 			refreshStatus: activeRefreshStatus,
+			noRefresh:     opts.NoRefresh,
 			username:      activeUser,
 		})
 		statuses.Hosts[hostname] = append(statuses.Hosts[hostname], entry)
@@ -328,6 +349,7 @@ func statusRun(opts *StatusOptions) error {
 				hostname:      hostname,
 				credential:    cred,
 				refreshStatus: refreshStatus,
+				noRefresh:     opts.NoRefresh,
 				username:      username,
 			})
 			statuses.Hosts[hostname] = append(statuses.Hosts[hostname], entry)
@@ -426,6 +448,7 @@ type buildEntryOptions struct {
 	hostname      string
 	credential    gh.Credential
 	refreshStatus gh.RefreshStatus
+	noRefresh     bool
 	username      string
 }
 
@@ -486,6 +509,14 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 
 		entry.State = authEntryStateError
 		entry.Error = err.Error()
+		// Without a refresh, an expiring token past its expiry time is bound to be rejected with HTTP 401. Flag it so
+		// the output can explain the failure instead of reporting the token as invalid. The expiry check runs only
+		// after a rejection, so a server that still accepts the token (for example, under clock skew) reports success,
+		// and unrelated failures (for example, HTTP 503) keep the generic error output.
+		httpErr, isHTTPErr := errors.AsType[api.HTTPError](err)
+		entry.expiredWithoutRefresh = opts.noRefresh && entry.Refreshable &&
+			isHTTPErr && httpErr.StatusCode == http.StatusUnauthorized &&
+			entry.TokenExpiresAt != nil && !entry.TokenExpiresAt.After(timeNow())
 		return entry
 	}
 	entry.Scopes = scopesHeader

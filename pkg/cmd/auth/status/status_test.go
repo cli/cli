@@ -350,6 +350,95 @@ func Test_statusRun(t *testing.T) {
 			`),
 		},
 		{
+			name: "no-refresh hints at refreshing an expired expiring token",
+			opts: StatusOptions{NoRefresh: true},
+			now:  time.Date(2000, 1, 3, 0, 0, 0, 0, time.UTC),
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+				rtFuture := time.Date(2000, 1, 13, 0, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past, &rtFuture)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.StatusStringResponse(401, "Bad credentials"))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Token for github.com account monalisa (GH_CONFIG_DIR/hosts.yml) has expired
+				  - Active account: true
+				  - Expiring token that gh refreshes automatically
+				  - Token expires: 2000-01-01T00:00:00Z (expired about 2 days ago)
+				  - Refresh token expires: 2000-01-13T00:00:00Z (in about 10 days)
+				  - To refresh it, run gh auth status (without --no-refresh)
+			`),
+		},
+		{
+			name: "no-refresh suggests logging in when the refresh token has also expired",
+			opts: StatusOptions{NoRefresh: true},
+			now:  time.Date(2000, 1, 3, 0, 0, 0, 0, time.UTC),
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+				rtPast := time.Date(2000, 1, 2, 0, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past, &rtPast)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.StatusStringResponse(401, "Bad credentials"))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Token for github.com account monalisa (GH_CONFIG_DIR/hosts.yml) has expired
+				  - Active account: true
+				  - Expiring token that gh refreshes automatically
+				  - Token expires: 2000-01-01T00:00:00Z (expired about 2 days ago)
+				  - Refresh token expires: 2000-01-02T00:00:00Z (expired about 1 day ago)
+				  - To re-authenticate, run: gh auth login -h github.com
+			`),
+		},
+		{
+			name: "no-refresh does not hint at expiry for an expired expiring token that fails with a non-401 error",
+			opts: StatusOptions{NoRefresh: true},
+			now:  time.Date(2000, 1, 3, 0, 0, 0, 0, time.UTC),
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+				rtFuture := time.Date(2000, 1, 13, 0, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past, &rtFuture)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.StatusStringResponse(503, "Service Unavailable"))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Failed to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
+				  - To re-authenticate, run: gh auth refresh -h github.com
+				  - To forget about this account, run: gh auth logout -h github.com -u monalisa
+			`),
+		},
+		{
+			name: "no-refresh reports an unexpired expiring token that fails as invalid",
+			opts: StatusOptions{NoRefresh: true},
+			now:  time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				future := time.Date(2000, 1, 1, 8, 0, 0, 0, time.UTC)
+				loginRefreshable(t, c, "github.com", "monalisa", "gho_revoked", "ghr_abc", &future, nil)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.StatusStringResponse(401, "Bad credentials"))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Failed to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
+				  - To re-authenticate, run: gh auth refresh -h github.com
+				  - To forget about this account, run: gh auth logout -h github.com -u monalisa
+			`),
+		},
+		{
 			name: "omits the refresh token expiry line when its lifetime is unknown",
 			opts: StatusOptions{NoRefresh: true},
 			now:  time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
