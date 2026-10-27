@@ -9,5 +9,4 @@ $ script/api-host-gateway/run.sh
 ```
 
 See [`docs/api-host-test-harness.md`](../../docs/api-host-test-harness.md) for
-what it does, how to run the acceptance subset, how to read a failure, and the
-current state of the routing it exercises.
+what it does and how to read a failure. Phases 4 and 5 do not run on this tree.

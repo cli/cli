@@ -8,15 +8,14 @@ generated test doubles.
 ## Local validation
 
 Run from the repository root with the toolchain declared in [go.mod](../go.mod).
-For building and exercising the local binary, see
-[CONTRIBUTING](../.github/CONTRIBUTING.md#building-the-project).
+Build with `make bin/gh`. See [install](install.md).
 
 Start with affected-package tests; substitute the actual package and test name
 in these examples:
 
 ```sh
-go test ./pkg/cmd/issue/list/... -run '^TestNewCmdList$'
-go test ./pkg/cmd/issue/list/...
+go test ./pkg/cmd/issue/close/ -run '^TestNewCmdClose$'
+go test ./pkg/cmd/issue/list/
 ```
 
 Before committing code changes, run the existing quality gates:
@@ -27,7 +26,7 @@ go test ./...
 make lint                      # golangci-lint run ./...
 ```
 
-Report blocked checks honestly. These checks are not full CI parity; see
+Report blocked checks honestly. CI runs `make test` only. See
 [CI and live acceptance tests](#ci-and-live-acceptance-tests-are-different) below.
 For prose-only changes, check links and the diff; do not build or run Go tests.
 
@@ -39,7 +38,7 @@ single table spanning unrelated behaviors.
 
 | Changed behavior | Test surface |
 | --- | --- |
-| Flag parsing, defaults, validation, Options curation | Constructor with injected `runF`; see `TestNewCmdList` in [issue/list tests](../pkg/cmd/issue/list/list_test.go) |
+| Flag parsing, defaults, validation, Options curation | Constructor with injected `runF`; see `TestNewCmdClose` in [issue/close tests](../pkg/cmd/issue/close/close_test.go) |
 | Business behavior, output, HTTP/Git interactions | Run function or the command's existing execution seam |
 | Repository overrides and pre-run wiring | Command execution with the relevant parent hooks and override |
 | TTY-sensitive output or prompts | Relevant TTY/non-TTY cases, with separate stream assertions |
@@ -48,9 +47,7 @@ single table spanning unrelated behaviors.
 
 Prove changed behavior, including relevant error paths and regressions; do not
 repeat the same assertion at every layer. The named examples demonstrate those
-seams, not every helper in their files. The top-level `test` package is
-[deprecated](project-layout.md); do not copy legacy `test.ExpectLines` or
-command harnesses into new tests. Prefer exact assertions for stable output.
+seams, not every helper in their files. The top-level `test` package is not in this tree. Do not add it back. Prefer exact assertions for stable output.
 
 Use `testify`: **use `require`, not `assert`, for error checks**, so an
 unexpected error stops the test before dependent assertions. Use
@@ -102,18 +99,12 @@ root and inspect the generated diff. Broaden only for actual dependent mocks.
 
 ## CI and live acceptance tests are different
 
-`make lint` runs `golangci-lint run ./...`, not all CI checks.
-[Lint CI](../.github/workflows/lint.yml) also checks `go mod tidy -diff`,
-`go fix -diff ./...`, license generation, and vulnerabilities.
-[Go CI](../.github/workflows/go.yml) runs `go test -race -tags=integration ./...`
-on Linux and macOS, plus a separate attestation integration job with
-its own environment. Inspect the relevant workflow/setup before reproducing
-environment-dependent checks; an ordinary test run is not evidence of CI parity.
+`make lint` runs `golangci-lint run ./...` on your machine. CI does not run it.
+[`.github/workflows/test.yml`](../.github/workflows/test.yml) runs `make test`
+(`go test ./...`) on `ubuntu-latest` for pull requests and pushes to `trunk`.
+There is no race job and no attestation job in this repository.
 
-**Before running or changing acceptance tests**, read the
-[Acceptance README](../acceptance/README.md). They create/manage real GitHub
-resources and are not ordinary unit tests or the `integration` tag. Running
-them requires explicitly authorized `GH_ACCEPTANCE_HOST`, `GH_ACCEPTANCE_ORG`,
-and `GH_ACCEPTANCE_TOKEN`, including permission to clean up. Do not borrow the
-operator's token or treat available credentials as permission. Preserve resource
-cleanup; verbose logs can expose environment secrets despite redaction.
+`make acceptance` runs `go test -tags acceptance ./acceptance`. Those tests do
+not execute the `acceptance/testdata` txtar scripts. The runner that did is not
+in this tree. `script/run-acceptance` dispatches `acceptance.yml` on `cli/cli`,
+which is not a workflow here. Do not use it to test this fork.

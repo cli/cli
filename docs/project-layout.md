@@ -12,7 +12,6 @@ Some auxiliary Go packages are at the top level of the project for historical re
 - [`api/`](../api) - main utilities for making requests to the GitHub API
 - [`context/`](../context) - DEPRECATED: use only for referencing git remotes
 - [`git/`](../git) - utilities to gather information from a local git repository
-- [`test/`](../test) - DEPRECATED: do not use
 - [`utils/`](../utils) - DEPRECATED: use only for printing table output
 
 ## Command-line help text
@@ -29,8 +28,10 @@ text, is in [pkg/cmd/issue/list/list.go](../pkg/cmd/issue/list/list.go)
 Other help topics not specific to any command, for example `gh help environment`, are found in
 [pkg/cmd/root/help_topic.go](../pkg/cmd/root/help_topic.go).
 
-During our release process, these help topics are [automatically converted](../cmd/gen-docs/main.go) to
-manual pages and published under https://cli.github.com/manual/.
+`make manpages` writes man pages under `share/man/man1/` from that help text
+via [cmd/gen-docs](../cmd/gen-docs/main.go). The pre-release workflow does not
+publish them. `make site-docs` updates a clone of `github/cli.github.com`, which
+is upstream's site.
 
 ## How GitHub CLI works
 
@@ -61,14 +62,16 @@ and talk through which code gets run in order.
 ## How to add a new command
 
 1. First, check on our issue tracker to verify that our team had approved the plans for a new command.
-2. Create a package for the new command, e.g. for a new command `gh boom` create the following directory
-   structure: `pkg/cmd/boom/`
+2. Create a package under `pkg/cmd/` named for the command. A command `gh boom`
+   lives in a `boom` directory there.
 3. The new package should expose a method, e.g. `NewCmdBoom()`, that accepts a `*cmdutil.Factory` type and
    returns a `*cobra.Command`.
    * Any logic specific to this command should be kept within the command's package and not added to any
      "global" packages like `api` or `utils`.
-4. Use the method from the previous step to generate the command and add it to the command tree, typically
-   somewhere in the `NewCmdRoot()` method.
+4. Register that constructor in `rootCommandBuilders` in
+   [pkg/cmd/root/root.go](../pkg/cmd/root/root.go). A normal invocation builds
+   only the selected command family. Help, completion, and aliases build the
+   full tree.
 
 ## How to write tests
 

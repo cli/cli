@@ -95,15 +95,14 @@ resolve their own destination rather than asking the client to.
 
 Whole commands remain unmigrated, and none of them are covered by the harness:
 `gh agent-task` and `gh copilot` each build their own absolute
-URLs, and the update checker does too. They are not oversights. Codespaces and
-agent-task talk to services that are not the REST API and have clients of their
-own, so whether `api_host` should apply to them is a question about what the
-setting means rather than about how to implement it.
+URLs, and the update checker does too. They are not oversights. `gh agent-task`
+talks to a service that is not the REST API and has a client of its own, so
+whether `api_host` should apply to it is a question about what the setting
+means rather than about how to implement it.
 
-So the harness proves something narrower than "`gh` honours `api_host`": it
-proves that the twelve journeys it exercises do, and that the shared client can
-express what a call site needs in order to stop resolving its own destination.
-What is left is mechanical for the REST commands, and a design question for the
-rest.
+Phases 1 to 3 of the harness prove the commands they run. Phases 4 and 5 do
+not run on this tree. The shared client can express what a call site needs in
+order to stop resolving its own destination. What is left is mechanical for
+the REST commands, and a design question for the rest.
 
 [go-gh]: https://github.com/cli/go-gh

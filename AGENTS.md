@@ -19,3 +19,5 @@ This fork tracks `cli/cli` and removes selected features to keep the GitHub CLI 
 ## When updating from upstream
 
 Rebase on `cli/cli`'s `trunk`. Keep new upstream behavior outside the listed removals. Remove new code, dependencies, commands, and docs that restore a listed feature. Keep the fork buildable after each rebase.
+
+Build with `make bin/gh`. Test with `make test`. [Install](docs/install.md), [release](docs/releasing.md), [other maintainer notes](docs/README.md).

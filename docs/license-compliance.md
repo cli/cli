@@ -4,7 +4,7 @@ GitHub CLI complies with the software licenses of its dependencies. This documen
 
 ## Overview
 
-Third-party license information is embedded into the `gh` binary at build time using [`google/go-licenses`](https://github.com/google/go-licenses). Each release binary contains the correct license listing for its target platform (GOOS/GOARCH), since the set of dependencies can vary by platform.
+Third-party license information is embedded into the `gh` binary at build time using [`google/go-licenses`](https://github.com/google/go-licenses). GoReleaser runs [`script/licenses`](../script/licenses) so the binary for that GOOS/GOARCH contains the report. The [pre-release workflow](releasing.md) does not run that script, so those binaries do not embed `report.txt`.
 
 ## Viewing License Information
 

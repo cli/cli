@@ -1,64 +1,36 @@
-# Releasing
+# Release this fork
 
-To read about what happens during a production deployment, see the [release process deep dive doc](release-process-deep-dive.md).
+Published builds come from [`.github/workflows/prerelease.yml`](../.github/workflows/prerelease.yml). This repository does not run `cli/cli`'s deployment workflow, and it does not publish cli.github.com, Homebrew, or Linux package repositories.
 
-To initiate a new production deployment:
+## Dispatch the pre-release workflow
 
-```sh
-script/release vX.Y.Z
-```
+The workflow has no `push` trigger. Dispatch `prerelease` on the commit you want to ship.
 
-See `script/release --help` for more information.
+It builds four binaries on `ubuntu-latest` with `CGO_ENABLED=0` and `go build -trimpath`:
 
-> [!NOTE]
-> Deployment workflow requires maintainer approval to run.
+- `linux/amd64` as `gh-x86_64-unknown-linux-musl`
+- `linux/arm64` as `gh-aarch64-unknown-linux-musl`
+- `darwin/amd64` as `gh-x86_64-apple-darwin`
+- `darwin/arm64` as `gh-aarch64-apple-darwin`
 
-What this does is:
+The Linux file names include `musl`. The workflow does not use a musl cross-compiler. It is a cgo-disabled Go build. After the build, the workflow checks that each Linux ELF has no dynamic interpreter and no `NEEDED` entry, and that there is one x86_64 ELF and one aarch64 ELF.
 
-- Builds Linux binaries on Ubuntu;
-- Builds, signs, and notarizes macOS binaries on macOS;
-- Uploads all release artifacts to a new GitHub Release;
-- A new git tag `vX.Y.Z` is created in the remote repository;
-- The changelog is [generated from the list of merged pull requests](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes);
-- Updates [GitHub CLI marketing site](https://cli.github.com) with the contents of the new release.
+Darwin binaries are cross-compiled on Linux. The workflow does not sign or notarize them.
 
-## Bumping Homebrew
+The workflow does not run `script/licenses`. On these binaries, `gh licenses` prints the placeholder from `internal/licenses/licenses.go`, because `report.txt` is not in the embed directory.
 
-Homebrew bumps are handled by [autobump](https://docs.brew.sh/Autobump), which runs periodically every 3 hours. In cases where a quicker rollout is required, a pull request can be opened manually with the following steps:
- 1. Replace the version number in the url to point ot the updated version.
- 2. Calculate and replace the sha256 value.
- 3. Open the PR.
+The workflow zips each binary and publishes a GitHub pre-release on this repository. The tag is `release-<full git sha>`, and the release targets that commit.
 
-To test out the build system while avoiding creating an actual release:
+## Do not publish with `script/release`
+
+Without `--local`, `script/release` runs `gh workflow -R cli/cli run deployment.yml`. That workflow is not in this repository. A normal invocation sets `environment=production` and `dry_run=false`, so it asks `cli/cli` to deploy. That is [GHCL-7](../TODO.md).
+
+`script/release --local` is a different build. It runs GoReleaser from `.goreleaser.yml` and can write Linux and macOS archives plus Linux deb and rpm packages under `dist/`. GoReleaser's pre-build hook runs `script/licenses`. Install GoReleaser, then run:
 
 ```sh
-script/release --staging vX.Y.Z --branch patch-1 -p macos
+script/release --local
 ```
 
-The build artifacts will be available via `gh run download <RUN> -n macos`.
+That local build is not the pre-release above.
 
-## General guidelines
-
-- Features to be released should be reviewed and approved at least one day prior
-  to the release.
-- Feature releases should bump up the minor version number.
-- Breaking releases should bump up the major version number. These should
-  generally be rare.
-
-## Test the build system locally
-
-A local release can be created for testing without creating anything official on
-the release page.
-
-1. Make sure GoReleaser is installed: `brew install goreleaser`
-2. `script/release --local`
-3. Find the built products under `dist/`.
-
-## Cleaning up a bad release
-
-Occasionally, it might be necessary to clean up a bad release and re-release.
-
-1. Delete the release and associated tag
-2. Re-release and monitor the workflow run logs
-3. Open pull request updating [`gh` Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/g/gh.rb) with new SHA versions, linking the previous PR
-4. Verify resulting Debian and RPM packages, Homebrew formula
+`make site`, `make site-docs`, and `make site-bump` clone `github/cli.github.com` and update upstream's site. They are not part of this pre-release.

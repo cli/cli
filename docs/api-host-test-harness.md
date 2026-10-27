@@ -29,6 +29,8 @@ the gateway and is logged. A request that ignores it dies with
 $ script/api-host-gateway/run.sh
 ```
 
+The script's default image is `golang:1.26`. This module requires the Go version in [go.mod](../go.mod). Set `GH_APIHOST_IMAGE` to an image that satisfies that version before you run the script.
+
 Requires Docker and a token: `$GH_TOKEN` if set, otherwise
 `gh auth token --hostname github.com`. The login the test asserts against is
 derived from that token, and can be set explicitly with
@@ -59,25 +61,10 @@ $ /tmp/gh-harness/script/api-host-gateway/run.sh
 useful while iterating on a fix, but a `-dirty` run should never be quoted as
 evidence that a call site is fixed.
 
-### With the acceptance subset
+### Acceptance subset
 
-Set `GH_APIHOST_ACCEPTANCE=yes` and `GH_APIHOST_ORG` to a GitHub organisation the
-token can create repositories in:
-
-```console
-$ GH_APIHOST_ACCEPTANCE=yes GH_APIHOST_ORG=my-org script/api-host-gateway/run.sh
-```
-
-This creates real repositories and takes a couple of minutes. It prompts for a
-fine-grained PAT owned by the organisation. The PAT must be scoped to all
-repositories in the org, because the scripts create repositories with random
-names that cannot be listed ahead of time. Set `GH_APIHOST_ORG_TOKEN` to skip the
-prompt.
-
-Phases 4 and 5 are intentionally non-blocking: a red result is printed but does
-not stop the script or affect the exit code, which is driven by phases 1-3 alone.
-The phases exist to produce a tally that moves from red to green over a series of
-changes, not to gate a build.
+Do not set `GH_APIHOST_ACCEPTANCE=yes` to test routing. Phases 4 and 5 call
+`TestAcceptance`, which is not in this tree. See [Current state](#current-state).
 
 ## Why a container
 
@@ -136,20 +123,9 @@ Phases 2 and 3 are controls. They are expected to pass even when phase 1 is
 entirely red, and if they ever fail the harness itself is broken rather than the
 product.
 
-**Phases 4 and 5, acceptance subset.** Run when `GH_APIHOST_ACCEPTANCE=yes`.
-`api_host` is set and `api.github.com` is blackholed, matching phase 1. A chosen
-subset of the real acceptance suite runs through the gateway, one script per
-`go test` invocation.
-
-Scripts are run one at a time rather than batched per test function, because a
-test function bundles scripts that fail for unrelated reasons. Batching them
-would hide a single script turning green.
-
-The two phases are split because a fine-grained PAT has exactly one resource
-owner, and Gists is an *Account* permission while the rest need *Organization*
-permissions. No single PAT covers both. Phase 4 runs the org-scoped scripts under
-a PAT owned by the test organisation; phase 5 runs the gist script under the
-developer's own OAuth token.
+**Phases 4 and 5.** `test.sh` still calls `go test -run '^TestAcceptance$'` when
+`GH_APIHOST_ACCEPTANCE=yes`. That test is not in this tree, so the phases record
+NOMATCH. They do not gate the script. The exit code comes from phases 1 to 3.
 
 `run_subset` distinguishes three outcomes, not two: pass, fail, and **matched no
 tests**. The third matters because a script that does not exist at the revision
@@ -209,8 +185,18 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 
 ## Current state
 
-Every phase passes and every script is green, apart from one failure that is
-not about routing:
+Phases 1 to 3 run `gh` directly. They do not use the acceptance suite.
+
+Phases 4 and 5 do not exercise this tree. `script/api-host-gateway/test.sh`
+runs `go test -run '^TestAcceptance$'`, and `TestAcceptance` is not in this
+tree. `extension.txtar` is not in the tree either. With
+`GH_APIHOST_ACCEPTANCE=yes`, those phases record NOMATCH. They do not show
+that the old scripts route through `api_host`.
+
+## Past transcript
+
+The transcript below is from a run before `TestAcceptance` was removed. It is
+not the result of this checkout. One failure in that run was not about routing:
 
 ```
 HTTP 422: Validation Failed (https://gh-gateway.internal/repos/gh-acceptance-testing/repo_list_rename-LFxrOIbkOT)
@@ -225,20 +211,14 @@ server declined for a reason of its own. It fails intermittently on trunk too.
 
 ## Remaining
 
-Nothing that this harness can see. `gh` sends every request in these twelve
-scripts to a host's `api_host`, and sends none of them anywhere else while
-`api.github.com` is unreachable.
-
-That is a claim about twelve scripts, not about `gh`. What the harness proves
-is that the shared client can now express what call sites needed, so migrating
-the rest is mechanical rather than blocked. `docs/api-host.md` records what is
+Phases 1 to 3 are what this checkout still runs. They do not cover the twelve
+acceptance scripts. [api-host.md](api-host.md) records call sites that are
 still unrouted.
 
 ## Transcript
 
-From a `GH_APIHOST_ACCEPTANCE=yes` run of this commit. Each commit that changes
-routing replaces this section with its own run, so `git log -p` on this file
-shows the tally moving from red to green.
+From a `GH_APIHOST_ACCEPTANCE=yes` run before `TestAcceptance` was removed.
+It is not the result of this checkout.
 
 ```
 == Results

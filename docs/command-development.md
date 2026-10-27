@@ -46,8 +46,7 @@ Preserve accepted values, defaults, flag names, and non-interactive paths.
 Use `heredoc.Doc` for command examples, with `#` explanatory comment lines and
 `$ ` command prefixes. Edit help in command Go source (or
 [help_topic.go](../pkg/cmd/root/help_topic.go) for general topics), not
-generated manual pages; [CONTRIBUTING](../.github/CONTRIBUTING.md) describes
-their release-time generation.
+generated manual pages. `make manpages` writes them under `share/man/man1/`.
 
 Use [cmdutil errors](../pkg/cmdutil/errors.go), rather than reproducing their
 printing or exit handling:
