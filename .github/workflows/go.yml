@@ -50,8 +50,10 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      # -count=1 disables Go's test result cache so every test runs. The build
+      # cache above only exists to reuse compiled packages.
       - name: Run unit and integration tests
-        run: go test -race -tags=integration ./...
+        run: go test -count=1 -race -tags=integration ./...
 
       - name: Build
         run: go build -v ./cmd/gh
