@@ -443,6 +443,11 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 		if isRefreshLockInaccessible(lockErr) {
 			result = current
 			status = gh.RefreshStatusSkipped
+			c.addWarning(fmt.Sprintf(
+				"Skipped refreshing the token of account %s on %s because gh's state directory (%s) is not writable. "+
+					"The token has expired or is about to expire. To fix this, grant gh write access to that directory. "+
+					"If gh is running in a sandbox, you may need to run `gh auth status` outside of it.",
+				username, hostname, ghConfig.StateDir()))
 			return fmt.Errorf("skipped token refresh because the state directory is not writable: %w", lockErr)
 		}
 		if simulateRefreshTokenExpired(current, timeNow()) {

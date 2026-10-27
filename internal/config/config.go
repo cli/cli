@@ -267,6 +267,27 @@ type AuthConfig struct {
 	// gh processes but not against goroutines sharing this single AuthConfig instance, so this mutex provides the
 	// in-process half of the mutual exclusion that keeps a rotating refresh token from being spent twice.
 	refreshMu sync.Mutex
+	// warningsMu guards warnings.
+	warningsMu sync.Mutex
+	// warnings collects deduplicated messages, such as a skipped token refresh, for the user to see before gh exits.
+	warnings []string
+}
+
+// Warnings returns the deduplicated warnings recorded so far in this process, such as a skipped token refresh, in the
+// order they were first recorded. Callers are expected to show them to the user before gh exits.
+func (c *AuthConfig) Warnings() []string {
+	c.warningsMu.Lock()
+	defer c.warningsMu.Unlock()
+	return slices.Clone(c.warnings)
+}
+
+// addWarning records msg for Warnings unless an identical message was already recorded.
+func (c *AuthConfig) addWarning(msg string) {
+	c.warningsMu.Lock()
+	defer c.warningsMu.Unlock()
+	if !slices.Contains(c.warnings, msg) {
+		c.warnings = append(c.warnings, msg)
+	}
 }
 
 // SetTokenRefresher supplies the refresher used to renew tokens. Because Authentication returns a single shared

@@ -18,6 +18,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/keyring"
+	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1032,6 +1033,13 @@ func TestActiveTokenWithRefresh(t *testing.T) {
 				require.Equal(t, gh.RefreshStatusSkipped, status)
 				require.Equal(t, "old-access", credential.Token)
 				require.Empty(t, refresher.RefreshCalls())
+
+				// The skip is reported once however many times it happens, so the user can fix the environment.
+				_, _, _ = authCfg.ActiveTokenWithRefresh(host)
+				warnings := authCfg.Warnings()
+				require.Len(t, warnings, 1)
+				require.Contains(t, warnings[0], fmt.Sprintf("token of account %s on %s", user, host))
+				require.Contains(t, warnings[0], ghConfig.StateDir())
 			})
 		}
 	})
@@ -1062,6 +1070,7 @@ func TestActiveTokenWithRefresh(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, gh.RefreshStatusDone, status)
 				require.Len(t, refresher.RefreshCalls(), 1)
+				require.Empty(t, authCfg.Warnings())
 			})
 		}
 	})

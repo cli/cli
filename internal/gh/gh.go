@@ -229,6 +229,10 @@ type AuthConfig interface {
 	// as when refreshing fails. The caller decides whether to use the returned credential.
 	ActiveTokenWithRefresh(hostname string) (credential Credential, refreshResult RefreshStatus, err error)
 
+	// Warnings returns the deduplicated warnings recorded so far in this process, such as a skipped token refresh, in
+	// the order they were first recorded. Callers are expected to show them to the user before gh exits.
+	Warnings() []string
+
 	// ActiveToken retrieves the active credential for the given hostname, searching environment variables, general
 	// configuration, and finally encrypted storage. It returns the last stored token as-is, including the current
 	// access token of a refreshable credential, and never contacts the token endpoint to refresh it. A caller that
