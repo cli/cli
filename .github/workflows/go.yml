@@ -20,10 +20,32 @@ jobs:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # setup-go's built-in cache uses the same key for every job, so whichever
+      # job saves first decides the cache contents. Race-instrumented packages
+      # can't be reused by non-race builds (and vice versa), so the jobs in this
+      # workflow manage their own caches with separate keys.
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
+          cache: false
+
+      - name: Determine Go cache paths
+        id: go-cache
+        shell: bash
+        run: |
+          echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "buildcache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageOS}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Go modules and race build artifacts
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.modcache }}
+            ${{ steps.go-cache.outputs.buildcache }}
+          key: go-race-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-cache.outputs.image }}-${{ steps.go-cache.outputs.version }}-${{ hashFiles('go.mod') }}
 
       - name: Download dependencies
         run: go mod download
@@ -55,6 +77,24 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
+          cache: false
+
+      - name: Determine Go cache paths
+        id: go-cache
+        shell: bash
+        run: |
+          echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "buildcache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageOS}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Go modules and build artifacts
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.modcache }}
+            ${{ steps.go-cache.outputs.buildcache }}
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-cache.outputs.image }}-${{ steps.go-cache.outputs.version }}-${{ hashFiles('go.mod') }}
 
       - name: Build executable
         run: make
