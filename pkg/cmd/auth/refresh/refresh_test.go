@@ -258,6 +258,7 @@ func Test_refreshRun(t *testing.T) {
 		cfgHosts               []string
 		cfgRefreshable         bool
 		cfgRefreshableExpired  bool
+		refreshSkipped         bool
 		refresher              *ghmock.TokenRefresherMock
 		authOut                authOut
 		oldScopes              string
@@ -691,6 +692,26 @@ func Test_refreshRun(t *testing.T) {
 			wantStderrContains:     "Could not read the current token's scopes",
 		},
 		{
+			name: "skipped refresh still preserves the scopes of the current token",
+			cfgHosts: []string{
+				"github.com",
+			},
+			cfgRefreshable: true,
+			refreshSkipped: true,
+			oldScopes:      "repo, read:org",
+			opts:           &RefreshOptions{},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"repo", "read:org"},
+				secureStorage: true,
+				clipboard:     true,
+				expiring:      true,
+			},
+			wantStoredToken:        "xyz456",
+			wantStoredRefreshToken: "",
+			wantStderrOmits:        "Could not read the current token's scopes",
+		},
+		{
 			name: "errors when active user does not match user returned by auth flow",
 			cfgHosts: []string{
 				"github.com",
@@ -751,6 +772,9 @@ func Test_refreshRun(t *testing.T) {
 				}
 			}
 			tt.opts.Config = func() (gh.Config, error) {
+				if tt.refreshSkipped {
+					return skippedRefreshConfig{cfg}, nil
+				}
 				return cfg, nil
 			}
 
@@ -1021,4 +1045,22 @@ func failingRefresher() *ghmock.TokenRefresherMock {
 			return gh.RefreshableCredential{}, errors.New("refresh failed")
 		},
 	}
+}
+
+// skippedRefreshConfig wraps a config so ActiveTokenWithRefresh reports a refresh skipped because the state directory
+// is not writable, returning the stored credential alongside an error as the real implementation does.
+type skippedRefreshConfig struct {
+	gh.Config
+}
+
+func (c skippedRefreshConfig) Authentication() gh.AuthConfig {
+	return skippedRefreshAuthConfig{c.Config.Authentication()}
+}
+
+type skippedRefreshAuthConfig struct {
+	gh.AuthConfig
+}
+
+func (a skippedRefreshAuthConfig) ActiveTokenWithRefresh(hostname string) (gh.Credential, gh.RefreshStatus, error) {
+	return a.ActiveToken(hostname), gh.RefreshStatusSkipped, errors.New("skipped token refresh")
 }
