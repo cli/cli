@@ -485,7 +485,7 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	// a refresh still waiting on the lock reloads afterwards, finds the refreshable record removed below, and bails
 	// without persisting. The lock is best effort, so login still proceeds when it is unavailable.
 	var insecureStorageUsed bool
-	err := c.withFreshConfigForRefresh(func(lockHeld bool) error {
+	err := c.withFreshConfigForRefresh(func(lockErr error) error {
 		var err error
 		insecureStorageUsed, err = c.login(hostname, username, token, gitProtocol, secureStorage)
 		return err
@@ -580,7 +580,7 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 func (c *AuthConfig) Logout(hostname, username string) error {
 	// Run under the shared refresh lock so logout wins any race with an in-flight refresh: a concurrent refresh
 	// cannot persist a rotated credential after logout has removed the account and reported success.
-	return c.withFreshConfigForRefresh(func(lockHeld bool) error {
+	return c.withFreshConfigForRefresh(func(lockErr error) error {
 		users := c.UsersForHost(hostname)
 
 		// The user's per-user keyring records are not covered by removing config keys, so delete them explicitly.

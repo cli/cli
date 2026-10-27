@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/cli/cli/v2/internal/debug"
@@ -59,6 +61,21 @@ func flockRefreshLock(ctx context.Context, path string) (unlock func(), err erro
 	return unlock, err
 }
 
+// isRefreshLockInaccessible reports whether err, returned while acquiring the refresh lock, shows that the lock file
+// or its directory cannot be created or opened because the filesystem denies the write. That is the case when gh runs
+// in a sandbox that makes its state directory read-only, which also prevents persisting a refreshed credential.
+//
+// Only *fs.PathError values qualify, which is what directory creation and opening the lock file return. Errors from
+// the locking syscall itself (for example a filesystem without advisory locking) and lock contention timeouts are
+// bare errors, so they are deliberately not classified as inaccessible.
+func isRefreshLockInaccessible(err error) bool {
+	var pathErr *fs.PathError
+	if !errors.As(err, &pathErr) {
+		return false
+	}
+	return errors.Is(pathErr.Err, fs.ErrPermission) || errors.Is(pathErr.Err, syscall.EROFS)
+}
+
 // withFreshConfigForRefresh runs fn, a credential-store read-modify-write (a token refresh, or a logout that must not
 // race one), while holding both an in-process mutex and a cross-process advisory lock, and reloads the configuration
 // from disk before running fn so it observes any credential another process persisted. The mutex serializes goroutines
@@ -70,21 +87,20 @@ func flockRefreshLock(ctx context.Context, path string) (unlock func(), err erro
 // The file lock is best effort: fn still runs so a filesystem limitation never blocks the user. This tolerates both
 // being unable to create the state directory that holds the lock file (for example a read-only mount) and being
 // unable to acquire the lock itself (a filesystem without advisory locking, or another process holding it past
-// refreshLockTimeout). fn receives lockHeld reporting whether the cross-process lock was actually acquired, so it can
-// skip destructive cleanup that is only safe when peers are serialized; see refreshCredentialForUser for why cleanup
-// is gated on it.
+// refreshLockTimeout). fn receives lockErr, the error from acquiring the cross-process lock, which is nil when the lock
+// is held. fn can use it to skip destructive cleanup that is only safe when peers are serialized, or to skip work that
+// cannot succeed when the lock file is inaccessible; see refreshCredentialForUser for both.
 //
 // The reload refreshes the shared configuration in place, so any config changes not yet written to disk are discarded.
 // That is acceptable on the refresh path because mutations are persisted as they happen.
-func (c *AuthConfig) withFreshConfigForRefresh(fn func(lockHeld bool) error) error {
+func (c *AuthConfig) withFreshConfigForRefresh(fn func(lockErr error) error) error {
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
-	// Best-effort cross-process lock; see the godoc. We proceed without it rather than fail the user's refresh when
-	// the state directory cannot be created or the lock cannot be acquired. lockHeld then tells fn to skip cleanup
-	// that is unsafe without serialized peers. The residual risk without the lock is two processes refreshing at once
-	// and spending a rotating token twice.
-	var lockHeld bool
+	// Best-effort cross-process lock; see the godoc. We proceed without it rather than fail the caller when the state
+	// directory cannot be created or the lock cannot be acquired. lockErr then lets fn decide what is unsafe or futile
+	// without serialized peers. The residual risk without the lock is two processes refreshing at once and spending a
+	// rotating token twice.
 	unlock := func() {}
 	ctx, cancel := context.WithTimeout(context.Background(), refreshLockTimeout)
 	defer cancel()
@@ -98,9 +114,9 @@ func (c *AuthConfig) withFreshConfigForRefresh(fn func(lockHeld bool) error) err
 	// home-manager and similar setups, managed config files are symlinked into the immutable nix store, so creating a
 	// lock file there always fails. The state directory is XDG's location for writable runtime state, home-manager
 	// leaves it writable, and gh already writes state there (state.yml, telemetry), so it is the safer bet.
-	if u, err := acquire(ctx, filepath.Join(ghConfig.StateDir(), refreshLockFile)); err == nil {
+	u, lockErr := acquire(ctx, filepath.Join(ghConfig.StateDir(), refreshLockFile))
+	if lockErr == nil {
 		unlock = u
-		lockHeld = true
 	}
 	defer unlock()
 
@@ -108,7 +124,7 @@ func (c *AuthConfig) withFreshConfigForRefresh(fn func(lockHeld bool) error) err
 		return fmt.Errorf("could not reload configuration: %w", err)
 	}
 
-	return fn(lockHeld)
+	return fn(lockErr)
 }
 
 // reload re-reads the config from disk into the shared config, using the reloadConfig seam when set and the real
@@ -128,7 +144,7 @@ func (c *AuthConfig) reload() error {
 // concurrent configuration read-modify-write in another gh process.
 func (c *AuthConfig) LoginRefreshable(hostname, username string, credential gh.Credential, gitProtocol string, secureStorage bool) (bool, error) {
 	var insecureStorageUsed bool
-	err := c.withFreshConfigForRefresh(func(lockHeld bool) error {
+	err := c.withFreshConfigForRefresh(func(lockErr error) error {
 		var err error
 		insecureStorageUsed, err = c.loginRefreshable(hostname, username, credential, gitProtocol, secureStorage)
 		return err
@@ -393,9 +409,10 @@ func credentialFromRefreshable(renewed gh.RefreshableCredential, source string) 
 // returns the credential to use and the outcome: RefreshStatusUnnecessary when the token is still valid,
 // RefreshStatusInapplicable when no refresher is configured, RefreshStatusExpired when the server rejected the refresh
 // token (in which case the user's stored credential is removed so re-authentication is required), RefreshStatusFailed
-// when the exchange or persistence fails for a transient reason, and RefreshStatusDone when a renewed credential was
-// stored. The re-read, token exchange, and write run as one unit under the cross-process refresh lock so concurrent gh
-// processes cannot each spend the rotating refresh token.
+// when the exchange or persistence fails for a transient reason, RefreshStatusSkipped when the refresh lock file is
+// inaccessible (see isRefreshLockInaccessible), and RefreshStatusDone when a renewed credential was stored. The
+// re-read, token exchange, and write run as one unit under the cross-process refresh lock so concurrent gh processes
+// cannot each spend the rotating refresh token.
 func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credential gh.Credential) (gh.Credential, gh.RefreshStatus, error) {
 	if !accessTokenNeedsRefresh(credential, timeNow()) {
 		return credential, gh.RefreshStatusUnnecessary, nil
@@ -406,7 +423,8 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 
 	result := credential
 	status := gh.RefreshStatusFailed
-	err := c.withFreshConfigForRefresh(func(lockHeld bool) error {
+	err := c.withFreshConfigForRefresh(func(lockErr error) error {
+		lockHeld := lockErr == nil
 		// Re-read under the lock: another gh process may have refreshed the credential while we waited for it.
 		current, secure, err := c.refreshableForUser(hostname, username)
 		if err != nil {
@@ -416,6 +434,16 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 			result = current
 			status = gh.RefreshStatusUnnecessary
 			return nil
+		}
+		// A lock file we are not allowed to create means the state directory is not writable, as in a sandbox that
+		// mounts it read-only. The refreshed credential could then most likely not be persisted either, yet the
+		// server would already have rotated the refresh token, leaving the stored credential unusable. So do not
+		// attempt the exchange and keep presenting the current access token. Even if it looks expired, the server
+		// may still accept it (for example under clock skew), so let the server decide.
+		if isRefreshLockInaccessible(lockErr) {
+			result = current
+			status = gh.RefreshStatusSkipped
+			return fmt.Errorf("skipped token refresh because the state directory is not writable: %w", lockErr)
 		}
 		if simulateRefreshTokenExpired(current, timeNow()) {
 			// Simulate server rejection under the debug override, mirroring the ErrRefreshTokenInvalid

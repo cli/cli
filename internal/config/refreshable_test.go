@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/flock"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -731,7 +734,7 @@ func TestWithFreshConfigUnderLockInvokesReloadBeforeFn(t *testing.T) {
 		return nil
 	}
 
-	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
+	err := authCfg.withFreshConfigForRefresh(func(lockErr error) error {
 		order = append(order, "fn")
 		return nil
 	})
@@ -746,7 +749,7 @@ func TestWithFreshConfigUnderLockPropagatesReloadError(t *testing.T) {
 	authCfg.reloadConfig = func() error { return sentinel }
 
 	fnRan := false
-	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
+	err := authCfg.withFreshConfigForRefresh(func(lockErr error) error {
 		fnRan = true
 		return nil
 	})
@@ -759,7 +762,7 @@ func TestWithFreshConfigUnderLockPropagatesError(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 	sentinel := errors.New("boom")
 
-	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error { return sentinel })
+	err := authCfg.withFreshConfigForRefresh(func(lockErr error) error { return sentinel })
 
 	require.ErrorIs(t, err, sentinel)
 }
@@ -791,16 +794,16 @@ func TestWithFreshConfigUnderLockProceedsWhenStateDirCannotBeCreated(t *testing.
 	t.Setenv("XDG_STATE_HOME", filepath.Join(file, "state"))
 
 	ran := false
-	observedLockHeld := true
-	err := authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
+	var observedLockErr error
+	err := authCfg.withFreshConfigForRefresh(func(lockErr error) error {
 		ran = true
-		observedLockHeld = lockHeld
+		observedLockErr = lockErr
 		return nil
 	})
 
 	require.NoError(t, err)
 	require.True(t, ran, "fn must still run when the state directory cannot be created")
-	require.False(t, observedLockHeld, "the lock cannot be held when its directory cannot be created")
+	require.Error(t, observedLockErr, "the lock cannot be held when its directory cannot be created")
 }
 
 func TestWithFreshConfigUnderLockSerializesInProcess(t *testing.T) {
@@ -816,7 +819,7 @@ func TestWithFreshConfigUnderLockSerializesInProcess(t *testing.T) {
 
 	for range goroutines {
 		wg.Go(func() {
-			_ = authCfg.withFreshConfigForRefresh(func(lockHeld bool) error {
+			_ = authCfg.withFreshConfigForRefresh(func(lockErr error) error {
 				n := active.Add(1)
 				for {
 					m := maxActive.Load()
@@ -998,6 +1001,69 @@ func TestActiveTokenWithRefresh(t *testing.T) {
 		// short-circuiting on a missing credential.
 		_, _, _ = authCfg.ActiveTokenWithRefresh(host)
 		require.Len(t, refresher.RefreshCalls(), 2)
+	})
+
+	t.Run("skips the refresh when the lock file is inaccessible", func(t *testing.T) {
+		// A sandbox that mounts the state directory read-only would also block persisting the rotated credential,
+		// so gh must not spend the refresh token there and must keep presenting the current access token.
+		lockPath := filepath.Join("state", "gh", refreshLockFile)
+		tests := []struct {
+			name    string
+			lockErr error
+		}{
+			{name: "read-only lock file", lockErr: &fs.PathError{Op: "open", Path: lockPath, Err: syscall.EROFS}},
+			{name: "read-only state directory", lockErr: &fs.PathError{Op: "mkdir", Path: lockPath, Err: syscall.EROFS}},
+			{name: "permission denied", lockErr: &fs.PathError{Op: "open", Path: lockPath, Err: syscall.EACCES}},
+			{name: "operation not permitted", lockErr: &fs.PathError{Op: "open", Path: lockPath, Err: syscall.EPERM}},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				authCfg := newTestAuthConfig(t)
+				authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+					return nil, tt.lockErr
+				}
+				refresher := renewingRefresher()
+				authCfg.SetTokenRefresher(refresher)
+				loginRefreshableWithExpiry(t, authCfg, host, user, "old-access", "old-refresh", time.Now().Add(-time.Hour), false)
+
+				credential, status, err := authCfg.ActiveTokenWithRefresh(host)
+
+				require.ErrorIs(t, err, tt.lockErr)
+				require.Equal(t, gh.RefreshStatusSkipped, status)
+				require.Equal(t, "old-access", credential.Token)
+				require.Empty(t, refresher.RefreshCalls())
+			})
+		}
+	})
+
+	t.Run("still refreshes when the lock is unavailable for other reasons", func(t *testing.T) {
+		// Only a lock file gh is not allowed to write signals a read-only environment. A filesystem without advisory
+		// locking, a contended lock, or an unrelated path error keeps the best-effort refresh without the lock.
+		tests := []struct {
+			name    string
+			lockErr error
+		}{
+			{name: "advisory locking unsupported", lockErr: syscall.ENOLCK},
+			{name: "lock contention timeout", lockErr: flock.ErrTimeout},
+			{name: "state directory path not a directory", lockErr: &fs.PathError{Op: "mkdir", Path: "state", Err: syscall.ENOTDIR}},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				authCfg := newTestAuthConfig(t)
+				authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+					return nil, tt.lockErr
+				}
+				refresher := renewingRefresher()
+				authCfg.SetTokenRefresher(refresher)
+				loginRefreshableWithExpiry(t, authCfg, host, user, "old-access", "old-refresh", time.Now().Add(-time.Hour), false)
+
+				_, status, err := authCfg.ActiveTokenWithRefresh(host)
+
+				require.NoError(t, err)
+				require.Equal(t, gh.RefreshStatusDone, status)
+				require.Len(t, refresher.RefreshCalls(), 1)
+			})
+		}
 	})
 
 	t.Run("cannot refresh when no refresher is configured", func(t *testing.T) {
