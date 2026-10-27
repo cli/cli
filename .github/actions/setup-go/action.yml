@@ -1,0 +1,41 @@
+name: Set up Go
+description: >-
+  Installs the Go version from go.mod and caches the module and build caches
+  under a key specific to the calling job.
+
+inputs:
+  cache-key-prefix:
+    description: >-
+      Prefix for the cache key. Jobs that compile with different flags (for
+      example -race) must use different prefixes, because their compiled
+      packages can't be reused by each other.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # setup-go's built-in cache uses the same key for every job, so whichever
+    # job saves first decides the cache contents. We cache ourselves instead so
+    # that each kind of build gets its own key.
+    - name: Install Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: false
+
+    - name: Determine Go cache paths
+      id: go-cache
+      shell: bash
+      run: |
+        echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        echo "buildcache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+        echo "image=${ImageOS}" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Go modules and build artifacts
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: |
+          ${{ steps.go-cache.outputs.modcache }}
+          ${{ steps.go-cache.outputs.buildcache }}
+        key: ${{ inputs.cache-key-prefix }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-cache.outputs.image }}-${{ steps.go-cache.outputs.version }}-${{ hashFiles('go.mod') }}
