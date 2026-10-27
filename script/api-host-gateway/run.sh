@@ -42,45 +42,6 @@ if [ -z "$token" ]; then
 	}
 fi
 
-org_token=
-if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
-	if [ -n "${GH_APIHOST_ORG_TOKEN:-}" ]; then
-		org_token="$GH_APIHOST_ORG_TOKEN"
-	elif [ -t 0 ]; then
-		printf 'The org run requires a fine-grained PAT with resource owner gh-acceptance-testing.\n' >&2
-		printf 'The token must be scoped to all repositories because the scripts create\n' >&2
-		printf 'repositories with random names that cannot be listed ahead of time.\n' >&2
-		printf '\nCreate one at:\n' >&2
-		printf '  %s\n\n' \
-			'https://github.com/settings/personal-access-tokens/new?name=gh-acceptance-api-host&description=Acceptance+subset+for+the+api_host+gateway+loop&target_name=gh-acceptance-testing&expires_in=7&administration=write&contents=write&actions=write&workflows=write&issues=write' >&2
-		printf 'Paste the token: ' >&2
-		read -rs org_token </dev/tty || true
-		printf '\n' >&2
-	else
-		printf 'error: stdin is not a terminal; set GH_APIHOST_ORG_TOKEN instead\n' >&2
-		exit 1
-	fi
-	if [ -z "$org_token" ]; then
-		printf 'error: org token is required for the acceptance run\n' >&2
-		exit 1
-	fi
-	# The token is written into a YAML file unquoted, so a stray control
-	# character makes that file unparseable and every acceptance script fails
-	# for a reason that has nothing to do with routing. Arrow keys at the
-	# prompt are the easy way to do this: read -s happily accepts the escape
-	# sequence as part of the token.
-	case $org_token in
-	*[![:print:]]*)
-		printf 'error: the org token contains non-printable characters\n' >&2
-		printf '\n' >&2
-		printf 'Arrow keys and other control characters are captured verbatim at\n' >&2
-		printf 'the prompt. Paste the token without editing it, or set\n' >&2
-		printf 'GH_APIHOST_ORG_TOKEN instead.\n' >&2
-		exit 1
-		;;
-	esac
-fi
-
 # A go.mod replace pointing at a directory on this machine is invisible inside
 # the container unless we mount it, so collect any such directories and bind
 # them at the same absolute path the replace names. There are none once the
@@ -107,10 +68,7 @@ exec docker run --rm -t \
 	-v "$MODULE_CACHE_VOLUME:/go/pkg/mod" \
 	-v "$BUILD_CACHE_VOLUME:/root/.cache/go-build" \
 	-e GH_APIHOST_TOKEN="$token" \
-	-e GH_APIHOST_ORG_TOKEN="$org_token" \
 	-e GH_APIHOST_EXPECTED_LOGIN="${GH_APIHOST_EXPECTED_LOGIN:-}" \
-	-e GH_APIHOST_ORG="${GH_APIHOST_ORG:-}" \
-	-e GH_APIHOST_ACCEPTANCE="${GH_APIHOST_ACCEPTANCE:-no}" \
 	-w /src \
 	"$IMAGE" \
 	/src/script/api-host-gateway/test.sh

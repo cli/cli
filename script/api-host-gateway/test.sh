@@ -19,7 +19,6 @@ REPO=${GH_APIHOST_REPO:-/src}
 WORK=${GH_APIHOST_WORK:-/tmp/api-host-gateway}
 EXPECTED_LOGIN=${GH_APIHOST_EXPECTED_LOGIN:-}
 TOKEN=${GH_APIHOST_TOKEN:-}
-ORG_TOKEN=${GH_APIHOST_ORG_TOKEN:-}
 
 CONFIG_DIR="$WORK/ghconfig"
 LOG="$WORK/gateway.jsonl"
@@ -27,10 +26,6 @@ BUNDLE="$WORK/bundle.pem"
 RESULTS="$WORK/results.tsv"
 
 FAILURES=0
-SUBSET_REDS=0
-SUBSET_RED_NAMES=
-SUBSET_NOMATCHES=0
-SUBSET_NOMATCH_NAMES=
 GATEWAY_PID=
 
 # PHASE labels every recorded result so the summary can be read phase by phase.
@@ -42,7 +37,7 @@ die() {
 	exit 1
 }
 
-# record <name> <PASS|FAIL|NOMATCH> appends one line to the results ledger that
+# record <name> <PASS|FAIL> appends one line to the results ledger that
 # the summary prints. Named results matter because a commit that fixes one call
 # site should be visible as that specific assertion turning green.
 record() {
@@ -134,22 +129,20 @@ fi
 
 # --- helpers -----------------------------------------------------------------
 
-# write_config yes|no [token] controls whether hosts.yml carries the api_host
-# override. The optional second argument sets the oauth_token; defaults to
-# $TOKEN so existing single-argument call sites are unchanged.
+# write_config yes|no controls whether hosts.yml carries the api_host
+# override.
 write_config() {
-	local tok="${2:-$TOKEN}"
 	{
 		printf '%s:\n' "github.com"
 		printf '    user: %s\n' "$EXPECTED_LOGIN"
-		printf '    oauth_token: %s\n' "$tok"
+		printf '    oauth_token: %s\n' "$TOKEN"
 		printf '    git_protocol: https\n'
 		if [ "$1" = "yes" ]; then
 			printf '    api_host: %s\n' "$GATEWAY_HOST"
 		fi
 		printf '    users:\n'
 		printf '        %s:\n' "$EXPECTED_LOGIN"
-		printf '            oauth_token: %s\n' "$tok"
+		printf '            oauth_token: %s\n' "$TOKEN"
 	} >"$CONFIG_DIR/hosts.yml"
 	chmod 600 "$CONFIG_DIR/hosts.yml"
 }
@@ -318,80 +311,6 @@ expect_gh_failure "gh cannot reach GitHub directly while blackholed" api user
 
 blackhole_off
 
-# --- phase 4 & 5: acceptance subset ------------------------------------------
-# Fine-grained PATs have mutually exclusive resource owners: Account permissions
-# (such as Gists) can only be used when the resource owner is the current user,
-# while Organization permissions can only be used when the resource owner is an
-# organization. A single fine-grained PAT cannot cover both the org-scoped
-# scripts and the gist script. Phase 4 therefore runs the eleven org-scoped
-# scripts under GH_APIHOST_ORG_TOKEN (a PAT owned by gh-acceptance-testing),
-# and phase 5 runs the one gist script under the developer's OAuth token.
-if [ "${GH_APIHOST_ACCEPTANCE:-no}" = "yes" ]; then
-	[ -n "$ORG_TOKEN" ] || die "GH_APIHOST_ORG_TOKEN is required for the acceptance run"
-
-	# run_subset <group> <script> <token> runs exactly one acceptance
-	# script. Scripts are run one at a time rather than batched per test
-	# group because a group bundles scripts that fail for unrelated
-	# reasons, which would hide a script turning green on its own.
-	run_subset() {
-		local group="$1" script="$2" tok="$3"
-		local logfile rc
-		logfile="$WORK/subset-${group}-${script%.txtar}.log"
-		# Tee to a file so we can inspect output for "no tests to run" while
-		# still streaming it live to the terminal. pipefail would make the
-		# pipeline exit with tee's status; PIPESTATUS[0] extracts go test's
-		# own exit code regardless.
-		GH_ACCEPTANCE_HOST=github.com \
-		GH_ACCEPTANCE_ORG="$GH_APIHOST_ORG" \
-		GH_ACCEPTANCE_TOKEN="$tok" \
-		GH_ACCEPTANCE_USER="$EXPECTED_LOGIN" \
-		GH_ACCEPTANCE_API_HOST="$GATEWAY_HOST" \
-		GH_ACCEPTANCE_GROUP="$group" \
-		GH_ACCEPTANCE_SCRIPT="$script" \
-		SSL_CERT_FILE="$BUNDLE" \
-		go test -tags=acceptance -count=1 -parallel=1 -timeout=45m \
-			-run '^TestAcceptance$' ./acceptance 2>&1 | tee "$logfile"
-		rc=${PIPESTATUS[0]}
-		if [ "$rc" -ne 0 ]; then
-			SUBSET_REDS=$((SUBSET_REDS + 1))
-			SUBSET_RED_NAMES="${SUBSET_RED_NAMES:+${SUBSET_RED_NAMES} }${script}"
-			record "$script" FAIL
-		elif grep -qE '^\s*(ok|FAIL)\s+\S+\s+[0-9.]+s \[no tests to run\]' "$logfile"; then
-			SUBSET_NOMATCHES=$((SUBSET_NOMATCHES + 1))
-			SUBSET_NOMATCH_NAMES="${SUBSET_NOMATCH_NAMES:+${SUBSET_NOMATCH_NAMES} }${script}"
-			record "$script" NOMATCH
-		else
-			record "$script" PASS
-		fi
-	}
-
-	blackhole_on
-
-	heading "Phase 4: org-scoped acceptance subset through the gateway"
-	PHASE=4
-	write_config yes "$ORG_TOKEN"
-
-	run_subset api       basic-rest.txtar                        "$ORG_TOKEN"
-	run_subset api       basic-graphql.txtar                     "$ORG_TOKEN"
-	run_subset release   release-upload-download.txtar           "$ORG_TOKEN"
-	run_subset repo      repo-delete.txtar                       "$ORG_TOKEN"
-	run_subset repo      repo-list-rename.txtar                  "$ORG_TOKEN"
-	run_subset repo      repo-read-file.txtar                    "$ORG_TOKEN"
-	run_subset repo      repo-rename-transfer-ownership.txtar    "$ORG_TOKEN"
-	run_subset workflow  run-download.txtar                      "$ORG_TOKEN"
-	run_subset extension extension.txtar                         "$ORG_TOKEN"
-	run_subset search    search-issues.txtar                     "$ORG_TOKEN"
-	run_subset auth      auth-status.txtar                       "$ORG_TOKEN"
-
-	heading "Phase 5: user-scoped acceptance subset through the gateway"
-	PHASE=5
-	write_config yes "$TOKEN"
-
-	run_subset gist gist-create-view-delete.txtar "$TOKEN"
-
-	blackhole_off
-fi
-
 # --- summary -----------------------------------------------------------------
 
 heading "Results"
@@ -403,28 +322,10 @@ while IFS=$'\t' read -r phase status name; do
 done <"$RESULTS"
 
 heading "Summary"
-# Phases 4 and 5 are expected to be partly red during the migration period,
-# so subset failures are reported but do not drive the exit code. Only the
-# phase 1-3 assertion count does that.
-if [ "$FAILURES" -eq 0 ] && [ "$SUBSET_REDS" -eq 0 ] && [ "$SUBSET_NOMATCHES" -eq 0 ]; then
+if [ "$FAILURES" -eq 0 ]; then
 	printf 'all assertions passed\n'
 	exit 0
 fi
 
-if [ "$FAILURES" -gt 0 ]; then
-	printf '%d assertion(s) failed\n' "$FAILURES"
-fi
-
-if [ "$SUBSET_REDS" -gt 0 ]; then
-	printf '%d subset script(s) red: %s\n' "$SUBSET_REDS" "$SUBSET_RED_NAMES"
-fi
-
-if [ "$SUBSET_NOMATCHES" -gt 0 ]; then
-	printf '%d subset script(s) matched no tests (script may not exist at this revision): %s\n' "$SUBSET_NOMATCHES" "$SUBSET_NOMATCH_NAMES"
-fi
-
-if [ "$FAILURES" -gt 0 ]; then
-	exit 1
-fi
-
-exit 0
+printf '%d assertion(s) failed\n' "$FAILURES"
+exit 1

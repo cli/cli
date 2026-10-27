@@ -61,11 +61,6 @@ $ /tmp/gh-harness/script/api-host-gateway/run.sh
 useful while iterating on a fix, but a `-dirty` run should never be quoted as
 evidence that a call site is fixed.
 
-### Acceptance subset
-
-Do not set `GH_APIHOST_ACCEPTANCE=yes` to test routing. Phases 4 and 5 call
-`TestAcceptance`, which is not in this tree. See [Current state](#current-state).
-
 ## Why a container
 
 Two constraints make this awkward to run directly on a developer machine, and
@@ -123,15 +118,6 @@ Phases 2 and 3 are controls. They are expected to pass even when phase 1 is
 entirely red, and if they ever fail the harness itself is broken rather than the
 product.
 
-**Phases 4 and 5.** `test.sh` still calls `go test -run '^TestAcceptance$'` when
-`GH_APIHOST_ACCEPTANCE=yes`. That test is not in this tree, so the phases record
-NOMATCH. They do not gate the script. The exit code comes from phases 1 to 3.
-
-`run_subset` distinguishes three outcomes, not two: pass, fail, and **matched no
-tests**. The third matters because a script that does not exist at the revision
-under test would otherwise look green. It is detected by grepping for
-`[no tests to run]`.
-
 ### Reading a failure
 
 Two failure signatures mean opposite things, and telling them apart is the first
@@ -187,11 +173,10 @@ $ curl --cacert /tmp/ca.pem --resolve gh-gateway.internal:8443:127.0.0.1 \
 
 Phases 1 to 3 run `gh` directly. They do not use the acceptance suite.
 
-Phases 4 and 5 do not exercise this tree. `script/api-host-gateway/test.sh`
-runs `go test -run '^TestAcceptance$'`, and `TestAcceptance` is not in this
-tree. `extension.txtar` is not in the tree either. With
-`GH_APIHOST_ACCEPTANCE=yes`, those phases record NOMATCH. They do not show
-that the old scripts route through `api_host`.
+The old phases 4 and 5, which ran the acceptance subset through the gateway,
+are removed. `TestAcceptance` is not in this tree and neither is
+`extension.txtar`, so those phases recorded NOMATCH instead of showing that
+the old scripts route through `api_host`.
 
 ## Past transcript
 
