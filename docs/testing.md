@@ -106,5 +106,4 @@ There is no race job and no attestation job in this repository.
 
 `make acceptance` runs `go test -tags acceptance ./acceptance`. Those tests do
 not execute the `acceptance/testdata` txtar scripts. The runner that did is not
-in this tree. `script/run-acceptance` dispatches `acceptance.yml` on `cli/cli`,
-which is not a workflow here. Do not use it to test this fork.
+in this tree. This repository has no acceptance workflow.

@@ -1,15 +1,6 @@
 Prefix: GHCL
 Next: 10
 
-### GHCL-8 · P2 · `script/run-acceptance` dispatches `cli/cli` acceptance
-
-- **Area:** Tests
-- **Where:** `script/run-acceptance:5`, `script/run-acceptance:95`
-- **Problem:** The script sets `repository=cli/cli` and `workflow=acceptance.yml`, then calls `gh workflow run`. This tree's workflows are `test.yml`, `prerelease.yml`, and `dependabot-triage-schedule.yml`. Running the script against the real `gh` reached `POST /repos/cli/cli/actions/workflows/354871894/dispatches` and stopped with HTTP 403, admin rights required. That workflow id is cli/cli's active Acceptance Tests workflow (`acceptance.yml` in that repo). No run was created. A token that can dispatch `cli/cli` would start upstream's live acceptance tests. `make acceptance` does not execute the txtar scripts. `TestAcceptance` was removed on purpose and stays removed.
-- **Recommendation:** Delete the `cli/cli` dispatch. Do not restore the removed acceptance runner.
-- **Fix with:** delete
-- **Effort:** S
-
 ### GHCL-5 · P3 · Read remote details with fewer Git processes
 
 - **Area:** Performance
