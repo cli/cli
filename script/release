@@ -3,14 +3,14 @@ set -e
 
 print_help() {
     cat <<EOF
-To tag a new release:
-  script/release [--staging] [--dry-run] <tag-name> [--platform {linux|macos}] [--branch <branch>]
+To publish a pre-release of a ref:
+  script/release [--branch <branch>] [<tag-name>]
 
-To build staging binaries from the current branch:
-  script/release --current [--platform {linux|macos}]
+To publish a pre-release of the current upstream branch:
+  script/release --current
 
 To build binaries locally with goreleaser:
-  script/release --local --platform {linux|macos}
+  script/release --local [--platform {linux|macos}] [<tag-name>]
 EOF
 }
 
@@ -24,8 +24,6 @@ is_local=""
 do_push=""
 platform=""
 branch="trunk"
-deploy_env="production"
-dry_run="false"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -45,16 +43,7 @@ while [ $# -gt 0 ]; do
     is_local=1
     shift 1
     ;;
-  --staging )
-    deploy_env="staging"
-    shift 1
-    ;;
-  --dry-run )
-    dry_run="true"
-    shift 1
-    ;;
   --current )
-    deploy_env="staging"
     tag_name="$(git describe --tags --abbrev=0)"
     branch="$(git rev-parse --symbolic-full-name '@{upstream}' 2>/dev/null || git branch --show-current)"
     branch="${branch#refs/remotes/*/}"
@@ -78,8 +67,37 @@ announce() {
   "$@"
 }
 
-trigger_deployment() {
-  announce gh workflow -R cli/cli run deployment.yml --ref "$branch" -f tag_name="$tag_name" -f environment="$deploy_env" -f dry_run="$dry_run"
+repository_slug() {
+  local here url
+  here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+  url=$(git -C "${here}/.." remote get-url origin)
+  url=${url%.git}
+  case "$url" in
+  git@*:*)
+    url=${url#*:}
+    ;;
+  *://*)
+    url=${url#*://}
+    url=${url#*@}
+    url=${url#*/}
+    ;;
+  *)
+    printf 'unrecognized origin url: %s\n' "$url" >&2
+    exit 1
+    ;;
+  esac
+  case "$url" in
+  */*) ;;
+  *)
+    printf 'unrecognized origin url: %s\n' "$url" >&2
+    exit 1
+    ;;
+  esac
+  printf '%s\n' "$url"
+}
+
+dispatch_prerelease() {
+  announce gh workflow -R "$(repository_slug)" run prerelease.yml --ref "$branch"
 }
 
 build_local() {
@@ -108,9 +126,5 @@ else
     fi
     announce git push
   fi
-  trigger_deployment
-  if [ "$deploy_env" = "production" ]; then
-    echo
-    echo "Go to Slack to manually approve this production deployment."
-  fi
+  dispatch_prerelease
 fi

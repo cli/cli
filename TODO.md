@@ -1,16 +1,6 @@
 Prefix: GHCL
 Next: 10
 
-### GHCL-7 · P1 · `script/release` deploys `cli/cli`, not this fork
-
-- **Area:** Build
-- **Where:** `script/release:82`, `.github/workflows/prerelease.yml:47`, `internal/licenses/licenses.go:25`
-- **Problem:** Without `--local`, `script/release` runs `gh workflow -R cli/cli run deployment.yml` with `environment=production` and `dry_run=false`. Proved by running that script with a stub `gh` on `PATH`: the arguments were `workflow -R cli/cli run deployment.yml --ref trunk -f tag_name=v9.9.9-ultrareview-probe -f environment=production -f dry_run=false`. This repository has no `deployment.yml`. The workflow that publishes here is `prerelease` (`workflow_dispatch` only). That build does not run `script/licenses`, so `gh licenses` hits the missing-`report.txt` path and prints the official-build placeholder. Darwin binaries from that workflow are unsigned cross-compiles.
-- **Recommendation:** Stop dispatching `cli/cli`. Make `prerelease` on this repository the publish path, and run `script/licenses` for the target `GOOS`/`GOARCH` before `go build`. Keep `script/release --local` as the local GoReleaser build only.
-- **Fix with:** none
-- **Effort:** M
-- **Design:** [docs/rfc/GHCL-7-release-path.md](docs/rfc/GHCL-7-release-path.md)
-
 ### GHCL-8 · P2 · `script/run-acceptance` dispatches `cli/cli` acceptance
 
 - **Area:** Tests

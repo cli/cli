@@ -36,4 +36,4 @@ Should the Linux artifact names drop `musl` until the build uses a musl toolchai
 
 ## Decision
 
-Unset.
+`script/release` without `--local` dispatches `prerelease.yml` on the repository that contains the script, passing only the selected ref, and that workflow runs `script/licenses` before `go build`.
