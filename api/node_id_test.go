@@ -9,8 +9,9 @@ import (
 
 func TestEncodeNodeID(t *testing.T) {
 	tests := map[string]struct {
-		id   int64
-		want string
+		templateIndex int64
+		id            int64
+		want          string
 	}{
 		"positive fixint max": {id: 127, want: "kgB_"},
 		"uint8 min":           {id: 128, want: "kgDMgA"},
@@ -20,10 +21,18 @@ func TestEncodeNodeID(t *testing.T) {
 		"uint32 min":          {id: 65536, want: "kgDOAAEAAA"},
 		"uint32 max":          {id: math.MaxUint32, want: "kgDO_____w"},
 		"uint64 min":          {id: math.MaxUint32 + 1, want: "kgDPAAAAAQAAAAA"},
+		"nonzero template":    {templateIndex: 1, id: 127, want: "kgF_"},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.want, EncodeNodeID(0, tt.id))
+			// Given a template index, database ID, and expected payload
+			templateIndex, id := tt.templateIndex, tt.id
+
+			// When the node ID encoder receives the explicit template index
+			got := EncodeNodeID(templateIndex, id)
+
+			// Then it preserves the payload, including the template index
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

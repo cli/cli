@@ -6,11 +6,21 @@ import (
 	"math"
 )
 
-// EncodeNodeID encodes ids as a base64 MessagePack array of compact ints,
-// the payload of a GraphQL node ID such as "PR_<payload>".
-func EncodeNodeID(ids ...int64) string {
-	b := []byte{0x90 | byte(len(ids))}
-	for _, id := range ids {
+// EncodeNodeID encodes templateIndex and ids as a base64 MessagePack array
+// of compact integers, the payload of a GraphQL node ID such as "PR_<payload>".
+//
+// templateIndex is an internal GitHub node ID detail. Clients should treat node
+// IDs as opaque rather than construct them. This helper was introduced to
+// preserve existing behaviour while removing the msgpack dependency. Ideally,
+// node IDs would not be generated on the client, but removing that coupling is
+// a larger undertaking than a direct dependency replacement.
+//
+// templateIndex and all IDs must be non-negative. Callers must supply fewer
+// than 15 IDs.
+func EncodeNodeID(templateIndex int64, ids ...int64) string {
+	parts := append([]int64{templateIndex}, ids...)
+	b := []byte{0x90 | byte(len(parts))}
+	for _, id := range parts {
 		switch {
 		case id < 0x80:
 			b = append(b, byte(id))
