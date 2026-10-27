@@ -21,15 +21,17 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: "go.mod"
+          cache-key-prefix: go-race
 
       - name: Download dependencies
         run: go mod download
 
+      # -count=1 disables Go's test result cache so every test runs. The build
+      # cache above only exists to reuse compiled packages.
       - name: Run unit and integration tests
-        run: go test -race -tags=integration ./...
+        run: go test -count=1 -race -tags=integration ./...
 
       - name: Build
         run: go build -v ./cmd/gh
@@ -52,9 +54,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: "go.mod"
+          cache-key-prefix: go
 
       - name: Build executable
         run: make
