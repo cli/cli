@@ -18,7 +18,6 @@ import (
 // That ancestor hook receives the invoked leaf cmd, not the ancestor, matching
 // how cobra passes the leaf to every persistent hook:
 // https://github.com/spf13/cobra/blob/v1.10.2/command.go#L984-L986
-//
 func executeParentHook(overrideCmd, cmd *cobra.Command, args []string) error {
 	for p := overrideCmd.Parent(); p != nil; p = p.Parent() {
 		if p.PersistentPreRunE != nil {

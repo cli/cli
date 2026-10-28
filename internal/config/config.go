@@ -923,12 +923,14 @@ func ConfigDir() string {
 	return ghConfig.ConfigDir()
 }
 
+//nolint:unused // resolve payload kept for the planned token-cache read path
 type activeTokenEntry struct {
 	once   sync.Once
 	token  string
 	source string
 }
 
+//nolint:unused // username and source are part of the planned cache key
 type activeTokenKey struct {
 	hostname string
 	username string
@@ -940,6 +942,7 @@ type activeTokenCache struct {
 	tokens map[activeTokenKey]*activeTokenEntry
 }
 
+//nolint:unused // resolve path kept for the planned token-cache reads
 func (c *activeTokenCache) get(key activeTokenKey, resolve func() (string, string)) (string, string) {
 	for {
 		c.mu.RLock()

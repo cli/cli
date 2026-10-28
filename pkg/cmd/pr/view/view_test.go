@@ -17,44 +17,44 @@ import (
 
 func TestViewRunPipedSkipsUnusedPreloads(t *testing.T) {
 	tests := []struct {
-		name          string
-		terminal      bool
-		comments      bool
-		jsonFields    []string
-		wantPreloads  bool
-		wantOutput    string
+		name         string
+		terminal     bool
+		comments     bool
+		jsonFields   []string
+		wantPreloads bool
+		wantOutput   string
 	}{
 		{
-			name: "piped default",
+			name:       "piped default",
 			wantOutput: "title:\tExample\nstate:\tOPEN\nauthor:\toctocat\nlabels:\t\nassignees:\t\nreviewers:\treviewer (Approved)\nprojects:\t\nmilestone:\t\nnumber:\t1\nurl:\thttps://github.com/owner/repo/pull/1\nadditions:\t0\ndeletions:\t0\nauto-merge:\tdisabled\n--\nBody\n",
 		},
 		{
-			name: "terminal default",
-			terminal: true,
+			name:         "terminal default",
+			terminal:     true,
 			wantPreloads: true,
-			wantOutput: "View this pull request on GitHub: https://github.com/owner/repo/pull/1",
+			wantOutput:   "View this pull request on GitHub: https://github.com/owner/repo/pull/1",
 		},
 		{
-			name: "piped comments",
-			comments: true,
+			name:         "piped comments",
+			comments:     true,
 			wantPreloads: true,
-			wantOutput: "Paginated comment",
+			wantOutput:   "Paginated comment",
 		},
 		{
-			name: "terminal comments",
-			terminal: true,
-			comments: true,
+			name:         "terminal comments",
+			terminal:     true,
+			comments:     true,
 			wantPreloads: true,
-			wantOutput: "Paginated comment",
+			wantOutput:   "Paginated comment",
 		},
 		{
-			name: "json comments and checks",
-			jsonFields: []string{"comments", "statusCheckRollup"},
+			name:         "json comments and checks",
+			jsonFields:   []string{"comments", "statusCheckRollup"},
 			wantPreloads: true,
-			wantOutput: "Paginated comment",
+			wantOutput:   "Paginated comment",
 		},
 		{
-			name: "json title",
+			name:       "json title",
 			jsonFields: []string{"title"},
 			wantOutput: "{\"title\":\"Example\"}\n",
 		},
@@ -93,12 +93,12 @@ func TestViewRunPipedSkipsUnusedPreloads(t *testing.T) {
 				},
 			}
 			opts := &ViewOptions{
-				IO: ios,
-				Finder: shared.NewFinder(factory),
-				Detector: &fd.DisabledDetectorMock{},
+				IO:          ios,
+				Finder:      shared.NewFinder(factory),
+				Detector:    &fd.DisabledDetectorMock{},
 				SelectorArg: "https://github.com/owner/repo/pull/1",
-				Comments: tt.comments,
-				Now: func() time.Time { return time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC) },
+				Comments:    tt.comments,
+				Now:         func() time.Time { return time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC) },
 			}
 			if tt.jsonFields != nil {
 				exporter := cmdutil.NewJSONExporter()

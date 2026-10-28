@@ -91,7 +91,7 @@ type IOStreams struct {
 	pagerCommand string
 	pagerProcess *os.Process
 
-	neverPrompt                 bool
+	neverPrompt bool
 
 	TempFileOverride *os.File
 }

@@ -8,9 +8,9 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/surveyext"
-	"github.com/cli/cli/v2/internal/text"
 )
 
 //go:generate moq -rm -out prompter_mock.go . Prompter

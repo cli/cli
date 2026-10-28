@@ -426,12 +426,12 @@ func TestDownloadRun(t *testing.T) {
 	p := filepath.FromSlash
 
 	tests := []struct {
-		name          string
-		repo          ghrepo.Interface
-		opts          DownloadOptions
-		tty           bool
-		color         bool
-		setup         func(t *testing.T)
+		name  string
+		repo  ghrepo.Interface
+		opts  DownloadOptions
+		tty   bool
+		color bool
+		setup func(t *testing.T)
 		// changeAfterCheck changes the working directory after download
 		// checks a file's path and before it writes the file, as another
 		// process could.
@@ -898,9 +898,9 @@ func TestDownloadRun(t *testing.T) {
 			},
 		},
 		{
-			name:          "a --dir that can't be opened fails the file and names the directory",
-			opts:          DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Dir: "notes"},
-			tty:           true,
+			name: "a --dir that can't be opened fails the file and names the directory",
+			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Dir: "notes"},
+			tty:  true,
 			changeAfterCheck: func(t *testing.T) {
 				writeTestFile(t, "notes", "not a directory\n")
 			},
@@ -912,9 +912,9 @@ func TestDownloadRun(t *testing.T) {
 			},
 		},
 		{
-			name:          "a --dir that is a dangling symlink fails every file, even with --skip-existing",
-			opts:          DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 5}, Dir: "notes", SkipExisting: true},
-			tty:           true,
+			name: "a --dir that is a dangling symlink fails every file, even with --skip-existing",
+			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2, 5}, Dir: "notes", SkipExisting: true},
+			tty:  true,
 			setup: func(t *testing.T) {
 				symlinkTestFile(t, "missing", "notes")
 			},
@@ -933,8 +933,8 @@ func TestDownloadRun(t *testing.T) {
 			},
 		},
 		{
-			name:          "a dangling symlink in --output's path fails the file, even with --skip-existing",
-			opts:          DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Output: "notes/plan.md", SkipExisting: true},
+			name: "a dangling symlink in --output's path fails the file, even with --skip-existing",
+			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Output: "notes/plan.md", SkipExisting: true},
 			setup: func(t *testing.T) {
 				symlinkTestFile(t, "missing", "notes")
 			},
@@ -946,9 +946,9 @@ func TestDownloadRun(t *testing.T) {
 			},
 		},
 		{
-			name:          "an error from the file system names the file once",
-			opts:          DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Dir: "notes"},
-			tty:           true,
+			name: "an error from the file system names the file once",
+			opts: DownloadOptions{IssueNumber: 142, ArtifactNumbers: []int{2}, Dir: "notes"},
+			tty:  true,
 			setup: func(t *testing.T) {
 				writeTestFile(t, "notes", "not a directory\n")
 			},

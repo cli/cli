@@ -39,8 +39,8 @@ type CreateOptions struct {
 	// file, and generic otherwise.
 	Type string
 
-	AttachFlag  *attachments.Flag
-	Assets      []attachments.UserAsset
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
 }
 
 // sourceKind is where an artifact's content comes from.

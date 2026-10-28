@@ -32,7 +32,6 @@ func TestNewCmdComment(t *testing.T) {
 	tmpImage := filepath.Join(t.TempDir(), "login.png")
 	require.NoError(t, os.WriteFile(tmpImage, []byte("the bytes"), 0600))
 
-
 	tests := []struct {
 		name             string
 		input            string
@@ -264,8 +263,8 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:           "--attach alone is enough of a body to post without prompting",
-			input:          fmt.Sprintf("1 --attach '%s'", tmpImage),
+			name:  "--attach alone is enough of a body to post without prompting",
+			input: fmt.Sprintf("1 --attach '%s'", tmpImage),
 			output: shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -281,8 +280,8 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:           "--attach with --body keeps the body and records that one was given",
-			input:          fmt.Sprintf("1 --body test --attach '%s'", tmpImage),
+			name:  "--attach with --body keeps the body and records that one was given",
+			input: fmt.Sprintf("1 --body test --attach '%s'", tmpImage),
 			output: shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeInline,
@@ -293,8 +292,8 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:           "--attach with --edit-last is accepted and needs no body",
-			input:          fmt.Sprintf("1 --edit-last --attach '%s'", tmpImage),
+			name:  "--attach with --edit-last is accepted and needs no body",
+			input: fmt.Sprintf("1 --edit-last --attach '%s'", tmpImage),
 			output: shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -306,8 +305,8 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			// KeepExistingBody is set either way. BodyProvided is what decides
 			// that this one replaces the comment rather than keeping it.
-			name:           "--attach with --edit-last and --body records the body that replaces the comment",
-			input:          fmt.Sprintf("1 --edit-last --body 'a new body' --attach '%s'", tmpImage),
+			name:  "--attach with --edit-last and --body records the body that replaces the comment",
+			input: fmt.Sprintf("1 --edit-last --body 'a new body' --attach '%s'", tmpImage),
 			output: shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeInline,
@@ -340,8 +339,8 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErrContains: "./nope.png: ",
 		},
 		{
-			name:           "--attach asks the issue lookup for the repository id",
-			input:          fmt.Sprintf("1 --attach '%s'", tmpImage),
+			name:  "--attach asks the issue lookup for the repository id",
+			input: fmt.Sprintf("1 --attach '%s'", tmpImage),
 			output: shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -366,7 +365,7 @@ func TestNewCmdComment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-						ios, stdin, _, _ := iostreams.Test()
+			ios, stdin, _, _ := iostreams.Test()
 			isTTY := tt.isTTY
 			ios.SetStdoutTTY(isTTY)
 			ios.SetStdinTTY(isTTY)
@@ -428,7 +427,7 @@ func TestNewCmdComment(t *testing.T) {
 
 			// When the command executes
 			_, err = cmd.ExecuteC()
-						if tt.wantsErr {
+			if tt.wantsErr {
 				require.Error(t, err)
 				if tt.wantsErrContains != "" {
 					require.ErrorContains(t, err, tt.wantsErrContains)

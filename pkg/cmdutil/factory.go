@@ -17,13 +17,13 @@ type Factory struct {
 	ExecutablePath string
 	InvokingAgent  string
 
-	Browser          browser.Browser
-	GitClient        *git.Client
-	IOStreams        *iostreams.IOStreams
-	Prompter         prompter.Prompter
+	Browser   browser.Browser
+	GitClient *git.Client
+	IOStreams *iostreams.IOStreams
+	Prompter  prompter.Prompter
 
-	BaseRepo func() (ghrepo.Interface, error)
-	Branch   func() (string, error)
+	BaseRepo   func() (ghrepo.Interface, error)
+	Branch     func() (string, error)
 	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	// PlainHttpClient is a special HTTP client that does not automatically set

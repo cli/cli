@@ -271,7 +271,6 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication credentials saved in plain text\n", cs.Yellow("!"))
 	}
 
-
 	// Record success as soon as the credential is persisted. The git credential-helper setup and SSH key upload below
 	// are separate side effects whose failure must not retract a credential that was already stored successfully.
 

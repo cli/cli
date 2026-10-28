@@ -39,9 +39,9 @@ type EditOptions struct {
 	SelectorArg string
 	Interactive bool
 
-	BodyDir     string
-	AttachFlag  *attachments.Flag
-	Assets      []attachments.UserAsset
+	BodyDir    string
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
 
 	shared.Editable
 }

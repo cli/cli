@@ -18,12 +18,12 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/template"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/cli/go-gh/v2/pkg/jq"
-	"github.com/cli/cli/v2/internal/template"
 	"github.com/spf13/cobra"
 )
 
@@ -32,13 +32,13 @@ const (
 )
 
 type ApiOptions struct {
-	AppVersion        string
-	InvokingAgent     string
-	BaseRepo          func() (ghrepo.Interface, error)
-	Branch            func() (string, error)
-	Config            func() (gh.Config, error)
-	HttpClient        func(api.HTTPClientOptions) (*http.Client, error)
-	IO                *iostreams.IOStreams
+	AppVersion    string
+	InvokingAgent string
+	BaseRepo      func() (ghrepo.Interface, error)
+	Branch        func() (string, error)
+	Config        func() (gh.Config, error)
+	HttpClient    func(api.HTTPClientOptions) (*http.Client, error)
+	IO            *iostreams.IOStreams
 
 	Hostname            string
 	RequestMethod       string
@@ -63,13 +63,13 @@ type ApiOptions struct {
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
-		AppVersion:        f.AppVersion,
-		InvokingAgent:     f.InvokingAgent,
-		BaseRepo:          f.BaseRepo,
-		Branch:            f.Branch,
-		Config:            f.Config,
-		HttpClient:        api.NewHTTPClient,
-		IO:                f.IOStreams,
+		AppVersion:    f.AppVersion,
+		InvokingAgent: f.InvokingAgent,
+		BaseRepo:      f.BaseRepo,
+		Branch:        f.Branch,
+		Config:        f.Config,
+		HttpClient:    api.NewHTTPClient,
+		IO:            f.IOStreams,
 	}
 
 	cmd := &cobra.Command{
@@ -391,14 +391,14 @@ func apiRun(opts *ApiOptions) error {
 		log = opts.IO.Out
 	}
 	httpClient, err := opts.HttpClient(api.HTTPClientOptions{
-		AppVersion:        opts.AppVersion,
-		InvokingAgent:     opts.InvokingAgent,
-		CacheTTL:          opts.CacheTTL,
-		RefreshingConfig:  cfg.Authentication(),
-		EnableCache:       opts.CacheTTL > 0,
-		Log:               log,
-		LogColorize:       opts.IO.ColorEnabled(),
-		LogVerboseHTTP:    opts.Verbose,
+		AppVersion:       opts.AppVersion,
+		InvokingAgent:    opts.InvokingAgent,
+		CacheTTL:         opts.CacheTTL,
+		RefreshingConfig: cfg.Authentication(),
+		EnableCache:      opts.CacheTTL > 0,
+		Log:              log,
+		LogColorize:      opts.IO.ColorEnabled(),
+		LogVerboseHTTP:   opts.Verbose,
 	})
 	if err != nil {
 		return err

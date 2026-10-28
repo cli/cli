@@ -56,9 +56,9 @@ type CreateOptions struct {
 	BlockedBy   []string
 	Blocking    []string
 
-	BodyDir     string
-	AttachFlag  *attachments.Flag
-	Assets      []attachments.UserAsset
+	BodyDir    string
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {

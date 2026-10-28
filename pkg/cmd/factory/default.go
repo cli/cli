@@ -42,9 +42,9 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
 	f.Remotes = remotesFunc(f)    // Depends on Config, and GitClient
 	f.BaseRepo = BaseRepoFunc(f.Remotes)
-	f.Prompter = newPrompter(f)              // Depends on Config and IOStreams
-	f.Browser = newBrowser(f)                // Depends on Config, and IOStreams
-	f.Branch = branchFunc(f)                 // Depends on GitClient
+	f.Prompter = newPrompter(f) // Depends on Config and IOStreams
+	f.Browser = newBrowser(f)   // Depends on Config, and IOStreams
+	f.Branch = branchFunc(f)    // Depends on GitClient
 
 	return f
 }
@@ -204,11 +204,11 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			RefreshingConfig:  cfg.Authentication(),
-			Log:               ios.ErrOut,
-			LogColorize:       ios.ColorEnabled(),
-			AppVersion:        appVersion,
-			InvokingAgent:     invokingAgent,
+			RefreshingConfig: cfg.Authentication(),
+			Log:              ios.ErrOut,
+			LogColorize:      ios.ColorEnabled(),
+			AppVersion:       appVersion,
+			InvokingAgent:    invokingAgent,
 		}
 		newClient, err := api.NewHTTPClient(opts)
 		if err != nil {
@@ -282,16 +282,6 @@ func configWithTokenRefresher(cfgFunc func() (gh.Config, error), plainClientFunc
 			cfg.Authentication().SetTokenRefresher(authflow.NewTokenRefresher(plainClient))
 		})
 		return cfg, nil
-	}
-}
-
-func externalHttpClientFunc(ios *iostreams.IOStreams, appVersion string) func() (*http.Client, error) {
-	return func() (*http.Client, error) {
-		return api.NewExternalHTTPClient(api.ExternalHTTPClientOptions{
-			AppVersion:  appVersion,
-			Log:         ios.ErrOut,
-			LogColorize: ios.ColorEnabled(),
-		})
 	}
 }
 

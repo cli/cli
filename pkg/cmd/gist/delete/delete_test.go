@@ -132,7 +132,7 @@ func Test_deleteRun(t *testing.T) {
 		wantStderr      string
 	}{
 		{
-			name: "successfully delete",
+			name:          "successfully delete",
 			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "1234",
@@ -146,7 +146,7 @@ func Test_deleteRun(t *testing.T) {
 			wantStdout: "✓ Gist \"cool.txt\" deleted\n",
 		},
 		{
-			name: "successfully delete with prompt",
+			name:          "successfully delete with prompt",
 			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "",
@@ -186,7 +186,7 @@ func Test_deleteRun(t *testing.T) {
 			wantStdout:      "✓ Gist \"cool.txt\" deleted\n",
 		},
 		{
-			name: "cancel delete with id",
+			name:          "cancel delete with id",
 			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "1234",
@@ -199,7 +199,7 @@ func Test_deleteRun(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "cancel delete with url",
+			name:          "cancel delete with url",
 			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "https://gist.github.com/myrepo/1234",
@@ -212,7 +212,7 @@ func Test_deleteRun(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "cancel delete with prompt",
+			name:          "cancel delete with prompt",
 			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "",
@@ -223,7 +223,7 @@ func Test_deleteRun(t *testing.T) {
 			wantErr:         true,
 		},
 		{
-			name: "not owned by you",
+			name:          "not owned by you",
 			confirmPrompt: true,
 			opts: &DeleteOptions{
 				Selector: "1234",

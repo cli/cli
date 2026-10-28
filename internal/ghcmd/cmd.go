@@ -421,4 +421,3 @@ func executable(fallback string) string {
 
 	return exe
 }
-

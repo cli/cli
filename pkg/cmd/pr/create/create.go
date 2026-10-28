@@ -76,9 +76,9 @@ type CreateOptions struct {
 
 	DryRun bool
 
-	BodyDir     string
-	AttachFlag  *attachments.Flag
-	Assets      []attachments.UserAsset
+	BodyDir    string
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.

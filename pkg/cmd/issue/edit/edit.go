@@ -50,9 +50,9 @@ type EditOptions struct {
 	AddBlocking     []string
 	RemoveBlocking  []string
 
-	BodyDir     string
-	AttachFlag  *attachments.Flag
-	Assets      []attachments.UserAsset
+	BodyDir    string
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
 
 	prShared.Editable
 }

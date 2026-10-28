@@ -12,7 +12,7 @@ import (
 
 func newTestConfig() *cfg {
 	return &cfg{
-		cfg:          ghConfig.ReadFromString(""),
+		cfg: ghConfig.ReadFromString(""),
 	}
 }
 

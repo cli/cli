@@ -20,7 +20,7 @@ func TestConfigIndependentCommands(t *testing.T) {
 			loads := 0
 			f := &cmdutil.Factory{
 				IOStreams: ios,
-				Browser: &browser.Stub{},
+				Browser:   &browser.Stub{},
 				Config: func() (gh.Config, error) {
 					loads++
 					return nil, errors.New("unreadable config")

@@ -40,8 +40,8 @@ type EditOptions struct {
 	// and body from that version, so no other flag goes with it.
 	RestoreVersion int
 
-	AttachFlag  *attachments.Flag
-	Assets      []attachments.UserAsset
+	AttachFlag *attachments.Flag
+	Assets     []attachments.UserAsset
 }
 
 // NewCmdEdit creates the gh issue artifact edit command.
