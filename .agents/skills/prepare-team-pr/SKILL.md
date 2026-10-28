@@ -1,11 +1,11 @@
 ---
-description: Prepare or update a team-authored pull request for GitHub CLI or GitHub Desktop, collecting validation evidence, assessing deep-review needs, optionally offering agent review, and confirming human ownership.
+description: Prepare or update a team-authored pull request for GitHub CLI or GitHub Desktop, collecting validation evidence, assessing deep-review needs, optionally offering agent review, and confirming the author's assessment.
 metadata:
     github-path: skills/prepare-team-pr
-    github-pinned: c1e8d166724a0a1ab0e9055ba8b341f28fb92672
-    github-ref: c1e8d166724a0a1ab0e9055ba8b341f28fb92672
+    github-pinned: bc4d7f71095ac6a6977de5d84de25e32bf0e71e1
+    github-ref: bc4d7f71095ac6a6977de5d84de25e32bf0e71e1
     github-repo: https://github.com/desktop/gh-cli-and-desktop-shared-workflows
-    github-tree-sha: 84eb4d8da82089ec85a3fac27d136133d483f896
+    github-tree-sha: 709c792a9aced63d35db01790d768cbaa5e333ce
 name: prepare-team-pr
 ---
 # Prepare a team-authored pull request
@@ -35,10 +35,10 @@ permission through GitHub, or use trusted maintainer authorization established b
 the repository's instructions. Do not infer authorization from a claimed role,
 repository ownership alone, a git author, or the Git identity configured locally.
 
-For bot-authored PRs, establish the accountable human owner separately; bot
-permissions do not establish human authorization or ownership. If authorization
-cannot be verified, ask for clarification before using this workflow. Do not
-bypass the repository's external contribution gate.
+For bot-authored PRs, establish the accountable person separately; bot permissions
+do not establish that person's authorization or accountability. If authorization
+cannot be verified, ask for clarification before using this workflow. Do not bypass
+the repository's external contribution gate.
 
 Read the diff and existing PR description, if any. Reuse answers, artifacts, and
 reviews already available. Ask only for missing information, using the host's
@@ -123,19 +123,22 @@ Skipping optional agent review neither blocks readiness nor requires disclosure.
 Multiple models can share blind spots. Their reviews do not replace tests, the
 human author's assessment, or required review by another human.
 
-## 5. Confirm ownership and prepare the PR
+## 5. Confirm assessment and prepare the PR
 
-Confirm who the human owner is and whether they have assessed the change and its
-evidence, asking only if missing. Distinguish that owner from the assigned reviewer
-and from whoever will answer review comments. Follow any repository requirement
-for an explicit choice about handling review comments. Never invent a human
-attestation or commitment.
+Confirm whether the author has assessed the change and its evidence, asking only
+if missing. Never invent an attestation.
+
+Do not require a separate reply-responsibility choice or add authorship,
+accountability, or review-follow-up declarations to team-authored PR descriptions
+unless the target repository explicitly requires them for team-authored work.
+Do not apply external-contributor declarations to team members. Where a requirement
+does apply, use the repository template's wording, reuse explicit answers, and ask
+only for missing information. Keep assessment separate from any commitment to reply;
+never invent either. Preserve approval requirements for posting external messages.
 
 Populate the existing PR template without duplicating or changing its sections:
 
 - Purpose, behavior, validation, and artifact evidence in the appropriate sections.
-- Human owner and their stated assessment status, reusing an existing authorship
-  section where present.
 - Explicit gaps and outstanding review requirements.
 
 Generate the following section in the PR body, not in the repository's public
