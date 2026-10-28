@@ -96,9 +96,7 @@ For prose-only changes, check links and the diff; do not build or run Go tests.
 
 For an authorized team-authored PR, follow the
 [prepare-team-pr skill](.agents/skills/prepare-team-pr/SKILL.md) when preparing
-or updating it. This supplements, but does not replace, the contribution policy
-or the current PR template. Preserve the template and generate or update the
-skill's `Team-authored review` section in the PR body, not in the template.
+or updating it.
 
 Before preparing or updating a PR, read the [PR template](.github/PULL_REQUEST_TEMPLATE.md)
 fresh. Keep its headings and HTML comments; fill every section, using "N/A" only
