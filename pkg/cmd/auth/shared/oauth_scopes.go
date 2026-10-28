@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -57,30 +58,26 @@ func GetScopes(httpClient *http.Client, hostname, authToken string) (string, err
 }
 
 // HasMinimumScopes performs a GitHub API request and returns an error if the token used in the request
-// lacks the minimum required scopes for performing API operations with gh.
-func HasMinimumScopes(httpClient *http.Client, hostname, authToken string) error {
+// lacks the minimum required scopes for performing API operations with gh, including any extraScopes.
+func HasMinimumScopes(httpClient *http.Client, hostname, authToken string, extraScopes ...string) error {
 	scopesHeader, err := GetScopes(httpClient, hostname, authToken)
 	if err != nil {
 		return err
 	}
 
-	return HeaderHasMinimumScopes(scopesHeader)
+	return HeaderHasMinimumScopes(scopesHeader, extraScopes...)
 }
 
 // HeaderHasMinimumScopes parses the comma separated scopesHeader string and returns an error
-// if it lacks the minimum required scopes for performing API operations with gh.
-func HeaderHasMinimumScopes(scopesHeader string) error {
+// if it lacks the minimum required scopes for performing API operations with gh, including any extraScopes.
+func HeaderHasMinimumScopes(scopesHeader string, extraScopes ...string) error {
 	if scopesHeader == "" {
 		// if the token reports no scopes, assume that it's an integration token and give up on
 		// detecting its capabilities
 		return nil
 	}
 
-	search := map[string]bool{
-		"repo":      false,
-		"read:org":  false,
-		"admin:org": false,
-	}
+	search := map[string]bool{}
 	for s := range strings.SplitSeq(scopesHeader, ",") {
 		search[strings.TrimSpace(s)] = true
 	}
@@ -92,6 +89,23 @@ func HeaderHasMinimumScopes(scopesHeader string) error {
 
 	if !search["read:org"] && !search["write:org"] && !search["admin:org"] {
 		missingScopes = append(missingScopes, "read:org")
+	}
+
+	for _, scope := range extraScopes {
+		scope = strings.TrimSpace(scope)
+		if scope == "" || scope == "repo" || scope == "read:org" {
+			continue
+		}
+		switch scope {
+		case "write:org":
+			if !search["write:org"] && !search["admin:org"] && !slices.Contains(missingScopes, "write:org") {
+				missingScopes = append(missingScopes, "write:org")
+			}
+		default:
+			if !search[scope] && !slices.Contains(missingScopes, scope) {
+				missingScopes = append(missingScopes, scope)
+			}
+		}
 	}
 
 	if len(missingScopes) > 0 {

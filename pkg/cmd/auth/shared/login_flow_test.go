@@ -198,7 +198,7 @@ func TestLogin(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "api/v3/"),
-					httpmock.ScopesResponder("repo,read:org"))
+					httpmock.ScopesResponder("repo,read:org,admin:public_key"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{ "login": "monalisa" }}}`))
@@ -278,7 +278,7 @@ func TestLogin(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "api/v3/"),
-					httpmock.ScopesResponder("repo,read:org"))
+					httpmock.ScopesResponder("repo,read:org,admin:public_key"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{ "login": "monalisa" }}}`))
@@ -601,7 +601,7 @@ func TestAuthenticatingGitCredentials(t *testing.T) {
 	defer reg.Verify(t)
 	reg.Register(
 		httpmock.REST("GET", "api/v3/"),
-		httpmock.ScopesResponder("repo,read:org"))
+		httpmock.ScopesResponder("repo,read:org,workflow"))
 	reg.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data":{"viewer":{ "login": "monalisa" }}}`))
@@ -655,7 +655,7 @@ func TestLogin_pastedTokenIgnoresConfiguredExpiringPreference(t *testing.T) {
 	defer reg.Verify(t)
 	reg.Register(
 		httpmock.REST("GET", ""),
-		httpmock.ScopesResponder("repo,read:org"))
+		httpmock.ScopesResponder("repo,read:org,workflow"))
 	reg.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data":{"viewer":{ "login": "monalisa" }}}`))
@@ -701,6 +701,51 @@ func TestLogin_pastedTokenIgnoresConfiguredExpiringPreference(t *testing.T) {
 	events := recorder.Events()
 	require.Len(t, events, 1)
 	assert.Equal(t, "false", events[0].Dimensions["expiring_requested"])
+}
+
+func TestLogin_pastedTokenMissingAdvertisedWorkflowScope(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("GET", "api/v3/"),
+		httpmock.ScopesResponder("repo,read:org"))
+
+	opts := &LoginOptions{
+		IO:          ios,
+		Config:      tinyConfig{},
+		HTTPClient:  &http.Client{Transport: reg},
+		Hostname:    "example.com",
+		Interactive: true,
+		GitProtocol: "https",
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(prompt, _ string, opts []string) (int, error) {
+				if prompt == "How would you like to authenticate GitHub CLI?" {
+					return prompter.IndexFor(opts, "Paste an authentication token")
+				}
+				return -1, prompter.NoSuchPromptErr(prompt)
+			},
+			AuthTokenFunc: func() (string, error) {
+				return "ATOKEN", nil
+			},
+		},
+		CredentialFlow: &GitCredentialFlow{
+			Prompter: &prompter.PrompterMock{
+				ConfirmFunc: func(prompt string, _ bool) (bool, error) {
+					return true, nil
+				},
+			},
+			HelperConfig: &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers:            map[string]gitcredentials.Helper{},
+			},
+		},
+	}
+
+	err := Login(opts)
+	require.Error(t, err)
+	assert.EqualError(t, err, "error validating token: missing required scope 'workflow'")
 }
 
 func TestLogin_recordsAuthTelemetry(t *testing.T) {

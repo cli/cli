@@ -222,7 +222,18 @@ func Login(opts *LoginOptions) error {
 		refreshableCredential = result.Refreshable
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 	} else {
-		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
+		var requiredScopes []string
+		for _, s := range append(opts.Scopes, additionalScopes...) {
+			if s != "" && !slices.Contains(requiredScopes, s) {
+				requiredScopes = append(requiredScopes, s)
+			}
+		}
+		var minimumScopes []string
+		for _, s := range append([]string{"repo", "read:org"}, requiredScopes...) {
+			if !slices.Contains(minimumScopes, s) {
+				minimumScopes = append(minimumScopes, s)
+			}
+		}
 		fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
 			Tip: you can generate a Personal Access Token here https://%s/settings/tokens
 			The minimum required scopes are %s.
@@ -234,7 +245,7 @@ func Login(opts *LoginOptions) error {
 			return err
 		}
 
-		if err := HasMinimumScopes(httpClient, hostname, authToken); err != nil {
+		if err := HasMinimumScopes(httpClient, hostname, authToken, requiredScopes...); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 	}

@@ -236,7 +236,7 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if opts.Token != "" {
-		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
+		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token, opts.Scopes...); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 		username, err := shared.GetCurrentLogin(httpClient, hostname, opts.Token)

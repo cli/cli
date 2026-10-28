@@ -415,6 +415,34 @@ func Test_loginRun_nontty(t *testing.T) {
 			wantErr: `error validating token: missing required scope 'read:org'`,
 		},
 		{
+			name: "missing advertised required scope",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Token:    "abc456",
+				Scopes:   []string{"workflow"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantErr: `error validating token: missing required scope 'workflow'`,
+		},
+		{
+			name: "has advertised required scope",
+			opts: &LoginOptions{
+				Hostname:        "github.com",
+				Token:           "abc456",
+				Scopes:          []string{"workflow"},
+				InsecureStorage: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org,workflow"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
+			},
+			wantHosts: "github.com:\n    users:\n        monalisa:\n            oauth_token: abc456\n    oauth_token: abc456\n    user: monalisa\n",
+		},
+		{
 			name: "has admin scope",
 			opts: &LoginOptions{
 				Hostname:        "github.com",
