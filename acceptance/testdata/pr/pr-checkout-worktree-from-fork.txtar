@@ -15,7 +15,7 @@ exec gh auth setup-git
 exec gh repo create ${ORG}/${REPO} --add-readme --private
 
 # Defer upstream cleanup
-defer gh repo delete --yes ${ORG}/${REPO}
+defer gh repo delete --yes --accept-cascading-deletion-of-private-forks ${ORG}/${REPO}
 
 # Create a fork
 exec gh repo fork ${ORG}/${REPO} --org ${ORG} --fork-name ${REPO}-fork
