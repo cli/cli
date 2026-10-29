@@ -1,6 +1,7 @@
 package git
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +12,28 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRunPreservesGitErrorDiagnostics(t *testing.T) {
+	// Given a command that writes output before failing with a diagnostic on stderr
+	const stdout = "partial output\n"
+	const stderr = "fatal: test transport failed\n"
+	execCmd, _ := createCommandContext(t, 128, stdout, stderr)
+	stdoutBuffer := &bytes.Buffer{}
+	execCmd.Stdout = stdoutBuffer
+	cmd := Command{execCmd}
+
+	// When the command is run
+	err := cmd.Run()
+
+	// Then stdout is written and the Git error preserves the diagnostic and exit code
+	require.Error(t, err)
+	var gitErr *GitError
+	require.ErrorAs(t, err, &gitErr)
+	assert.Equal(t, stdout, stdoutBuffer.String())
+	assert.Equal(t, 128, gitErr.ExitCode)
+	assert.Equal(t, stderr, gitErr.Stderr)
+	require.EqualError(t, err, "failed to run git: fatal: test transport failed\n")
+}
 
 func TestOutput(t *testing.T) {
 	tests := []struct {
