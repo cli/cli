@@ -1,0 +1,1314 @@
+# Installing gh on Linux and BSD
+
+## Recommended _(Official)_
+
+> [!IMPORTANT]
+> Our Linux packages and repository metadata are signed with the following PGP key fingerprints:
+> - `2C6106201985B60E6C7AC87323F3D4EA75716059`
+> - `7F38BBB59D064DBCB3D84D725612B36462313325`
+>
+> You may be prompted to confirm the import of these keys during installation.
+>
+> <details><summary>Expand for SHA256/SHA512/MD5 checksums of our official keyring files.</summary>
+> <p>
+>
+>  **For security reasons, it is strongly recommended to only rely on SHA256/SHA512 checksums. MD5 checksums below are only for legacy systems where SHA256/SHA512 tooling is not available.**
+>
+> - `https://cli.github.com/packages/githubcli-archive-keyring.gpg` (Binary):
+>    ```
+>    SHA256: 6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b
+>    SHA512: ce6b9466dbd2a90b3227e177aa9b8187bd2405b1c29f91d78de83b9699dbbe2af35efd733bf53da622e7a38c59a7bc55539d63a3deae3c9ff9c2bff8af626434
+>    MD5:    23748c0965069fb1edae1b83c17890e1
+>    ```
+> - `https://cli.github.com/packages/githubcli-archive-keyring.asc` (ASCII-armored):
+>    ```
+>    SHA256: cec6e9ed82d3949ca5f4428cc968b41ef5e7416cb3653cdfc2a421977663bbfd
+>    SHA512: 2ca9487d88a508a1c87f06b46ba336b11cc5f20bd83915b4c2acde49d2cffbbce76af1641bf8494c29a765f96bc1fd694ebde2954b28b80dcc76376b6f1b766d
+>    MD5:    97100400ef48007b69e42be348cc6582
+>    ```
+>
+> </p>
+> </details>
+
+### Debian
+
+Debian packages are hosted on the [GitHub CLI marketing site](https://cli.github.com/) for various operating systems including:
+
+- [Debian](https://www.debian.org/)
+- [Raspberry Pi](https://www.raspberrypi.com/)
+- [Ubuntu Linux](https://ubuntu.com/)
+
+These packages are supported by the GitHub CLI maintainers with updates powered by [GitHub CLI deployment workflow](https://github.com/cli/cli/actions/workflows/deployment.yml).
+
+To install:
+
+```bash
+(type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
+	&& sudo mkdir -p -m 755 /etc/apt/keyrings \
+	&& out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+	&& cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+	&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+	&& sudo mkdir -p -m 755 /etc/apt/sources.list.d \
+	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+	&& sudo apt update \
+	&& sudo apt install gh -y
+```
+
+To upgrade:
+
+```bash
+sudo apt update
+sudo apt install gh
+```
+
+> [!TIP]
+> To verify PGP keys before installing `gh`, you can run this and match the listed fingerprints with those at the top of this document:
+>
+> ```shell
+> curl -fsSL -o - https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --show-keys
+> ```
+
+### RPM
+
+RPM packages are hosted on the [GitHub CLI marketing site](https://cli.github.com) for various operating systems including:
+
+- [Amazon Linux 2](https://aws.amazon.com/amazon-linux-2/)
+- [CentOS](https://www.centos.org/)
+- [Fedora](https://fedoraproject.org/)
+- [Red Hat Enterprise Linux](https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux)
+- [openSUSE](https://www.opensuse.org/)
+- [SUSE](https://www.suse.com/)
+
+These packages are supported by the GitHub CLI maintainers with updates powered by [GitHub CLI deployment workflow](https://github.com/cli/cli/actions/workflows/deployment.yml).
+
+> [!TIP]
+> During installation, you may be prompted to confirm the import of PGP keys. You can verify the keys with the list of fingerprints at the top of this document.
+>
+> To verify the PGP keys before installing `gh`, you can run the following command and match the listed fingerprints with those at the top of this document:
+>
+> ```shell
+> curl -fsSL -o - https://cli.github.com/packages/githubcli-archive-keyring.asc | gpg --show-keys
+> ```
+
+#### DNF5
+
+> [!IMPORTANT]
+> **These commands apply to DNF5 only**. If you're using DNF4, please use [the DNF4 instructions](#dnf4).
+
+To install:
+
+```bash
+sudo dnf install dnf5-plugins
+sudo dnf config-manager addrepo --from-repofile=https://cli.github.com/packages/rpm/gh-cli.repo
+sudo dnf install gh
+```
+
+To upgrade:
+
+```bash
+sudo dnf update gh
+```
+
+#### DNF4
+
+> [!IMPORTANT]
+> **These commands apply to DNF4 only**. If you're using DNF5, please use [the DNF5 instructions](#dnf5).
+
+To install:
+
+```bash
+sudo dnf install 'dnf-command(config-manager)'
+sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo dnf install gh
+```
+
+To upgrade:
+
+```bash
+sudo dnf update gh
+```
+
+#### Amazon Linux 2 (yum)
+
+To install:
+
+```bash
+type -p yum-config-manager >/dev/null || sudo yum install yum-utils
+sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo yum install gh
+```
+
+To upgrade:
+
+```bash
+sudo yum update gh
+```
+
+#### openSUSE/SUSE Linux (zypper)
+
+To install:
+
+```bash
+sudo zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo zypper ref
+sudo zypper install gh
+```
+
+To upgrade:
+
+```bash
+sudo zypper ref
+sudo zypper update gh
+```
+
+### Homebrew
+
+[Homebrew](https://brew.sh/) is a free and open-source software package management system that simplifies the installation of software on Apple's operating system, macOS, as well as Linux.
+
+The [GitHub CLI formulae](https://formulae.brew.sh/formula/gh) is supported by the GitHub CLI maintainers with help from our friends at Homebrew with updates powered by [homebrew/homebrew-core](https://github.com/Homebrew/homebrew-core/blob/main/Formula/g/gh.rb).
+
+To install:
+
+```shell
+brew install gh
+```
+
+To upgrade:
+
+```shell
+brew upgrade gh
+```
+
+### Precompiled binaries
+
+[GitHub CLI releases](https://github.com/cli/cli/releases/latest) contain precompiled binaries for `386`, `amd64`, `arm64`, and `armv6` architectures.
+
+## Community _(Unofficial)_
+
+> [!IMPORTANT]
+> The GitHub CLI team does not maintain the following packages or repositories. We are unable to provide support for these installation methods or any guarantees of stability, security, or availability for these installation methods.
+
+### Alpine Linux
+
+The [GitHub CLI package](https://pkgs.alpinelinux.org/package/edge/community/x86_64/github-cli) is supported by the Alpine Linux community with updates powered by [alpine/aports](https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/community/github-cli).
+
+To install stable release:
+
+```bash
+apk add github-cli
+```
+
+To install edge release:
+
+```bash
+echo "@community http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+apk add github-cli@community
+```
+
+### Android
+
+The [GitHub CLI package](https://packages.termux.dev/apt/termux-main/pool/main/g/gh/) is supported by the Termux community with updates powered by [termux/termux-packages](https://github.com/termux/termux-packages/tree/master/packages/gh).
+
+To install and upgrade:
+
+```bash
+pkg install gh
+```
+
+### Arch Linux
+
+The [GitHub CLI package](https://www.archlinux.org/packages/extra/x86_64/github-cli) is supported by the Arch Linux community with updates powered by [Arch Linux packaging](https://gitlab.archlinux.org/archlinux/packaging/packages/github-cli).
+
+To install:
+
+```bash
+sudo pacman -S github-cli
+```
+
+To upgrade all packages:
+
+```bash
+sudo pacman -Syu
+```
+
+Alternatively, use the [unofficial AUR package](https://aur.archlinux.org/packages/github-cli-git) to build GitHub CLI from source.
+
+### Conda
+
+[Conda](https://docs.conda.io/en/latest/) is an open source package management system and environment management system for installing multiple versions of software packages and their dependencies and switching easily between them. It works on Linux, OS X and Windows, and was created for Python programs but can package and distribute any software.
+
+The [GitHub CLI package](https://anaconda.org/conda-forge/gh) is supported by the Conda community with updates powered by [conda-forge/gh-feedstock](https://github.com/conda-forge/gh-feedstock#installing-gh).
+
+To install:
+
+```shell
+conda install gh --channel conda-forge
+```
+
+To upgrade:
+
+```shell
+conda update gh --channel conda-forge
+```
+
+### Debian (extrepo)
+
+The [extrepo tool](https://packages.debian.org/stable/extrepo) and [GitHub CLI repository metadata](https://salsa.debian.org/extrepo-team/extrepo-data/-/blob/master/repos/debian/github-cli.yaml) are supported by the Debian community. The packages installed from the configured repository are the [official GitHub CLI packages](#debian).
+
+To install:
+
+```shell
+sudo apt install extrepo
+sudo extrepo enable github-cli
+sudo apt update
+sudo apt install gh
+```
+
+> [!WARNING]
+> The keyring downloaded by `extrepo` may differ from our published keyring, so the checksums listed at the top of this document may not apply.
+
+### Debian Community
+
+The [GitHub CLI package](https://packages.debian.org/stable/gh) is supported by the Debian community with updates powered by [Debian Go Packaging Team](https://salsa.debian.org/go-team/packages/gh).
+
+> [!NOTE]
+> As of November 2025, GitHub CLI maintainers strongly recommend [official Debian packages](#debian) especially as the community-distributed `2.45.x` / `2.46.x` version is broken due to deprecated GitHub APIs.
+
+### Fedora Community
+
+The [GitHub CLI package](https://packages.fedoraproject.org/pkgs/gh/gh/) is supported by the Fedora community with updates powered by [Fedora Project](https://src.fedoraproject.org/rpms/gh).
+
+To install:
+
+```bash
+sudo dnf install gh
+```
+
+To upgrade:
+
+```bash
+sudo dnf update gh
+```
+
+### Flox
+
+[Flox](https://flox.dev/) is a virtual environment and package manager all in one. With Flox you create environments that layer and replace dependencies just where it matters, making them portable across the full software lifecycle.
+
+Flox relies upon the [GitHub CLI package](https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/gh/gh/package.nix) supported by the [NixOS community](https://nixos.org/)
+
+To install:
+
+```shell
+flox install gh
+```
+
+To upgrade:
+
+```shell
+flox upgrade toplevel
+```
+
+### FreeBSD
+
+The [GitHub CLI port](https://www.freshports.org/devel/gh/) is supported by the FreeBSD community with updates powered by [FreeBSD ports](https://cgit.freebsd.org/ports/tree/devel/gh).
+
+```bash
+cd /usr/ports/devel/gh/ && make install clean
+```
+
+Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
+
+```bash
+pkg install gh
+```
+
+### Funtoo
+
+The GitHub CLI portage is supported by the Funtoo community with updates powered by [funtoo/dev-kit](https://github.com/funtoo/dev-kit/tree/1.4-release/dev-util/github-cli).
+
+To install:
+
+```bash
+emerge -av github-cli
+```
+
+To upgrade:
+
+```bash
+ego sync
+emerge -u github-cli
+```
+
+### Gentoo
+
+The [GitHub CLI portage](https://packages.gentoo.org/packages/dev-util/github-cli) is supported by the Gentoo community with updates powered by [Gentoo portage](https://gitweb.gentoo.org/repo/gentoo.git/tree/dev-util/github-cli).
+
+To install:
+
+``` bash
+emerge -av github-cli
+```
+
+To upgrade:
+
+``` bash
+emerge --sync
+emerge -u github-cli
+```
+
+### Manjaro Linux
+
+The [GitHub CLI package](https://manjaristas.org/branch_compare?q=github-cli) is the same package produced by the [Arch Linux community](#arch-linux)
+
+To install and upgrade:
+
+```bash
+pamac install github-cli
+```
+
+### MidnightBSD
+
+The [GitHub CLI port](https://www.midnightbsd.org/mports/devel/gh/README.html) is supported by the MidnightBSD community with updates powered by [MidnightBSD/mports](https://github.com/MidnightBSD/mports/tree/master/devel/gh).
+
+To install:
+
+```bash
+cd /usr/mports/devel/gh/ && make install clean
+```
+
+Or via [mport(1)](http://man.midnightbsd.org/cgi-bin/man.cgi/mport):
+
+```bash
+mport install gh
+```
+
+### NetBSD/pkgsrc
+
+The [GitHub CLI package](https://pkgsrc.se/net/gh) is supported by the NetBSD community with updates powered by [NetBSD/pkgsrc](https://github.com/NetBSD/pkgsrc/tree/trunk/net/gh).
+
+To install:
+
+```bash
+pkgin install gh
+```
+
+### Nix/NixOS
+
+The [GitHub CLI package](https://search.nixos.org/packages?query=gh&sort=relevance&show=gh) is supported by the NixOS community with updates powered by [NixOS/nixpkgs](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name/gh/gh).
+
+For temporary use:
+
+```bash
+nix-shell -p gh
+```
+
+For permanent installation, see the [NixOS package instructions](https://search.nixos.org/packages?query=gh&sort=relevance&show=gh) to declare `pkgs.gh` in your NixOS configuration or Home Manager.
+
+### OpenBSD
+
+The [GitHub CLI port](https://openports.pl/path/devel/github-cli) is supported by the OpenBSD community with updates powered by [OpenBSD ports](https://cvsweb.openbsd.org/ports/devel/github-cli/).
+
+To install:
+
+```shell
+pkg_add github-cli
+```
+
+### openSUSE Tumbleweed
+
+The [GitHub CLI package](https://software.opensuse.org/package/gh) is supported by the openSUSE community.
+
+To install:
+
+```bash
+sudo zypper install gh
+```
+
+To upgrade:
+
+```bash
+sudo zypper update gh
+```
+
+### Solus Linux
+
+The GitHub CLI package is supported by the Solus Linux community with updates powered by [getsolus/packages](https://github.com/getsolus/packages/blob/main/packages/g/github-cli/).
+
+To install:
+
+```bash
+sudo eopkg install github-cli
+```
+
+### Spack
+
+[Spack](https://spack.io/) is a flexible package manager supporting multiple versions, configurations, platforms, and compilers for supercomputers, Linux, and macOS.
+
+The [GitHub CLI package](https://packages.spack.io/package.html?name=gh) is supported by the Spack community with updates powered by [spack/spack-packages](https://github.com/spack/spack-packages/tree/develop/repos/spack_repo/builtin/packages/gh).
+
+To install:
+
+```shell
+spack install gh
+```
+
+To upgrade:
+
+```shell
+spack uninstall gh && spack install gh
+```
+
+### Ubuntu Community
+
+The [GitHub CLI package](https://packages.ubuntu.com/noble/gh) is synced from [upstream Debian Community package](#debian-community).
+
+> [!NOTE]
+> As of November 2025, GitHub CLI maintainers strongly recommend [official Debian packages](#debian) especially as the community-distributed `2.45.x` / `2.46.x` version is broken due to deprecated GitHub APIs.
+
+### Void Linux
+
+The [GitHub CLI package](https://voidlinux.org/packages/?arch=x86_64&q=github-cli): is supported by the Void Linux community with updates powered by [void-linux/void-packages](https://github.com/void-linux/void-packages/tree/master/srcpkgs/github-cli).
+
+To install:
+
+```bash
+sudo xbps-install github-cli
+```
+
+### Webi
+
+[Webi](https://webinstall.dev/) is a tool that aims to effortlessly install developer tools with easy-to-remember URLs from official builds quickly, without sudo or Admin, without a package manager, and without changing system file permissions.
+
+The [GitHub CLI package](https://webinstall.dev/gh/) is supported by the Webi community with updates powered by [webinstall/webi-installers](https://github.com/webinstall/webi-installers/tree/main/gh).
+
+To install:
+
+```shell
+curl -sS https://webi.sh/gh | sh
+```
+
+To upgrade:
+
+```shell
+webi gh@stable
+```
+
+## Discouraged
+
+> [!WARNING]
+> The GitHub CLI team actively discourages use of the following methods of installation.
+
+### Snap
+
+The [GitHub CLI package](https://snapcraft.io/gh) has [so many issues with Snap](https://github.com/casperdcl/cli/issues/7) as a runtime mechanism for apps like GitHub CLI that our team suggests _never installing gh as a snap_.FootPrint e Fingerprint 
+Traduzindo de uma forma de fácil entendimento, footprint seria as ‘pegadas’, e 
+fingerprint seriam as ‘impressões digitais’ do seu alvo. É conhecido também como 
+levantamento de dados. E é com essas duas etapas que você vai estudar seu alvo, saber o 
+que ele faz, tentar elaborar uma rotina para ele. Ex: Você sabe que o servidor faz backup 
+toda sexta-feira às 19h, isso pode ser usado futuramente para algum ataque.
+Esse levantamento de informações pode ser feito tanto usando softwares para isso, 
+quando feito manualmente, por meio de engenharia social.
+Em casos mais específicos, se o seu alvo for uma empresa, existe uma técnica 
+chamada Trash Scouring, que foi usada muito por Kevin Mitnick. Falamos dele no capítulo de 
+Engenharia Social. Trash Scouringé uma técnica que consiste em vasculhar o lixo de uma 
+determinada empresa para obter informações que são jogadas fora, como documentos 
+antigos, pagamentos de faturas, etc. Isso pode ser usado em uma engenharia social contra a 
+empresa. “O lixo de uns é o luxo de outros”.
+2. Análise de rede e enumeração de serviços
+Nessa etapa o pentester vai conseguir identificar quantas máquianas estão 
+conectadas à rede, seus sistemas, portas abertas e os serviços que rodam nelas. “Eh... 
+Portas? Como assim?”. Bom, esse assunto será mais detalhado no capítulo de redes. Porta 
+basicamente é por onde a conexão será efetuada. 
+Imagine que você está na frente da casa de seu amigo, e precisa entrar nela para 
+passar uma informação para ele. O que você faz? Você precisa da porta aberta para entrar 
+na casa, se ela estiver fechada, você não entra, certo?
+É mais ou menos assim na informática. Para você efetuar uma conexão com algum 
+servidor, você e ele precisam estar com portas abertas.
+E existem alguns serviços que rodam nessas portas. Sabe quando você vai entrar em 
+algum site, e antes dele você coloca “http://”? Então, o HTTP (HyperText Transfer Protocol) é 
+um serviço que roda na porta 80 dos sites. Todos os sites tem a porta 80 aberta. Se ela 
+estiver fechada, o serviço HTTP fica indisponível, e você não consegue acessar o site. E vários 
+outros serviços existem para que o servidor funcione, como o FTP (transferência de 
+arquivos), SMTP (envio de email), etc. Isso será explicado detalhadamente no capítulo de 
+redes.
+3. À procura de vulnerabilidades
+Depois de enumerar todos os serviços e portas abertas no servidor, é hora de 
+procurar por vulnerabilidades nesses serviços.
+A falha mais atual e fatal que eu conheço (até o momento em que estou escrevendo 
+este livro) é o HertBleed, que atinge o serviço de SSL (Security Sockets Layer), que é um 
+serviço de segurança na transmissão de dados. Essa falha faz com que seja possível obter 
+informações que o servidor envia/recebe.
+Existem programas que fazem o scanneamento do servidor a procura de falhas, por 
+exemplo o Acunetix, ou o Nikto, que são muito úteis para defacers (explicarei sobre deface 
+mais a frente). Ou você pode tentar encontrar as falhas manualmente, inserindo parâmetros em 
+alguns lugares do sistema para tentar encontrar uma reação inesperada por parte do 
+servidor.
+4. Explorando a vulnerabilidade
+Após encontrar as vulnerabilidades, chegou a hora de explorá-las. A hora mais 
+esperada do dia... Bom, para explorar uma vulnerabilidade, você pode usar dois métodos: O 
+manual e o automatizado.
+No método manual, você precisa ter mais conhecimento sobre o que está fazendo, 
+precisa dominar o sistema da sua vítima para conseguir fazê-lo interpretar seus comandos.
+E no método automatizado, você usa um exploit para fazer o serviço para você.
+É aí que tá a utilidade da programação. Programando um exploit para uma 
+determinada falha, você poupa o tempo de ter que fazer o mesmo processo cansativo toda 
+vez que for invadir um sistema com aquela falha.
+“Mas eu não sei programar, como vou conseguir um exploit?”
+Vários sites disponibilizam bancos de exploits das falhas mais recentes que foram 
+descobertas. Alguns são privados, os chamados 0day, e você só tem acesso à eles se comprá-
+los. Mas grande parte deles é gratuita. Sites como o Exploit-DB, 1337day, Rapid7, etc...
+5. Mantendo acesso
+Com o acesso ao servidor em mãos, você precisa fazer com que esse acesso se 
+prolongue, se não o administrador pode perceber que foi invadido, corrigir a falha e 
+bloquear as portas, e você não conseguirá se conectar novamente.
+Para isso que foi criado o backdoor. Backdoor significa “porta dos fundos”, e é um 
+malwarecriado para manter acesso ao computador da vítima. O backdoor abre portas 
+escondido, sem que ninguém sabia, e fica aguardando conexão nessas portas. Assim, sempre 
+que você quiser, você pode se conectar à ele, e o administrador não vai perceber, porque 
+você estará usando portas que não eram usadas antes.
+6. Eliminação de evidências e evasão
+Todos aprendemos no primário que o prefixo “i” significa dentro, e o prefixo “e” 
+significa fora. Então, se invasão é o fluxo para dentro, evasão é o fluxo para fora. É 
+basicamente o abandono do local do ‘crime’(ainda estou levando em conta de que todos as 
+invasões serão feitos em ambientes de testes).
+Mas não pode ser de qualquer jeito... Você precisa apagar seus vestígios antes, ou 
+será pego pelo webmaster.
+Existem arquivos chamados logs, e esses arquivos são responsáveis por registrar tudo 
+que acontece dentro e fora do servidor. Se você acessa uma página de um site, o seu IP, 
+junto com as informações da sua sessão, serão enviados para o arquivo de log, contendo a 
+data do acesso à página. 
+É por causa desses arquivos que vários crackers são presos. Esquecem de limpá-los, e 
+acabam deixando pegadas.
+Mas não é só apagar o arquivo inteiro e pronto, se não, você vai deixar um buraco 
+gigante, e qualquer um vai perceber que você esteve ali. Você precisa apagar apenas as linhas dos logs referentes à seu IP. Para isso, procure 
+pelo arquivo de logs, que geralmente fica na raiz do servidor, abra-o com algum editor de 
+texto e procure pelo seu IP usando CTRL + F, apague todas as linhas que contenham seu IP e 
+salve o arquivo. Depois disso será seguro sair.
+Mas cuidado, muitos servidores tem mais de um arquivo de logs, e fazem backups, 
+então sempre procure pelas pastas...
+E esses são os 6 passos para um pentest bem sucedido. Claro que não ensinei como 
+fazer o pentest passo-a-passo, eu expliquei apenas a composição desse ataque.
+6.2 Deface
+Deface é a arte de desconfigurar páginas de sites na web. Já entrou em algum site 
+que estava com uma index diferente, com o fundo escuro, letras verdes, dizendo 
+“hackeado”, com a foto da Anonymous? Pois é, esse é um exemplo de deface.
+Exemplo de um site invadido e desfigurado pelo Prime, antigo membro do GH
+O deface pode ser feito por três métodos principais, e estes se desenrolam em 
+outros. São eles: 
+Engenharia social – Usando técnicas de engenharia social você pode conseguir 
+acessos à informações que podem te levar a conseguir privilégios. Já dei o exemplo de 
+quando eu fui hackeado no MSN via engenharia social. Daí é com você, vai da sua 
+imaginação... Você pode enviar um email se passando por um chefe para alguma pessoa que tenha 
+um cargo menor pra conseguir informações, ou sei lá... Invente, mas não esqueça de 
+planejar antes.
+Exploração à nível WEB – A maioria dos defaces são feitos por esse método, talvez 
+por ser o mais fácil, talvez por ser o mais comum. Nesse método você precisa conhecer 
+bastante as linguagens que atuam na WEB, sendo alguns exemplos delas: PHP, ASP, 
+Javascript, etc. E ter um bom conhecimento em banco de dados também.
+Existem inúmeras falhas que atígem o nível WEB, por exemplo: SQL Injection, XSS, 
+CSRF (Cross Site Request Forgery), LFI, RFI, LFD, etc... Essas são apenas algumas das mais 
+comuns.
+Exploração à nível de servidor – Por meio desse método você terá que atacar 
+diretamente o servidor, como já foi explicado na secção principal de pentest.
+Geralmente os serviços atacados são HTTP, FTP, SSH, MySQL, etc. Para isso, você 
+precisará de exploits, que eu também já expliquei o funcionamento. Se você usar algum 
+portscanner (programa que escaneia portas e serviços abertos), e ver que há um servidor 
+FTP rodando no servidor, coloque o nome do servidor + versão + exploit no google. Ex: 
+“PureFTPD 3.2.2 exploit”.No caso, PureFTPD é o nome do servidor FTP que está rodando. 
+(Todos esses nomes serão explicados no próximo capítulo: Redes).Na próxima secção nós 
+falaremos sobre Google Hacking, uma técnica muito boa, onde se pode conseguir 
+informações preciosas sobre os servidores, e que todos deveriam aprender.
+Depois de obter acesso ao site, você deve hospedar uma shell nele. Shell é uma 
+espécie de gerenciador de arquivos do hacker/cracker. É com ela que você pode alterar os 
+arquivos, instalar backdoors, ler informações sobre o servidor, etc... As shells geralmente são 
+desenvolvidas em PHP, e são hospedadas no site usando alguma função de upload presente 
+no painel de administração.
+Por exemplo, na página de criar uma nova notícia (no painel de admin) há a opção 
+para fazer upload de uma imagem de capa para a notícia. Porém, ao invés de enviar uma 
+imagem, o invasor envia a shell PHP, e então abre o caminho dela no servidor, e pronto. 
+6.3 Google Hacking
+Com o Google Hacking você pode achar arquivos importantes dentro de site, páginas 
+que deveriam ser secretas, lista de emails, lista de senhas, shells upadas, backups de banco 
+de dados, e várias outras coisas que o Google indexa.
+O Google tem vários recursos que facilita a vida do hacker. Por isso eu sempre digo 
+quando me perguntam algo óbvio: Aprenda a usar o Google, ele é seu amigo!
+(Quando digo “algo óbvio”, me refiro a alguma informação que pode ser facilmente 
+adquirida com uma simples pesquisa no Google)
+Bom, um desses recursos que o Google oferece é a utilização de Dorks.
+“O que é essa coisa de dork, Nick?”
+Dorks são parâmetros que são passados na pesquisa para que o Google interprete 
+melhor o que você quer e mostre os resultados de acordo com a pesquisa.
+Quer um exemplo prático disso? Vamos digitar o seguinte comando no Google: 
+“inurl:php?id=1”. Imagem: Acervo Pessoal
+Notou algo diferente? Exato, todos os sites listados tem o parâmetro “php?id=1” na 
+URL. Isso acontece porque você disse ao Google para listar apenas os sites que contenham 
+esse parâmetro na URL.
+“E qual é a utilidade disso?”
+Essa dork que eu passei pode ser modificada para encontrar falhas em sites. Uma 
+falha muito comum é a SQL Injection, onde você injeta um comando no banco de dados do 
+site para ele retornar a lista de usuários e senha. E esse comando é feito através da URL do 
+site.
+Com essa dork você pode achar sites que podem estar vulneráveis a SQLi, por que o 
+id que está na URL é usado em uma consulta no banco de dados, então, se você alterar esse 
+id para um comando qualquer, ele será executado pelo banco. Veja alguns exemplos de 
+dorks: allintitle [Faz uma busca de palavras que estão no título do site]
+Exemplo: allintitle:seja bem vindo
+(Lista todas as páginas que contém o nome seja bem vindo no título do site)
+allinurl [Faz uma busca de arquivos/palavras na url]
+Exemplo: allinurl:index.swf
+(Lista todas as páginas que contém o arquivo index.swf no site)
+intext [Faz uma busca específica de palavras que estão na página]
+Exemplo: intext:senhas
+(Lista todas as páginas que contém a palavra “senha” no corpo)
+(Tente pesquisar por intext:seuemail@provedor.com, e veja se há alguma lista com ele)
+filetype [Faz uma busca específica e retorna apenas o tipo de arquivo citado]
+Exemplo: filetype:txt
+(Lista apenas arquivos txt, em qualquer site)
+Você pode combinar as dorks para fazer uma busca mais específica, por exemplo:
+intext:"PHPMyAdmin SQL Dump" filetype:sql
+(Lista os arquivos .sql que contenham “PHPMyAdmin SQL Dump” no conteúdo. Nesse caso, 
+dumps de bancos de dados inteiros serão exibidos, podendo ter algum conteúdo interessante 
+nele)
+@ +yahoo +hotmail +gmail filetype:txt
+(Lista os arquivos .txt que tenham um arroba (@) seguido de “yahoo”, “hotmail” ou “gmail”. 
+Ou seja, retorna listas de emails)
+E esses são apenas alguns exemplos de dorks, se tiver interesse, procure por Google 
+Dorks no Google. (Você pode usar dorks para isso, haha)
+Depois dessa explicação sobre deface e invasão, creio que surgiram algumas dúvidas 
+relacionadas à rede. Vamos esclarecer algumas delas no próximo capítulo, onde eu vou 
+explicar os principais protocolos usados. Até mais, te vejo lá! Esse capítulo será um pouco extenso, porque eu vou tentar explicar sobre os 
+protocolos mais importantes usados no dia-a-dia.
+O conceito de rede de computadores é simples. Ela é formada por um conjunto de 
+dois ou mais computadores conectados entre si. Podemos fazer uma analogia à uma rede de 
+pesca. Suponha que cada nó da rede seja um computador, e este está se conectado com 
+vários outros.
+Vale lembrar que os computadores de uma determinada rede não precisam 
+obrigatoriamente estar conectados à internet. Três computadores de uma pequena empresa 
+podem estar configurados para trocar informações apenas entre si, e isso é uma rede.
+Um pouco mais sobre portas
+Já falamos bem superficialmente sobre as portas, vamos aprofundar um pouquinho 
+mais agora.
+As portas variam de 1 até 65535, e são divididas em dois intervalos: as portas 
+conhecidas e portas registradas.
+As portas conhecidas estão entre 1 e 1023 e são usadas geralmente por serviços 
+padrões do sistema, ou por programas executados por usuários com privilégios.
+As portas registradas estão entre 1024 e 65535 e são usadas por processos comuns e 
+por programas executados por um usuário comum.
+Bom, vamos entender o conceito de protocolo de rede. O que é um protocolo? 
+Falando de uma forma clara, protocolo é a linguagem na qual os computadores se 
+comunicam entre si. Se eles não existissem, você não estaria lendo isso, porque não haveria 
+internet para você baixar esse livro. Eles são responsáveis por te conectar à internet e fazer 
+com que seu PC se comunique com outros.
+“Ahh, legal Nick, então isso é tipo uma linguagem de programação, mas para a 
+internet, né?!”
+Sim, é como se fosse isso. A linguagem de programação é a linguagem que você usa 
+pra se comunicar com o seu PC, e os protocolos de rede são as linguagens que os PCs usam 
+para se comunicar entre si. Existe uma pilha de protocolos chamada TCP/IP, e é a principal. Como o nome diz, é 
+uma pilha, então são vários protocolos empilhados em uma sequência e em algumas 
+camadas. Veja as 4 camadas da pilha de protocolos TCP/IP:
+Camada Protocolos Função
+Aplicação HTTP, FTP, TELNET, 
+POP3, SMTP, SSH, 
+IRC, IMAP, DNS
+Prover suporte aos 
+programas e serviços para 
+que você se conecte à 
+internet
+Transporte TCP/UDP Responsável pelo modo de 
+envio dos pacotes
+Rede IP, ICMP, ARP, NAT Controla a operação e 
+endereçamento de pacotes
+Física Modem, RDIS, 
+Bluetooth, USB
+Converter pacotes em sinais 
+eletrônicos e prover a 
+conexão física com o PC
+Eu espero muito que não esteja confuso, pois é fundamental você entender o 
+funcionamento da rede.
+Veja, vou comentar sobre alguns protocolos das 4 camadas.
+Camada de Aplicação.
+-HTTP (HyperText Transfer Protocol) – Talvez o mais conhecido dos protocolos, 
+é por causa dele que nos conectamos aos sites. Se você notar nas URLs dos sites, antes do 
+link, tem escrito http://.
+Se esse protocolo não existisse, todos os sites que você conhece hoje não existiriam, 
+porque ele é o responsável por enviar os dados da requisição para o servidor, e retornar a 
+página HTML para o seu navegador.
+O método de conexão é bem simples. O computador cliente (da pessoa que vê o 
+site)estabelece uma conexão com o computador servidor (que armazena o site), e envia uma 
+requisição para ele contendo a URI (caracteres usados para identificar protocolos) e uma 
+mensagem com as informações sobre o cliente, pedindo para que lhe seja retornado o 
+conteúdo HTML contido no servidor.
+O servidor responderá à essa requisição com uma status line (linha de status), com a 
+versão do protocolo usado e um código contendo o retorno da operação sendo esse código 
+o de operação bem sucedida ou um código de erro. Depois dessa linha de status, a conexão 
+entre o cliente e o servidor é interrompida, já que as informações já estão sendo exibidas no 
+navegador do cliente. É por esse motivo que, se você abrir um site e desconectar da 
+internet, ele continua aberto (até você atualizar a página). FTP (File Transfer Protocol) – Ahh, o bom e velho FTP... Ele é responsável pela 
+transferência de arquivos entre o cliente e o servidor, e é bem mais rápida que a 
+transferência feita via HTTP.
+Quem aqui já procurou “como invadir um site” no youtube já deve ter se deparado com 
+algum tutorial que usa esse protocolo como ‘ferramenta’. Na verdade, todos esses vídeos 
+são falsos, você não invade o site de fato. (Pelo menos não da forma que eles ensinam).
+Talvez esse protocolo seja tão famoso quanto o HTTP, e é bem velho também. 
+Uma coisa que pouca gente sabe é que o FTP usa duas portas para se comunicar. A 
+porta 21 é usada para sincronizar e a porta 20 é usada para a transferência.
+Para que a conexão seja efetuada, o computador cliente (que solicita a conexão)
+precisa usar um programa de Cliente FTP, ou pode acessar o servidor diretamente usando 
+um navegador WEB, onde será colocado as credenciais (se necessárias) para logar no 
+servidor FTP. Com as credenciais aceitas, a conexão é efetuada e o cliente pode manipular 
+arquivos no servidor.
+Durante a transferência dos arquivos, duas representações para a transmissão de 
+dados podem ser usadas (na verdade são quatro, mas vou mostrar apenas as duas mais 
+usadas):
+Modo ASCII, onde o formato original dos dados é convertido em ASCII antes da 
+transmissão, e convertidos novamente para a forma original depois. 
+Esse método é mais usado para a transferência de arquivos pequenos, e não é 
+recomendado utilizá-lo para arquivos muito grandes.
+Para quem não entendeu o que é ASCII, é um código para universalizar a 
+transferência de dados pela internet, já que os teclados de alguns países têm acentos e 
+caracteres especiais que não são usados em outros. Então tudo é convertido para ASCII para 
+que não haja erros. É como se fosse o SI (Sistema Internacional), só que na informática :P
+Modo binário, também conhecido como modo imagem, é o modo onde as máquinas 
+transmitem os arquivos byte-a-byte, e o receptor vai armazenando em formato de pilha, até 
+que todos os bytes sejam recebidos e o programa/arquivo possa rodar normalmente. Bem 
+usado para o envio de imagens, executáveis e outros arquivos pesados.
+-DNS (Domain Name System) – Se ele não existisse, talvez a internet não teria 
+todo esse sucesso. Como eu expliquei na secção de página fake, o DNS é o protocolo que 
+transforma os endereços IPs nas URLs dos sites que acessamos.
+Vou usar o mesmo exemplo de antes. IP do Google é 173.194.42.137, então, se você 
+digitar isso na barra de endereços do seu navegador, você será levado até o site do Google. 
+Mas seria difícil gravar os IPs de todos os sites que conhecemos, talvez você conseguiria 
+gravar uns 5 ou 6, mas são muitos números... E é para isso que serve o DNS, pra deixar os IPs 
+mais ‘bonitos’. 
+Cada computador, ao obter um endereço IP e de Gateway, também obtém um 
+endereço IP de um servidor DNS, sendo esse o responsável pela conversão,ou seja, toda vez 
+que vocêdigitar www.google.com no navegador, o servidor DNS vai converter para IP e 
+assim você vai poder acessar o website.E cada vez que você entra num site, ele guarda as 
+informações em seu cache,para quando você precisar novamente, não precisar fazer 
+consulta à servidores DNS,economizando tempo e banda. Camada de Transporte
+- TCP (Transfer Control Protocol) – Olha ele aí, o grande TCP. O mais usado, 
+seguro, o top dos tops. O TCP é um ótimo protocolo porque é orientado à conexão, ou seja, 
+quando uma requisição TCP é enviada, você tem certeza que ele vai chegar ao destinatário 
+de forma correta, sem desvios, sem perdas. Todos os outros protocolos de aplicação usam 
+ele na transmissão de dados. Ele se encarrega a quebrar os pacotes e depois remontá-los no 
+destino,e, se um pacote estiver faltando ele se encarrega de pedir a retransmissão. 
+Os pacotes TCP têm campos chamados flags, que é onde ficam informações sobre o 
+tipo de pacote. Por exemplo, uma requisição de sincronização tem a flag “SYN” ativada, 
+enquanto que uma requisição de finalização de conexão tem a flag “FIN”ativada, e um 
+pedido de reiniciamento de conexão tem a flag “RST” ativada. O computador que recebe os 
+pacotes interpreta essas flags e faz o que é pedido.
+Para que o TCP possa enviar um arquivo ou estabelecer uma conexão, ele usa um 
+método chamado de Three-way Handshake ou seja um ‘aperto de mão’ em 3 vias. Preste 
+atenção agora, porque isso será útil no próximo capítulo: DoS (Negação de Serviços).
+Quando o cliente quer acessar o servidor Telnet na porta 23, ele envia um pacote SYN 
+(Synchronize(sincronização)) para o servidor, pedindo para sincronizar com ele, e iniciar a 
+conexão.
+ClienteServidor
+SYN + Porta 23
+-------------------------------------->
+Então o servidor envia um pacote SYN/ACK (Acknowledgement(reconhecimento) de volta 
+para o cliente, dizendo que conseguiu sincronizar, aceitou o pedido de conexão e está 
+aguardando a confirmação e o estabelecimento da conexão.
+Cliente Servidor
+SYN/ACK + Porta(Acima de 1024)
+<-------------------------------------
+Apos o cliente receber o pacote com os flags SYN/ACK ativados ele envia um ACK
+(Acknowledgement(reconhecimento) para confirmar o estabelecimento de conexão.
+Cliente Servidor
+ACK + Porta 23
+------------------------------------->
+Traduzindo para o português, a ‘conversa’ entre os computadores seria algo assim: Cliente: “Eaí servidor, vamos sincronizar nossos sistemas para iniciarmos uma conexão?”;
+- Servidor: “Beleza, já reconheci que você quer conectar e já consegui me sincronizar com 
+você, estou aguardando você iniciar a conexão”;
+- Cliente: “Tranquilo, então eu confirmo a conexão. Já podemos trocar dados.”
+Por isso o nome do método é Three-way Handshake, porque são feitos 3 verificações 
+para ver se a conexão foi efetuada e se os arquivos foram passados. Por isso também que eu 
+disse que ele é um pacote seguro, diferente do UDP, que veremos a seguir.
+Imagem: Reddit
+-UDP (User Datagram Protocol) – Esse é um protocolo bem mais simples que o 
+TCP, e muito conhecido pela turma que gosta de fazer ataques de negação de serviço 
+(próximo tópico a ser abordado), justamente por não ser orientado à conexão e não fazer a 
+verificação se os dados foram enviados corretamente (diferente do TCP), então ele gasta 
+menos tempo em cada pacote, e pode assim, enviar mais pacotes no mesmo período de 
+tempo.Sendo assim, ele não precisa reenvia pacotes corrompidos e nem os confere. Alguns 
+outros protocolos usam ele como o DNS e o DHCP.
+Aí você diz: “Mas Nick, se ele tem todas essas desvantagens, pra que usá-lo?”
+E eu respondo: Velocidade.
+Imagine-se assistindo uma livestream no youtube, onde tem 70 mil pessoas 
+conectadas, assistindo a mesma coisa. O servidor fica muito lento, porque a transmissão é 
+em tempo real, e é muita gente acessando ao mesmo tempo. Se todos os pacotes enviados e 
+recebidos fossem verificados, tal como os pacotes que se perderam no caminho, tudo ficaria 
+lento e o serviço pararia de funcionar (Negação de serviço, novamente... rs). Aí que entra o 
+UDP, ele é rápido, não faz verificação, então ele consegue transmitir todos os dados para 
+todo mundo. Por isso acontece a perda de qualidade e travamento quando tem muita gente, 
+já que ele não faz o reenvio de pacotes perdidos, o que se perdeu nunca vai chegar à você, 
+então a imagem trava até receber outro pacote. Camada de Rede
+- IP (Internet Protocol) – Também muito conhecido, o endereço IP serve para 
+identificar o ser computador na internet. Muitos já disseram “vou invadir seu PC pelo IP”, 
+mas não fazem ideia de como ele funciona.
+O endereço IP é a nossa identificação na internet, como se fosse o nosso CPF, e este 
+é um endereço único de 32 bytes, pois são 4 octetos (8x8x8x8=32) xxx.xxx.xxx.xxx,sendo sua
+faixa de atuação entre 0.0.0.0 e 255.255.255.255.
+Lembre-se do exemplo da casa. Você precisa ir na casa de seu amigo, mas não sabe 
+onde é. O que você faz? Exato, pergunta o endereço pra ele, só assim você consegue chegar 
+até lá.
+E é +/- assim que acontece na internet, os computadores (tanto clientes e servidores) 
+precisam de um endereço IP para serem identificados e receberem as informações pela 
+rede. O endereço de IP é único no momento, ou seja, o IP que você está usando agora é só 
+seu, e de mais ninguém no mundo. Mas, se você desconectar, e outra pessoa conectar, ela 
+pode receber o seu IP antigo. 
+Mas sempre em tempos diferentes, nunca no mesmo tempo, se não acontece um 
+conflito, e os dois são desconectados para receberem novos IPs. 
+O IP se responsabiliza por fazer o endereçamento de pacotes, ou seja, ele é tipo ‘a 
+pessoa que coloca a carta no correio’ da internet. Ele pega a sua requisição, com o seu IP, IP 
+de destino e mensagem(como numa carta, remetente e destinatário),coloca tudo isso em 
+um pacote e manda ele pro protocolo de envio (TCP ou UDP).
+Atualmente o endereço IP está na versão 4, que é conhecida como IPv4 (IP versão 4), 
+mas desde 2012, já está sendo usada a nova versão, o IPv6. 
+“Mas Nick, pra que atualizar o IP se ele tá funcionando?”
+O IPv4 perdeu sua capacidade de expansão... São muitos computadores, servidores, 
+notebooks, celulares, tablets, e outras coisas conectadas à internet 24h por dia. Como o 
+endereço IP tem apenas 32 bits, todas as combinações resultariam em 4x109
+, que são 
+4.000.000.000 (quatro bilhões) de endereços. Mas veja, a Terra tem 8 bilhões de pessoas, e 
+em uma casa há mais de um computador, tablet, celular... Fora os que não foram vendidos. 
+Além das lan houses, e das salas com centenas de servidores.
+Não é difícil de perceber que muita gente ficaria sem poder acessar a internet por 
+não ter IP. É por isso que o IPv6 foi criado.
+Ao contrário do IPv4 que tem 32 bits, o IPv6 tem 128 bits, e suas combinações 
+resultariam em 3,4x1038endereços. Pra quem quer ter uma noção do número de IPs, vou 
+escrever: 340.000.000.000.000.000.000.000.000.000.000.000.000;
+Tentem achar um nome para esse número. Não é exagero, esse é realmente o 
+número certo.
+Além disso ele cobre todos os buracos de segurança que tinham no IPv4, onde os 
+crackers faziam a festa. Isso combinado com o seu suporte obrigatório à IPSec (Extensão do 
+protocolo IP pra melhorar a privacidade, integridade dos dados e segurança) certamente vai 
+fazer os crackers terem dor de cabeça. Bom, o IPv6 se destaca pois se difere bastante do IPv4. Veja a tabela com as 
+diferenças:
+IPv4 IPv6
+Endereço de 32 bits Endereço de 128 bits
+Suporte opcional à IPSec Suporte obrigatório a IPSec
+Processo de fragmentação de pacotes feito 
+pelo roteador
+Processo de fragmentação de pacotes feito 
+pelos hosts emissores
+O cabeçalho do pacote inclui campos de 
+opção
+Todos os campos de opção foram mudados 
+para dentro do campoextension header
+O endereço tem que ser configurado 
+manualmente
+Funcionalidades de autoconfiguração
+- ICMP (Internet Control Message Protocol) - Protocolo muito importante no 
+diagnostico da rede, pórem é um protocolo que está sendo muito bloqueado devido ao seu 
+mau uso por parte de usuários mal-intencionados. Hoje em dia, quase todos os firewalls ou 
+roteadores já bloqueiam a entrada desse protocolo em suas redes, permitindo apenas em 
+redes locais. O famoso Ping usa o protocolo ICMP, ou seja quando eu envio um ping à uma 
+máquina, naverdade eu envio para ela o pacote ICMP Echo Request e espero o ICMP Echo 
+Reply, assim posso saber que a outra maquina está ativa e funcionando. Antigamente existia 
+um ataque chamado Ping Of Death, onde as pessoas tiravam serviços do ar enviando uma 
+milhares de pacotes ping com tamanhos alterados (Essa técnica é conhecida como Denial of 
+Service, e será o tema do nosso próximo capítulo), ou seja bem maior que o normal. Por isso, 
+hoje em dia poucos são os hosts que respondem a esse protocolo.
+A funcionalidade dele é apenas essa, mostrar se uma determinada máquina está 
+ativa na rede ou não. Você envia um pacote ping (ICMP Echo Request) para uma máquina 
+qualquer. Se ela estiver conectada à rede, e se o firewall dela não bloquear, ela responderá o 
+seu pedido com o pacote ICMP Echo Reply, dizendo que está ativa.
+Camada física
+- USB (Universial Serial Bus) – Um protocolo muito conhecido, o USB faz parte 
+da camada física. E esse protocolo é visível, e está presente em nosso dia a dia. Você pode 
+tocá-lo, fisicamente. Ele foi criado porque antigamente, quando você precisava instalar 
+periféricos no computador, era necessário reiniciar a máquina, e isso não era uma boa ideia, 
+por conta do número de conexões internas sendo realizadas.
+Imagem: Wikipédia Daí surgiu a tecnologia PnP (Plug and Play), onde o usuário não é obrigado a reiniciar 
+a máquina, basta plugar o cabo e usá-lo.
+O objetivo dele é fazer com que qualquer usuário sem experiência consiga instalar 
+periféricos em sua máquina, sem dificuldades.
+O USB padrão 1.1 foi criado em 1996, a 19 anos atrás, e tinha uma taxa de 
+transferência de dados de 1,5Mbps, sendo alimentado por uma fonte de 5v, com 500mA. 
+As versões foram sendo lançadas ao longo dos anos, e em 2000 foi lançado o USB 2.0, 
+que é o mais comum até hoje. O USB 2.0 tem uma taxa de transferência de dado de 480 
+Mbps (cerca de 60MB/s (Não confunda Mbps com MB/s), tendo como fonte a mesma do 
+1.0.
+Mais recentemente, em 2009, foi lançada a versão 3.0 do USB, com incríveis 5GBps 
+de transferência, e tem como fonte uma alimentação de 5V – 900mA, e pode enviar e 
+receber dados ao mesmo tempo.
+- Bluetooth – Também muito utilizado em aparelhos celulares e em dispositivos 
+sem fio, o Bluetooth é um protocolo que usa a frequência de rádio de curto alcance para se 
+comunicar com dispositivos próximos, conseguindo transportar informações de um 
+dispositivo à outro sem a necessidade de cabos.
+Imagem: Wikipédia
+Ele está presente em celulares, mouses, teclados, fones de ouvido, notebooks, 
+impressoras, câmeras digitais, consoles de videogames, entre outros dispositivos. O mouse 
+que estou usando agora usa essa tecnologia!
+Os dois dispositivos não precisam estar no mesmo campo de visão, só precisam estar 
+no mesmo ambiente, e, dependendo da fraquência de envio, o raio de alcance limite pode 
+aumentar. 1m, 10m, 100m, isso depende da potência máxima usada.
+O Bluetooth se encontra agora na versão 3.0, suportando transferências de até 
+24Mb/s.
+Como a faixa do Bluetooth é aberta, ou seja, pode ser utilizada por qualquer 
+dispositivo (que tenha capacidade), é necessário que o sinal do Bluetooth não sofra 
+interferência, se não, não seria útil. Já aconteceu de você pegar o controle do quarto, ou de 
+qualquer outro lugar, e usá-lo para desligar a televisão da sala? Pois é, isso acontece por 
+causa da interferência. O dispositivo que está recebendo os comandos pensa que o controle 
+que você usou é o original dele, e obedece suas ordens. O esquema de comunicação FH-
+CDMA (Frequency Hopping - Code-Division Multiple Access), que é usado pelo Bluetooth, faz 
+com que a frequência seja dividida em vários canais. O dispositivo que estabelece a conexão muda de um canal para outro de maneira 
+bastante rápida. Este procedimento é chamado "salto de frequência" (frequency hopping) e 
+permite que a largura de banda da frequência seja muito pequena, diminuindo 
+sensivelmente as chances de interferência. No Bluetooth, pode-se utilizar até 79 frequências 
+(ou 23, dependendo do país), cada uma "espaçada" da outra por intervalos de 1 MHz.
+Bom, finalmente terminamos de falar sobre redes. Sei que achou o capítulo um 
+pouco entediante por ser só teoria, mas é necessário entender como a rede funciona para 
+entender o próximo tópico, sobre ataques de negação de serviço, os ataques que deixam os 
+sites fora do ar. Vamos lá!
+7.1 Negação de serviço (DoS)
+Esse capítulo será muito interessante, porque é um tema bem polêmico e 
+interessante, e certamente você vai querer saber como esse ataque funciona.
+Bom, vamos entender primeiro o que é um ataque de negação de serviço.
+Imagine que você acorda 7h da manhã para trabalhar. Pega o ônibus e vai para a 
+estação esperar o metrô chegar. Tem muita gente com você, mas um grupo bem grande fura 
+a ‘fila’, e passa na frente dos outros e o metrô já passa cheio. Quando ele para, todo mundo 
+quer entrar ao mesmo tempo, até que o metrô fique sem lugar para você, e você não 
+consiga entrar. Então ele fecha a porta e você não consegue sair dali, pois o metrô negou 
+prestar serviço à você, já que estava congestionado.
+Na informática é mais ou menos isso que acontece, quando você vê no jornal dizendo 
+que “hackers” derrubaram o site da receita da fazenda, eles fizeram esse ataque. Enviaram 
+diversas solicitações falsas, como se fossem reais, para que o site prestasse serviço a elas, 
+até que o servidor fique sobrecarregado e não consiga dar conta de tudo. Então ele para de 
+atender novos pedidos para priorizar os que ele já recebeu. Quando ele esvazia a memória e 
+atende a todos os pedidos, ele volta a prestar serviços, e o site volta ao ar.
+Imagem: DuckOpenSource Os ataques de negação de serviço pode ser classificado em dois grupos principais:
+DoS (Denial of Service) – É o ataque simples, onde apenas uma pessoa ataca o alvo. 
+Não é tão comum hoje em dia por conta da sua baixa potência e eficiência.
+DDoS (Distributed Denial of Service)– É o mais usado, onde muitos usuários (cientes 
+ou não) atacam um alvo apenas. 
+Como assim ‘cientes ou não’, Nick?
+Bom, existe um malware chamado Botnet, onde o cracker infecta várias vítimas, e 
+usa o computador dessas vítimas pra atacar o alvo que ele quer. E isso é feito sem a vítima
+saber. Falaremos mais especificamente sobre esse malware no próximo capítulo.
+Tipos de ataques [D]DoS:
+Syn Flood – O syn flood é um método de ataque de negação de serviço, onde o 
+pacote usado para atacar é o TCP. Como nós falamos, o TCP tem um sistema chamado 
+Three-way Handshake, ou seja, ele tem três etapas até concluir a sua conexão.
+Revisando o conceito desse sistema, o cliente envia uma requisição com a flag 
+SYNpara o servidor, pedindo para sincronizar os dados. O servidor envia um pacote com a 
+flag SYN/ACK, dizendo que já sincronizou e está aguardando a conexão, e então o cliente 
+envia um outro pacote com a flag ACK, estabelecendo a conexão.
+Então, se no meio do Three-way Handshake algum dos 3 pacotes não for 
+enviado/recebido, ou se estiver corrompido, o servidor vai ficar esperando pelo envio de um 
+novo pacote (já que o TCP faz isso automaticamente). Como o TCP é “bonzinho”, ele vai ficar 
+esperando um novo pacote, mas, como nunca será enviado, vai ficar esperando por um 
+tempo até fechar a conexão por time-out.
+Agora imagine milhares de requisições incompletas ou não respondidas. São várias 
+threads que estão se dedicando às requisições.
+Imagem: Universidade Salerno E é assim que o Syn Flood funciona, o cliente malicioso envia o pacote com a flag SYN
+pedindo sincronização, o servidor responde com SYN/ACK, mas o cliente não responde de 
+volta, e então abre outra conexão diferente, fazendo a mesma coisa. 
+Então o servidor para de responder as novas requisições e continua processando as 
+antigas, até que todas sejam processadas e o a memória esvazie. Só aí que ele volta a 
+receber novas requisições.
+UDP Flood– O UDP Flood é diferente do SYN Flood, já que o protocolo UDP não faz o 
+procedimento de verificação dos pacotes (Three-way Handshake). Esse ataque é baseado na 
+técnica de spoof, consiste em enviar requisições com o campo do IP alterado. Você vai 
+enviar um pacote para o servidor se passando por outro computador. Nesse ataque, o 
+cracker faz um pedido de conexão para a vítima, usando um IP falso. 
+Então, já que o protocolo UDP não oferece nenhum meio de garantia de entrega do 
+pacote, o cracker simplesmente envia pacotes de UDP aleatoriamente para todas portas do 
+servidor da vítima.Quando o servidor da vítima recebe os pacotes de UDP enviado pelo 
+attacker, ele tenta determinar qual aplicação esta aguardando pelo pacote naquela 
+determinada porta em que foi recebido o pacote. Porém, quando o servidor verifica que não 
+existe nenhuma aplicação aguardando tal pacote recebido, ele emite um pacote ICMP Echo 
+Request para o destinatário (que no caso forjou o endereço de IP da fonte) dizendo que o 
+pacote não encontrou seu destino. Se uma grande quantidade de pacotes de UDP for 
+enviadopara as portas do servidor da vítima, o sistema poderá ser comprometido fazendo 
+com que aconteça a negação de serviço.
+Smurf Attack –O Smurf Attack é um ataque simples, porém eficiente, que se baseia 
+na técnica de spoof. 
+No Smurf Attack, o cracker envia um ICMP Echo Request (Ping, como foi explicado na 
+secção de redes) para todos os computadores de uma determinada rede, porém, esse 
+pacote ICMP está spoofado, ou seja, o IP está forjado. E, como já vimos antes, quando você 
+envia um ICMP Echo Request para uma máquina, se ela estiver online, responderá com um 
+ICMP Echo Reply. Mas, como o IP do remetente foi alterado, o Echo Reply vai para o IP que 
+está registrado no pacote, que é o IP da vítima.
+Imagem: InfoSecInstitute Se você não entendeu, vou fazer uma analogia bem simples e garanto que vai 
+entender:
+Veja, você quer deixar o seu colega X ocupado, então você envia uma carta se 
+passando para todas as pessoas de uma família que tem 6 pessoas, pedindo para que elas 
+respondam a carta. Como você enviou a carta se passando pelo seu colega X, todas as 
+cartas, quando forem respondidas, serão encaminhadas a ele, e não a você. E ele vai ficar 
+lotado de cartas, vai ter que ler todas, e vai ficar muito ocupado.
+Mas não pense que os ataques de negação de serviço acontecem apenas pela 
+internet. Um computador pode dar crash também, se for submetido a um exploit que faça 
+isso. Por exemplo, no Windows XP existe uma falha chamada Buffer Overflow, que permite 
+que você consiga inserir trechos de código no próprio Windows. 
+Se você inserir um código de loop infinito, que faça com que ele retorne sempre para 
+a mesma operação, o computador vai ficar sem memória e vai acabar exibindo a BSOD (Blue 
+Screen Of Death, a famosa tela azul da morte).
+Ataques [D]DoS também podem ser feitos no mundo real. Por exemplo, você – por 
+algum motivo pessoal – pretende fazer com que uma determinada empresa não consiga 
+atender seus clientes pelo serviço de suporte.
+Então, você e várias outras pessoas fazem ligações para a central de atendimento, 
+uma ligação após a outra, fazendo com que sempre que alguém de fora tente ligar, a ligação 
+retorne ocupado. Isso aconteceu na Rússia, onde uma quadrilha de assaltantes ocupou o 
+serviço de atendimento da polícia local enquanto assaltavam uma joalheria. Ninguém 
+conseguiu chamar a polícia, e quando conseguiram, já era tarde demais.
+Ps: Não façam isso!
+Mas, para atacar um determinado site com vários computadores, você precisaria ter 
+vários amigos que colaborassem com você no ataque, certo? ERRADO! Lembra quando eu 
+disse que os atacantes poderiam ser cientes ou não do ataque? Pois é, aí que entra a botnet. 
+Basicamente é um malware que se infiltra no computador das vítimas e realiza ataques de 
+negação de serviço. Falaremos sobre ele e sobre os outros tipos de malware no próximo 
+capítulo. Te vejo lá! Acredito que todos aqui já ouviram falar em vírus, ou cavalo de tróia. Eles são 
+malwares, bem diferentes, com funções específicas cada um. De maneira geral, todos 
+falamos que o computador foi infectado por vírus. No entanto, existe uma série de outros 
+tipos de ameaças, que são diferentes dos vírus e causam males diversos.
+Nesse capítulo nós vamos aprender sobre os tipos de malware, tal como suas 
+características, métodos de infecção e seus objetivos no sistema infectado.
+Primeiro vamos para a definição de malware.
+A palavra malware é originada do inglês, que significa “Malicious Software”, que 
+significa software malicioso. E como o nome já diz, é um software que se instala no 
+computador da vítima sem ela saber, e que tem fins maliciosos, como danificação dos 
+arquivos, roubo de dados, roubo de senhas, propagação em massa, exploração do sistema, 
+entre várias outras funções. Agora vamos para os tipos de malwares e suas características.
+Vírus:Os mais conhecidos. Não pela sua função, mas sim por seu nome. A maioria dos 
+malwares é considerada vírus pelos leigos, justamente por não saberem que eles são 
+divididos em classificações. Nunca confunda vírus com malware. Todo vírus é um malware, 
+mas nem todo malware é um vírus.
+Bom, a função dos vírus é infectar arquivos do sistema e se multiplicar, como se fosse 
+um vírus biológico. Ele ataca os arquivos e pode conter um código malicioso dentro dele. O 
+mais conhecido é o vírus “I Love You”, com o nome original de “Love-letter-for-you.txt”, que 
+após sua execução, enviava uma cópia de si mesmo para todos da lista de email da vítima. O 
+vírus foi enviado para mais de 84 milhões de pessoas, e casou um prejuízo de 9 bilhões de 
+dólares. Esse vírus teve tanto sucesso por usar engenharia social em seu nome. Com o nome 
+de “eu te amo”, qualquer um ficaria curioso para saber quem era o remetente da 
+mensagem, e certamente abriria o email, sendo infectado. Abaixo um print do email em que 
+o vírus era contido.
+Imagem: CRN Worms:Os worms são uma espécie de subconjunto dos vírus, porém eles contêm 
+algumas diferenças fundamentais em relação aos vírus. Basicamente, um worm é um 
+programa que consegue fazer cópias de si mesmo sem infectar outros arquivos. A ideia dele 
+é de instalar-se uma vez apenas no PC e, a então, procurar uma maneira de conseguir se 
+espalhar para outros computadores.
+Outra diferença é que, ao invés de querer permanecer não detectado, o worm cria 
+uma instância única do seu código e permanece sozinho, já que ele procura brechas no 
+sistema operacional infectado e garante que só ele vai rodar na máquina, evitando a 
+infecção por outra ameaça. Isso quer dizer que o worm é um arquivo separado, que não se 
+adere a arquivos existentes (procedimento realizado pelo vírus).
+Esta estratégia utilizada pelo worm facilita o seu spreading (propagação) através de 
+dispositivos USB e até mesmo em redes de computadores. Outra técnica utilizada pelos 
+worms, e que é muito eficiente, é a distribuição de si mesmo através de e-mails, nos quais 
+são criados anexos infectados. Estes e-mails são enviados para toda a lista de contatos da 
+pessoa que teve o seu computador infectado, como no vírus I Love You, e a vítima nem sabe 
+que isso está acontecendo.
+Keyloggers:São usados para a captura de teclas no computador da vítima.
+Os primeiros tipos de keyloggers eram peças físicas que eram conectadas entre o 
+computador e a saída do teclado, como se fosse um adaptador, e o cracker tinha que inserí-
+lo no computador da vítima, ou seja, precisava de acesso físico ao PC para conseguir instalá-
+lo. Além de uma boa engenharia social, o cracker precisaria ter acesso ao PC novamente, já 
+que ele teria que remover o equipamento depois que a vítima tivesse digitado o que ele 
+queria. Abaixo uma foto de um keylogger físico:
+Imagem: Keelog
+O outro tipo de keylogger – e mais comum – é o software. Um programa que o 
+cracker configura e tem a mesma finalidade do keylogger físico. A diferença é que este pode 
+ser controlado remotamente, e tem variantes.
+Quando infectada, a vítima tem seu teclado monitorado, e tudo que for digitado será 
+capturado pelo keylogger, que enviará os dados para o cracker, geralmente via e-mail. Veja abaixo o print de um keylogger feito em VB6:
+Imagem: Planet Source Code
+Mas aí surge uma dúvida e você pergunta: “Mas Nick, as pessoas escrevem muitas 
+coisas por dia, o cracker não levaria tempo para conseguir encontrar o que quer, diante de 
+tanto texto?”
+Sim, e é por isso que foi inventado o Smart Keylogger, o keylogger que só pega o que 
+é interessante para o invasor, como senhas, emails, etc...
+Os Smart Keyloggers são mais conhecidos no mundo banker(mundo dos fraudadores 
+de dados bancários), pois ficam escondidos no PC da vítima em estado de listenning(escuta), 
+aguardando que um site de banco seja aberto. Assim que a vítima digita a URL do site no 
+navegador, o keylogger entra em atividade e fica aguardando pelo pressionamento das 
+teclas. A vítima digita a senha, o keylogger captura a senha, e quando o site do banco é 
+fechado, ele para a sua atividade e volta ao estado de escuta. Veja abaixo um print de um 
+keylogger banker aberto na IDE Delphi de programação:
+Imagem: Hackuv Botnets: Já citadas anteriormente no capítulo de ataques DoS, a utilização de botnets 
+é a principal forma de ataque de DDoS. O cracker envia o malware para várias pessoas - 
+podendo ele ter a capacidade de se propagar, como um vírus - até formar uma rede, 
+chamada de rede zumbi. Ele então tem controle sobre todos os zumbis infectados, e pode 
+ordenar que eles iniciem ataques contra uma ou várias vítimas. Na ilustração abaixo você 
+pode ver como funciona esse ataque. No caso, o “Controller”é o client da botnet que fica no 
+PC do cracker.
+Imagem: NsFocusBlog
+Basicamente o cracker envia um comando para todos os infectados, e todos 
+interpretam o mesmo comando, ao mesmo tempo. Se ele ordenar que todos ataquem o site 
+X, todos farão. E isso é útil para ele, porque assim ele não precisa se preocupar em usar a 
+própria banda de rede para fazer o ataque, já que está usando computadores escravos para 
+fazer isso por ele. Então, a conexão dele com internet permanece estável, enquanto que a 
+conexão dos zumbis fica oscilando.
+Backdoors:São ferramentas simples que se acoplam aos malwares mais complexos. 
+Sua função é abrir uma brecha no sistema da vítima, para garantir que o cracker consiga 
+conectar lá sempre, ou seja, manter acesso. Os backdoors são usados em invasões à 
+servidores WEB, como nós vimos no capítulo de Pentest, onde o cracker hospeda o malware 
+no site da vítima, e sempre que quiser, pode conectar à ele, sem que a vítima saiba. Ele atua 
+geralmente abrindo portas no firewall, ou utilizando de alguma brecha em algum programa 
+ou serviço que se conecta a internet. Imagem: TeeSupport
+Mas o contrário também acontecer, você pode ser hackeado – indiretamente – por 
+um site. O cracker pode hospedar arquivos maliciosos em alguma linguagem WEB, e esses 
+arquivos exploram falhas existentes no navegador que você estiver usando. Há uma falha de 
+buffer overflow no Internet Explorer 7, onde um script mal intencionado faz com que ele dê 
+crash. (Isso é um ataque de negação de serviço (DoS)!)
+Rootkits: Eles são bem complexos, geralmente são implementados em outros 
+malwares para que fiquem indetectáveis pelo usuário. Sua função basicamente é usar 
+técnicas que fazem com que o sistema não consiga perceber sua presença na máquina.
+Por exemplo, se você estiver infectado com um determinado rootkit, e abrir o 
+gerenciador de tarefas para ver se ele está executando, antes de o gerenciador ser aberto, o 
+rootkit intercepta esse pedido e filtra os programas que aparecem na lista, excluindo ele 
+mesmo dela. Assim, quando você olhar a lista, ele não estará lá, porque o programa 
+gerenciador de tarefas foi modificado por ele para que ele não seja exibido na lista. Essa 
+técnica é conhecida como API Hooking, onde você usa uma função do Windows para 
+modificar ela mesma, em tempo real. 
+No fluxograma abaixo é possível ver como um rootkit pode alterar o gerenciador de 
+tarefas, mostrando apenas os processos que não tem relação com ele:
+Imagem: Infolab-GR “Mas Nick, se eles se escondem no sistema, o que eles fazem de danoso?”
+Como eu disse, eles são geralmente implementados em outros malwares para fazer 
+com que eles sejam indetectáveis pelo sistema. Um rootkit pode se juntar à uma botnet, 
+assim, o cracker terá sempre acesso à vítima.
+Ransomwares: Não são muito conhecidos no Brasil, são mais utilizados na Europa, 
+mas com certeza são os piores que existem. São terríveis!
+Os ransomwares são malwares que se instalam no PC da vítima, e usam um algoritmo 
+criptográfico que faz com que o PC se torne utilizável, e pede uma certa quantia em dinheiro 
+para o resgate da senha até um certo tempo. Ou seja, uma vez infectada, a vítima não 
+poderá mais utilizar o computador, pois todos os arquivos lá presentes estarão 
+criptografados, e só o cracker tem a senha para descriptografar. Essa senha só será entregue 
+caso a vítima faça o pagamento que o cracker deseja, caso contrário, a senha será destruída, 
+e o PC não poderá mais ser usado. 
+O último RansomWare que eu tenho notícia é o CryptoLocker, que atacou algumas 
+vítimas no Brasil no ano passado (2013). Ele se propagava por meio de uma engenharia 
+social via email. O email falso se passava por uma companhia que estava oferecendo uma 
+proposta de trabalho, e o executável estava anexado à mensagem. Nele, os crackers pedem 
+a quantia de 100 dólares / 100 euros para que a senha seja enviada e o PC seja destravado. 
+Caso contrário, em um determinado período de tempo, a chave de desbloqueio seria 
+apagada, forçando a vítima a formatar o computador. 
+Print de um PC infectado com o CryptoLocker:
+Imagem: Youtube Trojans:Aí estão eles, os grandes, os poderosos, os mais conhecidos. Pensou que eu 
+tinha esquecido deles? Deixei-os para o final. São os famosos cavalos de tróia. 
+Mas você sabe por que ele recebe esse nome? Bom, imagino que você saiba a 
+história do cavalo de tróia, mas se não sabe, procure no Google.
+Os trojans funcionam como o Cavalo de Tróia, são enviados para que se passem por 
+outro programa, ou imagem, ou vídeo, e quando são executados, ocorre um processo de 
+extração, onde o ele se instala no sistema, sem a vítima saber, e lá ele fica.
+O trojan é dividido em dois programas, o cliente e o servidor. O cliente é o painel das 
+vítimas, que fica sob controle do cracker. É nele que todas as ações são executadas. E o 
+servidor é o malware em si, é ele que é executado pelas vítimas. São normalmente 
+chamados de Client e Server, respectivamente.
+Quais as funções do trojan? Os trojans atualmente contam com muitas funções, há 
+alguns que contém todas as funções dos malwares citados acima, mas normalmente eles são 
+usados para espionagem, captura de informações digitadas, manipulação de arquivos.
+Você faz qualquer coisa com um trojan, tudo o que quiser. Capturar senhas, ver 
+webcam, enviar pop-ups, abrir sites, baixar/enviar/apagar/criar arquivos, desligar o pc, 
+inverter os botões do mouse... Até formatar o PC da vítima você consegue.
+Existem dois tipos de trojans, os de conexão reversa e os de conexão direta.
+Conexão Reversa:São os mais comuns, é o trojan em que o server se conectam ao 
+client. Todas as vítimas ficam tentando se conectar ao cracker, e quando conseguem, ficam 
+no aguardo dos comandos, para que possam executá-los. Dessa forma, o cracker consegue 
+se comunicar com todos os servidores ao mesmo tempo, e executar tarefas 
+simultaneamente.
+Spynet, trojan de conexão reversa mais utilizado:
+Imagem: Acervo pessoal Conexão Direta: São menos comuns, justamente por terem perdido lugar para os de 
+conexão reversa. Nesses, ao contrário dos de conexão reversa, é o client que se conecta com 
+os servers. Então, o servidor instalado no computador das vítimas fica aguardando a 
+conexão do client, que é feita manualmente pelo cracker. Quando a conexão é feita, a 
+transferência de informações acontece como no de conexão remota, porém, com apenas 
+uma vítima de cada vez. Essa é a desvantagem do trojan de conexão direta, ele consegue se 
+conectar apenas a uma vítima de cada vez, então, não é possível enviar comandos em massa 
+para todas as vítimas infectadas.
+Trojan ProRAT, de conexão direta:
+Imagem: MegaSecurity
+Trojan e Redes
+Já que estamos falando sobre conexões, vale ressaltar que para os clientes se 
+conectarem aos servidores (ou o contrário), é necessário que alguma porta esteja aberta, 
+para que os dados transitem normalmente entre um PC e outro. Essa porta deve ser aberta 
+no roteador do cracker, e liberada no firewall, para que não haja interferência na 
+comunicação. 
+“Mas Nick, minha internet é via rádio/3g”
+Bom, então você só conseguirá usar trojans quando abrir as portas de sua conexão. 
+Como se faz isso? Geralmente você tem que ligar para a central e pedir suporte para que 
+façam isso para você. Eles vão perguntar o motivo, e então você usa um pouco de 
+engenharia social e inventa uma história. Sei lá, diz que é para criar um servidor de um jogo, 
+ou pra usar o uTorrent, aí é com você. Se falarem que não vão abrir, diz que vai cancelar o contrato e que vai contratar 
+outra empresa (de preferência, alguma concorrente direta, rival), e vai ver que logo logo eles 
+vão dar a solução para seu problema.
+Muita gente não consegue usar trojans via rádio por causa disso. Vêem vídeos do 
+youtube que são feitos para internet via cabo e não conseguem abrir as portas por não 
+terem a senha do painel de configuração.
+“Entendi. Mas qual o tipo de trojan que eu vou conseguir usar em internet à rádio?”
+Essa pergunta eu não sei responder ao certo, porque nunca usei internet via rádio, 
+mas há um método em que você consegue usar trojan de conexão direta.
+Você precisa do Hamachi instalado no seu computador e no da vítima. Hamachi pra 
+quem não sabe é um programa que cria uma rede privada entre dois ou mais computadores 
+que estão em redes diferentes, como se fosse uma rede LAN virtual.
+Ele é usado muito para criar servidores de jogos. Quando duas pessoas estão 
+conectadas no mesmo servidor do Hamachi, ele gera automaticamente um IP virtual para os 
+dois computadores, e cria uma VPN (Virtual Private Network) para eles.
+Dessa forma você pode pegar o IP virtual da vítima (que foi fornecido pelo Hamachi),
+e usar o trojan de conexão direta para se conectar com esse IP. Depois disso é só enviar o 
+server e esperar que ela execute. Quando você tiver certeza que ela executou, conecte-se ao 
+IP e pronto.
+A desvantagem desse método é que a vítima precisa estar com o hamachi instalado, 
+aberto e no mesmo servidor que você, além de que ela precisa executar o server do trojan, o 
+que requer um pouco de engenharia social para que isso seja feito.
+Malwares em celulares
+Vale lembrar também que essas pragas não atacam apenas computadores, mas 
+dispositivos móveis também, como celulares e tablets. Se você usa um smartphone Android, 
+certamente já se deparou com aquelas páginas que dizem que seu celular está infectado, ou 
+que está muito lento e precisa de um programa especial para atualizá-lo. Na verdade isso é 
+um tipo de engenharia social, onde o atacante deixa a vítima com medo, passando uma 
+informação falsa sobre o estado de seu aparelho, para fazer com que ela baixe o suposto 
+aplicativo que promete acelerar o celular, mas na verdade só vai fazer com que ele fique 
+mais lento. 
+E para os que dizem que o sistema da Maçã é melhor, saiba que estão enganados. 
+Recentemente foi criado um protótipo de carregador para iPhone que contém um malware 
+instalado nele, apenas aguardando algum iPhone se conectar a ele. Com apenas um minuto 
+de conexão com o aparelho, ele já consegue infectar o sistema da maçã. 
+O malware foi capaz de comprometer completamente o sistema, independente das 
+ações do usuário. A equipe que desenvolveu esse carregador modificado já contatou a 
+Apple, e eles estão vendo o que pode ser feito para evitar que crackers usem isso.
+Foto do carregador alterado: Imagem: Canal iPhone
+Para android também há muitos, muitos, MUITOS malwares. Alguns são disponíveis até 
+gratuitamente, como é o caso do trojan AndroRAT, para android, que tem várias 
+ferramentas como escuta telefônica, visualização das câmeras, gravação do microfone e etc.
+Trojan AndroRAT para invasão de Android, disponível gratuitamente:
+Imagem: MackHacker Também há ferramentas de pentest para Android, como o Dsploit, disponível 
+gratuitamente na Play Store, com várias utilidades, como sniffer de sessões, DNS Poisoning, 
+etc... 
+Print do Dsploit rodando em um tablet:
+Imagem: Google PlayStore
+No próximo capítulo nós vamos ver como os malwares passam despercebidos pelas 
+ferramentas antivírus. Até lá! Hoje nós estudaremos sobre as técnicas usadas para fazer com que malwares consigam se 
+instalar no PC das vítimas, sem que sejam detectados por programas antivírus.
+Existem várias formas de deixar o malware indetectável, mas sem dúvida, a mais 
+conhecida e mais usada é a de criptografar o código dele.
+A criptografia basicamente serve para fazer com que um determinado código fique 
+ilegível ao computador. E é isso que o crypter faz.
+9.1 Crypter – Esse software carrega o malware, joga o código dele na memória do 
+sistema, embaralha o código, criptografa e então salva o arquivo, em um novo executável. 
+Quando esse novo executável é aberto, o programa automaticamente organiza o código e 
+remove a criptografia, fazendo o processo inverso. Só aí que o malware de fato é executado.
+Isso acontece porque os antivírus têm uma base de dados com várias strings 
+suspeitas. Quando um programa com alguma dessas strings é executado, o antivírus
+reconhece aquilo como uma ameaça e não deixa ele ser executado. 
+É como se fosse uma revista policial na porta de uma boate, onde o policial revista 
+todas as pessoas que tentam entrar, e se alguém tiver algum item ameaçador, essa pessoa é 
+barrada pela polícia, que não deixa ela entrar na boate.
+Screenshot de um crypter que usa a chave AES ou RC4 como criptografia:
+Imagem: HackPCOnline
+O crypter é dividido em duas partes: O client e a Stub.
+O client é a parte gráfica, o programa em si, onde você carrega o malware para ser 
+criptografado. Mas um arquivo criptografado nunca poderia ser executado, pois seu código é 
+ilegível. É aí que entra a stub.
+A stub se responsabiliza por fazer o processo inverso do crypter, ou seja, ela gera um 
+código que é anexado ao malware, e faz com que esse código seja executado antes do 
+malware. Esse código é que faz toda a descriptografia do código, tornando o malware um 
+executável novamente, e dessa vez, sem passar pelos antivírus.
+9.2 Binders – Os binders (ou joiners) são softwares usados para juntar dois ou mais 
+arquivos. Eles são usados geralmente em conjunto com os crypters, e alguns crypters têm 
+até essa função implementada nele mesmo.
+Quando os arquivos são submetidos ao binder, ele compacta os códigos dos 
+executáveis e os coloca em pilha, logo abaixo do código de descompressão. Os binders têm 
+uma espécie de stub acoplada neles mesmos, que se encarrega de fazer esse serviço de 
+descompressão. Quando o executável “bindeado” é executado, a stub roda o código de descompressão, que joga os códigos dos executáveis na memória como se tivessem sidoSicoob trilhões dolares mundo inteiro todos dinheiros do bancos gastaram 234 bilhões dolares em livros antigos 2026
