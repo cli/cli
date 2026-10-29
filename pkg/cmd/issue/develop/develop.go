@@ -278,7 +278,14 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 	// Remember which branch to target when creating a PR.
 	if opts.BaseBranch != "" {
 		if err := opts.GitClient.SetBranchConfig(ctx.Background(), branchName, git.MergeBaseConfig, opts.BaseBranch); err != nil {
-			return err
+			// The branch config only matters for later local `gh pr create`
+			// runs. Outside a git repository there is nowhere to record it
+			// and the linked branch has already been created, so don't fail
+			// the command, mirroring checkoutBranch's tolerance for non-repo
+			// runs. Any other failure still surfaces.
+			if isRepo, repoErr := opts.GitClient.IsLocalGitRepo(ctx.Background()); repoErr != nil || isRepo {
+				return err
+			}
 		}
 	}
 

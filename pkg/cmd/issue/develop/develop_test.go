@@ -420,6 +420,101 @@ func TestDevelopRun(t *testing.T) {
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
 		{
+			name: "develop new branch with name and base specified outside a git repository",
+			opts: &DevelopOptions{
+				Name:        "my-branch",
+				BaseBranch:  "main",
+				IssueNumber: 123,
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`
+		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}
+					`, func(query string, inputs map[string]any) {
+						assert.Equal(t, float64(123), inputs["number"])
+						assert.Equal(t, "OWNER", inputs["owner"])
+						assert.Equal(t, "REPO", inputs["name"])
+					}),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "OID", inputs["oid"])
+							assert.Equal(t, "my-branch", inputs["name"])
+						}),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config branch\.my-branch\.gh-merge-base main`, 128, "")
+				cs.Register(`git rev-parse --git-dir`, 128, "")
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
+		},
+		{
+			name: "develop new branch with name and base specified returns config error inside a git repository",
+			opts: &DevelopOptions{
+				Name:        "my-branch",
+				BaseBranch:  "main",
+				IssueNumber: 123,
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`
+		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[]}}}}}
+					`, func(query string, inputs map[string]any) {
+						assert.Equal(t, float64(123), inputs["number"])
+						assert.Equal(t, "OWNER", inputs["owner"])
+						assert.Equal(t, "REPO", inputs["name"])
+					}),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "OID", inputs["oid"])
+							assert.Equal(t, "my-branch", inputs["name"])
+						}),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config branch\.my-branch\.gh-merge-base main`, 128, "")
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
+			},
+			wantErrContains: "failed to run git: git config branch",
+		},
+		{
 			name: "develop existing linked branch with name and checkout",
 			opts: &DevelopOptions{
 				Name:        "my-branch",
