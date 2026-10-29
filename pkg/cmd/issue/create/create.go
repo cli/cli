@@ -453,6 +453,13 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
+		if opts.IssueType != "" && opts.issueTypeID == "" {
+			opts.issueTypeID, err = issueShared.ResolveIssueTypeName(apiClient, baseRepo, opts.IssueType)
+			if err != nil {
+				return
+			}
+		}
+
 		// With nothing uploaded the body would promise an attachment that does
 		// not exist, so no issue is created. Once anything has uploaded the
 		// issue is created and the failures are reported.
@@ -475,6 +482,8 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
+		fmt.Fprintln(opts.IO.Out, newIssue.URL)
+
 		var updateOpts api.DeferredUpdateIssueOptions
 		updateOpts, err = deferredUpdateIssueOptions(apiClient, baseRepo, newIssue, opts)
 		if err != nil {
@@ -483,8 +492,6 @@ func createRun(opts *CreateOptions) (err error) {
 		if err = api.DeferredUpdateIssue(apiClient, updateOpts); err != nil {
 			return
 		}
-
-		fmt.Fprintln(opts.IO.Out, newIssue.URL)
 	} else {
 		panic("Unreachable state")
 	}

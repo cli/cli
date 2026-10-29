@@ -913,7 +913,7 @@ func Test_createRun(t *testing.T) {
 				Body:      "bug body",
 				IssueType: "Bugz",
 			},
-			httpStubs: func(_ *testing.T, r *httpmock.Registry) {
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
@@ -922,13 +922,6 @@ func Test_createRun(t *testing.T) {
 							"hasIssuesEnabled": true
 						} } }`))
 				r.Register(
-					httpmock.GraphQL(`mutation IssueCreate\b`),
-					httpmock.StringResponse(`
-						{ "data": { "createIssue": { "issue": {
-							"id": "ISSUE_ID_123",
-							"URL": "https://github.com/OWNER/REPO/issues/123"
-						} } } }`))
-				r.Register(
 					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
 					httpmock.StringResponse(`
 						{ "data": { "repository": { "issueTypes": { "nodes": [
@@ -936,8 +929,70 @@ func Test_createRun(t *testing.T) {
 							{ "id": "IT_2", "name": "Feature", "description": "", "color": "0075ca" },
 							{ "id": "IT_3", "name": "Task", "description": "", "color": "e4e669" }
 						] } } } }`))
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
 			},
 			wantsErr: `type "Bugz" not found; available types: Bug, Feature, Task`,
+		},
+		{
+			name: "create with type on repository without issue types",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "bug title",
+				Body:      "bug body",
+				IssueType: "Bug",
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "issueTypes": null } } }`))
+				r.Exclude(t, httpmock.GraphQL(`mutation IssueCreate\b`))
+			},
+			wantsErr: `type "Bug" not found; available types: `,
+		},
+		{
+			name: "create with type deferred update failure still prints issue url",
+			opts: CreateOptions{
+				Detector:  &fd.EnabledDetectorMock{},
+				Title:     "bug title",
+				Body:      "bug body",
+				IssueType: "Bug",
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "issueTypes": { "nodes": [
+							{ "id": "IT_1", "name": "Bug", "description": "", "color": "d73a4a" }
+						] } } } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createIssue": { "issue": {
+							"id": "ISSUE_ID_123",
+							"URL": "https://github.com/OWNER/REPO/issues/123"
+						} } } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.StringResponse(`{ "errors": [{ "message": "deferred update failed" }] }`))
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/123\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+			wantsErr:    "GraphQL: deferred update failed",
 		},
 		{
 			name: "create with parent",
@@ -1472,6 +1527,12 @@ func Test_createRun(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				assert.EqualError(t, err, tt.wantsErr)
+				if tt.wantsStdout != "" {
+					assert.Equal(t, tt.wantsStdout, stdout.String())
+				}
+				if tt.wantsStderr != "" {
+					assert.Equal(t, tt.wantsStderr, stderr.String())
+				}
 				return
 			}
 
