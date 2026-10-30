@@ -267,6 +267,27 @@ type AuthConfig struct {
 	// gh processes but not against goroutines sharing this single AuthConfig instance, so this mutex provides the
 	// in-process half of the mutual exclusion that keeps a rotating refresh token from being spent twice.
 	refreshMu sync.Mutex
+	// warningsMu guards warnings.
+	warningsMu sync.Mutex
+	// warnings collects deduplicated messages, such as a skipped token refresh, for the user to see before gh exits.
+	warnings []string
+}
+
+// Warnings returns the deduplicated warnings recorded so far in this process, such as a skipped token refresh, in the
+// order they were first recorded. Callers are expected to show them to the user before gh exits.
+func (c *AuthConfig) Warnings() []string {
+	c.warningsMu.Lock()
+	defer c.warningsMu.Unlock()
+	return slices.Clone(c.warnings)
+}
+
+// addWarning records msg for Warnings unless an identical message was already recorded.
+func (c *AuthConfig) addWarning(msg string) {
+	c.warningsMu.Lock()
+	defer c.warningsMu.Unlock()
+	if !slices.Contains(c.warnings, msg) {
+		c.warnings = append(c.warnings, msg)
+	}
 }
 
 // SetTokenRefresher supplies the refresher used to renew tokens. Because Authentication returns a single shared
@@ -485,7 +506,7 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	// a refresh still waiting on the lock reloads afterwards, finds the refreshable record removed below, and bails
 	// without persisting. The lock is best effort, so login still proceeds when it is unavailable.
 	var insecureStorageUsed bool
-	err := c.withFreshConfigForRefresh(func(lockHeld bool) error {
+	err := c.withFreshConfigForRefresh(func(lockErr error) error {
 		var err error
 		insecureStorageUsed, err = c.login(hostname, username, token, gitProtocol, secureStorage)
 		return err
@@ -580,7 +601,7 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 func (c *AuthConfig) Logout(hostname, username string) error {
 	// Run under the shared refresh lock so logout wins any race with an in-flight refresh: a concurrent refresh
 	// cannot persist a rotated credential after logout has removed the account and reported success.
-	return c.withFreshConfigForRefresh(func(lockHeld bool) error {
+	return c.withFreshConfigForRefresh(func(lockErr error) error {
 		users := c.UsersForHost(hostname)
 
 		// The user's per-user keyring records are not covered by removing config keys, so delete them explicitly.

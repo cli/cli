@@ -698,3 +698,26 @@ func Test_authRecoveryCommand(t *testing.T) {
 		})
 	}
 }
+
+// warningsAuthConfig returns fixed warnings and otherwise defers to the embedded AuthConfig.
+type warningsAuthConfig struct {
+	gh.AuthConfig
+	warnings []string
+}
+
+func (a warningsAuthConfig) Warnings() []string {
+	return a.warnings
+}
+
+func Test_printAuthWarnings(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	authCfg := warningsAuthConfig{
+		AuthConfig: config.NewMockConfig().Authentication(),
+		warnings:   []string{"first line\nsecond line", "another warning"},
+	}
+
+	var out bytes.Buffer
+	printAuthWarnings(&out, ios.ColorScheme(), authCfg)
+
+	assert.Equal(t, "! first line\n  second line\n! another warning\n", out.String())
+}

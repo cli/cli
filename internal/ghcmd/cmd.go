@@ -130,6 +130,12 @@ func Main() exitCode {
 	// Complete and send events even when returning before Cobra reaches RunE.
 	defer telemetryService.Finish()
 
+	// Show authentication warnings, such as a skipped token refresh, even when the command succeeds, so the user (or a
+	// calling agent) can fix the cause before the token stops working.
+	if cfgErr == nil {
+		defer printAuthWarnings(stderr, ioStreams.ColorScheme(), cfg.Authentication())
+	}
+
 	cmdFactory := factory.New(buildVersion, string(invokingAgent), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
 
 	ctx := context.Background()
@@ -312,6 +318,14 @@ func authRecoveryCommand(cfg gh.Config, httpErr api.HTTPError) string {
 	}
 
 	return fmt.Sprintf("gh auth login -h %s", hostname)
+}
+
+// printAuthWarnings writes each warning recorded by authCfg to w, prefixed with a warning icon.
+func printAuthWarnings(w io.Writer, cs *iostreams.ColorScheme, authCfg gh.AuthConfig) {
+	for _, warning := range authCfg.Warnings() {
+		// Indent continuation lines so a multi-line warning reads as one item.
+		fmt.Fprintf(w, "%s %s\n", cs.WarningIcon(), strings.ReplaceAll(warning, "\n", "\n  "))
+	}
 }
 
 func checkForUpdate(ctx context.Context, f *cmdutil.Factory, currentVersion string) (*update.ReleaseInfo, error) {
