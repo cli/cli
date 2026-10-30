@@ -301,6 +301,23 @@ func TestClientShowRefsReturnsExistingRefsAlongsideMissingRefError(t *testing.T)
 	assert.Equal(t, []Ref{{Hash: wantHash, Name: "refs/heads/trunk"}}, refs)
 }
 
+func TestClientShowRefsSeparatesRefsFromOptions(t *testing.T) {
+	// Given a repository with one branch
+	repo := newTestRepo(t)
+	repo.run(t, "commit", "--quiet", "--allow-empty", "-m", "initial commit")
+	wantHash := repo.run(t, "rev-parse", "HEAD")
+
+	// When the branch and an option-like ref are resolved
+	refs, err := repo.client.ShowRefs(t.Context(), []string{"refs/heads/trunk", "--quiet"})
+
+	// Then an option separator protects the refs, so the branch resolves and the option-like ref is rejected
+	require.Error(t, err)
+	var gitError *GitError
+	require.ErrorAs(t, err, &gitError)
+	assert.NotZero(t, gitError.ExitCode)
+	assert.Equal(t, []Ref{{Hash: wantHash, Name: "refs/heads/trunk"}}, refs)
+}
+
 func TestClientConfigReturnsConfiguredValue(t *testing.T) {
 	// Given a repository with a configured credential helper
 	repo := newTestRepo(t)
