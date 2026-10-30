@@ -95,9 +95,11 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			The update re-downloads the skill with metadata injected, so future
 			updates work automatically.
 
-			With %[1]s--force%[1]s, re-downloads skills even when the remote version matches
-			the local tree SHA. This overwrites locally modified skill files with
-			their original content, but does not remove extra files added locally.
+			Applying an update replaces the installed skill directory's contents
+			with the upstream skill, discarding local modifications and additional files.
+
+			With %[1]s--force%[1]s, re-downloads and replaces skills even when the
+			remote version matches the local tree SHA.
 
 			In interactive mode, shows which skills have updates and asks for
 			confirmation before proceeding. With %[1]s--all%[1]s, updates without prompting.
@@ -113,7 +115,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			# Update all without prompting
 			$ gh skill update --all
 
-			# Re-download all skills (restore locally modified files)
+			# Re-download all skills even if up to date (discarding local modifications)
 			$ gh skill update --force --all
 
 			# Check for updates without applying (read-only)
