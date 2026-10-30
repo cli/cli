@@ -276,7 +276,8 @@ func (c *AuthConfig) SetTokenRefresher(refresher gh.TokenRefresher) {
 }
 
 // ActiveTokenType reports what kind of credential the active token is, so a
-// caller that only needs to know that can avoid handling the token.
+// caller that only needs to know that can avoid handling the token. It is
+// currently unused.
 func (c *AuthConfig) ActiveTokenType(hostname string) gh.TokenType {
 	token := c.ActiveToken(hostname).Token
 	for _, tokenType := range gh.TokenTypes {

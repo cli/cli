@@ -395,7 +395,6 @@ func Test_createRun(t *testing.T) {
 		opts           CreateOptions
 		attach         []string
 		host           string
-		config         string
 		httpStubs      func(*testing.T, *httpmock.Registry)
 		promptStubs    func(*testing.T, *prompter.PrompterMock)
 		wantsStdout    string
@@ -1291,7 +1290,7 @@ func Test_createRun(t *testing.T) {
 			wantsErr: "cannot embed a video as a reference-style image: ./clip.mp4",
 		},
 		{
-			name: "the token comes from the host the base repository resolved to",
+			name: "the upload goes to the host the base repository resolved to",
 			opts: CreateOptions{
 				Detector: &fd.EnabledDetectorMock{},
 				Title:    "mytitle",
@@ -1299,17 +1298,6 @@ func Test_createRun(t *testing.T) {
 			},
 			attach: []string{"shot.png"},
 			host:   "acme.ghe.com",
-			// The default host holds a token class that cannot upload, so
-			// making both usable disarms half the row.
-			config: heredoc.Doc(`
-				hosts:
-				  github.com:
-				    user: monalisa
-				    oauth_token: ghs_anactionstoken
-				  acme.ghe.com:
-				    user: monalisa
-				    oauth_token: gho_atenanttoken
-			`),
 			httpStubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
@@ -1472,13 +1460,6 @@ func Test_createRun(t *testing.T) {
 			attachmentRecorder := &telemetry.InvocationRecorderSpy{}
 			if tt.wantOperations != nil {
 				opts.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
-			}
-			opts.Config = func() (gh.Config, error) {
-				cfg := tt.config
-				if cfg == "" {
-					cfg = fmt.Sprintf("hosts:\n  %s:\n    user: monalisa\n    oauth_token: gho_atokenthatcanupload\n", host)
-				}
-				return config.NewMockConfigFromString(cfg), nil
 			}
 
 			// When issue creation runs

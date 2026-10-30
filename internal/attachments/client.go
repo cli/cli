@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/go-gh/v2/pkg/auth"
@@ -29,19 +28,15 @@ type Uploader struct {
 
 // NewUploader prepares uploads against targetRepository, the numeric REST id of
 // the repository the assets are uploaded against, and viewerPermission, the
-// GraphQL viewerPermission field on that same repository. It validates
-// everything an upload needs, so a caller that gets an Uploader back can use
-// it.
+// GraphQL viewerPermission field on that same repository. It refuses what gh
+// can tell will not upload. The credential is left to the endpoint, which
+// accepts tokens from only some GitHub Apps.
 //
-// The host is checked first. On an enterprise server no token and no permission
-// makes an upload work, so any other order would name a fault the user cannot
-// fix. The other checks are free to move.
-func NewUploader(httpClient *http.Client, tokenType gh.TokenType, host string, targetRepository int64, viewerPermission string) (*Uploader, error) {
+// The host is checked first. On an enterprise server no permission makes an
+// upload work, so any other order would name a fault the user cannot fix. The
+// other checks are free to move.
+func NewUploader(httpClient *http.Client, host string, targetRepository int64, viewerPermission string) (*Uploader, error) {
 	if err := checkHost(host); err != nil {
-		return nil, err
-	}
-
-	if err := checkUploadTokenType(tokenType); err != nil {
 		return nil, err
 	}
 
@@ -68,24 +63,6 @@ func checkHost(host string) error {
 	return nil
 }
 
-// uploadTokenTypes lists the credentials that can attach a file. Some GitHub
-// App user-to-server tokens are supported, so the endpoint decides which.
-var uploadTokenTypes = []gh.TokenType{
-	gh.TokenTypeOAuth,
-	gh.TokenTypePersonalAccess,
-	gh.TokenTypeFineGrainedPAT,
-	gh.TokenTypeUserToServer,
-}
-
-// checkUploadTokenType rejects a credential that cannot upload. It is an
-// allowlist, so an unlisted kind is rejected rather than sent.
-func checkUploadTokenType(tokenType gh.TokenType) error {
-	if slices.Contains(uploadTokenTypes, tokenType) {
-		return nil
-	}
-	return errors.New("unsupported authentication type")
-}
-
 // uploadPermissions lists the repository permissions that can attach a file.
 // The list matches api.Repository.ViewerCanPush, and it is measured against the
 // upload endpoint: READ and TRIAGE get a 404.
@@ -94,10 +71,10 @@ var uploadPermissions = []string{"ADMIN", "MAINTAIN", "WRITE"}
 // checkPermission rejects a permission that cannot upload. It is an allowlist,
 // so an unlisted value is rejected rather than sent.
 func checkPermission(viewerPermission string) error {
-	// A caller that never requested the field hands over an empty string. That
-	// is a different fault from a permission that is too low.
+	// GraphQL has no viewerPermission for a GitHub App installation, so an
+	// empty one is left to the endpoint rather than refused.
 	if viewerPermission == "" {
-		return errors.New("could not determine your permission on the repository to attach files")
+		return nil
 	}
 
 	if slices.Contains(uploadPermissions, viewerPermission) {

@@ -7,12 +7,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
-	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
@@ -437,11 +435,7 @@ func Test_editRun(t *testing.T) {
 		input     *EditOptions
 		httpStubs func(*testing.T, *httpmock.Registry)
 		attach    []string
-		// Empty means the default token, which can upload.
-		token string
-		// Overrides token, for a row that needs more than one host.
-		hostTokens map[string]string
-		uploads    []attachments.UploadStub
+		uploads   []attachments.UploadStub
 		// Empty means the row does not care which host was reached.
 		wantUploadHost     string
 		wantLookupFields   []string
@@ -1255,14 +1249,14 @@ func Test_editRun(t *testing.T) {
 			wantErr: "the user quit the editor",
 		},
 		{
-			name: "a token that cannot upload fails before any prompt",
+			name: "a permission that cannot upload fails before any prompt",
 			input: &EditOptions{
 				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					URL:        "https://github.com/OWNER/REPO/pull/123",
 					Body:       "the original body",
-					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "WRITE"},
+					Repository: &api.PRRepository{DatabaseID: 1234, ViewerPermission: "READ"},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive:     true,
 				Surveyor:        testSurveyor{},
@@ -1270,8 +1264,7 @@ func Test_editRun(t *testing.T) {
 				EditorRetriever: testEditorRetriever{},
 			},
 			attach:  []string{"shot.png"},
-			token:   "ghs_anactionstoken",
-			wantErr: "unsupported authentication type",
+			wantErr: "attaching files requires write access to the repository",
 		},
 		{
 			name: "attaching with no body flag keeps the body already on the pull request",
@@ -1536,9 +1529,7 @@ func Test_editRun(t *testing.T) {
 			wantErr: "could not upload ./a.png: attaching files requires write access to the repository",
 		},
 		{
-			// The default host deliberately holds a token that cannot upload,
-			// so tidying these fixture tokens weakens the row without failing it.
-			name: "the token comes from the host the pull request was fetched from",
+			name: "the upload goes to the host the pull request was fetched from",
 			input: &EditOptions{
 				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "https://acme.ghe.com/OWNER/REPO/pull/123",
@@ -1551,7 +1542,6 @@ func Test_editRun(t *testing.T) {
 				Fetcher:     testFetcher{},
 			},
 			attach:         []string{"shot.png"},
-			hostTokens:     map[string]string{"github.com": "ghs_anactionstoken", "acme.ghe.com": "gho_atenanttoken"},
 			uploads:        []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
 			wantUploadHost: "uploads.acme.ghe.com",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -1696,20 +1686,6 @@ func Test_editRun(t *testing.T) {
 				tt.input.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
 			}
 
-			// The host comes from the pull request the row's finder returns, so
-			// a row can hold a token for a host the config's default is not.
-			hostTokens := tt.hostTokens
-			if hostTokens == nil {
-				token := tt.token
-				if token == "" {
-					token = "gho_atokenthatcanupload"
-				}
-				hostTokens = map[string]string{"github.com": token}
-			}
-			tt.input.Config = func() (gh.Config, error) {
-				return config.NewMockConfigFromString(hostsConfig(hostTokens)), nil
-			}
-
 			var lookupFields []string
 			tt.input.Finder = fieldCapturingFinder{PRFinder: tt.input.Finder, fields: &lookupFields}
 
@@ -1747,15 +1723,6 @@ type fieldCapturingFinder struct {
 func (f fieldCapturingFinder) Find(opts shared.FindOptions) (*api.PullRequest, ghrepo.Interface, error) {
 	*f.fields = opts.Fields
 	return f.PRFinder.Find(opts)
-}
-
-func hostsConfig(tokens map[string]string) string {
-	var b strings.Builder
-	b.WriteString("hosts:\n")
-	for host, token := range tokens {
-		fmt.Fprintf(&b, "  %s:\n    user: monalisa\n    oauth_token: %s\n", host, token)
-	}
-	return b.String()
 }
 
 type mockRepoMetadataOptions struct {

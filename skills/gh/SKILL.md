@@ -135,10 +135,10 @@ blocked-by/blocking relationships.
   document that references it at the upload, and a file that no document
   references is an error before anything uploads. `edit` with only
   `--attach` appends the files to the artifact's current content.
-- Uploads require GitHub.com or a GHE.com tenant, an OAuth token, classic PAT,
-  or fine-grained PAT, and `WRITE`, `MAINTAIN`, or `ADMIN` repository
-  permission. GitHub Enterprise Server and most GitHub App tokens are
-  unsupported.
+- Uploads require GitHub.com or a GHE.com tenant and `WRITE`, `MAINTAIN`, or
+  `ADMIN` repository permission. GitHub Enterprise Server is unsupported. The
+  upload endpoint accepts tokens from only some GitHub Apps, and refuses the
+  rest with the same error as missing write access.
 - Uploads stop at the first failure. If earlier files uploaded, `gh` still
   writes those attachments and exits non-zero. `gh issue create`,
   `gh issue edit`, `gh pr create`, and `gh pr edit` also print the issue or

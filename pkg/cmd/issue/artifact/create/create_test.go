@@ -12,8 +12,6 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
-	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/telemetry"
@@ -604,7 +602,6 @@ func TestCreateRun(t *testing.T) {
 		isPullRequest bool
 		lookupErr     error
 		permission    string
-		token         string
 		createErrs    map[string]error
 		wantCalls     []string
 		wantBodies    []string
@@ -1452,16 +1449,6 @@ func TestCreateRun(t *testing.T) {
 			wantErr:    "attaching files requires write access to the repository",
 		},
 		{
-			name:      "--attach needs a token that can upload",
-			files:     map[string]string{"signin-plan.md": signinPlanFlow},
-			attach:    []string{"signin-flow.png"},
-			opts:      CreateOptions{Sources: []source{{kind: fromFile, arg: "signin-plan.md"}}},
-			tty:       true,
-			token:     "ghs_aninstallationtoken",
-			wantCalls: []string{"UploadTarget monalisa/monas-cafe#142"},
-			wantErr:   "unsupported authentication type",
-		},
-		{
 			name:    "--attach uploads to a ghe.com host",
 			repo:    ghrepo.NewWithHost("monalisa", "monas-cafe", "monas-cafe.ghe.com"),
 			files:   map[string]string{"signin-plan.md": signinPlanFlow},
@@ -1560,13 +1547,6 @@ func TestCreateRun(t *testing.T) {
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return repo, nil }
 			opts.Client = func() (client.ArtifactClient, error) { return mock, nil }
 			opts.HttpClient = func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
-			opts.Config = func() (gh.Config, error) {
-				token := tt.token
-				if token == "" {
-					token = "gho_atokenthatcanupload"
-				}
-				return config.NewMockConfigFromString(fmt.Sprintf("hosts:\n  %s:\n    user: monalisa\n    oauth_token: %s\n", repo.RepoHost(), token)), nil
-			}
 
 			err := createRun(&opts)
 

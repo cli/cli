@@ -13,7 +13,7 @@ exec gh auth setup-git
 exec gh repo create ${ORG}/${REPO} --add-readme --private
 
 # Defer repo cleanup of upstream
-defer gh repo delete --yes ${ORG}/${REPO}
+defer gh repo delete --yes --accept-cascading-deletion-of-private-forks ${ORG}/${REPO}
 exec gh repo view ${ORG}/${REPO} --json id --jq '.id'
 stdout2env REPO_ID
 

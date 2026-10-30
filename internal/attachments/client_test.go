@@ -45,7 +45,7 @@ func testAsset(t *testing.T, name, contentType, body string) UserAsset {
 func newTestUploader(t *testing.T, reg *httpmock.Registry, host string, targetRepository int64) *Uploader {
 	t.Helper()
 
-	uploader, err := NewUploader(&http.Client{Transport: reg}, gh.TokenTypeOAuth, host, targetRepository, "WRITE")
+	uploader, err := NewUploader(&http.Client{Transport: reg}, host, targetRepository, "WRITE")
 	require.NoError(t, err)
 	return uploader
 }
@@ -149,7 +149,7 @@ func TestUploadAuthentication(t *testing.T) {
 					staticTokenConfig{tt.configuredHost: tt.configuredToken},
 				),
 			}
-			uploader, err := NewUploader(client, gh.TokenTypeOAuth, tt.configuredHost, 1, "WRITE")
+			uploader, err := NewUploader(client, tt.configuredHost, 1, "WRITE")
 			require.NoError(t, err)
 
 			_, err = uploader.upload(context.Background(), a)
@@ -370,12 +370,10 @@ func TestUploadMissingFile(t *testing.T) {
 }
 
 func TestNewUploader(t *testing.T) {
-	const badTokenErr = "unsupported authentication type"
 	const badPermissionErr = "attaching files requires write access to the repository"
 
 	tests := []struct {
 		name             string
-		tokenType        gh.TokenType
 		host             string
 		targetRepository int64
 		viewerPermission string
@@ -383,42 +381,18 @@ func TestNewUploader(t *testing.T) {
 	}{
 		{
 			name:             "github.com",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: 42,
 			viewerPermission: "WRITE",
 		},
 		{
 			name:             "data residency tenant",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "acme.ghe.com",
 			targetRepository: 7,
 			viewerPermission: "WRITE",
 		},
 		{
-			name:             "classic personal access token",
-			tokenType:        gh.TokenTypePersonalAccess,
-			host:             "github.com",
-			targetRepository: 42,
-			viewerPermission: "WRITE",
-		},
-		{
-			name:             "fine-grained personal access token",
-			tokenType:        gh.TokenTypeFineGrainedPAT,
-			host:             "github.com",
-			targetRepository: 42,
-			viewerPermission: "WRITE",
-		},
-		{
-			name:             "App user-to-server token",
-			tokenType:        gh.TokenTypeUserToServer,
-			host:             "github.com",
-			targetRepository: 42,
-			viewerPermission: "WRITE",
-		},
-		{
 			name:             "rejects an enterprise server host",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.example.com",
 			targetRepository: 42,
 			viewerPermission: "WRITE",
@@ -426,46 +400,19 @@ func TestNewUploader(t *testing.T) {
 		},
 		{
 			// This row defends a message, not an order. On an enterprise server
-			// the token message would tell the user to re-authenticate, and that
-			// remedy does not work there. The other checks are free to move.
-			name:             "reports the host before the token",
-			tokenType:        gh.TokenTypeServerToServer,
+			// the permission message would tell the user to get write access,
+			// and that remedy does not work there. The other checks are free to
+			// move.
+			name:             "reports the host before the permission",
 			host:             "github.example.com",
 			targetRepository: 42,
-			viewerPermission: "WRITE",
+			viewerPermission: "READ",
 			wantErr:          "attaching files is not supported on GitHub Enterprise Server",
-		},
-		{
-			name:             "rejects an App server-to-server token",
-			tokenType:        gh.TokenTypeServerToServer,
-			host:             "github.com",
-			targetRepository: 42,
-			viewerPermission: "WRITE",
-			wantErr:          badTokenErr,
-		},
-		{
-			name:             "rejects a refresh token",
-			tokenType:        gh.TokenTypeRefresh,
-			host:             "github.com",
-			targetRepository: 42,
-			viewerPermission: "WRITE",
-			wantErr:          badTokenErr,
-		},
-		{
-			// An unrecognised prefix and no token at all reach here the same
-			// way. Which is which is decided by ActiveTokenType.
-			name:             "rejects a credential gh does not recognise",
-			tokenType:        gh.TokenTypeUnknown,
-			host:             "github.com",
-			targetRepository: 42,
-			viewerPermission: "WRITE",
-			wantErr:          badTokenErr,
 		},
 		{
 			// A caller that never fetched the id hands over a zero, and an
 			// upload cannot be taken back, so it stops before the endpoint.
 			name:             "rejects an unresolved target",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: 0,
 			viewerPermission: "WRITE",
@@ -473,7 +420,6 @@ func TestNewUploader(t *testing.T) {
 		},
 		{
 			name:             "rejects a negative target",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: -1,
 			viewerPermission: "WRITE",
@@ -481,21 +427,18 @@ func TestNewUploader(t *testing.T) {
 		},
 		{
 			name:             "admin permission",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: 42,
 			viewerPermission: "ADMIN",
 		},
 		{
 			name:             "maintain permission",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: 42,
 			viewerPermission: "MAINTAIN",
 		},
 		{
 			name:             "rejects triage permission",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: 42,
 			viewerPermission: "TRIAGE",
@@ -503,7 +446,6 @@ func TestNewUploader(t *testing.T) {
 		},
 		{
 			name:             "rejects read permission",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: 42,
 			viewerPermission: "READ",
@@ -511,20 +453,17 @@ func TestNewUploader(t *testing.T) {
 		},
 		{
 			name:             "rejects an unrecognized permission",
-			tokenType:        gh.TokenTypeOAuth,
 			host:             "github.com",
 			targetRepository: 42,
 			viewerPermission: "UNKNOWN",
 			wantErr:          badPermissionErr,
 		},
 		{
-			// Only the user can fix a low permission, so an empty string and a
-			// permission that is too low get different messages.
-			name:             "rejects an unrequested permission",
-			tokenType:        gh.TokenTypeOAuth,
+			// GraphQL has no viewerPermission for a GitHub App installation,
+			// so the endpoint decides.
+			name:             "leaves an empty permission to the endpoint",
 			host:             "github.com",
 			targetRepository: 42,
-			wantErr:          "could not determine your permission on the repository to attach files",
 		},
 	}
 
@@ -534,7 +473,7 @@ func TestNewUploader(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 
-			uploader, err := NewUploader(&http.Client{Transport: reg}, tt.tokenType, tt.host, tt.targetRepository, tt.viewerPermission)
+			uploader, err := NewUploader(&http.Client{Transport: reg}, tt.host, tt.targetRepository, tt.viewerPermission)
 
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)

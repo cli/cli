@@ -17,7 +17,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/attachments"
-	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
@@ -554,13 +553,12 @@ func TestNewCmdEdit(t *testing.T) {
 
 func Test_editRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		input      *EditOptions
-		httpStubs  func(*testing.T, *httpmock.Registry)
-		attach     []string
-		host       string
-		hostTokens map[string]string
-		uploads    []attachments.UploadStub
+		name      string
+		input     *EditOptions
+		httpStubs func(*testing.T, *httpmock.Registry)
+		attach    []string
+		host      string
+		uploads   []attachments.UploadStub
 		// The lookup builds its field list from a set, so the order varies and
 		// a row cannot assert the whole query.
 		wantLookupSelections   []string
@@ -1688,7 +1686,7 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
 		{
-			name: "the token comes from the host the issue was fetched from",
+			name: "the upload goes to the host the issue was fetched from",
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
@@ -1696,10 +1694,9 @@ func Test_editRun(t *testing.T) {
 			},
 			attach: []string{"shot.png"},
 			// A ghe.com tenant rather than a GHES host, which NewUploader
-			// refuses before it looks at the token at all.
-			host:       "acme.ghe.com",
-			hostTokens: map[string]string{"github.com": "ghs_anactionstoken", "acme.ghe.com": "gho_atenanttoken"},
-			uploads:    []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
+			// refuses.
+			host:    "acme.ghe.com",
+			uploads: []attachments.UploadStub{{Name: "shot.png", Status: 201, Body: `{"url":"https://example.com/1"}`}},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGetWithRepository(reg, "the original body", 1234, "WRITE")
 				mockIssueUpdateWithBody(t, reg, "the original body\n\n![shot](https://example.com/1)")
@@ -1773,14 +1770,6 @@ func Test_editRun(t *testing.T) {
 				tt.input.AttachEvent = attachments.BeginTelemetry(attachmentRecorder, "gh test", len(tt.attach))
 			}
 
-			hostTokens := tt.hostTokens
-			if hostTokens == nil {
-				hostTokens = map[string]string{host: "gho_atokenthatcanupload"}
-			}
-			tt.input.Config = func() (gh.Config, error) {
-				return config.NewMockConfigFromString(hostsConfig(hostTokens)), nil
-			}
-
 			// When issue editing runs
 			err := editRun(tt.input)
 			if tt.wantOperations != nil {
@@ -1842,16 +1831,6 @@ func (g *graphQLRecorder) recorded() string {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return strings.Join(g.queries, "\n")
-}
-
-// hostsConfig renders a config holding one token per host.
-func hostsConfig(tokens map[string]string) string {
-	var b strings.Builder
-	b.WriteString("hosts:\n")
-	for host, token := range tokens {
-		fmt.Fprintf(&b, "  %s:\n    user: monalisa\n    oauth_token: %s\n", host, token)
-	}
-	return b.String()
 }
 
 func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {

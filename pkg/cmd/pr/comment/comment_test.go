@@ -496,7 +496,6 @@ func TestNewCmdComment(t *testing.T) {
 			assert.Equal(t, tt.output.DeleteLastConfirmed, gotOpts.DeleteLastConfirmed)
 			assert.Equal(t, tt.output.BodyProvided, gotOpts.BodyProvided)
 
-			assert.NotNil(t, gotOpts.Config)
 			// Asserted here rather than per row, because no input changes it.
 			assert.True(t, gotOpts.KeepExistingBody)
 

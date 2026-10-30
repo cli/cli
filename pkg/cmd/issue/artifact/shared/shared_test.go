@@ -3,13 +3,10 @@ package shared
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/attachments"
-	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/artifact/client"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -788,7 +785,6 @@ func TestNewUploader(t *testing.T) {
 		target     *client.UploadTarget
 		lookupErr  error
 		httpErr    error
-		token      string
 		wantUpload bool
 		wantErr    string
 	}{
@@ -828,14 +824,6 @@ func TestNewUploader(t *testing.T) {
 			wantErr: "attaching files requires write access to the repository",
 		},
 		{
-			name:    "a token that can't upload",
-			repo:    ghrepo.New("monalisa", "monas-cafe"),
-			number:  142,
-			target:  &client.UploadTarget{RepositoryID: 1234, ViewerPermission: "WRITE"},
-			token:   "ghs_aninstallationtoken",
-			wantErr: "unsupported authentication type",
-		},
-		{
 			name:    "the HTTP client's error",
 			repo:    ghrepo.New("monalisa", "monas-cafe"),
 			number:  142,
@@ -865,15 +853,8 @@ func TestNewUploader(t *testing.T) {
 				}
 				return &http.Client{Transport: reg}, nil
 			}
-			cfg := func() (gh.Config, error) {
-				token := tt.token
-				if token == "" {
-					token = "gho_atokenthatcanupload"
-				}
-				return config.NewMockConfigFromString(fmt.Sprintf("hosts:\n  %s:\n    user: monalisa\n    oauth_token: %s\n", tt.repo.RepoHost(), token)), nil
-			}
 
-			uploader, err := NewUploader(mock, tt.repo, tt.number, httpClient, cfg)
+			uploader, err := NewUploader(mock, tt.repo, tt.number, httpClient)
 
 			require.Len(t, mock.UploadTargetCalls(), 1)
 			assert.Equal(t, tt.repo, mock.UploadTargetCalls()[0].Repo)

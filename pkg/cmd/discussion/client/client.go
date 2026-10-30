@@ -4,8 +4,6 @@
 package client
 
 import (
-	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,7 +14,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 //go:generate moq -rm -out client_mock.go . DiscussionClient
@@ -1296,16 +1293,5 @@ func (c *discussionClient) ResolveCommentNodeID(repo ghrepo.Interface, commentDa
 		return "", err
 	}
 
-	buf := bytes.Buffer{}
-	parts := []int64{0, meta.DatabaseId, commentDatabaseID}
-
-	encoder := msgpack.NewEncoder(&buf)
-	encoder.UseCompactInts(true)
-
-	if err := encoder.Encode(parts); err != nil {
-		return "", fmt.Errorf("encoding comment node ID: %w", err)
-	}
-
-	encoded := base64.RawURLEncoding.EncodeToString(buf.Bytes())
-	return "DC_" + encoded, nil
+	return "DC_" + api.EncodeNodeID(0, meta.DatabaseId, commentDatabaseID), nil
 }

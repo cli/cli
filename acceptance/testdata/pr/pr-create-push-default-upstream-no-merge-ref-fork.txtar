@@ -20,7 +20,7 @@ stdout2env USER
 exec gh repo create ${ORG}/${REPO} --add-readme --private
 
 # Defer repo cleanup of upstream
-defer gh repo delete --yes ${ORG}/${REPO}
+defer gh repo delete --yes --accept-cascading-deletion-of-private-forks ${ORG}/${REPO}
 
 # Create a user fork of repository. This will be owned by USER.
 exec gh repo fork ${ORG}/${REPO} --fork-name ${FORK}

@@ -1656,7 +1656,6 @@ func Test_createRun(t *testing.T) {
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "shot.png")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
@@ -1709,7 +1708,6 @@ func Test_createRun(t *testing.T) {
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "shot.png")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
@@ -1775,7 +1773,6 @@ func Test_createRun(t *testing.T) {
 				opts.Body = "before ![the shot](./shot.png) after"
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "shot.png")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
@@ -1803,7 +1800,6 @@ func Test_createRun(t *testing.T) {
 				opts.BodyDir = "docs"
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "docs/diagram.png")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
@@ -1823,7 +1819,7 @@ func Test_createRun(t *testing.T) {
 		},
 		{
 
-			name: "the token comes from the host the base repository resolves to",
+			name: "the upload goes to the host the base repository resolves to",
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.TitleProvided = true
 				opts.BodyProvided = true
@@ -1831,13 +1827,6 @@ func Test_createRun(t *testing.T) {
 				opts.Body = "my body"
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "shot.png")
-				// github.com must keep a token class that cannot upload: make
-				// both usable and this row passes against a command that reads
-				// the wrong host.
-				opts.Config = uploadTokenConfigForHosts(map[string]string{
-					"github.com":   "ghs_anactionstoken",
-					"acme.ghe.com": "gho_atenanttoken",
-				})
 				opts.Remotes = func() (context.Remotes, error) {
 					return context.Remotes{
 						{
@@ -1863,32 +1852,6 @@ func Test_createRun(t *testing.T) {
 			expectedOut: "https://acme.ghe.com/OWNER/REPO/pull/12\n",
 		},
 		{
-			name: "a token that cannot upload stops the command before it prompts",
-			tty:  true,
-			setup: func(opts *CreateOptions, t *testing.T) func() {
-				opts.HeadBranch = "feature"
-				opts.Assets = attachments.NewTestAssets(t, "shot.png")
-				opts.Config = uploadTokenConfig("not_a_token_that_can_upload")
-				return func() {}
-			},
-			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-			},
-			promptStubs: func(pm *prompter.PrompterMock) {
-				pm.InputFunc = func(p, d string) (string, error) {
-					return "", errors.New("the command prompted before it checked the token")
-				}
-				pm.SelectFunc = func(p, _ string, options []string) (int, error) {
-					return -1, errors.New("the command prompted before it checked the token")
-				}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Exclude(t, httpmock.REST("POST", "user-attachments/assets"))
-				reg.Exclude(t, httpmock.GraphQL(`mutation PullRequestCreate\b`))
-			},
-			wantErr: "unsupported authentication type",
-		},
-		{
 			name: "an upload that partly succeeded still creates the pull request and reports the failure",
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.TitleProvided = true
@@ -1897,7 +1860,6 @@ func Test_createRun(t *testing.T) {
 				opts.Body = "my body"
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "good.png", "bad.png")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
@@ -1926,7 +1888,6 @@ func Test_createRun(t *testing.T) {
 				opts.Body = "See the screenshot below"
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "shot.png")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
@@ -1944,7 +1905,6 @@ func Test_createRun(t *testing.T) {
 				opts.Body = "![clip][ref]\n\n[ref]: ./clip.mp4"
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "clip.mp4")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
@@ -1962,7 +1922,6 @@ func Test_createRun(t *testing.T) {
 				opts.Body = "my body"
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "good.png", "bad.png")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
@@ -1981,7 +1940,6 @@ func Test_createRun(t *testing.T) {
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "shot.png")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			repoPermission: "READ",
@@ -2004,7 +1962,6 @@ func Test_createRun(t *testing.T) {
 				opts.Body = "my body"
 				opts.HeadBranch = "feature"
 				opts.Assets = attachments.NewTestAssets(t, "shot.png")
-				opts.Config = uploadTokenConfig("gho_atokenthatcanupload")
 				return func() {}
 			},
 			repoPermission: "TRIAGE",
@@ -2128,26 +2085,6 @@ func Test_createRun(t *testing.T) {
 				assert.Equal(t, tt.expectedBrowse, output.BrowsedURL)
 			}
 		})
-	}
-}
-
-// The token's prefix decides whether the uploader accepts it, so a row varies
-// the prefix.
-func uploadTokenConfig(token string) func() (gh.Config, error) {
-	return uploadTokenConfigForHosts(map[string]string{"github.com": token})
-}
-
-// A row can give the default host a different token from the host its base
-// repository resolves to.
-func uploadTokenConfigForHosts(tokens map[string]string) func() (gh.Config, error) {
-	var b strings.Builder
-	b.WriteString("hosts:\n")
-	for host, token := range tokens {
-		fmt.Fprintf(&b, "  %s:\n    user: monalisa\n    oauth_token: %s\n", host, token)
-	}
-
-	return func() (gh.Config, error) {
-		return config.NewMockConfigFromString(b.String()), nil
 	}
 }
 
