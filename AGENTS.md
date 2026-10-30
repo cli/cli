@@ -92,6 +92,12 @@ For prose-only changes, check links and the diff; do not build or run Go tests.
   non-obvious reasons and constraints, not a narration of the code.
 - Use ordinary hyphens, not em dashes, in code, comments, and documentation.
 
+## Preparing team-authored pull requests
+
+For an authorized team-authored PR, follow the
+[prepare-team-pr skill](.agents/skills/prepare-team-pr/SKILL.md) when preparing
+or updating it.
+
 Before preparing or updating a PR, read the [PR template](.github/PULL_REQUEST_TEMPLATE.md)
 fresh. Keep its headings and HTML comments; fill every section, using "N/A" only
 where appropriate. Follow its observed-evidence, authorship, and explicit human
