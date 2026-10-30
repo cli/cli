@@ -1203,7 +1203,7 @@ func Test_downloadAsset_archiveAvoidsLegacyCodeload(t *testing.T) {
 	dest := destinationWriter{dir: tempDir}
 	defer dest.Close()
 
-	err := downloadAsset(&dest, ts.Client(), safeurl.NewImmutableSafeURL(ts.URL+"/asset"), "", true)
+	err := downloadAsset(&dest, ts.Client(), safeurl.NewImmutableSafeURL(ts.URL+"/asset"), "", true, "")
 	require.NoError(t, err)
 
 	// The file name is derived from the response, so it also proves which resource was served.
