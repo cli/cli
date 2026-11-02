@@ -107,6 +107,7 @@ func clearConfigEnv(t *testing.T) {
 		"GH_INTERNAL_AT_EXPIRES_IN",
 		"GH_INTERNAL_RT_EXPIRES_IN",
 		"GH_INTERNAL_DEBUG_REFRESH_TOKEN",
+		"GH_INTERNAL_DISABLE_KEYRING",
 	} {
 		t.Setenv(key, "")
 		require.NoError(t, os.Unsetenv(key))
