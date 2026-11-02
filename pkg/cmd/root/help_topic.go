@@ -43,8 +43,8 @@ var HelpTopics = []helpTopic{
 		short: "Environment variables that can be used with gh",
 		long: heredoc.Docf(`
 			%[1]sGH_TOKEN%[1]s, %[1]sGITHUB_TOKEN%[1]s (in order of precedence): an authentication token that will be used when
-			a command targets either %[1]sgithub.com%[1]s or a subdomain of %[1]sghe.com%[1]s. Setting this avoids being prompted to
-			authenticate and takes precedence over previously stored credentials.
+			a command targets %[1]sgithub.com%[1]s, a subdomain of %[1]sghe.com%[1]s, or %[1]sgithub.localhost%[1]s. Setting this avoids
+			being prompted to authenticate and takes precedence over previously stored credentials.
 
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s, %[1]sGITHUB_ENTERPRISE_TOKEN%[1]s (in order of precedence): an authentication
 			token that will be used when a command targets a GitHub Enterprise Server host. %[1]sgh%[1]s treats any host other
