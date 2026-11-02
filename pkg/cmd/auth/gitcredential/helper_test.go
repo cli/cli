@@ -2,6 +2,7 @@ package login
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -11,21 +12,28 @@ import (
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) ActiveTokenWithRefresh(host string) (gh.Credential, gh.RefreshStatus, error) {
+func (c tinyConfig) ResolveGitCredential(host, requestedUser string) (string, gh.Credential, gh.RefreshStatus, error) {
+	if strings.HasPrefix(host, "gist.") && c[host+":user"] == "" {
+		host = strings.TrimPrefix(host, "gist.")
+	}
 	status := gh.RefreshStatusInapplicable
 	switch c["_refresh_status"] {
 	case "expired":
 		status = gh.RefreshStatusExpired
 	}
-	return gh.Credential{
+	credential := gh.Credential{
 		Token:        c[fmt.Sprintf("%s:%s", host, "oauth_token")],
 		Source:       c["_source"],
 		RefreshToken: c["_refresh_token"],
-	}, status, nil
-}
-
-func (c tinyConfig) ActiveUser(host string) (string, error) {
-	return c[fmt.Sprintf("%s:%s", host, "user")], nil
+	}
+	user := c[host+":user"]
+	if strings.HasSuffix(credential.Source, "_TOKEN") || user == "" {
+		user = "x-access-token"
+	}
+	if requestedUser != "" && user != "x-access-token" && !strings.EqualFold(requestedUser, user) {
+		return "", gh.Credential{}, status, nil
+	}
+	return user, credential, status, nil
 }
 
 func Test_helperRun(t *testing.T) {

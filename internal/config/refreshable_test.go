@@ -716,7 +716,7 @@ func TestLoginFailsWhenOtherCredentialKindSurvivesPurge(t *testing.T) {
 			require.EqualError(t, err, tt.wantErr)
 
 			// The user was never activated.
-			_, err = authCfg.ActiveUser("github.com")
+			_, err = authCfg.ConfiguredUser("github.com")
 			require.Error(t, err)
 		})
 	}

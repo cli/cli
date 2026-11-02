@@ -191,11 +191,11 @@ func TestUserNotLoggedIn(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	// When we get the user
-	_, err := authCfg.ActiveUser("github.com")
+	user, err := authCfg.ActiveUser("github.com")
 
-	// Then it returns failure, bubbling the KeyNotFoundError
-	var keyNotFoundError *ghConfig.KeyNotFoundError
-	require.ErrorAs(t, err, &keyNotFoundError)
+	// Then no username is known
+	require.NoError(t, err)
+	require.Empty(t, user)
 }
 
 func TestHostsIncludesEnvVar(t *testing.T) {

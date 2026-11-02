@@ -108,7 +108,7 @@ func switchRun(opts *SwitchOptions) error {
 		if hostname != "" && host != hostname {
 			continue
 		}
-		hostActiveUser, err := authCfg.ActiveUser(host)
+		hostActiveUser, err := authCfg.ConfiguredUser(host)
 		if err != nil {
 			return err
 		}

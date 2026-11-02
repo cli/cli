@@ -10,6 +10,7 @@ type gitClient interface {
 	CheckoutBranch(branch string) error
 	Clone(cloneURL string, args []string) (string, error)
 	CommandOutput(args []string) ([]byte, error)
+	LsRemote(remote, ref string) ([]byte, error)
 	Config(name string) (string, error)
 	Fetch(remote string, refspec string) error
 	ForRepo(repoDir string) gitClient
@@ -31,6 +32,14 @@ func (g *gitExecuter) Clone(cloneURL string, cloneArgs []string) (string, error)
 
 func (g *gitExecuter) CommandOutput(args []string) ([]byte, error) {
 	cmd, err := g.client.Command(context.Background(), args...)
+	if err != nil {
+		return nil, err
+	}
+	return cmd.Output()
+}
+
+func (g *gitExecuter) LsRemote(remote, ref string) ([]byte, error) {
+	cmd, err := g.client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, "ls-remote", remote, ref)
 	if err != nil {
 		return nil, err
 	}

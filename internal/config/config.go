@@ -43,6 +43,11 @@ const (
 	versionKey             = "version"
 )
 
+const (
+	identityHostEnv    = "GH_IDENTITY_HOST"
+	identityAccountEnv = "GH_IDENTITY_ACCOUNT"
+)
+
 func NewConfig() (gh.Config, error) {
 	c, err := ghConfig.Read(fallbackConfig())
 	if err != nil {
@@ -255,6 +260,8 @@ type AuthConfig struct {
 	defaultHostOverride func() (string, string)
 	hostsOverride       func() []string
 	tokenOverride       func(string) (string, string)
+	accountHost         string
+	accountUser         string
 	// acquireRefreshLock acquires the cross-process refresh lock and returns a function that releases it. It is nil in
 	// production, where withFreshConfigForRefresh falls back to a flock-backed implementation. Tests set it to a no-op
 	// so they never take a real filesystem lock.
@@ -275,6 +282,82 @@ func (c *AuthConfig) SetTokenRefresher(refresher gh.TokenRefresher) {
 	c.refresher = refresher
 }
 
+// SetAccountOverride selects a saved account for this invocation without changing persistent configuration.
+func (c *AuthConfig) SetAccountOverride(host, account string) {
+	c.accountHost, c.accountUser = host, account
+}
+
+// AuthenticationEnvironment forwards invocation selection, but never credentials, to child processes.
+func (c *AuthConfig) AuthenticationEnvironment() []string {
+	host, account := c.accountHost, c.accountUser
+	if account == "" {
+		host, account = os.Getenv(identityHostEnv), os.Getenv(identityAccountEnv)
+	}
+	if host == "" || account == "" {
+		return nil
+	}
+	return []string{identityHostEnv + "=" + host, identityAccountEnv + "=" + account}
+}
+
+func (c *AuthConfig) selectedAccount(host string) string {
+	if c.accountUser != "" && strings.EqualFold(host, c.accountHost) {
+		return c.accountUser
+	}
+	if strings.EqualFold(host, os.Getenv(identityHostEnv)) {
+		return os.Getenv(identityAccountEnv)
+	}
+	return ""
+}
+
+// ResolveGitCredential resolves the effective account for Git's actual destination.
+// The helper only formats the result; account precedence and username constraints live here.
+func (c *AuthConfig) ResolveGitCredential(host, requestedUser string) (string, gh.Credential, gh.RefreshStatus, error) {
+	gistAccount := ""
+	if strings.HasPrefix(host, "gist.") {
+		gistAccount, _ = c.ConfiguredUser(host)
+		if gistAccount == "" && c.selectedAccount(host) == "" {
+			if len(c.UsersForHost(host)) > 0 {
+				return "", gh.Credential{}, gh.RefreshStatusInapplicable,
+					fmt.Errorf("saved accounts exist for %s but none is active; choose one with 'gh auth switch --hostname %s'", host, host)
+			}
+			host = strings.TrimPrefix(host, "gist.")
+		}
+	}
+
+	var credential gh.Credential
+	var status gh.RefreshStatus
+	var err error
+	user := gistAccount
+	if gistAccount != "" && c.selectedAccount(host) == "" {
+		// An independently configured gist host owns its saved credential, rather than
+		// inheriting the parent host's selection or environment-token normalization.
+		credential, status, err = c.TokenForUserWithRefresh(host, gistAccount)
+		if err == nil && (status == gh.RefreshStatusExpired || credential.Token == "") {
+			err = fmt.Errorf("account %q has no usable credential on %s; run 'gh auth login --hostname %s'", gistAccount, host, host)
+		}
+		if err != nil {
+			return "", gh.Credential{}, status, err
+		}
+	} else {
+		credential, status, err = c.ActiveTokenWithRefresh(host)
+		if err != nil && credential.Token == "" {
+			return "", gh.Credential{}, status, err
+		}
+		user, err = c.ActiveUser(host)
+		if err != nil {
+			return "", gh.Credential{}, status, err
+		}
+	}
+	if strings.HasSuffix(credential.Source, "_TOKEN") || user == "" {
+		user = "x-access-token"
+	}
+	if c.selectedAccount(host) == "" && requestedUser != "" && user != "x-access-token" &&
+		!strings.EqualFold(requestedUser, user) {
+		return "", gh.Credential{}, status, nil
+	}
+	return user, credential, status, nil
+}
+
 // ActiveTokenType reports what kind of credential the active token is, so a
 // caller that only needs to know that can avoid handling the token. It is
 // currently unused.
@@ -288,11 +371,15 @@ func (c *AuthConfig) ActiveTokenType(hostname string) gh.TokenType {
 	return gh.TokenTypeUnknown
 }
 
-// ActiveToken retrieves the active credential for the given hostname, searching environment variables, plain text
-// config, and lastly encrypted storage. It returns the last stored token as-is, including the current access token of
+// ActiveToken retrieves the effective credential for the given hostname. Invocation selection takes precedence over
+// environment variables, plain text config, and encrypted storage. It returns the last stored token as-is, including the current access token of
 // a refreshable credential, and never contacts the token endpoint to refresh it. Callers that need a token valid for
 // API calls should use ActiveTokenWithRefresh.
 func (c *AuthConfig) ActiveToken(hostname string) gh.Credential {
+	if account := c.selectedAccount(hostname); account != "" {
+		credential, _ := c.TokenForUser(hostname, account)
+		return credential
+	}
 	if c.tokenOverride != nil {
 		token, source := c.tokenOverride(hostname)
 		return gh.Credential{Source: source, Token: token}
@@ -330,6 +417,16 @@ func (c *AuthConfig) ActiveToken(hostname string) gh.Credential {
 // access token is expiring, renews and persists it, returning the credential to use and the refresh outcome.
 // Non-refreshable credentials are returned unchanged with RefreshStatusInapplicable.
 func (c *AuthConfig) ActiveTokenWithRefresh(hostname string) (gh.Credential, gh.RefreshStatus, error) {
+	if account := c.selectedAccount(hostname); account != "" {
+		credential, status, err := c.TokenForUserWithRefresh(hostname, account)
+		if err != nil {
+			return gh.Credential{}, status, fmt.Errorf("account %q on %s: %w", account, hostname, err)
+		}
+		if status == gh.RefreshStatusExpired || credential.Token == "" {
+			return gh.Credential{}, status, fmt.Errorf("account %q has no usable credential on %s; run 'gh auth login --hostname %s'", account, hostname, hostname)
+		}
+		return credential, status, nil
+	}
 	credential := c.ActiveToken(hostname)
 	if !credential.IsRefreshable() {
 		return credential, gh.RefreshStatusInapplicable, nil
@@ -400,6 +497,27 @@ func (c *AuthConfig) TokenFromKeyringForUser(hostname, username string) (string,
 // ActiveUser will retrieve the username for the active user at the given hostname.
 // This will not be accurate if the oauth token is set from an environment variable.
 func (c *AuthConfig) ActiveUser(hostname string) (string, error) {
+	if account := c.selectedAccount(hostname); account != "" {
+		return account, nil
+	}
+	var source string
+	if c.tokenOverride != nil {
+		_, source = c.tokenOverride(hostname)
+	} else {
+		_, source = ghauth.TokenFromEnvOrConfig(hostname)
+	}
+	if strings.HasSuffix(source, "_TOKEN") {
+		return "", nil
+	}
+	user, err := c.ConfiguredUser(hostname)
+	if _, ok := errors.AsType[*ghConfig.KeyNotFoundError](err); ok {
+		return "", nil
+	}
+	return user, err
+}
+
+// ConfiguredUser returns the persisted default account independently of invocation authentication.
+func (c *AuthConfig) ConfiguredUser(hostname string) (string, error) {
 	return c.cfg.Get([]string{hostsKey, hostname, userKey})
 }
 
@@ -544,7 +662,7 @@ func (c *AuthConfig) completeLogin(hostname, username, gitProtocol string) error
 }
 
 func (c *AuthConfig) SwitchUser(hostname, user string) error {
-	previouslyActiveUser, err := c.ActiveUser(hostname)
+	previouslyActiveUser, err := c.ConfiguredUser(hostname)
 	if err != nil {
 		return fmt.Errorf("failed to get active user: %s", err)
 	}
@@ -601,7 +719,7 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 		_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
 
 		// This error is ignorable because we already know there is an active user for the host
-		activeUser, _ := c.ActiveUser(hostname)
+		activeUser, _ := c.ConfiguredUser(hostname)
 
 		// If the user we're removing isn't active, then we just write the config
 		if activeUser != username {

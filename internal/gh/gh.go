@@ -217,6 +217,18 @@ type TokenRefresher interface {
 // with knowledge on how to access encrypted storage when necessary.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig interface {
+	// SetAccountOverride selects a saved account for this invocation without changing persistent configuration.
+	// Empty hostname and account values clear the override.
+	SetAccountOverride(hostname, account string)
+
+	// AuthenticationEnvironment carries invocation-local selection to child processes without tokens.
+	AuthenticationEnvironment() []string
+
+	// ResolveGitCredential resolves a Git HTTPS request for the supplied host and username.
+	// Explicit invocation selection takes precedence over requestedUser; otherwise a mismatch
+	// returns an empty credential. Environment tokens use a generic username of unknown ownership.
+	ResolveGitCredential(hostname, requestedUser string) (username string, credential Credential, refreshResult RefreshStatus, err error)
+
 	// HasActiveToken returns true when a token for the hostname is present.
 	HasActiveToken(hostname string) bool
 
@@ -225,8 +237,9 @@ type AuthConfig interface {
 	// as when refreshing fails. The caller decides whether to use the returned credential.
 	ActiveTokenWithRefresh(hostname string) (credential Credential, refreshResult RefreshStatus, err error)
 
-	// ActiveToken retrieves the active credential for the given hostname, searching environment variables, general
-	// configuration, and finally encrypted storage. It returns the last stored token as-is, including the current
+	// ActiveToken retrieves the effective credential for the given hostname. An invocation selection takes
+	// precedence; otherwise it searches environment variables, configuration, and encrypted storage.
+	// It returns the last stored token as-is, including the current
 	// access token of a refreshable credential, and never contacts the token endpoint to refresh it. A caller that
 	// needs a token valid for API calls should use ActiveTokenWithRefresh instead.
 	ActiveToken(hostname string) Credential
@@ -249,10 +262,12 @@ type AuthConfig interface {
 	// surprising cases is just too high to risk compared to the utility of having the function being smart.
 	TokenFromKeyringForUser(hostname, username string) (token string, err error)
 
-	// ActiveUser will retrieve the username for the active user at the given hostname.
-	//
-	// This will not be accurate if the oauth token is set from an environment variable.
+	// ActiveUser returns the effective username for the host, including invocation-local selection.
+	// It returns an empty username when an environment token's owner is unknown.
 	ActiveUser(hostname string) (username string, err error)
+
+	// ConfiguredUser returns the persisted default account, ignoring invocation selection and environment tokens.
+	ConfiguredUser(hostname string) (username string, err error)
 
 	// Hosts retrieves a list of known hosts.
 	Hosts() []string

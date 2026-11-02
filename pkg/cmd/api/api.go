@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/identity"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -403,7 +404,7 @@ func apiRun(opts *ApiOptions) error {
 		AppVersion:        opts.AppVersion,
 		InvokingAgent:     opts.InvokingAgent,
 		CacheTTL:          opts.CacheTTL,
-		RefreshingConfig:  cfg.Authentication(),
+		TokenForHost:      identity.TokenResolver(cfg.Authentication()),
 		EnableCache:       opts.CacheTTL > 0,
 		Log:               log,
 		LogColorize:       opts.IO.ColorEnabled(),

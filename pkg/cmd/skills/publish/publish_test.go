@@ -1648,8 +1648,11 @@ func TestEnsurePushed(t *testing.T) {
 			ios.SetStderrTTY(true)
 
 			opts := &PublishOptions{
-				IO:        ios,
-				GitClient: &git.Client{GitPath: "some/path/git", RepoDir: workDir},
+				IO: ios,
+				GitClient: &git.Client{
+					GitPath: "some/path/git", RepoDir: workDir,
+					Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+				},
 			}
 
 			err := ensurePushed(opts, workDir, "origin")

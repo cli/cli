@@ -96,8 +96,9 @@ func TestClientAuthenticatedCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := Client{
-				GhPath:  tt.path,
-				GitPath: "path/to/git",
+				GhPath:         tt.path,
+				GitPath:        "path/to/git",
+				Authentication: func() (Authentication, error) { return Authentication{}, nil },
 			}
 			cmd, err := client.AuthenticatedCommand(context.Background(), tt.pattern, "fetch")
 			if tt.wantErr != nil {
@@ -1670,6 +1671,7 @@ func TestClientFetch(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
+			client.Authentication = func() (Authentication, error) { return Authentication{}, nil }
 			err := client.Fetch(context.Background(), "origin", "trunk", tt.mods...)
 			if tt.wantErrorMsg == "" {
 				require.NoError(t, err)
@@ -1723,6 +1725,7 @@ func TestClientPull(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
+			client.Authentication = func() (Authentication, error) { return Authentication{}, nil }
 			err := client.Pull(context.Background(), "origin", "trunk", tt.mods...)
 			if tt.wantErrorMsg == "" {
 				require.NoError(t, err)
@@ -1776,6 +1779,7 @@ func TestClientPush(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
+			client.Authentication = func() (Authentication, error) { return Authentication{}, nil }
 			err := client.Push(context.Background(), "origin", "trunk", tt.mods...)
 			if tt.wantErrorMsg == "" {
 				require.NoError(t, err)
@@ -1839,6 +1843,7 @@ func TestClientClone(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
+			client.Authentication = func() (Authentication, error) { return Authentication{}, nil }
 			target, err := client.Clone(context.Background(), "https://github.com/cli/cli", tt.args, tt.mods...)
 			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
 			if tt.wantErrorMsg == "" {

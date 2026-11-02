@@ -172,7 +172,7 @@ func resolveUsername(authCfg gh.AuthConfig, hostname, username string) string {
 	if username != "" {
 		return username
 	}
-	user, _ := authCfg.ActiveUser(hostname)
+	user, _ := authCfg.ConfiguredUser(hostname)
 	return user
 }
 

@@ -13,11 +13,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const tokenUser = "x-access-token"
-
 type config interface {
-	ActiveTokenWithRefresh(string) (gh.Credential, gh.RefreshStatus, error)
-	ActiveUser(string) (string, error)
+	ResolveGitCredential(string, string) (string, gh.Credential, gh.RefreshStatus, error)
 }
 
 type CredentialOptions struct {
@@ -116,39 +113,22 @@ func helperRun(opts *CredentialOptions) error {
 		return err
 	}
 
-	lookupHost := wants["host"]
-	var gotUser string
-	// ActiveTokenWithRefresh refreshes an expired or near-expiry token before
-	// handing it to git; for non-refreshable tokens it is a no-op that just returns them.
-	cred, refreshStatus, _ := cfg.ActiveTokenWithRefresh(lookupHost)
-	if cred.Token == "" && strings.HasPrefix(lookupHost, "gist.") {
-		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-		cred, refreshStatus, _ = cfg.ActiveTokenWithRefresh(lookupHost)
+	gotUser, cred, refreshStatus, err := cfg.ResolveGitCredential(wants["host"], wants["username"])
+	if err != nil {
+		fmt.Fprintln(opts.IO.Out, "quit=1")
+		return err
 	}
 
 	// A rejected refresh token can only be recovered by re-authenticating. Notify the user on
 	// stderr, which git surfaces, and hand git no credential rather than one that is already dead.
 	if refreshStatus == gh.RefreshStatusExpired {
-		fmt.Fprintf(opts.IO.ErrOut, "the token for %s has expired; please run 'gh auth login' to re-authenticate\n", lookupHost)
+		fmt.Fprintf(opts.IO.ErrOut, "the token for %s has expired; please run 'gh auth login' to re-authenticate\n", wants["host"])
 		return cmdutil.SilentError
 	}
 
-	gotToken, source := cred.Token, cred.Source
-
-	if strings.HasSuffix(source, "_TOKEN") {
-		gotUser = tokenUser
-	} else {
-		gotUser, _ = cfg.ActiveUser(lookupHost)
-		if gotUser == "" {
-			gotUser = tokenUser
-		}
-	}
+	gotToken := cred.Token
 
 	if gotUser == "" || gotToken == "" {
-		return cmdutil.SilentError
-	}
-
-	if wants["username"] != "" && gotUser != tokenUser && !strings.EqualFold(wants["username"], gotUser) {
 		return cmdutil.SilentError
 	}
 

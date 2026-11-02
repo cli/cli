@@ -35,6 +35,16 @@ func NewCmdAuth(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *c
 	cmd.AddCommand(authTokenCmd.NewCmdToken(f, nil))
 	cmd.AddCommand(authSwitchCmd.NewCmdSwitch(f, nil))
 
+	// --account selects a saved API/HTTPS credential, not an SSH key. Until identities
+	// provide explicit SSH routes in a later stack layer, Git invokes this helper to
+	// fail rather than silently authenticate with an unrelated key from the user's SSH setup.
+	cmd.AddCommand(&cobra.Command{
+		Use: "git-ssh", Hidden: true, DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmdutil.FlagErrorf("--account SSH routing is not supported; use HTTPS")
+		},
+	})
+
 	cmdutil.DisableTelemetryForSubcommands(cmd)
 
 	return cmd

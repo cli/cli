@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/identity"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -44,7 +45,7 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
 	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
-	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
+	f.GitClient = newGitClient(f) // Depends on IOStreams, ExecutablePath, and Config
 	f.Remotes = remotesFunc(f)    // Depends on Config, and GitClient
 	f.BaseRepo = BaseRepoFunc(f.Remotes)
 	f.Prompter = newPrompter(f)              // Depends on Config and IOStreams
@@ -201,7 +202,7 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			RefreshingConfig:  cfg.Authentication(),
+			TokenForHost:      identity.TokenResolver(cfg.Authentication()),
 			Log:               ios.ErrOut,
 			LogColorize:       ios.ColorEnabled(),
 			AppVersion:        appVersion,
@@ -301,6 +302,15 @@ func newGitClient(f *cmdutil.Factory) *git.Client {
 		Stderr: io.ErrOut,
 		Stdin:  io.In,
 		Stdout: io.Out,
+		Authentication: func() (git.Authentication, error) {
+			cfg, err := f.Config()
+			if err != nil {
+				return git.Authentication{}, err
+			}
+			auth := cfg.Authentication()
+			env := auth.AuthenticationEnvironment()
+			return git.Authentication{Environment: env, UseSSHHelper: len(env) > 0}, nil
+		},
 	}
 	return client
 }

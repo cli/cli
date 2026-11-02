@@ -18,6 +18,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/safeexec"
+	"github.com/kballard/go-shellquote"
 )
 
 // MergeBaseConfig is the configuration setting to keep track of the PR target branch.
@@ -50,6 +51,12 @@ type errWithExitCode interface {
 	ExitCode() int
 }
 
+// Authentication supplies child-process authentication context and SSH routing policy.
+type Authentication struct {
+	Environment  []string
+	UseSSHHelper bool
+}
+
 type Client struct {
 	GhPath  string
 	RepoDir string
@@ -57,6 +64,8 @@ type Client struct {
 	Stderr  io.Writer
 	Stdin   io.Reader
 	Stdout  io.Writer
+	// Authentication resolves settings when constructing an authenticated command, after command pre-run.
+	Authentication func() (Authentication, error)
 
 	commandContext commandCtx
 	mu             sync.Mutex
@@ -64,12 +73,13 @@ type Client struct {
 
 func (c *Client) Copy() *Client {
 	return &Client{
-		GhPath:  c.GhPath,
-		RepoDir: c.RepoDir,
-		GitPath: c.GitPath,
-		Stderr:  c.Stderr,
-		Stdin:   c.Stdin,
-		Stdout:  c.Stdout,
+		GhPath:         c.GhPath,
+		RepoDir:        c.RepoDir,
+		GitPath:        c.GitPath,
+		Stderr:         c.Stderr,
+		Stdin:          c.Stdin,
+		Stdout:         c.Stdout,
+		Authentication: c.Authentication,
 
 		commandContext: c.commandContext,
 	}
@@ -138,8 +148,8 @@ func CredentialPatternFromHost(host string) CredentialPattern {
 	}
 }
 
-// AuthenticatedCommand is a wrapper around Command that included configuration to use gh
-// as the credential helper for git.
+// AuthenticatedCommand configures gh as Git's credential helper and applies any
+// invocation-local account selection to HTTPS and SSH authentication.
 func (c *Client) AuthenticatedCommand(ctx context.Context, credentialPattern CredentialPattern, args ...string) (*Command, error) {
 	if c.GhPath == "" {
 		// Assumes that gh is in PATH.
@@ -147,19 +157,37 @@ func (c *Client) AuthenticatedCommand(ctx context.Context, credentialPattern Cre
 	}
 	credHelper := fmt.Sprintf("!%q auth git-credential", c.GhPath)
 
+	// An empty helper resets the matching chain before installing gh, so another
+	// credential helper cannot supply credentials ahead of the selected account.
 	var preArgs []string
-	if credentialPattern == disallowedCredentialPattern {
+	switch credentialPattern {
+	case disallowedCredentialPattern:
 		return nil, fmt.Errorf("empty credential pattern is not allowed unless provided explicitly")
-	} else if credentialPattern == AllMatchingCredentialsPattern {
+	case AllMatchingCredentialsPattern:
 		preArgs = []string{"-c", "credential.helper="}
 		preArgs = append(preArgs, "-c", fmt.Sprintf("credential.helper=%s", credHelper))
-	} else {
+	default:
 		preArgs = []string{"-c", fmt.Sprintf("credential.%s.helper=", credentialPattern.pattern)}
 		preArgs = append(preArgs, "-c", fmt.Sprintf("credential.%s.helper=%s", credentialPattern.pattern, credHelper))
 	}
 
-	args = append(preArgs, args...)
-	return c.Command(ctx, args...)
+	auth, err := c.Authentication()
+	if err != nil {
+		return nil, err
+	}
+	cmd, err := c.Command(ctx, append(preArgs, args...)...)
+	if err != nil {
+		return nil, err
+	}
+	// Forward authentication context, not credentials, to the helper's fresh process.
+	// Git supplies the actual host and requested username to the helper, which resolves
+	// the effective account. The helper chain above affects this invocation only.
+	cmd.Env = append(cmd.Environ(), auth.Environment...)
+	if auth.UseSSHHelper {
+		// Route SSH through gh rather than an unrelated key; declare OpenSSH argument syntax.
+		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+shellquote.Join(c.GhPath, "auth", "git-ssh"), "GIT_SSH_VARIANT=ssh")
+	}
+	return cmd, nil
 }
 
 func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {

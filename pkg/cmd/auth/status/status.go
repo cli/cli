@@ -316,7 +316,7 @@ func statusRun(opts *StatusOptions) error {
 		gitProtocol := cfg.GitProtocol(hostname).Value
 		activeCred, activeRefreshStatus := resolveCredential(authCfg, hostname, "", opts.NoRefresh)
 		if authTokenWriteable(activeCred.Source) {
-			activeUser, _ = authCfg.ActiveUser(hostname)
+			activeUser, _ = authCfg.ConfiguredUser(hostname)
 		}
 		entry := buildEntry(httpClient, buildEntryOptions{
 			active:        true,

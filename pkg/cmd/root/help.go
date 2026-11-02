@@ -185,7 +185,17 @@ func WriteHelp(w io.Writer, cs *iostreams.ColorScheme, command *cobra.Command) {
 	if flagUsages != "" {
 		helpEntries = append(helpEntries, helpEntry{"FLAGS", dedent(flagUsages)})
 	}
-	inheritedFlagUsages := command.InheritedFlags().FlagUsages()
+	inherited := command.InheritedFlags()
+	if isAuthCommand(command) {
+		visible := pflag.NewFlagSet("", pflag.ContinueOnError)
+		inherited.VisitAll(func(flag *pflag.Flag) {
+			if flag.Name != "account" {
+				visible.AddFlag(flag)
+			}
+		})
+		inherited = visible
+	}
+	inheritedFlagUsages := inherited.FlagUsages()
 	if inheritedFlagUsages != "" {
 		helpEntries = append(helpEntries, helpEntry{"INHERITED FLAGS", dedent(inheritedFlagUsages)})
 	}

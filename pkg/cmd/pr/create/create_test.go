@@ -2036,8 +2036,9 @@ func Test_createRun(t *testing.T) {
 			}
 			opts.Finder = shared.NewMockFinder(branch, nil, nil)
 			opts.GitClient = &git.Client{
-				GhPath:  "some/path/gh",
-				GitPath: "some/path/git",
+				Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+				GhPath:         "some/path/gh",
+				GitPath:        "some/path/git",
 			}
 			cleanSetup := func() {}
 			if tt.setup != nil {
@@ -2577,8 +2578,9 @@ func Test_createRun_GHES(t *testing.T) {
 			}
 			opts.Finder = shared.NewMockFinder(branch, nil, nil)
 			opts.GitClient = &git.Client{
-				GhPath:  "some/path/gh",
-				GitPath: "some/path/git",
+				Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+				GhPath:         "some/path/gh",
+				GitPath:        "some/path/git",
 			}
 			cleanSetup := func() {}
 			if tt.setup != nil {
@@ -2653,8 +2655,9 @@ func TestRemoteGuessing(t *testing.T) {
 		IO:       ios,
 		Prompter: &prompter.PrompterMock{},
 		GitClient: &git.Client{
-			GhPath:  "some/path/gh",
-			GitPath: "some/path/git",
+			Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+			GhPath:         "some/path/gh",
+			GitPath:        "some/path/git",
 		},
 		Finder: shared.NewMockFinder("feature", nil, nil),
 		Remotes: func() (context.Remotes, error) {
@@ -2728,8 +2731,9 @@ func TestNoRepoCanBeDetermined(t *testing.T) {
 		IO:       ios,
 		Prompter: &prompter.PrompterMock{},
 		GitClient: &git.Client{
-			GhPath:  "some/path/gh",
-			GitPath: "some/path/git",
+			Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+			GhPath:         "some/path/gh",
+			GitPath:        "some/path/git",
 		},
 		Finder: shared.NewMockFinder("feature", nil, nil),
 		Remotes: func() (context.Remotes, error) {
@@ -3073,8 +3077,9 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				GitClient: &git.Client{
-					GhPath:  "some/path/gh",
-					GitPath: "some/path/git",
+					Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+					GhPath:         "some/path/gh",
+					GitPath:        "some/path/git",
 				},
 				Remotes: func() (context.Remotes, error) {
 					return context.Remotes{
@@ -3125,8 +3130,9 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				GitClient: &git.Client{
-					GhPath:  "some/path/gh",
-					GitPath: "some/path/git",
+					Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+					GhPath:         "some/path/gh",
+					GitPath:        "some/path/git",
 				},
 				Remotes: func() (context.Remotes, error) {
 					return context.Remotes{
@@ -3236,8 +3242,9 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				IO:       ios,
 				Prompter: pm,
 				GitClient: &git.Client{
-					GhPath:  "some/path/gh",
-					GitPath: "some/path/git",
+					Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+					GhPath:         "some/path/gh",
+					GitPath:        "some/path/git",
 				},
 				Finder:   shared.NewMockFinder("feature", nil, nil),
 				Detector: &fd.EnabledDetectorMock{},
@@ -3331,8 +3338,9 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				IO:       ios,
 				Prompter: pm,
 				GitClient: &git.Client{
-					GhPath:  "some/path/gh",
-					GitPath: "some/path/git",
+					Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+					GhPath:         "some/path/gh",
+					GitPath:        "some/path/git",
 				},
 				Finder:   shared.NewMockFinder("feature", nil, nil),
 				Detector: &fd.DisabledDetectorMock{},
@@ -3389,8 +3397,9 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				GitClient: &git.Client{
-					GhPath:  "some/path/gh",
-					GitPath: "some/path/git",
+					Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+					GhPath:         "some/path/gh",
+					GitPath:        "some/path/git",
 				},
 				Remotes: func() (context.Remotes, error) {
 					return context.Remotes{
@@ -3443,8 +3452,9 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				GitClient: &git.Client{
-					GhPath:  "some/path/gh",
-					GitPath: "some/path/git",
+					Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+					GhPath:         "some/path/gh",
+					GitPath:        "some/path/git",
 				},
 				Remotes: func() (context.Remotes, error) {
 					return context.Remotes{

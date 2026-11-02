@@ -277,8 +277,9 @@ func runCommandWithBranchFunc(rt http.RoundTripper, pm *prompter.PrompterMock, b
 			}, nil
 		},
 		GitClient: &git.Client{
-			GhPath:  "some/path/gh",
-			GitPath: "some/path/git",
+			Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+			GhPath:         "some/path/gh",
+			GitPath:        "some/path/git",
 		},
 		Prompter: pm,
 	}

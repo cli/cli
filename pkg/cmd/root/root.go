@@ -67,6 +67,7 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 	if err != nil {
 		return nil, fmt.Errorf("failed to read configuration: %s\n", err)
 	}
+	cfg.Authentication().SetAccountOverride("", "")
 
 	cmd := &cobra.Command{
 		Use:   "gh <command> <subcommand> [flags]",
@@ -100,6 +101,7 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 	// cmd.SetErr(f.IOStreams.ErrOut) // just let it default to os.Stderr instead
 
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
+	cmd.PersistentFlags().String("account", "", "Use saved account `login` for this command's API and Git authentication (experimental)")
 
 	// override Cobra's default behaviors unless an opt-out has been set
 	if os.Getenv("GH_COBRA") == "" {
@@ -251,6 +253,7 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 
 	cmdutil.DisableAuthCheck(cmd)
 	cmdutil.RecordTelemetryForSubcommands(cmd, telemetry)
+	installAccountOverride(cmd, cfg, f)
 
 	// The reference command produces paged output that displays information on every other command.
 	// Therefore, we explicitly set the Long text and HelpFunc here after all other commands are registered.

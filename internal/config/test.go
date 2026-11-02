@@ -151,6 +151,8 @@ func NewIsolatedTestConfig(t *testing.T, cfgString string) (*cfg, func(io.Writer
 		"GH_ENTERPRISE_TOKEN",
 		"GITHUB_ENTERPRISE_TOKEN",
 		"GH_HOST",
+		identityHostEnv,
+		identityAccountEnv,
 	} {
 		t.Setenv(key, "")
 	}

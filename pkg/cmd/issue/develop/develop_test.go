@@ -958,8 +958,9 @@ func TestDevelopRun(t *testing.T) {
 			}
 
 			opts.GitClient = &git.Client{
-				GhPath:  "some/path/gh",
-				GitPath: "some/path/git",
+				Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+				GhPath:         "some/path/gh",
+				GitPath:        "some/path/git",
 			}
 
 			cmdStubs, cmdTeardown := run.Stub()

@@ -276,7 +276,7 @@ func refreshRun(opts *RefreshOptions) error {
 	// a later storage failure must not hide that an expiring, refreshable token was issued.
 	authEvent.RecordExpiringReceived(result.Refreshable != nil)
 
-	activeUser, _ := authCfg.ActiveUser(hostname)
+	activeUser, _ := authCfg.ConfiguredUser(hostname)
 	if activeUser != "" && activeUser != result.Username {
 		return fmt.Errorf("error refreshing credentials for %s, received credentials for %s, did you use the correct account in the browser?", activeUser, result.Username)
 	}
@@ -314,7 +314,7 @@ func refreshRun(opts *RefreshOptions) error {
 	if credentialFlow.ShouldSetup() {
 		// The active token was just minted by the auth flow above, so it cannot be expired here. We use
 		// ActiveToken rather than the WithRefresh variant to avoid a needless refresh round-trip.
-		username, _ := authCfg.ActiveUser(hostname)
+		username, _ := authCfg.ConfiguredUser(hostname)
 		password := authCfg.ActiveToken(hostname).Token
 		warning, err := credentialFlow.Setup(hostname, username, password, result.Refreshable != nil)
 		if err != nil {

@@ -27,8 +27,9 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 			return config.NewMockConfig(), nil
 		},
 		GitClient: &git.Client{
-			GhPath:  "some/path/gh",
-			GitPath: "some/path/git",
+			Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+			GhPath:         "some/path/gh",
+			GitPath:        "some/path/git",
 		},
 	}
 

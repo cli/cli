@@ -126,8 +126,9 @@ func runCloneCommandWithConfig(httpClient *http.Client, cfg gh.Config, cli strin
 			return cfg, nil
 		},
 		GitClient: &git.Client{
-			GhPath:  "some/path/gh",
-			GitPath: "some/path/git",
+			Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+			GhPath:         "some/path/gh",
+			GitPath:        "some/path/git",
 		},
 	}
 

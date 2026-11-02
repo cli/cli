@@ -738,8 +738,9 @@ func Test_checkoutRun(t *testing.T) {
 			}
 
 			opts.GitClient = &git.Client{
-				GhPath:  "some/path/gh",
-				GitPath: "some/path/git",
+				Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+				GhPath:         "some/path/gh",
+				GitPath:        "some/path/git",
 			}
 
 			err := checkoutRun(opts)
@@ -879,8 +880,9 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cl
 			return branch, nil
 		},
 		GitClient: &git.Client{
-			GhPath:  "some/path/gh",
-			GitPath: "some/path/git",
+			Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+			GhPath:         "some/path/gh",
+			GitPath:        "some/path/git",
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return baseRepo, nil
@@ -1209,8 +1211,9 @@ func Test_authenticatedCommand_stripsWorktreePrefix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &git.Client{
-				GhPath:  "/some/path/gh",
-				GitPath: "/some/path/git",
+				GhPath:         "/some/path/gh",
+				GitPath:        "/some/path/git",
+				Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
 			}
 			cmd, err := authenticatedCommand(client, git.AllMatchingCredentialsPattern, tt.args)
 			require.NoError(t, err)

@@ -24,6 +24,11 @@ func (g *mockGitClient) CommandOutput(commandArgs []string) ([]byte, error) {
 	return []byte(args.String(0)), args.Error(1)
 }
 
+func (g *mockGitClient) LsRemote(remote, ref string) ([]byte, error) {
+	args := g.Called(remote, ref)
+	return []byte(args.String(0)), args.Error(1)
+}
+
 func (g *mockGitClient) Config(name string) (string, error) {
 	args := g.Called(name)
 	return args.String(0), args.Error(1)

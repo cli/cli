@@ -135,7 +135,7 @@ func (e *Extension) LatestVersion() string {
 		}
 		latestVersion = release.Tag
 	case GitKind:
-		if lsRemote, err := e.gitClient.CommandOutput([]string{"ls-remote", "origin", "HEAD"}); err == nil {
+		if lsRemote, err := e.gitClient.LsRemote("origin", "HEAD"); err == nil {
 			latestVersion = string(bytes.SplitN(lsRemote, []byte("\t"), 2)[0])
 		}
 	}

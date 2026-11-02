@@ -36,18 +36,19 @@ type HTTPClientOptions struct {
 	AppVersion    string
 	InvokingAgent string
 	CacheTTL      time.Duration
-	// Config is the primitive, backward-compatible token source for authenticating requests. Provide either Config or
-	// RefreshingConfig, never both; NewHTTPClient returns an error if both are set. A token from Config is used as-is,
-	// with no refresh.
+	// Config is the primitive, backward-compatible token source for authenticating requests.
+	// Provide only one of Config, RefreshingConfig, or TokenForHost. A token from Config is used as-is, with no refresh.
 	Config config
-	// RefreshingConfig is the refresh-aware token source gh supplies for its own clients. Provide either Config or
-	// RefreshingConfig, never both; NewHTTPClient returns an error if both are set. When set, a near-expiry
-	// token is refreshed on demand before each request.
+	// RefreshingConfig is a refresh-aware token source, mutually exclusive with Config and TokenForHost.
+	// When set, a near-expiry token is refreshed on demand before each request.
 	RefreshingConfig refreshingConfig
-	EnableCache      bool
-	Log              io.Writer
-	LogColorize      bool
-	LogVerboseHTTP   bool
+	// TokenForHost resolves authentication for a normalized request hostname. It is mutually
+	// exclusive with Config and RefreshingConfig. Errors stop the request before it is sent.
+	TokenForHost   func(host string) (string, error)
+	EnableCache    bool
+	Log            io.Writer
+	LogColorize    bool
+	LogVerboseHTTP bool
 	// LogHeadlineOnly keeps logging non-verbose even when GH_DEBUG requests api tracing, so only httpretty's head
 	// lines (timing and URL) are emitted, not request/response headers and bodies. It is used by the token refresher
 	// client so a refresh triggered mid request does not dump a full trace into the middle of the user's request log.
@@ -59,6 +60,9 @@ type HTTPClientOptions struct {
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	if opts.Config != nil && opts.RefreshingConfig != nil {
 		return nil, errors.New("provide either Config or RefreshingConfig, not both")
+	}
+	if opts.TokenForHost != nil && (opts.Config != nil || opts.RefreshingConfig != nil) {
+		return nil, errors.New("provide TokenForHost without Config or RefreshingConfig")
 	}
 
 	// Provide invalid host, and token values so gh.HTTPClient will not automatically resolve them.
@@ -102,7 +106,9 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		return nil, err
 	}
 
-	if opts.RefreshingConfig != nil {
+	if opts.TokenForHost != nil {
+		client.Transport = AddAuthTokenHeaderWithResolver(client.Transport, opts.TokenForHost)
+	} else if opts.RefreshingConfig != nil {
 		client.Transport = AddAuthTokenHeaderWithRefresh(client.Transport, opts.RefreshingConfig)
 	} else if opts.Config != nil {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
@@ -181,10 +187,9 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 }
 
 // AddAuthTokenHeader adds an authentication token header for the host specified by the request, using the primitive
-// token source. It is the backward-compatible entry point retained for external callers of this package; gh's own code
-// authenticates through the refresh-aware AddAuthTokenHeaderWithRefresh.
+// token source. It is the backward-compatible entry point retained for external callers of this package.
 func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
-	return addAuthHeaderRoundTripper(rt, func(host string) string {
+	return AddAuthTokenHeaderWithResolver(rt, func(host string) (string, error) {
 		token, _ := cfg.ActiveToken(host)
 		if token == "" {
 			// The request may be aimed at a host's api_host, which gh is
@@ -196,15 +201,14 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
 				token, _ = cfg.ActiveToken(canonicalHost)
 			}
 		}
-		return token
+		return token, nil
 	})
 }
 
 // AddAuthTokenHeaderWithRefresh is the refresh-aware counterpart of AddAuthTokenHeader. It renews a near-expiry
-// token before attaching it, and is the attach helper gh's own code uses so its requests go through the
-// refresh path rather than the backward-compatible primitive seam.
+// token before attaching it while retaining the configuration-based gateway fallback policy.
 func AddAuthTokenHeaderWithRefresh(rt http.RoundTripper, cfg refreshingConfig) http.RoundTripper {
-	return addAuthHeaderRoundTripper(rt, func(host string) string {
+	return AddAuthTokenHeaderWithResolver(rt, func(host string) (string, error) {
 		// Refreshing is best effort because it happens before actual expiry, and expiry checks can be unreliable due
 		// to clock skew. Continue with the returned token and let the API determine whether it is valid.
 		cred, _, _ := cfg.ActiveTokenWithRefresh(host)
@@ -220,14 +224,14 @@ func AddAuthTokenHeaderWithRefresh(rt http.RoundTripper, cfg refreshingConfig) h
 				token = cred.Token
 			}
 		}
-		return token
+		return token, nil
 	})
 }
 
-// addAuthHeaderRoundTripper wraps rt so each request receives the token returned by tokenForHost for its (normalized)
+// AddAuthTokenHeaderWithResolver wraps rt so each request receives the token returned by tokenForHost for its normalized
 // host, unless the Authorization header is already set or the request is a redirect to a different host. tokenForHost
-// encapsulates how the token is resolved, which is the only difference between the primitive and refresh-aware paths.
-func addAuthHeaderRoundTripper(rt http.RoundTripper, tokenForHost func(host string) string) http.RoundTripper {
+// encapsulates credential selection; an error prevents the request from being sent.
+func AddAuthTokenHeaderWithResolver(rt http.RoundTripper, tokenForHost func(host string) (string, error)) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
 		if req.Header.Get(authorization) != "" {
@@ -235,6 +239,9 @@ func addAuthHeaderRoundTripper(rt http.RoundTripper, tokenForHost func(host stri
 		}
 
 		var redirectHostnameChange bool
+		// net/http sets Response to the response that triggered a redirect, whose Request
+		// identifies the previous destination. Don't reattach credentials that the client
+		// may have stripped when crossing hosts.
 		if req.Response != nil && req.Response.Request != nil {
 			redirectHostnameChange = getHostname(req) != getHostname(req.Response.Request)
 		}
@@ -246,8 +253,12 @@ func addAuthHeaderRoundTripper(rt http.RoundTripper, tokenForHost func(host stri
 		}
 
 		hostnameInRequest := ghauth.NormalizeHostname(getHostname(req))
-		token := tokenForHost(hostnameInRequest)
+		token, err := tokenForHost(hostnameInRequest)
+		if err != nil {
+			return nil, err
+		}
 		if token != "" {
+			req = req.Clone(req.Context())
 			req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 		}
 

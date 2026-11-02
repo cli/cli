@@ -769,8 +769,9 @@ func TestRepoFork(t *testing.T) {
 			}
 
 			tt.opts.GitClient = &git.Client{
-				GhPath:  "some/path/gh",
-				GitPath: "some/path/git",
+				Authentication: func() (git.Authentication, error) { return git.Authentication{}, nil },
+				GhPath:         "some/path/gh",
+				GitPath:        "some/path/git",
 			}
 
 			pm := prompter.NewMockPrompter(t)

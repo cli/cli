@@ -151,13 +151,13 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 
 	// We can ignore the error here because a host must always have an active user
-	preLogoutActiveUser, _ := authCfg.ActiveUser(hostname)
+	preLogoutActiveUser, _ := authCfg.ConfiguredUser(hostname)
 
 	if err := authCfg.Logout(hostname, username); err != nil {
 		return err
 	}
 
-	postLogoutActiveUser, _ := authCfg.ActiveUser(hostname)
+	postLogoutActiveUser, _ := authCfg.ConfiguredUser(hostname)
 	hasSwitchedToNewUser := preLogoutActiveUser != postLogoutActiveUser &&
 		postLogoutActiveUser != ""
 
