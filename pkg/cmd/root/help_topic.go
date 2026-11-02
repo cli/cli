@@ -47,7 +47,8 @@ var HelpTopics = []helpTopic{
 			authenticate and takes precedence over previously stored credentials.
 
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s, %[1]sGITHUB_ENTERPRISE_TOKEN%[1]s (in order of precedence): an authentication
-			token that will be used when a command targets a GitHub Enterprise Server host.
+			token that will be used when a command targets a GitHub Enterprise Server host. %[1]sgh%[1]s treats any host other
+			than %[1]sgithub.com%[1]s, a subdomain of %[1]sghe.com%[1]s, or %[1]sgithub.localhost%[1]s as a GitHub Enterprise Server host.
 
 			%[1]sGH_HOST%[1]s: specify the GitHub hostname for commands where a hostname has not been provided, or
 			cannot be inferred from the context of a local Git repository. If this host was previously
