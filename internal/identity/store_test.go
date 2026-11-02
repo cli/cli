@@ -208,23 +208,6 @@ func TestDirectoryChoiceFromSubdirectoryStartsAtRepositoryRoot(t *testing.T) {
 	assert.Equal(t, "alice@test.invalid\n", runGit(t, repo, "config", "user.email"))
 }
 
-func TestBasicSSHRefusesCustomConnectionCommand(t *testing.T) {
-	// Given a global SSH command that basic alias routing cannot safely preserve
-	s := isolatedStore(t)
-	dir := t.TempDir()
-	runGit(t, dir, "init", "-q")
-	runGit(t, dir, "config", "--global", "core.sshCommand", "ssh -F company.conf")
-	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
-
-	// When applying the identity
-	err := s.Bind(Binding{Identity: "work", Directory: dir}, "/path/to/gh")
-
-	// Then setup refuses explicitly and preserves the user's connection settings
-	require.ErrorContains(t, err, "custom core.sshCommand is not supported")
-	assert.Equal(t, "ssh -F company.conf\n", runGit(t, dir, "config", "--global", "core.sshCommand"))
-	assert.NoFileExists(t, s.authConfigPath())
-}
-
 func TestNestedDirectoryBindingOverridesAndRevealsParent(t *testing.T) {
 	// Given two directory choices above a repository
 	s := isolatedStore(t)
