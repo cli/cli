@@ -3,6 +3,7 @@ package identity
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -16,17 +17,17 @@ type Credentials interface {
 
 type accountConfig interface {
 	HostForAPIHost(string) (string, bool)
-	ResolveToken(host, owner, dir string) (gh.Credential, error)
+	ResolveToken(host string, request *http.Request) (gh.Credential, error)
 }
 
 // TokenResolver resolves effective credentials for the logical host named by api_host.
 // HTTP header and redirect handling belong to the shared API authentication wrapper.
-func TokenResolver(auth accountConfig) func(string) (string, error) {
-	return func(host string) (string, error) {
+func TokenResolver(auth accountConfig) func(string, *http.Request) (string, error) {
+	return func(host string, request *http.Request) (string, error) {
 		if canonical, ok := auth.HostForAPIHost(host); ok {
 			host = canonical
 		}
-		credential, err := auth.ResolveToken(host, "", "")
+		credential, err := auth.ResolveToken(host, request)
 		return credential.Token, err
 	}
 }

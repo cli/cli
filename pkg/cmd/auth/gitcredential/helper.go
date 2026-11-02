@@ -14,7 +14,7 @@ import (
 )
 
 type config interface {
-	ResolveGitCredential(string, string) (string, gh.Credential, gh.RefreshStatus, error)
+	ResolveGitCredential(string, string, string) (string, gh.Credential, gh.RefreshStatus, error)
 }
 
 type CredentialOptions struct {
@@ -113,7 +113,7 @@ func helperRun(opts *CredentialOptions) error {
 		return err
 	}
 
-	gotUser, cred, refreshStatus, err := cfg.ResolveGitCredential(wants["host"], wants["username"])
+	gotUser, cred, refreshStatus, err := cfg.ResolveGitCredential(wants["host"], wants["username"], wants["path"])
 	if err != nil {
 		fmt.Fprintln(opts.IO.Out, "quit=1")
 		return err

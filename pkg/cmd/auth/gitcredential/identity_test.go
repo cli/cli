@@ -2,7 +2,6 @@ package login
 
 import (
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,10 +15,8 @@ import (
 
 func TestCredentialHelperUsesBoundAccountRatherThanActiveAccount(t *testing.T) {
 	isolateIdentityCredential(t)
-	// Given an repository identity selecting alice while bob is globally active
+	// Given an owner identity selecting alice while bob is globally active
 	home := t.TempDir()
-	require.NoError(t, exec.Command("git", "init", "-q", home).Run())
-	t.Chdir(home)
 	t.Setenv("HOME", home)
 	t.Setenv("GH_CONFIG_DIR", filepath.Join(home, "gh"))
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
@@ -31,7 +28,7 @@ func TestCredentialHelperUsesBoundAccountRatherThanActiveAccount(t *testing.T) {
 	s, err := identity.Open()
 	require.NoError(t, err)
 	require.NoError(t, s.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
-	require.NoError(t, s.Bind(identity.Binding{Identity: "work", Directory: home}, "/path/to/gh"))
+	require.NoError(t, s.Bind(identity.Binding{Identity: "work", Owner: "company"}, "/path/to/gh"))
 	ios, input, output, _ := iostreams.Test()
 	fmt.Fprint(input, "protocol=https\nhost=github.com\npath=company/project.git\n\n")
 	opts := &CredentialOptions{

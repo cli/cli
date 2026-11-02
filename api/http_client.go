@@ -42,9 +42,9 @@ type HTTPClientOptions struct {
 	// RefreshingConfig is a refresh-aware token source, mutually exclusive with Config and TokenForHost.
 	// When set, a near-expiry token is refreshed on demand before each request.
 	RefreshingConfig refreshingConfig
-	// TokenForHost resolves authentication for a normalized request hostname. It is mutually
+	// TokenForHost resolves authentication for a normalized hostname and request context. It is mutually
 	// exclusive with Config and RefreshingConfig. Errors stop the request before it is sent.
-	TokenForHost   func(host string) (string, error)
+	TokenForHost   func(host string, request *http.Request) (string, error)
 	EnableCache    bool
 	Log            io.Writer
 	LogColorize    bool
@@ -189,7 +189,7 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 // AddAuthTokenHeader adds an authentication token header for the host specified by the request, using the primitive
 // token source. It is the backward-compatible entry point retained for external callers of this package.
 func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
-	return AddAuthTokenHeaderWithResolver(rt, func(host string) (string, error) {
+	return AddAuthTokenHeaderWithResolver(rt, func(host string, _ *http.Request) (string, error) {
 		token, _ := cfg.ActiveToken(host)
 		if token == "" {
 			// The request may be aimed at a host's api_host, which gh is
@@ -208,7 +208,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg config) http.RoundTripper {
 // AddAuthTokenHeaderWithRefresh is the refresh-aware counterpart of AddAuthTokenHeader. It renews a near-expiry
 // token before attaching it while retaining the configuration-based gateway fallback policy.
 func AddAuthTokenHeaderWithRefresh(rt http.RoundTripper, cfg refreshingConfig) http.RoundTripper {
-	return AddAuthTokenHeaderWithResolver(rt, func(host string) (string, error) {
+	return AddAuthTokenHeaderWithResolver(rt, func(host string, _ *http.Request) (string, error) {
 		// Refreshing is best effort because it happens before actual expiry, and expiry checks can be unreliable due
 		// to clock skew. Continue with the returned token and let the API determine whether it is valid.
 		cred, _, _ := cfg.ActiveTokenWithRefresh(host)
@@ -231,7 +231,7 @@ func AddAuthTokenHeaderWithRefresh(rt http.RoundTripper, cfg refreshingConfig) h
 // AddAuthTokenHeaderWithResolver wraps rt so each request receives the token returned by tokenForHost for its normalized
 // host, unless the Authorization header is already set or the request is a redirect to a different host. tokenForHost
 // encapsulates credential selection; an error prevents the request from being sent.
-func AddAuthTokenHeaderWithResolver(rt http.RoundTripper, tokenForHost func(host string) (string, error)) http.RoundTripper {
+func AddAuthTokenHeaderWithResolver(rt http.RoundTripper, tokenForHost func(host string, request *http.Request) (string, error)) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
 		if req.Header.Get(authorization) != "" {
@@ -253,7 +253,7 @@ func AddAuthTokenHeaderWithResolver(rt http.RoundTripper, tokenForHost func(host
 		}
 
 		hostnameInRequest := ghauth.NormalizeHostname(getHostname(req))
-		token, err := tokenForHost(hostnameInRequest)
+		token, err := tokenForHost(hostnameInRequest, req)
 		if err != nil {
 			return nil, err
 		}

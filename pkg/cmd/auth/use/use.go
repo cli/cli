@@ -16,6 +16,7 @@ import (
 type UseOptions struct {
 	Identity  string
 	Directory string
+	Owner     string
 	Host      string
 	Unset     bool
 	List      bool
@@ -39,16 +40,20 @@ func NewCmdUse(f *cmdutil.Factory, runF func(*UseOptions) error) *cobra.Command 
 			if opts.Identity != "" && cmd.Flags().Changed("hostname") {
 				return cmdutil.FlagErrorf("--hostname is for inspection or --unset; a named identity supplies its own hostname")
 			}
-
+			if cmd.Flags().Changed("owner") && opts.Owner == "" {
+				return cmdutil.FlagErrorf("--owner cannot be empty")
+			}
 			if opts.Host == "" {
 				return cmdutil.FlagErrorf("--hostname cannot be empty")
 			}
-
+			if opts.Owner != "" && opts.Directory != "" {
+				return cmdutil.FlagErrorf("--owner cannot be combined with --directory")
+			}
 			if opts.Unset && opts.Identity != "" {
 				return cmdutil.FlagErrorf("--unset does not take an identity")
 			}
 
-			if opts.List && (opts.Identity != "" || opts.Unset || opts.Directory != "") {
+			if opts.List && (opts.Identity != "" || opts.Unset || opts.Owner != "" || opts.Directory != "") {
 				return cmdutil.FlagErrorf("--list cannot be combined with a binding scope or identity")
 			}
 			if runF != nil {
@@ -58,11 +63,13 @@ func NewCmdUse(f *cmdutil.Factory, runF func(*UseOptions) error) *cobra.Command 
 		},
 	}
 	cmd.Flags().StringVar(&opts.Directory, "directory", "", "Target directory or checkout; a checkout selects its whole repository family")
+	cmd.Flags().StringVar(&opts.Owner, "owner", "", "Repository owner for selection (repository/directory choices still win), or the owner choice to apply/unset")
 	cmd.Flags().StringVar(&opts.Host, "hostname", "github.com", "Host to inspect or unset; does not follow GH_HOST or remotes (a named identity supplies its host)")
 	cmd.Flags().BoolVar(&opts.Unset, "unset", false, "Remove this repository-family, directory, or owner choice; fallback choices remain")
 	cmd.Flags().BoolVar(&opts.List, "list", false, "Show all bindings as JSON")
 	cmd.Flags().BoolVar(&opts.View, "view", false, "Show the selected identity as JSON (the default with no arguments)")
 	cmd.Long += "\nOutside a repository, choose an identity for the directory tree. The main repository location determines inheritance for external worktrees. Repository choices beat the deepest matching directory. --directory targets another location."
+	cmd.Long += "\n--owner supplies a fallback behind repository and directory choices. Conflicting owner identities are refused; select a repository explicitly to resolve ambiguity."
 	return cmd
 }
 
@@ -84,7 +91,7 @@ func useRun(f *cmdutil.Factory, opts *UseOptions) error {
 		return encoder.Encode(bindings)
 	}
 	if opts.Identity == "" && !opts.Unset {
-		id, err := s.Resolve(opts.Host, "", opts.Directory)
+		id, err := s.Resolve(opts.Host, opts.Owner, opts.Directory)
 		if err != nil {
 			return err
 		}
@@ -93,6 +100,7 @@ func useRun(f *cmdutil.Factory, opts *UseOptions) error {
 	}
 	binding := identity.Binding{
 		Identity: opts.Identity, Host: opts.Host, Directory: opts.Directory,
+		Owner: opts.Owner,
 	}
 	executable := f.ExecutablePath
 	if executable == "" {

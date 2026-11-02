@@ -16,7 +16,7 @@ func TestAuthTokenResolverFailureStopsRequest(t *testing.T) {
 		t.Fatal("request must not be sent after credential resolution fails")
 		return nil, nil
 	}}
-	transport := AddAuthTokenHeaderWithResolver(base, func(host string) (string, error) {
+	transport := AddAuthTokenHeaderWithResolver(base, func(host string, _ *http.Request) (string, error) {
 		require.Equal(t, "github.com", host)
 		return "", want
 	})
@@ -41,7 +41,7 @@ func TestHTTPClientRejectsAmbiguousTokenResolvers(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given both a configuration-based source and an explicit token resolver
-			tt.opts.TokenForHost = func(string) (string, error) { return "", nil }
+			tt.opts.TokenForHost = func(string, *http.Request) (string, error) { return "", nil }
 
 			// When constructing a client
 			_, err := NewHTTPClient(tt.opts)

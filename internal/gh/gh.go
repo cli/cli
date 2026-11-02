@@ -11,6 +11,7 @@ package gh
 
 import (
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/cli/cli/v2/pkg/auth"
@@ -218,7 +219,7 @@ type TokenRefresher interface {
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig interface {
 	// ResolveToken selects credentials using invocation, repository, and host context.
-	ResolveToken(host, owner, dir string) (Credential, error)
+	ResolveToken(host string, request *http.Request) (Credential, error)
 
 	// SetAccountOverride selects a saved account for this invocation without changing persistent configuration.
 	// Empty hostname and account values clear the override.
@@ -230,7 +231,7 @@ type AuthConfig interface {
 	// ResolveGitCredential resolves a Git HTTPS request for the supplied host and username.
 	// Explicit invocation selection takes precedence over requestedUser; otherwise a mismatch
 	// returns an empty credential. Environment tokens use a generic username of unknown ownership.
-	ResolveGitCredential(hostname, requestedUser string) (username string, credential Credential, refreshResult RefreshStatus, err error)
+	ResolveGitCredential(hostname, requestedUser, repositoryPath string) (username string, credential Credential, refreshResult RefreshStatus, err error)
 
 	// HasActiveToken returns true when a token for the hostname is present.
 	HasActiveToken(hostname string) bool

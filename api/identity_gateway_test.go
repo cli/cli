@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -13,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIdentityGatewayFallbackRespectsDestinationEnvironmentCredential(t *testing.T) {
+func TestIdentityGatewayMappingOverridesDestinationEnvironmentCredential(t *testing.T) {
 	for _, tt := range []struct{ name, environment, expected string }{
 		{"uncredentialed gateway", "", "alice-token"},
-		{"gateway owns an environment credential", "destination-token", "destination-token"},
+		{"gateway owns an environment credential", "destination-token", "alice-token"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given a configured gateway without registered users and an optional destination credential
@@ -31,8 +30,6 @@ hosts:
         oauth_token: alice-token
 `)
 			home := t.TempDir()
-			require.NoError(t, exec.Command("git", "init", "-q", home).Run())
-			t.Chdir(home)
 			t.Chdir(home)
 			t.Setenv("HOME", home)
 			t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
@@ -43,7 +40,7 @@ hosts:
 			s, err := identity.Open()
 			require.NoError(t, err)
 			require.NoError(t, s.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
-			require.NoError(t, s.Bind(identity.Binding{Identity: "work", Directory: home}, "/path/to/gh"))
+			require.NoError(t, s.Bind(identity.Binding{Identity: "work", Owner: "company"}, "/path/to/gh"))
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			reg.Register(httpmock.REST("GET", "repos/company/project"), func(req *http.Request) (*http.Response, error) {
@@ -51,12 +48,12 @@ hosts:
 				assert.Equal(t, "token "+tt.expected, req.Header.Get("Authorization"))
 				return httpmock.StringResponse("{}")(req)
 			})
-			client := &http.Client{Transport: AddAuthTokenHeaderWithRefresh(reg, cfg.Authentication())}
+			client := &http.Client{Transport: AddAuthTokenHeaderWithResolver(reg, identity.TokenResolver(cfg.Authentication()))}
 
 			// When a request reaches the gateway
 			response, err := client.Get("https://gateway.example/repos/company/project")
 
-			// Then canonical identity fallback only supplies otherwise missing destination credentials
+			// Then the configured gateway mapping determines the logical authentication host
 			require.NoError(t, err)
 			response.Body.Close()
 		})

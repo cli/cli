@@ -31,12 +31,13 @@ type Identity struct {
 	SSHHost string `json:"sshHost,omitempty"`
 }
 
-// Binding applies an identity to a repository family or directory tree.
+// Binding applies an identity to a repository family, directory tree, or owner.
 type Binding struct {
 	Identity   string `json:"identity"`
 	Host       string `json:"host"`
 	Directory  string `json:"directory,omitempty"`
 	Repository string `json:"repository,omitempty"` // Canonical common Git directory.
+	Owner      string `json:"owner,omitempty"`
 }
 
 // Store owns the generated identity files and the scoped references to them.
@@ -217,13 +218,15 @@ func (s *Store) Bindings() ([]Binding, error) {
 			b.Directory = value
 		case "repository":
 			b.Repository = value
+		case "owner":
+			b.Owner = value
 		default:
 			return nil, fmt.Errorf("unsupported identity scope field %q in %s", key, path)
 		}
 	}
 	for i, b := range bindings {
 		scopes := 0
-		for _, value := range []string{b.Directory, b.Repository} {
+		for _, value := range []string{b.Directory, b.Repository, b.Owner} {
 			if value != "" {
 				scopes++
 			}
@@ -231,7 +234,8 @@ func (s *Store) Bindings() ([]Binding, error) {
 		if !safeName.MatchString(b.Identity) || !safeName.MatchString(b.Host) ||
 			scopes != 1 ||
 			(b.Directory != "" && (!filepath.IsAbs(b.Directory) || strings.ContainsAny(b.Directory, "*?[\\"))) ||
-			(b.Repository != "" && (!filepath.IsAbs(b.Repository) || !validValue(b.Repository) || filepath.Base(b.Repository) != ".git" || strings.ContainsAny(b.Repository, "*?[\\"))) {
+			(b.Repository != "" && (!filepath.IsAbs(b.Repository) || !validValue(b.Repository) || filepath.Base(b.Repository) != ".git" || strings.ContainsAny(b.Repository, "*?[\\"))) ||
+			(b.Owner != "" && (!safeName.MatchString(b.Owner) || b.Owner != strings.ToLower(b.Owner))) {
 			return nil, fmt.Errorf("invalid identity scope %d in %s", i, path)
 		}
 		for _, other := range bindings[:i] {
@@ -262,7 +266,16 @@ func normalizeBinding(b Binding) (Binding, error) {
 	if b.Repository != "" {
 		return b, errors.New("supply a checkout directory, not an internal repository scope")
 	}
-
+	if b.Owner != "" {
+		if b.Directory != "" {
+			return b, errors.New("owner choices cannot also specify a directory scope")
+		}
+		if !safeName.MatchString(b.Owner) {
+			return b, errors.New("--owner must be a GitHub owner name")
+		}
+		b.Owner = strings.ToLower(b.Owner)
+		return b, nil
+	}
 	dir, err := canonicalDirectory(b.Directory)
 	if err != nil {
 		return b, err
@@ -306,7 +319,7 @@ func normalizeBinding(b Binding) (Binding, error) {
 }
 
 func sameScope(a, b Binding) bool {
-	return a.Host == b.Host && a.Directory == b.Directory && a.Repository == b.Repository
+	return a.Host == b.Host && a.Directory == b.Directory && a.Repository == b.Repository && a.Owner == b.Owner
 }
 
 // Bind replaces the binding for a scope and installs Git's managed configuration.
@@ -323,9 +336,11 @@ func (s *Store) Bind(b Binding, executable string) error {
 	}
 	b.Host = id.Host
 	contextDir := b.Directory
-	contextDir, err = canonicalDirectory(contextDir)
-	if err != nil {
-		return err
+	if b.Owner == "" {
+		contextDir, err = canonicalDirectory(contextDir)
+		if err != nil {
+			return err
+		}
 	}
 	b, err = normalizeBinding(b)
 	if err != nil {
@@ -353,34 +368,36 @@ func (s *Store) Bind(b Binding, executable string) error {
 		if err := s.supportedCredentialHelpers(contextDir, b.Host); err != nil {
 			return err
 		}
-		executable, err = filepath.Abs(executable)
-		if err != nil {
-			return err
-		}
-		current, err := gitOptional(contextDir, "config", "--show-scope", "--get", "core.sshCommand")
-		if err != nil {
-			return err
-		}
-		scope, command, _ := strings.Cut(current, "\t")
-		if current != "" && command != shellquote.Join(executable, "auth", "git-ssh") &&
-			(scope == "local" || scope == "worktree" || scope == "command") {
-			return fmt.Errorf("checkout %s: repository or command-level core.sshCommand would bypass gh's global SSH dispatcher; persistent identity routing is not supported for this setup, and your SSH configuration has not been changed", contextDir)
-		}
-		remotes, err := gitOptional(contextDir, "config", "--get-regexp", `^remote\..*\.url$`)
-		if err != nil {
-			return err
-		}
-		for line := range strings.SplitSeq(remotes, "\n") {
-			_, raw, ok := strings.Cut(line, " ")
-			if !ok {
-				continue
-			}
-			u, err := git.ParseURL(raw)
+		if b.Owner == "" {
+			executable, err = filepath.Abs(executable)
 			if err != nil {
-				return fmt.Errorf("parse repository remote: %w", err)
+				return err
 			}
-			if u.Scheme == "ssh" && strings.EqualFold(u.Host, id.Host) && id.SSHHost == "" {
-				return fmt.Errorf("identity %q has no SSH route for this repository; edit it with --ssh-host <alias>", id.Name)
+			current, err := gitOptional(contextDir, "config", "--show-scope", "--get", "core.sshCommand")
+			if err != nil {
+				return err
+			}
+			scope, command, _ := strings.Cut(current, "\t")
+			if current != "" && command != shellquote.Join(executable, "auth", "git-ssh") &&
+				(scope == "local" || scope == "worktree" || scope == "command") {
+				return fmt.Errorf("checkout %s: repository or command-level core.sshCommand would bypass gh's global SSH dispatcher; persistent identity routing is not supported for this setup, and your SSH configuration has not been changed", contextDir)
+			}
+			remotes, err := gitOptional(contextDir, "config", "--get-regexp", `^remote\..*\.url$`)
+			if err != nil {
+				return err
+			}
+			for line := range strings.SplitSeq(remotes, "\n") {
+				_, raw, ok := strings.Cut(line, " ")
+				if !ok {
+					continue
+				}
+				u, err := git.ParseURL(raw)
+				if err != nil {
+					return fmt.Errorf("parse repository remote: %w", err)
+				}
+				if u.Scheme == "ssh" && strings.EqualFold(u.Host, id.Host) && id.SSHHost == "" {
+					return fmt.Errorf("identity %q has no SSH route for this repository; edit it with --ssh-host <alias>", id.Name)
+				}
 			}
 		}
 	}
@@ -476,39 +493,41 @@ func (s *Store) Unbind(b Binding, executable string) error {
 		return err
 	}
 	exact := false
-	dir := b.Directory
-	if dir == "" {
-		dir = "."
-	}
-	dir, err = canonicalRemovalDirectory(dir)
-	if err != nil {
-		return err
-	}
-	if _, statErr := os.Stat(dir); statErr == nil {
-		normalized, normErr := normalizeBinding(b)
-		if normErr != nil {
-			return normErr
+	if b.Owner == "" {
+		dir := b.Directory
+		if dir == "" {
+			dir = "."
 		}
-		if normalized.Repository != "" {
-			for _, candidate := range bindings {
-				if sameScope(normalized, candidate) {
-					b, exact = candidate, true
-					break
+		dir, err = canonicalRemovalDirectory(dir)
+		if err != nil {
+			return err
+		}
+		if _, statErr := os.Stat(dir); statErr == nil {
+			normalized, normErr := normalizeBinding(b)
+			if normErr != nil {
+				return normErr
+			}
+			if normalized.Repository != "" {
+				for _, candidate := range bindings {
+					if sameScope(normalized, candidate) {
+						b, exact = candidate, true
+						break
+					}
 				}
 			}
 		}
-	}
-	for _, candidate := range bindings {
-		if exact {
-			break
-		}
-		if candidate.Host == b.Host && candidate.Directory == dir {
-			b, exact = candidate, true
-			break
-		}
-		if candidate.Host == b.Host && candidate.Repository != "" && filepath.Dir(candidate.Repository) == dir {
-			b, exact = candidate, true
-			break
+		for _, candidate := range bindings {
+			if exact {
+				break
+			}
+			if candidate.Host == b.Host && candidate.Directory == dir {
+				b, exact = candidate, true
+				break
+			}
+			if candidate.Host == b.Host && candidate.Repository != "" && filepath.Dir(candidate.Repository) == dir {
+				b, exact = candidate, true
+				break
+			}
 		}
 	}
 	if !exact {
@@ -571,7 +590,9 @@ func (s *Store) writeBindings(bindings []Binding, executable string) error {
 	for i, binding := range bindings {
 		fmt.Fprintf(&config, "[gh-auth-binding %q]\n\tidentity = %s\n\thost = %s\n",
 			strconv.Itoa(i), gitQuote(binding.Identity), gitQuote(binding.Host))
-		if binding.Repository != "" {
+		if binding.Owner != "" {
+			fmt.Fprintf(&config, "\towner = %s\n", gitQuote(binding.Owner))
+		} else if binding.Repository != "" {
 			fmt.Fprintf(&config, "\trepository = %s\n", gitQuote(binding.Repository))
 		} else {
 			fmt.Fprintf(&config, "\tdirectory = %s\n", gitQuote(binding.Directory))
@@ -591,7 +612,16 @@ func (s *Store) writeBindings(bindings []Binding, executable string) error {
 	}
 	for _, binding := range bindings {
 		path := s.IdentityPath(binding.Identity)
-		if binding.Repository != "" {
+		if binding.Owner != "" {
+			host := ownerPattern(strings.ToLower(binding.Host))
+			for _, prefix := range []string{
+				"https://" + host + "/", "https://*@" + host + "/",
+				"*@" + host + ":", "ssh://*@" + host + "/", "ssh://" + host + "/",
+			} {
+				condition := "hasconfig:remote.*.url:" + prefix + ownerPattern(binding.Owner) + "/**"
+				fmt.Fprintf(&config, "[includeIf %s]\n\tpath = %s\n", gitQuote(condition), gitQuote(path))
+			}
+		} else if binding.Repository != "" {
 			for _, pattern := range []string{filepath.ToSlash(binding.Repository), filepath.ToSlash(binding.Repository) + "/worktrees/*"} {
 				fmt.Fprintf(&config, "[includeIf %s]\n\tpath = %s\n", gitQuote("gitdir:"+pattern), gitQuote(path))
 			}
@@ -642,6 +672,18 @@ func (s *Store) writeBindings(bindings []Binding, executable string) error {
 	return nil
 }
 
+func ownerPattern(owner string) string {
+	var pattern strings.Builder
+	for _, char := range owner {
+		if char >= 'a' && char <= 'z' {
+			fmt.Fprintf(&pattern, "[%c%c]", char, char-'a'+'A')
+		} else {
+			pattern.WriteRune(char)
+		}
+	}
+	return pattern.String()
+}
+
 func sortedKeys(m map[string]bool) []string {
 	keys := make([]string, 0, len(m))
 	for key := range m {
@@ -669,8 +711,8 @@ func workingTreeRoot(dir string) (string, error) {
 	return root, nil
 }
 
-// Resolve selects a repository choice, then deepest directory tree.
-// Outside a repository, directory-tree bindings still apply.
+// Resolve selects a repository choice, then deepest directory tree, then owner.
+// Outside a repository, directory-tree and explicit owner bindings still apply.
 func (s *Store) Resolve(host, owner, dir string) (*Identity, error) {
 	result, err := s.resolve(host, owner, dir)
 	if err != nil {
@@ -728,7 +770,7 @@ func (s *Store) resolveBindings(host, owner, dir string, bindings []Binding) (*r
 	}
 	for i := range bindings {
 		b := &bindings[i]
-		if !strings.EqualFold(b.Host, host) {
+		if !strings.EqualFold(b.Host, host) || b.Owner != "" {
 			continue
 		}
 		if b.Repository != "" {
@@ -741,6 +783,34 @@ func (s *Store) resolveBindings(host, owner, dir string, bindings []Binding) (*r
 		if under(scopeDir, b.Directory) {
 			result.Matches = append(result.Matches, *b)
 		}
+	}
+	owners := map[string]bool{}
+	if owner != "" {
+		owners[strings.ToLower(owner)] = true
+	} else if root != "" {
+		urls, err := gitOptional(dir, "config", "--get-regexp", `^remote\..*\.url$`)
+		if err != nil {
+			return nil, err
+		}
+		for line := range strings.SplitSeq(urls, "\n") {
+			_, raw, ok := strings.Cut(line, " ")
+			if !ok {
+				continue
+			}
+			u, err := git.ParseURL(raw)
+			if err != nil || !strings.EqualFold(u.Host, host) {
+				continue
+			}
+			owner, _, _ := strings.Cut(strings.TrimPrefix(u.Path, "/"), "/")
+			owners[strings.ToLower(owner)] = true
+		}
+	}
+	for i := range bindings {
+		b := &bindings[i]
+		if !strings.EqualFold(b.Host, host) || b.Owner == "" || !owners[b.Owner] {
+			continue
+		}
+		result.Matches = append(result.Matches, *b)
 	}
 	sort.SliceStable(result.Matches, func(i, j int) bool {
 		a, b := result.Matches[i], result.Matches[j]
@@ -758,7 +828,13 @@ func (s *Store) resolveBindings(host, owner, dir string, bindings []Binding) (*r
 		}
 	}
 	selected := result.Matches[0]
-
+	if selected.Owner != "" {
+		for _, other := range result.Matches[1:] {
+			if other.Identity != selected.Identity {
+				return nil, errors.New("multiple owners select different identities; bind this repository explicitly with 'gh auth use <identity>'")
+			}
+		}
+	}
 	result.Identity, err = s.Load(selected.Identity)
 	return result, err
 }
@@ -818,7 +894,7 @@ func supportedGitVersion() error {
 	major, majorErr := strconv.Atoi(parts[0])
 	minor, minorErr := strconv.Atoi(parts[1])
 	if majorErr != nil || minorErr != nil || major < 2 || (major == 2 && minor < 36) {
-		return errors.New("identities require Git 2.36 or newer for managed configuration; no identity choice was applied")
+		return errors.New("identities require Git 2.36 or newer for owner-conditional configuration; no identity choice was applied")
 	}
 	return nil
 }

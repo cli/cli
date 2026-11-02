@@ -11,7 +11,6 @@ func TestSSHAccountOverrideUsesUniqueRouteWithoutChangingIdentity(t *testing.T) 
 	// Given an alice directory identity and two bob profiles sharing one SSH alias
 	s := isolatedStore(t)
 	dir := t.TempDir()
-	runGit(t, dir, "init", "-q")
 	for _, id := range []Identity{
 		{Name: "alice", Host: "github.com", Account: "alice", SSHHost: "alice-ssh"},
 		{Name: "bob-work", Host: "github.com", Account: "bob", SSHHost: "bob-ssh"},
@@ -31,6 +30,32 @@ func TestSSHAccountOverrideUsesUniqueRouteWithoutChangingIdentity(t *testing.T) 
 	selected, err := s.Resolve("github.com", "company", dir)
 	require.NoError(t, err)
 	assert.Equal(t, "alice", selected.Account)
+}
+
+func TestSSHAccountOverrideResolvesEachRepositoryUsingMatchingAccountScopes(t *testing.T) {
+	// Given alice is selected locally, while bob uses different routes for his fork and its upstream
+	s := isolatedStore(t)
+	dir := t.TempDir()
+	for _, id := range []Identity{
+		{Name: "alice", Host: "github.com", Account: "alice", SSHHost: "alice-ssh"},
+		{Name: "bob-work", Host: "github.com", Account: "bob", SSHHost: "company-ca"},
+		{Name: "bob-personal", Host: "github.com", Account: "bob", SSHHost: "personal-key"},
+	} {
+		require.NoError(t, s.Save(id, false))
+	}
+	require.NoError(t, s.Bind(Binding{Identity: "alice", Directory: dir}, "/path/to/gh"))
+	require.NoError(t, s.Bind(Binding{Identity: "bob-work", Owner: "company"}, "/path/to/gh"))
+	require.NoError(t, s.Bind(Binding{Identity: "bob-personal", Owner: "bob"}, "/path/to/gh"))
+
+	// When one invocation contacts both repositories as bob
+	fork, err := s.SSHArgumentsForAccount([]string{"git@github.com", "git-upload-pack 'bob/project.git'"}, dir, "github.com", "bob")
+	require.NoError(t, err)
+	upstream, err := s.SSHArgumentsForAccount([]string{"git@github.com", "git-upload-pack 'company/project.git'"}, dir, "github.com", "bob")
+
+	// Then each target uses its matching route, rather than alice's route or the first route in storage
+	require.NoError(t, err)
+	assert.Equal(t, "git@personal-key", fork[0])
+	assert.Equal(t, "git@company-ca", upstream[0])
 }
 
 func TestSSHAccountOverrideRejectsConflictingAliasDeclarations(t *testing.T) {

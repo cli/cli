@@ -102,7 +102,7 @@ func TestGitCredentialExplicitSelectionWinsOverRequestedUsername(t *testing.T) {
 	t.Setenv("GH_IDENTITY_ACCOUNT", "bob")
 
 	// When resolving the credential request for its destination
-	user, cred, _, err := cfg.Authentication().ResolveGitCredential("github.com", "alice")
+	user, cred, _, err := cfg.Authentication().ResolveGitCredential("github.com", "alice", "")
 
 	// Then Bob supplies both fields, without changing the saved default
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestGitCredentialDefaultRejectsRequestedUsernameMismatch(t *testing.T) {
 	cfg, _ := NewIsolatedTestConfig(t, activeAccountFixture)
 
 	// When Git requests credentials for Bob
-	_, cred, _, err := cfg.Authentication().ResolveGitCredential("github.com", "bob")
+	_, cred, _, err := cfg.Authentication().ResolveGitCredential("github.com", "bob", "")
 
 	// Then Alice's credentials are not returned for the conflicting username
 	require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestGitCredentialEnvironmentTokenDoesNotAssumeSavedUser(t *testing.T) {
 	t.Setenv("GH_TOKEN", "unknown-owner-token")
 
 	// When Git requests a username
-	user, cred, _, err := cfg.Authentication().ResolveGitCredential("github.com", "some-user")
+	user, cred, _, err := cfg.Authentication().ResolveGitCredential("github.com", "some-user", "")
 
 	// Then the helper uses the generic token username, not the saved default
 	require.NoError(t, err)
@@ -146,7 +146,7 @@ func TestGitCredentialSelectionDoesNotOverrideAnotherHost(t *testing.T) {
 	t.Setenv("GH_IDENTITY_ACCOUNT", "bob")
 
 	// When Git requests Bob from the enterprise host
-	_, cred, _, err := cfg.Authentication().ResolveGitCredential("enterprise.example", "bob")
+	_, cred, _, err := cfg.Authentication().ResolveGitCredential("enterprise.example", "bob", "")
 
 	// Then the GitHub selection cannot bypass the other host's username constraint
 	require.NoError(t, err)
