@@ -1,0 +1,96 @@
+package identity
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestPersistentIdentityRefusesBareRepositoryWithoutChangingConfig(t *testing.T) {
+	// Given a bare repository where the working-tree identity contract cannot apply
+	s := isolatedStore(t)
+	dir := t.TempDir()
+	runGit(t, dir, "init", "--bare", "-q")
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+
+	// When attempting a directory binding there
+	err := s.Bind(Binding{Identity: "work", Directory: dir}, "/path/to/gh")
+
+	// Then it fails before installing any global integration
+	require.ErrorContains(t, err, "bare repositories")
+	bindings, err := s.Bindings()
+	require.NoError(t, err)
+	assert.Empty(t, bindings)
+}
+
+func TestPersistentIdentityDoesNotReplaceCustomCredentialHelpers(t *testing.T) {
+	// Given a user's existing HTTPS credential helper for the selected host
+	s := isolatedStore(t)
+	dir := t.TempDir()
+	runGit(t, dir, "init", "-q")
+	runGit(t, dir, "config", "--global", "credential.https://github.com.helper", "company-credential-helper")
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+
+	// When applying an identity would override the existing helper chain
+	err := s.Bind(Binding{Identity: "work", Directory: dir}, "/path/to/gh")
+
+	// Then the prototype refuses rather than taking ownership of that helper
+	require.ErrorContains(t, err, "existing HTTPS credential helper")
+	assert.Equal(t, "company-credential-helper\n", runGit(t, dir, "config", "--global", "credential.https://github.com.helper"))
+}
+
+func TestCredentialHelperResetAllowsExistingGhSetup(t *testing.T) {
+	// Given a system keychain helper already reset by the user's gh setup
+	s := isolatedStore(t)
+	dir := t.TempDir()
+	runGit(t, dir, "init", "-q")
+	system := filepath.Join(dir, "system.gitconfig")
+	require.NoError(t, os.WriteFile(system, []byte("[credential]\nhelper = osxkeychain\n"), 0o600))
+	t.Setenv("GIT_CONFIG_SYSTEM", system)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "0")
+	runGit(t, dir, "config", "--global", "--add", "credential.https://github.com.helper", "")
+	runGit(t, dir, "config", "--global", "--add", "credential.https://github.com.helper", "!gh auth git-credential")
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+
+	// When applying an identity using the already-gh-managed credential setup
+	err := s.Bind(Binding{Identity: "work", Directory: dir}, "/path/to/gh")
+
+	// Then the inactive system helper does not make a valid setup unusable
+	require.NoError(t, err)
+}
+
+func TestPersistentIdentityRefusesSeparateGitDirectory(t *testing.T) {
+	// Given a checkout whose Git metadata is outside the directory tree
+	s := isolatedStore(t)
+	dir := t.TempDir()
+	gitDir := filepath.Join(t.TempDir(), "metadata")
+	runGit(t, dir, "init", "--separate-git-dir", gitDir, "-q")
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+
+	// When binding the checkout would not activate its native Git include
+	err := s.Bind(Binding{Identity: "work", Directory: dir}, "/path/to/gh")
+
+	// Then the unsupported layout is rejected instead of giving gh and Git different settings
+	require.ErrorContains(t, err, "separate Git directories")
+}
+
+func TestPersistentIdentityRefusesRepositoryUsingSubmodulesAtSetup(t *testing.T) {
+	// Given a standalone repository whose Git operations may recurse into submodules
+	s := isolatedStore(t)
+	dir := t.TempDir()
+	runGit(t, dir, "init", "-q")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".gitmodules"), []byte("[submodule \"library\"]\npath = vendor/library\nurl = https://github.com/example/library.git\n"), 0o600))
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+
+	// When applying an identity to that repository
+	err := s.Bind(Binding{Identity: "work", Directory: dir}, "/path/to/gh")
+
+	// Then incompatibility is reported at setup instead of during a later submodule fetch
+	require.ErrorContains(t, err, "repositories that use submodules")
+	bindings, err := s.Bindings()
+	require.NoError(t, err)
+	assert.Empty(t, bindings)
+}

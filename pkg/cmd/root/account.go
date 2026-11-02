@@ -42,7 +42,7 @@ func applyAccountOverride(cmd *cobra.Command, args []string, cfg gh.Config, f *c
 	// It's pretty gross that we have to look up "auth" by name.
 	// It really couples this logic to the command structure rather than having a more explicit way to identify the auth command.
 	if isAuthCommand(cmd) {
-		return cmdutil.FlagErrorf("--account selects authentication for commands such as 'gh pr create --account <login>', not auth management; see this auth command's --help")
+		return cmdutil.FlagErrorf("--account selects authentication for commands such as 'gh pr create --account <login>', not auth management; use 'gh auth use <identity>' for a persistent choice or see this auth command's --help")
 	}
 	host, err := accountHostname(cmd, args, cfg, f)
 	if err != nil {

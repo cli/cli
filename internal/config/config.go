@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/identity"
 	"github.com/cli/cli/v2/internal/keyring"
 	o "github.com/cli/cli/v2/pkg/option"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
@@ -309,6 +310,28 @@ func (c *AuthConfig) selectedAccount(host string) string {
 	return ""
 }
 
+// ResolveToken applies invocation selection before persistent repository identities and defaults.
+func (c *AuthConfig) ResolveToken(host, owner, dir string) (gh.Credential, error) {
+	if c.selectedAccount(host) == "" {
+		store, err := identity.Open()
+		if err != nil {
+			return gh.Credential{}, err
+		}
+		selected, err := store.Resolve(host, owner, dir)
+		if err != nil {
+			return gh.Credential{}, err
+		}
+		if selected != nil {
+			return identity.CredentialFor(c, selected)
+		}
+	}
+	credential, _, err := c.ActiveTokenWithRefresh(host)
+	if credential.Token != "" {
+		err = nil // Refresh is best effort while a usable credential remains.
+	}
+	return credential, err
+}
+
 // ResolveGitCredential resolves the effective account for Git's actual destination.
 // The helper only formats the result; account precedence and username constraints live here.
 func (c *AuthConfig) ResolveGitCredential(host, requestedUser string) (string, gh.Credential, gh.RefreshStatus, error) {
@@ -328,7 +351,27 @@ func (c *AuthConfig) ResolveGitCredential(host, requestedUser string) (string, g
 	var status gh.RefreshStatus
 	var err error
 	user := gistAccount
-	if gistAccount != "" && c.selectedAccount(host) == "" {
+	var selected *identity.Identity
+	if c.selectedAccount(host) == "" {
+		store, openErr := identity.Open()
+		if openErr != nil {
+			return "", gh.Credential{}, status, openErr
+		}
+		selected, err = store.Resolve(host, "", "")
+		if err != nil {
+			return "", gh.Credential{}, status, err
+		}
+	}
+	if selected != nil {
+		credential, err = identity.CredentialFor(c, selected)
+		if err != nil {
+			return "", gh.Credential{}, status, err
+		}
+		user = selected.Account
+		if requestedUser != "" && !strings.EqualFold(requestedUser, user) {
+			return "", gh.Credential{}, status, fmt.Errorf("requested Git username %q conflicts with identity %q (%s)", requestedUser, selected.Name, user)
+		}
+	} else if gistAccount != "" && c.selectedAccount(host) == "" {
 		// An independently configured gist host owns its saved credential, rather than
 		// inheriting the parent host's selection or environment-token normalization.
 		credential, status, err = c.TokenForUserWithRefresh(host, gistAccount)
