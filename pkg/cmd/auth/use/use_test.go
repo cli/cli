@@ -205,6 +205,7 @@ func TestUseViewShowsSelectionWithoutChangingIt(t *testing.T) {
 func TestUseViewRejectsOtherActions(t *testing.T) {
 	for _, args := range [][]string{
 		{"--view", "work"}, {"--view", "--unset"}, {"--view", "--list"},
+		{"--view", "--explain"}, {"--view", "--explanation"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			// Given an explicit view combined with another action
@@ -222,6 +223,78 @@ func TestUseViewRejectsOtherActions(t *testing.T) {
 	}
 }
 
+func TestExplanationShowsNestedDirectoryPrecedenceAndEffectiveGitMetadata(t *testing.T) {
+	// Given an owner choice, a broad directory choice, and a more specific directory choice
+	store, f := useFixture(t)
+	for _, id := range []identity.Identity{
+		{Name: "owner", Host: "github.com", Account: "alice"},
+		{Name: "work", Host: "github.com", Account: "alice", GitUserName: "Alice", GitUserEmail: "alice@work.test"},
+		{Name: "client", Host: "github.com", Account: "bob", SSHHost: "github-client"},
+	} {
+		require.NoError(t, store.Save(id, false))
+	}
+	work, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	client := filepath.Join(work, "client")
+	repo := filepath.Join(client, "project")
+	require.NoError(t, os.MkdirAll(filepath.Join(repo, "src"), 0o700))
+	runUse(t, f, "owner", "--owner", "company")
+	runUse(t, f, "work", "--directory", work)
+	runUse(t, f, "client", "--directory", client)
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"remote", "add", "origin", "git@github.com:company/project.git"},
+		{"config", "user.email", "local@client.test"},
+	} {
+		out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
+		require.NoError(t, err, "%s", out)
+	}
+	t.Chdir(filepath.Join(repo, "src"))
+
+	// When explaining the identity from a repository subdirectory
+	output := runUse(t, f, "--explanation")
+
+	// Then the explanation traces the winning choice, broader matches, and actual inherited/overridden Git values
+	assert.Contains(t, output, `Using identity "client" (bob on github.com)`)
+	assert.Contains(t, output, "Selected: directory "+client+" (includes descendants)")
+	assert.Contains(t, output, "Overrides directory "+work+" -> work: more specific directory")
+	assert.Contains(t, output, "Overrides owner company -> owner: directory choices take precedence")
+	assert.Contains(t, output, "gh API:    bob\n")
+	assert.Contains(t, output, "SSH Git:   github-client (SSH host)")
+	assert.Contains(t, output, "gh has not checked which account this SSH host signs in as.")
+	assert.Contains(t, output, "Git user.name: Alice")
+	assert.Contains(t, output, "work.gitconfig")
+	assert.Contains(t, output, "Git user.email: local@client.test")
+	assert.Contains(t, output, ".git/config")
+}
+
+func TestExplanationOutsideRepositoryShowsIdentityAttribution(t *testing.T) {
+	// Given an identity selected in a directory with no repository
+	store, f := useFixture(t)
+	require.NoError(t, store.Save(identity.Identity{
+		Name: "work", Host: "github.com", Account: "alice",
+		GitUserName: "Alice", GitUserEmail: "alice@work.test",
+	}, false))
+	t.Chdir(t.TempDir())
+	runUse(t, f, "work")
+
+	// When explaining the selection outside a repository
+	output := runUse(t, f, "--explanation")
+
+	// Then attribution describes the selected identity rather than unrelated current Git defaults
+	assert.Contains(t, output, "You're not in a Git repository. This identity sets:")
+	assert.Contains(t, output, "user.name:  Alice")
+	assert.Contains(t, output, "user.email: alice@work.test")
+	assert.Contains(t, output, "SSH Git:   Not configured.")
+	for _, phrase := range []string{"[declared]", "[blocked]", "Persistent selection", "No remote authentication checks", "target read", "target not observed", "Actual include directives", "Conditional identity includes may apply"} {
+		assert.NotContains(t, output, phrase)
+	}
+	assert.NotContains(t, output, "Current Git defaults outside a repository:")
+	assert.NotContains(t, output, "Git user.name:")
+	assert.NotContains(t, output, "Git user.email:")
+	assert.NotContains(t, output, "Git name/email are defaults for both author and committer")
+}
+
 func TestUseCuratesScope(t *testing.T) {
 	tests := []struct {
 		name string
@@ -231,6 +304,7 @@ func TestUseCuratesScope(t *testing.T) {
 		{name: "directory tree", args: []string{"work"}, want: UseOptions{Identity: "work", Host: "github.com"}},
 		{name: "owner", args: []string{"work", "--owner", "company"}, want: UseOptions{Identity: "work", Host: "github.com", Owner: "company"}},
 		{name: "explicit directory", args: []string{"work", "--directory", "/work"}, want: UseOptions{Identity: "work", Host: "github.com", Directory: "/work"}},
+		{name: "explanation context", args: []string{"--explanation", "--directory", "/work"}, want: UseOptions{Host: "github.com", Directory: "/work", Explanation: true}},
 		{name: "unset owner", args: []string{"--unset", "--owner", "company", "--hostname", "example.com"}, want: UseOptions{Host: "example.com", Owner: "company", Unset: true}},
 	}
 	for _, tt := range tests {
@@ -255,6 +329,29 @@ func TestUseCuratesScope(t *testing.T) {
 	}
 }
 
+func TestExplanationFromParentShowsDescendantOverrides(t *testing.T) {
+	// Given a broad choice and a different identity in one of its subdirectories
+	store, f := useFixture(t)
+	require.NoError(t, store.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+	require.NoError(t, store.Save(identity.Identity{Name: "client", Host: "github.com", Account: "bob"}, false))
+	work, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	client := filepath.Join(work, "client")
+	require.NoError(t, os.Mkdir(client, 0o700))
+	runUse(t, f, "work", "--directory", work)
+	runUse(t, f, "client", "--directory", client)
+	t.Chdir(work)
+
+	// When explaining the broader directory
+	output := runUse(t, f, "--explanation")
+
+	// Then the current identity and future descendant exceptions are clearly distinguished
+	assert.Contains(t, output, `Using identity "work" (alice on github.com)`)
+	assert.Contains(t, output, "Descendant overrides (do not affect this directory):")
+	assert.Contains(t, output, "directory "+client+" -> client")
+	assert.NotContains(t, output, "Overrides directory "+client)
+}
+
 func TestUnsetRemovesDirectoryChoice(t *testing.T) {
 	// Given an identity applied at a repository root
 	store, f := useFixture(t)
@@ -274,6 +371,43 @@ func TestUnsetRemovesDirectoryChoice(t *testing.T) {
 	assert.Nil(t, selected)
 }
 
+func TestExplanationShowsGitSSHBehindManagedRouting(t *testing.T) {
+	// Given managed SSH routing with GIT_SSH supplying the underlying connection program
+	store, f := useFixture(t)
+	require.NoError(t, store.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice", SSHHost: "github-work"}, false))
+	t.Chdir(t.TempDir())
+	runUse(t, f, "work")
+	t.Setenv("GIT_SSH", "/some/other/ssh")
+
+	// When explaining the effective SSH route
+	output := runUse(t, f, "--explanation")
+
+	// Then gh still selects the route while GIT_SSH supplies the connection program
+	assert.Contains(t, output, "SSH Git:   github-work (SSH host)")
+	assert.Contains(t, output, "Connects using /some/other/ssh.")
+	assert.NotContains(t, output, "GIT_SSH overrides")
+}
+
+func TestExplanationReportsAccountBlockerAndCommitOverrideWithoutToken(t *testing.T) {
+	// Given an identity whose account is blocked by a token override and whose author email is overridden
+	store, f := useFixture(t)
+	require.NoError(t, store.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+	t.Chdir(t.TempDir())
+	runUse(t, f, "work")
+	t.Setenv("GH_TOKEN", "fixture-secret-never-print")
+	t.Setenv("GIT_AUTHOR_EMAIL", "overridden@example.invalid")
+
+	// When requesting an explanation, rather than performing an authenticated operation
+	output := runUse(t, f, "--explanation")
+
+	// Then the blockers are explained without claiming agreement or disclosing the token
+	assert.Contains(t, output, "gh API:    Cannot use alice:")
+	assert.Contains(t, output, "HTTPS Git: Cannot use alice:")
+	assert.Contains(t, output, "GH_TOKEN overrides saved accounts")
+	assert.Contains(t, output, "Active commit override: GIT_AUTHOR_EMAIL")
+	assert.NotContains(t, output, "fixture-secret-never-print")
+}
+
 func TestUseRejectsContradictoryScopes(t *testing.T) {
 	tests := []struct {
 		name string
@@ -285,6 +419,9 @@ func TestUseRejectsContradictoryScopes(t *testing.T) {
 		{name: "identity and list", args: []string{"work", "--list"}, want: "--list cannot be combined"},
 		{name: "identity and hostname", args: []string{"work", "--hostname", "example.com"}, want: "a named identity supplies its own hostname"},
 		{name: "empty owner", args: []string{"work", "--owner", ""}, want: "--owner cannot be empty"},
+		{name: "explanation and identity", args: []string{"work", "--explanation"}, want: "--explanation cannot be combined"},
+		{name: "explanation and unset", args: []string{"--unset", "--explanation"}, want: "--explanation cannot be combined"},
+		{name: "explanation and list", args: []string{"--list", "--explanation"}, want: "--explanation cannot be combined"},
 	}
 
 	for _, tt := range tests {

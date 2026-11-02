@@ -19,6 +19,61 @@ type helpTopic struct {
 
 var HelpTopics = []helpTopic{
 	{
+		name:  "accounts",
+		short: "Choose accounts and Git identities (experimental)",
+		long: heredoc.Doc(`
+			A saved account holds credentials for a GitHub host. An identity gives a name to
+			an account plus optional SSH and Git name/email settings.
+
+			Use gh auth identity create NAME --account LOGIN to save an identity, then
+			gh auth use NAME inside any checkout to apply it to the main repository and all its
+			existing and future linked worktrees, wherever they live. Outside a repository,
+			it applies to a directory tree and repositories whose main Git directory is beneath it.
+			External worktrees inherit the main repository's directory choice, not their own location's.
+			Repository choices beat directory choices; more-specific directories beat broader ones,
+			then owner choices provide a fallback. gh auth use --view prints the selected identity
+			as JSON, or null; gh auth use --list prints repository, directory and owner choices.
+			gh auth use --explain shows why it applies and the Git settings in this repository.
+			Inspection defaults to github.com unless --hostname is supplied; it does not follow
+			GH_HOST or the repository remote.
+
+			gh auth use installs a global Git include, a host-wide HTTPS credential helper,
+			and an SSH dispatcher. This changes Git's connection setup even outside selected
+			directories; keep this gh executable in place while any bindings remain.
+			Compatible existing SSH commands are preserved. Active non-gh credential helpers,
+			submodule identities, separate Git directories, and bare repositories
+			are not supported by this prototype.
+			Persistent identities are refused on Windows before changing Git. Git 2.36 or newer is required.
+
+			For one command, use --account LOGIN, for example gh pr create --account alice.
+			This selects a saved account on the command's host for API calls and Git operations
+			the command runs, including its push. It does not change commit name/email,
+			persistent identity choices, the saved active account, or later independent Git.
+			API and HTTPS selection do not require an identity. SSH requires an alias already
+			configured in an identity for this account; missing or ambiguous routes fail.
+
+			--account overrides environment tokens for the selected account's host. Explicit
+			HTTP Authorization headers still take precedence. SSH aliases are connection names,
+			not verification that a key signs in as the account.
+			Without --account, token environment variables block persistent identities, including
+			SSH Git. Unset GH_TOKEN/GITHUB_TOKEN (or the enterprise equivalents) to use an identity.
+
+			The global --account flag is not supported on auth-management commands.
+			The --account on auth identity create/edit instead stores the identity's account.
+			gh auth status and gh auth switch manage the active account used where no identity applies.
+
+			Remove a choice with gh auth use --unset. Delete an identity and its choices with
+			gh auth identity delete NAME. Unsetting from any worktree removes the repository
+			choice for all worktrees, revealing directory/owner fallbacks. Use
+			gh auth identity delete --all to remove all identities
+			and bindings. Deletion asks you to retype the name; scripts must pass --confirm.
+			Removing the last binding removes gh's managed Git include. Credentials and SSH keys remain.
+			Before replacing or uninstalling this prerelease, run
+			gh auth reset-multi-account-experiment to remove all experiment configuration.
+			It performs the same cleanup as identity delete --all, with the same confirmation.
+		`),
+	},
+	{
 		name:  "mintty",
 		short: "Information about using gh with MinTTY",
 		long: heredoc.Docf(`

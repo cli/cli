@@ -781,25 +781,26 @@ func workingTreeRoot(dir string) (string, error) {
 // Resolve selects a repository choice, then deepest directory tree, then owner.
 // Outside a repository, directory-tree and explicit owner bindings still apply.
 func (s *Store) Resolve(host, owner, dir string) (*Identity, error) {
-	result, err := s.resolve(host, owner, dir)
+	bindings, err := s.Bindings()
+	if err != nil || len(bindings) == 0 {
+		return nil, err
+	}
+	result, err := s.resolveBindings(host, owner, dir, bindings)
 	if err != nil {
 		return nil, err
 	}
 	return result.Identity, nil
 }
 
-func (s *Store) resolve(host, owner, dir string) (*resolution, error) {
+func (s *Store) resolve(host, owner, dir string) (*Explanation, error) {
 	bindings, err := s.Bindings()
 	if err != nil {
 		return nil, err
 	}
-	if len(bindings) == 0 {
-		return &resolution{}, nil
-	}
 	return s.resolveBindings(host, owner, dir, bindings)
 }
 
-func (s *Store) resolveBindings(host, owner, dir string, bindings []Binding) (*resolution, error) {
+func (s *Store) resolveBindings(host, owner, dir string, bindings []Binding) (*Explanation, error) {
 	dir, err := canonicalDirectory(dir)
 	if err != nil {
 		return nil, err
@@ -823,7 +824,7 @@ func (s *Store) resolveBindings(host, owner, dir string, bindings []Binding) (*r
 			root = dir
 		}
 	}
-	result := &resolution{}
+	result := &Explanation{Host: host, Directory: dir, Repository: root}
 	scopeDir := dir
 	if root != "" {
 		result.CommonGitDir, err = commonGitDirectory(dir)
@@ -832,6 +833,7 @@ func (s *Store) resolveBindings(host, owner, dir string, bindings []Binding) (*r
 		}
 		scopeDir = filepath.Dir(result.CommonGitDir)
 	}
+	result.ScopeDirectory = scopeDir
 	if len(bindings) == 0 {
 		return result, nil
 	}
@@ -843,10 +845,14 @@ func (s *Store) resolveBindings(host, owner, dir string, bindings []Binding) (*r
 		if b.Repository != "" {
 			if b.Repository == result.CommonGitDir {
 				result.Matches = append(result.Matches, *b)
+			} else if under(filepath.Dir(b.Repository), scopeDir) {
+				result.Descendants = append(result.Descendants, *b)
 			}
 			continue
 		}
-
+		if b.Directory != scopeDir && under(b.Directory, scopeDir) {
+			result.Descendants = append(result.Descendants, *b)
+		}
 		if under(scopeDir, b.Directory) {
 			result.Matches = append(result.Matches, *b)
 		}
@@ -1008,10 +1014,4 @@ func atomicWrite(path string, contents []byte) error {
 		return fmt.Errorf("refusing to install invalid Git configuration: %w", err)
 	}
 	return os.Rename(file.Name(), path)
-}
-
-type resolution struct {
-	CommonGitDir string
-	Identity     *Identity
-	Matches      []Binding
 }

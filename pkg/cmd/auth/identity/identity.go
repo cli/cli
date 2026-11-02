@@ -16,11 +16,11 @@ import (
 func NewCmdIdentity(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "identity <command>",
-		Short: "Manage reusable account and SSH identities (experimental)",
+		Short: "Manage reusable account, SSH, and commit identities (experimental)",
 		Long: heredoc.Doc(`
 			Save reusable account and Git settings under an identity name.
 			An identity references an account you have already signed in to; it does not store tokens.
-			Several identities can use the same account with different SSH aliases.
+			Several identities can use the same account with different SSH aliases or Git name/email.
 			Creating an identity does not apply it. Use gh auth use NAME to choose where it applies.
 			Use these commands to edit generated files; manual edits are unsupported.
 			An SSH alias is a connection name. gh does not check which account its key signs in as.
@@ -38,7 +38,9 @@ func NewCmdIdentity(f *cmdutil.Factory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-
+			if err := warnAccounts(f, ids); err != nil {
+				return err
+			}
 			return writeJSON(f, ids)
 		},
 	})
@@ -53,7 +55,9 @@ func NewCmdIdentity(f *cmdutil.Factory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-
+			if err := warnAccounts(f, []identity.Identity{*id}); err != nil {
+				return err
+			}
 			return writeJSON(f, id)
 		},
 	})
@@ -136,8 +140,40 @@ func newSaveCommand(f *cmdutil.Factory, edit bool) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Long = "Save a reference to an existing saved account. Creating does not apply it. Use gh auth use NAME in a checkout to select its repository family. SSH aliases are connection names, not account verification. Editing preserves omitted values and cannot change the hostname."
-	cmd.Example = "$ gh auth identity " + verb + " work --account alice --ssh-host github-work"
+	cmd.Long = heredoc.Doc(`
+		Save an identity referencing an account you have already signed in to.
+		--account is required when creating an identity. --hostname defaults to github.com,
+		not GH_HOST or the current repository. Creation does not change the active account
+		or select the identity for any directory; apply it afterward with gh auth use NAME.
+
+		Git name and email are optional. Supply both, or omit both to store neither.
+		Omitting them does not copy your current Git name or email.
+		--ssh-host stores an SSH host/alias name without checking its existence or account.
+		It is optional for HTTPS, but needed before applying an identity to an SSH repository.
+	`)
+	cmd.Example = heredoc.Doc(`
+		$ gh auth identity create work --account alice --ssh-host github-work
+		$ gh auth identity create personal --account alice --git-user-name "Alice Example" --git-user-email alice@example.com
+		$ gh auth use work
+		$ gh auth use --explain
+	`)
+	if edit {
+		cmd.Long = heredoc.Doc(`
+			Edit an identity everywhere it is used. Existing repository, directory and owner choices
+			reference the identity, so account, SSH host, and Git defaults change without rebinding.
+			Omitted flags keep their existing values. The hostname cannot be changed.
+			Changing the account does not automatically change the SSH host or Git name/email.
+
+			Git name and email must both be present or both absent afterward. --clear-git
+			removes them from this identity only; matching broader settings can still supply them.
+			Run gh auth use --explain inside a repository to see the Git settings there.
+		`)
+		cmd.Example = heredoc.Doc(`
+			$ gh auth identity edit work --account other-login
+			$ gh auth identity edit work --git-user-name "Alice Example" --git-user-email new@example.com
+			$ gh auth identity edit work --clear-git
+		`)
+	}
 	cmd.Flags().StringVar(&id.Account, "account", "", "Saved account `login` to reference (required when creating)")
 	if !edit {
 		cmd.Flags().StringVar(&id.Host, "hostname", "github.com", "GitHub hostname")
@@ -163,7 +199,6 @@ func newSaveCommand(f *cmdutil.Factory, edit bool) *cobra.Command {
 	}
 	cmd.Example += "\n"
 	cmd.Flags().Lookup("git-user-email").Usage = "Git email `address`, @public, or @noreply (requires a Git name; selectors use the network)"
-	cmd.Long += "\nGit name and email are optional; supply both or neither. --clear-git removes both when editing."
 	return cmd
 }
 
@@ -171,6 +206,22 @@ func writeJSON(f *cmdutil.Factory, value any) error {
 	encoder := json.NewEncoder(f.IOStreams.Out)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(value)
+}
+
+func warnAccounts(f *cmdutil.Factory, ids []identity.Identity) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	cfg, err := f.Config()
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if warning := identity.AccountWarning(cfg.Authentication(), &id); warning != "" {
+			fmt.Fprintln(f.IOStreams.ErrOut, warning)
+		}
+	}
+	return nil
 }
 
 // NewCmdGitSSH is Git's persistent SSH dispatcher for independently invoked commands.

@@ -216,7 +216,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			Display active account and authentication state on each known GitHub host.
 
 			For each host, the authentication state of each known account is tested and any issues are included in the output.
-			Each host section will indicate the active account, which will be used when targeting that host.
+			Each host section indicates the active account used where no identity applies.
+			Use %[1]sgh auth use --explain%[1]s to inspect the account choice in the current directory.
 
 			If an account on any host (or only the one given via %[1]s--hostname%[1]s) has authentication issues,
 			the command will exit with 1 and output to stderr. Note that when using the %[1]s--json%[1]s option, the command
