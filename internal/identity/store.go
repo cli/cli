@@ -31,7 +31,7 @@ type Identity struct {
 	SSHHost string `json:"sshHost,omitempty"`
 }
 
-// Binding applies an identity to a repository family.
+// Binding applies an identity to a repository family or directory tree.
 type Binding struct {
 	Identity   string `json:"identity"`
 	Host       string `json:"host"`
@@ -213,6 +213,8 @@ func (s *Store) Bindings() ([]Binding, error) {
 			b.Identity = value
 		case "host":
 			b.Host = value
+		case "directory":
+			b.Directory = value
 		case "repository":
 			b.Repository = value
 		default:
@@ -227,7 +229,7 @@ func (s *Store) Bindings() ([]Binding, error) {
 			}
 		}
 		if !safeName.MatchString(b.Identity) || !safeName.MatchString(b.Host) ||
-			scopes != 1 || b.Directory != "" ||
+			scopes != 1 ||
 			(b.Directory != "" && (!filepath.IsAbs(b.Directory) || strings.ContainsAny(b.Directory, "*?[\\"))) ||
 			(b.Repository != "" && (!filepath.IsAbs(b.Repository) || !validValue(b.Repository) || filepath.Base(b.Repository) != ".git" || strings.ContainsAny(b.Repository, "*?[\\"))) {
 			return nil, fmt.Errorf("invalid identity scope %d in %s", i, path)
@@ -292,9 +294,6 @@ func normalizeBinding(b Binding) (Binding, error) {
 		} else if bare == "true" {
 			return b, errors.New("persistent identities in bare repositories are not supported; use a standalone checkout")
 		}
-	}
-	if b.Repository == "" {
-		return b, errors.New("identity choices currently require a repository checkout")
 	}
 	path := b.Directory
 	if b.Repository != "" {
@@ -560,12 +559,23 @@ func (s *Store) writeBindings(bindings []Binding, executable string) error {
 			return err
 		}
 	}
+	sort.SliceStable(bindings, func(i, j int) bool {
+		a, b := bindings[i], bindings[j]
+		if scopeRank(a) != scopeRank(b) {
+			return scopeRank(a) < scopeRank(b)
+		}
+		return len(a.Directory) < len(b.Directory)
+	})
 	var config strings.Builder
 	fmt.Fprintln(&config, "# Managed by gh auth use. Do not edit.")
 	for i, binding := range bindings {
 		fmt.Fprintf(&config, "[gh-auth-binding %q]\n\tidentity = %s\n\thost = %s\n",
 			strconv.Itoa(i), gitQuote(binding.Identity), gitQuote(binding.Host))
-		fmt.Fprintf(&config, "\trepository = %s\n", gitQuote(binding.Repository))
+		if binding.Repository != "" {
+			fmt.Fprintf(&config, "\trepository = %s\n", gitQuote(binding.Repository))
+		} else {
+			fmt.Fprintf(&config, "\tdirectory = %s\n", gitQuote(binding.Directory))
+		}
 	}
 	if len(bindings) > 0 {
 		fmt.Fprintf(&config, "[core]\n\tsshCommand = %s\n[ssh]\n\tvariant = ssh\n", gitQuote(sshCommand))
@@ -581,8 +591,14 @@ func (s *Store) writeBindings(bindings []Binding, executable string) error {
 	}
 	for _, binding := range bindings {
 		path := s.IdentityPath(binding.Identity)
-		for _, pattern := range []string{filepath.ToSlash(binding.Repository), filepath.ToSlash(binding.Repository) + "/worktrees/*"} {
+		if binding.Repository != "" {
+			for _, pattern := range []string{filepath.ToSlash(binding.Repository), filepath.ToSlash(binding.Repository) + "/worktrees/*"} {
+				fmt.Fprintf(&config, "[includeIf %s]\n\tpath = %s\n", gitQuote("gitdir:"+pattern), gitQuote(path))
+			}
+		} else {
+			pattern := strings.TrimSuffix(filepath.ToSlash(binding.Directory), "/") + "/**/.git"
 			fmt.Fprintf(&config, "[includeIf %s]\n\tpath = %s\n", gitQuote("gitdir:"+pattern), gitQuote(path))
+			fmt.Fprintf(&config, "[includeIf %s]\n\tpath = %s\n", gitQuote("gitdir:"+pattern+"/worktrees/*"), gitQuote(path))
 		}
 	}
 	oldConfig, readErr := os.ReadFile(managed)
@@ -635,6 +651,11 @@ func sortedKeys(m map[string]bool) []string {
 	return keys
 }
 
+func under(dir, parent string) bool {
+	rel, err := filepath.Rel(parent, dir)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
 func workingTreeRoot(dir string) (string, error) {
 	root, err := gitOptional(dir, "rev-parse", "--show-toplevel")
 	if err != nil {
@@ -648,7 +669,8 @@ func workingTreeRoot(dir string) (string, error) {
 	return root, nil
 }
 
-// Resolve selects the identity for a repository family.
+// Resolve selects a repository choice, then deepest directory tree.
+// Outside a repository, directory-tree bindings still apply.
 func (s *Store) Resolve(host, owner, dir string) (*Identity, error) {
 	result, err := s.resolve(host, owner, dir)
 	if err != nil {
@@ -693,20 +715,40 @@ func (s *Store) resolveBindings(host, owner, dir string, bindings []Binding) (*r
 		}
 	}
 	result := &resolution{}
+	scopeDir := dir
 	if root != "" {
 		result.CommonGitDir, err = commonGitDirectory(dir)
 		if err != nil {
 			return nil, err
 		}
+		scopeDir = filepath.Dir(result.CommonGitDir)
 	}
 	if len(bindings) == 0 {
 		return result, nil
 	}
-	for _, b := range bindings {
-		if strings.EqualFold(b.Host, host) && b.Repository == result.CommonGitDir {
-			result.Matches = append(result.Matches, b)
+	for i := range bindings {
+		b := &bindings[i]
+		if !strings.EqualFold(b.Host, host) {
+			continue
+		}
+		if b.Repository != "" {
+			if b.Repository == result.CommonGitDir {
+				result.Matches = append(result.Matches, *b)
+			}
+			continue
+		}
+
+		if under(scopeDir, b.Directory) {
+			result.Matches = append(result.Matches, *b)
 		}
 	}
+	sort.SliceStable(result.Matches, func(i, j int) bool {
+		a, b := result.Matches[i], result.Matches[j]
+		if scopeRank(a) != scopeRank(b) {
+			return scopeRank(a) > scopeRank(b)
+		}
+		return len(a.Directory) > len(b.Directory)
+	})
 	if len(result.Matches) == 0 {
 		return result, nil
 	}
@@ -751,6 +793,16 @@ func commonGitDirectory(dir string) (string, error) {
 		return "", err
 	}
 	return canonicalDirectory(common)
+}
+
+func scopeRank(b Binding) int {
+	if b.Repository != "" {
+		return 2
+	}
+	if b.Directory != "" {
+		return 1
+	}
+	return 0
 }
 
 func supportedGitVersion() error {

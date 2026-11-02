@@ -3,7 +3,6 @@ package login
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -17,10 +16,8 @@ import (
 
 func TestGistCredentialHelperUsesCanonicalHostIdentity(t *testing.T) {
 	isolateIdentityCredential(t)
-	// Given an Alice repository identity while Bob is globally active
+	// Given an Alice directory identity while Bob is globally active
 	home := t.TempDir()
-	require.NoError(t, exec.Command("git", "init", "-q", home).Run())
-	t.Chdir(home)
 	t.Chdir(home)
 	t.Setenv("HOME", home)
 	t.Setenv("GH_CONFIG_DIR", filepath.Join(home, "gh"))

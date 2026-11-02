@@ -26,7 +26,7 @@ type UseOptions struct {
 func NewCmdUse(f *cmdutil.Factory, runF func(*UseOptions) error) *cobra.Command {
 	opts := &UseOptions{}
 	cmd := &cobra.Command{
-		Use: "use [identity]", Short: "Use an identity for this repository and its worktrees (experimental)",
+		Use: "use [identity]", Short: "Use an identity for this repository and its worktrees, or this directory tree (experimental)",
 		Long: "Choose an identity for this repository's main checkout and all current and future worktrees. This installs a global Git include, HTTPS helper, and SSH dispatcher. Keep this gh executable in place until the last choice is removed. --view shows the selected identity as JSON; --list shows choices; --unset removes this scope. The saved active account and credentials remain unchanged. Token environment variables block persistent identity use. Unsupported SSH setups, non-gh credential helpers, bare repositories, submodules, and separate Git directories are refused without changing configuration.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -57,11 +57,12 @@ func NewCmdUse(f *cmdutil.Factory, runF func(*UseOptions) error) *cobra.Command 
 			return useRun(f, opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.Directory, "directory", "", "Target checkout; selects its whole repository family")
+	cmd.Flags().StringVar(&opts.Directory, "directory", "", "Target directory or checkout; a checkout selects its whole repository family")
 	cmd.Flags().StringVar(&opts.Host, "hostname", "github.com", "Host to inspect or unset; does not follow GH_HOST or remotes (a named identity supplies its host)")
-	cmd.Flags().BoolVar(&opts.Unset, "unset", false, "Remove this repository-family choice")
+	cmd.Flags().BoolVar(&opts.Unset, "unset", false, "Remove this repository-family, directory, or owner choice; fallback choices remain")
 	cmd.Flags().BoolVar(&opts.List, "list", false, "Show all bindings as JSON")
 	cmd.Flags().BoolVar(&opts.View, "view", false, "Show the selected identity as JSON (the default with no arguments)")
+	cmd.Long += "\nOutside a repository, choose an identity for the directory tree. The main repository location determines inheritance for external worktrees. Repository choices beat the deepest matching directory. --directory targets another location."
 	return cmd
 }
 
