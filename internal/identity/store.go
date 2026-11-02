@@ -25,10 +25,12 @@ var safeName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 // Identity is a saved account reference and optional Git preferences, never credentials.
 type Identity struct {
-	Name    string `json:"name"`
-	Host    string `json:"host"`
-	Account string `json:"account"`
-	SSHHost string `json:"sshHost,omitempty"`
+	Name         string `json:"name"`
+	Host         string `json:"host"`
+	Account      string `json:"account"`
+	SSHHost      string `json:"sshHost,omitempty"`
+	GitUserName  string `json:"gitUserName,omitempty"`
+	GitUserEmail string `json:"gitUserEmail,omitempty"`
 }
 
 // Binding applies an identity to a repository family, directory tree, or owner.
@@ -75,6 +77,12 @@ func (s *Store) Save(id Identity, replace bool) error {
 	if id.SSHHost != "" && !safeName.MatchString(id.SSHHost) {
 		return errors.New("SSH host must be an existing SSH host name or alias, not a URL or command")
 	}
+	if !validValue(id.GitUserName) || !validValue(id.GitUserEmail) {
+		return errors.New("Git name and email must be valid UTF-8 without newlines or NUL characters")
+	}
+	if (id.GitUserName == "") != (id.GitUserEmail == "") {
+		return errors.New("supply both --git-user-name and --git-user-email, or neither")
+	}
 	path := s.IdentityPath(id.Name)
 	if _, err := os.Stat(path); err == nil && !replace {
 		return fmt.Errorf("identity %q already exists; use 'gh auth identity edit'", id.Name)
@@ -90,16 +98,27 @@ func (s *Store) Save(id Identity, replace bool) error {
 			return errors.New("an identity's hostname cannot change; create another identity")
 		}
 	}
-
+	if id.GitUserName != "" {
+		bindings, err := s.Bindings()
+		if err != nil {
+			return err
+		}
+		if err := s.validateDirectoryAttribution(bindings, &id); err != nil {
+			return err
+		}
+	}
 	var b strings.Builder
 	fmt.Fprintln(&b, "# Managed by gh auth identity. Manual changes may be overwritten.")
 	fmt.Fprintf(&b, "[gh-identity %s]\n", gitQuote(id.Host))
 	for _, field := range []struct{ key, value string }{
 		{"name", id.Name}, {"account", id.Account}, {"sshHost", id.SSHHost},
+		{"gitUserName", id.GitUserName}, {"gitUserEmail", id.GitUserEmail},
 	} {
 		fmt.Fprintf(&b, "\t%s = %s\n", field.key, gitQuote(field.value))
 	}
-
+	if id.GitUserName != "" {
+		fmt.Fprintf(&b, "[user]\n\tname = %s\n\temail = %s\n", gitQuote(id.GitUserName), gitQuote(id.GitUserEmail))
+	}
 	fmt.Fprintf(&b, "[credential %s]\n\tusername = %s\n", gitQuote("https://"+id.Host), gitQuote(id.Account))
 	return atomicWrite(path, []byte(b.String()))
 }
@@ -139,7 +158,10 @@ func (s *Store) Load(name string) (*Identity, error) {
 			id.Account = value
 		case "sshhost":
 			id.SSHHost = value
-
+		case "gitusername", "gitname":
+			id.GitUserName = value
+		case "gituseremail", "gitemail":
+			id.GitUserEmail = value
 		}
 	}
 	if id.Name != name || !safeName.MatchString(id.Host) || !safeName.MatchString(id.Account) {
@@ -407,7 +429,9 @@ func (s *Store) Bind(b Binding, executable string) error {
 	}
 	bindings = slices.DeleteFunc(bindings, func(other Binding) bool { return sameScope(b, other) })
 	bindings = append(bindings, b)
-
+	if err := s.validateDirectoryAttribution(bindings, id); err != nil {
+		return err
+	}
 	return s.writeBindings(bindings, executable)
 }
 
@@ -484,6 +508,49 @@ func (s *Store) supportedCredentialHelpers(dir, host string) error {
 		return fmt.Errorf("an existing HTTPS credential helper from %s would be replaced; no identity choice was applied. If you intend gh to manage credentials for this host, first run 'gh auth setup-git --hostname %s'", externalOrigins[0], host)
 	}
 	return nil
+}
+
+func (s *Store) validateDirectoryAttribution(bindings []Binding, replacement *Identity) error {
+	ids := map[string]*Identity{replacement.Name: replacement}
+	for i, a := range bindings {
+		for _, b := range bindings[:i] {
+			if strings.EqualFold(a.Host, b.Host) || !scopesOverlap(a, b) {
+				continue
+			}
+			for _, name := range []string{a.Identity, b.Identity} {
+				if ids[name] == nil {
+					id, err := s.Load(name)
+					if err != nil {
+						return err
+					}
+					ids[name] = id
+				}
+			}
+			if ids[a.Identity].GitUserName != "" || ids[b.Identity].GitUserName != "" {
+				return errors.New("Git attribution cannot be selected by host in overlapping repository, directory or owner choices; use separate directory trees, owner-only choices, or identities without Git name/email defaults")
+			}
+		}
+	}
+	return nil
+}
+
+func scopesOverlap(a, b Binding) bool {
+	if a.Owner != "" && b.Owner != "" {
+		return false
+	}
+	if a.Owner != "" || b.Owner != "" {
+		return true
+	}
+	if a.Repository != "" && b.Repository != "" {
+		return a.Repository == b.Repository
+	}
+	if a.Repository != "" {
+		return under(filepath.Dir(a.Repository), b.Directory)
+	}
+	if b.Repository != "" {
+		return under(filepath.Dir(b.Repository), a.Directory)
+	}
+	return under(a.Directory, b.Directory) || under(b.Directory, a.Directory)
 }
 
 // Unbind removes only the requested scope, revealing any broader binding.

@@ -63,6 +63,7 @@ func NewCmdIdentity(f *cmdutil.Factory) *cobra.Command {
 
 func newSaveCommand(f *cmdutil.Factory, edit bool) *cobra.Command {
 	id := identity.Identity{}
+	clearGit := false
 	verb := "create"
 	if edit {
 		verb = "edit"
@@ -86,9 +87,19 @@ func newSaveCommand(f *cmdutil.Factory, edit bool) *cobra.Command {
 				if !cmd.Flags().Changed("ssh-host") {
 					id.SSHHost = existing.SSHHost
 				}
-
+				if !cmd.Flags().Changed("git-user-name") {
+					id.GitUserName = existing.GitUserName
+				}
+				if !cmd.Flags().Changed("git-user-email") {
+					id.GitUserEmail = existing.GitUserEmail
+				}
 			}
-
+			if clearGit {
+				if cmd.Flags().Changed("git-user-name") || cmd.Flags().Changed("git-user-email") {
+					return cmdutil.FlagErrorf("--clear-git cannot be combined with --git-user-name or --git-user-email")
+				}
+				id.GitUserName, id.GitUserEmail = "", ""
+			}
 			id.Name = args[0]
 			id.Host = strings.ToLower(id.Host)
 			cfg, err := f.Config()
@@ -123,7 +134,12 @@ func newSaveCommand(f *cmdutil.Factory, edit bool) *cobra.Command {
 		_ = cmd.MarkFlagRequired("account")
 	}
 	cmd.Flags().StringVar(&id.SSHHost, "ssh-host", "", "SSH host or alias `name` to use; existence and account are not checked")
-
+	cmd.Flags().StringVar(&id.GitUserName, "git-user-name", "", "Git user.name (requires a Git email in the identity)")
+	cmd.Flags().StringVar(&id.GitUserEmail, "git-user-email", "", "Git user.email (requires a Git name in the identity)")
+	if edit {
+		cmd.Flags().BoolVar(&clearGit, "clear-git", false, "Remove this identity's Git name/email; broader Git defaults may still apply")
+	}
+	cmd.Long += "\nGit name and email are optional; supply both or neither. --clear-git removes both when editing."
 	return cmd
 }
 
