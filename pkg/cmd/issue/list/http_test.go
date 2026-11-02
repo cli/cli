@@ -2,8 +2,10 @@ package list
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -264,6 +266,93 @@ func TestSearchIssues_rejectsPullRequestQualifiers(t *testing.T) {
 
 			assert.EqualError(t, err, "cannot use pull request search qualifiers with `gh issue list`; use `gh pr list` instead")
 			assert.Len(t, reg.Requests, 0)
+		})
+	}
+}
+
+func TestSearchIssues_paginationLimit(t *testing.T) {
+	tests := []struct {
+		name            string
+		limit           int
+		secondPageCount int
+		wantLimits      []float64
+	}{
+		{
+			name:            "second page requests only the remaining amount",
+			limit:           150,
+			secondPageCount: 50,
+			wantLimits:      []float64{100, 50},
+		},
+		{
+			name:            "second page requests a single item when one remains",
+			limit:           101,
+			secondPageCount: 1,
+			wantLimits:      []float64{100, 1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			issueNodes := func(n int) string {
+				parts := make([]string, n)
+				for i := range parts {
+					parts[i] = fmt.Sprintf(`{"number": %d}`, i+1)
+				}
+				return "[" + strings.Join(parts, ",") + "]"
+			}
+
+			var gotLimits []float64
+			captureLimit := func(_ string, vars map[string]any) {
+				if limit, ok := vars["limit"].(float64); ok {
+					gotLimits = append(gotLimits, limit)
+				}
+			}
+
+			reg.Register(
+				httpmock.GraphQL(`query IssueSearch\b`),
+				httpmock.GraphQLQuery(fmt.Sprintf(`
+					{ "data": { "repository": { "hasIssuesEnabled": true }, "search": {
+						"issueCount": 1000,
+						"nodes": %s,
+						"pageInfo": {
+							"hasNextPage": true,
+							"endCursor": "ENDCURSOR"
+						}
+					} } }
+				`, issueNodes(100)), captureLimit),
+			)
+			reg.Register(
+				httpmock.GraphQL(`query IssueSearch\b`),
+				httpmock.GraphQLQuery(fmt.Sprintf(`
+					{ "data": { "repository": { "hasIssuesEnabled": true }, "search": {
+						"issueCount": 1000,
+						"nodes": %s,
+						"pageInfo": {
+							"hasNextPage": false,
+							"endCursor": "ENDCURSOR"
+						}
+					} } }
+				`, issueNodes(tt.secondPageCount)), captureLimit),
+			)
+
+			httpClient := &http.Client{Transport: reg}
+			client := api.NewClientFromHTTP(httpClient)
+
+			_, err := searchIssues(
+				client,
+				fd.AdvancedIssueSearchSupportedAsOnlyBackend(),
+				ghrepo.New("OWNER", "REPO"),
+				prShared.FilterOptions{State: "open"},
+				tt.limit,
+			)
+			assert.NoError(t, err)
+
+			assert.Equal(t, 2, len(reg.Requests), "expected 2 HTTP requests")
+			assert.Equal(t, tt.wantLimits, gotLimits,
+				"expected the $limit variable passed to search() to shrink to the remaining amount on the second page")
 		})
 	}
 }
