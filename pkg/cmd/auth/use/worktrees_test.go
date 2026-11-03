@@ -68,6 +68,7 @@ func TestUseFromAnyWorktreeSelectsEntireRepositoryFamily(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(runUse(t, f, "--list")), &bindings))
 	require.Len(t, bindings, 1)
 	assert.Equal(t, "personal@example.test", familyGit(t, main, "config", "user.email"))
+	assert.Contains(t, runUse(t, f, "--explain", "--directory", linked), "all worktrees")
 	runUse(t, f, "--unset", "--directory", main)
 	assert.JSONEq(t, "null", runUse(t, f, "--view", "--directory", linked))
 }
@@ -105,7 +106,20 @@ func TestDirectoryChoicesFollowMainRepositoryNotWorktreeLocation(t *testing.T) {
 	assert.Equal(t, "git@work-ssh", args[0])
 	runUse(t, f, "specific", "--directory", linked)
 	assert.Equal(t, "specific@example.test", familyGit(t, main, "config", "user.email"))
+	var report struct {
+		Context   struct{ CommonGitDir, ScopeDirectory string }
+		Selection struct {
+			Selected   identity.Binding
+			Superseded []identity.Match
+		}
+	}
 	t.Chdir(linked)
+	require.NoError(t, json.Unmarshal([]byte(runUse(t, f, "--explain", "--owner", "company", "--json", "context,selection")), &report))
+	assert.Equal(t, familyGit(t, main, "rev-parse", "--path-format=absolute", "--git-common-dir"), report.Context.CommonGitDir)
+	assert.Equal(t, filepath.Dir(report.Context.CommonGitDir), report.Context.ScopeDirectory)
+	assert.NotEmpty(t, report.Selection.Selected.Repository)
+	require.Len(t, report.Selection.Superseded, 2)
+	assert.Equal(t, "repository choices take precedence", report.Selection.Superseded[0].Reason)
 	runUse(t, f, "--unset")
 	assert.Equal(t, "work@example.test", familyGit(t, main, "config", "user.email"))
 	assert.Contains(t, runUse(t, f, "--view"), `"name": "work"`)

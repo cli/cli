@@ -35,8 +35,9 @@ func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Switch the active account for a GitHub host.
 
-			This command changes the authentication configuration that will
-			be used when running commands targeting the specified GitHub host.
+			This changes the account used for the specified host where no identity applies.
+			It does not change identities or their repository, directory and owner choices.
+			Use %[1]sgh auth use --explain%[1]s to inspect the account selected in this directory.
 
 			If the specified host has two accounts, the active account will be switched
 			automatically. If there are more than two accounts, disambiguation will be

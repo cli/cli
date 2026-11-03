@@ -101,7 +101,7 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 	// cmd.SetErr(f.IOStreams.ErrOut) // just let it default to os.Stderr instead
 
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
-	cmd.PersistentFlags().String("account", "", "Use saved account `login` for this command's API and Git authentication (experimental)")
+	cmd.PersistentFlags().String("account", "", "Use saved account `login` for this command's API and Git authentication; see 'gh help accounts' (experimental)")
 
 	// override Cobra's default behaviors unless an opt-out has been set
 	if os.Getenv("GH_COBRA") == "" {
