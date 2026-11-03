@@ -275,13 +275,6 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 		fmt.Fprintf(opts.IO.ErrOut, "Using existing linked branch %q\n", branchName)
 	}
 
-	// Remember which branch to target when creating a PR.
-	if opts.BaseBranch != "" {
-		if err := opts.GitClient.SetBranchConfig(ctx.Background(), branchName, git.MergeBaseConfig, opts.BaseBranch); err != nil {
-			return err
-		}
-	}
-
 	fmt.Fprintf(opts.IO.Out, "%s/%s/tree/%s\n", branchRepo.RepoHost(), ghrepo.FullName(branchRepo), branchName)
 
 	return checkoutBranch(opts, branchRepo, branchName, worktreeTarget)
@@ -375,6 +368,13 @@ func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutB
 	}
 
 	gc := opts.GitClient
+
+	// Remember which branch to target when creating a PR.
+	if opts.BaseBranch != "" {
+		if err := gc.SetBranchConfig(ctx.Background(), checkoutBranch, git.MergeBaseConfig, opts.BaseBranch); err != nil {
+			return err
+		}
+	}
 
 	if err := gc.Fetch(ctx.Background(), baseRemote.Name, fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/%[2]s/%[1]s", checkoutBranch, baseRemote.Name)); err != nil {
 		return err
