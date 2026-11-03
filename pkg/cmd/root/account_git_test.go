@@ -143,13 +143,12 @@ done
 			repo := t.TempDir()
 			t.Chdir(repo)
 			accountGit(t, repo, "init", "-q", "--initial-branch=main")
-			accountGit(t, repo, "config", "user.name", "Alice")
-			accountGit(t, repo, "config", "user.email", "alice@example.invalid")
 			accountGit(t, repo, "config", "credential.https://github.com.username", "alice")
 			store, err := identity.Open()
 			require.NoError(t, err)
 			require.NoError(t, store.Save(identity.Identity{
 				Name: "alice", Host: "github.com", Account: "alice", SSHHost: "alice-ssh",
+				GitUserName: "Alice", GitUserEmail: "alice@example.invalid",
 			}, false))
 			require.NoError(t, store.Save(identity.Identity{Name: "bob", Host: "github.com", Account: "bob", SSHHost: "bob-ssh"}, false))
 			require.NoError(t, store.Bind(identity.Binding{Identity: "alice", Directory: repo}, helper))

@@ -11,6 +11,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUnicodeIdentityAndDirectoryRemainValidGitConfiguration(t *testing.T) {
+	// Given a valid Unicode name and a directory containing a non-breaking space
+	s := isolatedStore(t)
+	repo := filepath.Join(t.TempDir(), "work\u00a0projects")
+	require.NoError(t, os.Mkdir(repo, 0o700))
+	runGit(t, repo, "init", "-q")
+	id := Identity{Name: "work", Host: "github.com", Account: "alice",
+		GitUserName: "\u0645\u062d\u0645\u062f\u200c\u0631\u0636\u0627", GitUserEmail: "alice@example.test"}
+
+	// When saving and binding that identity
+	require.NoError(t, s.Save(id, false))
+	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: repo}, "/path/to/gh"))
+
+	// Then Git can still read its configuration and preserves the supplied name verbatim
+	assert.Equal(t, id.GitUserName+"\n", runGit(t, repo, "config", "user.name"))
+	assert.Empty(t, runGit(t, repo, "status", "--porcelain"))
+	loaded, err := s.Load("work")
+	require.NoError(t, err)
+	assert.Equal(t, id.GitUserName, loaded.GitUserName)
+}
+
 func TestUnsetDeletedDirectoryPreservesOtherChoices(t *testing.T) {
 	// Given two choices using one identity, one of whose directories has been removed
 	s := isolatedStore(t)
@@ -31,6 +52,47 @@ func TestUnsetDeletedDirectoryPreservesOtherChoices(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, bindings, 1)
 	assert.Equal(t, "company", bindings[0].Owner)
+}
+
+func TestRepositoryChoiceIsInheritedByLinkedWorktree(t *testing.T) {
+	// Given a normal checkout with a bound directory and a linked checkout elsewhere
+	s := isolatedStore(t)
+	main := t.TempDir()
+	runGit(t, main, "init", "-q")
+	runGit(t, main, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "initial")
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice", GitUserName: "Work", GitUserEmail: "work@example.test"}, false))
+	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: main}, "/path/to/gh"))
+	linked := filepath.Join(t.TempDir(), "linked")
+	runGit(t, main, "worktree", "add", "--detach", linked)
+
+	// When Git reads its configuration in the linked checkout
+	email, err := gitOptional(linked, "config", "--get", "user.email")
+
+	// Then the repository choice applies to the linked worktree and can be reapplied there
+	require.NoError(t, err)
+	assert.Equal(t, "work@example.test", email)
+	err = s.Bind(Binding{Identity: "work", Directory: linked}, "/path/to/gh")
+	require.NoError(t, err)
+	assert.Equal(t, "work@example.test\n", runGit(t, main, "config", "user.email"))
+}
+
+func TestOverlappingHostsCannotSilentlyReplaceGitAttribution(t *testing.T) {
+	// Given a directory identity with personal attribution
+	s := isolatedStore(t)
+	dir := t.TempDir()
+	require.NoError(t, s.Save(Identity{Name: "personal", Host: "github.com", Account: "alice", GitUserName: "Alice", GitUserEmail: "personal@example.test"}, false))
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "enterprise.test", Account: "alice", GitUserName: "Work", GitUserEmail: "work@example.test"}, false))
+	require.NoError(t, s.Bind(Binding{Identity: "personal", Directory: dir}, "/path/to/gh"))
+
+	// When a different host's identity is applied to the same tree
+	err := s.Bind(Binding{Identity: "work", Directory: dir}, "/path/to/gh")
+
+	// Then gh rejects host-dependent attribution that native Git cannot represent
+	require.ErrorContains(t, err, "Git attribution cannot be selected by host")
+	bindings, err := s.Bindings()
+	require.NoError(t, err)
+	require.Len(t, bindings, 1)
+	assert.Equal(t, "personal", bindings[0].Identity)
 }
 
 func TestPersistentIdentityRefusesBareRepositoryWithoutChangingConfig(t *testing.T) {

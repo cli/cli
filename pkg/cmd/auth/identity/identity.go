@@ -63,6 +63,7 @@ func NewCmdIdentity(f *cmdutil.Factory) *cobra.Command {
 
 func newSaveCommand(f *cmdutil.Factory, edit bool) *cobra.Command {
 	id := identity.Identity{}
+	clearGit := false
 	verb := "create"
 	if edit {
 		verb = "edit"
@@ -86,9 +87,19 @@ func newSaveCommand(f *cmdutil.Factory, edit bool) *cobra.Command {
 				if !cmd.Flags().Changed("ssh-host") {
 					id.SSHHost = existing.SSHHost
 				}
-
+				if !cmd.Flags().Changed("git-user-name") {
+					id.GitUserName = existing.GitUserName
+				}
+				if !cmd.Flags().Changed("git-user-email") {
+					id.GitUserEmail = existing.GitUserEmail
+				}
 			}
-
+			if clearGit {
+				if cmd.Flags().Changed("git-user-name") || cmd.Flags().Changed("git-user-email") {
+					return cmdutil.FlagErrorf("--clear-git cannot be combined with --git-user-name or --git-user-email")
+				}
+				id.GitUserName, id.GitUserEmail = "", ""
+			}
 			id.Name = args[0]
 			id.Host = strings.ToLower(id.Host)
 			cfg, err := f.Config()
@@ -104,11 +115,21 @@ func newSaveCommand(f *cmdutil.Factory, edit bool) *cobra.Command {
 					id.Account = user
 				}
 			}
+			emailSource := ""
+			if cmd.Flags().Changed("git-user-email") && strings.HasPrefix(id.GitUserEmail, "@") {
+				emailSource = id.GitUserEmail
+				id.GitUserEmail, err = resolveEmail(f, cfg.Authentication(), id)
+				if err != nil {
+					return err
+				}
+			}
 			if err := s.Save(id, edit); err != nil {
 				return err
 			}
 			fmt.Fprintf(f.IOStreams.ErrOut, "Saved identity %q in %s\n", id.Name, s.IdentityPath(id.Name))
-
+			if emailSource != "" {
+				fmt.Fprintf(f.IOStreams.ErrOut, "Git email: %s (resolved from %s; saved as a fixed value)\n", id.GitUserEmail, emailSource)
+			}
 			if id.SSHHost != "" {
 				fmt.Fprintf(f.IOStreams.ErrOut, "SSH host %q is a connection name; gh has not checked which account its key signs in as.\n", id.SSHHost)
 			}
@@ -123,7 +144,26 @@ func newSaveCommand(f *cmdutil.Factory, edit bool) *cobra.Command {
 		_ = cmd.MarkFlagRequired("account")
 	}
 	cmd.Flags().StringVar(&id.SSHHost, "ssh-host", "", "SSH host or alias `name` to use; existence and account are not checked")
-
+	cmd.Flags().StringVar(&id.GitUserName, "git-user-name", "", "Git user.name (requires a Git email in the identity)")
+	cmd.Flags().StringVar(&id.GitUserEmail, "git-user-email", "", "Git user.email (requires a Git name in the identity)")
+	if edit {
+		cmd.Flags().BoolVar(&clearGit, "clear-git", false, "Remove this identity's Git name/email; broader Git defaults may still apply")
+	}
+	cmd.Long += "\nUse --git-user-email @public for the account's public profile email, or @noreply\n" +
+		"for its ID-based github.com noreply address. These perform a network lookup using\n" +
+		"the identity's saved account and host, and save the resulting address once.\n" +
+		"Missing public email or a failed lookup leaves the identity unchanged. No name is\n" +
+		"inferred. Future profile/account edits do not refresh the saved address; pass the\n" +
+		"selector again to resolve it again. @noreply is currently github.com-only and uses\n" +
+		"ID+LOGIN@users.noreply.github.com. Supply a literal address for a legacy username-only\n" +
+		"noreply address or a different host. Email privacy settings are not changed.\n"
+	cmd.Example += "\n$ gh auth identity " + verb + " work --git-user-name \"Alice Example\" --git-user-email @noreply"
+	if !edit {
+		cmd.Example += " --account alice"
+	}
+	cmd.Example += "\n"
+	cmd.Flags().Lookup("git-user-email").Usage = "Git email `address`, @public, or @noreply (requires a Git name; selectors use the network)"
+	cmd.Long += "\nGit name and email are optional; supply both or neither. --clear-git removes both when editing."
 	return cmd
 }
 

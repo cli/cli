@@ -41,24 +41,24 @@ func runGit(t *testing.T, dir string, args ...string) string {
 }
 
 func TestRepositoryUsesLiveIdentity(t *testing.T) {
-	// Given an identity referencing an account and SSH route
+	// Given an identity referencing an account, SSH route, and commit metadata
 	s := isolatedStore(t)
 	repo := t.TempDir()
 	runGit(t, repo, "init", "-q")
-	id := Identity{Name: "work", Host: "github.com", Account: "alice", SSHHost: "github-work"}
+	id := Identity{Name: "work", Host: "github.com", Account: "alice", SSHHost: "github-work", GitUserName: "Alice", GitUserEmail: "alice@work.test"}
 	require.NoError(t, s.Save(id, false))
 
 	// When that identity is applied to a repository and subsequently edited
 	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: repo}, "/path/to/gh"))
-	id.Account = "bob"
+	id.GitUserEmail = "new@work.test"
 	require.NoError(t, s.Save(id, true))
 	got, err := s.Resolve("github.com", "", repo)
 
 	// Then both gh selection and Git see the edited shared identity
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.Equal(t, "bob", got.Account)
-	assert.Equal(t, "bob\n", runGit(t, repo, "config", "credential.https://github.com.username"))
+	assert.Equal(t, "alice", got.Account)
+	assert.Equal(t, "new@work.test\n", runGit(t, repo, "config", "user.email"))
 	assert.Equal(t, "work\n", runGit(t, repo, "config", "gh-identity.github.com.name"))
 	contents, err := os.ReadFile(s.IdentityPath("work"))
 	require.NoError(t, err)
@@ -74,9 +74,9 @@ func TestDeeperDirectoryOverridesTreeAndUnbindingRevealsIt(t *testing.T) {
 	runGit(t, repo, "init", "-q")
 	runGit(t, repo, "remote", "add", "origin", "git@github.com:company/project.git")
 	for _, id := range []Identity{
-		{Name: "owner", Host: "github.com", Account: "owner", SSHHost: "github-owner"},
-		{Name: "tree", Host: "github.com", Account: "tree", SSHHost: "github-tree"},
-		{Name: "repo", Host: "github.com", Account: "repo", SSHHost: "github-repo"},
+		{Name: "owner", Host: "github.com", Account: "owner", SSHHost: "github-owner", GitUserName: "Owner", GitUserEmail: "owner@test.invalid"},
+		{Name: "tree", Host: "github.com", Account: "tree", SSHHost: "github-tree", GitUserName: "Tree", GitUserEmail: "tree@test.invalid"},
+		{Name: "repo", Host: "github.com", Account: "repo", SSHHost: "github-repo", GitUserName: "Repo", GitUserEmail: "repo@test.invalid"},
 	} {
 		require.NoError(t, s.Save(id, false))
 	}
@@ -87,7 +87,7 @@ func TestDeeperDirectoryOverridesTreeAndUnbindingRevealsIt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, selected)
 	assert.Equal(t, "repo", selected.Name)
-	assert.Equal(t, "repo\n", runGit(t, repo, "config", "gh-identity.github.com.name"))
+	assert.Equal(t, "repo@test.invalid\n", runGit(t, repo, "config", "user.email"))
 
 	// When removing only the deeper directory choice
 	require.NoError(t, s.Unbind(Binding{Host: "github.com", Directory: repo}, "/path/to/gh"))
@@ -97,7 +97,24 @@ func TestDeeperDirectoryOverridesTreeAndUnbindingRevealsIt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, selected)
 	assert.Equal(t, "tree", selected.Name)
-	assert.Equal(t, "tree\n", runGit(t, repo, "config", "gh-identity.github.com.name"))
+	assert.Equal(t, "tree@test.invalid\n", runGit(t, repo, "config", "user.email"))
+}
+
+func TestSwitchingToAccountOnlyRemovesPreviousCommitMetadata(t *testing.T) {
+	// Given ordinary Git defaults and an explicitly applied commit identity
+	s := isolatedStore(t)
+	repo := t.TempDir()
+	runGit(t, repo, "init", "-q")
+	runGit(t, repo, "config", "--global", "user.email", "ordinary@test.invalid")
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice", GitUserName: "Work", GitUserEmail: "work@test.invalid"}, false))
+	require.NoError(t, s.Save(Identity{Name: "account-only", Host: "github.com", Account: "alice"}, false))
+	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: repo}, "/path/to/gh"))
+
+	// When replacing that binding with an account-only identity
+	require.NoError(t, s.Bind(Binding{Identity: "account-only", Directory: repo}, "/path/to/gh"))
+
+	// Then the previous identity no longer contributes any commit metadata
+	assert.Equal(t, "ordinary@test.invalid\n", runGit(t, repo, "config", "user.email"))
 }
 
 func TestExplicitGitDirectoryUsesSelectedRepository(t *testing.T) {
@@ -128,14 +145,14 @@ func TestOwnerBindingMatchesCanonicalCapitalization(t *testing.T) {
 	repo := t.TempDir()
 	runGit(t, repo, "init", "-q")
 	runGit(t, repo, "remote", "add", "origin", "git@github.com:MyCompany/project.git")
-	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice", GitUserName: "Alice", GitUserEmail: "alice@test.invalid"}, false))
 	require.NoError(t, s.Bind(Binding{Identity: "work", Owner: "mycompany"}, "/path/to/gh"))
 
 	// When ordinary Git reads the conditional identity include
-	email := runGit(t, repo, "config", "gh-identity.github.com.name")
+	email := runGit(t, repo, "config", "user.email")
 
 	// Then Git uses the same case-insensitive owner matching as gh
-	assert.Equal(t, "work\n", email)
+	assert.Equal(t, "alice@test.invalid\n", email)
 }
 
 func TestBindingRefusesConflictingRepositorySSHCommand(t *testing.T) {
@@ -178,7 +195,7 @@ func TestDirectoryChoiceFromSubdirectoryStartsAtRepositoryRoot(t *testing.T) {
 	runGit(t, repo, "init", "-q")
 	child := filepath.Join(repo, "child")
 	require.NoError(t, os.Mkdir(child, 0o700))
-	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice", GitUserName: "Alice", GitUserEmail: "alice@test.invalid"}, false))
 	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: child}, "/path/to/gh"))
 
 	// When gh is invoked from that repository subdirectory
@@ -188,7 +205,7 @@ func TestDirectoryChoiceFromSubdirectoryStartsAtRepositoryRoot(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, selected)
 	assert.Equal(t, "work", selected.Name)
-	assert.Equal(t, "work\n", runGit(t, repo, "config", "gh-identity.github.com.name"))
+	assert.Equal(t, "alice@test.invalid\n", runGit(t, repo, "config", "user.email"))
 }
 
 func TestBasicSSHRefusesCustomConnectionCommand(t *testing.T) {
