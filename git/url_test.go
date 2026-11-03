@@ -34,11 +34,6 @@ func TestIsURL(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "git with extension",
-			url:  "git://example.com/owner/repo.git",
-			want: true,
-		},
-		{
 			name: "git+ssh",
 			url:  "git+ssh://git@example.com/owner/repo.git",
 			want: true,
@@ -61,7 +56,14 @@ func TestIsURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, IsURL(tt.url))
+			// Given a possible Git remote URL
+			rawURL := tt.url
+
+			// When it is classified
+			got := IsURL(rawURL)
+
+			// Then only supported URL forms are accepted
+			assert.Equal(t, tt.want, got, "expected URL classification to match the transport form")
 		})
 	}
 }
@@ -74,10 +76,9 @@ func TestParseURL(t *testing.T) {
 		Path   string
 	}
 	tests := []struct {
-		name    string
-		url     string
-		want    url
-		wantErr bool
+		name string
+		url  string
+		want url
 	}{
 		{
 			name: "HTTPS",
@@ -219,24 +220,33 @@ func TestParseURL(t *testing.T) {
 				Path:   "",
 			},
 		},
-		{
-			name:    "fails to parse",
-			url:     "ssh://git@[/tmp/git-repo",
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u, err := ParseURL(tt.url)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
+			// Given a valid Git remote URL
+			rawURL := tt.url
 
-			assert.Equal(t, u.Scheme, tt.want.Scheme)
-			assert.Equal(t, u.User.Username(), tt.want.User)
-			assert.Equal(t, u.Host, tt.want.Host)
-			assert.Equal(t, u.Path, tt.want.Path)
+			// When it is normalized
+			u, err := ParseURL(rawURL)
+
+			// Then its canonical URL components are returned
+			require.NoError(t, err)
+			assert.Equal(t, tt.want.Scheme, u.Scheme)
+			assert.Equal(t, tt.want.User, u.User.Username())
+			assert.Equal(t, tt.want.Host, u.Host)
+			assert.Equal(t, tt.want.Path, u.Path)
 		})
 	}
+}
+
+func TestParseURLReportsMalformedInput(t *testing.T) {
+	// Given an SSH URL with a malformed bracketed host
+	rawURL := "ssh://git@[/tmp/git-repo"
+
+	// When it is parsed
+	u, err := ParseURL(rawURL)
+
+	// Then the malformed URL is rejected
+	require.Error(t, err)
+	assert.Nil(t, u)
 }

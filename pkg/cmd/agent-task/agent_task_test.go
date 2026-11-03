@@ -76,6 +76,21 @@ func TestNewCmdAgentTask(t *testing.T) {
 			wantStdout: "",
 		},
 		{
+			name: "plaintext refreshable oauth token is accepted",
+			customConfig: func() (gh.Config, error) {
+				return &ghmock.ConfigMock{
+					AuthenticationFunc: func() gh.AuthConfig {
+						c := &config.AuthConfig{}
+						c.SetDefaultHost("github.com", "default")
+						c.SetActiveToken("gho_REFRESH123", gh.TokenSourceRefreshableOAuthToken)
+						return c
+					},
+				}, nil
+			},
+			wantErr:    false,
+			wantStdout: "",
+		},
+		{
 			name: "enterprise host is rejected",
 			customConfig: func() (gh.Config, error) {
 				return &ghmock.ConfigMock{

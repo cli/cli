@@ -40,7 +40,10 @@ With `none`, create every required repository explicitly and immediately
 register deferred cleanup. Use `defer gh repo delete --yes $ORG/$REPO` when the
 repository should still exist under that name. Use `defer cleanup-repo $REPO`
 when testing deletion or renaming; it is scoped to `$ORG` and treats an already
-absent repository as success.
+absent repository as success. When a script forks a private repository, add
+`--accept-cascading-deletion-of-private-forks` to the upstream's cleanup.
+Without it, `gh repo delete` refuses to delete a private repository that still
+has forks.
 
 Repositories created with an initial commit can remain busy after `gh repo
 create` returns. Before renaming one, use `wait-for-repository-ready

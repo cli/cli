@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/stretchr/testify/require"
 )
@@ -82,4 +83,16 @@ host=github.com
 username=monalisa
 password=new-password
 `), fillCredentials(t))
+}
+
+func TestRejectExisting(t *testing.T) {
+	cs, restoreRun := run.Stub()
+	defer restoreRun(t)
+	// Only reject is registered: approve must not be called, otherwise the stub panics.
+	cs.Register(`git credential reject`, 0, "")
+
+	u := &gitcredentials.Updater{
+		GitClient: &git.Client{GitPath: "some/path/git"},
+	}
+	require.NoError(t, u.RejectExisting("github.com"))
 }

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/pkg/auth"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,7 @@ import (
 
 func TestNewHTTPClient(t *testing.T) {
 	type args struct {
-		config             config
+		config             refreshingConfig
 		appVersion         string
 		invokingAgent      string
 		logVerboseHTTP     bool
@@ -241,7 +242,7 @@ func TestNewHTTPClient(t *testing.T) {
 			client, err := NewHTTPClient(HTTPClientOptions{
 				AppVersion:         tt.args.appVersion,
 				InvokingAgent:      tt.args.invokingAgent,
-				Config:             tt.args.config,
+				RefreshingConfig:   tt.args.config,
 				Log:                ios.ErrOut,
 				LogVerboseHTTP:     tt.args.logVerboseHTTP,
 				SkipDefaultHeaders: tt.args.skipDefaultHeaders,
@@ -265,6 +266,103 @@ func TestNewHTTPClient(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, normalizeVerboseLog(stderr.String()))
 		})
 	}
+}
+
+func TestNewHTTPClientRejectsConfigAndRefreshingConfig(t *testing.T) {
+	// Config and RefreshingConfig are mutually exclusive, so supplying both is a programming error that must be
+	// reported rather than silently picking one.
+	_, err := NewHTTPClient(HTTPClientOptions{
+		Config:           legacyConfig{},
+		RefreshingConfig: tinyConfig{},
+	})
+	require.EqualError(t, err, "provide either Config or RefreshingConfig, not both")
+}
+
+func TestAddAuthTokenHeaderLegacyConfig(t *testing.T) {
+	// Regression: the primitive config seam that external callers implement must keep attaching tokens, including the
+	// api_host fallback, exactly as it did before refresh support was added.
+	var gotAuthorization string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuthorization = r.Header.Get(authorization)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	host := serverHostname(t, ts.URL)
+	cfg := legacyConfig{
+		"canonical.example:oauth_token": "CANONICAL-TOKEN",
+		"api_host:" + host:              "canonical.example",
+	}
+	client := &http.Client{Transport: AddAuthTokenHeader(http.DefaultTransport, cfg)}
+
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	require.NoError(t, err)
+
+	res, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, 204, res.StatusCode)
+	// The request host has no token of its own, so the token of the canonical host it stands in for is attached.
+	assert.Equal(t, "token CANONICAL-TOKEN", gotAuthorization)
+}
+
+func TestNewHTTPClientLegacyConfigAttachesToken(t *testing.T) {
+	// Regression: HTTPClientOptions.Config (the primitive seam) must keep authenticating requests for external callers.
+	var gotAuthorization string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuthorization = r.Header.Get(authorization)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	ios, _, _, _ := iostreams.Test()
+	client, err := NewHTTPClient(HTTPClientOptions{
+		AppVersion: "v1.2.3",
+		Config:     legacyConfig{serverHostname(t, ts.URL) + ":oauth_token": "MYTOKEN"},
+		Log:        ios.ErrOut,
+	})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	require.NoError(t, err)
+
+	res, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, 204, res.StatusCode)
+	assert.Equal(t, "token MYTOKEN", gotAuthorization)
+}
+
+func TestNewHTTPClientLogHeadlineOnly(t *testing.T) {
+	// Under GH_DEBUG=api the client normally logs a full verbose trace. LogHeadlineOnly must keep it non-verbose, so
+	// only httpretty's head lines are emitted and the request/response header and body lines are suppressed.
+	t.Setenv("GH_DEBUG", "api")
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	ios, _, _, stderr := iostreams.Test()
+	client, err := NewHTTPClient(HTTPClientOptions{
+		AppVersion:         "v1.2.3",
+		Log:                ios.ErrOut,
+		LogHeadlineOnly:    true,
+		SkipDefaultHeaders: true,
+	})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	require.NoError(t, err)
+	req.Host = "github.com"
+
+	res, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, 204, res.StatusCode)
+
+	assert.Equal(t, heredoc.Doc(`
+		* Request at <time>
+		* Request to http://<host>:<port>
+		* Request took <duration>
+	`), normalizeVerboseLog(stderr.String()))
 }
 
 func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
@@ -305,7 +403,7 @@ func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 		"other.example:oauth_token":     "OTHER-TOKEN",
 		"canonical.example:oauth_token": "CANONICAL-TOKEN",
 	}
-	client := &http.Client{Transport: AddAuthTokenHeader(transport, config)}
+	client := &http.Client{Transport: AddAuthTokenHeaderWithRefresh(transport, config)}
 
 	req, err := http.NewRequest("GET", "http://other.example/", nil)
 	require.NoError(t, err)
@@ -527,13 +625,27 @@ func (f *fakeTelemetryDisabler) Disable() {
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) ActiveToken(host string) (string, string) {
-	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], "oauth_token"
+func (c tinyConfig) ActiveTokenWithRefresh(host string) (auth.Credential, auth.RefreshStatus, error) {
+	return auth.Credential{Token: c[fmt.Sprintf("%s:%s", host, "oauth_token")]}, auth.RefreshStatusUnnecessary, nil
 }
 
 // HostForAPIHost resolves via an "api_host:<apiHost>" key holding the host that
 // configured it, mirroring the reverse lookup the real config performs.
 func (c tinyConfig) HostForAPIHost(apiHost string) (string, bool) {
+	host, ok := c[fmt.Sprintf("%s:%s", "api_host", apiHost)]
+	return host, ok
+}
+
+// legacyConfig implements the primitive config interface (string return values) that external consumers of this
+// package rely on. It exercises the backward-compatible seam that predates refresh support, so the regression tests
+// below can prove that seam keeps authenticating requests.
+type legacyConfig map[string]string
+
+func (c legacyConfig) ActiveToken(host string) (string, string) {
+	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], "oauth_token"
+}
+
+func (c legacyConfig) HostForAPIHost(apiHost string) (string, bool) {
 	host, ok := c[fmt.Sprintf("%s:%s", "api_host", apiHost)]
 	return host, ok
 }

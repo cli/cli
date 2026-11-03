@@ -53,6 +53,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
 			Display the title, body, and other information about an issue.
 
+			When %[1]s--comments%[1]s is used, terminal output includes the issue details and comments.
+			When output is piped or redirected, only the comments are printed.
+
 			With %[1]s--web%[1]s flag, open the issue in a web browser instead.
 		`, "`"),
 		Args: cobra.ExactArgs(1),

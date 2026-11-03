@@ -64,6 +64,9 @@ var _ gh.Config = &ConfigMock{}
 //			PreferEditorPromptFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the PreferEditorPrompt method")
 //			},
+//			ExpiringCredentialsFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the ExpiringCredentials method")
+//			},
 //			PromptFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Prompt method")
 //			},
@@ -133,6 +136,9 @@ type ConfigMock struct {
 
 	// PreferEditorPromptFunc mocks the PreferEditorPrompt method.
 	PreferEditorPromptFunc func(hostname string) gh.ConfigEntry
+
+	// ExpiringCredentialsFunc mocks the ExpiringCredentials method.
+	ExpiringCredentialsFunc func(hostname string) gh.ConfigEntry
 
 	// PromptFunc mocks the Prompt method.
 	PromptFunc func(hostname string) gh.ConfigEntry
@@ -223,6 +229,11 @@ type ConfigMock struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
+		// ExpiringCredentials holds details about calls to the ExpiringCredentials method.
+		ExpiringCredentials []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
 		// Prompt holds details about calls to the Prompt method.
 		Prompt []struct {
 			// Hostname is the hostname argument value.
@@ -252,27 +263,28 @@ type ConfigMock struct {
 		Write []struct {
 		}
 	}
-	lockAccessibleColors   sync.RWMutex
-	lockAccessiblePrompter sync.RWMutex
-	lockAliases            sync.RWMutex
-	lockAuthentication     sync.RWMutex
-	lockBrowser            sync.RWMutex
-	lockCacheDir           sync.RWMutex
-	lockClipboard          sync.RWMutex
-	lockColorLabels        sync.RWMutex
-	lockEditor             sync.RWMutex
-	lockGetOrDefault       sync.RWMutex
-	lockGitProtocol        sync.RWMutex
-	lockHTTPUnixSocket     sync.RWMutex
-	lockMigrate            sync.RWMutex
-	lockPager              sync.RWMutex
-	lockPreferEditorPrompt sync.RWMutex
-	lockPrompt             sync.RWMutex
-	lockSet                sync.RWMutex
-	lockSpinner            sync.RWMutex
-	lockTelemetry          sync.RWMutex
-	lockVersion            sync.RWMutex
-	lockWrite              sync.RWMutex
+	lockAccessibleColors    sync.RWMutex
+	lockAccessiblePrompter  sync.RWMutex
+	lockAliases             sync.RWMutex
+	lockAuthentication      sync.RWMutex
+	lockBrowser             sync.RWMutex
+	lockCacheDir            sync.RWMutex
+	lockClipboard           sync.RWMutex
+	lockColorLabels         sync.RWMutex
+	lockEditor              sync.RWMutex
+	lockGetOrDefault        sync.RWMutex
+	lockGitProtocol         sync.RWMutex
+	lockHTTPUnixSocket      sync.RWMutex
+	lockMigrate             sync.RWMutex
+	lockPager               sync.RWMutex
+	lockPreferEditorPrompt  sync.RWMutex
+	lockExpiringCredentials sync.RWMutex
+	lockPrompt              sync.RWMutex
+	lockSet                 sync.RWMutex
+	lockSpinner             sync.RWMutex
+	lockTelemetry           sync.RWMutex
+	lockVersion             sync.RWMutex
+	lockWrite               sync.RWMutex
 }
 
 // AccessibleColors calls AccessibleColorsFunc.
@@ -737,6 +749,38 @@ func (mock *ConfigMock) PreferEditorPromptCalls() []struct {
 	calls = mock.calls.PreferEditorPrompt
 	mock.lockPreferEditorPrompt.RUnlock()
 	return calls
+}
+
+// ExpiringCredentialsCalls gets all the calls that were made to ExpiringCredentials.
+// Check the length with:
+//
+//	len(mockedConfig.ExpiringCredentialsCalls())
+func (mock *ConfigMock) ExpiringCredentialsCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockExpiringCredentials.RLock()
+	calls = mock.calls.ExpiringCredentials
+	mock.lockExpiringCredentials.RUnlock()
+	return calls
+}
+
+// ExpiringCredentials calls ExpiringCredentialsFunc.
+func (mock *ConfigMock) ExpiringCredentials(hostname string) gh.ConfigEntry {
+	if mock.ExpiringCredentialsFunc == nil {
+		panic("ConfigMock.ExpiringCredentialsFunc: method is nil but Config.ExpiringCredentials was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockExpiringCredentials.Lock()
+	mock.calls.ExpiringCredentials = append(mock.calls.ExpiringCredentials, callInfo)
+	mock.lockExpiringCredentials.Unlock()
+	return mock.ExpiringCredentialsFunc(hostname)
 }
 
 // Prompt calls PromptFunc.

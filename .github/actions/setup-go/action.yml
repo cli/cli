@@ -1,0 +1,61 @@
+name: Set up Go
+description: >-
+  Installs the Go version from go.mod and restores the module and build caches
+  under a key specific to the calling job. Only trunk saves the caches.
+
+inputs:
+  cache-key-prefix:
+    description: >-
+      Prefix for the cache key. Jobs that compile with different flags (for
+      example -race) must use different prefixes, because their compiled
+      packages can't be reused by each other.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # setup-go's built-in cache uses the same key for every job, so whichever
+    # job saves first decides the cache contents. We cache ourselves instead so
+    # that each kind of build gets its own key.
+    - name: Install Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: false
+
+    - name: Determine Go cache paths and key
+      id: go-cache
+      shell: bash
+      env:
+        PREFIX: ${{ inputs.cache-key-prefix }}-${{ runner.os }}-${{ runner.arch }}
+        GO_MOD_HASH: ${{ hashFiles('go.mod') }}
+      run: |
+        restore_prefix="${PREFIX}-${ImageOS}-$(go env GOVERSION)-"
+        echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        echo "buildcache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "restore-prefix=${restore_prefix}" >> "$GITHUB_OUTPUT"
+        echo "key=${restore_prefix}${GO_MOD_HASH}" >> "$GITHUB_OUTPUT"
+
+    # Only trunk saves, so pull requests don't fill the repository's cache
+    # storage with entries no other branch can restore. Each cache is roughly
+    # 300 MB, or 520 MB for -race builds.
+    - name: Cache Go modules and build artifacts
+      if: github.ref == 'refs/heads/trunk'
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: |
+          ${{ steps.go-cache.outputs.modcache }}
+          ${{ steps.go-cache.outputs.buildcache }}
+        key: ${{ steps.go-cache.outputs.key }}
+
+    # Pull requests that change go.mod fall back to the most recent trunk
+    # cache, which still holds most of the compiled packages they need.
+    - name: Restore Go modules and build artifacts
+      if: github.ref != 'refs/heads/trunk'
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: |
+          ${{ steps.go-cache.outputs.modcache }}
+          ${{ steps.go-cache.outputs.buildcache }}
+        key: ${{ steps.go-cache.outputs.key }}
+        restore-keys: ${{ steps.go-cache.outputs.restore-prefix }}

@@ -84,7 +84,7 @@ func userAssetsFromArgs(args []string) ([]UserAsset, error) {
 
 // assetFromArg turns one --attach argument into a UserAsset.
 func assetFromArg(arg string) (UserAsset, error) {
-	path, alt := parseArg(arg)
+	path, alt := SplitFileArg(arg)
 
 	if path == "" {
 		return nil, errEmptyPath
@@ -97,15 +97,18 @@ func assetFromArg(arg string) (UserAsset, error) {
 	return newAsset(path, alt)
 }
 
-// parseArg splits the `path#alt text` form of an --attach argument. An existing
-// path wins over the delimiter, since `#` is legal in filenames.
-func parseArg(arg string) (path, alt string) {
+// SplitFileArg splits an argument of the form <file>#<text>, the way --attach
+// reads '<file>#<image alt text>'. An existing path wins over the delimiter,
+// since `#` is legal in filenames. path is arg itself when there was no `#` to
+// split at. gh issue artifact create uses it for <file>#<name>, so `#` means
+// the same there as in --attach.
+func SplitFileArg(arg string) (path, text string) {
 	if _, err := os.Stat(arg); err == nil {
 		return arg, ""
 	}
 	// Scan from the last hash to the first, so the longest path that exists
 	// wins. That continues the rule above, where the whole argument is the
-	// longest match of all, and it leaves a hash inside the alt text usable.
+	// longest match of all, and it leaves a hash inside the text usable.
 	for i := strings.LastIndex(arg, "#"); i > 0; i = strings.LastIndex(arg[:i], "#") {
 		if _, err := os.Stat(arg[:i]); err == nil {
 			return arg[:i], arg[i+1:]

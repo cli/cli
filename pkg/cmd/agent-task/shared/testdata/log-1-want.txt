@@ -36,8 +36,8 @@ View README.md
 # foo
 
 Bash: Check if there are any existing scripts or build files
-$ cd /home/runner/work/foo/foo && find . -name "*.sh" -o -name "Makefile" -
-  o -name "package.json" -o -name "*.yml" -o -name "*.yaml"                   
+$ cd /home/runner/work/foo/foo && find . -name "*.sh" -o -name "Makefile" 
+  -o -name "package.json" -o -name "*.yml" -o -name "*.yaml"                  
     ./.github/workflows/upload-artifact.yml                                   
     ./.github/workflows/manual-dispatch.yml                                   
     ./.github/workflows/cache.yml                                             

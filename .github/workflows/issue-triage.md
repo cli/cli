@@ -47,6 +47,8 @@ strict: false
 engine: copilot
 
 tools:
+  bash: false
+  cli-proxy: false
   github:
     toolsets: [repos, issues, discussions]
     allowed-repos: ["desktop/gh-cli-and-desktop-shared-workflows", "cli/cli"]
@@ -116,7 +118,7 @@ safe-outputs:
       steps:
         - name: Create GitHub App token
           id: app-token
-          uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+          uses: actions/create-github-app-token@v3.3.0
           with:
             client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
             private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}

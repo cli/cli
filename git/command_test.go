@@ -1,104 +1,86 @@
 package git
 
 import (
-	"fmt"
-	"os"
+	"bytes"
 	"os/exec"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestOutput(t *testing.T) {
-	tests := []struct {
-		name     string
-		exitCode int
-		stdout   string
-		stderr   string
-		wantErr  *GitError
-	}{
-		{
-			name:     "successful command",
-			stdout:   "hello world",
-			stderr:   "",
-			exitCode: 0,
-			wantErr:  nil,
-		},
-		{
-			name:     "not a repo failure",
-			stdout:   "",
-			stderr:   "fatal: not a git repository (or any of the parent directories): .git",
-			exitCode: 128,
-			wantErr: &GitError{
-				ExitCode: 128,
-				Stderr:   "fatal: not a git repository (or any of the parent directories): .git",
-				err:      &exec.ExitError{},
-			},
-		},
-	}
+func TestRunPreservesGitErrorDiagnostics(t *testing.T) {
+	// Given a command that writes output before failing with a diagnostic on stderr
+	const stdout = "partial output\n"
+	const stderr = "fatal: test transport failed\n"
+	execCmd := createCommand(t, 128, stdout, stderr)
+	stdoutBuffer := &bytes.Buffer{}
+	execCmd.Stdout = stdoutBuffer
+	cmd := Command{execCmd}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	// When the command is run
+	err := cmd.Run()
 
-			cmd := Command{
-				&exec.Cmd{
-					Path: createMockExecutable(t, tt.stdout, tt.stderr, tt.exitCode),
-				},
-			}
-
-			out, err := cmd.Output()
-			if tt.wantErr != nil {
-				require.Error(t, err)
-				var gitError *GitError
-				require.ErrorAs(t, err, &gitError)
-				assert.Equal(t, tt.wantErr.ExitCode, gitError.ExitCode)
-				assert.Equal(t, tt.wantErr.Stderr, gitError.Stderr)
-				assert.Equal(t, tt.wantErr.Error(), gitError.Error())
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equal(t, tt.stdout, string(out))
-		})
-	}
+	// Then stdout is written and the Git error preserves the diagnostic and exit code
+	require.Error(t, err)
+	var gitErr *GitError
+	require.ErrorAs(t, err, &gitErr)
+	assert.Equal(t, stdout, stdoutBuffer.String())
+	assert.Equal(t, 128, gitErr.ExitCode)
+	assert.Equal(t, stderr, gitErr.Stderr)
+	require.EqualError(t, err, "failed to run git: fatal: test transport failed\n")
 }
 
-func createMockExecutable(t *testing.T, stdout string, stderr string, exitCode int) string {
-	tmpDir := t.TempDir()
-	sourcePath := filepath.Join(tmpDir, "main.go")
-	binaryPath := filepath.Join(tmpDir, "mockexec")
-	if runtime.GOOS == "windows" {
-		binaryPath += ".exe"
-	}
+func TestOutputReturnsCommandOutput(t *testing.T) {
+	// Given a command that writes to standard output
+	cmd := createCommand(t, 0, "hello world", "")
+	command := Command{cmd}
 
-	// Create Go source
-	source := buildCommandSourceCode(exitCode, stdout, stderr)
+	// When its output is captured
+	out, err := command.Output()
 
-	// Write source file
-	if err := os.WriteFile(sourcePath, []byte(source), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	// Compile
-	cmd := exec.Command("go", "build", "-o", binaryPath, sourcePath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to compile: %v\n%s", err, out)
-	}
-	return binaryPath
-
+	// Then the output is returned without an error
+	require.NoError(t, err)
+	assert.Equal(t, "hello world", string(out))
 }
 
-func buildCommandSourceCode(exitCode int, stdout, stderr string) string {
-	return fmt.Sprintf(`package main
-	import (
-		   "fmt"
-		"os"
-	)
-	func main() {
-		fmt.Printf(%q)
-		fmt.Fprintf(os.Stderr, %q)
-		os.Exit(%d)
-	}`, stdout, stderr, exitCode)
+func TestOutputReturnsGitError(t *testing.T) {
+	// Given a command that fails with Git's not-a-repository diagnostic
+	stderr := "fatal: not a git repository (or any of the parent directories): .git"
+	cmd := createCommand(t, 128, "", stderr)
+	command := Command{cmd}
+
+	// When its output is captured
+	out, err := command.Output()
+
+	// Then the exit status and diagnostic are preserved in a Git error
+	require.Error(t, err)
+	var gitErr *GitError
+	require.ErrorAs(t, err, &gitErr)
+	assert.Equal(t, 128, gitErr.ExitCode)
+	assert.Equal(t, stderr, gitErr.Stderr)
+	require.EqualError(t, gitErr, "failed to run git: "+stderr)
+	assert.Empty(t, out)
+}
+
+func TestWithRepoDirInsertsRepositoryBeforeGitArguments(t *testing.T) {
+	// Given a Git command with a final -C operand after the argument separator
+	command := &Command{exec.Command("git", "rev-parse", "--", "-C")}
+
+	// When its repository directory is changed
+	WithRepoDir("path/to/repo")(command)
+
+	// Then the repository option is inserted before the Git subcommand without moving the separator
+	assert.Equal(t, []string{"git", "-C", "path/to/repo", "rev-parse", "--", "-C"}, command.Args)
+}
+
+func TestWithRepoDirReplacesExistingRepository(t *testing.T) {
+	// Given a Git command already scoped to a repository
+	command := &Command{exec.Command("git", "-C", "old/repo", "status")}
+
+	// When its repository directory is changed
+	WithRepoDir("new/repo")(command)
+
+	// Then the existing repository value is replaced without adding another option
+	assert.Equal(t, []string{"git", "-C", "new/repo", "status"}, command.Args)
 }

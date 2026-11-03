@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/gh"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/agent-task/create"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/agent-task/list"
 	cmdView "github.com/cli/cli/v2/pkg/cmd/agent-task/view"
@@ -84,16 +85,20 @@ func requireOAuthToken(f *cmdutil.Factory) error {
 		return errors.New("agent tasks are not supported on this host")
 	}
 
-	token, source := authCfg.ActiveToken(host)
+	cred := authCfg.ActiveToken(host)
 
-	// Tokens from sources "oauth_token" and "keyring" are likely
-	// minted through our device flow.
-	tokenSourceIsDeviceFlow := source == "oauth_token" || source == "keyring"
+	// Tokens from sources "oauth_token", "keyring", and "refreshable_oauth_token" are
+	// likely minted through our device flow. The refreshable source covers an expiring
+	// login whose credential fell back to plaintext config; without it, such a login would
+	// be rejected here before the CAPI refresh path can run.
+	tokenSourceIsDeviceFlow := cred.Source == gh.TokenSourceOAuthToken ||
+		cred.Source == gh.TokenSourceKeyring ||
+		cred.Source == gh.TokenSourceRefreshableOAuthToken
 	// Tokens with "gho_" prefix are OAuth tokens.
 	//
 	// TODO: this matches a token prefix itself. It could ask
 	// gh.AuthConfig.ActiveTokenType instead.
-	tokenIsOAuth := strings.HasPrefix(token, "gho_")
+	tokenIsOAuth := strings.HasPrefix(cred.Token, "gho_")
 
 	// Reject if the token is not from a device flow source or is not an OAuth token
 	if !tokenSourceIsDeviceFlow || !tokenIsOAuth {

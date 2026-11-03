@@ -114,12 +114,15 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			- Git tags associated with a release cannot be modified or deleted.
 			- Release assets cannot be modified or deleted.
 
-			Immutability is enforced only after a release is published. Draft releases can be modified
-			or deleted, and the associated git tags can be modified or deleted as well.
+			When you attach assets, %[1]sgh release create%[1]s creates a draft release, uploads
+			each asset, and then publishes the release. These steps use separate API requests
+			and do not form a single atomic operation. If you specify %[1]s--draft%[1]s, the command
+			leaves the release unpublished.
 
-			When using the %[1]screate%[1]s command to attach assets to a release, separate API calls
-			are made to create the release as a draft, upload the assets, and then publish the release.
-			Immutability protections will be enforced ONLY after the release is published.
+			When release immutability is enabled for the repository, its protections take effect
+			only when the release is published. While the release remains a draft, users and
+			workflows with the required permissions can modify it and its assets, including while
+			this command is running.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Interactively create a release

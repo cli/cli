@@ -40,10 +40,10 @@ type EditOptions struct {
 	SelectorArg string
 	Interactive bool
 
+	BodyDir     string
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
-	Config      func() (gh.Config, error)
 
 	shared.Editable
 }
@@ -52,7 +52,6 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 	opts := &EditOptions{
 		IO:              f.IOStreams,
 		HttpClient:      f.HttpClient,
-		Config:          f.Config,
 		Surveyor:        surveyor{P: f.Prompter},
 		Fetcher:         fetcher{},
 		EditorRetriever: editorRetriever{config: f.Config},
@@ -77,7 +76,8 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			Use %[1]s--attach%[1]s to upload an image or video. Without a body flag the pull
 			request keeps the body it already has and the attachment is appended to it. If the
 			body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that reference
-			is rewritten to point at the uploaded asset instead.
+			is rewritten to point at the uploaded asset instead. Paths in a %[1]s--body-file%[1]s are
+			relative to its directory, falling back to the working directory.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -174,11 +174,11 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			if bodyProvided || bodyFileProvided {
 				opts.Editable.Body.Edited = true
 				if bodyFileProvided {
-					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					var err error
+					opts.Editable.Body.Value, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 					if err != nil {
 						return err
 					}
-					opts.Editable.Body.Value = string(b)
 				}
 			}
 
@@ -328,15 +328,9 @@ func editRun(opts *EditOptions) error {
 	// Built before the prompts, so a run that cannot upload stops early.
 	var uploader *attachments.Uploader
 	if len(opts.Assets) > 0 {
-		cfg, err := opts.Config()
-		if err != nil {
-			return err
-		}
 		// A URL selector names its own host, so this can differ from the
 		// default host.
-		host := repo.RepoHost()
-		tokenType := cfg.Authentication().ActiveTokenType(host)
-		uploader, err = attachments.NewUploader(httpClient, tokenType, host, pr.RepositoryDatabaseID(), pr.RepositoryViewerPermission())
+		uploader, err = attachments.NewUploader(httpClient, repo.RepoHost(), pr.RepositoryDatabaseID(), pr.RepositoryViewerPermission())
 		if err != nil {
 			return err
 		}
@@ -424,7 +418,7 @@ func editRun(opts *EditOptions) error {
 
 		// Nothing that can prompt or cancel may follow this.
 		var uploadResult attachments.UploadResult
-		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.BodyDir, opts.Assets)
 		opts.AttachEvent.RecordOperations(uploadResult)
 
 		// With nothing uploaded, even a body the caller typed goes unwritten:

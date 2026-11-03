@@ -78,6 +78,7 @@ type CreateOptions struct {
 
 	DryRun bool
 
+	BodyDir     string
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
@@ -247,7 +248,8 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 
 			Use %[1]s--attach%[1]s to upload an image or video. The attachment is appended to the
 			body. If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
-			reference is rewritten to point at the uploaded asset instead.
+			reference is rewritten to point at the uploaded asset instead. Paths in a
+			%[1]s--body-file%[1]s are relative to its directory, falling back to the working directory.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -334,11 +336,10 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			if bodyFile != "" {
-				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				opts.Body, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 				if err != nil {
 					return err
 				}
-				opts.Body = string(b)
 				opts.BodyProvided = true
 			}
 
@@ -531,15 +532,8 @@ func createRun(opts *CreateOptions) error {
 	// Built before the prompts, so a run that cannot upload stops early.
 	var uploader *attachments.Uploader
 	if len(opts.Assets) > 0 {
-		cfg, err := opts.Config()
-		if err != nil {
-			return err
-		}
 		baseRepo := ctx.PRRefs.BaseRepo()
-		host := baseRepo.RepoHost()
-		tokenType := cfg.Authentication().ActiveTokenType(host)
-
-		uploader, err = attachments.NewUploader(httpClient, tokenType, host, baseRepo.DatabaseID, baseRepo.ViewerPermission)
+		uploader, err = attachments.NewUploader(httpClient, baseRepo.RepoHost(), baseRepo.DatabaseID, baseRepo.ViewerPermission)
 		if err != nil {
 			return err
 		}
@@ -1126,7 +1120,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 
 	var uploadErr error
 	if uploader != nil {
-		body, uploadResult, err := uploader.UploadAndAttach(context.Background(), state.Body, opts.Assets)
+		body, uploadResult, err := uploader.UploadAndAttach(context.Background(), state.Body, opts.BodyDir, opts.Assets)
 		opts.AttachEvent.RecordOperations(uploadResult)
 		// With nothing uploaded, a body that lost the files it was written
 		// around is not what the caller asked to create. The branch is already

@@ -59,7 +59,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			$ gh ruleset view
 
 			# Interactively choose a ruleset to view from only rulesets configured in the current repository
-			$ gh ruleset view --no-parents
+			$ gh ruleset view --parents=false
 
 			# View a ruleset configured in the current repository or any of its parents
 			$ gh ruleset view 43

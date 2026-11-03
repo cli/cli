@@ -4,7 +4,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/charmbracelet/glamour"
+	"charm.land/glamour/v2"
 	ghMarkdown "github.com/cli/go-gh/v2/pkg/markdown"
 )
 

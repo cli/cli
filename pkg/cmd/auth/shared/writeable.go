@@ -16,6 +16,6 @@ func AuthTokenRefreshable(token, src string) bool {
 }
 
 func AuthTokenWriteable(authCfg gh.AuthConfig, hostname string) (string, bool) {
-	token, src := authCfg.ActiveToken(hostname)
-	return src, (token == "" || !strings.HasSuffix(src, "_TOKEN"))
+	cred := authCfg.ActiveToken(hostname)
+	return cred.Source, (cred.Token == "" || !strings.HasSuffix(cred.Source, "_TOKEN"))
 }

@@ -57,6 +57,71 @@ func TestMinimumNs_with_error(t *testing.T) {
 	}
 }
 
+func TestRangeArgs(t *testing.T) {
+	const msg = "artifact number or URL is required"
+
+	tests := []struct {
+		name    string
+		min     int
+		max     int
+		args    []string
+		wantErr string
+	}{
+		{
+			name: "the fewest arguments",
+			min:  1,
+			max:  2,
+			args: []string{"142"},
+		},
+		{
+			name: "the most arguments",
+			min:  1,
+			max:  2,
+			args: []string{"142", "2"},
+		},
+		{
+			name: "a range of one",
+			min:  2,
+			max:  2,
+			args: []string{"142", "2"},
+		},
+		{
+			name:    "no arguments",
+			min:     1,
+			max:     2,
+			wantErr: msg,
+		},
+		{
+			name:    "fewer than the fewest",
+			min:     2,
+			max:     3,
+			args:    []string{"142"},
+			wantErr: msg,
+		},
+		{
+			name:    "more than the most",
+			min:     1,
+			max:     2,
+			args:    []string{"142", "2", "3"},
+			wantErr: "too many arguments",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := RangeArgs(tt.min, tt.max, msg)(nil, tt.args)
+
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, tt.wantErr)
+			var flagErr *FlagError
+			require.ErrorAs(t, err, &flagErr)
+		})
+	}
+}
+
 func TestPartition(t *testing.T) {
 	tests := []struct {
 		name            string

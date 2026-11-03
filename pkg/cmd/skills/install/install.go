@@ -422,7 +422,7 @@ func installRun(opts *InstallOptions) error {
 			}
 
 			printFileTree(opts.IO.ErrOut, cs, result.Dir, result.Installed)
-			printReviewHint(opts.IO.ErrOut, cs, repoSource, resolved.SHA, result.Installed, opts.AllowHiddenDirs)
+			printReviewHint(opts.IO.ErrOut, repoSource, resolved.SHA, result.Installed, opts.AllowHiddenDirs)
 			printHostHints(opts.IO.ErrOut, cs, plan.hosts, result.Installed, result.Dir, gitRoot)
 		}
 
@@ -570,7 +570,7 @@ func runLocalInstall(opts *InstallOptions) error {
 		}
 
 		printFileTree(opts.IO.ErrOut, cs, result.Dir, result.Installed)
-		printReviewHint(opts.IO.ErrOut, cs, "", "", result.Installed, false)
+		printReviewHint(opts.IO.ErrOut, "", "", result.Installed, false)
 		printHostHints(opts.IO.ErrOut, cs, plan.hosts, result.Installed, result.Dir, gitRoot)
 	}
 
@@ -1183,21 +1183,21 @@ func printPreInstallDisclaimer(w io.Writer, cs *iostreams.ColorScheme) {
 	fmt.Fprintf(w, "\n%s Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n", cs.WarningIcon())
 }
 
-// printReviewHint warns the user to review installed skills and suggests preview commands.
+// printReviewHint reminds the user to review installed skills and suggests preview commands.
 // When sha is non-empty the suggested commands include @SHA so the user previews
 // exactly the version that was installed. When allowHiddenDirs is true, the
 // suggested commands include --allow-hidden-dirs so previewing hidden-dir
 // skills works without an extra manual step.
-func printReviewHint(w io.Writer, cs *iostreams.ColorScheme, repo, sha string, skillNames []string, allowHiddenDirs bool) {
+func printReviewHint(w io.Writer, repo, sha string, skillNames []string, allowHiddenDirs bool) {
 	if len(skillNames) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "\n%s Skills may contain prompt injections or malicious scripts.\n", cs.WarningIcon())
+	fmt.Fprintln(w)
 	if repo == "" {
-		fmt.Fprintln(w, "  Review the installed files before use.")
+		fmt.Fprintln(w, "Review the installed files before use.")
 		return
 	}
-	fmt.Fprintln(w, "  Review installed content before use:")
+	fmt.Fprintln(w, "Review installed content before use:")
 	fmt.Fprintln(w)
 	hiddenFlag := ""
 	if allowHiddenDirs {

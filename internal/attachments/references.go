@@ -3,6 +3,7 @@ package attachments
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -66,11 +67,11 @@ type attachableMarkdown struct {
 
 // newAttachableMarkdown scans markdown for the files it references, and
 // refuses references that no asset URL can fix.
-func newAttachableMarkdown(md string, attachmentArgs []attachmentArg) (attachableMarkdown, error) {
+func newAttachableMarkdown(md, markdownDir string, attachmentArgs []attachmentArg) (attachableMarkdown, error) {
 	if len(attachmentArgs) == 0 {
 		return attachableMarkdown{markdown: md}, nil
 	}
-	refs, err := scanMarkdownRefs(md, attachmentArgs)
+	refs, err := scanMarkdownRefs(md, markdownDir, attachmentArgs)
 	if err != nil {
 		return attachableMarkdown{}, err
 	}
@@ -241,7 +242,7 @@ func (r attachmentRef) referenceStyle() bool { return len(r.defs) > 0 }
 
 // scanMarkdownRefs finds every place the markdown names one of the attached
 // files.
-func scanMarkdownRefs(md string, attachmentArgs []attachmentArg) ([]attachmentRef, error) {
+func scanMarkdownRefs(md, markdownDir string, attachmentArgs []attachmentArg) ([]attachmentRef, error) {
 	byPath, err := attachmentArgsByPath(attachmentArgs)
 	if err != nil {
 		return nil, err
@@ -262,7 +263,7 @@ func scanMarkdownRefs(md string, attachmentArgs []attachmentArg) ([]attachmentRe
 		if !ok {
 			return ast.WalkContinue, nil
 		}
-		idx, ok := attachmentArgForDestination(dest, byPath)
+		idx, ok := attachmentArgForDestination(dest, markdownDir, byPath)
 		if !ok {
 			return ast.WalkContinue, nil
 		}
@@ -359,12 +360,24 @@ func attachmentArgsByPath(attachmentArgs []attachmentArg) (map[string]int, error
 // names.
 //
 // Only a local path can name one, and markdown offers several spellings for
-// the same path, so each is resolved to an absolute path and looked up.
-func attachmentArgForDestination(dest string, byPath map[string]int) (int, bool) {
+// the same path, so each is resolved to an absolute path and looked up. A
+// relative spelling is tried in markdownDir before the working directory, so
+// the file beside the markdown wins when both exist.
+func attachmentArgForDestination(dest, markdownDir string, byPath map[string]int) (int, bool) {
 	if dest == "" || strings.HasPrefix(dest, "#") || isRemoteDestination(dest) {
 		return 0, false
 	}
-	for _, path := range candidatePaths(dest) {
+	spellings := candidatePaths(dest)
+	paths := make([]string, 0, 2*len(spellings))
+	if markdownDir != "" {
+		for _, s := range spellings {
+			if isRelativePath(s) {
+				paths = append(paths, filepath.Join(markdownDir, s))
+			}
+		}
+	}
+	paths = append(paths, spellings...)
+	for _, path := range paths {
 		abs, err := filepath.Abs(path)
 		if err != nil {
 			continue
@@ -374,6 +387,17 @@ func attachmentArgForDestination(dest string, byPath map[string]int) (int, bool)
 		}
 	}
 	return 0, false
+}
+
+// isRelativePath reports whether path is relative to a directory, and so can
+// be placed inside the one the markdown was read from. filepath.IsAbs is not
+// enough on Windows, where "\x" is rooted on the current drive and "C:x" names
+// a drive of its own, though neither is absolute.
+func isRelativePath(path string) bool {
+	if path == "" || filepath.IsAbs(path) || filepath.VolumeName(path) != "" {
+		return false
+	}
+	return !os.IsPathSeparator(path[0])
 }
 
 // isRemoteDestination reports whether a destination addresses somewhere other

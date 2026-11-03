@@ -7,7 +7,7 @@
 // An upload cannot be undone. Callers must ensure that the returned markdown
 // is written to a resource (issue, PR, etc.).
 //
-// A caller must build the Uploader before it prompts for anything, so a token
+// A caller must build the Uploader before it prompts for anything, so a host
 // or permission that cannot upload stops the command before an editor opens.
 // It must call UploadAndAttach after every possible prompt has been exercised,
 // not before, because nothing that can cancel may follow an upload.
@@ -20,12 +20,14 @@
 //	// repositoryID and viewerPermission come from the lookup the command
 //	// already makes.
 //	uploader, err := attachments.NewUploader(
-//		httpClient, token, host, repositoryID, viewerPermission)
+//		httpClient, host, repositoryID, viewerPermission)
 //	...
 //
 //	// Every reasonable cancellation possible belongs here.
 //
-//	md, result, err := uploader.UploadAndAttach(ctx, md, attachmentArgs)
+//	// bodyDir is the directory of the --body-file md was read from, or ""
+//	// when md came from no file.
+//	md, result, err := uploader.UploadAndAttach(ctx, md, bodyDir, attachmentArgs)
 //	if result.Uploaded == 0 {
 //		return err
 //	}
@@ -38,4 +40,11 @@
 // is above zero, including after a partial failure, because what did upload must
 // be referenced by something. At zero nothing is stranded and nothing is
 // written.
+//
+// UploadAndAttachDocuments attaches the same files to several documents at
+// once. Each file uploads once, and every document that references it gets its
+// URL. With several documents, a file that no document references is refused
+// before anything uploads, since no document is the place to append it. Each
+// document gets its own result, and the rule above applies to each one: a
+// document with anything in Uploaded must be written, even when its Err is set.
 package attachments

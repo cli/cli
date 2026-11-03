@@ -54,7 +54,7 @@ func TestAttachAssetsToMarkdownFixture(t *testing.T) {
 	require.NoError(t, err)
 
 	attachmentArgs := fixtureAttachmentArgs()
-	v, err := newAttachableMarkdown(string(markdown), attachmentArgs)
+	v, err := newAttachableMarkdown(string(markdown), "", attachmentArgs)
 	require.NoError(t, err)
 
 	got, err := attachAssetsToMarkdown(v)

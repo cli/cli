@@ -51,10 +51,10 @@ type EditOptions struct {
 	AddBlocking     []string
 	RemoveBlocking  []string
 
+	BodyDir     string
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
-	Config      func() (gh.Config, error)
 
 	prShared.Editable
 }
@@ -63,7 +63,6 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 	opts := &EditOptions{
 		IO:                 f.IOStreams,
 		HttpClient:         f.HttpClient,
-		Config:             f.Config,
 		DetermineEditor:    func() (string, error) { return cmdutil.DetermineEditor(f.Config) },
 		FieldsToEditSurvey: prShared.FieldsToEditSurvey,
 		EditFieldsSurvey:   prShared.EditFieldsSurvey,
@@ -86,7 +85,8 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			Use %[1]s--attach%[1]s to upload an image or video to a single issue. Without a body
 			flag the issue keeps the body it already has and the attachment is appended to it.
 			If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
-			reference is rewritten to point at the uploaded asset instead.
+			reference is rewritten to point at the uploaded asset instead. Paths in a
+			%[1]s--body-file%[1]s are relative to its directory, falling back to the working directory.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -156,11 +156,10 @@ func NewCmdEdit(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ru
 			if bodyProvided || bodyFileProvided {
 				opts.Editable.Body.Edited = true
 				if bodyFileProvided {
-					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					opts.Editable.Body.Value, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 					if err != nil {
 						return err
 					}
-					opts.Editable.Body.Value = string(b)
 				}
 			}
 
@@ -367,13 +366,7 @@ func editRun(opts *EditOptions) error {
 	// so a run that cannot upload stops before any write.
 	var uploader *attachments.Uploader
 	if len(opts.Assets) > 0 {
-		cfg, err := opts.Config()
-		if err != nil {
-			return err
-		}
-		host := baseRepo.RepoHost()
-		tokenType := cfg.Authentication().ActiveTokenType(host)
-		uploader, err = attachments.NewUploader(httpClient, tokenType, host, issues[0].RepositoryDatabaseID(), issues[0].RepositoryViewerPermission())
+		uploader, err = attachments.NewUploader(httpClient, baseRepo.RepoHost(), issues[0].RepositoryDatabaseID(), issues[0].RepositoryViewerPermission())
 		if err != nil {
 			return err
 		}
@@ -418,7 +411,7 @@ func editRun(opts *EditOptions) error {
 		// Clone carries the merged body into the issue. Nothing that can
 		// prompt or cancel may follow an upload.
 		var uploadResult attachments.UploadResult
-		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.Assets)
+		body, uploadResult, uploadErr = uploader.UploadAndAttach(context.Background(), body, opts.BodyDir, opts.Assets)
 		opts.AttachEvent.RecordOperations(uploadResult)
 
 		if uploadResult.Uploaded > 0 {

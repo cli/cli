@@ -281,7 +281,7 @@ func TestNewCmdExtension(t *testing.T) {
 				return func(t *testing.T) {
 					calls := em.InstallLocalCalls()
 					assert.Equal(t, 1, len(calls))
-					assert.Equal(t, localExtensionTempDir, normalizeDir(calls[0].Dir))
+					assert.Equal(t, normalizeDir(localExtensionTempDir), normalizeDir(calls[0].Dir))
 				}
 			},
 		},

@@ -1,0 +1,30 @@
+# requires-user-capability: false
+
+fixture-repo none
+
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+env FORK=${REPO}-fork
+
+# Register cleanup first because cleanup-repo ignores repositories that are already gone
+defer cleanup-repo ${REPO}
+defer cleanup-repo ${FORK}
+
+# Create a private upstream and fork it within the org
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+exec gh repo fork ${ORG}/${REPO} --org ${ORG} --fork-name ${FORK}
+sleep 5
+
+# Stop here if the fork isn't counted yet, rather than deleting the upstream below
+exec gh api repos/${ORG}/${REPO} --jq '.forks_count'
+stdout '^1$'
+
+# Without the flag, deleting the private upstream is refused and nothing is deleted
+! exec gh repo delete --yes ${ORG}/${REPO}
+stderr 'will also delete 1 fork since this is a private repository'
+exec gh repo view ${ORG}/${REPO} --json name --jq '.name'
+stdout ${REPO}
+
+# With the flag, the upstream is deleted
+exec gh repo delete --yes --accept-cascading-deletion-of-private-forks ${ORG}/${REPO}
+! exec gh repo view ${ORG}/${REPO}
+stderr 'Could not resolve to a Repository with the name'

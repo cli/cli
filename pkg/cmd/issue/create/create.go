@@ -27,7 +27,6 @@ import (
 
 type CreateOptions struct {
 	HttpClient       func() (*http.Client, error)
-	Config           func() (gh.Config, error)
 	IO               *iostreams.IOStreams
 	BaseRepo         func() (ghrepo.Interface, error)
 	Browser          browser.Browser
@@ -58,6 +57,7 @@ type CreateOptions struct {
 	BlockedBy   []string
 	Blocking    []string
 
+	BodyDir     string
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
@@ -67,7 +67,6 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
 		Browser:    f.Browser,
 		Prompter:   f.Prompter,
 
@@ -84,7 +83,8 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 
 			Use %[1]s--attach%[1]s to upload an image or video. The attachment is appended to the
 			body. If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
-			reference is rewritten to point at the uploaded asset instead.
+			reference is rewritten to point at the uploaded asset instead. Paths in a
+			%[1]s--body-file%[1]s are relative to its directory, falling back to the working directory.
 			You can attach up to 50 files per command.
 
 			Alt text for an image follows the path after %[1]s#%[1]s, as in
@@ -135,11 +135,10 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			titleProvided := cmd.Flags().Changed("title")
 			bodyProvided := cmd.Flags().Changed("body")
 			if bodyFile != "" {
-				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				opts.Body, opts.BodyDir, err = cmdutil.ReadMarkdownBodyFile(bodyFile, opts.IO.In)
 				if err != nil {
 					return err
 				}
-				opts.Body = string(b)
 				bodyProvided = true
 			}
 
@@ -299,15 +298,7 @@ func createRun(opts *CreateOptions) (err error) {
 	// Built before the first survey, so a run that cannot upload stops early.
 	var uploader *attachments.Uploader
 	if len(opts.Assets) > 0 {
-		var cfg gh.Config
-		cfg, err = opts.Config()
-		if err != nil {
-			return
-		}
-		host := baseRepo.RepoHost()
-		tokenType := cfg.Authentication().ActiveTokenType(host)
-
-		uploader, err = attachments.NewUploader(httpClient, tokenType, host, repo.DatabaseID, repo.ViewerPermission)
+		uploader, err = attachments.NewUploader(httpClient, baseRepo.RepoHost(), repo.DatabaseID, repo.ViewerPermission)
 		if err != nil {
 			return
 		}
@@ -466,7 +457,7 @@ func createRun(opts *CreateOptions) (err error) {
 		// not exist, so no issue is created. Once anything has uploaded the
 		// issue is created and the failures are reported.
 		if uploader != nil {
-			body, uploadResult, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.Assets)
+			body, uploadResult, uploadErr := uploader.UploadAndAttach(context.Background(), tb.Body, opts.BodyDir, opts.Assets)
 			opts.AttachEvent.RecordOperations(uploadResult)
 			if uploadErr != nil && uploadResult.Uploaded == 0 {
 				err = uploadErr

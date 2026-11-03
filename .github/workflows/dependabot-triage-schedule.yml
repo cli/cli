@@ -1,0 +1,45 @@
+name: Dependabot PR Triage Scheduler
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "9,39 * * * *"
+
+permissions: {}
+
+concurrency:
+  group: dependabot-triage-schedule
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compute Dependabot triage work list
+        id: worklist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          WORKLIST_PATH: ${{ runner.temp }}/dependabot-triage-worklist.json
+        run: bash .github/scripts/dependabot-triage.sh select
+
+      - name: Dispatch Dependabot triage
+        if: steps.worklist.outputs.count != '0'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          WORKLIST_PATH: ${{ steps.worklist.outputs.worklist_path }}
+        run: bash .github/scripts/dependabot-triage.sh dispatch

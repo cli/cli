@@ -306,8 +306,8 @@ func authRecoveryCommand(cfg gh.Config, httpErr api.HTTPError) string {
 	}
 
 	hostname := ghauth.NormalizeHostname(httpErr.RequestURL.Hostname())
-	token, source := cfg.Authentication().ActiveToken(hostname)
-	if shared.AuthTokenRefreshable(token, source) {
+	cred := cfg.Authentication().ActiveToken(hostname)
+	if shared.AuthTokenRefreshable(cred.Token, cred.Source) {
 		return fmt.Sprintf("gh auth refresh -h %s", hostname)
 	}
 

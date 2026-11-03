@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
@@ -634,6 +635,32 @@ func TestPRView_Preview(t *testing.T) {
 			test.ExpectLines(t, out, tc.expectedOutputs...)
 		})
 	}
+}
+
+func TestPRView_tty_wrappedLink(t *testing.T) {
+	t.Setenv("GLAMOUR_STYLE", "notty")
+
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	pr := &api.PullRequest{
+		Number:    123,
+		CreatedAt: now,
+		Body:      "https://user-images.githubusercontent.com/1532486/119571265-fe41be00-bd65-11eb-8c99-a3eaec2a9b1c.png",
+	}
+	opts := &ViewOptions{
+		IO:          ios,
+		Finder:      shared.NewMockFinder("123", pr, ghrepo.New("OWNER", "REPO")),
+		SelectorArg: "123",
+		Now:         func() time.Time { return now },
+	}
+
+	require.NoError(t, viewRun(opts))
+	assert.Empty(t, stderr.String())
+	assert.Contains(t, stdout.String(),
+		"\x1b]8;id=105816246;https://user-images.githubusercontent.com/1532486/119571265-fe41be00-bd65-11eb-8c99-a3eaec2a9b1c.png\ahttps://user-images.githubusercontent.com/1532486/119571265-fe41be00-bd65-\x1b]8;;\a  \n"+
+			"  \x1b]8;id=105816246;https://user-images.githubusercontent.com/1532486/119571265-fe41be00-bd65-11eb-8c99-a3eaec2a9b1c.png\a11eb-8c99-a3eaec2a9b1c.png\x1b]8;;\a")
 }
 
 func TestPRView_web_currentBranch(t *testing.T) {

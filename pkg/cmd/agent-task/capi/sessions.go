@@ -1,9 +1,7 @@
 package capi
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/shurcooL/githubv4"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 const AgentsHomeURL = "https://github.com/copilot/agents"
@@ -549,35 +546,11 @@ func (c *CAPIClient) GetPullRequestDatabaseID(ctx context.Context, hostname stri
 // generatePullRequestNodeID converts an int64 databaseID and repoID to a GraphQL Node ID format
 // with the "PR_" prefix for pull requests
 func generatePullRequestNodeID(repoID, pullRequestID int64) string {
-	buf := bytes.Buffer{}
-	parts := []int64{0, repoID, pullRequestID}
-
-	encoder := msgpack.NewEncoder(&buf)
-	encoder.UseCompactInts(true)
-
-	if err := encoder.Encode(parts); err != nil {
-		panic(err)
-	}
-
-	encoded := base64.RawURLEncoding.EncodeToString(buf.Bytes())
-
-	return "PR_" + encoded
+	return "PR_" + api.EncodeNodeID(0, repoID, pullRequestID)
 }
 
 func generateUserNodeID(userID int64) string {
-	buf := bytes.Buffer{}
-	parts := []int64{0, userID}
-
-	encoder := msgpack.NewEncoder(&buf)
-	encoder.UseCompactInts(true)
-
-	if err := encoder.Encode(parts); err != nil {
-		panic(err)
-	}
-
-	encoded := base64.RawURLEncoding.EncodeToString(buf.Bytes())
-
-	return "U_" + encoded
+	return "U_" + api.EncodeNodeID(0, userID)
 }
 
 func fromAPISession(s session) *Session {

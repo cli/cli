@@ -2,15 +2,13 @@ package git
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"os/exec"
+	"slices"
 
 	"github.com/cli/cli/v2/internal/run"
 )
-
-type commandCtx = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 type Command struct {
 	*exec.Cmd
@@ -62,22 +60,11 @@ func (gc *Command) Output() ([]byte, error) {
 }
 
 func (gc *Command) setRepoDir(repoDir string) {
-	for i, arg := range gc.Args {
-		if arg == "-C" {
-			gc.Args[i+1] = repoDir
-			return
-		}
+	if len(gc.Args) >= 3 && gc.Args[1] == "-C" {
+		gc.Args[2] = repoDir
+		return
 	}
-	// Handle "--" invocations for testing purposes.
-	var index int
-	for i, arg := range gc.Args {
-		if arg == "--" {
-			index = i + 1
-		}
-	}
-	gc.Args = append(gc.Args[:index+3], gc.Args[index+1:]...)
-	gc.Args[index+1] = "-C"
-	gc.Args[index+2] = repoDir
+	gc.Args = slices.Insert(gc.Args, 1, "-C", repoDir)
 }
 
 // Allow individual commands to be modified from the default client options.

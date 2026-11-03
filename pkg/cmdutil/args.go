@@ -35,6 +35,24 @@ func ExactArgs(n int, msg string) cobra.PositionalArgs {
 	}
 }
 
+// RangeArgs is cobra.RangeArgs with the usage errors ExactArgs gives: more
+// than max arguments is "too many arguments", and fewer than min is msg, so
+// the command can say which argument is missing. Both are flag errors, which
+// print the usage.
+func RangeArgs(min, max int, msg string) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) > max {
+			return FlagErrorf("too many arguments")
+		}
+
+		if len(args) < min {
+			return FlagErrorf("%s", msg)
+		}
+
+		return nil
+	}
+}
+
 func NoArgsQuoteReminder(cmd *cobra.Command, args []string) error {
 	if len(args) < 1 {
 		return nil
