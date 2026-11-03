@@ -217,6 +217,9 @@ type TokenRefresher interface {
 // with knowledge on how to access encrypted storage when necessary.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig interface {
+	// ResolveToken selects credentials using invocation, repository, and host context.
+	ResolveToken(host, owner, dir string) (Credential, error)
+
 	// SetAccountOverride selects a saved account for this invocation without changing persistent configuration.
 	// Empty hostname and account values clear the override.
 	SetAccountOverride(hostname, account string)

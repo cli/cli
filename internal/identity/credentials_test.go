@@ -1,11 +1,16 @@
-package identity
+package identity_test
 
 import (
 	"net/http"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/identity"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +49,7 @@ hosts:
 	require.NoError(t, err)
 
 	// When resolving effective authentication for the gateway destination
-	_, err = api.AddAuthTokenHeaderWithResolver(base, TokenResolver(cfg.Authentication())).RoundTrip(req)
+	_, err = api.AddAuthTokenHeaderWithResolver(base, identity.TokenResolver(cfg.Authentication())).RoundTrip(req)
 
 	// Then the explicit API host mapping determines which host supplies authentication
 	require.NoError(t, err)
@@ -97,7 +102,7 @@ hosts:
 			})
 
 			// When authentication is attached for the selected saved account
-			_, err = api.AddAuthTokenHeaderWithResolver(base, TokenResolver(auth)).RoundTrip(req)
+			_, err = api.AddAuthTokenHeaderWithResolver(base, identity.TokenResolver(auth)).RoundTrip(req)
 
 			// Then only eligible requests get the saved account, without changing persistent selection
 			require.NoError(t, err)
@@ -108,4 +113,56 @@ hosts:
 			assert.Equal(t, "alice", user)
 		})
 	}
+}
+
+func TestBoundIdentityRefusesEnvironmentToken(t *testing.T) {
+	// Given a bound identity and an environment token of unknown account
+	cfg, s := isolatedAccounts(t)
+	dir := t.TempDir()
+	runGit(t, dir, "init", "-q")
+	require.NoError(t, s.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+	require.NoError(t, s.Bind(identity.Binding{Identity: "work", Directory: dir}, "/path/to/gh"))
+	t.Chdir(dir)
+	t.Setenv("GH_TOKEN", "unknown-account-token")
+	base := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		t.Fatal("a conflicting identity must fail before any network request")
+		return nil, nil
+	})
+	client := &http.Client{Transport: api.AddAuthTokenHeaderWithResolver(base, identity.TokenResolver(cfg.Authentication()))}
+
+	// When the request would otherwise use the bound identity
+	_, err := client.Get("https://api.github.com/repos/company/project")
+
+	// Then it refuses the override rather than claiming account agreement
+	require.ErrorContains(t, err, "GH_TOKEN overrides saved accounts")
+}
+
+func isolatedAccounts(t *testing.T) (gh.Config, *identity.Store) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("persistent identities are not supported on Windows")
+	}
+	cfg, _ := config.NewIsolatedTestConfig(t, `
+hosts:
+  github.com:
+    user: alice
+    oauth_token: alice-token
+    users:
+      alice:
+        oauth_token: alice-token
+`)
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	store, err := identity.Open()
+	require.NoError(t, err)
+	return cfg, store
+}
+
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	return string(out)
 }

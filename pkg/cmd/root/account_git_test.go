@@ -74,26 +74,6 @@ func accountGit(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-func TestAccountSSHRefusesUndeclaredRouting(t *testing.T) {
-	// Given an account selection without SSH identity routing support
-	isolateAccountCommand(t)
-	cfg, _ := config.NewIsolatedTestConfig(t, accountGitConfig)
-	ios, _, stdout, stderr := iostreams.Test()
-	cmd := authcmd.NewCmdAuth(&cmdutil.Factory{
-		IOStreams: ios, Config: func() (gh.Config, error) { return cfg, nil },
-	}, &telemetry.NoOpService{})
-	cmd.SetArgs([]string{"git-ssh", "git@github.com", "git-upload-pack 'company/project.git'"})
-	cmd.SilenceErrors, cmd.SilenceUsage = true, true
-
-	// When Git invokes the account-specific SSH command
-	err := cmd.Execute()
-
-	// Then no unrelated SSH key is used and the refusal is explicit
-	require.ErrorContains(t, err, "--account SSH routing is not supported")
-	assert.Empty(t, stdout.String())
-	assert.Empty(t, stderr.String())
-}
-
 func TestAccountOverridePRCreatePushesBeforeCreatingPR(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("uses Unix executable fixtures for Git's SSH and HTTPS protocols")
@@ -103,6 +83,7 @@ func TestAccountOverridePRCreatePushesBeforeCreatingPR(t *testing.T) {
 		url      string
 	}{
 		{protocol: "https", url: "https://github.com/bob/project.git"},
+		{protocol: "ssh", url: "git@github.com:bob/project.git"},
 	} {
 		t.Run(tt.protocol, func(t *testing.T) {
 			// Given an unpublished branch with alice attribution, but a repository only bob can push to
@@ -165,6 +146,13 @@ done
 			accountGit(t, repo, "config", "user.name", "Alice")
 			accountGit(t, repo, "config", "user.email", "alice@example.invalid")
 			accountGit(t, repo, "config", "credential.https://github.com.username", "alice")
+			store, err := identity.Open()
+			require.NoError(t, err)
+			require.NoError(t, store.Save(identity.Identity{
+				Name: "alice", Host: "github.com", Account: "alice", SSHHost: "alice-ssh",
+			}, false))
+			require.NoError(t, store.Save(identity.Identity{Name: "bob", Host: "github.com", Account: "bob", SSHHost: "bob-ssh"}, false))
+			require.NoError(t, store.Bind(identity.Binding{Identity: "alice", Directory: repo}, helper))
 			accountGit(t, repo, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "base")
 			accountGit(t, repo, "push", "-q", bare, "main")
 			accountGit(t, repo, "remote", "add", "origin", tt.url)
@@ -218,7 +206,12 @@ done
 			assert.Contains(t, string(evidence), "bob")
 			assert.Equal(t, before, accountGit(t, repo, "log", "-1", "--format=%H|%an|%ae|%cn|%ce"))
 			assert.Equal(t, tt.url, accountGit(t, repo, "config", "remote.origin.url"))
-
+			selected, err := store.Resolve("github.com", "bob", repo)
+			require.NoError(t, err)
+			assert.Equal(t, "alice", selected.Account)
+			mainSelected, err := store.Resolve("github.com", "bob", mainRepo)
+			require.NoError(t, err)
+			assert.Equal(t, "alice", mainSelected.Account)
 		})
 	}
 }

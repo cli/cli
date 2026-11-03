@@ -185,6 +185,14 @@ func (c *Client) AuthenticatedCommand(ctx context.Context, credentialPattern Cre
 	cmd.Env = append(cmd.Environ(), auth.Environment...)
 	if auth.UseSSHHelper {
 		// Route SSH through gh rather than an unrelated key; declare OpenSSH argument syntax.
+		for _, entry := range cmd.Environ() {
+			if value, ok := strings.CutPrefix(entry, "GIT_SSH_COMMAND="); ok {
+				cmd.Env = append(cmd.Env, "GH_IDENTITY_SSH_COMMAND="+value)
+			}
+			if value, ok := strings.CutPrefix(entry, "GIT_SSH_VARIANT="); ok {
+				cmd.Env = append(cmd.Env, "GH_IDENTITY_SSH_VARIANT="+value)
+			}
+		}
 		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+shellquote.Join(c.GhPath, "auth", "git-ssh"), "GIT_SSH_VARIANT=ssh")
 	}
 	return cmd, nil

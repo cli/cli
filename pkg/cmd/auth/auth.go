@@ -3,6 +3,7 @@ package auth
 import (
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	gitCredentialCmd "github.com/cli/cli/v2/pkg/cmd/auth/gitcredential"
+	authIdentityCmd "github.com/cli/cli/v2/pkg/cmd/auth/identity"
 	authLoginCmd "github.com/cli/cli/v2/pkg/cmd/auth/login"
 	authLogoutCmd "github.com/cli/cli/v2/pkg/cmd/auth/logout"
 	authRefreshCmd "github.com/cli/cli/v2/pkg/cmd/auth/refresh"
@@ -10,6 +11,7 @@ import (
 	authStatusCmd "github.com/cli/cli/v2/pkg/cmd/auth/status"
 	authSwitchCmd "github.com/cli/cli/v2/pkg/cmd/auth/switch"
 	authTokenCmd "github.com/cli/cli/v2/pkg/cmd/auth/token"
+	authUseCmd "github.com/cli/cli/v2/pkg/cmd/auth/use"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -34,16 +36,12 @@ func NewCmdAuth(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *c
 	cmd.AddCommand(authSetupGitCmd.NewCmdSetupGit(f, nil))
 	cmd.AddCommand(authTokenCmd.NewCmdToken(f, nil))
 	cmd.AddCommand(authSwitchCmd.NewCmdSwitch(f, nil))
-
-	// --account selects a saved API/HTTPS credential, not an SSH key. Until identities
-	// provide explicit SSH routes in a later stack layer, Git invokes this helper to
-	// fail rather than silently authenticate with an unrelated key from the user's SSH setup.
-	cmd.AddCommand(&cobra.Command{
-		Use: "git-ssh", Hidden: true, DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmdutil.FlagErrorf("--account SSH routing is not supported; use HTTPS")
-		},
-	})
+	cmd.AddCommand(authIdentityCmd.NewCmdIdentity(f))
+	cmd.AddCommand(authIdentityCmd.NewCmdResetExperiment(f))
+	// --account selects a saved API/HTTPS credential, not an SSH key. The helper
+	// requires an explicit identity SSH route rather than silently using an unrelated key.
+	cmd.AddCommand(authIdentityCmd.NewCmdGitSSH(f))
+	cmd.AddCommand(authUseCmd.NewCmdUse(f, nil))
 
 	cmdutil.DisableTelemetryForSubcommands(cmd)
 
