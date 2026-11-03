@@ -2,12 +2,36 @@ package identity
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
+	"github.com/kballard/go-shellquote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestUnsetDeletedDirectoryPreservesOtherChoices(t *testing.T) {
+	// Given two choices using one identity, one of whose directories has been removed
+	s := isolatedStore(t)
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+	parent := t.TempDir()
+	removed := filepath.Join(parent, "removed")
+	require.NoError(t, os.Mkdir(removed, 0o700))
+	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: removed}, "/path/to/gh"))
+	require.NoError(t, s.Bind(Binding{Identity: "work", Owner: "company"}, "/path/to/gh"))
+	require.NoError(t, os.Remove(removed))
+
+	// When removing the stale choice by its original path
+	err := s.Unbind(Binding{Host: "github.com", Directory: removed}, "/path/to/gh")
+
+	// Then it can be removed without deleting the reusable identity or the other choice
+	require.NoError(t, err)
+	bindings, err := s.Bindings()
+	require.NoError(t, err)
+	require.Len(t, bindings, 1)
+	assert.Equal(t, "company", bindings[0].Owner)
+}
 
 func TestPersistentIdentityRefusesBareRepositoryWithoutChangingConfig(t *testing.T) {
 	// Given a bare repository where the working-tree identity contract cannot apply
@@ -30,7 +54,6 @@ func TestPersistentIdentityDoesNotReplaceCustomCredentialHelpers(t *testing.T) {
 	// Given a user's existing HTTPS credential helper for the selected host
 	s := isolatedStore(t)
 	dir := t.TempDir()
-	runGit(t, dir, "init", "-q")
 	runGit(t, dir, "config", "--global", "credential.https://github.com.helper", "company-credential-helper")
 	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
 
@@ -46,7 +69,6 @@ func TestCredentialHelperResetAllowsExistingGhSetup(t *testing.T) {
 	// Given a system keychain helper already reset by the user's gh setup
 	s := isolatedStore(t)
 	dir := t.TempDir()
-	runGit(t, dir, "init", "-q")
 	system := filepath.Join(dir, "system.gitconfig")
 	require.NoError(t, os.WriteFile(system, []byte("[credential]\nhelper = osxkeychain\n"), 0o600))
 	t.Setenv("GIT_CONFIG_SYSTEM", system)
@@ -95,27 +117,20 @@ func TestPersistentIdentityRefusesRepositoryUsingSubmodulesAtSetup(t *testing.T)
 	assert.Empty(t, bindings)
 }
 
-func TestUnsetDeletedDirectoryPreservesOtherChoices(t *testing.T) {
-	// Given two choices using one identity, one of whose directories has been removed
+func TestOldGitCannotInstallUnsupportedConditionalConfiguration(t *testing.T) {
+	// Given a Git version without hasconfig include conditions
 	s := isolatedStore(t)
 	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
-	parent := t.TempDir()
-	removed := filepath.Join(parent, "removed")
-	require.NoError(t, os.Mkdir(removed, 0o700))
-	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: removed}, "/path/to/gh"))
-	other := t.TempDir()
-	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: other}, "/path/to/gh"))
-	require.NoError(t, os.Remove(removed))
+	realGit, err := exec.LookPath("git")
+	require.NoError(t, err)
+	tools := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tools, "git"), []byte("#!/bin/sh\nif [ \"$1\" = version ]; then printf 'git version 2.35.1\\n'; exit 0; fi\nexec "+shellquote.Join(realGit)+" \"$@\"\n"), 0o700))
+	t.Setenv("PATH", tools+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	// When removing the stale choice by its original path
-	err := s.Unbind(Binding{Host: "github.com", Directory: removed}, "/path/to/gh")
+	// When setup would otherwise install an owner choice
+	err = s.Bind(Binding{Identity: "work", Owner: "company"}, "/path/to/gh")
 
-	// Then it can be removed without deleting the reusable identity or the other choice
-	require.NoError(t, err)
-	bindings, err := s.Bindings()
-	require.NoError(t, err)
-	require.Len(t, bindings, 1)
-	canonical, err := canonicalDirectory(other)
-	require.NoError(t, err)
-	assert.Equal(t, canonical, bindings[0].Directory)
+	// Then it fails explicitly before installing configuration Git would silently ignore
+	require.ErrorContains(t, err, "Git 2.36 or newer")
+	assert.NoFileExists(t, filepath.Join(filepath.Dir(s.Dir), "auth.gitconfig"))
 }

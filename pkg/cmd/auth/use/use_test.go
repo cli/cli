@@ -1,6 +1,7 @@
 package use
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -158,4 +159,153 @@ func TestUnsetRemovesDirectoryChoice(t *testing.T) {
 	selected, err := store.Resolve("github.com", "", repo)
 	require.NoError(t, err)
 	assert.Nil(t, selected)
+}
+
+func TestUseStoresScopesAndGitRoutingInSharedAuthConfig(t *testing.T) {
+	// Given an owner identity and a directory identity outside any repository
+	store, f := useFixture(t)
+	for _, id := range []identity.Identity{
+		{Name: "owner", Host: "github.com", Account: "bob"},
+		{Name: "work", Host: "github.com", Account: "alice"},
+	} {
+		require.NoError(t, store.Save(id, false))
+	}
+	work, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	t.Chdir(work)
+
+	// When saving both choices through auth use
+	runUse(t, f, "owner", "--owner", "company")
+	runUse(t, f, "work")
+
+	// Then one Git config beside identities contains the scope records and native routing
+	path := filepath.Join(os.Getenv("GH_CONFIG_DIR"), "auth.gitconfig")
+	out, err := exec.Command("git", "config", "--no-includes", "--file", path, "--get-regexp", `^gh-auth-binding\.`).CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	assert.Contains(t, string(out), "identity owner\n")
+	assert.Contains(t, string(out), "owner company\n")
+	assert.Contains(t, string(out), "identity work\n")
+	assert.Contains(t, string(out), "directory "+work+"\n")
+	out, err = exec.Command("git", "config", "--global", "--get-all", "include.path").CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	assert.Equal(t, path+"\n", string(out))
+	assert.NoFileExists(t, filepath.Join(store.Dir, "bindings.json"))
+	assert.NoFileExists(t, filepath.Join(store.Dir, "bindings.gitconfig"))
+	var scopes []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(runUse(t, f, "--list")), &scopes))
+	assert.Len(t, scopes, 2)
+	for _, scope := range scopes {
+		assert.NotContains(t, scope, "recursive")
+		assert.NotContains(t, scope, "gitDir")
+	}
+	selected, err := store.Resolve("github.com", "company", work)
+	require.NoError(t, err)
+	require.NotNil(t, selected)
+	assert.Equal(t, "work", selected.Name)
+}
+
+func TestUseRejectsInvalidScopeStorage(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		contents string
+		want     string
+	}{
+		{name: "old JSON", path: "identities/bindings.json", contents: "[]", want: "old prototype scope file"},
+		{name: "old Git projection", path: "identities/bindings.gitconfig", contents: "# earlier prototype\n", want: "old prototype scope file"},
+		{name: "malformed Git config", path: "auth.gitconfig", contents: "[unfinished\n", want: "read identity scopes"},
+		{name: "duplicate field", path: "auth.gitconfig", contents: "[gh-auth-binding \"0\"]\nidentity = work\nidentity = other\nhost = github.com\nowner = company\n", want: "invalid identity scope field"},
+		{name: "contradictory scopes", path: "auth.gitconfig", contents: "[gh-auth-binding \"0\"]\nidentity = work\nhost = github.com\nowner = company\ndirectory = /work\n", want: "invalid identity scope"},
+		{name: "removed recursion switch", path: "auth.gitconfig", contents: "[gh-auth-binding \"0\"]\nidentity = work\nhost = github.com\ndirectory = /work\nrecursive = false\n", want: "unsupported identity scope field"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given scope storage that cannot represent a valid current choice
+			_, f := useFixture(t)
+			path := filepath.Join(os.Getenv("GH_CONFIG_DIR"), tt.path)
+			require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+			require.NoError(t, os.WriteFile(path, []byte(tt.contents), 0o600))
+			ios, _, stdout, stderr := iostreams.Test()
+			f.IOStreams = ios
+			cmd := NewCmdUse(f, nil)
+			cmd.SetOut(stderr)
+			cmd.SetErr(stderr)
+			cmd.SetArgs([]string{"--list"})
+
+			// When inspecting the saved choices
+			err := cmd.Execute()
+
+			// Then the invalid data is reported instead of looking like an empty set of choices
+			require.ErrorContains(t, err, tt.want)
+			assert.Empty(t, stdout.String())
+		})
+	}
+}
+
+func TestUseCuratesScope(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want UseOptions
+	}{
+		{name: "directory tree", args: []string{"work"}, want: UseOptions{Identity: "work", Host: "github.com"}},
+		{name: "owner", args: []string{"work", "--owner", "company"}, want: UseOptions{Identity: "work", Host: "github.com", Owner: "company"}},
+		{name: "explicit directory", args: []string{"work", "--directory", "/work"}, want: UseOptions{Identity: "work", Host: "github.com", Directory: "/work"}},
+		{name: "unset owner", args: []string{"--unset", "--owner", "company", "--hostname", "example.com"}, want: UseOptions{Host: "example.com", Owner: "company", Unset: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Given an auth use invocation with an explicit scope
+			ios, _, _, _ := iostreams.Test()
+			var got UseOptions
+			cmd := NewCmdUse(&cmdutil.Factory{IOStreams: ios}, func(opts *UseOptions) error {
+				got = *opts
+				return nil
+			})
+			cmd.SetArgs(tt.args)
+
+			// When Cobra executes the command
+			err := cmd.Execute()
+
+			// Then the run function receives the scope without eager repository discovery
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestUseRejectsContradictoryScopes(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "owner and directory", args: []string{"work", "--owner", "company", "--directory", "/work"}, want: "--owner cannot be combined"},
+		{name: "identity and unset", args: []string{"work", "--unset"}, want: "--unset does not take an identity"},
+		{name: "identity and list", args: []string{"work", "--list"}, want: "--list cannot be combined"},
+		{name: "identity and hostname", args: []string{"work", "--hostname", "example.com"}, want: "a named identity supplies its own hostname"},
+		{name: "empty owner", args: []string{"work", "--owner", ""}, want: "--owner cannot be empty"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Given an invocation whose scope flags contradict each other
+			ios, _, _, _ := iostreams.Test()
+			cmd := NewCmdUse(&cmdutil.Factory{IOStreams: ios}, func(*UseOptions) error {
+				t.Fatal("invalid scopes must not reach the run function")
+				return nil
+			})
+			cmd.SetArgs(tt.args)
+			cmd.SetOut(ios.ErrOut)
+			cmd.SetErr(ios.ErrOut)
+
+			// When Cobra executes it
+			err := cmd.Execute()
+
+			// Then it reports a flag error without changing configuration
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
 }

@@ -18,7 +18,6 @@ func TestResetExperimentUsesTypedAllIdentitiesConfirmation(t *testing.T) {
 	// Given an existing experiment and an interactive user who cancels
 	f := identityFactory(t)
 	t.Chdir(t.TempDir())
-	require.NoError(t, exec.Command("git", "init", "-q").Run())
 	runIdentity(t, f, "create", "work", "--account", "alice")
 	f.IOStreams.SetStdinTTY(true)
 	f.IOStreams.SetStdoutTTY(true)
@@ -41,7 +40,6 @@ func TestDeleteIdentityRequiresExplicitConfirmation(t *testing.T) {
 	// Given a saved identity and no terminal
 	f := identityFactory(t)
 	t.Chdir(t.TempDir())
-	require.NoError(t, exec.Command("git", "init", "-q").Run())
 	runIdentity(t, f, "create", "work", "--account", "alice")
 	cmd := NewCmdIdentity(f)
 	cmd.SilenceErrors, cmd.SilenceUsage = true, true
@@ -55,17 +53,57 @@ func TestDeleteIdentityRequiresExplicitConfirmation(t *testing.T) {
 	assert.Contains(t, runIdentity(t, f, "view", "work"), `"name": "work"`)
 }
 
-func TestDeleteIdentityCascadesOnlyItsOwnBindings(t *testing.T) {
-	// Given two identities bound to different repositories
+func TestDeleteIdentityWarningDistinguishesBindingsFromRepositories(t *testing.T) {
+	// Given an identity used by owner, directory, and repository bindings
 	f := identityFactory(t)
 	t.Chdir(t.TempDir())
-	require.NoError(t, exec.Command("git", "init", "-q").Run())
+	runIdentity(t, f, "create", "work", "--account", "alice")
+	repo := filepath.Join(t.TempDir(), "checkout")
+	out, err := exec.Command("git", "init", "-q", repo).CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	repo, err = filepath.EvalSymlinks(repo)
+	require.NoError(t, err)
+	directory, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	s, err := identities.Open()
+	require.NoError(t, err)
+	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Owner: "company"}, f.ExecutablePath))
+	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Directory: directory}, f.ExecutablePath))
+	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Directory: repo}, f.ExecutablePath))
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdinTTY(true)
+	ios.SetStdoutTTY(true)
+	f.IOStreams = ios
+	f.Prompter = &prompter.PrompterMock{ConfirmDeletionFunc: func(value string) error {
+		assert.Equal(t, "work", value)
+		assert.Contains(t, stderr.String(), "  Remove binding for repository "+repo+" (all worktrees) on github.com\n")
+		assert.Contains(t, stderr.String(), "  Remove binding for directory "+directory+" on github.com\n")
+		assert.Contains(t, stderr.String(), "  Remove binding for owner company on github.com\n")
+		assert.Contains(t, stderr.String(), "Repository files, commits, and worktrees will not be deleted.\n")
+		assert.NotContains(t, stderr.String(), filepath.Join(repo, ".git"))
+		return cmdutil.CancelError
+	}}
+	cmd := NewCmdIdentity(f)
+	cmd.SilenceErrors, cmd.SilenceUsage = true, true
+	cmd.SetArgs([]string{"delete", "work"})
+
+	// When reviewing deletion before deciding whether to confirm
+	err = cmd.Execute()
+
+	// Then the warning describes binding removal, not deletion of repositories or their metadata
+	require.ErrorIs(t, err, cmdutil.CancelError)
+	assert.Empty(t, stdout.String())
+}
+
+func TestDeleteIdentityCascadesOnlyItsOwnBindings(t *testing.T) {
+	// Given two identities bound to different owners
+	f := identityFactory(t)
+	t.Chdir(t.TempDir())
 	s, err := identities.Open()
 	require.NoError(t, err)
 	for _, name := range []string{"work", "personal"} {
-		require.NoError(t, exec.Command("git", "init", "-q", name).Run())
 		runIdentity(t, f, "create", name, "--account", "alice")
-		require.NoError(t, s.Bind(identities.Binding{Identity: name, Directory: name}, f.ExecutablePath))
+		require.NoError(t, s.Bind(identities.Binding{Identity: name, Owner: name}, f.ExecutablePath))
 	}
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdinTTY(true)
@@ -73,7 +111,7 @@ func TestDeleteIdentityCascadesOnlyItsOwnBindings(t *testing.T) {
 	f.IOStreams = ios
 	f.Prompter = &prompter.PrompterMock{ConfirmDeletionFunc: func(value string) error {
 		assert.Equal(t, "work", value)
-		assert.Contains(t, stderr.String(), "repository ")
+		assert.Contains(t, stderr.String(), "owner work")
 		assert.Contains(t, stderr.String(), "Saved accounts")
 		return nil
 	}}
@@ -97,13 +135,12 @@ func TestDeleteAllCleansManagedIntegrationAndPreservesUserSettings(t *testing.T)
 	// Given managed identities alongside unrelated configuration and files
 	f := identityFactory(t)
 	t.Chdir(t.TempDir())
-	require.NoError(t, exec.Command("git", "init", "-q").Run())
 	s, err := identities.Open()
 	require.NoError(t, err)
 	global := os.Getenv("GIT_CONFIG_GLOBAL")
 	require.NoError(t, os.WriteFile(global, []byte("[user]\nname = Original\n"), 0o600))
 	runIdentity(t, f, "create", "work", "--account", "alice")
-	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Directory: "."}, f.ExecutablePath))
+	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Owner: "company"}, f.ExecutablePath))
 	unrelated := filepath.Join(s.Dir, "notes.txt")
 	require.NoError(t, os.WriteFile(unrelated, []byte("keep me"), 0o600))
 	beforeUser, err := f.Config()
@@ -131,11 +168,10 @@ func TestCancelledIdentityDeletionKeepsBindings(t *testing.T) {
 	// Given a bound identity and a cancelled typed confirmation
 	f := identityFactory(t)
 	t.Chdir(t.TempDir())
-	require.NoError(t, exec.Command("git", "init", "-q").Run())
 	s, err := identities.Open()
 	require.NoError(t, err)
 	runIdentity(t, f, "create", "work", "--account", "alice")
-	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Directory: "."}, f.ExecutablePath))
+	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Owner: "company"}, f.ExecutablePath))
 	f.IOStreams.SetStdinTTY(true)
 	f.IOStreams.SetStdoutTTY(true)
 	f.Prompter = &prompter.PrompterMock{ConfirmDeletionFunc: func(value string) error {
@@ -161,11 +197,10 @@ func TestDeleteAllRollsBackWhenGitConfigurationIsLocked(t *testing.T) {
 	// Given a bound identity and a Git config locked by another writer
 	f := identityFactory(t)
 	t.Chdir(t.TempDir())
-	require.NoError(t, exec.Command("git", "init", "-q").Run())
 	s, err := identities.Open()
 	require.NoError(t, err)
 	runIdentity(t, f, "create", "work", "--account", "alice")
-	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Directory: "."}, f.ExecutablePath))
+	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Owner: "company"}, f.ExecutablePath))
 	require.NoError(t, os.WriteFile(os.Getenv("GIT_CONFIG_GLOBAL")+".lock", nil, 0o600))
 	cmd := NewCmdIdentity(f)
 	cmd.SilenceErrors, cmd.SilenceUsage = true, true
@@ -188,11 +223,10 @@ func TestDeleteAllPreservesUnexpectedSettingsInManagedFile(t *testing.T) {
 	// Given someone has added unrelated settings to the generated file
 	f := identityFactory(t)
 	t.Chdir(t.TempDir())
-	require.NoError(t, exec.Command("git", "init", "-q").Run())
 	s, err := identities.Open()
 	require.NoError(t, err)
 	runIdentity(t, f, "create", "work", "--account", "alice")
-	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Directory: "."}, f.ExecutablePath))
+	require.NoError(t, s.Bind(identities.Binding{Identity: "work", Owner: "company"}, f.ExecutablePath))
 	path := filepath.Join(filepath.Dir(s.Dir), "auth.gitconfig")
 	contents, err := os.ReadFile(path)
 	require.NoError(t, err)

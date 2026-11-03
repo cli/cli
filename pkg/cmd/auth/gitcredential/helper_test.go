@@ -12,7 +12,7 @@ import (
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) ResolveGitCredential(host, requestedUser string) (string, gh.Credential, gh.RefreshStatus, error) {
+func (c tinyConfig) ResolveGitCredential(host, requestedUser, _ string) (string, gh.Credential, gh.RefreshStatus, error) {
 	if strings.HasPrefix(host, "gist.") && c[host+":user"] == "" {
 		host = strings.TrimPrefix(host, "gist.")
 	}

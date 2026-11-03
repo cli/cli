@@ -3,12 +3,12 @@ package api
 import (
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
 
 	ghconfig "github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/identity"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -17,10 +17,8 @@ import (
 
 func TestRefreshAwareAuthenticationUsesBoundIdentity(t *testing.T) {
 	isolateIdentityAPI(t)
-	// Given a repository binding and an otherwise globally active account
+	// Given an owner binding and an otherwise globally active account
 	home := t.TempDir()
-	require.NoError(t, exec.Command("git", "init", "-q", home).Run())
-	t.Chdir(home)
 	t.Setenv("HOME", home)
 	t.Setenv("GH_CONFIG_DIR", filepath.Join(home, "gh"))
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
@@ -32,7 +30,7 @@ func TestRefreshAwareAuthenticationUsesBoundIdentity(t *testing.T) {
 	store, err := identity.Open()
 	require.NoError(t, err)
 	require.NoError(t, store.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
-	require.NoError(t, store.Bind(identity.Binding{Identity: "work", Directory: home}, "/path/to/gh"))
+	require.NoError(t, store.Bind(identity.Binding{Identity: "work", Owner: "company"}, "/path/to/gh"))
 	registry := &httpmock.Registry{}
 	defer registry.Verify(t)
 	registry.Register(httpmock.REST("GET", "repos/company/project"), func(req *http.Request) (*http.Response, error) {
@@ -58,6 +56,47 @@ hosts:
 	response.Body.Close()
 }
 
+func TestCloneRepositoryLookupUsesOwnerIdentity(t *testing.T) {
+	isolateIdentityAPI(t)
+	// Given an owner binding while the globally active credential belongs elsewhere
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("GH_CONFIG_DIR", filepath.Join(home, "gh"))
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
+	t.Setenv("GIT_SSH_COMMAND", "")
+	t.Setenv("GIT_SSH", "")
+	store, err := identity.Open()
+	require.NoError(t, err)
+	require.NoError(t, store.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+	require.NoError(t, store.Bind(identity.Binding{Identity: "work", Owner: "company"}, "/path/to/gh"))
+	registry := &httpmock.Registry{}
+	defer registry.Verify(t)
+	registry.Register(httpmock.GraphQL("query RepositoryInfo"), func(req *http.Request) (*http.Response, error) {
+		assert.Equal(t, "token github.com/alice-token", req.Header.Get("Authorization"))
+		return httpmock.StringResponse(`{"data":{"repository":{"name":"project","owner":{"login":"company"}}}}`)(req)
+	})
+	cfg := ghconfig.NewMockConfigFromString(`
+hosts:
+  github.com:
+    user: bob
+    oauth_token: globally-active-token
+    users:
+      alice:
+        oauth_token: github.com/alice-token
+`)
+	client := NewClientFromHTTP(&http.Client{Transport: AddAuthTokenHeaderWithResolver(registry, identity.TokenResolver(cfg.Authentication()))})
+
+	// When gh repo clone performs its actual GraphQL repository lookup
+	repo, err := GitHubRepo(client, ghrepo.New("company", "project"))
+
+	// Then the shared client preserves owner context and selects the bound account
+	require.NoError(t, err)
+	assert.Equal(t, "project", repo.RepoName())
+}
+
 func TestPersistentIdentityUsesCanonicalGatewayCredentials(t *testing.T) {
 	isolateIdentityAPI(t)
 	// Given an independently authenticated destination that is also configured as another host's API gateway
@@ -77,8 +116,6 @@ hosts:
         oauth_token: bob-token
 `)
 	home := t.TempDir()
-	require.NoError(t, exec.Command("git", "init", "-q", home).Run())
-	t.Chdir(home)
 	t.Chdir(home)
 	t.Setenv("HOME", home)
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
@@ -89,7 +126,7 @@ hosts:
 	store, err := identity.Open()
 	require.NoError(t, err)
 	require.NoError(t, store.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
-	require.NoError(t, store.Bind(identity.Binding{Identity: "work", Directory: home}, "/path/to/gh"))
+	require.NoError(t, store.Bind(identity.Binding{Identity: "work", Owner: "company"}, "/path/to/gh"))
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
 	reg.Register(httpmock.REST("GET", "repos/company/project"), func(req *http.Request) (*http.Response, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -311,13 +312,24 @@ func (c *AuthConfig) selectedAccount(host string) string {
 }
 
 // ResolveToken applies invocation selection before persistent repository identities and defaults.
-func (c *AuthConfig) ResolveToken(host, owner, dir string) (gh.Credential, error) {
+func (c *AuthConfig) ResolveToken(host string, request *http.Request) (gh.Credential, error) {
 	if c.selectedAccount(host) == "" {
 		store, err := identity.Open()
 		if err != nil {
 			return gh.Credential{}, err
 		}
-		selected, err := store.Resolve(host, owner, dir)
+		bindings, err := store.Bindings()
+		if err != nil {
+			return gh.Credential{}, err
+		}
+		owner := ""
+		if len(bindings) > 0 {
+			owner, err = identity.RequestOwner(request)
+			if err != nil {
+				return gh.Credential{}, err
+			}
+		}
+		selected, err := store.Resolve(host, owner, "")
 		if err != nil {
 			return gh.Credential{}, err
 		}
@@ -334,7 +346,7 @@ func (c *AuthConfig) ResolveToken(host, owner, dir string) (gh.Credential, error
 
 // ResolveGitCredential resolves the effective account for Git's actual destination.
 // The helper only formats the result; account precedence and username constraints live here.
-func (c *AuthConfig) ResolveGitCredential(host, requestedUser string) (string, gh.Credential, gh.RefreshStatus, error) {
+func (c *AuthConfig) ResolveGitCredential(host, requestedUser, repositoryPath string) (string, gh.Credential, gh.RefreshStatus, error) {
 	gistAccount := ""
 	if strings.HasPrefix(host, "gist.") {
 		gistAccount, _ = c.ConfiguredUser(host)
@@ -357,7 +369,8 @@ func (c *AuthConfig) ResolveGitCredential(host, requestedUser string) (string, g
 		if openErr != nil {
 			return "", gh.Credential{}, status, openErr
 		}
-		selected, err = store.Resolve(host, "", "")
+		owner, _, _ := strings.Cut(strings.TrimPrefix(repositoryPath, "/"), "/")
+		selected, err = store.Resolve(host, owner, "")
 		if err != nil {
 			return "", gh.Credential{}, status, err
 		}
