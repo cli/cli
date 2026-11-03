@@ -219,10 +219,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		Annotations: map[string]string{
 			"help:environment": heredoc.Docf(`
 				GH_TOKEN, GITHUB_TOKEN (in order of precedence): an authentication token for
-				%[1]sgithub.com%[1]s API requests.
+				API requests to %[1]sgithub.com%[1]s, a subdomain of %[1]sghe.com%[1]s, or %[1]sgithub.localhost%[1]s.
 
 				GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an
-				authentication token for API requests to GitHub Enterprise.
+				authentication token for API requests to GitHub Enterprise Server. %[1]sgh%[1]s treats
+				any host other than %[1]sgithub.com%[1]s, a subdomain of %[1]sghe.com%[1]s, or
+				%[1]sgithub.localhost%[1]s as a GitHub Enterprise Server host.
 
 				GH_HOST: make the request to a GitHub host other than %[1]sgithub.com%[1]s.
 			`, "`"),
