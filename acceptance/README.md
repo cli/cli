@@ -2,6 +2,17 @@
 
 The acceptance tests are blackbox* tests that are expected to interact with resources on a real GitHub instance.  They are built on top of the [`go-internal/testscript`](https://pkg.go.dev/github.com/rogpeppe/go-internal/testscript) package, which provides a framework for building tests for command line tools.
 
+The experimental `identity/identity-lifecycle.txtar` additionally requires the
+`ghdebug` build tag (`-tags=acceptance,ghdebug`). Its `require-keyring-isolation`
+step refuses a normal build and disables OS keyring access before login/logout.
+Its token is passed through a private temporary stdin file rather than process
+arguments. It still requires an explicitly authorized user-capable token; this
+does not change other acceptance scripts' credential or keyring behavior.
+The lifecycle includes directory inheritance into external worktrees, applying
+from one worktree to the main/existing/future family, attribution, unrelated
+nested repositories, and family-wide unset/delete. It creates no remote
+repositories or SSH keys.
+
 *Note: they aren't strictly blackbox because `exec gh` commands delegate to a binary set up by `testscript` that calls into `ghcmd.Main`. However, since our real `func main` is an extremely thin adapter over `ghcmd.Main`, this is reasonable. This tradeoff avoids us building the binary ourselves for the tests, and allows us to get code coverage metrics.
 
 ### Running the Acceptance Tests

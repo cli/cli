@@ -21,6 +21,7 @@ import (
 	"math/rand"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/debug"
 	"github.com/cli/cli/v2/internal/ghcmd"
 	"github.com/cli/go-gh/v2/pkg/jq"
 	"github.com/cli/go-internal/testscript"
@@ -930,6 +931,30 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 // sharedCmds defines a collection of custom testscript commands for our use.
 func sharedCmds(tsEnv testScriptEnv, fixtureRepositories *fixtureRepositoryManager) map[string]func(ts *testscript.TestScript, neg bool, args []string) {
 	return map[string]func(ts *testscript.TestScript, neg bool, args []string){
+		"require-keyring-isolation": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg || len(args) != 0 {
+				ts.Fatalf("usage: require-keyring-isolation")
+			}
+			if !debug.Enabled {
+				ts.Fatalf("this lifecycle requires -tags=acceptance,ghdebug to isolate OS keyring access")
+			}
+			ts.Setenv("GH_INTERNAL_DISABLE_KEYRING", "true")
+		},
+		"write-test-token": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg || len(args) != 0 {
+				ts.Fatalf("usage: write-test-token")
+			}
+			tokenPath := ts.MkAbs(".identity-login-token")
+			file, err := os.OpenFile(tokenPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+			ts.Check(err)
+			ts.Defer(func() {
+				if err := os.Remove(tokenPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+					ts.Check(err)
+				}
+			})
+			_, writeErr := file.WriteString(tsEnv.token)
+			ts.Check(errors.Join(writeErr, file.Close()))
+		},
 		"defer": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
 				ts.Fatalf("unsupported: ! defer")

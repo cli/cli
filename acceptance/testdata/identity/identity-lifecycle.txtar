@@ -1,0 +1,153 @@
+# requires-user-capability: true
+
+fixture-repo none
+[windows] skip 'The identity prototype is not Windows-qualified'
+
+# Refuse to start unless this test executable can disable OS keyring access.
+require-keyring-isolation
+# This exercises a real user credential stored only in this test's configuration.
+# Keep this lifecycle in one script to avoid concurrent login/logout for the same account.
+exec gh api user --jq .login
+stdout2env LOGIN
+env GH_TOKEN=''
+env GITHUB_TOKEN=''
+env GH_ENTERPRISE_TOKEN=''
+env GITHUB_ENTERPRISE_TOKEN=''
+env GH_REPO=''
+env GIT_CONFIG_NOSYSTEM=1
+env GIT_CONFIG_GLOBAL=$WORK/identity.gitconfig
+env GIT_SSH_COMMAND=''
+env GIT_SSH=''
+env GIT_SSH_VARIANT=''
+mkdir identity-config
+env GH_CONFIG_DIR=$WORK/identity-config
+write-test-token
+stdin .identity-login-token
+exec gh auth login --hostname $GH_HOST --with-token --insecure-storage --git-protocol https
+rm .identity-login-token
+defer gh auth identity delete --all --confirm
+
+# Creating an identity does not bind it. Public and noreply attribution are literal defaults.
+exec gh auth identity create work --hostname $GH_HOST --account $LOGIN --git-user-name 'Work User' --git-user-email work@example.invalid
+exec gh auth identity create personal --hostname $GH_HOST --account $LOGIN
+exec gh auth use --list
+stdout '^\[\]$'
+mkdir tree
+cd tree
+exec gh auth use work
+exec gh auth use --view --hostname $GH_HOST
+stdout '"name": "work"'
+! exec gh auth use --view --explain --hostname $GH_HOST
+stderr '--view cannot be combined'
+exec gh auth use --explain --hostname $GH_HOST --json selection,attribution --jq '[.selection.identity.name,.attribution.status] | join(":")'
+stdout '^work:declared$'
+exec gh api user --hostname $GH_HOST --jq .login
+stdout $LOGIN
+
+# A new repository inherits the identity. Local overrides are visible in the explanation.
+exec git init -q project
+cd project
+exec git config user.email
+stdout '^work@example.invalid$'
+exec git config --local user.email local@example.invalid
+exec gh auth use --explain --hostname $GH_HOST --json attribution --jq '.attribution.email.value'
+stdout '^local@example.invalid$'
+exec git config --local --unset user.email
+exec gh auth identity edit work --git-user-email edited@example.invalid
+exec git config user.email
+stdout '^edited@example.invalid$'
+exec gh auth use personal
+exec gh auth use --unset --hostname $GH_HOST
+exec gh auth use --view --hostname $GH_HOST
+stdout '"name": "work"'
+
+# A directory choice follows the main repository into worktrees outside the directory tree.
+exec git -c commit.gpgsign=false commit --allow-empty -m 'Identity family fixture'
+exec git worktree add --detach $WORK/external-worktree
+cd $WORK/external-worktree
+exec gh auth use --view --hostname $GH_HOST
+stdout '"name": "work"'
+exec git config user.email
+stdout '^edited@example.invalid$'
+exec gh api user --hostname $GH_HOST --jq .login
+stdout $LOGIN
+
+# Applying from any worktree creates one repository choice shared with current and future worktrees.
+exec gh auth identity edit personal --git-user-name 'Family User' --git-user-email family@example.invalid
+exec gh auth use personal
+exec gh auth use --explain --hostname $GH_HOST --json selection --jq '.selection.selected.repository | endswith("/.git")'
+stdout '^true$'
+exec git -C $WORK/tree/project config user.email
+stdout '^family@example.invalid$'
+exec git worktree add --detach $WORK/future-worktree
+exec git -C $WORK/future-worktree config user.email
+stdout '^family@example.invalid$'
+exec gh auth use --view --hostname $GH_HOST --directory $WORK/future-worktree
+stdout '"name": "personal"'
+exec git -C $WORK/future-worktree -c commit.gpgsign=false commit --allow-empty -m 'Future worktree identity'
+exec git -C $WORK/future-worktree log -1 --format=%ae
+stdout '^family@example.invalid$'
+
+# Repository scope does not include unrelated nested repositories, and unset from a sibling reveals the tree.
+exec git init -q $WORK/tree/project/nested
+exec gh auth use --view --hostname $GH_HOST --directory $WORK/tree/project/nested
+stdout '"name": "work"'
+cd $WORK/future-worktree
+exec gh auth use --unset --hostname $GH_HOST
+exec git -C $WORK/tree/project config user.email
+stdout '^edited@example.invalid$'
+exec gh auth use --list
+stdout2env CHOICES
+jq-assert CHOICES '[.[] | select(.repository != null)] | length' '^0$'
+exec gh auth use personal
+exec gh auth identity delete personal --confirm
+exec gh auth use --view --hostname $GH_HOST --directory $WORK/external-worktree
+stdout '"name": "work"'
+exec gh auth identity create personal --hostname $GH_HOST --account $LOGIN
+cd $WORK/tree/project
+
+# Logout keeps choices, but explains how to recover. SSH keys are not revoked by logout.
+exec gh auth logout --hostname $GH_HOST --user $LOGIN
+stderr 'Identity "work" still references this account'
+stderr 'SSH keys and Git attribution are unchanged'
+exec gh auth use --view --hostname $GH_HOST
+stdout '"name": "work"'
+stderr 'is not signed in'
+exec gh auth use --explain --hostname $GH_HOST --json authentication,warnings --jq '.authentication.api.status'
+stdout '^blocked$'
+exec git config user.email
+stdout '^edited@example.invalid$'
+
+# Signing back in repairs the retained identity without reapplying it.
+write-test-token
+stdin .identity-login-token
+exec gh auth login --hostname $GH_HOST --with-token --insecure-storage --git-protocol https
+rm .identity-login-token
+exec gh api user --hostname $GH_HOST --jq .login
+stdout $LOGIN
+exec gh auth use --explain --hostname $GH_HOST --json warnings --jq '.warnings | length'
+stdout '^0$'
+
+# Non-interactive deletion requires --confirm. Named deletion cascades only its own choices.
+! exec gh auth identity delete work --all --confirm
+stderr 'specify an identity name or --all, but not both'
+! exec gh auth identity delete work
+stderr '--confirm required when not running interactively'
+exec gh auth identity delete work --confirm
+exec gh auth use --view --hostname $GH_HOST
+stdout '^null$'
+exec gh auth identity view personal
+stdout '"name": "personal"'
+exec gh auth use personal
+! exec gh auth identity delete --all
+stderr '--confirm required when not running interactively'
+exec gh auth identity delete --all --confirm
+exec gh auth identity list
+stdout '^\[\]$'
+exec gh auth use --list
+stdout '^\[\]$'
+! exec git config --get core.sshCommand
+! exec git config --global --get-all include.path
+exec gh api user --hostname $GH_HOST --jq .login
+stdout $LOGIN
+exec gh auth identity delete --all --confirm

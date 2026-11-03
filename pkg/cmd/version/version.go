@@ -26,7 +26,11 @@ func NewCmdVersion(f *cmdutil.Factory, version, buildDate string) *cobra.Command
 }
 
 func Format(version, buildDate string) string {
-	return format(version, buildDate, debug.Enabled)
+	output := format(version, buildDate, debug.Enabled)
+	if disabled, _ := debug.Config().DisableKeyring.Value(); disabled {
+		output += "OS keyring: disabled (isolated debug workflow)\n"
+	}
+	return output
 }
 
 func format(version, buildDate string, debugBuild bool) string {

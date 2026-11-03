@@ -25,12 +25,23 @@ type DebugConfig struct {
 	// VerboseTokenRefresh overrides full refresh traffic logging using GH_INTERNAL_DEBUG_REFRESH_TOKEN.
 	// The environment value must be accepted by strconv.ParseBool; None means no override.
 	VerboseTokenRefresh o.Option[bool]
+
+	// DisableKeyring prevents all OS keyring access in explicitly isolated debug workflows.
+	DisableKeyring o.Option[bool]
 }
 
 // configFromEnv builds a DebugConfig from the environment, panicking on invalid values. It is not build-gated so
 // its parsing is tested in regular builds; only debug builds call it from Config.
 func configFromEnv() DebugConfig {
 	verboseTokenRefresh := o.None[bool]()
+	disableKeyring := o.None[bool]()
+	if raw, ok := os.LookupEnv("GH_INTERNAL_DISABLE_KEYRING"); ok {
+		value, err := strconv.ParseBool(raw)
+		if err != nil {
+			panic(fmt.Errorf("GH_INTERNAL_DISABLE_KEYRING: %w", err))
+		}
+		disableKeyring = o.Some(value)
+	}
 	if raw, ok := os.LookupEnv("GH_INTERNAL_DEBUG_REFRESH_TOKEN"); ok {
 		verbose, err := strconv.ParseBool(raw)
 		if err != nil {
@@ -42,6 +53,7 @@ func configFromEnv() DebugConfig {
 		AccessTokenExpiresIn:  lifetimeFromEnv("GH_INTERNAL_AT_EXPIRES_IN"),
 		RefreshTokenExpiresIn: lifetimeFromEnv("GH_INTERNAL_RT_EXPIRES_IN"),
 		VerboseTokenRefresh:   verboseTokenRefresh,
+		DisableKeyring:        disableKeyring,
 	}
 }
 

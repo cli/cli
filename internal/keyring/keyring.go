@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/cli/cli/v2/internal/debug"
 	"github.com/zalando/go-keyring"
 )
 
@@ -20,6 +21,9 @@ func (e *TimeoutError) Error() string {
 
 // Set secret in keyring for user.
 func Set(service, user, secret string) error {
+	if disabled, _ := debug.Config().DisableKeyring.Value(); disabled {
+		return errors.New("OS keyring access is disabled for this isolated debug workflow; use insecure storage")
+	}
 	ch := make(chan error, 1)
 	go func() {
 		defer close(ch)
@@ -35,6 +39,9 @@ func Set(service, user, secret string) error {
 
 // Get secret from keyring given service and user name.
 func Get(service, user string) (string, error) {
+	if disabled, _ := debug.Config().DisableKeyring.Value(); disabled {
+		return "", ErrNotFound
+	}
 	ch := make(chan struct {
 		val string
 		err error
@@ -60,6 +67,9 @@ func Get(service, user string) (string, error) {
 
 // Delete secret from keyring.
 func Delete(service, user string) error {
+	if disabled, _ := debug.Config().DisableKeyring.Value(); disabled {
+		return ErrNotFound
+	}
 	ch := make(chan error, 1)
 	go func() {
 		defer close(ch)
