@@ -94,3 +94,28 @@ func TestPersistentIdentityRefusesRepositoryUsingSubmodulesAtSetup(t *testing.T)
 	require.NoError(t, err)
 	assert.Empty(t, bindings)
 }
+
+func TestUnsetDeletedDirectoryPreservesOtherChoices(t *testing.T) {
+	// Given two choices using one identity, one of whose directories has been removed
+	s := isolatedStore(t)
+	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+	parent := t.TempDir()
+	removed := filepath.Join(parent, "removed")
+	require.NoError(t, os.Mkdir(removed, 0o700))
+	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: removed}, "/path/to/gh"))
+	other := t.TempDir()
+	require.NoError(t, s.Bind(Binding{Identity: "work", Directory: other}, "/path/to/gh"))
+	require.NoError(t, os.Remove(removed))
+
+	// When removing the stale choice by its original path
+	err := s.Unbind(Binding{Host: "github.com", Directory: removed}, "/path/to/gh")
+
+	// Then it can be removed without deleting the reusable identity or the other choice
+	require.NoError(t, err)
+	bindings, err := s.Bindings()
+	require.NoError(t, err)
+	require.Len(t, bindings, 1)
+	canonical, err := canonicalDirectory(other)
+	require.NoError(t, err)
+	assert.Equal(t, canonical, bindings[0].Directory)
+}

@@ -2,6 +2,7 @@ package use
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -110,4 +111,51 @@ func TestUseViewRejectsOtherActions(t *testing.T) {
 			require.ErrorContains(t, err, "--view cannot be combined")
 		})
 	}
+}
+
+func TestUseOutsideRepositoryAppliesToFutureDescendants(t *testing.T) {
+	// Given an identity and a directory that is not a repository
+	store, f := useFixture(t)
+	require.NoError(t, store.Save(identity.Identity{
+		Name: "work", Host: "github.com", Account: "alice",
+	}, false))
+	work := t.TempDir()
+	t.Chdir(work)
+
+	// When auth use is invoked without a scope flag, before a child repository exists
+	cmd := NewCmdUse(f, nil)
+	cmd.SetArgs([]string{"work"})
+	require.NoError(t, cmd.Execute())
+	child := filepath.Join(work, "new-repository")
+	require.NoError(t, os.Mkdir(child, 0o700))
+	out, err := exec.Command("git", "-C", child, "init", "-q").CombinedOutput()
+	require.NoError(t, err, "%s", out)
+
+	// Then gh and independently invoked Git inherit the identity in the new repository
+	selected, err := store.Resolve("github.com", "", child)
+	require.NoError(t, err)
+	require.NotNil(t, selected)
+	assert.Equal(t, "work", selected.Name)
+	out, err = exec.Command("git", "-C", child, "config", "gh-identity.github.com.name").CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	assert.Equal(t, "work\n", string(out))
+}
+
+func TestUnsetRemovesDirectoryChoice(t *testing.T) {
+	// Given an identity applied at a repository root
+	store, f := useFixture(t)
+	require.NoError(t, store.Save(identity.Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
+	repo := t.TempDir()
+	out, err := exec.Command("git", "-C", repo, "init", "-q").CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	t.Chdir(repo)
+	runUse(t, f, "work")
+
+	// When removing the choice through the current public command
+	runUse(t, f, "--unset")
+
+	// Then the directory choice no longer selects an identity
+	selected, err := store.Resolve("github.com", "", repo)
+	require.NoError(t, err)
+	assert.Nil(t, selected)
 }

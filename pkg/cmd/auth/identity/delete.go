@@ -44,9 +44,9 @@ func NewCmdResetExperiment(f *cmdutil.Factory) *cobra.Command {
 func newCleanupCommand(f *cmdutil.Factory, reset bool) *cobra.Command {
 	all, confirm := reset, false
 	cmd := &cobra.Command{
-		Use: "delete [<name>]", Short: "Delete identities and their repository choices",
+		Use: "delete [<name>]", Short: "Delete identities and their repository and directory choices",
 		Long: heredoc.Doc(`
-			Delete an identity and every repository choice that uses it.
+			Delete an identity and every repository or directory choice that uses it.
 			Deleting a repository choice affects its main checkout and all linked worktrees.
 			Use --all to delete all identities and bindings across all hosts in this gh configuration.
 
@@ -109,7 +109,10 @@ func newCleanupCommand(f *cmdutil.Factory, reset bool) *cobra.Command {
 			}
 			for _, b := range bindings {
 				if all || slices.Contains(names, b.Identity) {
-					scope := "repository " + filepath.Dir(b.Repository) + " (all worktrees)"
+					scope := "directory " + b.Directory
+					if b.Repository != "" {
+						scope = "repository " + filepath.Dir(b.Repository) + " (all worktrees)"
+					}
 
 					fmt.Fprintf(f.IOStreams.ErrOut, "  Remove binding for %s on %s\n", scope, b.Host)
 				}

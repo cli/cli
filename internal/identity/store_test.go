@@ -40,20 +40,6 @@ func runGit(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
-func TestIdentityBindingRequiresRepository(t *testing.T) {
-	// Given an identity and an ordinary directory outside any repository
-	s := isolatedStore(t)
-	dir := t.TempDir()
-	require.NoError(t, s.Save(Identity{Name: "work", Host: "github.com", Account: "alice"}, false))
-
-	// When attempting to apply a repository choice outside a checkout
-	err := s.Bind(Binding{Identity: "work", Directory: dir}, "/path/to/gh")
-
-	// Then no broader directory choice or global integration is silently installed
-	require.ErrorContains(t, err, "require a repository checkout")
-	assert.NoFileExists(t, s.authConfigPath())
-}
-
 func TestBasicSSHRefusesCustomConnectionCommand(t *testing.T) {
 	// Given a global SSH command that basic alias routing cannot safely preserve
 	s := isolatedStore(t)
@@ -147,4 +133,88 @@ func TestDirectoryChoiceFromSubdirectoryStartsAtRepositoryRoot(t *testing.T) {
 	require.NotNil(t, selected)
 	assert.Equal(t, "work", selected.Name)
 	assert.Equal(t, "alice\n", runGit(t, repo, "config", "credential.https://github.com.username"))
+}
+
+func TestDeeperDirectoryOverridesTreeAndUnbindingRevealsIt(t *testing.T) {
+	// Given overlapping owner, broad directory, and deeper directory choices
+	s := isolatedStore(t)
+	parent := t.TempDir()
+	repo := filepath.Join(parent, "repo")
+	require.NoError(t, os.Mkdir(repo, 0o700))
+	runGit(t, repo, "init", "-q")
+	runGit(t, repo, "remote", "add", "origin", "git@github.com:company/project.git")
+	for _, id := range []Identity{
+		{Name: "owner", Host: "github.com", Account: "owner", SSHHost: "github-owner"},
+		{Name: "tree", Host: "github.com", Account: "tree", SSHHost: "github-tree"},
+		{Name: "repo", Host: "github.com", Account: "repo", SSHHost: "github-repo"},
+	} {
+		require.NoError(t, s.Save(id, false))
+	}
+	require.NoError(t, s.Bind(Binding{Identity: "tree", Directory: parent}, "/path/to/gh"))
+	require.NoError(t, s.Bind(Binding{Identity: "repo", Directory: repo}, "/path/to/gh"))
+	selected, err := s.Resolve("github.com", "company", repo)
+	require.NoError(t, err)
+	require.NotNil(t, selected)
+	assert.Equal(t, "repo", selected.Name)
+	assert.Equal(t, "repo\n", runGit(t, repo, "config", "gh-identity.github.com.name"))
+
+	// When removing only the deeper directory choice
+	require.NoError(t, s.Unbind(Binding{Host: "github.com", Directory: repo}, "/path/to/gh"))
+	selected, err = s.Resolve("github.com", "company", repo)
+
+	// Then both Git and gh reveal the tree identity, ahead of the owner identity
+	require.NoError(t, err)
+	require.NotNil(t, selected)
+	assert.Equal(t, "tree", selected.Name)
+	assert.Equal(t, "tree\n", runGit(t, repo, "config", "gh-identity.github.com.name"))
+}
+
+func TestExplicitGitDirectoryUsesSelectedRepository(t *testing.T) {
+	// Given an explicit Git directory with a tree binding different from the owner's default
+	s := isolatedStore(t)
+	parent := t.TempDir()
+	destination := filepath.Join(parent, "destination")
+	require.NoError(t, os.Mkdir(destination, 0o700))
+	runGit(t, destination, "init", "-q")
+	require.NoError(t, s.Save(Identity{Name: "owner", Host: "github.com", Account: "owner"}, false))
+	require.NoError(t, s.Save(Identity{Name: "tree", Host: "github.com", Account: "tree"}, false))
+	require.NoError(t, s.Bind(Binding{Identity: "tree", Directory: parent}, "/path/to/gh"))
+	t.Setenv("GIT_DIR", filepath.Join(destination, ".git"))
+
+	// When Git invokes its transport from elsewhere with the destination's GIT_DIR
+	got, err := s.Resolve("github.com", "company", t.TempDir())
+
+	// Then transport authentication follows the destination's tree
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "tree", got.Name)
+}
+
+func TestNestedDirectoryBindingOverridesAndRevealsParent(t *testing.T) {
+	// Given two directory choices above a repository
+	s := isolatedStore(t)
+	parent := t.TempDir()
+	nested := filepath.Join(parent, "team")
+	repo := filepath.Join(nested, "project")
+	require.NoError(t, os.MkdirAll(repo, 0o700))
+	runGit(t, repo, "init", "-q")
+	require.NoError(t, s.Save(Identity{Name: "parent", Host: "github.com", Account: "alice"}, false))
+	require.NoError(t, s.Save(Identity{Name: "nested", Host: "github.com", Account: "bob"}, false))
+	require.NoError(t, s.Bind(Binding{Identity: "parent", Directory: parent}, "/path/to/gh"))
+	require.NoError(t, s.Bind(Binding{Identity: "nested", Directory: nested}, "/path/to/gh"))
+
+	// When resolving the repository before and after removing only the deeper directory choice
+	selected, err := s.Resolve("github.com", "", repo)
+	require.NoError(t, err)
+	require.NotNil(t, selected)
+	assert.Equal(t, "nested", selected.Name)
+	assert.Equal(t, "nested\n", runGit(t, repo, "config", "gh-identity.github.com.name"))
+	require.NoError(t, s.Unbind(Binding{Host: "github.com", Directory: nested}, "/path/to/gh"))
+	selected, err = s.Resolve("github.com", "", repo)
+
+	// Then both gh and independent Git reveal the parent directory's identity
+	require.NoError(t, err)
+	require.NotNil(t, selected)
+	assert.Equal(t, "parent", selected.Name)
+	assert.Equal(t, "parent\n", runGit(t, repo, "config", "gh-identity.github.com.name"))
 }

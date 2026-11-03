@@ -3,7 +3,6 @@ package login
 import (
 	"bytes"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -31,8 +30,6 @@ hosts:
         oauth_token: bob-token
 `+extraHost)
 	home := t.TempDir()
-	require.NoError(t, exec.Command("git", "init", "-q", home).Run())
-	t.Chdir(home)
 	t.Chdir(home)
 	t.Setenv("HOME", home)
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
@@ -50,7 +47,7 @@ hosts:
 }
 
 func TestGistWithProductionConfigUsesPersistentIdentity(t *testing.T) {
-	// Given real config normalization, Bob's active host token, and Alice's repository identity
+	// Given real config normalization, Bob's active host token, and Alice's directory identity
 	_, f, output := productionGistFixture(t, "")
 	cmd := NewCmdCredential(f, nil)
 	cmd.SetArgs([]string{"get"})
@@ -65,7 +62,7 @@ func TestGistWithProductionConfigUsesPersistentIdentity(t *testing.T) {
 }
 
 func TestGistWithProductionConfigHonorsExplicitAccount(t *testing.T) {
-	// Given Alice's repository identity and an explicit Bob override on the parent host
+	// Given Alice's directory identity and an explicit Bob override on the parent host
 	_, f, output := productionGistFixture(t, "")
 	t.Setenv("GH_IDENTITY_HOST", "github.com")
 	t.Setenv("GH_IDENTITY_ACCOUNT", "bob")
