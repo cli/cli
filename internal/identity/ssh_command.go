@@ -12,28 +12,60 @@ import (
 
 // SSHCommand resolves the user's connection command underneath gh's managed
 // dispatcher. Override reads the original environment captured by --account.
-// Only the default OpenSSH command is supported; custom connection commands are refused.
+// It supports literal OpenSSH arguments, not arbitrary shell programs.
 func (s *Store) SSHCommand(dir string, override bool) ([]string, error) {
 	commandEnv, variantEnv := "GIT_SSH_COMMAND", "GIT_SSH_VARIANT"
 	if override {
 		commandEnv, variantEnv = "GH_IDENTITY_SSH_COMMAND", "GH_IDENTITY_SSH_VARIANT"
 	}
-	if os.Getenv(commandEnv) != "" || os.Getenv("GIT_SSH") != "" {
-		return nil, errors.New("custom SSH commands are not supported for identity routing; your SSH configuration has not been changed")
-	}
-	if variant := os.Getenv(variantEnv); variant != "" && variant != "ssh" {
-		return nil, errors.New("custom SSH variants are not supported for identity routing")
-	}
-	for _, key := range []string{"core.sshCommand", "ssh.variant"} {
-		value, err := s.underlyingGitValue(dir, key)
+	variant := os.Getenv(variantEnv)
+	if variant == "" {
+		var err error
+		variant, err = s.underlyingGitValue(dir, "ssh.variant")
 		if err != nil {
 			return nil, err
 		}
-		if value != "" {
-			return nil, fmt.Errorf("custom %s is not supported for identity routing; your SSH configuration has not been changed", key)
+	}
+	if variant != "" && variant != "auto" && variant != "ssh" {
+		return nil, fmt.Errorf("identity SSH routing does not support SSH variant %q; your existing SSH configuration has not been changed", variant)
+	}
+	value := os.Getenv(commandEnv)
+	if value == "" {
+		var err error
+		value, err = s.underlyingGitValue(dir, "core.sshCommand")
+		if err != nil {
+			return nil, err
 		}
 	}
-	return []string{"ssh"}, nil
+	var command []string
+	if value == "" {
+		if executable := os.Getenv("GIT_SSH"); executable != "" {
+			command = []string{executable}
+		} else {
+			command = []string{"ssh"}
+		}
+	}
+	if command == nil {
+		if strings.ContainsAny(value, "\r\n$`;&|<>") {
+			return nil, errors.New("identity routing cannot safely preserve SSH shell expressions; your existing SSH configuration has not been changed")
+		}
+		var err error
+		command, err = shellquote.Split(value)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse SSH command: %w", err)
+		}
+	}
+	if isSSHDispatcher(command) {
+		return nil, errors.New("SSH command would recursively invoke gh auth git-ssh; configure the underlying connection command instead")
+	}
+	if len(command) == 0 {
+		return nil, errors.New("SSH connection command is empty")
+	}
+	name := strings.TrimSuffix(strings.ToLower(filepath.Base(command[0])), ".exe")
+	if name != "ssh" && variant != "ssh" {
+		return nil, errors.New("the configured SSH command has unknown argument conventions; set ssh.variant=ssh only if it accepts OpenSSH arguments and honors the supplied destination")
+	}
+	return command, nil
 }
 
 func isSSHDispatcher(command []string) bool {
