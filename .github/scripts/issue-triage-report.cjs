@@ -127,7 +127,7 @@ function parseReport(output, context, sanitize) {
       if (item.outcome !== "blocked") {
         requireValue(documents.reproduction_log, "Include the reproduction log");
         requireValue(blocks.length === 1 && /^\$ gh \S/.test(blocks[0][0] ?? ""), "Show the actual gh command");
-        requireValue(blocks[0].length > 1 || /\b(?:no output|printed nothing|output:\*\* none)/i.test(comment), "Show captured output, or explicitly say the command printed nothing");
+        requireValue(blocks[0].length > 1 || /\b(?:no output|printed nothing|output:(?:\*\*)?\s*none)/i.test(comment), "Show captured output, or explicitly say the command printed nothing");
         requireValue(/\*\*Exit status:\*\* (?:`-?\d+`|not available)/.test(comment), "State the recorded exit status separately");
       }
     }
@@ -181,6 +181,8 @@ async function knownArtifacts(api, context) {
   const known = {};
   const latest = {};
   let alreadyPublished = false;
+  let publication;
+  let latestRun = 0n;
   const prefix = `<!-- gh-aw-triage:${context.workflow}:${context.issue}:comment-`;
   for (const comment of await pages(api, `repos/${context.repo}/issues/${context.issue}/comments`)) {
     if (comment.user?.login !== context.bot || !comment.body?.includes(prefix)) continue;
@@ -188,7 +190,13 @@ async function knownArtifacts(api, context) {
     const run = /:comment-([1-9]\d*):/.exec(signed?.[2] ?? "")?.[1];
     requireValue(signed && run && signed[2] === marker(context, `comment-${run}`, signed[1]),
       "A previous triage comment was edited; refusing to replace its report references");
-    if (run === context.runId) alreadyPublished = true;
+    if (BigInt(run) > latestRun) latestRun = BigInt(run);
+    if (run === context.runId) {
+      requireValue(!publication, "More than one comment exists for this run");
+      alreadyPublished = true;
+      const state = /\n\n<!-- gh-aw-triage-publication:(\{[^\n]+\}) -->\n\n<!-- gh-aw-triage-reports:\{[^\n]+\} -->$/.exec(signed[1]);
+      publication = { comment, state: state ? JSON.parse(state[1]) : null };
+    }
     const registry = /\n\n<!-- gh-aw-triage-reports:(\{[^\n]+\}) -->$/.exec(signed[1]);
     if (!registry) continue;
     requireValue(Number.isSafeInteger(comment.id) && comment.id > 0, "Invalid saved comment identity");
@@ -201,7 +209,7 @@ async function knownArtifacts(api, context) {
       }
     }
   }
-  return { known, alreadyPublished };
+  return { known, alreadyPublished, publication, latestRun };
 }
 
 async function readArtifact(operation, onNotFound) {
@@ -271,17 +279,22 @@ function renderComment(report, links, failed) {
   return `${body}\n\n${report.footer}`;
 }
 
-async function saveComment(api, context, body) {
+async function saveComment(api, context, body, previous) {
   const endpoint = `repos/${context.repo}/issues/${context.issue}/comments`;
   const identity = `<!-- gh-aw-triage:${context.workflow}:${context.issue}:comment-${context.runId}:`;
   const matches = (await pages(api, endpoint)).filter(comment => comment.user?.login === context.bot && comment.body?.includes(identity));
   requireValue(matches.length <= 1, "More than one comment exists for this run");
   if (matches.length) {
-    requireValue(matches[0].body === body, "A different comment already exists for this run; refusing to overwrite it");
-    return commentURL(context, matches[0]);
+    if (matches[0].body === body) return commentURL(context, matches[0]);
+    requireValue(previous && matches[0].id === previous.id && matches[0].body === previous.body,
+      "A different comment already exists for this run; refusing to overwrite it");
+  } else {
+    requireValue(!previous, "The previous triage comment was removed; refusing to replace it");
   }
+  const method = matches.length ? "PATCH" : "POST";
+  const target = matches.length ? `${endpoint}/${matches[0].id}` : endpoint;
   try {
-    return commentURL(context, await api("POST", endpoint, { body }));
+    return commentURL(context, await api(method, target, { body }));
   } catch (error) {
     const found = (await pages(api, endpoint)).filter(comment => comment.user?.login === context.bot && comment.body === body);
     if (found.length === 1) return commentURL(context, found[0]);
@@ -331,7 +344,25 @@ async function publishReport(report, context, api, writeFile) {
   requireValue(!issue.pull_request, "Triage reports target issues, not pull requests");
   requireValue(issue.state === "open" && !issue.locked, "The issue is closed or locked; refusing publication");
   await checkPublicReferences(api, context, report);
-  const { known, alreadyPublished } = await knownArtifacts(api, context);
+  const { known, alreadyPublished, publication, latestRun } = await knownArtifacts(api, context);
+  requireValue(BigInt(context.runId) >= latestRun, "A newer run already published triage; refusing stale report updates");
+  const inputHash = digest(JSON.stringify({ comment: report.comment, documents }));
+  if (publication) {
+    requireValue(typeof publication.state?.complete === "boolean" &&
+      /^[a-f0-9]{64}$/.test(publication.state?.input ?? ""),
+    "This run has no publication state; start a new run instead of changing its reports");
+    if (publication.state.complete) {
+      result.artifacts = Object.fromEntries(Object.entries(known).map(([key, number]) =>
+        [key, `https://github.com/${context.repo}/issues/${context.issue}/artifacts/${number}`]));
+      result.comment = commentURL(context, publication.comment);
+      result.skipped = "This run already completed publication; reports were left unchanged.";
+      writeFile("comment.md", publication.comment.body);
+      writeFile("result.json", JSON.stringify(result, null, 2));
+      return result;
+    }
+    requireValue(publication.state.input === inputHash,
+      "The retry differs from the partial publication; start a new run instead");
+  }
   for (const [key, body] of Object.entries(documents)) {
     let warned = false;
     const onNotFound = () => {
@@ -347,13 +378,14 @@ async function publishReport(report, context, api, writeFile) {
       result.failures.push({ report: key, message: error.message });
     }
   }
+  const state = `<!-- gh-aw-triage-publication:${JSON.stringify({ input: inputHash, complete: result.failures.length === 0 })} -->`;
   const registry = `<!-- gh-aw-triage-reports:${JSON.stringify(known)} -->`;
   const body = mark(context, `comment-${context.runId}`,
-    `${renderComment(report, result.artifacts, result.failures.map(failure => failure.report))}\n\n${registry}`);
+    `${renderComment(report, result.artifacts, result.failures.map(failure => failure.report))}\n\n${state}\n\n${registry}`);
   requireValue(body.length <= 60000, "Comment and fallback reports exceed the publication limit");
   writeFile("comment.md", body);
   try {
-    result.comment = await saveComment(api, context, body);
+    result.comment = await saveComment(api, context, body, publication?.comment);
   } finally {
     writeFile("result.json", JSON.stringify(result, null, 2));
   }
@@ -399,8 +431,9 @@ async function run({ env, sanitize, core }) {
   fs.mkdirSync(directory, { recursive: false, mode: 0o700 });
   const writeFile = (name, data) => fs.writeFileSync(path.join(directory, name), data + "\n", { flag: "wx", mode: 0o600 });
   const result = await publishReport(report, context, ghClient(), writeFile);
-  core.setOutput("status", result.staged ? "skipped" : result.failures.length ? "failure" : "success");
+  core.setOutput("status", result.staged || result.skipped ? "skipped" : result.failures.length ? "failure" : "success");
   if (!result.staged && result.comment) core.setOutput("url", result.comment);
+  if (result.skipped) core.notice(result.skipped);
   for (const warning of result.warnings ?? []) core.warning(`${reports[warning.report]}: ${warning.message}`);
   for (const failure of result.failures) core.error(`${reports[failure.report]}: ${failure.message}`);
   if (result.failures.length) core.setFailed("Some report artifacts could not be published; their contents remain in the review files and comment fallback.");

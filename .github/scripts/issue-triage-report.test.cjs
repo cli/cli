@@ -89,6 +89,10 @@ test("parseReport", async t => {
       change: data => decision(data).comment = comment.replace("test\ttest\tsimulated failure\n", "").replace("**Exit status:**", "**Output:** none.\n\n**Exit status:**"),
     },
     {
+      name: "plain no-output wording matches the workflow instructions",
+      change: data => decision(data).comment = comment.replace("test\ttest\tsimulated failure\n", "").replace("**Exit status:**", "Output: none.\n\n**Exit status:**"),
+    },
+    {
       name: "stopped process has no exit status",
       change: data => {
         decision(data).outcome = "partial";
@@ -160,6 +164,7 @@ function fakeAPI(options = {}) {
   const artifacts = structuredClone(options.artifacts ?? []);
   const comments = structuredClone(options.comments ?? []);
   let detailReads = 0;
+  let commentReads = 0;
   const api = async (method, endpoint, data) => {
     calls.push({ method, endpoint, data });
     const failure = options.fail?.(method, endpoint, data, calls);
@@ -183,11 +188,15 @@ function fakeAPI(options = {}) {
       if (options.lostArtifactResponse) throw new Error("Response lost after write");
       return structuredClone(artifact);
     }
-    if (method === "GET" && endpoint.includes("/comments?")) return structuredClone(comments);
-    if (method === "POST" && endpoint.endsWith("/comments")) {
-      const id = Math.max(0, ...comments.map(comment => comment.id)) + 1;
+    if (method === "GET" && endpoint.includes("/comments?")) {
+      if (options.concurrentComment && ++commentReads === 2) comments[0].body += "\nHuman revision.";
+      return structuredClone(comments);
+    }
+    if ((method === "POST" && endpoint.endsWith("/comments")) || (method === "PATCH" && /\/comments\/\d+$/.test(endpoint))) {
+      const id = method === "POST" ? Math.max(0, ...comments.map(comment => comment.id)) + 1 : Number(endpoint.split("/").at(-1));
       const comment = { ...data, id, user: { login: context.bot }, html_url: `https://github.com/octo/hello/issues/12#issuecomment-${id}` };
-      comments.push(comment);
+      if (method === "POST") comments.push(comment);
+      else comments.splice(comments.findIndex(comment => comment.id === id), 1, comment);
       if (options.lostCommentResponse) throw new Error("Response lost after write");
       return comment;
     }
@@ -345,18 +354,43 @@ test("publishReport", async t => {
       options: { fail: (method, endpoint) => method === "GET" && endpoint.includes("/artifacts?") && httpError(404) },
       check: async ({ fake }) => {
         const writes = fake.calls.filter(call => call.method !== "GET").length;
-        const files = {};
         const report = parseReport(input(), context, identity);
-        await assert.rejects(publishReport(report, context, fake.api, (name, body) => files[name] = body),
-          /different comment already exists/);
+        const reads = fake.calls.filter(call => call.method === "GET" && call.endpoint.includes("/artifacts")).length;
+        const repeated = await publishReport(report, context, fake.api, () => {});
+        assert.match(repeated.skipped, /already completed/);
         assert.equal(fake.artifacts.length, 4);
         assert.equal(fake.comments.length, 1);
         assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
-        assert.ok(JSON.parse(files["result.json"]).failures.every(failure =>
-          failure.message.includes("refusing duplicate uploads")));
+        assert.equal(fake.calls.filter(call => call.method === "GET" && call.endpoint.includes("/artifacts")).length, reads);
         fake.options.fail = undefined;
         const recovered = await publishReport(report, context, fake.api, () => {});
         assert.deepEqual(recovered.failures, []);
+        assert.match(recovered.skipped, /already completed/);
+        assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
+      },
+    },
+    {
+      name: "a completed readable publication is not changed by a rerun",
+      check: async ({ fake }) => {
+        const original = structuredClone(fake.artifacts);
+        const writes = fake.calls.filter(call => call.method !== "GET").length;
+        const changed = input();
+        decision(changed).investigation_notes = "Different evidence on a rerun.";
+        const result = await publishReport(parseReport(changed, context, identity), context, fake.api, () => {});
+        assert.match(result.skipped, /already completed/);
+        assert.deepEqual(fake.artifacts, original);
+        assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
+      },
+    },
+    {
+      name: "an older run cannot replace a newer run's evidence",
+      check: async ({ fake }) => {
+        const newer = { ...context, runId: "124" };
+        await publishReport(parseReport(input(), newer, identity), newer, fake.api, () => {});
+        const original = structuredClone(fake.artifacts);
+        const writes = fake.calls.filter(call => call.method !== "GET").length;
+        await assert.rejects(publishReport(parseReport(input(), context, identity), context, fake.api, () => {}), /newer run already published/);
+        assert.deepEqual(fake.artifacts, original);
         assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
       },
     },
@@ -376,6 +410,93 @@ test("publishReport", async t => {
         assert.equal(result.failures.length, 1);
         assert.match(files["comment.md"], /### Reproduction log/);
         assert.equal(fake.calls.filter(c => c.method === "POST" && c.data?.name === "Reproduction log").length, 1);
+      },
+    },
+    {
+      name: "a partial publication repairs its existing fallback comment",
+      options: { fail: (method, endpoint, data) => method === "POST" && data?.name === "Reproduction log" },
+      check: async ({ fake }) => {
+        fake.options.fail = undefined;
+        const result = await publishReport(parseReport(input(), context, identity), context, fake.api, () => {});
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.artifacts.length, 4);
+        assert.equal(fake.comments.length, 1);
+        assert.doesNotMatch(fake.comments[0].body, /### Reproduction log/);
+        assert.equal(fake.calls.filter(call => call.method === "PATCH" && /\/comments\/\d+$/.test(call.endpoint)).length, 1);
+        assert.equal(fake.calls.filter(call => call.method === "PATCH" && call.endpoint.includes("/artifacts/")).length, 0);
+      },
+    },
+    {
+      name: "a partial duplicate publication can repair reports without expanding its comment",
+      data: duplicateInput,
+      options: { fail: (method, endpoint, data) => method === "POST" && data?.name === "Duplicate analysis" },
+      check: async ({ fake }) => {
+        fake.options.fail = undefined;
+        const result = await publishReport(parseReport(duplicateInput(), context, identity), context, fake.api, () => {});
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.artifacts.length, 2);
+        assert.equal(fake.comments.length, 1);
+        assert.doesNotMatch(fake.comments[0].body, /<details>|###/);
+      },
+    },
+    {
+      name: "partial retries cannot replace the original input",
+      options: { fail: (method, endpoint, data) => method === "POST" && data?.name === "Reproduction log" },
+      check: async ({ fake }) => {
+        fake.options.fail = undefined;
+        const changed = input();
+        decision(changed).reproduction_log = "Different reproduction evidence.";
+        const writes = fake.calls.filter(call => call.method !== "GET").length;
+        await assert.rejects(publishReport(parseReport(changed, context, identity), context, fake.api, () => {}), /retry differs/);
+        assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
+      },
+    },
+    {
+      name: "human-edited fallback comments are not repaired",
+      options: { fail: (method, endpoint, data) => method === "POST" && data?.name === "Reproduction log" },
+      check: async ({ fake }) => {
+        fake.options.fail = undefined;
+        fake.comments[0].body += "\nHuman revision.";
+        const writes = fake.calls.filter(call => call.method !== "GET").length;
+        await assert.rejects(publishReport(parseReport(input(), context, identity), context, fake.api, () => {}), /previous triage comment was edited/);
+        assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
+      },
+    },
+    {
+      name: "a fallback edited during repair is not overwritten",
+      options: { fail: (method, endpoint, data) => method === "POST" && data?.name === "Reproduction log" },
+      check: async ({ fake }) => {
+        fake.options.fail = undefined;
+        fake.options.concurrentComment = true;
+        await assert.rejects(publishReport(parseReport(input(), context, identity), context, fake.api, () => {}), /different comment already exists/);
+        assert.match(fake.comments[0].body, /Human revision/);
+        assert.equal(fake.calls.filter(call => call.method === "PATCH" && /\/comments\/\d+$/.test(call.endpoint)).length, 0);
+      },
+    },
+    {
+      name: "partial retries do not duplicate reports when reads are unavailable",
+      options: { fail: (method, endpoint, data) => method === "POST" && data?.name === "Reproduction log" },
+      check: async ({ fake }) => {
+        const writes = fake.calls.filter(call => call.method === "POST" && call.endpoint.endsWith("/artifacts")).length;
+        fake.options.fail = (method, endpoint) => method === "GET" && endpoint.includes("/artifacts?") && httpError(404);
+        const result = await publishReport(parseReport(input(), context, identity), context, fake.api, () => {});
+        assert.equal(result.failures.length, 4);
+        assert.ok(result.failures.every(failure => failure.message.includes("refusing duplicate uploads")));
+        assert.equal(fake.calls.filter(call => call.method === "POST" && call.endpoint.endsWith("/artifacts")).length, writes);
+      },
+    },
+    {
+      name: "a lost fallback-comment update response is reconciled without repeating the patch",
+      options: {
+        fail: (method, endpoint, data) => method === "POST" && data?.name === "Reproduction log",
+        lostCommentResponse: true,
+      },
+      check: async ({ fake }) => {
+        fake.options.fail = undefined;
+        const result = await publishReport(parseReport(input(), context, identity), context, fake.api, () => {});
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.comments.length, 1);
+        assert.equal(fake.calls.filter(call => call.method === "PATCH" && /\/comments\/\d+$/.test(call.endpoint)).length, 1);
       },
     },
     {

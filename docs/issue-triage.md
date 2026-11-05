@@ -70,8 +70,8 @@ an artifact number. It records a warning in the job log and `result.json`, witho
 adding publishing details to the visible comment. Earlier artifacts remain
 untouched, so more than one report of a type can exist while reads are unavailable.
 When reads recover, the saved number identifies the latest report to check and
-update. If the run already published its comment, unreadable reports cause a
-failure instead of duplicate uploads. Other read errors are failures; issue and
+update. A partial publication with an existing comment cannot duplicate uploads
+when its reports are unreadable. Other read errors are failures; issue and
 comment reads do not use this exception.
 
 A failed artifact write does not repeat successful writes. The missing document
@@ -80,6 +80,15 @@ Duplicate comments stay one sentence; their failed report remains in the review
 files instead. Lost write responses are checked against the server before any
 further action, not blindly retried. If a reconciliation read also returns 404,
 the write remains unverified and is reported as a failure, not retried.
+
+Comments record whether publication completed and a checksum of the submitted
+content. A completed run is a no-op on retry, before any report reads or writes.
+An older run cannot replace reports after a newer run has published.
+
+A partial run can repair its missing reports and update its existing fallback
+comment when the submitted content is unchanged. The bot-owned comment must still
+match the previously verified body; human edits are preserved. A changed input or
+an older comment without publication state requires a new run instead.
 
 Every run saves a `triage-reports` workflow artifact with the rendered
 `comment.md`, separate report Markdown files, and `result.json`. In staged mode,
