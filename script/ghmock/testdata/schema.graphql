@@ -1,0 +1,107 @@
+"""
+The query root.
+"""
+type Query {
+  repository(owner: String!, name: String!): Repository
+  viewer: User!
+}
+
+type Mutation {
+  closeIssue(input: CloseIssueInput!): CloseIssuePayload
+}
+
+interface Node {
+  id: ID!
+}
+
+interface Actor {
+  login: String!
+}
+
+"""
+A repository contains the content for a project.
+"""
+type Repository implements Node {
+  id: ID!
+  name: String!
+  issue(number: Int!): Issue
+  issueOrPullRequest(number: Int!): IssueOrPullRequest
+  labels(first: Int = 30): LabelConnection
+}
+
+type Issue implements Node {
+  id: ID!
+  number: Int!
+  title: String!
+  body: String
+  state: IssueState!
+  createdAt: DateTime!
+  author: Actor
+  assignees: [User!]!
+  databaseId: Int @deprecated(reason: "Use fullDatabaseId instead.")
+}
+
+type PullRequest implements Node {
+  id: ID!
+  number: Int!
+  title: String!
+  state: PullRequestState!
+}
+
+union IssueOrPullRequest = Issue | PullRequest
+
+type User implements Node & Actor {
+  id: ID!
+  login: String!
+  name: String
+}
+
+type Bot implements Node & Actor {
+  id: ID!
+  login: String!
+}
+
+type LabelConnection {
+  nodes: [Label]
+  totalCount: Int!
+}
+
+type Label {
+  name: String!
+  color: String!
+}
+
+"""
+The possible states of an issue.
+"""
+enum IssueState {
+  "An issue that is still open"
+  OPEN
+  "An issue that has been closed"
+  CLOSED
+}
+
+enum PullRequestState {
+  OPEN
+  CLOSED
+  MERGED
+}
+
+input CloseIssueInput {
+  issueId: ID!
+  stateReason: IssueClosedStateReason
+}
+
+enum IssueClosedStateReason {
+  COMPLETED
+  NOT_PLANNED
+}
+
+type CloseIssuePayload {
+  issue: Issue
+}
+
+"""
+An ISO-8601 encoded UTC date string.
+"""
+scalar DateTime

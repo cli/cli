@@ -114,6 +114,12 @@ func printLog(w io.Writer, entries []loggedRequest, full bool) {
 		if e.Body != "" {
 			fmt.Fprintf(w, "   body: %s\n", compactJSON([]byte(e.Body)))
 		}
+		for _, group := range problemGroups(e) {
+			fmt.Fprintf(w, "   %s:\n", group.label)
+			for _, p := range group.problems {
+				fmt.Fprintf(w, "     %s\n", p)
+			}
+		}
 	}
 }
 

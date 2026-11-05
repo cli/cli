@@ -14,28 +14,36 @@ import (
 
 // logSummary is the part of a logged request that tests compare.
 type logSummary struct {
-	Seq       int
-	Name      string
-	Body      string
-	Status    int
-	Matched   bool
-	Blocked   bool
-	Response  int
-	Responses int
+	Seq            int
+	Name           string
+	Body           string
+	Status         int
+	Matched        bool
+	Blocked        bool
+	Response       int
+	Responses      int
+	OffSchema      bool
+	QueryProblems  []string
+	SchemaProblems []string
+	SchemaNote     string
 }
 
 func summarize(entries []loggedRequest) []logSummary {
 	var out []logSummary
 	for _, e := range entries {
 		out = append(out, logSummary{
-			Seq:       e.Seq,
-			Name:      e.Name,
-			Body:      e.Body,
-			Status:    e.Status,
-			Matched:   e.Matched,
-			Blocked:   e.Blocked,
-			Response:  e.Response,
-			Responses: e.Responses,
+			Seq:            e.Seq,
+			Name:           e.Name,
+			Body:           e.Body,
+			Status:         e.Status,
+			Matched:        e.Matched,
+			Blocked:        e.Blocked,
+			Response:       e.Response,
+			Responses:      e.Responses,
+			OffSchema:      e.OffSchema,
+			QueryProblems:  e.QueryProblems,
+			SchemaProblems: e.SchemaProblems,
+			SchemaNote:     e.SchemaNote,
 		})
 	}
 	return out
@@ -67,12 +75,13 @@ func TestMockServer(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		responses responseSet
-		calls     []call
-		want      []reply
-		wantLog   []logSummary
-		wantKinds []string
+		name         string
+		responses    responseSet
+		checkSchemas bool
+		calls        []call
+		want         []reply
+		wantLog      []logSummary
+		wantKinds    []string
 	}{
 		{
 			name:      "request at the body limit is recorded in full",
@@ -179,6 +188,53 @@ func TestMockServer(t *testing.T) {
 			want:    []reply{{err: true}},
 			wantLog: []logSummary{{Seq: 1, Status: 403, Blocked: true}},
 		},
+		{
+			name: "a response that doesn't match GitHub's schema is still served, and logged with its problems",
+			responses: responseSet{"graphql IssueTitle": {{
+				Body: json.RawMessage(`{"data":{"repository":{"issue":{"title":null}}}}`),
+			}}},
+			checkSchemas: true,
+			calls: []call{{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBody(t,
+				`query IssueTitle { repository(owner: "o", name: "r") { issue(number: 1) { title } } }`)}},
+			want: []reply{{status: 200, body: `{"data":{"repository":{"issue":{"title":null}}}}`}},
+			wantLog: []logSummary{{
+				Seq: 1, Name: "graphql IssueTitle", Status: 200, Matched: true, Response: 1, Responses: 1,
+				SchemaProblems: []string{"data.repository.issue.title: is null, but GitHub's schema says it can't be (String!)"},
+			}},
+		},
+		{
+			name: "an off-schema response isn't checked",
+			responses: responseSet{"graphql IssueTitle": {{
+				Body:      json.RawMessage(`{"data":{"repository":{"issue":{"title":null}}}}`),
+				OffSchema: true,
+			}}},
+			checkSchemas: true,
+			calls: []call{{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBody(t,
+				`query IssueTitle { repository(owner: "o", name: "r") { issue(number: 1) { title } } }`)}},
+			want:    []reply{{status: 200, body: `{"data":{"repository":{"issue":{"title":null}}}}`}},
+			wantLog: []logSummary{{Seq: 1, Name: "graphql IssueTitle", Status: 200, Matched: true, Response: 1, Responses: 1, OffSchema: true}},
+		},
+		{
+			name:         "gh's query is checked even without a response",
+			checkSchemas: true,
+			calls:        []call{{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBody(t, "query Nope { viewer { nope } }")}},
+			want:         []reply{{status: 200, body: `{"errors":[{"message":"ghmock: no response for graphql Nope"}]}`}},
+			wantLog: []logSummary{{
+				Seq: 1, Name: "graphql Nope", Status: 200,
+				QueryProblems: []string{`line 1, column 23: Cannot query field "nope" on type "User". Did you mean "name"?`},
+			}},
+		},
+		{
+			name:         "a REST request GitHub doesn't document isn't checked",
+			responses:    responseSet{"GET /nope": {{Body: json.RawMessage(`{}`)}}},
+			checkSchemas: true,
+			calls:        []call{{method: "GET", url: "http://api.github.localhost/nope"}},
+			want:         []reply{{status: 200, body: `{}`}},
+			wantLog: []logSummary{{
+				Seq: 1, Name: "GET /nope", Status: 200, Matched: true, Response: 1, Responses: 1,
+				SchemaNote: "not in GitHub's REST description",
+			}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -187,7 +243,11 @@ func TestMockServer(t *testing.T) {
 			if tt.responses != nil {
 				require.NoError(t, st.saveResponses(tt.responses))
 			}
-			srv, err := startServer(st)
+			var chk *checker
+			if tt.checkSchemas {
+				chk = testChecker(t)
+			}
+			srv, err := startServer(st, chk)
 			require.NoError(t, err)
 			proxy, err := url.Parse(srv.proxyURL())
 			require.NoError(t, err)

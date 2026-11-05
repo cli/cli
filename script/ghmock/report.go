@@ -9,15 +9,20 @@ import (
 	"strings"
 )
 
-const maxShownBody = 300
+const (
+	maxShownBody     = 300
+	maxShownProblems = 10
+)
 
 // printReport writes what each binary did. With more than one binary, it then
-// lists how each one differs from the first.
-func printReport(w io.Writer, opts runOptions, results []runResult) {
+// lists how each one differs from the first. notes say which schema checks
+// couldn't run.
+func printReport(w io.Writer, opts runOptions, results []runResult, notes []string) {
 	command := "$ gh " + strings.Join(opts.args, " ")
 	if len(results) == 1 {
 		fmt.Fprintf(w, "%s - %s\n", results[0].version, results[0].path)
 		printResult(w, command, results[0])
+		printNotes(w, notes)
 		return
 	}
 
@@ -34,6 +39,17 @@ func printReport(w io.Writer, opts runOptions, results []runResult) {
 	fmt.Fprintln(w, "=== differences from [1]")
 	for i := 1; i < len(results); i++ {
 		printDifferences(w, results[0], results[i], i+1)
+	}
+	printNotes(w, notes)
+}
+
+func printNotes(w io.Writer, notes []string) {
+	if len(notes) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "--- schema checks")
+	for _, n := range notes {
+		fmt.Fprintln(w, n)
 	}
 }
 
@@ -57,6 +73,53 @@ func printResult(w io.Writer, command string, res runResult) {
 			fmt.Fprintln(w, name)
 		}
 	}
+	printProblems(w, res.requests)
+}
+
+// printProblems lists what the schema checks found, request by request.
+func printProblems(w io.Writer, requests []loggedRequest) {
+	header := false
+	for _, e := range requests {
+		for _, group := range problemGroups(e) {
+			if !header {
+				fmt.Fprintln(w, "--- schema problems")
+				header = true
+			}
+			fmt.Fprintf(w, "%d. %s: %s\n", e.Seq, displayName(e), group.label)
+			fmt.Fprint(w, indentProblems(group.problems, "   ", maxShownProblems))
+		}
+	}
+}
+
+// problemGroup is one kind of schema problem found for a request.
+type problemGroup struct {
+	label    string
+	problems []string
+}
+
+func problemGroups(e loggedRequest) []problemGroup {
+	var groups []problemGroup
+	if len(e.SchemaProblems) > 0 {
+		groups = append(groups, problemGroup{"the response doesn't match GitHub's schema", e.SchemaProblems})
+	}
+	if len(e.QueryProblems) > 0 {
+		groups = append(groups, problemGroup{"gh's query doesn't match GitHub's schema", e.QueryProblems})
+	}
+	return groups
+}
+
+// indentProblems lists problems one per line. With a limit above zero, it
+// shows at most that many and points to the log for the rest.
+func indentProblems(problems []string, indent string, limit int) string {
+	var b strings.Builder
+	for i, p := range problems {
+		if limit > 0 && i == limit {
+			fmt.Fprintf(&b, "%s...and %d more; ghmock log --json shows them all\n", indent, len(problems)-i)
+			break
+		}
+		fmt.Fprintf(&b, "%s%s\n", indent, p)
+	}
+	return b.String()
 }
 
 func printOutput(w io.Writer, label, text string) {
@@ -99,7 +162,26 @@ func formatRequest(e loggedRequest) string {
 	default:
 		fmt.Fprintf(&b, " -> %d, no response stored", e.Status)
 	}
+	if e.OffSchema {
+		b.WriteString(" [off-schema]")
+	}
+	if n := len(e.SchemaProblems); n > 0 {
+		fmt.Fprintf(&b, " [%s]", plural(n, "schema problem"))
+	}
+	if n := len(e.QueryProblems); n > 0 {
+		fmt.Fprintf(&b, " [query: %s]", plural(n, "schema problem"))
+	}
+	if e.SchemaNote != "" {
+		fmt.Fprintf(&b, " [not checked: %s]", e.SchemaNote)
+	}
 	return b.String()
+}
+
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
 }
 
 // missingNames lists, once each and in order, requests that had no response.

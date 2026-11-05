@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,6 +49,16 @@ func TestParseSetArgs(t *testing.T) {
 			name: "host-qualified REST name",
 			args: []string{"POST uploads.github.localhost/upload", "--status", "500"},
 			want: setOptions{name: "POST uploads.github.localhost/upload", status: 500},
+		},
+		{
+			name: "--off-schema alone is a change",
+			args: []string{"GET /", "--off-schema"},
+			want: setOptions{name: "GET /", offSchema: true},
+		},
+		{
+			name:    "unquoted REST name",
+			args:    []string{"GET", "/repos/octo/hello", "--status", "404"},
+			wantErr: "unexpected arguments: /repos/octo/hello --status 404; quote the request name, such as 'GET /repos/octo/hello'",
 		},
 		{
 			name:    "missing name",
@@ -104,7 +118,7 @@ func TestParseSetArgs(t *testing.T) {
 		{
 			name:    "nothing to change",
 			args:    []string{"GET /"},
-			wantErr: "nothing to change; pass --status, --header, --body, --body-file or --at",
+			wantErr: "nothing to change; pass --status, --header, --body, --body-file, --at or --off-schema",
 		},
 		{
 			name:    "extra arguments",
@@ -280,6 +294,159 @@ func TestApplySet(t *testing.T) {
 
 			assert.Equal(t, tt.wantPos, pos)
 			got, err := json.Marshal(responses[tt.opts.name])
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want, string(got))
+		})
+	}
+}
+
+func TestCmdSet(t *testing.T) {
+	const issueQuery = `query IssueTitle { repository(owner: "o", name: "r") { issue(number: 1) { title state } } }`
+	logged := []loggedRequest{{
+		Run: "r", Seq: 1, Method: "POST", Host: apiHost, Path: "/graphql", Name: "graphql IssueTitle",
+		GraphQL: &graphQLRequest{Kind: "query", Operation: "IssueTitle", Query: issueQuery},
+	}}
+	const validIssue = `{"id":1,"number":1,"title":"Bug","state":"open","user":null,"labels":[],"created_at":"2026-01-01T00:00:00Z"}`
+	const validTitle = `{"data":{"repository":{"issue":{"title":"Bug","state":"OPEN"}}}}`
+	const badTitle = `{"data":{"repository":{"issue":{"title":"Bug","state":"open"}}}}`
+
+	tests := []struct {
+		name       string
+		noSchemas  bool
+		responses  string
+		logged     []loggedRequest
+		args       []string
+		wantStdout string
+		wantErr    string
+		want       string
+	}{
+		{
+			name:       "a REST response that matches GitHub's description",
+			args:       []string{"GET /repos/o/r/issues/1", "--body", validIssue},
+			wantStdout: fmt.Sprintf("GET /repos/o/r/issues/1: response 1 of 1: status 200, no headers, body %d bytes\nSchema check: passed\n", len(validIssue)),
+			want:       `{"GET /repos/o/r/issues/1":[{"body":` + validIssue + `}]}`,
+		},
+		{
+			name: "a REST response that doesn't match isn't saved",
+			args: []string{"GET /repos/o/r/issues/1", "--body", `{"id":"1","number":1,"title":"Bug","state":"opened","user":null,"labels":[]}`},
+			wantErr: "the response doesn't match GitHub's schema, so it wasn't saved:\n" +
+				"  id: value must be an integer\n" +
+				"  state: value is not one of the allowed values [\"open\",\"closed\"]\n" +
+				"  created_at: missing, but GitHub's description requires it\n" +
+				"Fix it, or pass --off-schema to save it anyway",
+			want: `{}`,
+		},
+		{
+			name:       "--off-schema saves it anyway and labels it",
+			args:       []string{"GET /repos/o/r/issues/1", "--body", `{"id":"1"}`, "--off-schema"},
+			wantStdout: "GET /repos/o/r/issues/1: response 1 of 1: status 200, no headers, body 10 bytes, off-schema\nSchema check: skipped, saved as off-schema\n",
+			want:       `{"GET /repos/o/r/issues/1":[{"body":{"id":"1"},"off_schema":true}]}`,
+		},
+		{
+			name:       "a status GitHub doesn't document isn't checked",
+			args:       []string{"GET /repos/o/r/issues/1", "--status", "502", "--body", `{"message":"bad gateway"}`},
+			wantStdout: "GET /repos/o/r/issues/1: response 1 of 1: status 502, no headers, body 25 bytes\nSchema check: skipped, GitHub doesn't document status 502 for GET /repos/{owner}/{repo}/issues/{issue_number}\n",
+			want:       `{"GET /repos/o/r/issues/1":[{"status":502,"body":{"message":"bad gateway"}}]}`,
+		},
+		{
+			name:       "a request to another host isn't checked",
+			args:       []string{"POST uploads.github.localhost/upload", "--status", "201"},
+			wantStdout: "POST uploads.github.localhost/upload: response 1 of 1: status 201, no headers, body 0 bytes\nSchema check: skipped, not a REST API host\n",
+			want:       `{"POST uploads.github.localhost/upload":[{"status":201}]}`,
+		},
+		{
+			name:       "a GraphQL response waits for gh's query",
+			args:       []string{"graphql IssueTitle", "--body", badTitle},
+			wantStdout: fmt.Sprintf("graphql IssueTitle: response 1 of 1: status 200, no headers, body %d bytes\nSchema check: not yet, because gh hasn't sent graphql IssueTitle; the next run checks it\n", len(badTitle)),
+			want:       `{"graphql IssueTitle":[{"body":` + badTitle + `}]}`,
+		},
+		{
+			name:       "a GraphQL response is checked against gh's last query",
+			logged:     logged,
+			args:       []string{"graphql IssueTitle", "--body", validTitle},
+			wantStdout: fmt.Sprintf("graphql IssueTitle: response 1 of 1: status 200, no headers, body %d bytes\nSchema check: passed\n", len(validTitle)),
+			want:       `{"graphql IssueTitle":[{"body":` + validTitle + `}]}`,
+		},
+		{
+			name:   "a GraphQL response that doesn't match gh's last query isn't saved",
+			logged: logged,
+			args:   []string{"graphql IssueTitle", "--body", badTitle},
+			wantErr: "the response doesn't match GitHub's schema, so it wasn't saved:\n" +
+				"  data.repository.issue.state: \"open\" isn't a value of IssueState; it can be CLOSED, OPEN\n" +
+				"Fix it, or pass --off-schema to save it anyway",
+			want: `{}`,
+		},
+		{
+			name: "every problem is listed",
+			logged: []loggedRequest{{
+				Run: "r", Seq: 1, Method: "POST", Host: apiHost, Path: "/graphql", Name: "graphql Assignees",
+				GraphQL: &graphQLRequest{Kind: "query", Operation: "Assignees", Query: `query Assignees { repository(owner: "o", name: "r") { issue(number: 1) { assignees { login } } } }`},
+			}},
+			args: []string{"graphql Assignees", "--body", `{"data":{"repository":{"issue":{"assignees":[` + strings.TrimSuffix(strings.Repeat("null,", 11), ",") + `]}}}}`},
+			wantErr: "the response doesn't match GitHub's schema, so it wasn't saved:\n" + func() string {
+				var b strings.Builder
+				for i := range 11 {
+					fmt.Fprintf(&b, "  data.repository.issue.assignees.%d: is null, but GitHub's schema says it can't be (User!)\n", i)
+				}
+				return b.String()
+			}() + "Fix it, or pass --off-schema to save it anyway",
+			want: `{}`,
+		},
+		{
+			name:       "a GraphQL error status isn't checked",
+			logged:     logged,
+			args:       []string{"graphql IssueTitle", "--status", "502"},
+			wantStdout: "graphql IssueTitle: response 1 of 1: status 502, no headers, body 0 bytes\nSchema check: skipped, status 502 has no GraphQL result to check\n",
+			want:       `{"graphql IssueTitle":[{"status":502}]}`,
+		},
+		{
+			name:      "changing an off-schema response checks it again",
+			responses: `{"graphql IssueTitle":[{"body":` + badTitle + `,"off_schema":true}]}`,
+			logged:    logged,
+			args:      []string{"graphql IssueTitle", "--header", "X-A: 1"},
+			wantErr: "the response doesn't match GitHub's schema, so it wasn't saved:\n" +
+				"  data.repository.issue.state: \"open\" isn't a value of IssueState; it can be CLOSED, OPEN\n" +
+				"Fix it, or pass --off-schema to save it anyway",
+			want: `{"graphql IssueTitle":[{"body":` + badTitle + `,"off_schema":true}]}`,
+		},
+		{
+			name:      "without schemas, the response is saved unchecked",
+			noSchemas: true,
+			args:      []string{"GET /repos/o/r/issues/1", "--status", "404"},
+			wantStdout: "GET /repos/o/r/issues/1: response 1 of 1: status 404, no headers, body 0 bytes\n" +
+				"Schema check: skipped, REST checks are off: downloading GitHub's REST description from " + restSource.url +
+				`: Get "` + restSource.url + `": downloads are off in tests (without network access, set GHMOCK_REST_SCHEMA to a local copy)` + "\n",
+			want: `{"GET /repos/o/r/issues/1":[{"status":404}]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Setenv("GHMOCK_DIR", dir)
+			if !tt.noSchemas {
+				useTestSchemas(t)
+			}
+			st := &state{dir: dir}
+			if tt.responses != "" {
+				responses := responseSet{}
+				require.NoError(t, json.Unmarshal([]byte(tt.responses), &responses))
+				require.NoError(t, st.saveResponses(responses))
+			}
+			require.NoError(t, st.appendLog(tt.logged))
+
+			var stdout bytes.Buffer
+			err := cmdSet(tt.args, &stdout, io.Discard)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantStdout, stdout.String())
+
+			stored, err := st.loadResponses()
+			require.NoError(t, err)
+			got, err := json.Marshal(stored)
 			require.NoError(t, err)
 			assert.JSONEq(t, tt.want, string(got))
 		})

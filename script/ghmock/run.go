@@ -75,7 +75,7 @@ func parseRunArgs(args []string) (runOptions, error) {
 	return opts, nil
 }
 
-func cmdRun(args []string, stdout io.Writer) error {
+func cmdRun(args []string, stdout, stderr io.Writer) error {
 	opts, err := parseRunArgs(args)
 	if err != nil {
 		return err
@@ -84,21 +84,24 @@ func cmdRun(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	results, err := runAll(st, opts)
+	chk := newChecker(stderr)
+	chk.preload()
+	results, err := runAll(st, chk, opts)
 	if err != nil {
 		return err
 	}
-	printReport(stdout, opts, results)
+	printReport(stdout, opts, results, chk.unavailable())
 	return nil
 }
 
-// runAll runs each binary in turn and appends its requests to the log.
-func runAll(st *state, opts runOptions) ([]runResult, error) {
+// runAll runs each binary in turn and appends its requests to the log. A nil
+// checker turns schema checks off.
+func runAll(st *state, chk *checker, opts runOptions) ([]runResult, error) {
 	start := time.Now().UTC()
 	runID := newRunID()
 	results := make([]runResult, 0, len(opts.binaries))
 	for _, binary := range opts.binaries {
-		res, err := runBinary(st, binary, opts)
+		res, err := runBinary(st, chk, binary, opts)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", binary, err)
 		}
@@ -117,7 +120,7 @@ func runAll(st *state, opts runOptions) ([]runResult, error) {
 	return results, nil
 }
 
-func runBinary(st *state, binary string, opts runOptions) (runResult, error) {
+func runBinary(st *state, chk *checker, binary string, opts runOptions) (runResult, error) {
 	path, err := resolveBinary(binary)
 	if err != nil {
 		return runResult{}, err
@@ -135,7 +138,7 @@ func runBinary(st *state, binary string, opts runOptions) (runResult, error) {
 		}
 	}
 
-	srv, err := startServer(st)
+	srv, err := startServer(st, chk)
 	if err != nil {
 		return runResult{}, err
 	}

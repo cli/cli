@@ -13,9 +13,11 @@ import (
 const maxRequestBody = 10 << 20
 
 // mockServer answers gh's requests for one run of one binary. Each run gets a
-// fresh server, so every run starts from each request's first response.
+// fresh server, so every run starts from each request's first response. A nil
+// checker turns schema checks off.
 type mockServer struct {
 	state    *state
+	checker  *checker
 	listener net.Listener
 	srv      *http.Server
 
@@ -24,15 +26,27 @@ type mockServer struct {
 	requests []loggedRequest
 }
 
-func startServer(st *state) (*mockServer, error) {
+func startServer(st *state, chk *checker) (*mockServer, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
-	m := &mockServer{state: st, listener: ln, cursors: map[string]int{}}
+	m := &mockServer{state: st, checker: chk, listener: ln, cursors: map[string]int{}}
 	m.srv = &http.Server{Handler: m, ReadHeaderTimeout: 10 * time.Second}
 	go func() { _ = m.srv.Serve(ln) }()
 	return m, nil
+}
+
+// check records what the schema check found for a request and its response.
+func (m *mockServer) check(entry *loggedRequest, resp *response) {
+	if m.checker == nil {
+		return
+	}
+	res := m.checker.checkRequest(*entry, resp)
+	entry.QueryProblems = res.queryProblems
+	entry.SchemaProblems = res.responseProblems
+	entry.SchemaNote = res.note
+	entry.OffSchema = resp != nil && resp.OffSchema
 }
 
 // proxyURL is the value gh gets for HTTP_PROXY and HTTPS_PROXY.
@@ -122,6 +136,7 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(list) == 0 {
 		status, payload := missingResponse(name, gql != nil)
 		entry.Status = status
+		m.check(&entry, nil)
 		m.record(entry)
 		writeJSON(w, status, payload)
 		return
@@ -140,6 +155,7 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	entry.Matched = true
 	entry.Response = idx + 1
 	entry.Responses = len(list)
+	m.check(&entry, &resp)
 	m.record(entry)
 
 	for k, v := range resp.Headers {

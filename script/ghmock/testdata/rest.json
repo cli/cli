@@ -1,0 +1,208 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ghmock test description",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "meta/root",
+        "summary": "GitHub API Root",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/root" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}": {
+      "get": {
+        "operationId": "repos/get",
+        "summary": "Get a repository",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/full-repository" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/not_found" }
+        }
+      },
+      "delete": {
+        "operationId": "repos/delete",
+        "summary": "Delete a repository",
+        "responses": {
+          "204": { "description": "Response" }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/issues/{issue_number}": {
+      "get": {
+        "operationId": "issues/get",
+        "summary": "Get an issue",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/issue" }
+              }
+            }
+          },
+          "304": { "description": "Not modified" },
+          "404": { "$ref": "#/components/responses/not_found" }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/issues/comments": {
+      "get": {
+        "operationId": "issues/list-comments-for-repo",
+        "summary": "List issue comments for a repository",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/simple-user" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/contents/{path}": {
+      "get": {
+        "operationId": "repos/get-content",
+        "summary": "Get repository content",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/content-file" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "not_found": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/basic-error" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "root": {
+        "type": "object",
+        "properties": {
+          "current_user_url": { "type": "string", "format": "uri" }
+        },
+        "required": ["current_user_url"]
+      },
+      "basic-error": {
+        "title": "Basic Error",
+        "description": "Basic Error",
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "documentation_url": { "type": "string" }
+        }
+      },
+      "simple-user": {
+        "type": "object",
+        "properties": {
+          "login": { "type": "string" },
+          "id": { "type": "integer" }
+        },
+        "required": ["login", "id"]
+      },
+      "nullable-simple-user": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "login": { "type": "string" },
+          "id": { "type": "integer" }
+        },
+        "required": ["login", "id"]
+      },
+      "issue": {
+        "description": "Issues are a great way to keep track of tasks.",
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "number": { "type": "integer" },
+          "title": { "type": "string" },
+          "body": { "type": "string", "nullable": true },
+          "state": { "type": "string", "enum": ["open", "closed"] },
+          "user": { "$ref": "#/components/schemas/nullable-simple-user" },
+          "labels": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "color": { "type": "string", "nullable": true }
+                  }
+                }
+              ]
+            }
+          },
+          "created_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "number", "title", "state", "user", "labels", "created_at"]
+      },
+      "minimal-repository": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "owner": { "$ref": "#/components/schemas/simple-user" }
+        },
+        "required": ["id", "name", "owner"]
+      },
+      "full-repository": {
+        "allOf": [
+          { "$ref": "#/components/schemas/minimal-repository" },
+          {
+            "type": "object",
+            "properties": {
+              "subscribers_count": { "type": "integer" }
+            },
+            "required": ["subscribers_count"]
+          }
+        ]
+      },
+      "content-file": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "enum": ["file"] },
+          "path": { "type": "string" },
+          "content": { "type": "string" }
+        },
+        "required": ["type", "path", "content"]
+      }
+    }
+  }
+}

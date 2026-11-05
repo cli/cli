@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -103,6 +104,24 @@ func TestCmdLog(t *testing.T) {
 `,
 		},
 		{
+			name:    "full details list schema problems",
+			entries: []loggedRequest{withProblems(query)},
+			args:    []string{"--full"},
+			want: `=== run run-2, gh ./new
+1. graphql Viewer {"a":1} -> 200, response 1 of 1 [1 schema problem] [query: 1 schema problem]
+   query Viewer
+   variables: {"a":1}
+   query:
+     query Viewer {
+       viewer { login }
+     }
+   the response doesn't match GitHub's schema:
+     data.viewer.login: missing, but gh asked for it
+   gh's query doesn't match GitHub's schema:
+     line 2, column 12: Cannot query field "nope" on type "User".
+`,
+		},
+		{
 			name:    "JSON lines",
 			entries: []loggedRequest{first},
 			args:    []string{"--json"},
@@ -163,6 +182,18 @@ func TestRunMain(t *testing.T) {
 			wantStderr: "ghmock set: open does-not-exist.json: no such file or directory\n",
 		},
 		{
+			name:       "schema",
+			args:       []string{"schema"},
+			wantCode:   2,
+			wantStderr: "ghmock schema: missing name, such as Issue, Issue.title or \"GET /repos/octo/hello\"\n",
+		},
+		{
+			name:       "schemas",
+			args:       []string{"schemas"},
+			wantCode:   2,
+			wantStderr: "ghmock schemas: missing subcommand; use ghmock schemas update\n",
+		},
+		{
 			name:       "reset",
 			args:       []string{"reset"},
 			wantStdout: "Deleted responses and request log in <dir>\n",
@@ -187,11 +218,13 @@ func TestRunMain(t *testing.T) {
 func TestCmdSetAndReset(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("GHMOCK_DIR", dir)
+	useTestSchemas(t)
 	st := &state{dir: dir}
 
 	var out bytes.Buffer
-	require.NoError(t, cmdSet([]string{"GET /user", "--status", "401", "--header", "X-GitHub-SSO: required"}, &out))
-	assert.Equal(t, "GET /user: response 1 of 1: status 401, headers X-Github-Sso, body 0 bytes\n", out.String())
+	require.NoError(t, cmdSet([]string{"GET /user", "--status", "401", "--header", "X-GitHub-SSO: required"}, &out, io.Discard))
+	assert.Equal(t, "GET /user: response 1 of 1: status 401, headers X-Github-Sso, body 0 bytes\n"+
+		"Schema check: skipped, not in GitHub's REST description\n", out.String())
 
 	responses, err := st.loadResponses()
 	require.NoError(t, err)
@@ -210,4 +243,11 @@ func TestCmdSetAndReset(t *testing.T) {
 	runs, err := st.readRuns()
 	require.NoError(t, err)
 	assert.Empty(t, runs)
+}
+
+// withProblems adds schema problems to a GraphQL request for report tests.
+func withProblems(e loggedRequest) loggedRequest {
+	e.SchemaProblems = []string{"data.viewer.login: missing, but gh asked for it"}
+	e.QueryProblems = []string{`line 2, column 12: Cannot query field "nope" on type "User".`}
+	return e
 }

@@ -26,7 +26,52 @@ func TestMain(m *testing.M) {
 	if os.Getenv("GHMOCK_FAKE_GH") == "1" {
 		os.Exit(fakeGH(os.Args[1:]))
 	}
-	os.Exit(m.Run())
+	os.Exit(runTests(m))
+}
+
+// runTests keeps tests away from the network and the real cache folder. Tests
+// that need schemas call useTestSchemas.
+func runTests(m *testing.M) int {
+	cache, err := os.MkdirTemp("", "ghmock-test-cache-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer os.RemoveAll(cache)
+	userCacheDir = func() (string, error) { return cache, nil }
+	downloadClient = &http.Client{Transport: failingTransport{}}
+	os.Unsetenv(graphQLSource.envVar)
+	os.Unsetenv(restSource.envVar)
+	return m.Run()
+}
+
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("downloads are off in tests")
+}
+
+// useTestSchemas points ghmock at the small schemas in testdata.
+func useTestSchemas(t *testing.T) {
+	t.Helper()
+	for env, file := range map[string]string{
+		graphQLSource.envVar: "schema.graphql",
+		restSource.envVar:    "rest.json",
+	} {
+		p, err := filepath.Abs(filepath.Join("testdata", file))
+		require.NoError(t, err)
+		t.Setenv(env, p)
+	}
+}
+
+// testChecker returns a checker that uses the schemas in testdata.
+func testChecker(t *testing.T) *checker {
+	t.Helper()
+	useTestSchemas(t)
+	chk := newChecker(io.Discard)
+	chk.preload()
+	require.Empty(t, chk.unavailable())
+	return chk
 }
 
 // fakeGH implements the few commands the run tests need.
@@ -181,12 +226,13 @@ func TestRunAll(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		variants  []string
-		responses responseSet
-		opts      runOptions
-		want      []resultSummary
-		afterAPI  bool
+		name         string
+		variants     []string
+		responses    responseSet
+		checkSchemas bool
+		opts         runOptions
+		want         []resultSummary
+		afterAPI     bool
 	}{
 		{
 			name:      "a request-free command replaces the last run selection",
@@ -246,6 +292,21 @@ func TestRunAll(t *testing.T) {
 			}},
 		},
 		{
+			name:         "responses are checked against GitHub's schema",
+			variants:     []string{"a"},
+			responses:    responseSet{"GET /repos/octo/hello": {{Body: json.RawMessage(`{"id":1,"name":"hello","owner":{"login":"octo","id":2}}`)}}},
+			checkSchemas: true,
+			opts:         runOptions{args: []string{"api", "repos/octo/hello"}},
+			want: []resultSummary{{
+				Version: "gh version 0.0.0-a",
+				Stdout:  "200 {\"id\":1,\"name\":\"hello\",\"owner\":{\"login\":\"octo\",\"id\":2}}\n",
+				Requests: []logSummary{{
+					Seq: 1, Name: "GET /repos/octo/hello", Status: 200, Matched: true, Response: 1, Responses: 1,
+					SchemaProblems: []string{"subscribers_count: missing, but GitHub's description requires it"},
+				}},
+			}},
+		},
+		{
 			name:     "each binary starts from the first response",
 			variants: []string{"a", "b"},
 			responses: responseSet{"GET /flaky": {
@@ -287,14 +348,18 @@ func TestRunAll(t *testing.T) {
 			for _, v := range tt.variants {
 				opts.binaries = append(opts.binaries, writeFakeGH(t, v))
 			}
+			var chk *checker
+			if tt.checkSchemas {
+				chk = testChecker(t)
+			}
 			if tt.afterAPI {
 				previous := opts
 				previous.args = []string{"api", "user"}
-				_, err := runAll(st, previous)
+				_, err := runAll(st, chk, previous)
 				require.NoError(t, err)
 			}
 
-			results, err := runAll(st, opts)
+			results, err := runAll(st, chk, opts)
 			require.NoError(t, err)
 
 			var got []resultSummary
@@ -379,6 +444,7 @@ func TestPrintReport(t *testing.T) {
 	tests := []struct {
 		name            string
 		results         []runResult
+		notes           []string
 		want            string
 		wantDifferences string
 	}{
@@ -497,6 +563,51 @@ graphql IssueProjectItems
 `,
 		},
 		{
+			name: "schema problems, off-schema responses and notes",
+			results: []runResult{{
+				path: "/bin/gh", version: "gh version 1.0.0",
+				requests: []loggedRequest{
+					withProblems(viewRequest),
+					offSchema(withSeq(viewRequest, 2)),
+					{Seq: 3, Method: "GET", Name: "GET /zen", Status: 200, Matched: true, Response: 1, Responses: 1, SchemaNote: "GitHub documents no JSON body for status 200"},
+					{Seq: 4, Method: "POST", Name: "graphql Big", GraphQL: &graphQLRequest{Kind: "query", Operation: "Big"}, Status: 200, Matched: true, Response: 1, Responses: 1, SchemaProblems: numbered(12)},
+				},
+			}},
+			notes: []string{"REST checks are off: downloads are off"},
+			want: `gh version 1.0.0 - /bin/gh
+$ gh issue view 1
+exit code: 0
+--- stdout
+(empty)
+--- stderr
+(empty)
+--- requests (4)
+1. graphql IssueByNumber {"number":1} -> 200, response 1 of 1 [1 schema problem] [query: 1 schema problem]
+2. graphql IssueByNumber {"number":1} -> 200, response 1 of 1 [off-schema]
+3. GET /zen -> 200, response 1 of 1 [not checked: GitHub documents no JSON body for status 200]
+4. graphql Big -> 200, response 1 of 1 [12 schema problems]
+--- schema problems
+1. graphql IssueByNumber: the response doesn't match GitHub's schema
+   data.viewer.login: missing, but gh asked for it
+1. graphql IssueByNumber: gh's query doesn't match GitHub's schema
+   line 2, column 12: Cannot query field "nope" on type "User".
+4. graphql Big: the response doesn't match GitHub's schema
+   problem 1
+   problem 2
+   problem 3
+   problem 4
+   problem 5
+   problem 6
+   problem 7
+   problem 8
+   problem 9
+   problem 10
+   ...and 2 more; ghmock log --json shows them all
+--- schema checks
+REST checks are off: downloads are off
+`,
+		},
+		{
 			name: "two binaries that match",
 			results: []runResult{
 				{path: "/a/gh", version: "gh version 1.0.0", stdout: "ok\n", requests: []loggedRequest{viewRequest}},
@@ -532,7 +643,7 @@ ok
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf strings.Builder
-			printReport(&buf, opts, tt.results)
+			printReport(&buf, opts, tt.results, tt.notes)
 			if tt.wantDifferences != "" {
 				_, differences, ok := strings.Cut(buf.String(), "=== differences from [1]\n")
 				require.True(t, ok)
@@ -547,4 +658,17 @@ ok
 func withSeq(e loggedRequest, seq int) loggedRequest {
 	e.Seq = seq
 	return e
+}
+
+func offSchema(e loggedRequest) loggedRequest {
+	e.OffSchema = true
+	return e
+}
+
+func numbered(n int) []string {
+	var out []string
+	for i := 1; i <= n; i++ {
+		out = append(out, fmt.Sprintf("problem %d", i))
+	}
+	return out
 }

@@ -27,6 +27,7 @@ type setOptions struct {
 	at        string
 	value     string
 	valueSet  bool
+	offSchema bool
 }
 
 func parseSetArgs(args []string) (setOptions, error) {
@@ -41,23 +42,13 @@ func parseSetArgs(args []string) (setOptions, error) {
 	fs.StringVar(&opts.bodyFile, "body-file", "", "file holding the JSON body")
 	fs.StringVar(&opts.at, "at", "", "dotted path inside the body, such as data.repository.issue.title")
 	fs.StringVar(&opts.value, "json", "", "JSON value to put at --at")
+	fs.BoolVar(&opts.offSchema, "off-schema", false, "save the response even if it doesn't match GitHub's schema")
 
-	// The request name normally comes first, which would stop flag parsing.
-	rest := args
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		opts.name = args[0]
-		rest = args[1:]
+	name, err := parseWithName(fs, args)
+	if err != nil {
+		return setOptions{}, err
 	}
-	if err := fs.Parse(rest); err != nil {
-		return setOptions{}, usageError{err}
-	}
-	extra := fs.Args()
-	if opts.name == "" && len(extra) > 0 {
-		opts.name, extra = extra[0], extra[1:]
-	}
-	if len(extra) > 0 {
-		return setOptions{}, newUsageError("unexpected arguments: %s", strings.Join(extra, " "))
-	}
+	opts.name = name
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "body":
@@ -92,11 +83,36 @@ func parseSetArgs(args []string) (setOptions, error) {
 			return setOptions{}, newUsageError("--header %q must look like 'Name: value'", h)
 		}
 	}
-	changes := opts.status != 0 || len(opts.headers) > 0 || opts.bodySet || opts.bodyFile != "" || opts.at != ""
+	changes := opts.status != 0 || len(opts.headers) > 0 || opts.bodySet || opts.bodyFile != "" || opts.at != "" || opts.offSchema
 	if !changes && !opts.appendNew {
-		return setOptions{}, newUsageError("nothing to change; pass --status, --header, --body, --body-file or --at")
+		return setOptions{}, newUsageError("nothing to change; pass --status, --header, --body, --body-file, --at or --off-schema")
 	}
 	return opts, nil
+}
+
+// parseWithName parses flags for a command whose name argument normally comes
+// first, which would otherwise stop flag parsing. It returns the name.
+func parseWithName(fs *flag.FlagSet, args []string) (string, error) {
+	var name string
+	rest := args
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		name, rest = args[0], args[1:]
+	}
+	if err := fs.Parse(rest); err != nil {
+		return "", usageError{err}
+	}
+	extra := fs.Args()
+	if name == "" && len(extra) > 0 {
+		name, extra = extra[0], extra[1:]
+	}
+	if len(extra) > 0 {
+		hint := ""
+		if !strings.Contains(name, " ") && strings.HasPrefix(extra[0], "/") {
+			hint = fmt.Sprintf("; quote the request name, such as '%s %s'", name, extra[0])
+		}
+		return "", newUsageError("unexpected arguments: %s%s", strings.Join(extra, " "), hint)
+	}
+	return name, nil
 }
 
 // validateName checks that a request name looks like "graphql Operation" or
@@ -118,7 +134,7 @@ func validateName(name string) error {
 	return nil
 }
 
-func cmdSet(args []string, stdout io.Writer) error {
+func cmdSet(args []string, stdout, stderr io.Writer) error {
 	opts, err := parseSetArgs(args)
 	if err != nil {
 		return err
@@ -143,11 +159,79 @@ func cmdSet(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	result, err := checkBeforeSave(st, newChecker(stderr), opts.name, &responses[opts.name][pos], opts.offSchema)
+	if err != nil {
+		return err
+	}
 	if err := st.saveResponses(responses); err != nil {
 		return err
 	}
 	fmt.Fprintln(stdout, describeResponse(opts.name, responses[opts.name], pos))
+	fmt.Fprintln(stdout, result)
 	return nil
+}
+
+// checkBeforeSave checks a changed response against GitHub's schema before it
+// is saved. It returns a line saying what the check did, or an error listing
+// the problems. A GraphQL response is checked against the query gh last sent
+// for it, so it isn't checked until gh has sent one.
+func checkBeforeSave(st *state, chk *checker, name string, resp *response, offSchema bool) (string, error) {
+	if offSchema {
+		resp.OffSchema = true
+		return "Schema check: skipped, saved as off-schema", nil
+	}
+	resp.OffSchema = false
+
+	method, target, _ := strings.Cut(name, " ")
+	e := loggedRequest{Name: name, Method: method, Host: apiHost, Path: target}
+	if method == "graphql" {
+		if _, err := chk.graphQL(); err != nil {
+			return fmt.Sprintf("Schema check: skipped, GraphQL checks are off: %v", err), nil
+		}
+		query, err := lastQuery(st, name)
+		if err != nil {
+			return "", err
+		}
+		if query == "" {
+			return fmt.Sprintf("Schema check: not yet, because gh hasn't sent %s; the next run checks it", name), nil
+		}
+		e = loggedRequest{Name: name, Method: http.MethodPost, Host: apiHost, Path: "/graphql", GraphQL: &graphQLRequest{Query: query}}
+	} else {
+		if host, path, ok := strings.Cut(target, "/"); ok && host != "" {
+			e.Host, e.Path = host, "/"+path
+		}
+		if e.Host == apiHost {
+			if _, err := chk.rest(); err != nil {
+				return fmt.Sprintf("Schema check: skipped, REST checks are off: %v", err), nil
+			}
+		}
+	}
+
+	res := chk.checkRequest(e, resp)
+	switch {
+	case len(res.responseProblems) > 0:
+		return "", fmt.Errorf("the response doesn't match GitHub's schema, so it wasn't saved:\n%sFix it, or pass --off-schema to save it anyway",
+			indentProblems(res.responseProblems, "  ", 0))
+	case res.note != "":
+		return "Schema check: skipped, " + res.note, nil
+	default:
+		return "Schema check: passed", nil
+	}
+}
+
+// lastQuery returns the query gh most recently sent for a GraphQL request
+// name, or "" if it hasn't sent one.
+func lastQuery(st *state, name string) (string, error) {
+	entries, err := st.readLog()
+	if err != nil {
+		return "", err
+	}
+	for _, entrie := range slices.Backward(entries) {
+		if entrie.Name == name && entrie.GraphQL != nil {
+			return entrie.GraphQL.Query, nil
+		}
+	}
+	return "", nil
 }
 
 // applySet changes one stored response and returns its position.
@@ -314,6 +398,10 @@ func describeResponse(name string, list []response, pos int) string {
 	if len(headers) > 0 {
 		headerText = "headers " + strings.Join(headers, ", ")
 	}
-	return fmt.Sprintf("%s: response %d of %d: status %d, %s, body %d bytes",
-		name, pos+1, len(list), r.status(), headerText, len(r.Body))
+	offSchema := ""
+	if r.OffSchema {
+		offSchema = ", off-schema"
+	}
+	return fmt.Sprintf("%s: response %d of %d: status %d, %s, body %d bytes%s",
+		name, pos+1, len(list), r.status(), headerText, len(r.Body), offSchema)
 }
