@@ -99,6 +99,9 @@ Implements: Node
 Fields (a type ending in ! is never null):
   id: ID!
   name: String!
+  nameWithOwner: String!
+  url: URI!
+  hasIssuesEnabled: Boolean!
   issue: Issue
   issueOrPullRequest: IssueOrPullRequest
   labels: LabelConnection
@@ -141,8 +144,8 @@ Fields (a type ending in ! is never null):
 			want: `IssueState: an enum
 The possible states of an issue.
 Values:
-  OPEN    An issue that is still open
   CLOSED  An issue that has been closed
+  OPEN    An issue that is still open
 `,
 		},
 		{
@@ -277,6 +280,8 @@ Required properties:
   content: string
   path: string
   type: string, one of "file"
+Optional properties:
+  encoding: string
 `,
 		},
 		{

@@ -73,56 +73,74 @@ func (s schemaSource) locate(progress io.Writer) (string, error) {
 		}
 		return p, nil
 	}
-	dir, err := schemaCacheDir()
+	p, err := s.cachePath()
 	if err != nil {
 		return "", err
 	}
-	p := filepath.Join(dir, s.fileName)
 	if _, err := os.Stat(p); err == nil {
 		return p, nil
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return "", err
 	}
-	return s.download(dir, progress)
+	return p, s.download(p, progress)
 }
 
-// download fetches the file into dir. It checks the file and writes it to a
-// temporary file first, so a failed download never replaces a good copy.
-func (s schemaSource) download(dir string, progress io.Writer) (string, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+func (s schemaSource) cachePath() (string, error) {
+	dir, err := schemaCacheDir()
+	if err != nil {
 		return "", err
 	}
-	fmt.Fprintf(progress, "ghmock: downloading GitHub's %s to %s\n", s.label, dir)
+	return filepath.Join(dir, s.fileName), nil
+}
+
+// updatePath is where ghmock schemas update writes the file: the path in the
+// environment variable if it's set, because that's the file ghmock uses, and
+// the cache otherwise.
+func (s schemaSource) updatePath() (string, error) {
+	if p := os.Getenv(s.envVar); p != "" {
+		return p, nil
+	}
+	return s.cachePath()
+}
+
+// download fetches the file to path. It checks the file and writes it to a
+// temporary file first, so a failed download never replaces a good copy.
+func (s schemaSource) download(path string, progress io.Writer) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	fmt.Fprintf(progress, "ghmock: downloading GitHub's %s to %s\n", s.label, path)
 
 	req, err := http.NewRequest(http.MethodGet, s.url, nil)
 	if err != nil {
-		return "", err
+		return err
 	}
 	req.Header.Set("User-Agent", "ghmock")
 	resp, err := downloadClient.Do(req)
 	if err != nil {
-		return "", s.downloadError(err)
+		return s.downloadError(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", s.downloadError(fmt.Errorf("HTTP %d", resp.StatusCode))
+		return s.downloadError(fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxSchemaSize+1))
 	switch {
 	case err != nil:
-		return "", s.downloadError(err)
+		return s.downloadError(err)
 	case len(data) > maxSchemaSize:
-		return "", s.downloadError(fmt.Errorf("file is larger than %d MB", maxSchemaSize>>20))
+		return s.downloadError(fmt.Errorf("file is larger than %d MB", maxSchemaSize>>20))
 	case len(data) == 0:
-		return "", s.downloadError(errors.New("file is empty"))
+		return s.downloadError(errors.New("file is empty"))
 	}
 	if err := s.validate(data); err != nil {
-		return "", s.downloadError(fmt.Errorf("not a usable %s: %w", s.label, err))
+		return s.downloadError(fmt.Errorf("not a usable %s: %w", s.label, err))
 	}
 
-	tmp, err := os.CreateTemp(dir, s.fileName+".*.tmp")
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer os.Remove(tmp.Name())
 	_, err = tmp.Write(data)
@@ -135,13 +153,9 @@ func (s schemaSource) download(dir string, progress io.Writer) (string, error) {
 		err = closeErr
 	}
 	if err != nil {
-		return "", err
+		return err
 	}
-	p := filepath.Join(dir, s.fileName)
-	if err := os.Rename(tmp.Name(), p); err != nil {
-		return "", err
-	}
-	return p, nil
+	return os.Rename(tmp.Name(), path)
 }
 
 func (s schemaSource) downloadError(err error) error {

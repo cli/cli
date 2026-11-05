@@ -83,23 +83,26 @@ func fakeGH(args []string) int {
 	case "--version":
 		fmt.Printf("gh version 0.0.0-%s\n", os.Getenv("GHMOCK_FAKE_VARIANT"))
 	case "env":
-		home := os.Getenv("HOME")
-		if strings.Contains(home, "ghmock-run-") {
-			home = "<scratch>/" + filepath.Base(home)
-		}
 		wd, _ := os.Getwd()
-		if strings.Contains(wd, "ghmock-run-") {
-			wd = "<scratch>/" + filepath.Base(wd)
-		}
 		for _, kv := range [][2]string{
 			{"GH_HOST", os.Getenv("GH_HOST")},
 			{"GH_TOKEN", os.Getenv("GH_TOKEN")},
 			{"GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN")},
 			{"GH_FORCE_TTY", os.Getenv("GH_FORCE_TTY")},
-			{"HOME", home},
+			{"HOME", os.Getenv("HOME")},
 			{"PWD", wd},
 		} {
 			fmt.Printf("%s=%s\n", kv[0], kv[1])
+		}
+		for _, name := range []string{"config.yml", "hosts.yml"} {
+			path := filepath.Join(os.Getenv("GH_CONFIG_DIR"), name)
+			fmt.Printf("--- %s\n", path)
+			data, err := os.ReadFile(path)
+			if err != nil {
+				fmt.Println("(none)")
+				continue
+			}
+			fmt.Print(string(data))
 		}
 	case "stdin":
 		_, _ = io.Copy(os.Stdout, os.Stdin)
@@ -230,9 +233,14 @@ func TestRunAll(t *testing.T) {
 		variants     []string
 		responses    responseSet
 		checkSchemas bool
-		opts         runOptions
-		want         []resultSummary
-		afterAPI     bool
+		// builds sets buildsDir: "own" is the folder holding the fake gh,
+		// and "other" is a different folder.
+		builds      string
+		opts        runOptions
+		want        []resultSummary
+		wantCommand string
+		wantErr     string
+		afterAPI    bool
 	}{
 		{
 			name:      "a request-free command replaces the last run selection",
@@ -243,48 +251,93 @@ func TestRunAll(t *testing.T) {
 			afterAPI:  true,
 		},
 		{
-			name:     "gh gets an isolated environment with a fake token",
-			variants: []string{"a"},
-			opts:     runOptions{args: []string{"env"}},
+			name:        "gh gets an isolated environment, logged in with a fake token",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"env"}},
+			wantCommand: "ghmock run --gh <gh-a> --timeout 30s -- env",
 			want: []resultSummary{{
 				Version: "gh version 0.0.0-a",
-				Stdout: "GH_HOST=github.localhost\nGH_TOKEN=ghmock-fake-token\nGITHUB_TOKEN=\n" +
-					"GH_FORCE_TTY=\nHOME=<scratch>/home\nPWD=<scratch>/work\n",
+				Stdout: `GH_HOST=github.localhost
+GH_TOKEN=
+GITHUB_TOKEN=
+GH_FORCE_TTY=
+HOME=<scratch>/home
+PWD=<scratch>/work
+--- <scratch>/config/config.yml
+version: "1"
+--- <scratch>/config/hosts.yml
+github.localhost:
+    users:
+        monalisa:
+            oauth_token: ghmock-fake-token
+    git_protocol: https
+    oauth_token: ghmock-fake-token
+    user: monalisa
+`,
 			}},
 		},
 		{
-			name:     "--logged-out drops the token and --tty forces a terminal",
-			variants: []string{"a"},
-			opts:     runOptions{args: []string{"env"}, loggedOut: true, tty: true},
+			name:        "--logged-out skips the login and --tty forces a terminal",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"env"}, loggedOut: true, tty: true},
+			wantCommand: "ghmock run --gh <gh-a> --tty --logged-out --timeout 30s -- env",
 			want: []resultSummary{{
 				Version: "gh version 0.0.0-a",
-				Stdout: "GH_HOST=github.localhost\nGH_TOKEN=\nGITHUB_TOKEN=\n" +
-					"GH_FORCE_TTY=120\nHOME=<scratch>/home\nPWD=<scratch>/work\n",
+				Stdout: `GH_HOST=github.localhost
+GH_TOKEN=
+GITHUB_TOKEN=
+GH_FORCE_TTY=120
+HOME=<scratch>/home
+PWD=<scratch>/work
+--- <scratch>/config/config.yml
+version: "1"
+--- <scratch>/config/hosts.yml
+(none)
+`,
 			}},
 		},
 		{
-			name:     "--stdin is passed to gh",
-			variants: []string{"a"},
-			opts:     runOptions{args: []string{"stdin"}, stdin: "secret-token"},
-			want:     []resultSummary{{Version: "gh version 0.0.0-a", Stdout: "secret-token"}},
+			name:        "a ghmock built with a builds folder runs gh builds in it",
+			variants:    []string{"a"},
+			builds:      "own",
+			opts:        runOptions{args: []string{"exit", "0"}},
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", Stderr: "failing on purpose\n"}},
+			wantCommand: "ghmock run --gh <gh-a> --timeout 30s -- exit 0",
 		},
 		{
-			name:     "gh's exit code and stderr are reported",
+			name:     "a ghmock built with a builds folder refuses anything else",
 			variants: []string{"a"},
-			opts:     runOptions{args: []string{"exit", "3"}},
-			want:     []resultSummary{{Version: "gh version 0.0.0-a", ExitCode: 3, Stderr: "failing on purpose\n"}},
+			builds:   "other",
+			opts:     runOptions{args: []string{"exit", "0"}},
+			wantErr:  "<gh-a>: <gh-a> isn't a gh build in <builds>, and this ghmock only runs those",
 		},
 		{
-			name:     "a run that takes too long is stopped",
-			variants: []string{"a"},
-			opts:     runOptions{args: []string{"sleep"}, timeout: 300 * time.Millisecond},
-			want:     []resultSummary{{Version: "gh version 0.0.0-a", ExitCode: -1, TimedOut: true}},
+			name:        "--stdin is passed to gh",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"stdin"}, stdin: "it's secret"},
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", Stdout: "it's secret"}},
+			wantCommand: `ghmock run --gh <gh-a> --stdin 'it'\''s secret' --timeout 30s -- stdin`,
 		},
 		{
-			name:      "requests get stored responses",
-			variants:  []string{"a"},
-			responses: responseSet{"GET /repos/octo/hello": {{Body: json.RawMessage(`{"name":"hello"}`)}}},
-			opts:      runOptions{args: []string{"api", "repos/octo/hello"}},
+			name:        "gh's exit code and stderr are reported",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"exit", "3"}},
+			wantCommand: "ghmock run --gh <gh-a> --timeout 30s -- exit 3",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", ExitCode: 3, Stderr: "failing on purpose\n"}},
+		},
+		{
+			name:        "a run that takes too long is stopped",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"sleep"}, timeout: 300 * time.Millisecond},
+			wantCommand: "ghmock run --gh <gh-a> --timeout 300ms -- sleep",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", ExitCode: -1, TimedOut: true}},
+		},
+		{
+			name:        "requests get stored responses",
+			variants:    []string{"a"},
+			responses:   responseSet{"GET /repos/octo/hello": {{Body: json.RawMessage(`{"name":"hello"}`)}}},
+			opts:        runOptions{args: []string{"api", "repos/octo/hello"}},
+			wantCommand: "ghmock run --gh <gh-a> --timeout 30s -- api repos/octo/hello",
 			want: []resultSummary{{
 				Version:  "gh version 0.0.0-a",
 				Stdout:   "200 {\"name\":\"hello\"}\n",
@@ -297,6 +350,7 @@ func TestRunAll(t *testing.T) {
 			responses:    responseSet{"GET /repos/octo/hello": {{Body: json.RawMessage(`{"id":1,"name":"hello","owner":{"login":"octo","id":2}}`)}}},
 			checkSchemas: true,
 			opts:         runOptions{args: []string{"api", "repos/octo/hello"}},
+			wantCommand:  "ghmock run --gh <gh-a> --timeout 30s -- api repos/octo/hello",
 			want: []resultSummary{{
 				Version: "gh version 0.0.0-a",
 				Stdout:  "200 {\"id\":1,\"name\":\"hello\",\"owner\":{\"login\":\"octo\",\"id\":2}}\n",
@@ -313,7 +367,8 @@ func TestRunAll(t *testing.T) {
 				{Status: 502, Body: json.RawMessage(`{"message":"bad gateway"}`)},
 				{Body: json.RawMessage(`{"ok":true}`)},
 			}},
-			opts: runOptions{args: []string{"api", "flaky"}},
+			opts:        runOptions{args: []string{"api", "flaky"}},
+			wantCommand: "ghmock run --gh <gh-a> --gh <gh-b> --timeout 30s -- api flaky",
 			want: []resultSummary{
 				{
 					Version:  "gh version 0.0.0-a",
@@ -352,14 +407,30 @@ func TestRunAll(t *testing.T) {
 			if tt.checkSchemas {
 				chk = testChecker(t)
 			}
+			replacer := strings.NewReplacer()
+			if tt.builds != "" {
+				dir := filepath.Dir(opts.binaries[0])
+				if tt.builds == "other" {
+					dir = t.TempDir()
+				}
+				old := buildsDir
+				t.Cleanup(func() { buildsDir = old })
+				buildsDir = dir
+				replacer = strings.NewReplacer(opts.binaries[0], "<gh-a>", dir, "<builds>")
+			}
 			if tt.afterAPI {
 				previous := opts
 				previous.args = []string{"api", "user"}
-				_, err := runAll(st, chk, previous)
+				_, _, err := runAll(st, chk, previous)
 				require.NoError(t, err)
 			}
 
-			results, err := runAll(st, chk, opts)
+			rec, results, err := runAll(st, chk, opts)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErr, replacer.Replace(err.Error()))
+				return
+			}
 			require.NoError(t, err)
 
 			var got []resultSummary
@@ -401,7 +472,38 @@ func TestRunAll(t *testing.T) {
 			}
 			assert.Equal(t, wantLogged, summarize(logged))
 			for _, e := range logged {
-				assert.Equal(t, runs[0].ID, e.Run, "one run ID per ghmock run")
+				assert.Equal(t, rec.ID, e.Run, "one run ID per ghmock run")
+			}
+
+			// The run is saved for ghmock export, with what ghmock run printed.
+			saved, err := st.readRuns()
+			require.NoError(t, err)
+			require.Equal(t, []runRecord{rec}, saved)
+			command := rec.Command
+			for i, b := range opts.binaries {
+				command = strings.ReplaceAll(command, b, "<gh-"+tt.variants[i]+">")
+			}
+			assert.Equal(t, tt.wantCommand, command)
+			var outcomes []runOutcome
+			for i, r := range results {
+				outcomes = append(outcomes, runOutcome{
+					Binary: opts.binaries[i], Path: r.path, Version: r.version, ExitCode: r.exitCode,
+					TimedOut: r.timedOut, Stdout: r.stdout, Stderr: r.stderr,
+				})
+			}
+			assert.Equal(t, outcomes, rec.Results)
+			var report strings.Builder
+			printReport(&report, opts, results, nil)
+			assert.Equal(t, report.String(), rec.Report)
+			var schemas []string
+			for _, f := range rec.Schemas {
+				assert.Len(t, f.SHA256, 64)
+				schemas = append(schemas, f.Name+" "+filepath.Base(f.Path))
+			}
+			if tt.checkSchemas {
+				assert.Equal(t, []string{"GraphQL schema schema.graphql", "REST description rest.json"}, schemas)
+			} else {
+				assert.Empty(t, schemas)
 			}
 		})
 	}
@@ -608,6 +710,41 @@ REST checks are off: downloads are off
 `,
 		},
 		{
+			name: "two binaries that ask for different fields",
+			results: []runResult{
+				{path: "/old/gh", version: "gh version 1.0.0", requests: []loggedRequest{withQuery(viewRequest,
+					`query IssueByNumber { repository { issue: issueOrPullRequest { ... on Issue { title body } } } }`)}},
+				{path: "/new/gh", version: "gh version 2.0.0", requests: []loggedRequest{withQuery(viewRequest,
+					`query IssueByNumber { repository { issue: issueOrPullRequest { ... on Issue { title subIssuesSummary { total completed } } } } }`)}},
+			},
+			want: `=== [1] gh version 1.0.0 - /old/gh (baseline)
+$ gh issue view 1
+exit code: 0
+--- stdout
+(empty)
+--- stderr
+(empty)
+--- requests (1)
+1. graphql IssueByNumber {"number":1} -> 200, response 1 of 1
+
+=== [2] gh version 2.0.0 - /new/gh
+$ gh issue view 1
+exit code: 0
+--- stdout
+(empty)
+--- stderr
+(empty)
+--- requests (1)
+1. graphql IssueByNumber {"number":1} -> 200, response 1 of 1
+
+=== differences from [1]
+[2] gh version 2.0.0:
+  graphql IssueByNumber asked for different fields:
+    only [1]: data.repository.issue.body
+    only [2]: data.repository.issue.subIssuesSummary
+`,
+		},
+		{
 			name: "two binaries that match",
 			results: []runResult{
 				{path: "/a/gh", version: "gh version 1.0.0", stdout: "ok\n", requests: []loggedRequest{viewRequest}},
@@ -657,6 +794,13 @@ ok
 
 func withSeq(e loggedRequest, seq int) loggedRequest {
 	e.Seq = seq
+	return e
+}
+
+func withQuery(e loggedRequest, query string) loggedRequest {
+	gql := *e.GraphQL
+	gql.Query = query
+	e.GraphQL = &gql
 	return e
 }
 

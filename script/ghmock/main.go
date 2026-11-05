@@ -26,7 +26,11 @@ Commands:
                               [--at PATH --json VALUE] [--index N | --append] [--off-schema]
   log      Show the requests from the last run
            ghmock log [--all] [--full] [--json]
-  reset    Delete all responses and the request log
+  reset    Delete all responses, the request log and saved runs
+  scaffold Add placeholder responses that pass the schema check
+           ghmock scaffold REQUEST | --missing
+  export   Write runs, requests and responses to a folder, to check results
+           ghmock export DIR
   schema   Look up a GraphQL type or field, or a REST request, in GitHub's schemas
            ghmock schema Issue | Issue.title | 'GET /repos/octo/hello' [--status N] [--at PATH]
   schemas  Download GitHub's schemas again
@@ -42,8 +46,19 @@ ghmock set rejects a response that doesn't match GitHub's schema, unless you
 pass --off-schema. ghmock run reports responses, GraphQL queries and variables
 that don't match.
 
+GraphQL responses are trimmed to the fields gh asks for, as GitHub does, so one
+stored response can serve gh versions that ask for different fields. Off-schema
+responses are sent as stored.
+
+ghmock scaffold --missing adds a response for each request in the last run that
+had none, and adds fields gh asked for that a stored GraphQL response lacks. It
+never changes a value that's already there. GraphQL placeholders come from
+gh's query, and REST bodies from GitHub's examples. Change what matters with
+ghmock set, then run gh again.
+
 The schemas come from $GHMOCK_GRAPHQL_SCHEMA and $GHMOCK_REST_SCHEMA, or are
-downloaded into ghmock's cache folder the first time they're needed.
+downloaded into ghmock's cache folder the first time they're needed. ghmock
+schemas update downloads them again, to those paths when they're set.
 
 State lives in $GHMOCK_DIR, or in a ghmock folder in the system temp directory.
 ghmock exits non-zero only when ghmock itself fails. gh's exit code is in the report.
@@ -82,6 +97,10 @@ func runMain(args []string, stdout, stderr io.Writer) int {
 		err = cmdLog(args[1:], stdout)
 	case "reset":
 		err = cmdReset(args[1:], stdout)
+	case "scaffold":
+		err = cmdScaffold(args[1:], stdout, stderr)
+	case "export":
+		err = cmdExport(args[1:], stdout)
 	case "schema":
 		err = cmdSchema(args[1:], stdout, stderr)
 	case "schemas":

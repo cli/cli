@@ -12,12 +12,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
 
-// fakeToken is the token gh gets. It authenticates nothing.
-const fakeToken = "ghmock-fake-token"
+const (
+	defaultTimeout = time.Minute
+
+	// fakeToken is the token gh gets. It authenticates nothing.
+	fakeToken = "ghmock-fake-token"
+	// fakeUser is the account gh is logged in as.
+	fakeUser = "monalisa"
+)
 
 // runOptions are the parsed flags of ghmock run.
 type runOptions struct {
@@ -58,7 +66,7 @@ func parseRunArgs(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.tty, "tty", false, "make gh behave as if writing to a 120-column terminal")
 	fs.StringVar(&opts.stdin, "stdin", "", "text to pass to gh on standard input")
 	fs.BoolVar(&opts.loggedOut, "logged-out", false, "run gh without a token")
-	fs.DurationVar(&opts.timeout, "timeout", time.Minute, "how long each gh run may take")
+	fs.DurationVar(&opts.timeout, "timeout", defaultTimeout, "how long each gh run may take")
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, usageError{err}
 	}
@@ -86,38 +94,87 @@ func cmdRun(args []string, stdout, stderr io.Writer) error {
 	}
 	chk := newChecker(stderr)
 	chk.preload()
-	results, err := runAll(st, chk, opts)
+	rec, _, err := runAll(st, chk, opts)
 	if err != nil {
 		return err
 	}
-	printReport(stdout, opts, results, chk.unavailable())
+	fmt.Fprint(stdout, rec.Report)
 	return nil
 }
 
-// runAll runs each binary in turn and appends its requests to the log. A nil
-// checker turns schema checks off.
-func runAll(st *state, chk *checker, opts runOptions) ([]runResult, error) {
+// runAll runs each binary in turn and appends its requests to the log. It
+// then saves the run and its report for ghmock export. A nil checker turns
+// schema checks off.
+func runAll(st *state, chk *checker, opts runOptions) (runRecord, []runResult, error) {
 	start := time.Now().UTC()
-	runID := newRunID()
+	rec := runRecord{ID: newRunID(start), Time: start.Truncate(time.Second), Command: opts.commandLine()}
 	results := make([]runResult, 0, len(opts.binaries))
 	for _, binary := range opts.binaries {
 		res, err := runBinary(st, chk, binary, opts)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", binary, err)
+			return runRecord{}, nil, fmt.Errorf("%s: %w", binary, err)
 		}
 		for i := range res.requests {
-			res.requests[i].Run = runID
+			res.requests[i].Run = rec.ID
 			res.requests[i].Binary = binary
 		}
 		if err := st.appendLog(res.requests); err != nil {
-			return nil, err
+			return runRecord{}, nil, err
 		}
 		results = append(results, res)
+		rec.Results = append(rec.Results, runOutcome{
+			Binary: binary, Path: res.path, Version: res.version, ExitCode: res.exitCode,
+			TimedOut: res.timedOut, Stdout: res.stdout, Stderr: res.stderr,
+		})
 	}
-	if err := st.appendRun(runRecord{ID: runID, Time: start.Truncate(time.Second)}); err != nil {
-		return nil, err
+
+	var notes []string
+	if chk != nil {
+		notes = chk.unavailable()
+		rec.Schemas = chk.schemaFiles()
 	}
-	return results, nil
+	var report strings.Builder
+	printReport(&report, opts, results, notes)
+	rec.Report = report.String()
+	if err := st.appendRun(rec); err != nil {
+		return runRecord{}, nil, err
+	}
+	return rec, results, nil
+}
+
+// commandLine is the ghmock run command for these options, quoted for a
+// POSIX shell.
+func (o runOptions) commandLine() string {
+	parts := []string{"ghmock", "run"}
+	for _, b := range o.binaries {
+		parts = append(parts, "--gh", shellQuote(b))
+	}
+	if o.tty {
+		parts = append(parts, "--tty")
+	}
+	if o.stdin != "" {
+		parts = append(parts, "--stdin", shellQuote(o.stdin))
+	}
+	if o.loggedOut {
+		parts = append(parts, "--logged-out")
+	}
+	if o.timeout != defaultTimeout {
+		parts = append(parts, "--timeout", o.timeout.String())
+	}
+	parts = append(parts, "--")
+	for _, a := range o.args {
+		parts = append(parts, shellQuote(a))
+	}
+	return strings.Join(parts, " ")
+}
+
+var shellSafe = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
+
+func shellQuote(s string) string {
+	if shellSafe.MatchString(s) {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func runBinary(st *state, chk *checker, binary string, opts runOptions) (runResult, error) {
@@ -136,6 +193,9 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions) (runResu
 		if err := os.MkdirAll(filepath.Join(scratch, d), 0o755); err != nil {
 			return runResult{}, err
 		}
+	}
+	if err := writeGHConfig(filepath.Join(scratch, "config"), !opts.loggedOut); err != nil {
+		return runResult{}, err
 	}
 
 	srv, err := startServer(st, chk)
@@ -159,8 +219,8 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions) (runResu
 	runErr := cmd.Run()
 
 	res.requests = srv.close()
-	res.stdout = stdout.String()
-	res.stderr = stderr.String()
+	res.stdout = hideScratch(stdout.String(), scratch)
+	res.stderr = hideScratch(stderr.String(), scratch)
 	var exitErr *exec.ExitError
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
@@ -177,10 +237,13 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions) (runResu
 // resolveBinary turns a --gh value into an absolute path. A bare name is
 // looked up on PATH.
 func resolveBinary(p string) (string, error) {
+	var abs string
+	var err error
 	if !strings.ContainsRune(p, filepath.Separator) && !strings.Contains(p, "/") {
-		return exec.LookPath(p)
+		abs, err = exec.LookPath(p)
+	} else {
+		abs, err = filepath.Abs(p)
 	}
-	abs, err := filepath.Abs(p)
 	if err != nil {
 		return "", err
 	}
@@ -194,7 +257,76 @@ func resolveBinary(p string) (string, error) {
 	if info.Mode()&0o111 == 0 {
 		return "", fmt.Errorf("%s is not executable", abs)
 	}
+	if err := checkBuildsDir(p, abs); err != nil {
+		return "", err
+	}
 	return abs, nil
+}
+
+// buildsDir, when set at build time with -ldflags "-X main.buildsDir=DIR",
+// limits --gh to binaries inside DIR. The issue-triage workflow sets it: its
+// agent's only command is ghmock, and without this, ghmock run --gh /bin/sh
+// would run any program.
+var buildsDir string
+
+// checkBuildsDir checks that a binary is inside buildsDir, after following
+// symlinks, so a link can't point outside it.
+func checkBuildsDir(name, abs string) error {
+	if buildsDir == "" {
+		return nil
+	}
+	root, err := filepath.EvalSymlinks(buildsDir)
+	if err != nil {
+		return err
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return err
+	}
+	rel, err := filepath.Rel(root, resolved)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("%s isn't a gh build in %s, and this ghmock only runs those", name, buildsDir)
+	}
+	return nil
+}
+
+// writeGHConfig writes gh's config the way gh auth login --insecure-storage
+// leaves it, logged in as fakeUser with fakeToken. A token in GH_TOKEN would
+// also apply to github.com, so gh auth status would check github.com, which
+// ghmock blocks. The config version marks the multi-account migration as
+// done, as it is for anyone who has logged in with a recent gh.
+func writeGHConfig(dir string, loggedIn bool) error {
+	if err := os.WriteFile(filepath.Join(dir, "config.yml"), []byte("version: \"1\"\n"), 0o600); err != nil {
+		return err
+	}
+	if !loggedIn {
+		return nil
+	}
+	hosts := fmt.Sprintf(`%[1]s:
+    users:
+        %[2]s:
+            oauth_token: %[3]s
+    git_protocol: https
+    oauth_token: %[3]s
+    user: %[2]s
+`, mockHost, fakeUser, fakeToken)
+	return os.WriteFile(filepath.Join(dir, "hosts.yml"), []byte(hosts), 0o600)
+}
+
+// hideScratch replaces the run's scratch folder with <scratch> in gh's
+// output. Each binary gets its own folder, so paths such as the hosts.yml
+// that gh auth status names would otherwise differ between binaries.
+func hideScratch(text, scratch string) string {
+	paths := []string{scratch}
+	// macOS gives gh /private/var/... for a temporary folder under /var/....
+	if resolved, err := filepath.EvalSymlinks(scratch); err == nil && resolved != scratch {
+		paths = append(paths, resolved)
+	}
+	sort.Slice(paths, func(i, j int) bool { return len(paths[i]) > len(paths[j]) })
+	for _, p := range paths {
+		text = strings.ReplaceAll(text, p, "<scratch>")
+	}
+	return text
 }
 
 // ghEnv builds gh's whole environment from scratch, so the caller's tokens,
@@ -235,9 +367,6 @@ func ghEnv(scratch, proxyURL string, opts runOptions) []string {
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_CONFIG_GLOBAL=" + dir("home/.gitconfig"),
 	}
-	if !opts.loggedOut {
-		env = append(env, "GH_TOKEN="+fakeToken)
-	}
 	if opts.tty {
 		env = append(env, "GH_FORCE_TTY=120")
 	}
@@ -258,8 +387,8 @@ func ghVersion(path string, env []string, dir string) string {
 	return strings.TrimSpace(line)
 }
 
-func newRunID() string {
+func newRunID(start time.Time) string {
 	var b [3]byte
 	_, _ = rand.Read(b[:])
-	return time.Now().UTC().Format("20060102T150405Z") + "-" + hex.EncodeToString(b[:])
+	return start.Format("20060102T150405Z") + "-" + hex.EncodeToString(b[:])
 }

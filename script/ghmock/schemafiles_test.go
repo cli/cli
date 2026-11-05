@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -96,24 +97,24 @@ func TestSchemaSourceLocate(t *testing.T) {
 			served:       map[string]string{"/schema.graphql": schema},
 			wantPath:     "<cache>/schema.docs.graphql",
 			wantContent:  schema,
-			wantProgress: "ghmock: downloading GitHub's GraphQL schema to <cache>\n",
+			wantProgress: "ghmock: downloading GitHub's GraphQL schema to <cache>/schema.docs.graphql\n",
 		},
 		{
 			name:         "a failed download",
 			served:       map[string]string{},
-			wantProgress: "ghmock: downloading GitHub's GraphQL schema to <cache>\n",
+			wantProgress: "ghmock: downloading GitHub's GraphQL schema to <cache>/schema.docs.graphql\n",
 			wantErr:      "downloading GitHub's GraphQL schema from <server>/schema.graphql: HTTP 404 (without network access, set GHMOCK_GRAPHQL_SCHEMA to a local copy)",
 		},
 		{
 			name:         "a download that isn't a schema",
 			served:       map[string]string{"/schema.graphql": "<html>"},
-			wantProgress: "ghmock: downloading GitHub's GraphQL schema to <cache>\n",
+			wantProgress: "ghmock: downloading GitHub's GraphQL schema to <cache>/schema.docs.graphql\n",
 			wantErr:      "downloading GitHub's GraphQL schema from <server>/schema.graphql: not a usable GraphQL schema: line 1, column 1: Unexpected <Invalid> (without network access, set GHMOCK_GRAPHQL_SCHEMA to a local copy)",
 		},
 		{
 			name:         "an empty download",
 			served:       map[string]string{"/schema.graphql": ""},
-			wantProgress: "ghmock: downloading GitHub's GraphQL schema to <cache>\n",
+			wantProgress: "ghmock: downloading GitHub's GraphQL schema to <cache>/schema.docs.graphql\n",
 			wantErr:      "downloading GitHub's GraphQL schema from <server>/schema.graphql: file is empty (without network access, set GHMOCK_GRAPHQL_SCHEMA to a local copy)",
 		},
 	}
@@ -177,31 +178,30 @@ func TestCmdSchemas(t *testing.T) {
 			name:   "downloads both files",
 			args:   []string{"update"},
 			served: map[string]string{"/schema.graphql": schema, "/rest.json": rest},
-			wantStdout: "GraphQL schema: <cache>/schema.docs.graphql (1.6 KB)\n" +
-				"REST description: <cache>/api.github.com.json (5.7 KB)\n",
-			wantStderr: "ghmock: downloading GitHub's GraphQL schema to <cache>\n" +
-				"ghmock: downloading GitHub's REST description to <cache>\n",
+			wantStdout: "GraphQL schema: <cache>/schema.docs.graphql (<graphql size>)\n" +
+				"REST description: <cache>/api.github.com.json (<rest size>)\n",
+			wantStderr: "ghmock: downloading GitHub's GraphQL schema to <cache>/schema.docs.graphql\n" +
+				"ghmock: downloading GitHub's REST description to <cache>/api.github.com.json\n",
 			wantFiles: map[string]string{"schema.docs.graphql": schema, "api.github.com.json": rest},
 		},
 		{
-			name:   "says when an environment variable overrides the download",
+			name:   "downloads to the path in an environment variable, which ghmock uses",
 			args:   []string{"update"},
-			env:    map[string]string{"GHMOCK_REST_SCHEMA": "/elsewhere/rest.json"},
+			env:    map[string]string{"GHMOCK_REST_SCHEMA": "<cache>/pinned/rest.json"},
 			served: map[string]string{"/schema.graphql": schema, "/rest.json": rest},
-			wantStdout: "GraphQL schema: <cache>/schema.docs.graphql (1.6 KB)\n" +
-				"REST description: <cache>/api.github.com.json (5.7 KB)\n" +
-				"  GHMOCK_REST_SCHEMA is set, so ghmock uses /elsewhere/rest.json instead\n",
-			wantStderr: "ghmock: downloading GitHub's GraphQL schema to <cache>\n" +
-				"ghmock: downloading GitHub's REST description to <cache>\n",
-			wantFiles: map[string]string{"schema.docs.graphql": schema, "api.github.com.json": rest},
+			wantStdout: "GraphQL schema: <cache>/schema.docs.graphql (<graphql size>)\n" +
+				"REST description: <cache>/pinned/rest.json (<rest size>)\n",
+			wantStderr: "ghmock: downloading GitHub's GraphQL schema to <cache>/schema.docs.graphql\n" +
+				"ghmock: downloading GitHub's REST description to <cache>/pinned/rest.json\n",
+			wantFiles: map[string]string{"schema.docs.graphql": schema, "api.github.com.json": "old", "pinned/rest.json": rest},
 		},
 		{
 			name:       "reports a download that fails and keeps the other",
 			args:       []string{"update"},
 			served:     map[string]string{"/rest.json": rest},
-			wantStdout: "REST description: <cache>/api.github.com.json (5.7 KB)\n",
-			wantStderr: "ghmock: downloading GitHub's GraphQL schema to <cache>\n" +
-				"ghmock: downloading GitHub's REST description to <cache>\n",
+			wantStdout: "REST description: <cache>/api.github.com.json (<rest size>)\n",
+			wantStderr: "ghmock: downloading GitHub's GraphQL schema to <cache>/schema.docs.graphql\n" +
+				"ghmock: downloading GitHub's REST description to <cache>/api.github.com.json\n",
 			wantErr:   "downloading GitHub's GraphQL schema from <server>/schema.graphql: HTTP 404 (without network access, set GHMOCK_GRAPHQL_SCHEMA to a local copy)",
 			wantFiles: map[string]string{"api.github.com.json": rest},
 		},
@@ -226,12 +226,13 @@ func TestCmdSchemas(t *testing.T) {
 			cache := useCacheDir(t)
 			serveSchemas(t, tt.served)
 			for k, v := range tt.env {
-				t.Setenv(k, v)
+				t.Setenv(k, strings.ReplaceAll(v, "<cache>", cache))
 			}
 			// An old copy that a successful download replaces.
 			require.NoError(t, os.MkdirAll(cache, 0o755))
 			require.NoError(t, os.WriteFile(filepath.Join(cache, restSource.fileName), []byte("old"), 0o644))
-			replacer := strings.NewReplacer(cache, "<cache>", strings.TrimSuffix(graphQLSource.url, "/schema.graphql"), "<server>")
+			replacer := strings.NewReplacer(cache, "<cache>", strings.TrimSuffix(graphQLSource.url, "/schema.graphql"), "<server>",
+				formatSize(int64(len(schema))), "<graphql size>", formatSize(int64(len(rest))), "<rest size>")
 
 			var stdout, stderr bytes.Buffer
 			err := cmdSchemas(tt.args, &stdout, &stderr)
@@ -248,13 +249,18 @@ func TestCmdSchemas(t *testing.T) {
 				return
 			}
 			got := map[string]string{}
-			entries, err := os.ReadDir(cache)
-			require.NoError(t, err)
-			for _, e := range entries {
-				data, err := os.ReadFile(filepath.Join(cache, e.Name()))
-				require.NoError(t, err)
-				got[e.Name()] = string(data)
-			}
+			require.NoError(t, filepath.WalkDir(cache, func(path string, d fs.DirEntry, err error) error {
+				if err != nil || d.IsDir() {
+					return err
+				}
+				data, err := os.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				rel, err := filepath.Rel(cache, path)
+				got[filepath.ToSlash(rel)] = string(data)
+				return err
+			}))
 			assert.Equal(t, tt.wantFiles, got)
 		})
 	}

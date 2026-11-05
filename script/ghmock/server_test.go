@@ -60,6 +60,13 @@ func graphQLBody(t *testing.T, query string, operation ...string) string {
 	return string(data)
 }
 
+func graphQLBodyWithVariables(t *testing.T, query, variables string) string {
+	t.Helper()
+	data, err := json.Marshal(map[string]any{"query": query, "variables": json.RawMessage(variables)})
+	require.NoError(t, err)
+	return string(data)
+}
+
 func TestMockServer(t *testing.T) {
 	limitBody := strings.Repeat("x", maxRequestBody)
 	type call struct {
@@ -82,6 +89,9 @@ func TestMockServer(t *testing.T) {
 		want         []reply
 		wantLog      []logSummary
 		wantKinds    []string
+		// wantSent, when set, is the response body each logged request
+		// records as sent to gh.
+		wantSent []string
 	}{
 		{
 			name:      "request at the body limit is recorded in full",
@@ -124,10 +134,11 @@ func TestMockServer(t *testing.T) {
 			wantLog: []logSummary{{Seq: 1, Name: "GET /repos/octo/hello", Status: 201, Matched: true, Response: 1, Responses: 1}},
 		},
 		{
-			name:    "REST request without a response",
-			calls:   []call{{method: "GET", url: "http://api.github.localhost/nope"}},
-			want:    []reply{{status: 404, body: `{"message":"ghmock: no response for GET /nope"}`}},
-			wantLog: []logSummary{{Seq: 1, Name: "GET /nope", Status: 404}},
+			name:     "REST request without a response",
+			calls:    []call{{method: "GET", url: "http://api.github.localhost/nope"}},
+			want:     []reply{{status: 404, body: `{"message":"ghmock: no response for GET /nope"}`}},
+			wantLog:  []logSummary{{Seq: 1, Name: "GET /nope", Status: 404}},
+			wantSent: []string{`{"message":"ghmock: no response for GET /nope"}`},
 		},
 		{
 			name: "GraphQL response chosen by operation name",
@@ -187,6 +198,51 @@ func TestMockServer(t *testing.T) {
 			calls:   []call{{method: "GET", url: "https://api.github.com/zen"}},
 			want:    []reply{{err: true}},
 			wantLog: []logSummary{{Seq: 1, Status: 403, Blocked: true}},
+		},
+		{
+			name: "GraphQL responses are trimmed to the fields gh asked for",
+			responses: responseSet{"graphql Viewer": {{
+				Body: json.RawMessage(`{"data":{"viewer":{"name":"Mona","bio":"hi"}},"extensions":{"cost":1}}`),
+			}}},
+			calls:    []call{{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBody(t, "query Viewer { viewer { login name } }")}},
+			want:     []reply{{status: 200, body: `{"data":{"viewer":{"name":"Mona"}},"extensions":{"cost":1}}`}},
+			wantLog:  []logSummary{{Seq: 1, Name: "graphql Viewer", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			wantSent: []string{`{"data":{"viewer":{"name":"Mona"}},"extensions":{"cost":1}}`},
+		},
+		{
+			name: "trimming follows lists, aliases, fragments for the object's type, and @include",
+			responses: responseSet{"graphql Trim": {{
+				Body: json.RawMessage(`{"data":{"repository":{"name":"r",
+					"labels":{"nodes":[{"name":"bug","color":"f29513"}],"totalCount":1},
+					"item":{"__typename":"PullRequest","number":2,"title":"Fix","state":"OPEN"}}}}`),
+			}}},
+			checkSchemas: true,
+			calls: []call{{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBodyWithVariables(t,
+				`query Trim($withColor: Boolean!) { repository(owner: "o", name: "r") {
+					labels { nodes { name color @include(if: $withColor) } }
+					item: issueOrPullRequest(number: 2) { __typename ... on Issue { title } ... on PullRequest { number } }
+				} }`, `{"withColor": false}`)}},
+			want:    []reply{{status: 200, body: `{"data":{"repository":{"item":{"__typename":"PullRequest","number":2},"labels":{"nodes":[{"name":"bug"}]}}}}`}},
+			wantLog: []logSummary{{Seq: 1, Name: "graphql Trim", Status: 200, Matched: true, Response: 1, Responses: 1}},
+		},
+		{
+			name: "off-schema responses and errors are sent as stored",
+			responses: responseSet{
+				"graphql Viewer": {{Body: json.RawMessage(`{"data":{"viewer":{"login":"monalisa","extra":true}}}`), OffSchema: true}},
+				"graphql Nope":   {{Body: json.RawMessage(`{"data":null,"errors":[{"message":"Not Found"}]}`)}},
+			},
+			calls: []call{
+				{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBody(t, "query Viewer { viewer { login } }")},
+				{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBody(t, "query Nope { viewer { login } }")},
+			},
+			want: []reply{
+				{status: 200, body: `{"data":{"viewer":{"login":"monalisa","extra":true}}}`},
+				{status: 200, body: `{"data":null,"errors":[{"message":"Not Found"}]}`},
+			},
+			wantLog: []logSummary{
+				{Seq: 1, Name: "graphql Viewer", Status: 200, Matched: true, Response: 1, Responses: 1},
+				{Seq: 2, Name: "graphql Nope", Status: 200, Matched: true, Response: 1, Responses: 1},
+			},
 		},
 		{
 			name: "a response that doesn't match GitHub's schema is still served, and logged with its problems",
@@ -281,6 +337,18 @@ func TestMockServer(t *testing.T) {
 					require.NotNil(t, logged[i].GraphQL)
 					assert.Equal(t, kind, logged[i].GraphQL.Kind)
 				}
+			}
+			for _, e := range logged {
+				if e.Matched {
+					assert.Equal(t, tt.responses[e.Name][e.Response-1].Headers, e.ResponseHeaders, "headers gh got for %s", e.Name)
+				}
+			}
+			if tt.wantSent != nil {
+				var sent []string
+				for _, e := range logged {
+					sent = append(sent, string(e.ResponseBody))
+				}
+				assert.Equal(t, tt.wantSent, sent)
 			}
 		})
 	}

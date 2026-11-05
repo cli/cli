@@ -291,17 +291,21 @@ func directiveCondition(dirs ast.DirectiveList, variables map[string]any) (inclu
 	return true, known
 }
 
+func (w *gqlWalker) isA(concrete *ast.Definition, name string) bool {
+	return isA(w.schema, concrete, name)
+}
+
 // isA reports whether an object of type concrete is also of type name, which
 // can be the same type, an interface it implements or a union it belongs to.
-func (w *gqlWalker) isA(concrete *ast.Definition, name string) bool {
+func isA(schema *ast.Schema, concrete *ast.Definition, name string) bool {
 	if concrete.Name == name {
 		return true
 	}
-	def := w.schema.Types[name]
+	def := schema.Types[name]
 	if def == nil {
 		return false
 	}
-	for _, t := range w.schema.GetPossibleTypes(def) {
+	for _, t := range schema.GetPossibleTypes(def) {
 		if t.Name == concrete.Name {
 			return true
 		}

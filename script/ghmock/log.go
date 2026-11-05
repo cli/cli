@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strings"
 )
 
@@ -20,7 +22,7 @@ func parseLogArgs(args []string) (logOptions, error) {
 	fs := flag.NewFlagSet("log", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	fs.BoolVar(&opts.all, "all", false, "show requests from every run")
-	fs.BoolVar(&opts.full, "full", false, "include GraphQL query text and untruncated data")
+	fs.BoolVar(&opts.full, "full", false, "include GraphQL query text, untruncated data and the response gh got")
 	fs.BoolVar(&opts.asJSON, "json", false, "print one JSON object per request")
 	if err := fs.Parse(args); err != nil {
 		return logOptions{}, usageError{err}
@@ -114,6 +116,16 @@ func printLog(w io.Writer, entries []loggedRequest, full bool) {
 		if e.Body != "" {
 			fmt.Fprintf(w, "   body: %s\n", compactJSON([]byte(e.Body)))
 		}
+		if len(e.ResponseHeaders) > 0 {
+			names := slices.Sorted(maps.Keys(e.ResponseHeaders))
+			for i, name := range names {
+				names[i] = name + ": " + e.ResponseHeaders[name]
+			}
+			fmt.Fprintf(w, "   response headers: %s\n", strings.Join(names, ", "))
+		}
+		if len(e.ResponseBody) > 0 {
+			fmt.Fprintf(w, "   response: %s\n", compactJSON(e.ResponseBody))
+		}
 		for _, group := range problemGroups(e) {
 			fmt.Fprintf(w, "   %s:\n", group.label)
 			for _, p := range group.problems {
@@ -134,6 +146,6 @@ func cmdReset(args []string, stdout io.Writer) error {
 	if err := st.reset(); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "Deleted responses and request log in %s\n", st.dir)
+	fmt.Fprintf(stdout, "Deleted responses, request log and saved runs in %s\n", st.dir)
 	return nil
 }

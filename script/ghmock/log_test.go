@@ -104,6 +104,20 @@ func TestCmdLog(t *testing.T) {
 `,
 		},
 		{
+			name: "full details show the response gh got",
+			entries: []loggedRequest{{
+				Run: "run-3", Binary: "./new", Seq: 1, Method: "GET", Name: "GET /", Status: 200, Matched: true, Response: 1, Responses: 1,
+				ResponseHeaders: map[string]string{"X-Oauth-Scopes": "repo", "Link": "<next>"},
+				ResponseBody:    json.RawMessage(`{"current_user_url": "https://api.github.com/user"}`),
+			}},
+			args: []string{"--full"},
+			want: `=== run run-3, gh ./new
+1. GET / -> 200, response 1 of 1
+   response headers: Link: <next>, X-Oauth-Scopes: repo
+   response: {"current_user_url":"https://api.github.com/user"}
+`,
+		},
+		{
 			name:    "full details list schema problems",
 			entries: []loggedRequest{withProblems(query)},
 			args:    []string{"--full"},
@@ -188,6 +202,18 @@ func TestRunMain(t *testing.T) {
 			wantStderr: "ghmock schema: missing name, such as Issue, Issue.title or \"GET /repos/octo/hello\"\n",
 		},
 		{
+			name:       "scaffold",
+			args:       []string{"scaffold"},
+			wantCode:   2,
+			wantStderr: "ghmock scaffold: pass a request name, such as \"graphql IssueByNumber\", or --missing\n",
+		},
+		{
+			name:       "export",
+			args:       []string{"export"},
+			wantCode:   2,
+			wantStderr: "ghmock export: missing folder to export to\n",
+		},
+		{
 			name:       "schemas",
 			args:       []string{"schemas"},
 			wantCode:   2,
@@ -196,7 +222,7 @@ func TestRunMain(t *testing.T) {
 		{
 			name:       "reset",
 			args:       []string{"reset"},
-			wantStdout: "Deleted responses and request log in <dir>\n",
+			wantStdout: "Deleted responses, request log and saved runs in <dir>\n",
 		},
 	}
 
@@ -224,7 +250,7 @@ func TestCmdSetAndReset(t *testing.T) {
 	var out bytes.Buffer
 	require.NoError(t, cmdSet([]string{"GET /user", "--status", "401", "--header", "X-GitHub-SSO: required"}, &out, io.Discard))
 	assert.Equal(t, "GET /user: response 1 of 1: status 401, headers X-Github-Sso, body 0 bytes\n"+
-		"Schema check: skipped, not in GitHub's REST description\n", out.String())
+		"Schema check: skipped, GitHub doesn't document status 401 for GET /user\n", out.String())
 
 	responses, err := st.loadResponses()
 	require.NoError(t, err)

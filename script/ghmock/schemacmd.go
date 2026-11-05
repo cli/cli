@@ -264,7 +264,7 @@ func describeREST(w io.Writer, idx *restIndex, opts schemaOptions) error {
 		return fmt.Errorf("%s isn't on the REST API host, so GitHub's REST description doesn't cover it", target)
 	}
 	path, _, _ := strings.Cut(target, "?")
-	route := idx.match(path)
+	route := idx.match(method, path)
 	if route == nil {
 		return fmt.Errorf("GitHub's REST description has no path matching %s", path)
 	}
@@ -683,7 +683,7 @@ func editDistance(a, b string) int {
 }
 
 // cmdSchemas runs ghmock schemas update, which downloads both schema files
-// again.
+// again, to the files ghmock uses.
 func cmdSchemas(args []string, stdout, stderr io.Writer) error {
 	switch {
 	case len(args) == 0:
@@ -693,13 +693,12 @@ func cmdSchemas(args []string, stdout, stderr io.Writer) error {
 	case len(args) > 1:
 		return newUsageError("unexpected arguments: %s", strings.Join(args[1:], " "))
 	}
-	dir, err := schemaCacheDir()
-	if err != nil {
-		return err
-	}
 	var errs []error
 	for _, s := range []schemaSource{graphQLSource, restSource} {
-		p, err := s.download(dir, stderr)
+		p, err := s.updatePath()
+		if err == nil {
+			err = s.download(p, stderr)
+		}
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -709,9 +708,6 @@ func cmdSchemas(args []string, stdout, stderr io.Writer) error {
 			size = " (" + formatSize(info.Size()) + ")"
 		}
 		fmt.Fprintf(stdout, "%s: %s%s\n", s.label, p, size)
-		if env := os.Getenv(s.envVar); env != "" {
-			fmt.Fprintf(stdout, "  %s is set, so ghmock uses %s instead\n", s.envVar, env)
-		}
 	}
 	return errors.Join(errs...)
 }

@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,11 +24,27 @@ type checker struct {
 
 	gqlOnce   sync.Once
 	gqlSchema *ast.Schema
+	gqlFile   schemaFile
 	gqlErr    error
 
 	restOnce sync.Once
 	restIdx  *restIndex
+	restFile schemaFile
 	restErr  error
+}
+
+// schemaFile says which schema file checks used, so a result can be traced
+// to the exact file. Error says why it couldn't be loaded.
+type schemaFile struct {
+	Name   string `json:"name"`
+	Path   string `json:"path,omitempty"`
+	SHA256 string `json:"sha256,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+func newSchemaFile(source schemaSource, path string, data []byte) schemaFile {
+	sum := sha256.Sum256(data)
+	return schemaFile{Name: source.label, Path: path, SHA256: hex.EncodeToString(sum[:])}
 }
 
 func newChecker(progress io.Writer) *checker {
@@ -51,6 +69,7 @@ func (c *checker) graphQL() (*ast.Schema, error) {
 			return
 		}
 		c.gqlSchema = schema
+		c.gqlFile = newSchemaFile(graphQLSource, path, data)
 	})
 	return c.gqlSchema, c.gqlErr
 }
@@ -73,6 +92,7 @@ func (c *checker) rest() (*restIndex, error) {
 			return
 		}
 		c.restIdx = idx
+		c.restFile = newSchemaFile(restSource, path, data)
 	})
 	return c.restIdx, c.restErr
 }
@@ -82,6 +102,27 @@ func (c *checker) rest() (*restIndex, error) {
 func (c *checker) preload() {
 	_, _ = c.graphQL()
 	_, _ = c.rest()
+}
+
+// schemaFiles describes each schema the checker tried to load.
+func (c *checker) schemaFiles() []schemaFile {
+	var files []schemaFile
+	for _, f := range []struct {
+		source schemaSource
+		file   schemaFile
+		err    error
+	}{
+		{graphQLSource, c.gqlFile, c.gqlErr},
+		{restSource, c.restFile, c.restErr},
+	} {
+		switch {
+		case f.err != nil:
+			files = append(files, schemaFile{Name: f.source.label, Error: f.err.Error()})
+		case f.file.SHA256 != "":
+			files = append(files, f.file)
+		}
+	}
+	return files
 }
 
 // unavailable describes each schema that couldn't be loaded.

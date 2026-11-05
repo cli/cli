@@ -35,7 +35,8 @@ type responseSet map[string][]response
 // loggedRequest is one request that gh made during a run. QueryProblems are
 // ways gh's GraphQL query doesn't match GitHub's schema. SchemaProblems are
 // ways the stored response doesn't match it, and SchemaNote says why a
-// response wasn't checked.
+// response wasn't checked. ResponseHeaders and ResponseBody are what gh got,
+// after trimming, because the stored response can change after the run.
 type loggedRequest struct {
 	Run            string          `json:"run"`
 	Binary         string          `json:"binary"`
@@ -56,15 +57,35 @@ type loggedRequest struct {
 	QueryProblems  []string        `json:"query_problems,omitempty"`
 	SchemaProblems []string        `json:"schema_problems,omitempty"`
 	SchemaNote     string          `json:"schema_note,omitempty"`
+
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+	ResponseBody    json.RawMessage   `json:"response_body,omitempty"`
 }
 
-// runRecord keeps the identity of a completed run, including request-free runs.
+// runRecord is one ghmock run, kept for ghmock export. Report is what ghmock
+// run printed.
 type runRecord struct {
-	ID   string    `json:"id"`
-	Time time.Time `json:"time"`
+	ID      string       `json:"id"`
+	Time    time.Time    `json:"time"`
+	Command string       `json:"command"`
+	Schemas []schemaFile `json:"schemas,omitempty"`
+	Results []runOutcome `json:"results"`
+	Report  string       `json:"report"`
 }
 
-// state is the folder that holds responses and the request log between commands.
+// runOutcome is what one gh binary did in a run.
+type runOutcome struct {
+	Binary   string `json:"binary"`
+	Path     string `json:"path"`
+	Version  string `json:"version"`
+	ExitCode int    `json:"exit_code"`
+	TimedOut bool   `json:"timed_out,omitempty"`
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+}
+
+// state is the folder that holds responses, the request log and the runs
+// between commands.
 type state struct {
 	dir string
 }
@@ -174,7 +195,8 @@ func writeJSONL[T any](w io.Writer, items []T) error {
 	return nil
 }
 
-// readJSONL reads a file of JSON objects, one per line. A missing file has none.
+// readJSONL reads a file of JSON objects, one per line. A missing file has
+// none.
 func readJSONL[T any](path string) ([]T, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {

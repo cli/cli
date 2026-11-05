@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -340,6 +342,11 @@ func TestCheckRequest(t *testing.T) {
 			want: checkResult{responseProblems: []string{"subscribers_count: missing, but GitHub's description requires it"}},
 		},
 		{
+			name: "a value can match more than one oneOf alternative",
+			req:  rest("GET", "/events"),
+			resp: reply(200, `[{}]`),
+		},
+		{
 			name: "a literal path segment beats a parameter",
 			req:  rest("GET", "/repos/o/r/issues/comments"),
 			resp: reply(200, `[{"login":"a"}]`),
@@ -432,22 +439,27 @@ func TestCheckRequest(t *testing.T) {
 }
 
 func TestRESTMatch(t *testing.T) {
+	get := &openapi3.PathItem{Get: &openapi3.Operation{}}
 	idx := &restIndex{}
-	for _, tmpl := range []string{
-		"/",
-		"/repos/{owner}/{repo}",
-		"/repos/{owner}/{repo}/issues/{issue_number}",
-		"/repos/{owner}/{repo}/issues/comments",
-		"/repos/{owner}/{repo}/contents/{path}",
-		"/repos/{owner}/{repo}/compare/{basehead}",
-		"/files/{name}.{ext}",
+	for tmpl, item := range map[string]*openapi3.PathItem{
+		"/":                     get,
+		"/repos/{owner}/{repo}": get,
+		"/repos/{owner}/{repo}/issues/{issue_number}": get,
+		"/repos/{owner}/{repo}/issues/comments":       get,
+		"/repos/{owner}/{repo}/contents/{path}":       get,
+		"/repos/{owner}/{repo}/compare/{basehead}":    get,
+		"/files/{name}.{ext}":                         get,
+		"/orgs/{org}/attestations/{attestation_id}":   {Delete: &openapi3.Operation{}},
+		"/orgs/{org}/attestations/{subject_digest}":   get,
 	} {
-		idx.routes = append(idx.routes, restRoute{template: tmpl, segments: parseTemplate(tmpl)})
+		idx.routes = append(idx.routes, restRoute{template: tmpl, segments: parseTemplate(tmpl), item: item})
 	}
+	sort.Slice(idx.routes, func(i, j int) bool { return idx.routes[i].template < idx.routes[j].template })
 
 	tests := []struct {
-		path string
-		want string
+		method string
+		path   string
+		want   string
 	}{
 		{path: "/", want: "/"},
 		{path: "/repos/o/r", want: "/repos/{owner}/{repo}"},
@@ -462,12 +474,19 @@ func TestRESTMatch(t *testing.T) {
 		{path: "/repos/o/r/issues"},
 		{path: "/repos/o/r/issues/1/extra"},
 		{path: "/repos//r"},
+		{path: "/orgs/o/attestations/sha256:abc", want: "/orgs/{org}/attestations/{subject_digest}"},
+		{method: "DELETE", path: "/orgs/o/attestations/1", want: "/orgs/{org}/attestations/{attestation_id}"},
+		{method: "PATCH", path: "/repos/o/r/issues/comments", want: "/repos/{owner}/{repo}/issues/comments"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
+		method := tt.method
+		if method == "" {
+			method = "GET"
+		}
+		t.Run(method+" "+tt.path, func(t *testing.T) {
 			got := ""
-			if route := idx.match(tt.path); route != nil {
+			if route := idx.match(method, tt.path); route != nil {
 				got = route.template
 			}
 			assert.Equal(t, tt.want, got)

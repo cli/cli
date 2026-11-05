@@ -229,6 +229,25 @@ func printDifferences(w io.Writer, base, other runResult, n int) {
 	}
 
 	for _, name := range unionNames(base.requests, other.requests) {
+		a, b := askedFields(base.requests, name), askedFields(other.requests, name)
+		if a == nil || b == nil {
+			continue
+		}
+		onlyBase, onlyOther := onlyIn(a, b), onlyIn(b, a)
+		if len(onlyBase) == 0 && len(onlyOther) == 0 {
+			continue
+		}
+		same = false
+		fmt.Fprintf(w, "  %s asked for different fields:\n", name)
+		if len(onlyBase) > 0 {
+			fmt.Fprintf(w, "    only [1]: %s\n", joinLimited(onlyBase, maxShownProblems))
+		}
+		if len(onlyOther) > 0 {
+			fmt.Fprintf(w, "    only [%d]: %s\n", n, joinLimited(onlyOther, maxShownProblems))
+		}
+	}
+
+	for _, name := range unionNames(base.requests, other.requests) {
 		a, b := requestPayloads(base.requests, name), requestPayloads(other.requests, name)
 		if len(a) == 0 || len(b) == 0 || slices.Equal(a, b) {
 			continue
@@ -242,6 +261,36 @@ func printDifferences(w io.Writer, base, other runResult, n int) {
 	if same {
 		fmt.Fprintln(w, "  same exit code, output and requests")
 	}
+}
+
+// askedFields lists the fields that GraphQL requests with this name asked
+// for, or nil if there were none whose query could be read.
+func askedFields(requests []loggedRequest, name string) map[string]bool {
+	var fields map[string]bool
+	for _, e := range requests {
+		if displayName(e) != name || e.GraphQL == nil {
+			continue
+		}
+		paths := queryFields(e.GraphQL.Query)
+		if paths == nil {
+			continue
+		}
+		if fields == nil {
+			fields = map[string]bool{}
+		}
+		for path := range paths {
+			fields[path] = true
+		}
+	}
+	return fields
+}
+
+// joinLimited joins items, showing at most limit of them.
+func joinLimited(items []string, limit int) string {
+	if len(items) > limit {
+		return strings.Join(items[:limit], ", ") + fmt.Sprintf(" and %d more", len(items)-limit)
+	}
+	return strings.Join(items, ", ")
 }
 
 func exitLabel(res runResult) string {

@@ -88,19 +88,35 @@ func splitPath(p string) []string {
 	return strings.Split(p, "/")
 }
 
-// match finds the documented path template for a request path. Literal
-// segments beat parameters, so /repos/{owner}/{repo}/issues beats
-// /repos/{owner}/{repo}/{x} if both existed.
-func (idx *restIndex) match(path string) *restRoute {
+// match finds the documented path template for a request. Literal segments
+// beat parameters, so /repos/{owner}/{repo}/issues beats
+// /repos/{owner}/{repo}/{x} if both existed. Between templates that tie, such
+// as /orgs/{org}/attestations/{attestation_id} and
+// /orgs/{org}/attestations/{subject_digest}, the one that documents the
+// method wins.
+func (idx *restIndex) match(method, path string) *restRoute {
 	parts := splitPath(path)
-	var best *restRoute
+	var best []*restRoute
 	bestScore := -1
 	for i := range idx.routes {
-		if score, ok := idx.routes[i].score(parts); ok && score > bestScore {
-			best, bestScore = &idx.routes[i], score
+		score, ok := idx.routes[i].score(parts)
+		switch {
+		case !ok || score < bestScore:
+		case score > bestScore:
+			best, bestScore = []*restRoute{&idx.routes[i]}, score
+		default:
+			best = append(best, &idx.routes[i])
 		}
 	}
-	return best
+	for _, r := range best {
+		if r.item != nil && r.item.GetOperation(method) != nil {
+			return r
+		}
+	}
+	if len(best) == 0 {
+		return nil
+	}
+	return best[0]
 }
 
 func (r *restRoute) score(parts []string) (int, bool) {
@@ -143,7 +159,7 @@ func (r *restRoute) score(parts []string) (int, bool) {
 // check compares a response with GitHub's description of it. It returns the
 // problems it found, or a note saying why it couldn't check.
 func (idx *restIndex) check(method, path string, status int, body []byte) ([]string, string) {
-	route := idx.match(path)
+	route := idx.match(method, path)
 	if route == nil {
 		return nil, "not in GitHub's REST description"
 	}
@@ -208,6 +224,11 @@ func restProblems(err error) []string {
 				walk(inner, prefix)
 			}
 		case *openapi3.SchemaError:
+			// GitHub's descriptions use oneOf where the alternatives overlap,
+			// so real responses can match more than one. That's fine.
+			if e.SchemaField == "oneOf" && strings.HasPrefix(e.Reason, "value matches more than one schema") {
+				return
+			}
 			pointer := append(append([]string(nil), prefix...), e.JSONPointer()...)
 			var inner openapi3.MultiError
 			if e.SchemaField == "allOf" && errors.As(e.Origin, &inner) {

@@ -24,6 +24,9 @@ A repository contains the content for a project.
 type Repository implements Node {
   id: ID!
   name: String!
+  nameWithOwner: String!
+  url: URI!
+  hasIssuesEnabled: Boolean!
   issue(number: Int!): Issue
   issueOrPullRequest(number: Int!): IssueOrPullRequest
   labels(first: Int = 30): LabelConnection
@@ -75,16 +78,16 @@ type Label {
 The possible states of an issue.
 """
 enum IssueState {
-  "An issue that is still open"
-  OPEN
   "An issue that has been closed"
   CLOSED
+  "An issue that is still open"
+  OPEN
 }
 
 enum PullRequestState {
-  OPEN
   CLOSED
   MERGED
+  OPEN
 }
 
 input CloseIssueInput {
@@ -105,3 +108,8 @@ type CloseIssuePayload {
 An ISO-8601 encoded UTC date string.
 """
 scalar DateTime
+
+"""
+An RFC 3986, RFC 3987, and RFC 6570 (level 4) compliant URI string.
+"""
+scalar URI

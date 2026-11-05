@@ -8,13 +8,16 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/vektah/gqlparser/v2/ast"
 )
 
 const maxRequestBody = 10 << 20
 
 // mockServer answers gh's requests for one run of one binary. Each run gets a
 // fresh server, so every run starts from each request's first response. A nil
-// checker turns schema checks off.
+// checker turns schema checks off. GraphQL responses are trimmed to the fields
+// gh asked for, except off-schema ones, which are sent as stored.
 type mockServer struct {
 	state    *state
 	checker  *checker
@@ -47,6 +50,16 @@ func (m *mockServer) check(entry *loggedRequest, resp *response) {
 	entry.SchemaProblems = res.responseProblems
 	entry.SchemaNote = res.note
 	entry.OffSchema = resp != nil && resp.OffSchema
+}
+
+// graphQLSchema returns GitHub's GraphQL schema, or nil if checks are off or
+// it couldn't be loaded.
+func (m *mockServer) graphQLSchema() *ast.Schema {
+	if m.checker == nil {
+		return nil
+	}
+	schema, _ := m.checker.graphQL()
+	return schema
 }
 
 // proxyURL is the value gh gets for HTTP_PROXY and HTTPS_PROXY.
@@ -136,6 +149,7 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(list) == 0 {
 		status, payload := missingResponse(name, gql != nil)
 		entry.Status = status
+		entry.ResponseBody, _ = json.Marshal(payload)
 		m.check(&entry, nil)
 		m.record(entry)
 		writeJSON(w, status, payload)
@@ -151,21 +165,29 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := list[idx]
 
+	payload := resp.Body
+	if gql != nil && !resp.OffSchema && resp.status() == http.StatusOK {
+		payload = trimGraphQL(payload, gql, m.graphQLSchema())
+	}
+	// responses.json is indented for people to read; gh gets compact JSON.
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, payload); err == nil {
+		payload = compact.Bytes()
+	}
+
 	entry.Status = resp.status()
 	entry.Matched = true
 	entry.Response = idx + 1
 	entry.Responses = len(list)
+	entry.ResponseHeaders = resp.Headers
+	if json.Valid(payload) {
+		entry.ResponseBody = payload
+	}
 	m.check(&entry, &resp)
 	m.record(entry)
 
 	for k, v := range resp.Headers {
 		w.Header().Set(k, v)
-	}
-	payload := resp.Body
-	// responses.json is indented for people to read; gh gets compact JSON.
-	var compact bytes.Buffer
-	if err := json.Compact(&compact, payload); err == nil {
-		payload = compact.Bytes()
 	}
 	if len(payload) > 0 && w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
