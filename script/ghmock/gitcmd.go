@@ -273,6 +273,7 @@ func cmdGit(args []string, stdout, stderr io.Writer) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
 	defer cancel()
+	env = gitDeadlineEnvironment(ctx, env)
 	cmd := exec.CommandContext(ctx, "git", opts.args...)
 	cmd.Dir, cmd.Env = dir, env
 	cmd.Stdin = strings.NewReader(opts.stdin)
@@ -335,6 +336,13 @@ func gitEnvironment(env []string, scratch, world string) ([]string, error) {
 		"GIT_SSH_COMMAND="+shellQuote(exe)+" _git-ssh", "GIT_SSH_VARIANT=ssh",
 		"GHMOCK_GIT_WORLD="+world, "GHMOCK_GIT_LOG="+filepath.Join(scratch, "git-ssh.jsonl"),
 	), nil
+}
+
+func gitDeadlineEnvironment(ctx context.Context, env []string) []string {
+	if deadline, ok := ctx.Deadline(); ok {
+		return append(env, "GHMOCK_GIT_DEADLINE="+deadline.UTC().Format(time.RFC3339Nano))
+	}
+	return env
 }
 
 func localGit(dir string, env []string, args ...string) (string, error) {

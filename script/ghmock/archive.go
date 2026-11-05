@@ -155,6 +155,9 @@ func writeTarGzip(w io.Writer, root string) error {
 }
 
 func portableGitPath(path, root string) ([]byte, error) {
+	if strings.HasSuffix(filepath.ToSlash(path), "/objects/info/alternates") {
+		return relocateGitAlternates(path, root, root)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err

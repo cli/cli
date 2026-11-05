@@ -27,6 +27,8 @@ type gitRequest struct {
 	Service  string `json:"service"`
 	ExitCode int    `json:"exit_code"`
 	Error    string `json:"error,omitempty"`
+	ID       string `json:"id,omitempty"`
+	Complete bool   `json:"complete,omitempty"`
 }
 
 // serveGitHTTP delegates smart HTTP to Git before the JSON fixture handler
@@ -197,8 +199,21 @@ func cmdGitSSH(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		Name: "SSH " + host + "/" + repo + ".git", Git: &gitRequest{Service: service},
 	}
 	dir := gitRepoPath(world, host, repo)
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	deadline := time.Now().Add(defaultTimeout)
+	if value := os.Getenv("GHMOCK_GIT_DEADLINE"); value != "" {
+		deadline, err = time.Parse(time.RFC3339Nano, value)
+		if err != nil {
+			return fmt.Errorf("invalid Git transport deadline: %w", err)
+		}
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
+	entry.Git.ID = fmt.Sprintf("%d-%d", os.Getpid(), entry.Time.UnixNano())
+	entry.Git.ExitCode = -1
+	entry.Git.Error = "SSH request did not complete"
+	if err := appendJSONL(logPath, []loggedRequest{entry}); err != nil {
+		return fmt.Errorf("recording Git SSH request: %w", err)
+	}
 	cmd := exec.CommandContext(ctx, "git", strings.TrimPrefix(service, "git-"), dir)
 	cmd.Env = os.Environ()
 	cmd.Stdin, cmd.Stdout = stdin, stdout
@@ -209,6 +224,10 @@ func cmdGitSSH(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	entry.Matched = err == nil
 	entry.Git.ExitCode = processExitCode(err)
 	entry.Git.Error = strings.TrimSpace(diagnostic.String())
+	if err != nil && entry.Git.Error == "" {
+		entry.Git.Error = err.Error()
+	}
+	entry.Git.Complete = true
 	if logErr := appendJSONL(logPath, []loggedRequest{entry}); logErr != nil {
 		return errors.Join(err, fmt.Errorf("recording Git SSH request: %w", logErr))
 	}
@@ -230,7 +249,17 @@ func gitRequests(scratch string, requests []loggedRequest) ([]loggedRequest, err
 	if err != nil {
 		return nil, err
 	}
-	requests = append(requests, ssh...)
+	positions := map[string]int{}
+	for _, entry := range ssh {
+		if entry.Git != nil && entry.Git.ID != "" {
+			if index, ok := positions[entry.Git.ID]; ok {
+				requests[index] = entry
+				continue
+			}
+			positions[entry.Git.ID] = len(requests)
+		}
+		requests = append(requests, entry)
+	}
 	slices.SortStableFunc(requests, func(a, b loggedRequest) int { return a.Time.Compare(b.Time) })
 	for i := range requests {
 		requests[i].Seq = i + 1

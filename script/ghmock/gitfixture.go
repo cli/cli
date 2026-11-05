@@ -196,6 +196,9 @@ func copyGitTree(source, destination string) error {
 }
 
 func isGitPathFile(path string) bool {
+	if strings.HasSuffix(path, "/objects/info/alternates") {
+		return true
+	}
 	if filepath.Base(path) == ".git" {
 		return true
 	}
@@ -204,6 +207,13 @@ func isGitPathFile(path string) bool {
 }
 
 func copyGitPathFile(sourceFile, destinationFile, source, destination string, mode fs.FileMode) error {
+	if strings.HasSuffix(filepath.ToSlash(sourceFile), "/objects/info/alternates") {
+		data, err := relocateGitAlternates(sourceFile, source, destination)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(destinationFile, data, mode)
+	}
 	data, err := os.ReadFile(sourceFile)
 	if err != nil {
 		return err
@@ -229,4 +239,44 @@ func copyGitPathFile(sourceFile, destinationFile, source, destination string, mo
 		data = []byte(prefix + filepath.Join(destination, rel) + "\n")
 	}
 	return os.WriteFile(destinationFile, data, mode)
+}
+
+func relocateGitAlternates(path, source, destination string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	objects := filepath.Dir(filepath.Dir(path))
+	relative, err := filepath.Rel(source, objects)
+	if err != nil {
+		return nil, err
+	}
+	copiedObjects := filepath.Join(destination, relative)
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if line == "" {
+			continue
+		}
+		target := line
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(objects, target)
+		}
+		target, err = filepath.EvalSymlinks(target)
+		if err != nil {
+			return nil, fmt.Errorf("relocating Git alternate %s: %w", path, err)
+		}
+		if !pathWithin(source, target) {
+			return nil, fmt.Errorf("Git alternate %s points outside the fixture: %s", path, line)
+		}
+		relative, err = filepath.Rel(source, target)
+		if err != nil {
+			return nil, err
+		}
+		lines[i], err = filepath.Rel(copiedObjects, filepath.Join(destination, relative))
+		if err != nil {
+			return nil, err
+		}
+		lines[i] = filepath.ToSlash(lines[i])
+	}
+	return []byte(strings.Join(lines, "\n")), nil
 }

@@ -507,29 +507,29 @@ func TestMockServer(t *testing.T) {
 				for _, e := range logged {
 					sent = append(sent, string(e.ResponseBody))
 				}
-				if tt.wantRawSent != nil {
-					var sent [][]byte
-					for _, entry := range roundTrip {
-						var data []byte
-						if entry.ResponseRawBody != nil {
-							data = *entry.ResponseRawBody
-						}
-						sent = append(sent, data)
-					}
-					assert.Equal(t, tt.wantRawSent, sent)
-				}
-				if tt.wantRawRequests != nil {
-					var received [][]byte
-					for _, entry := range roundTrip {
-						var data []byte
-						if entry.RawBody != nil {
-							data = *entry.RawBody
-						}
-						received = append(received, data)
-					}
-					assert.Equal(t, tt.wantRawRequests, received)
-				}
 				assert.Equal(t, tt.wantSent, sent)
+			}
+			if tt.wantRawSent != nil {
+				var sent [][]byte
+				for _, entry := range roundTrip {
+					var data []byte
+					if entry.ResponseRawBody != nil {
+						data = *entry.ResponseRawBody
+					}
+					sent = append(sent, data)
+				}
+				assert.Equal(t, tt.wantRawSent, sent)
+			}
+			if tt.wantRawRequests != nil {
+				var received [][]byte
+				for _, entry := range roundTrip {
+					var data []byte
+					if entry.RawBody != nil {
+						data = *entry.RawBody
+					}
+					received = append(received, data)
+				}
+				assert.Equal(t, tt.wantRawRequests, received)
 			}
 		})
 	}

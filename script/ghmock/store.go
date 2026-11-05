@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -136,6 +135,10 @@ func openState() (*state, error) {
 	if dir == "" {
 		dir = filepath.Join(os.TempDir(), "ghmock")
 	}
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
@@ -256,20 +259,16 @@ func readJSONL[T any](path string) ([]T, error) {
 	defer f.Close()
 
 	var items []T
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	decoder := json.NewDecoder(f)
+	for {
 		var item T
-		if err := json.Unmarshal(line, &item); err != nil {
+		if err := decoder.Decode(&item); errors.Is(err, io.EOF) {
+			return items, nil
+		} else if err != nil {
 			return nil, fmt.Errorf("reading %s: %w", path, err)
 		}
 		items = append(items, item)
 	}
-	return items, scanner.Err()
 }
 
 func (s *state) reset() error {

@@ -118,6 +118,7 @@ exit code: none, gh was still waiting for input, so ghmock stopped it
 		archive         bool
 		configured      bool
 		withGit         bool
+		shared          bool
 		fileExists      bool
 		badWorktree     bool
 		errContains     bool
@@ -144,6 +145,13 @@ exit code: none, gh was still waiting for input, so ghmock stopped it
 			name:       "portable archive retains Git worktrees and hidden files",
 			archive:    true,
 			withGit:    true,
+			wantStdout: "Exported 2 runs, 2 requests and 2 responses, 1 off-schema, to <out>\n",
+		},
+		{
+			name:       "portable archive relocates every shared-clone alternate",
+			archive:    true,
+			withGit:    true,
+			shared:     true,
 			wantStdout: "Exported 2 runs, 2 requests and 2 responses, 1 off-schema, to <out>\n",
 		},
 		{
@@ -215,6 +223,16 @@ exit code: none, gh was still waiting for input, so ghmock stopped it
 			}
 			if tt.withGit {
 				prepareGitRepo(t, "git@github.com:octo/hello.git")
+				if tt.shared {
+					gitForTest(t, "--", "clone", "--quiet", "--shared", "main", "shared")
+					objects := filepath.Join(st.gitFixtureDir(), "repos", dotcomHost, "octo", "hello.git", "objects")
+					path := filepath.Join(st.gitFixtureDir(), "work", "shared", ".git", "objects", "info", "alternates")
+					file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+					require.NoError(t, err)
+					_, err = file.WriteString(objects + "\n")
+					require.NoError(t, err)
+					require.NoError(t, file.Close())
+				}
 				gitForTest(t, "--in", "main", "--", "worktree", "add", "--quiet", "../feature", "-b", "feature")
 				require.NoError(t, cmdWrite([]string{"feature/example.txt", "--text", "changed\n"}, io.Discard))
 				require.NoError(t, cmdWrite([]string{"feature/.notes", "--text", "hidden\n"}, io.Discard))
@@ -285,6 +303,16 @@ exit code: none, gh was still waiting for input, so ghmock stopped it
 			assert.JSONEq(t, string(want), string(got))
 			if tt.withGit {
 				t.Setenv("GHMOCK_DIR", out)
+				if tt.shared {
+					assert.Equal(t, "one\n", gitForTest(t, "--in", "shared", "--", "show", "HEAD:example.txt"))
+					data, err := os.ReadFile(filepath.Join(out, gitFixture, "work", "shared", ".git", "objects", "info", "alternates"))
+					require.NoError(t, err)
+					lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+					require.Len(t, lines, 2)
+					for _, line := range lines {
+						assert.False(t, filepath.IsAbs(line))
+					}
+				}
 				assert.FileExists(t, filepath.Join(out, gitFixture, "work", "main", ".git", "config"))
 				assert.FileExists(t, filepath.Join(out, gitFixture, "work", "main", ".git", "index"))
 				assert.Equal(t, "one\n", gitForTest(t, "--in", "feature", "--", "show", ":example.txt"))

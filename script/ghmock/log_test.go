@@ -54,6 +54,7 @@ func TestCmdLog(t *testing.T) {
 		runs    []runRecord
 		args    []string
 		want    string
+		large   bool
 	}{
 		{
 			name:    "the latest run can have no requests",
@@ -67,6 +68,11 @@ func TestCmdLog(t *testing.T) {
 			runs:    []runRecord{{ID: "run-1"}, {ID: "run-2"}},
 			args:    []string{"--all"},
 			want:    "=== run run-1, gh ./old\n1. GET /user -> 200, response 1 of 1\n",
+		},
+		{
+			name:  "raw response larger than the old JSONL scanner limit",
+			args:  []string{"--full"},
+			large: true,
 		},
 		{
 			name:    "raw bytes are retained in JSON",
@@ -162,6 +168,11 @@ func TestCmdLog(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 			t.Setenv("GHMOCK_DIR", dir)
+			if tt.large {
+				data := make([]byte, 48<<20)
+				tt.entries = []loggedRequest{{Seq: 1, Method: "GET", Name: "GET /artifact", Status: 200, ResponseRawBody: &data}}
+				tt.want = fmt.Sprintf("1. GET /artifact -> 200, no response stored\n   raw response body: %d bytes, sha256 %x (bytes in --json)\n", len(data), sha256.Sum256(data))
+			}
 			require.NoError(t, (&state{dir: dir}).appendLog(tt.entries))
 			for _, run := range tt.runs {
 				require.NoError(t, (&state{dir: dir}).appendRun(run))

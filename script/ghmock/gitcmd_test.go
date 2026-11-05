@@ -7,7 +7,9 @@ import (
 	"io"
 	"math/rand/v2"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -52,15 +54,22 @@ func TestCmdRepo(t *testing.T) {
 		host      string
 		branch    string
 		err       string
+		relative  bool
 	}{
 		{name: "empty remote", args: []string{"octo/hello"}, host: dotcomHost, branch: "main"},
+		{name: "relative state directory", args: []string{"octo/hello"}, host: dotcomHost, branch: "main", relative: true},
 		{name: "custom host and branch", args: []string{"example.com/octo/hello", "--branch", "topic/one"}, host: "example.com", branch: "topic/one"},
 		{name: "never overwrites", args: []string{"octo/hello"}, duplicate: true, err: "already exists"},
 		{name: "invalid Git branch", args: []string{"octo/hello", "--branch", "bad..ref"}, err: `invalid branch "bad..ref"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("GHMOCK_DIR", t.TempDir())
+			dir := t.TempDir()
+			if tt.relative {
+				t.Chdir(dir)
+				dir = "state"
+			}
+			t.Setenv("GHMOCK_DIR", dir)
 			if tt.duplicate {
 				require.NoError(t, cmdRepo(tt.args, io.Discard))
 			}
@@ -188,6 +197,62 @@ func TestCmdGit(t *testing.T) {
 		name string
 		run  func(*testing.T, *state)
 	}{
+		{name: "shared clones remain usable after the fixture is copied", run: func(t *testing.T, st *state) {
+			prepareGitRepo(t, "https://github.com/octo/hello.git")
+			gitForTest(t, "--", "clone", "--quiet", "--shared", "main", "shared")
+			copied := filepath.Join(t.TempDir(), "state")
+			destination := (&state{dir: copied}).gitFixtureDir()
+			require.NoError(t, copyGitTree(st.gitFixtureDir(), destination))
+			require.NoError(t, os.Rename(st.gitFixtureDir(), st.gitFixtureDir()+"-moved"))
+			t.Setenv("GHMOCK_DIR", copied)
+			assert.Equal(t, "one\n", gitForTest(t, "--in", "shared", "--", "show", "HEAD:example.txt"))
+			data, err := os.ReadFile(filepath.Join(destination, "work", "shared", ".git", "objects", "info", "alternates"))
+			require.NoError(t, err)
+			assert.False(t, filepath.IsAbs(strings.TrimSpace(string(data))))
+		}},
+		{name: "SSH inherits an extended command deadline", run: func(t *testing.T, _ *state) {
+			if runtime.GOOS == "windows" {
+				t.Skip("uses a Unix test wrapper")
+			}
+			prepareGitRepo(t, "git@github.com:octo/hello.git")
+			gitPath, err := exec.LookPath("git")
+			require.NoError(t, err)
+			bin := t.TempDir()
+			captured := filepath.Join(bin, "deadline")
+			wrapper := "#!/bin/sh\nif [ \"$1\" = upload-pack ]; then printf '%s' \"$GHMOCK_GIT_DEADLINE\" > " + shellQuote(captured) + "; fi\nexec " + shellQuote(gitPath) + " \"$@\"\n"
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte(wrapper), 0o755))
+			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			t.Setenv("GIT_EXEC_PATH", bin)
+			start := time.Now()
+			gitForTest(t, "--timeout", "2m", "--", "ls-remote", "git@github.com:octo/hello.git")
+			data, err := os.ReadFile(captured)
+			require.NoError(t, err)
+			deadline, err := time.Parse(time.RFC3339Nano, string(data))
+			require.NoError(t, err)
+			assert.WithinDuration(t, start.Add(2*time.Minute), deadline, 5*time.Second)
+		}},
+		{name: "SSH requests remain recorded when their helper is cancelled", run: func(t *testing.T, st *state) {
+			if runtime.GOOS == "windows" {
+				t.Skip("uses a Unix test wrapper")
+			}
+			prepareGitRepo(t, "git@github.com:octo/hello.git")
+			gitPath, err := exec.LookPath("git")
+			require.NoError(t, err)
+			bin := t.TempDir()
+			wrapper := "#!/bin/sh\nif [ \"$1\" = upload-pack ]; then sleep 15; fi\nexec " + shellQuote(gitPath) + " \"$@\"\n"
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte(wrapper), 0o755))
+			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			t.Setenv("GIT_EXEC_PATH", bin)
+			err = cmdGit([]string{"--timeout", "500ms", "--", "ls-remote", "git@github.com:octo/hello.git"}, io.Discard, io.Discard)
+			require.ErrorContains(t, err, "git stopped after")
+			records, err := readJSONL[gitCommandRecord](filepath.Join(st.gitFixtureDir(), "commands.jsonl"))
+			require.NoError(t, err)
+			requests := records[len(records)-1].Requests
+			require.Len(t, requests, 1)
+			assert.Equal(t, "SSH", requests[0].Method)
+			assert.Equal(t, "git-upload-pack", requests[0].Git.Service)
+			assert.NotZero(t, requests[0].Git.ExitCode)
+		}},
 		{name: "HTTPS clone fetch and push transfer real commits", run: func(t *testing.T, st *state) {
 			prepareGitRepo(t, "https://github.com/octo/hello.git")
 			gitForTest(t, "--", "clone", "--quiet", "https://github.com/octo/hello.git", "other")

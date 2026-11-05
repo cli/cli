@@ -342,6 +342,9 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *cert
 
 	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
 	defer cancel()
+	if backend != nil {
+		env = gitDeadlineEnvironment(ctx, env)
+	}
 	cmd := exec.CommandContext(ctx, path, opts.args...)
 	cmd.Env = env
 	cmd.Dir = workDir
