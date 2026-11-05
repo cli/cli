@@ -24,6 +24,9 @@ type setOptions struct {
 	body      string
 	bodySet   bool
 	bodyFile  string
+	rawFile   string
+	zipDir    string
+	rawBody   *[]byte
 	at        string
 	value     string
 	valueSet  bool
@@ -40,6 +43,8 @@ func parseSetArgs(args []string) (setOptions, error) {
 	fs.Var((*stringList)(&opts.headers), "header", "'Name: value' to set, or 'Name:' to remove")
 	fs.StringVar(&opts.body, "body", "", "JSON body that replaces the current one")
 	fs.StringVar(&opts.bodyFile, "body-file", "", "file holding the JSON body")
+	fs.StringVar(&opts.rawFile, "raw-file", "", "file holding the exact response bytes")
+	fs.StringVar(&opts.zipDir, "zip-dir", "", "directory to serve as a ZIP response")
 	fs.StringVar(&opts.at, "at", "", "dotted path inside the body, such as data.repository.issue.title")
 	fs.StringVar(&opts.value, "json", "", "JSON value to put at --at")
 	fs.BoolVar(&opts.offSchema, "off-schema", false, "save the response even if it doesn't match GitHub's schema")
@@ -49,7 +54,9 @@ func parseSetArgs(args []string) (setOptions, error) {
 		return setOptions{}, err
 	}
 	opts.name = name
+	specified := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) {
+		specified[f.Name] = true
 		switch f.Name {
 		case "body":
 			opts.bodySet = true
@@ -65,8 +72,16 @@ func parseSetArgs(args []string) (setOptions, error) {
 		return setOptions{}, usageError{err}
 	}
 	switch {
+	case specified["raw-file"] && opts.rawFile == "":
+		return setOptions{}, newUsageError("--raw-file needs a file path")
+	case specified["zip-dir"] && opts.zipDir == "":
+		return setOptions{}, newUsageError("--zip-dir needs a directory path")
 	case opts.bodySet && opts.bodyFile != "":
 		return setOptions{}, newUsageError("use either --body or --body-file, not both")
+	case (opts.rawFile != "" || opts.zipDir != "") && (opts.bodySet || opts.bodyFile != "" || opts.at != "" || opts.valueSet):
+		return setOptions{}, newUsageError("--raw-file and --zip-dir cannot be combined with JSON body flags")
+	case opts.rawFile != "" && opts.zipDir != "":
+		return setOptions{}, newUsageError("use either --raw-file or --zip-dir, not both")
 	case opts.at != "" && !opts.valueSet:
 		return setOptions{}, newUsageError("--at needs --json")
 	case opts.valueSet && opts.at == "":
@@ -83,9 +98,9 @@ func parseSetArgs(args []string) (setOptions, error) {
 			return setOptions{}, newUsageError("--header %q must look like 'Name: value'", h)
 		}
 	}
-	changes := opts.status != 0 || len(opts.headers) > 0 || opts.bodySet || opts.bodyFile != "" || opts.at != "" || opts.offSchema
+	changes := opts.status != 0 || len(opts.headers) > 0 || opts.bodySet || opts.bodyFile != "" || opts.rawFile != "" || opts.zipDir != "" || opts.at != "" || opts.offSchema
 	if !changes && !opts.appendNew {
-		return setOptions{}, newUsageError("nothing to change; pass --status, --header, --body, --body-file, --at or --off-schema")
+		return setOptions{}, newUsageError("nothing to change; pass --status, --header, --body, --body-file, --raw-file, --zip-dir, --at or --off-schema")
 	}
 	return opts, nil
 }
@@ -145,6 +160,28 @@ func cmdSet(args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 		opts.body, opts.bodySet = string(data), true
+	}
+	if opts.rawFile != "" {
+		data, err := os.ReadFile(opts.rawFile)
+		if err != nil {
+			return err
+		}
+		opts.rawBody = &data
+	}
+	if opts.zipDir != "" {
+		var buf bytes.Buffer
+		if err := writeZip(&buf, opts.zipDir); err != nil {
+			return err
+		}
+		data := buf.Bytes()
+		opts.rawBody = &data
+		hasContentType := slices.ContainsFunc(opts.headers, func(header string) bool {
+			name, _, _ := strings.Cut(header, ":")
+			return strings.EqualFold(strings.TrimSpace(name), "Content-Type")
+		})
+		if !hasContentType {
+			opts.headers = append(opts.headers, "Content-Type: application/zip")
+		}
 	}
 
 	st, err := openState()
@@ -305,8 +342,16 @@ func applySet(responses responseSet, opts setOptions) (int, error) {
 			body = nil
 		}
 		r.Body = body
+		r.RawBody = nil
+	}
+	if opts.rawBody != nil {
+		r.Body = nil
+		r.RawBody = opts.rawBody
 	}
 	if opts.at != "" {
+		if r.RawBody != nil {
+			return 0, fmt.Errorf("cannot use --at on a raw body; replace it with --body or --body-file first")
+		}
 		body, err := setAtPath(r.Body, opts.at, opts.value)
 		if err != nil {
 			return 0, err
@@ -427,6 +472,9 @@ func describeResponse(name string, list []response, pos int) string {
 	if r.OffSchema {
 		offSchema = ", off-schema"
 	}
+	if r.RawBody != nil {
+		offSchema += ", raw"
+	}
 	return fmt.Sprintf("%s: response %d of %d: status %d, %s, body %d bytes%s",
-		name, pos+1, len(list), r.status(), headerText, len(r.Body), offSchema)
+		name, pos+1, len(list), r.status(), headerText, len(r.bodyBytes()), offSchema)
 }

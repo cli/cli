@@ -200,7 +200,7 @@ func (c *checker) check(e loggedRequest, resp *response, validateVariables bool)
 		case resp.status() != 200:
 			res.note = fmt.Sprintf("status %d has no GraphQL result to check", resp.status())
 		default:
-			res.responseProblems = checkGraphQLResponse(schema, op, resp.Body, variables)
+			res.responseProblems = checkGraphQLResponse(schema, op, resp.bodyBytes(), variables)
 		}
 		return res
 	}
@@ -216,7 +216,7 @@ func (c *checker) check(e loggedRequest, resp *response, validateVariables bool)
 	if err != nil {
 		return res
 	}
-	res.responseProblems, res.note = idx.check(e.Method, e.Path, resp.status(), resp.Body)
+	res.responseProblems, res.note = idx.check(e.Method, e.Path, resp)
 	return res
 }
 

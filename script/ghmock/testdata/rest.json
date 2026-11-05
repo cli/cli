@@ -5,6 +5,34 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/binary": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Binary response",
+            "content": {
+              "application/octet-stream": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/archive": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "ZIP response",
+            "content": {
+              "application/zip": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "operationId": "meta/root",

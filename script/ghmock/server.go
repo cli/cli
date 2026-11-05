@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vektah/gqlparser/v2/ast"
 )
@@ -29,6 +30,7 @@ type mockServer struct {
 	state    *state
 	checker  *checker
 	ca       *certAuthority
+	git      *gitBackend
 	listener net.Listener
 	srv      *http.Server
 
@@ -36,6 +38,7 @@ type mockServer struct {
 	tunnels    *tunnelListener
 	tunnelSrv  *http.Server
 	handshakes sync.WaitGroup
+	handlers   sync.WaitGroup
 
 	mu       sync.Mutex
 	closing  bool
@@ -43,17 +46,19 @@ type mockServer struct {
 	requests []loggedRequest
 }
 
-func startServer(st *state, chk *checker, ca *certAuthority) (*mockServer, error) {
+func startServer(st *state, chk *checker, ca *certAuthority, git *gitBackend) (*mockServer, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
-	m := &mockServer{state: st, checker: chk, ca: ca, listener: ln, cursors: map[string]int{}}
+	m := &mockServer{state: st, checker: chk, ca: ca, git: git, listener: ln, cursors: map[string]int{}}
 	m.srv = &http.Server{Handler: m, ReadHeaderTimeout: 10 * time.Second}
-	go func() { _ = m.srv.Serve(ln) }()
 	if ca != nil {
 		m.tunnels = newTunnelListener(ln.Addr())
 		m.tunnelSrv = &http.Server{Handler: m, ReadHeaderTimeout: 10 * time.Second}
+	}
+	go func() { _ = m.srv.Serve(ln) }()
+	if m.tunnelSrv != nil {
 		go func() { _ = m.tunnelSrv.Serve(m.tunnels) }()
 	}
 	return m, nil
@@ -89,15 +94,16 @@ func (m *mockServer) proxyURL() string {
 // close stops the server and returns the requests it saw, in order. It waits
 // for TLS handshakes still under way, so a rejected certificate is logged.
 func (m *mockServer) close() []loggedRequest {
-	_ = m.srv.Close()
 	m.mu.Lock()
 	m.closing = true
 	m.mu.Unlock()
+	_ = m.srv.Close()
 	m.handshakes.Wait()
 	if m.tunnelSrv != nil {
 		_ = m.tunnelSrv.Close()
 		_ = m.tunnels.Close()
 	}
+	m.handlers.Wait()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([]loggedRequest(nil), m.requests...)
@@ -116,6 +122,9 @@ func (m *mockServer) record(e loggedRequest) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e.Seq = len(m.requests) + 1
+	if e.Time.IsZero() {
+		e.Time = time.Now().UTC()
+	}
 	m.requests = append(m.requests, e)
 }
 
@@ -130,6 +139,15 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "ghmock: HTTPS tunnels are blocked", http.StatusForbidden)
 		return
 	}
+	m.mu.Lock()
+	if m.closing {
+		m.mu.Unlock()
+		http.Error(w, "ghmock: server is closing", http.StatusServiceUnavailable)
+		return
+	}
+	m.handlers.Add(1)
+	m.mu.Unlock()
+	defer m.handlers.Done()
 
 	host := r.URL.Host
 	if host == "" {
@@ -140,12 +158,15 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		hostname = h
 	}
 
-	entry := loggedRequest{Method: r.Method, Host: hostname, Path: r.URL.Path, RawQuery: r.URL.RawQuery}
+	entry := loggedRequest{Time: time.Now().UTC(), Method: r.Method, Host: hostname, Path: r.URL.Path, RawQuery: r.URL.RawQuery}
 	if m.ca == nil && !isMockHost(hostname) {
 		entry.Status = http.StatusForbidden
 		entry.Blocked = true
 		m.record(entry)
 		http.Error(w, "ghmock: only "+mockHost+" is served", http.StatusForbidden)
+		return
+	}
+	if m.serveGitHTTP(w, r, entry) {
 		return
 	}
 
@@ -166,7 +187,11 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	entry.Name = name
 	entry.GraphQL = gql
 	if gql == nil && len(body) > 0 {
-		entry.Body = string(body)
+		if utf8.Valid(body) {
+			entry.Body = string(body)
+		} else {
+			entry.RawBody = &body
+		}
 	}
 
 	responses, err := m.state.loadResponses()
@@ -199,14 +224,16 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := list[idx]
 
-	payload := resp.Body
-	if gql != nil && !resp.OffSchema && resp.status() == http.StatusOK {
+	payload := resp.bodyBytes()
+	if resp.RawBody == nil && gql != nil && !resp.OffSchema && resp.status() == http.StatusOK {
 		payload = trimGraphQL(payload, gql, m.graphQLSchema())
 	}
 	// responses.json is indented for people to read; gh gets compact JSON.
-	var compact bytes.Buffer
-	if err := json.Compact(&compact, payload); err == nil {
-		payload = compact.Bytes()
+	if resp.RawBody == nil {
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, payload); err == nil {
+			payload = compact.Bytes()
+		}
 	}
 
 	entry.Status = resp.status()
@@ -214,7 +241,9 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	entry.Response = idx + 1
 	entry.Responses = len(list)
 	entry.ResponseHeaders = resp.Headers
-	if responseHasBody(r.Method, resp.status()) && json.Valid(payload) {
+	if responseHasBody(r.Method, resp.status()) && resp.RawBody != nil {
+		entry.ResponseRawBody = resp.RawBody
+	} else if responseHasBody(r.Method, resp.status()) && json.Valid(payload) {
 		entry.ResponseBody = payload
 	}
 	m.check(&entry, &resp)
@@ -223,8 +252,8 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for k, v := range resp.Headers {
 		w.Header().Set(k, v)
 	}
-	if len(payload) > 0 && w.Header().Get("Content-Type") == "" {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if (len(payload) > 0 || resp.RawBody != nil) && w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", resp.contentType())
 	}
 	w.WriteHeader(resp.status())
 	if len(payload) > 0 && responseHasBody(r.Method, resp.status()) {

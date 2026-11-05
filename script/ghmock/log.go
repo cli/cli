@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -122,6 +123,9 @@ func printLog(w io.Writer, entries []loggedRequest, full bool) {
 		if e.Body != "" {
 			fmt.Fprintf(w, "   body: %s\n", compactJSON([]byte(e.Body)))
 		}
+		if e.RawBody != nil {
+			fmt.Fprintf(w, "   raw request body: %s (bytes in --json)\n", rawBodySummary(*e.RawBody))
+		}
 		if len(e.ResponseHeaders) > 0 {
 			names := slices.Sorted(maps.Keys(e.ResponseHeaders))
 			for i, name := range names {
@@ -132,6 +136,9 @@ func printLog(w io.Writer, entries []loggedRequest, full bool) {
 		if len(e.ResponseBody) > 0 {
 			fmt.Fprintf(w, "   response: %s\n", compactJSON(e.ResponseBody))
 		}
+		if e.ResponseRawBody != nil {
+			fmt.Fprintf(w, "   raw response body: %s (bytes in --json)\n", rawBodySummary(*e.ResponseRawBody))
+		}
 		for _, group := range problemGroups(e) {
 			fmt.Fprintf(w, "   %s:\n", group.label)
 			for _, p := range group.problems {
@@ -139,6 +146,10 @@ func printLog(w io.Writer, entries []loggedRequest, full bool) {
 			}
 		}
 	}
+}
+
+func rawBodySummary(body []byte) string {
+	return fmt.Sprintf("%d bytes, sha256 %x", len(body), sha256.Sum256(body))
 }
 
 func cmdReset(args []string, stdout io.Writer) error {

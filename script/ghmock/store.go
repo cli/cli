@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -20,7 +21,27 @@ type response struct {
 	Status    int               `json:"status,omitempty"`
 	Headers   map[string]string `json:"headers,omitempty"`
 	Body      json.RawMessage   `json:"body,omitempty"`
+	RawBody   *[]byte           `json:"raw_body,omitempty"`
 	OffSchema bool              `json:"off_schema,omitempty"`
+}
+
+func (r response) bodyBytes() []byte {
+	if r.RawBody != nil {
+		return *r.RawBody
+	}
+	return r.Body
+}
+
+func (r response) contentType() string {
+	for name, value := range r.Headers {
+		if strings.EqualFold(name, "Content-Type") {
+			return value
+		}
+	}
+	if r.RawBody != nil {
+		return "application/octet-stream"
+	}
+	return "application/json; charset=utf-8"
 }
 
 func (r response) status() int {
@@ -39,6 +60,7 @@ type responseSet map[string][]response
 // response wasn't checked. ResponseHeaders and ResponseBody are what gh got,
 // after trimming, because the stored response can change after the run.
 type loggedRequest struct {
+	Time     time.Time       `json:"time,omitzero"`
 	Run      string          `json:"run"`
 	Binary   string          `json:"binary"`
 	Seq      int             `json:"seq"`
@@ -49,8 +71,10 @@ type loggedRequest struct {
 	Name     string          `json:"name,omitempty"`
 	GraphQL  *graphQLRequest `json:"graphql,omitempty"`
 	Body     string          `json:"body,omitempty"`
+	RawBody  *[]byte         `json:"raw_body,omitempty"`
 	Status   int             `json:"status"`
 	Matched  bool            `json:"matched"`
+	Git      *gitRequest     `json:"git,omitempty"`
 	Blocked  bool            `json:"blocked,omitempty"`
 	// TLSError is why gh's TLS handshake with ghmock failed, such as gh not
 	// trusting ghmock's certificate authority.
@@ -64,28 +88,33 @@ type loggedRequest struct {
 
 	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
 	ResponseBody    json.RawMessage   `json:"response_body,omitempty"`
+	ResponseRawBody *[]byte           `json:"response_raw_body,omitempty"`
 }
 
 // runRecord is one ghmock run, kept for ghmock export. Report is what ghmock
 // run printed.
 type runRecord struct {
-	ID      string       `json:"id"`
-	Time    time.Time    `json:"time"`
-	Command string       `json:"command"`
-	Schemas []schemaFile `json:"schemas,omitempty"`
-	Results []runOutcome `json:"results"`
-	Report  string       `json:"report"`
+	ID             string       `json:"id"`
+	Time           time.Time    `json:"time"`
+	Command        string       `json:"command"`
+	Schemas        []schemaFile `json:"schemas,omitempty"`
+	Results        []runOutcome `json:"results"`
+	Report         string       `json:"report"`
+	GitBaseline    string       `json:"git_baseline,omitempty"`
+	ConfigBaseline string       `json:"config_baseline,omitempty"`
 }
 
 // runOutcome is what one gh binary did in a run.
 type runOutcome struct {
-	Binary   string `json:"binary"`
-	Path     string `json:"path"`
-	Version  string `json:"version"`
-	ExitCode int    `json:"exit_code"`
-	TimedOut bool   `json:"timed_out,omitempty"`
-	Stdout   string `json:"stdout"`
-	Stderr   string `json:"stderr"`
+	Binary   string         `json:"binary"`
+	Path     string         `json:"path"`
+	Version  string         `json:"version"`
+	ExitCode int            `json:"exit_code"`
+	TimedOut bool           `json:"timed_out,omitempty"`
+	Stdout   string         `json:"stdout"`
+	Stderr   string         `json:"stderr"`
+	Git      *gitOutcome    `json:"git,omitempty"`
+	Config   *configOutcome `json:"config,omitempty"`
 	// Terminal runs keep the screen before each --keys entry in Steps, and
 	// the final screen in Stdout.
 	Terminal       bool           `json:"terminal,omitempty"`
@@ -139,6 +168,13 @@ func (s *state) loadResponses() (responseSet, error) {
 	}
 	if err := json.Unmarshal(data, &responses); err != nil {
 		return nil, fmt.Errorf("reading %s: %w", s.responsesPath(), err)
+	}
+	for name, list := range responses {
+		for i, resp := range list {
+			if resp.RawBody != nil && len(resp.Body) > 0 {
+				return nil, fmt.Errorf("reading %s: %s response %d has both JSON and raw bodies", s.responsesPath(), name, i+1)
+			}
+		}
 	}
 	return responses, nil
 }
@@ -239,6 +275,11 @@ func readJSONL[T any](path string) ([]T, error) {
 func (s *state) reset() error {
 	for _, p := range []string{s.responsesPath(), s.logPath(), s.runsPath()} {
 		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	for _, name := range []string{"git", "config"} {
+		if err := os.RemoveAll(filepath.Join(s.dir, name)); err != nil {
 			return err
 		}
 	}

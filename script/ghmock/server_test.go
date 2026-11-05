@@ -73,6 +73,7 @@ func graphQLBodyWithVariables(t *testing.T, query, variables string) string {
 
 func TestMockServer(t *testing.T) {
 	limitBody := strings.Repeat("x", maxRequestBody)
+	rawBytes := []byte{0, 255, ' ', '\n'}
 	type call struct {
 		method string
 		url    string
@@ -100,7 +101,10 @@ func TestMockServer(t *testing.T) {
 		wantKinds []string
 		// wantSent, when set, is the response body each logged request
 		// records as sent to gh.
-		wantSent []string
+		wantSent        []string
+		wantRawSent     [][]byte
+		wantRawRequests [][]byte
+		exactBody       bool
 	}{
 		{
 			name: "typename aliases trim fields from other concrete fragments",
@@ -169,6 +173,56 @@ func TestMockServer(t *testing.T) {
 			want:     []reply{{status: 200, body: `{"data":{"viewer":{"login":"Mona","name":"Mona"}}}`}},
 			wantLog:  []logSummary{{Seq: 1, Name: "graphql Default", Status: 200, Matched: true, Response: 1, Responses: 1}},
 			wantSent: []string{`{"data":{"viewer":{"login":"Mona","name":"Mona"}}}`},
+		},
+		{
+			name:         "raw binary response is byte exact and recorded",
+			responses:    responseSet{"GET /binary": {{RawBody: &rawBytes}}},
+			dotcom:       true,
+			checkSchemas: true,
+			calls:        []call{{method: "GET", url: "https://api.github.com/binary"}},
+			want:         []reply{{status: 200, body: string(rawBytes), headers: map[string]string{"Content-Type": "application/octet-stream"}}},
+			wantLog:      []logSummary{{Seq: 1, Name: "GET /binary", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			wantSent:     []string{""},
+			wantRawSent:  [][]byte{rawBytes},
+			exactBody:    true,
+		},
+		{
+			name:        "raw JSON is not compacted",
+			responses:   responseSet{"GET /raw": {{RawBody: &[]byte{' ', '{', '}', '\n'}, Headers: map[string]string{"Content-Type": "application/json"}}}},
+			calls:       []call{{method: "GET", url: "http://api.github.localhost/raw"}},
+			want:        []reply{{status: 200, body: " {}\n"}},
+			wantLog:     []logSummary{{Seq: 1, Name: "GET /raw", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			wantRawSent: [][]byte{[]byte(" {}\n")},
+			exactBody:   true,
+		},
+		{
+			name:        "HEAD does not send or record the configured body",
+			responses:   responseSet{"HEAD /binary": {{RawBody: &rawBytes}}},
+			calls:       []call{{method: "HEAD", url: "http://api.github.localhost/binary"}},
+			want:        []reply{{status: 200, body: ""}},
+			wantLog:     []logSummary{{Seq: 1, Name: "HEAD /binary", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			wantRawSent: [][]byte{nil},
+		},
+		{
+			name:            "binary request bytes survive JSON recording",
+			responses:       responseSet{"POST /binary": {{Body: json.RawMessage(`{}`)}}},
+			calls:           []call{{method: "POST", url: "http://api.github.localhost/binary", body: string(rawBytes)}},
+			want:            []reply{{status: 200, body: `{}`}},
+			wantLog:         []logSummary{{Seq: 1, Name: "POST /binary", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			wantRawRequests: [][]byte{rawBytes},
+		},
+		{
+			name:      "request at the body limit is recorded in full",
+			responses: responseSet{"POST /limit": {{Body: json.RawMessage(`{}`)}}},
+			calls:     []call{{method: "POST", url: "http://api.github.localhost/limit", body: limitBody}},
+			want:      []reply{{status: 200, body: `{}`}},
+			wantLog:   []logSummary{{Seq: 1, Name: "POST /limit", Body: limitBody, Status: 200, Matched: true, Response: 1, Responses: 1}},
+		},
+		{
+			name:    "oversized request is rejected instead of truncated",
+			calls:   []call{{method: "POST", url: "http://api.github.localhost/limit", body: limitBody + "x"}},
+			want:    []reply{{status: 413, body: `{"message":"ghmock: request body exceeds 10 MiB"}`}},
+			wantLog: []logSummary{{Seq: 1, Status: 413}},
 		},
 		{
 			name: "REST response with status, headers and body",
@@ -392,7 +446,7 @@ func TestMockServer(t *testing.T) {
 				ca, err = newCertAuthority()
 				require.NoError(t, err)
 			}
-			srv, err := startServer(st, chk, ca)
+			srv, err := startServer(st, chk, ca, nil)
 			require.NoError(t, err)
 			proxy, err := url.Parse(srv.proxyURL())
 			require.NoError(t, err)
@@ -420,13 +474,21 @@ func TestMockServer(t *testing.T) {
 				resp.Body.Close()
 
 				assert.Equal(t, tt.want[i].status, resp.StatusCode)
-				assert.Equal(t, tt.want[i].body, strings.TrimSpace(string(body)))
+				if tt.exactBody {
+					assert.Equal(t, []byte(tt.want[i].body), body)
+				} else {
+					assert.Equal(t, tt.want[i].body, strings.TrimSpace(string(body)))
+				}
 				for k, v := range tt.want[i].headers {
 					assert.Equal(t, v, resp.Header.Get(k), "header %s", k)
 				}
 			}
 
 			logged := srv.close()
+			require.NoError(t, st.appendLog(logged))
+			roundTrip, err := st.readLog()
+			require.NoError(t, err)
+			assert.Equal(t, logged, roundTrip)
 			assert.Equal(t, tt.wantLog, summarize(logged))
 			if tt.wantKinds != nil {
 				require.Len(t, logged, len(tt.wantKinds))
@@ -444,6 +506,28 @@ func TestMockServer(t *testing.T) {
 				var sent []string
 				for _, e := range logged {
 					sent = append(sent, string(e.ResponseBody))
+				}
+				if tt.wantRawSent != nil {
+					var sent [][]byte
+					for _, entry := range roundTrip {
+						var data []byte
+						if entry.ResponseRawBody != nil {
+							data = *entry.ResponseRawBody
+						}
+						sent = append(sent, data)
+					}
+					assert.Equal(t, tt.wantRawSent, sent)
+				}
+				if tt.wantRawRequests != nil {
+					var received [][]byte
+					for _, entry := range roundTrip {
+						var data []byte
+						if entry.RawBody != nil {
+							data = *entry.RawBody
+						}
+						received = append(received, data)
+					}
+					assert.Equal(t, tt.wantRawRequests, received)
 				}
 				assert.Equal(t, tt.wantSent, sent)
 			}

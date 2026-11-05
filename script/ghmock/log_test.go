@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"testing"
 
@@ -44,6 +46,7 @@ func TestCmdLog(t *testing.T) {
 		Status:  200, Matched: true, Response: 1, Responses: 1,
 	}
 	write := loggedRequest{Run: "run-2", Binary: "./new", Seq: 2, Method: "POST", Name: "POST /repos/o/r/issues", Body: `{"title": "Bug"}`, Status: 404}
+	raw := []byte{0, 255}
 
 	tests := []struct {
 		name    string
@@ -64,6 +67,18 @@ func TestCmdLog(t *testing.T) {
 			runs:    []runRecord{{ID: "run-1"}, {ID: "run-2"}},
 			args:    []string{"--all"},
 			want:    "=== run run-1, gh ./old\n1. GET /user -> 200, response 1 of 1\n",
+		},
+		{
+			name:    "raw bytes are retained in JSON",
+			entries: []loggedRequest{{Seq: 1, Method: "POST", Name: "POST /binary", RawBody: &raw, ResponseRawBody: &raw, Status: 200}},
+			args:    []string{"--json"},
+			want:    `{"run":"","binary":"","seq":1,"method":"POST","host":"","name":"POST /binary","raw_body":"AP8=","status":200,"matched":false,"response_raw_body":"AP8="}` + "\n",
+		},
+		{
+			name:    "raw bytes are summarized safely in full logs",
+			entries: []loggedRequest{{Seq: 1, Method: "POST", Name: "POST /binary", RawBody: &raw, ResponseRawBody: &raw, Status: 200}},
+			args:    []string{"--full"},
+			want:    fmt.Sprintf("1. POST /binary raw body 2 bytes, sha256 %[1]x -> 200, no response stored\n   raw request body: 2 bytes, sha256 %[1]x (bytes in --json)\n   raw response body: 2 bytes, sha256 %[1]x (bytes in --json)\n", sha256.Sum256(raw)),
 		},
 		{
 			name: "nothing logged",
@@ -160,6 +175,7 @@ func TestCmdLog(t *testing.T) {
 }
 
 func TestRunMain(t *testing.T) {
+	t.Setenv("GHMOCK_EXPORT_PATH", "")
 	tests := []struct {
 		name       string
 		args       []string

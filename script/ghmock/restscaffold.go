@@ -46,7 +46,7 @@ func (idx *restIndex) scaffold(method, path string) (response, string, error) {
 	media := jsonMedia(ref.Value.Content)
 	if media == nil || media.Schema == nil || media.Schema.Value == nil {
 		if len(ref.Value.Content) > 0 {
-			return response{}, "", fmt.Errorf("GitHub's response for status %s is %s, and ghmock can only store JSON bodies",
+			return response{}, "", fmt.Errorf("GitHub's response for status %s is %s; provide it with ghmock set --raw-file or --zip-dir",
 				code, strings.Join(slices.Sorted(maps.Keys(ref.Value.Content)), ", "))
 		}
 		return resp, fmt.Sprintf(" with no body%s", statusText), nil
@@ -58,7 +58,7 @@ func (idx *restIndex) scaffold(method, path string) (response, string, error) {
 		f.filled += encodeContent(filled)
 		body, err := json.Marshal(filled)
 		if err == nil {
-			if problems, _ := idx.check(method, path, status, body); len(problems) == 0 {
+			if problems, _ := idx.check(method, path, &response{Status: status, Body: body}); len(problems) == 0 {
 				resp.Body = body
 				detail := " from GitHub's example"
 				if f.filled > 0 {
@@ -74,7 +74,7 @@ func (idx *restIndex) scaffold(method, path string) (response, string, error) {
 	if err != nil {
 		return response{}, "", err
 	}
-	if problems, _ := idx.check(method, path, status, body); len(problems) > 0 {
+	if problems, _ := idx.check(method, path, &response{Status: status, Body: body}); len(problems) > 0 {
 		return response{}, "", fmt.Errorf("couldn't build a body that matches GitHub's description:\n%sSet one with ghmock set --off-schema",
 			indentProblems(problems, "  ", maxShownProblems))
 	}

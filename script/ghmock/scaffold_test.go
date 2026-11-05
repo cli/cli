@@ -393,7 +393,7 @@ func TestCmdScaffold(t *testing.T) {
 		{
 			name:    "a body that isn't JSON",
 			args:    []string{"GET /zen"},
-			wantErr: "GitHub's response for status 200 is text/plain, and ghmock can only store JSON bodies",
+			wantErr: "GitHub's response for status 200 is text/plain; provide it with ghmock set --raw-file or --zip-dir",
 		},
 		{
 			name:    "a path GitHub doesn't document",
@@ -418,7 +418,7 @@ func TestCmdScaffold(t *testing.T) {
 			},
 			args: []string{"--missing"},
 			wantStdout: "graphql RepoName: added response 1 of 1 with placeholder values\n" +
-				"GET /zen: can't scaffold: GitHub's response for status 200 is text/plain, and ghmock can only store JSON bodies\n" +
+				"GET /zen: can't scaffold: GitHub's response for status 200 is text/plain; provide it with ghmock set --raw-file or --zip-dir\n" +
 				"GET /repos/o/r/issues/1: added response 1 of 1 from GitHub's example\n",
 			want: `{
 				"graphql RepoName":[{"body":{"data":{"repository":{"name":"name"}}}}],

@@ -18,7 +18,11 @@ const (
 // lists how each one differs from the first. notes say which schema checks
 // couldn't run.
 func printReport(w io.Writer, opts runOptions, results []runResult, notes []string) {
-	command := "$ gh " + strings.Join(opts.args, " ")
+	quoted := make([]string, len(opts.args))
+	for i, arg := range opts.args {
+		quoted[i] = shellQuote(arg)
+	}
+	command := "$ gh " + strings.Join(quoted, " ")
 	if len(results) == 1 {
 		fmt.Fprintf(w, "%s - %s\n", results[0].version, results[0].path)
 		printResult(w, command, results[0])
@@ -54,6 +58,12 @@ func printNotes(w io.Writer, notes []string) {
 }
 
 func printResult(w io.Writer, command string, res runResult) {
+	if res.config != nil {
+		fmt.Fprintf(w, "Retained configuration: %s\n", res.config.Directory)
+	}
+	if res.git != nil {
+		fmt.Fprintf(w, "Git: %s\nRetained Git state: %s\n", res.git.Version, res.git.Directory)
+	}
 	fmt.Fprintln(w, command)
 	switch {
 	case res.timedOut:
@@ -221,7 +231,19 @@ func formatRequest(e loggedRequest) string {
 	if e.Body != "" {
 		b.WriteString(" body " + truncate(compactJSON([]byte(e.Body)), maxShownBody))
 	}
+	if e.RawBody != nil {
+		b.WriteString(" raw body " + rawBodySummary(*e.RawBody))
+	}
 	switch {
+	case e.Git != nil:
+		if e.Method == "SSH" {
+			fmt.Fprintf(&b, " -> %s, exit code %d", e.Git.Service, e.Git.ExitCode)
+		} else {
+			fmt.Fprintf(&b, " -> %d, %s", e.Status, e.Git.Service)
+		}
+		if e.Git.Error != "" {
+			b.WriteString(" [" + e.Git.Error + "]")
+		}
 	case e.Blocked:
 		b.WriteString(" -> blocked")
 	case e.TLSError != "":
@@ -258,7 +280,7 @@ func missingNames(requests []loggedRequest) []string {
 	seen := map[string]bool{}
 	var names []string
 	for _, e := range requests {
-		if e.Matched || e.Blocked || e.TLSError != "" || seen[e.Name] {
+		if e.Matched || e.Git != nil || e.Blocked || e.TLSError != "" || seen[e.Name] {
 			continue
 		}
 		seen[e.Name] = true
@@ -414,6 +436,8 @@ func unionNames(a, b []loggedRequest) []string {
 
 type requestPayload struct {
 	rawQuery, body, query, variables string
+	rawBody                          string
+	raw                              bool
 	graphQL                          bool
 }
 
@@ -429,6 +453,9 @@ func requestPayloads(requests []loggedRequest, name string) []requestPayload {
 			p.graphQL = true
 			p.query = e.GraphQL.Query
 			p.variables = compactJSON(e.GraphQL.Variables)
+		} else if e.RawBody != nil {
+			p.raw = true
+			p.rawBody = string(*e.RawBody)
 		} else {
 			p.body = compactJSON([]byte(e.Body))
 		}
@@ -451,6 +478,8 @@ func formatPayloads(payloads []requestPayload) string {
 			if p.variables != "" {
 				parts = append(parts, p.variables)
 			}
+		} else if p.raw {
+			parts = append(parts, "raw body "+rawBodySummary([]byte(p.rawBody)))
 		} else if p.body != "" {
 			if p.rawQuery != "" || !json.Valid([]byte(p.body)) {
 				parts = append(parts, fmt.Sprintf("body %q", p.body))

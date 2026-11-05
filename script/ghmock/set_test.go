@@ -1,11 +1,15 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -34,6 +38,41 @@ func TestParseSetArgs(t *testing.T) {
 			name: "empty body clears it",
 			args: []string{"GET /", "--body", ""},
 			want: setOptions{name: "GET /", bodySet: true},
+		},
+		{
+			name: "raw response file",
+			args: []string{"GET /archive", "--raw-file", "response.bin"},
+			want: setOptions{name: "GET /archive", rawFile: "response.bin"},
+		},
+		{
+			name: "ZIP response directory",
+			args: []string{"GET /archive", "--zip-dir", "logs"},
+			want: setOptions{name: "GET /archive", zipDir: "logs"},
+		},
+		{
+			name:    "empty raw file path",
+			args:    []string{"GET /binary", "--raw-file", "", "--status", "200"},
+			wantErr: "--raw-file needs a file path",
+		},
+		{
+			name:    "empty ZIP directory path",
+			args:    []string{"GET /archive", "--zip-dir", ""},
+			wantErr: "--zip-dir needs a directory path",
+		},
+		{
+			name:    "raw and JSON bodies conflict",
+			args:    []string{"GET /archive", "--raw-file", "response.bin", "--body", "{}"},
+			wantErr: "--raw-file and --zip-dir cannot be combined with JSON body flags",
+		},
+		{
+			name:    "ZIP and JSON edits conflict",
+			args:    []string{"GET /archive", "--zip-dir", "logs", "--at", "title", "--json", `"x"`},
+			wantErr: "--raw-file and --zip-dir cannot be combined with JSON body flags",
+		},
+		{
+			name:    "raw and ZIP bodies conflict",
+			args:    []string{"GET /archive", "--raw-file", "response.bin", "--zip-dir", "logs"},
+			wantErr: "use either --raw-file or --zip-dir, not both",
 		},
 		{
 			name: "path edit on a chosen response",
@@ -118,7 +157,7 @@ func TestParseSetArgs(t *testing.T) {
 		{
 			name:    "nothing to change",
 			args:    []string{"GET /"},
-			wantErr: "nothing to change; pass --status, --header, --body, --body-file, --at or --off-schema",
+			wantErr: "nothing to change; pass --status, --header, --body, --body-file, --raw-file, --zip-dir, --at or --off-schema",
 		},
 		{
 			name:    "extra arguments",
@@ -316,6 +355,9 @@ func TestCmdSet(t *testing.T) {
 		responses  string
 		logged     []loggedRequest
 		args       []string
+		files      map[string][]byte
+		symlink    bool
+		check      func(*testing.T, responseSet)
 		wantStdout string
 		wantErr    string
 		want       string
@@ -349,6 +391,97 @@ func TestCmdSet(t *testing.T) {
 			args:       []string{"graphql IssueTitle", "--body", validTitle},
 			wantStdout: fmt.Sprintf("graphql IssueTitle: response 1 of 1: status 200, no headers, body %d bytes\nSchema check: passed\n", len(validTitle)),
 			want:       `{"graphql IssueTitle":[{"body":` + validTitle + `}]}`,
+		},
+		{
+			name:       "raw files preserve arbitrary bytes",
+			args:       []string{"GET /binary", "--raw-file", "<files>/body.bin"},
+			files:      map[string][]byte{"body.bin": {0, 255}},
+			wantStdout: "GET /binary: response 1 of 1: status 200, no headers, body 2 bytes, raw\nSchema check: passed\n",
+			want:       `{"GET /binary":[{"raw_body":"AP8="}]}`,
+		},
+		{
+			name:       "empty raw body remains distinct from JSON",
+			args:       []string{"GET /binary", "--raw-file", "<files>/body.bin"},
+			files:      map[string][]byte{"body.bin": {}},
+			wantStdout: "GET /binary: response 1 of 1: status 200, no headers, body 0 bytes, raw\nSchema check: passed\n",
+			want:       `{"GET /binary":[{"raw_body":""}]}`,
+		},
+		{
+			name:  "raw media type must match a documented response",
+			args:  []string{"GET /repos/o/r/issues/1", "--raw-file", "<files>/body.bin"},
+			files: map[string][]byte{"body.bin": {0, 255}},
+			wantErr: "the response doesn't match GitHub's schema, so it wasn't saved:\n" +
+				"  Content-Type: application/octet-stream is not documented for status 200\n" +
+				"Fix it, or pass --off-schema to save it anyway",
+			want: `{}`,
+		},
+		{
+			name:  "off-schema raw response is explicit",
+			args:  []string{"GET /repos/o/r/issues/1", "--raw-file", "<files>/body.bin", "--off-schema"},
+			files: map[string][]byte{"body.bin": {0, 255}},
+			wantStdout: "GET /repos/o/r/issues/1: response 1 of 1: status 200, no headers, body 2 bytes, off-schema, raw\n" +
+				"Schema check: failed, saved as off-schema:\n  Content-Type: application/octet-stream is not documented for status 200\n",
+			want: `{"GET /repos/o/r/issues/1":[{"raw_body":"AP8=","off_schema":true}]}`,
+		},
+		{
+			name:       "text response can be checked",
+			args:       []string{"GET /zen", "--raw-file", "<files>/body.txt", "--header", "Content-Type: text/plain"},
+			files:      map[string][]byte{"body.txt": []byte("Hello\n")},
+			wantStdout: "GET /zen: response 1 of 1: status 200, headers Content-Type, body 6 bytes, raw\nSchema check: passed\n",
+			want:       `{"GET /zen":[{"headers":{"Content-Type":"text/plain"},"raw_body":"SGVsbG8K"}]}`,
+		},
+		{
+			name:    "JSON body flags still reject binary files",
+			args:    []string{"GET /binary", "--body-file", "<files>/body.bin"},
+			files:   map[string][]byte{"body.bin": {0, 255}},
+			wantErr: "body is not valid JSON",
+			want:    `{}`,
+		},
+		{
+			name:       "JSON replacement clears a raw body",
+			responses:  `{"GET /repos/o/r/issues/1":[{"raw_body":"AP8="}]}`,
+			args:       []string{"GET /repos/o/r/issues/1", "--body", validIssue},
+			wantStdout: fmt.Sprintf("GET /repos/o/r/issues/1: response 1 of 1: status 200, no headers, body %d bytes\nSchema check: passed\n", len(validIssue)),
+			want:       `{"GET /repos/o/r/issues/1":[{"body":` + validIssue + `}]}`,
+		},
+		{
+			name:      "JSON edits do not discard a raw body",
+			responses: `{"GET /binary":[{"raw_body":"AP8="}]}`,
+			args:      []string{"GET /binary", "--at", "a", "--json", "1"},
+			wantErr:   "cannot use --at on a raw body; replace it with --body or --body-file first",
+			want:      `{"GET /binary":[{"raw_body":"AP8="}]}`,
+		},
+		{
+			name:  "ZIP responses retain nested and hidden files",
+			args:  []string{"GET /archive", "--zip-dir", "<files>"},
+			files: map[string][]byte{"build/1_tests.txt": []byte("test failed\n"), ".hidden": {0, 255}},
+			check: func(t *testing.T, stored responseSet) {
+				require.Len(t, stored, 1)
+				require.Len(t, stored["GET /archive"], 1)
+				resp := stored["GET /archive"][0]
+				require.NotNil(t, resp.RawBody)
+				assert.Nil(t, resp.Body)
+				assert.Equal(t, "application/zip", resp.Headers["Content-Type"])
+				reader, err := zip.NewReader(bytes.NewReader(*resp.RawBody), int64(len(*resp.RawBody)))
+				require.NoError(t, err)
+				got := map[string][]byte{}
+				for _, file := range reader.File {
+					rc, err := file.Open()
+					require.NoError(t, err)
+					data, err := io.ReadAll(rc)
+					require.NoError(t, err)
+					require.NoError(t, rc.Close())
+					got[file.Name] = data
+				}
+				assert.Equal(t, map[string][]byte{"build/1_tests.txt": []byte("test failed\n"), ".hidden": {0, 255}}, got)
+			},
+		},
+		{
+			name:    "ZIP refuses symbolic links without changing responses",
+			args:    []string{"GET /archive", "--zip-dir", "<files>"},
+			symlink: true,
+			wantErr: "cannot ZIP <files>/link: not a regular file",
+			want:    `{}`,
 		},
 		{
 			name:       "a REST response that matches GitHub's description",
@@ -485,18 +618,43 @@ func TestCmdSet(t *testing.T) {
 				require.NoError(t, st.saveResponses(responses))
 			}
 			require.NoError(t, st.appendLog(tt.logged))
+			files := t.TempDir()
+			for name, data := range tt.files {
+				path := filepath.Join(files, name)
+				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+				require.NoError(t, os.WriteFile(path, data, 0o600))
+			}
+			if tt.symlink {
+				if runtime.GOOS == "windows" {
+					t.Skip("creating symlinks requires additional Windows privileges")
+				}
+				require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(files, "link")))
+			}
+			args := make([]string, len(tt.args))
+			for i, arg := range tt.args {
+				args[i] = strings.ReplaceAll(arg, "<files>", files)
+			}
 
 			var stdout bytes.Buffer
-			err := cmdSet(tt.args, &stdout, io.Discard)
+			err := cmdSet(args, &stdout, io.Discard)
 			if tt.wantErr != "" {
-				require.EqualError(t, err, tt.wantErr)
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErr, strings.ReplaceAll(err.Error(), files, "<files>"))
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Equal(t, tt.wantStdout, stdout.String())
+			if tt.check == nil {
+				assert.Equal(t, tt.wantStdout, stdout.String())
+			} else {
+				assert.Contains(t, stdout.String(), ", raw\nSchema check: passed\n")
+			}
 
 			stored, err := st.loadResponses()
 			require.NoError(t, err)
+			if tt.check != nil {
+				tt.check(t, stored)
+				return
+			}
 			got, err := json.Marshal(stored)
 			require.NoError(t, err)
 			assert.JSONEq(t, tt.want, string(got))

@@ -28,17 +28,25 @@ Runs gh binaries against a fake GitHub API and records every request.
 Commands:
   run      Run gh against the mock
            ghmock run --gh PATH [--gh PATH ...] [--tty | --terminal] [--keys KEYS ...] [--stdin TEXT]
-                      [--logged-out] [--localhost] [--timeout DURATION] -- ARGS
+                      [--logged-out | --config-dir DIR] [--localhost] [--in DIR] [--timeout DURATION] -- ARGS
+  repo     Create an empty fake remote repository
+           ghmock repo [HOST/]OWNER/REPO [--branch NAME]
+  git      Prepare a Git fixture or inspect a retained build's workspace
+           ghmock git [--in DIR] [--run ID|latest] [--build N | --before]
+                      [--stdin TEXT] [--timeout DURATION] -- GIT_ARGS
+  write    Write a file inside the prepared Git workspace, creating its directories
+           ghmock write PATH --text TEXT
   set      Change the response for a request
            ghmock set REQUEST [--status N] [--header 'Name: value'] [--body JSON | --body-file PATH]
+                              [--raw-file PATH | --zip-dir DIR]
                               [--at PATH --json VALUE] [--index N | --append] [--off-schema]
   log      Show the requests from the last run
            ghmock log [--all] [--full] [--json]
-  reset    Delete all responses, the request log and saved runs
+  reset    Delete all responses, logs, saved runs and retained Git/config state
   scaffold Add placeholder responses that pass the schema check
            ghmock scaffold REQUEST | --missing
-  export   Write runs, requests and responses to a folder, to check results
-           ghmock export DIR
+  export   Write runs, requests and responses to a folder or portable archive
+           ghmock export [--archive] [PATH]
   schema   Look up a GraphQL type or field, or a REST request, in GitHub's schemas
            ghmock schema Issue | Issue.title | 'GET /repos/octo/hello' [--status N] [--at PATH]
   schemas  Download GitHub's schemas again
@@ -69,6 +77,15 @@ pass --off-schema. ghmock run reports responses, GraphQL queries and variables
 that don't match.
 GitHub answers a query that doesn't match with an error, but ghmock still sends
 the stored response, so read the report as well as gh's exit code.
+
+For non-JSON responses, --raw-file sends a file byte-for-byte. --zip-dir builds
+a ZIP response from regular files in a directory, including hidden files; it
+rejects symlinks instead of following them. This supports logs and artifact
+downloads without needing a shell ZIP utility. --zip-dir sets Content-Type to
+application/zip unless you override it. Set Content-Type for other raw formats.
+Raw bodies are never compacted or trimmed. JSON logs and exports retain their
+exact bytes as base64 in raw_body/response_raw_body fields; log --full shows
+their size and SHA-256 instead of printing binary data to the terminal.
 
 ghmock run stops gh after --timeout, a minute by default. For a hang or a loop,
 the report lists the requests gh made before it stopped.
@@ -110,6 +127,46 @@ schemas update downloads them again, to those paths when they're set.
 State lives in $GHMOCK_DIR, or in a ghmock folder in the system temp directory.
 ghmock exits non-zero only when ghmock itself fails. gh's exit code is in the report.
 
+--config-dir copies a configuration fixture once, then gives each gh build its
+own writable copy as GH_CONFIG_DIR. Supply hosts.yml and/or config.yml as needed;
+no default account or config values are added to the fixture. The input directory
+is never modified. An empty fixture models a logged-out state. Files are copied
+verbatim, including malformed configuration for testing; contained symlinks and
+special files are rejected. With --localhost, name fixture hosts github.localhost.
+The before/after copies are retained under the state folder's config/runs and
+included in exports. Use synthetic credentials only. This supplies files, not
+an isolated OS keyring; run authentication scenarios inside a sandbox without
+access to the operator's credential store.
+
+export uses GHMOCK_EXPORT_PATH when PATH is omitted. --archive writes tar.gz,
+including hidden Git metadata and relative worktree links, without overwriting
+an existing file. Extract into an empty folder; portable linked worktrees need
+Git 2.48 or newer. Explicit directory exports keep their existing behavior.
+
+Git uses real repositories, not canned command output:
+  ghmock repo octo/hello
+  ghmock git -- clone https://github.com/octo/hello.git main
+  ghmock write main/example.txt --text 'first version'
+  ghmock git --in main -- add example.txt
+  ghmock git --in main -- commit -m 'Add example'
+  ghmock git --in main -- push origin main
+  ghmock git --in main -- worktree add ../feature -b feature
+  ghmock run --gh ./bin/gh --in feature -- repo sync
+  ghmock git --run latest --build 1 --in main -- status --porcelain=v1
+
+--in is a directory in the fixture workspace, not a repository name. Each run
+snapshots the complete fixture, including remotes, files, index and linked
+worktrees, then gives each gh build its own copy. --run selects that retained
+copy for inspection; --before selects the run's original snapshot. Without
+--run, git and write change only the fixture for future runs. reset deletes
+both the fixture and retained copies. export includes them with repaired paths.
+
+HTTPS uses git http-backend. SSH URLs use a local upload/receive-pack helper,
+not real SSH, so this does not test keys or host authentication. github.localhost
+is an alias for github.com fixtures. Git uses a fake author and fixed dates.
+API responses are still configured with set/scaffold; API mutations do not
+automatically create Git repositories or refs. Keep their URLs and SHAs aligned.
+
 ghmock does not block network access. Run it somewhere with no route to GitHub.
 `
 
@@ -144,6 +201,14 @@ func runMain(args []string, stdout, stderr io.Writer) int {
 
 	var err error
 	switch args[0] {
+	case "repo":
+		err = cmdRepo(args[1:], stdout)
+	case "git":
+		err = cmdGit(args[1:], stdout, stderr)
+	case "write":
+		err = cmdWrite(args[1:], stdout)
+	case "_git-ssh":
+		err = cmdGitSSH(args[1:], os.Stdin, stdout, stderr)
 	case "run":
 		err = cmdRun(args[1:], stdout, stderr)
 	case "set":

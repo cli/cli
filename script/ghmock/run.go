@@ -43,6 +43,8 @@ type runOptions struct {
 	stdin     string
 	loggedOut bool
 	localhost bool
+	configDir string
+	in        string
 	timeout   time.Duration
 	args      []string
 }
@@ -58,6 +60,8 @@ type runResult struct {
 	stdout   string
 	stderr   string
 	requests []loggedRequest
+	git      *gitOutcome
+	config   *configOutcome
 
 	terminal       bool
 	terminalOutput string
@@ -86,11 +90,19 @@ func parseRunArgs(args []string) (runOptions, error) {
 	fs.StringVar(&opts.stdin, "stdin", "", "text to pass to gh on standard input")
 	fs.BoolVar(&opts.loggedOut, "logged-out", false, "run gh without a token")
 	fs.BoolVar(&opts.localhost, "localhost", false, "use github.localhost over plain HTTP, for gh builds that ignore SSL_CERT_FILE")
+	fs.StringVar(&opts.configDir, "config-dir", "", "copy synthetic gh configuration from this fixture directory")
+	fs.StringVar(&opts.in, "in", "", "directory inside the prepared Git workspace")
 	fs.DurationVar(&opts.timeout, "timeout", defaultTimeout, "how long each gh run may take")
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, usageError{err}
 	}
 	opts.args = fs.Args()
+	configSpecified := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "config-dir" {
+			configSpecified = true
+		}
+	})
 	if len(opts.keys) > 0 {
 		opts.terminal = true
 	}
@@ -102,6 +114,12 @@ func parseRunArgs(args []string) (runOptions, error) {
 		return runOptions{}, newUsageError("missing gh arguments; put them after --")
 	case opts.timeout <= 0:
 		return runOptions{}, newUsageError("--timeout must be positive")
+	case configSpecified && opts.configDir == "":
+		return runOptions{}, newUsageError("--config-dir needs a fixture directory")
+	case opts.configDir != "" && opts.loggedOut:
+		return runOptions{}, newUsageError("--config-dir and --logged-out cannot be combined; use a fixture without hosts.yml for a logged-out run")
+	case opts.in != "" && !filepath.IsLocal(opts.in):
+		return runOptions{}, newUsageError("--in must be a relative path inside the Git workspace")
 	case opts.terminal && opts.tty:
 		return runOptions{}, newUsageError("--terminal and --keys already give gh a terminal; leave out --tty")
 	case opts.terminal && opts.stdin != "":
@@ -140,6 +158,16 @@ func cmdRun(args []string, stdout, stderr io.Writer) error {
 func runAll(st *state, chk *checker, opts runOptions) (runRecord, []runResult, error) {
 	start := time.Now().UTC()
 	rec := runRecord{ID: newRunID(start), Time: start.Truncate(time.Second), Command: opts.commandLine()}
+	configBaseline, err := st.snapshotConfig(rec.ID, opts.configDir)
+	if err != nil {
+		return runRecord{}, nil, err
+	}
+	rec.ConfigBaseline = configBaseline
+	baseline, err := st.snapshotGit(rec.ID, opts.in)
+	if err != nil {
+		return runRecord{}, nil, err
+	}
+	rec.GitBaseline = baseline
 	var ca *certAuthority
 	if !opts.localhost {
 		var err error
@@ -148,8 +176,22 @@ func runAll(st *state, chk *checker, opts runOptions) (runRecord, []runResult, e
 		}
 	}
 	results := make([]runResult, 0, len(opts.binaries))
-	for _, binary := range opts.binaries {
-		res, err := runBinary(st, chk, binary, opts, ca)
+	for i, binary := range opts.binaries {
+		var configDir string
+		if configBaseline != "" {
+			configDir = filepath.ToSlash(filepath.Join("config", "runs", rec.ID, fmt.Sprint(i+1)))
+			if err := copyConfigTree(filepath.Join(st.dir, filepath.FromSlash(configBaseline)), filepath.Join(st.dir, filepath.FromSlash(configDir))); err != nil {
+				return runRecord{}, nil, fmt.Errorf("copying configuration for build %d: %w", i+1, err)
+			}
+		}
+		var gitDir string
+		if baseline != "" {
+			gitDir = gitBuildDirectory(rec.ID, i)
+			if err := copyGitTree(filepath.Join(st.dir, filepath.FromSlash(baseline)), filepath.Join(st.dir, filepath.FromSlash(gitDir))); err != nil {
+				return runRecord{}, nil, fmt.Errorf("copying Git state for build %d: %w", i+1, err)
+			}
+		}
+		res, err := runBinary(st, chk, binary, opts, ca, gitDir, configDir)
 		if err != nil {
 			return runRecord{}, nil, fmt.Errorf("%s: %w", binary, err)
 		}
@@ -165,6 +207,7 @@ func runAll(st *state, chk *checker, opts runOptions) (runRecord, []runResult, e
 			Binary: binary, Path: res.path, Version: res.version, ExitCode: res.exitCode,
 			TimedOut: res.timedOut, Stdout: res.stdout, Stderr: res.stderr,
 			Terminal: res.terminal, TerminalOutput: res.terminalOutput, Steps: res.steps, UnusedKeys: res.unusedKeys,
+			Git: res.git, Config: res.config,
 		})
 	}
 
@@ -207,6 +250,12 @@ func (o runOptions) commandLine() string {
 	if o.localhost {
 		parts = append(parts, "--localhost")
 	}
+	if o.configDir != "" {
+		parts = append(parts, "--config-dir", shellQuote(o.configDir))
+	}
+	if o.in != "" {
+		parts = append(parts, "--in", shellQuote(o.in))
+	}
 	if o.timeout != defaultTimeout {
 		parts = append(parts, "--timeout", o.timeout.String())
 	}
@@ -228,40 +277,67 @@ func shellQuote(s string) string {
 
 // runBinary runs one gh binary in its own scratch folder. With ca, gh uses
 // github.com and trusts only ca; without it, gh uses github.localhost.
-func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *certAuthority) (runResult, error) {
+func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *certAuthority, gitDir, configDir string) (runResult, error) {
 	path, err := resolveBinary(binary)
 	if err != nil {
 		return runResult{}, err
 	}
 
-	scratch, err := os.MkdirTemp("", "ghmock-run-")
+	scratch, err := newScratch(ca)
 	if err != nil {
 		return runResult{}, err
 	}
 	defer os.RemoveAll(scratch)
 	workDir := filepath.Join(scratch, "work")
-	for _, d := range []string{"home", "tmp", "config", "work", "certs"} {
-		if err := os.MkdirAll(filepath.Join(scratch, d), 0o755); err != nil {
-			return runResult{}, err
-		}
-	}
 	host := mockHost
 	if ca != nil {
 		host = dotcomHost
-		if err := os.WriteFile(filepath.Join(scratch, caFile), ca.certPEM, 0o600); err != nil {
-			return runResult{}, err
-		}
 	}
 	if err := writeGHConfig(filepath.Join(scratch, "config"), host, !opts.loggedOut); err != nil {
 		return runResult{}, err
 	}
 
-	srv, err := startServer(st, chk, ca)
+	var backend *gitBackend
+	if gitDir != "" {
+		backend = &gitBackend{world: filepath.Join(st.dir, filepath.FromSlash(gitDir)), scratch: scratch}
+		workDir, err = gitWorkDir(backend.world, opts.in)
+		if err != nil {
+			return runResult{}, err
+		}
+	}
+	srv, err := startServer(st, chk, ca, backend)
 	if err != nil {
 		return runResult{}, err
 	}
+	defer srv.close()
 	env := ghEnv(scratch, srv.proxyURL(), opts)
 	res := runResult{path: path, version: ghVersion(path, env, workDir)}
+	configPath := ""
+	if configDir != "" {
+		configPath, err = filepath.Abs(filepath.Join(st.dir, filepath.FromSlash(configDir)))
+		if err != nil {
+			return runResult{}, err
+		}
+		// Version discovery uses the default scratch config so it cannot
+		// migrate or modify the fixture before the requested command runs.
+		for i, value := range env {
+			if strings.HasPrefix(value, "GH_CONFIG_DIR=") {
+				env[i] = "GH_CONFIG_DIR=" + configPath
+			}
+		}
+		res.config = &configOutcome{Directory: configDir}
+	}
+	if backend != nil {
+		env, err = gitEnvironment(env, scratch, backend.world)
+		if err != nil {
+			return runResult{}, err
+		}
+		version, err := localGit(workDir, env, "--version")
+		if err != nil {
+			return runResult{}, err
+		}
+		res.git = &gitOutcome{Directory: gitDir, Version: strings.TrimSpace(version)}
+	}
 	srv.discard()
 
 	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
@@ -269,17 +345,26 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *cert
 	cmd := exec.CommandContext(ctx, path, opts.args...)
 	cmd.Env = env
 	cmd.Dir = workDir
-	cmd.WaitDelay = 5 * time.Second
+	containCommand(cmd, opts.terminal)
+	hidePaths := func(text string) string {
+		if configPath != "" {
+			text = hideDirectory(text, configPath, "<config>")
+		}
+		if backend != nil {
+			text = hideDirectory(text, backend.world, "<git>")
+		}
+		return hideScratch(text, scratch)
+	}
 	var runErr error
 	if opts.terminal {
 		var term terminalRun
 		term, runErr = runInTerminal(ctx, cmd, opts.keys)
 		res.terminal = true
 		res.unusedKeys = term.unused
-		res.stdout = hideScratch(term.screen, scratch)
-		res.terminalOutput = hideScratch(term.output, scratch)
+		res.stdout = hidePaths(term.screen)
+		res.terminalOutput = hidePaths(term.output)
 		for _, s := range term.steps {
-			res.steps = append(res.steps, terminalStep{Keys: s.Keys, Screen: hideScratch(s.Screen, scratch)})
+			res.steps = append(res.steps, terminalStep{Keys: s.Keys, Screen: hidePaths(s.Screen)})
 		}
 	} else {
 		cmd.Stdin = strings.NewReader(opts.stdin)
@@ -287,11 +372,17 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *cert
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 		runErr = cmd.Run()
-		res.stdout = hideScratch(stdout.String(), scratch)
-		res.stderr = hideScratch(stderr.String(), scratch)
+		res.stdout = hidePaths(stdout.String())
+		res.stderr = hidePaths(stderr.String())
 	}
 
 	res.requests = srv.close()
+	if backend != nil {
+		res.requests, err = gitRequests(scratch, res.requests)
+		if err != nil {
+			return runResult{}, err
+		}
+	}
 	var exitErr *exec.ExitError
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
@@ -303,6 +394,26 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *cert
 		return runResult{}, runErr
 	}
 	return res, nil
+}
+
+func newScratch(ca *certAuthority) (string, error) {
+	scratch, err := os.MkdirTemp("", "ghmock-run-")
+	if err != nil {
+		return "", err
+	}
+	for _, name := range []string{"home", "tmp", "config", "work", "certs", "templates"} {
+		if err := os.MkdirAll(filepath.Join(scratch, name), 0o755); err != nil {
+			os.RemoveAll(scratch)
+			return "", err
+		}
+	}
+	if ca != nil {
+		if err := os.WriteFile(filepath.Join(scratch, caFile), ca.certPEM, 0o600); err != nil {
+			os.RemoveAll(scratch)
+			return "", err
+		}
+	}
+	return scratch, nil
 }
 
 // resolveBinary turns a --gh value into an absolute path. A bare name is
@@ -389,6 +500,10 @@ func writeGHConfig(dir, host string, loggedIn bool) error {
 // output. Each binary gets its own folder, so paths such as the hosts.yml
 // that gh auth status names would otherwise differ between binaries.
 func hideScratch(text, scratch string) string {
+	return hideDirectory(text, scratch, "<scratch>")
+}
+
+func hideDirectory(text, scratch, replacement string) string {
 	paths := []string{scratch}
 	// macOS gives gh /private/var/... for a temporary folder under /var/....
 	if resolved, err := filepath.EvalSymlinks(scratch); err == nil && resolved != scratch {
@@ -396,7 +511,7 @@ func hideScratch(text, scratch string) string {
 	}
 	sort.Slice(paths, func(i, j int) bool { return len(paths[i]) > len(paths[j]) })
 	for _, p := range paths {
-		text = strings.ReplaceAll(text, p, "<scratch>")
+		text = strings.ReplaceAll(text, p, replacement)
 	}
 	return text
 }

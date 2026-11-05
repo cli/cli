@@ -128,7 +128,7 @@ func requestNames(entries []loggedRequest) []string {
 	seen := map[string]bool{}
 	var names []string
 	for _, e := range entries {
-		if e.Blocked || e.Name == "" || seen[e.Name] {
+		if e.Blocked || e.Git != nil || e.Name == "" || seen[e.Name] {
 			continue
 		}
 		seen[e.Name] = true

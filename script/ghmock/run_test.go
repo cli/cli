@@ -9,8 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -26,6 +28,9 @@ import (
 // environment built from scratch, so a small wrapper script sets
 // GHMOCK_FAKE_GH before running this binary.
 func TestMain(m *testing.M) {
+	if len(os.Args) > 1 && os.Args[1] == "_git-ssh" {
+		os.Exit(runMain(os.Args[1:], os.Stdout, os.Stderr))
+	}
 	if os.Getenv("GHMOCK_FAKE_GH") == "1" {
 		os.Exit(fakeGH(os.Args[1:]))
 	}
@@ -84,7 +89,37 @@ func fakeGH(args []string) int {
 	}
 	switch args[0] {
 	case "--version":
+		if os.Getenv("GHMOCK_FAKE_VARIANT") == "config-probe" {
+			if err := os.WriteFile(filepath.Join(os.Getenv("GH_CONFIG_DIR"), "probe.txt"), []byte("version probe"), 0o600); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+		}
 		fmt.Printf("gh version 0.0.0-%s\n", os.Getenv("GHMOCK_FAKE_VARIANT"))
+	case "config":
+		fmt.Printf("GH_CONFIG_DIR=%s\n", os.Getenv("GH_CONFIG_DIR"))
+		for _, name := range []string{"config.yml", "hosts.yml", "probe.txt"} {
+			data, err := os.ReadFile(filepath.Join(os.Getenv("GH_CONFIG_DIR"), name))
+			if errors.Is(err, os.ErrNotExist) {
+				fmt.Printf("%s=(none)\n", name)
+				continue
+			}
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+			fmt.Printf("%s=%q\n", name, data)
+		}
+		if len(args) > 1 {
+			data := []byte("changed-by-" + os.Getenv("GHMOCK_FAKE_VARIANT") + "\n")
+			if err := os.WriteFile(filepath.Join(os.Getenv("GH_CONFIG_DIR"), "hosts.yml"), data, 0o600); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+			if args[1] == "mutate-fail" {
+				return 7
+			}
+		}
 	case "env":
 		wd, _ := os.Getwd()
 		for _, kv := range [][2]string{
@@ -160,6 +195,35 @@ func fakeGH(args []string) int {
 		return code
 	case "sleep":
 		time.Sleep(30 * time.Second)
+	case "git":
+		cmd := exec.Command("git", args[1:]...)
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+		return processExitCode(cmd.Run())
+	case "push-change":
+		if err := os.WriteFile("example.txt", []byte(os.Getenv("GHMOCK_FAKE_VARIANT")+"\n"), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		for _, args := range [][]string{{"commit", "--quiet", "-am", "Change"}, {"push", "--quiet", "origin", "main"}} {
+			cmd := exec.Command("git", args...)
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return processExitCode(err)
+			}
+		}
+	case "sync-worktree":
+		if err := exec.Command("git", "fetch", "--quiet", "origin", "main").Run(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		gitArgs := []string{"update-ref", "refs/heads/main", "FETCH_HEAD"}
+		if os.Getenv("GHMOCK_FAKE_VARIANT") == "fixed" {
+			gitArgs = []string{"branch", "-f", "main", "FETCH_HEAD"}
+		}
+		if err := exec.Command("git", gitArgs...).Run(); err != nil {
+			fmt.Fprintln(os.Stderr, "main belongs to another worktree")
+			return 1
+		}
 	case "api":
 		base := "https://api.github.com/"
 		if os.Getenv("GH_HOST") == "github.localhost" {
@@ -225,6 +289,36 @@ func TestParseRunArgs(t *testing.T) {
 			name: "one binary and gh arguments after --",
 			args: []string{"--gh", "./bin/gh", "--", "issue", "view", "1"},
 			want: runOptions{binaries: []string{"./bin/gh"}, timeout: time.Minute, args: []string{"issue", "view", "1"}},
+		},
+		{
+			name: "prepared worktree",
+			args: []string{"--gh", "a", "--in", "feature", "--", "repo", "sync"},
+			want: runOptions{binaries: []string{"a"}, in: "feature", timeout: time.Minute, args: []string{"repo", "sync"}},
+		},
+		{
+			name: "configuration fixture",
+			args: []string{"--gh", "a", "--config-dir", "fixtures/accounts", "--", "auth", "status"},
+			want: runOptions{binaries: []string{"a"}, configDir: "fixtures/accounts", timeout: time.Minute, args: []string{"auth", "status"}},
+		},
+		{
+			name:    "empty configuration fixture path",
+			args:    []string{"--gh", "a", "--config-dir", "", "--", "auth", "status"},
+			wantErr: "--config-dir needs a fixture directory",
+		},
+		{
+			name:    "missing configuration fixture flag value",
+			args:    []string{"--gh", "a", "--config-dir"},
+			wantErr: "flag needs an argument: -config-dir",
+		},
+		{
+			name:    "configuration fixture conflicts with default logged-out state",
+			args:    []string{"--gh", "a", "--config-dir", "fixtures/accounts", "--logged-out", "--", "auth", "status"},
+			wantErr: "--config-dir and --logged-out cannot be combined; use a fixture without hosts.yml for a logged-out run",
+		},
+		{
+			name:    "outside fixture",
+			args:    []string{"--gh", "a", "--in", "../other", "--", "repo", "sync"},
+			wantErr: "--in must be a relative path inside the Git workspace",
 		},
 		{
 			name: "every flag",
@@ -313,6 +407,10 @@ func TestParseRunArgs(t *testing.T) {
 }
 
 func TestRunAll(t *testing.T) {
+	const fixtureConfig = "version: \"1\"\ngit_protocol: ssh\n"
+	const fixtureHosts = "github.com:\n    user: alice\n    oauth_token: gho_ghmock-alice\n    users:\n        alice:\n            oauth_token: gho_ghmock-alice\n        bob:\n            oauth_token: gho_ghmock-bob\n"
+	fixtureOutput := fmt.Sprintf("GH_CONFIG_DIR=<config>\nconfig.yml=%q\nhosts.yml=%q\nprobe.txt=(none)\n", fixtureConfig, fixtureHosts)
+
 	// resultSummary is the part of a run result that tests compare.
 	type resultSummary struct {
 		Version    string
@@ -332,14 +430,16 @@ func TestRunAll(t *testing.T) {
 		checkSchemas bool
 		// builds sets buildsDir: "own" is the folder holding the fake gh,
 		// and "other" is a different folder.
-		builds      string
-		opts        runOptions
-		want        []resultSummary
-		wantCommand string
-		wantErr     string
-		afterAPI    bool
-		resolveOnly bool
-		check       func(*testing.T, *state, runRecord)
+		builds          string
+		opts            runOptions
+		want            []resultSummary
+		wantCommand     string
+		wantErr         string
+		wantErrContains string
+		afterAPI        bool
+		resolveOnly     bool
+		setup           func(*testing.T, *state)
+		check           func(*testing.T, *state, runRecord)
 	}{
 		{
 			name:      "a request-free command replaces the last run selection",
@@ -352,6 +452,289 @@ func TestRunAll(t *testing.T) {
 		{
 			name:        "PATH executable lookup uses platform permission rules",
 			resolveOnly: true,
+		},
+		{
+			name:     "direct command display preserves shell quoting",
+			variants: []string{"a"},
+			opts:     runOptions{args: []string{"stdin", "two words", "it's", "", "$HOME"}, stdin: "observed\n"},
+			wantCommand: `ghmock run --gh <gh-a> --stdin 'observed
+' --timeout 30s -- stdin 'two words' 'it'\''s' '' '$HOME'`,
+			want: []resultSummary{{Version: "gh version 0.0.0-a", Stdout: "observed\n"}},
+			check: func(t *testing.T, st *state, rec runRecord) {
+				assert.Contains(t, rec.Report, "$ gh stdin 'two words' 'it'\\''s' '' '$HOME'\n")
+			},
+		},
+		{
+			name:     "configuration is independent per build and preserved in exports",
+			variants: []string{"a", "b"},
+			opts:     runOptions{configDir: "<state>/fixture config", args: []string{"config", "mutate"}},
+			setup: func(t *testing.T, st *state) {
+				writeConfigFixture(t, filepath.Join(st.dir, "fixture config"), map[string][]byte{
+					"config.yml":    []byte(fixtureConfig),
+					"hosts.yml":     []byte(fixtureHosts),
+					"nested/.extra": []byte("retained"),
+					".git":          []byte("gitdir: /not/a/real/path\n"),
+				})
+			},
+			wantCommand: "ghmock run --gh <gh-a> --gh <gh-b> --config-dir '<state>/fixture config' --timeout 30s -- config mutate",
+			want: []resultSummary{
+				{Version: "gh version 0.0.0-a", Stdout: fixtureOutput},
+				{Version: "gh version 0.0.0-b", Stdout: fixtureOutput},
+			},
+			check: func(t *testing.T, st *state, rec runRecord) {
+				read := func(root, path string) string {
+					t.Helper()
+					data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+					require.NoError(t, err)
+					return string(data)
+				}
+				assert.Equal(t, fixtureHosts, read(st.dir, "fixture config/hosts.yml"))
+				assert.Equal(t, fixtureHosts, read(st.dir, rec.ConfigBaseline+"/hosts.yml"))
+				for i, result := range rec.Results {
+					require.NotNil(t, result.Config)
+					assert.Equal(t, fmt.Sprintf("changed-by-%c\n", 'a'+i), read(st.dir, result.Config.Directory+"/hosts.yml"))
+					info, err := os.Stat(filepath.Join(st.dir, result.Config.Directory, "hosts.yml"))
+					require.NoError(t, err)
+					assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+				}
+				t.Setenv("GHMOCK_DIR", st.dir)
+				directory := filepath.Join(t.TempDir(), "export")
+				require.NoError(t, cmdExport([]string{directory}, io.Discard))
+				assert.Equal(t, fixtureHosts, read(directory, rec.ConfigBaseline+"/hosts.yml"))
+				archive := filepath.Join(t.TempDir(), "export.tar.gz")
+				require.NoError(t, cmdExport([]string{"--archive", archive}, io.Discard))
+				restored := filepath.Join(t.TempDir(), "restored")
+				extractTestArchive(t, archive, restored)
+				assert.Equal(t, fixtureHosts, read(restored, rec.ConfigBaseline+"/hosts.yml"))
+				assert.Equal(t, "changed-by-a\n", read(restored, rec.Results[0].Config.Directory+"/hosts.yml"))
+				assert.Equal(t, "retained", read(restored, rec.Results[1].Config.Directory+"/nested/.extra"))
+				assert.Equal(t, "gitdir: /not/a/real/path\n", read(restored, rec.Results[1].Config.Directory+"/.git"))
+				require.NoError(t, cmdReset(nil, io.Discard))
+				assert.NoDirExists(t, filepath.Join(st.dir, "config"))
+				assert.Equal(t, fixtureHosts, read(st.dir, "fixture config/hosts.yml"))
+			},
+		},
+		{
+			name:     "empty fixture gets no defaults or version-probe mutations",
+			variants: []string{"config-probe"},
+			opts:     runOptions{configDir: "<state>/fixture", args: []string{"config"}},
+			setup: func(t *testing.T, st *state) {
+				writeConfigFixture(t, filepath.Join(st.dir, "fixture"), nil)
+			},
+			wantCommand: "ghmock run --gh <gh-config-probe> --config-dir <state>/fixture --timeout 30s -- config",
+			want: []resultSummary{{
+				Version: "gh version 0.0.0-config-probe",
+				Stdout:  "GH_CONFIG_DIR=<config>\nconfig.yml=(none)\nhosts.yml=(none)\nprobe.txt=(none)\n",
+			}},
+			check: func(t *testing.T, st *state, rec runRecord) {
+				require.NotNil(t, rec.Results[0].Config)
+				entries, err := os.ReadDir(filepath.Join(st.dir, rec.Results[0].Config.Directory))
+				require.NoError(t, err)
+				assert.Empty(t, entries)
+			},
+		},
+		{
+			name:     "malformed fixture is passed to the command unchanged",
+			variants: []string{"a"},
+			opts:     runOptions{configDir: "<state>/fixture", args: []string{"config"}},
+			setup: func(t *testing.T, st *state) {
+				writeConfigFixture(t, filepath.Join(st.dir, "fixture"), map[string][]byte{"hosts.yml": []byte("not: [valid")})
+			},
+			wantCommand: "ghmock run --gh <gh-a> --config-dir <state>/fixture --timeout 30s -- config",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", Stdout: "GH_CONFIG_DIR=<config>\nconfig.yml=(none)\nhosts.yml=\"not: [valid\"\nprobe.txt=(none)\n"}},
+		},
+		{
+			name:     "failed command retains its configuration changes",
+			variants: []string{"a"},
+			opts:     runOptions{configDir: "<state>/fixture", args: []string{"config", "mutate-fail"}},
+			setup: func(t *testing.T, st *state) {
+				writeConfigFixture(t, filepath.Join(st.dir, "fixture"), nil)
+			},
+			wantCommand: "ghmock run --gh <gh-a> --config-dir <state>/fixture --timeout 30s -- config mutate-fail",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", ExitCode: 7, Stdout: "GH_CONFIG_DIR=<config>\nconfig.yml=(none)\nhosts.yml=(none)\nprobe.txt=(none)\n"}},
+			check: func(t *testing.T, st *state, rec runRecord) {
+				require.NotNil(t, rec.Results[0].Config)
+				data, err := os.ReadFile(filepath.Join(st.dir, rec.Results[0].Config.Directory, "hosts.yml"))
+				require.NoError(t, err)
+				assert.Equal(t, "changed-by-a\n", string(data))
+			},
+		},
+		{
+			name:            "missing configuration fixture fails before execution",
+			variants:        []string{"a"},
+			opts:            runOptions{configDir: "<state>/missing", args: []string{"config"}},
+			wantErrContains: "no such file or directory",
+		},
+		{
+			name:     "configuration fixture must be a directory",
+			variants: []string{"a"},
+			opts:     runOptions{configDir: "<state>/file", args: []string{"config"}},
+			setup: func(t *testing.T, st *state) {
+				require.NoError(t, os.WriteFile(filepath.Join(st.dir, "file"), []byte("not a directory"), 0o600))
+			},
+			wantErrContains: "not a directory",
+		},
+		{
+			name:     "configuration fixture symlinks are rejected",
+			variants: []string{"a"},
+			opts:     runOptions{configDir: "<state>/fixture", args: []string{"config"}},
+			setup: func(t *testing.T, st *state) {
+				writeConfigFixture(t, filepath.Join(st.dir, "fixture"), nil)
+				outside := filepath.Join(t.TempDir(), "hosts.yml")
+				require.NoError(t, os.WriteFile(outside, []byte("outside fixture"), 0o600))
+				require.NoError(t, os.Symlink(outside, filepath.Join(st.dir, "fixture", "hosts.yml")))
+			},
+			wantErrContains: "not a regular file or directory",
+		},
+		{
+			name:            "configuration source cannot contain the state destination",
+			variants:        []string{"a"},
+			opts:            runOptions{configDir: "<state>", args: []string{"config"}},
+			wantErrContains: "cannot copy configuration into its source",
+		},
+		{
+			name:     "configuration special files are rejected",
+			variants: []string{"a"},
+			opts:     runOptions{configDir: "<state>/fixture", args: []string{"config"}},
+			setup: func(t *testing.T, st *state) {
+				// Unix socket names have a smaller limit than t.TempDir paths.
+				fixture, err := os.MkdirTemp("", "ghmock-config-")
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, os.RemoveAll(fixture)) })
+				listener, err := net.Listen("unix", filepath.Join(fixture, "socket"))
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, listener.Close()) })
+				require.NoError(t, os.Symlink(fixture, filepath.Join(st.dir, "fixture")))
+			},
+			wantErrContains: "not a regular file or directory",
+		},
+		{
+			name:     "aliased configuration destination does not modify the source",
+			variants: []string{"a"},
+			opts:     runOptions{configDir: "<state>/fixture", args: []string{"config"}},
+			setup: func(t *testing.T, st *state) {
+				fixture := filepath.Join(st.dir, "fixture")
+				writeConfigFixture(t, fixture, nil)
+				require.NoError(t, os.Symlink(fixture, filepath.Join(st.dir, "config")))
+				t.Cleanup(func() {
+					entries, err := os.ReadDir(fixture)
+					require.NoError(t, err)
+					assert.Empty(t, entries)
+				})
+			},
+			wantErrContains: "cannot copy configuration into its source",
+		},
+		{
+			name:     "worktree runs preserve the baseline and separate each build",
+			variants: []string{"old", "fixed"},
+			opts:     runOptions{in: "feature", args: []string{"sync-worktree"}},
+			setup: func(t *testing.T, st *state) {
+				t.Setenv("GHMOCK_DIR", st.dir)
+				prepareGitRepo(t, "git@github.com:octo/hello.git")
+				gitForTest(t, "--in", "main", "--", "worktree", "add", "--quiet", "../feature", "-b", "feature")
+				gitForTest(t, "--", "clone", "--quiet", "git@github.com:octo/hello.git", "producer")
+				require.NoError(t, cmdWrite([]string{"producer/example.txt", "--text", "two\n"}, io.Discard))
+				gitForTest(t, "--in", "producer", "--", "commit", "--quiet", "-am", "Second")
+				gitForTest(t, "--in", "producer", "--", "push", "--quiet", "origin", "main")
+			},
+			wantCommand: "ghmock run --gh <gh-old> --gh <gh-fixed> --in feature --timeout 30s -- sync-worktree",
+			want: []resultSummary{
+				{Version: "gh version 0.0.0-old", Requests: []logSummary{{Seq: 1, Name: "SSH github.com/octo/hello.git", Matched: true}}},
+				{Version: "gh version 0.0.0-fixed", ExitCode: 1, Stderr: "main belongs to another worktree\n", Requests: []logSummary{{Seq: 1, Name: "SSH github.com/octo/hello.git", Matched: true}}},
+			},
+			check: func(t *testing.T, st *state, rec runRecord) {
+				t.Setenv("GHMOCK_DIR", st.dir)
+				before := gitForTest(t, "--run", rec.ID, "--before", "--in", "main", "--", "rev-parse", "HEAD")
+				old := gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "main", "--", "rev-parse", "HEAD")
+				fixed := gitForTest(t, "--run", rec.ID, "--build", "2", "--in", "main", "--", "rev-parse", "HEAD")
+				assert.NotEqual(t, before, old)
+				assert.Equal(t, before, fixed)
+				assert.Equal(t, before, gitForTest(t, "--in", "main", "--", "rev-parse", "HEAD"))
+				assert.Equal(t, "M  example.txt\n", gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "main", "--", "status", "--porcelain=v1"))
+				assert.Empty(t, gitForTest(t, "--run", rec.ID, "--build", "2", "--in", "main", "--", "status", "--porcelain=v1"))
+				assert.Empty(t, gitForTest(t, "--in", "main", "--", "status", "--porcelain=v1"))
+				assert.Equal(t, "two\n", gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "main", "--", "show", "HEAD:example.txt"))
+				assert.Equal(t, "one\n", gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "main", "--", "show", ":example.txt"))
+				for _, result := range rec.Results {
+					require.NotNil(t, result.Git)
+					require.Contains(t, result.Git.Version, "git version")
+					data, err := os.ReadFile(filepath.Join(st.dir, result.Git.Directory, "work", "main", "example.txt"))
+					require.NoError(t, err)
+					assert.Equal(t, "one\n", string(data))
+				}
+				exported := filepath.Join(t.TempDir(), "export")
+				require.NoError(t, cmdExport([]string{exported}, io.Discard))
+				t.Setenv("GHMOCK_DIR", exported)
+				assert.Equal(t, "M  example.txt\n", gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "main", "--", "status", "--porcelain=v1"))
+				assert.Empty(t, gitForTest(t, "--run", rec.ID, "--build", "2", "--in", "main", "--", "status", "--porcelain=v1"))
+				gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "main", "--", "reset", "--hard", "--quiet")
+				t.Setenv("GHMOCK_DIR", st.dir)
+				assert.Equal(t, "M  example.txt\n", gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "main", "--", "status", "--porcelain=v1"), "changing the export must not change the original run")
+				archive := filepath.Join(t.TempDir(), "evidence.tar.gz")
+				require.NoError(t, cmdExport([]string{"--archive", archive}, io.Discard))
+				restored := filepath.Join(t.TempDir(), "restored")
+				extractTestArchive(t, archive, restored)
+				require.NoError(t, cmdReset(nil, io.Discard))
+				assert.NoDirExists(t, filepath.Join(st.dir, "git"))
+				t.Setenv("GHMOCK_DIR", restored)
+				assert.Equal(t, "M  example.txt\n", gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "main", "--", "status", "--porcelain=v1"))
+				assert.Empty(t, gitForTest(t, "--run", rec.ID, "--build", "2", "--in", "main", "--", "status", "--porcelain=v1"))
+				assert.Equal(t, before, gitForTest(t, "--run", rec.ID, "--before", "--in", "main", "--", "rev-parse", "HEAD"))
+				assert.Equal(t, before, gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "feature", "--", "rev-parse", "HEAD"))
+				assert.Equal(t, "one\n", gitForTest(t, "--run", rec.ID, "--build", "1", "--in", "main", "--", "show", ":example.txt"))
+			},
+		},
+		{
+			name:     "a push changes only that build's remote",
+			variants: []string{"a", "b"},
+			opts:     runOptions{in: "main", args: []string{"push-change"}},
+			setup: func(t *testing.T, st *state) {
+				t.Setenv("GHMOCK_DIR", st.dir)
+				prepareGitRepo(t, "git@github.com:octo/hello.git")
+			},
+			wantCommand: "ghmock run --gh <gh-a> --gh <gh-b> --in main --timeout 30s -- push-change",
+			want: []resultSummary{
+				{Version: "gh version 0.0.0-a", Requests: []logSummary{{Seq: 1, Name: "SSH github.com/octo/hello.git", Matched: true}}},
+				{Version: "gh version 0.0.0-b", Requests: []logSummary{{Seq: 1, Name: "SSH github.com/octo/hello.git", Matched: true}}},
+			},
+			check: func(t *testing.T, st *state, rec runRecord) {
+				t.Setenv("GHMOCK_DIR", st.dir)
+				before := gitForTest(t, "--in", "main", "--", "rev-parse", "HEAD")
+				var tips []string
+				for _, build := range []string{"1", "2"} {
+					prefix := []string{"--run", rec.ID, "--build", build, "--in", "main", "--"}
+					tip := gitForTest(t, append(prefix, "rev-parse", "HEAD")...)
+					tips = append(tips, tip)
+					assert.Equal(t, before, gitForTest(t, append(prefix, "rev-parse", "HEAD^")...))
+					assert.Equal(t, strings.TrimSpace(tip)+"\trefs/heads/main\n", gitForTest(t, append(prefix, "ls-remote", "origin", "refs/heads/main")...))
+				}
+				assert.NotEqual(t, tips[0], tips[1])
+				assert.Equal(t, strings.TrimSpace(before)+"\trefs/heads/main\n", gitForTest(t, "--in", "main", "--", "ls-remote", "origin", "refs/heads/main"))
+			},
+		},
+		{
+			name:     "staged unstaged and untracked files survive each copy",
+			variants: []string{"a", "b"},
+			opts:     runOptions{in: "main", args: []string{"git", "status", "--porcelain=v1"}},
+			setup: func(t *testing.T, st *state) {
+				t.Setenv("GHMOCK_DIR", st.dir)
+				prepareGitRepo(t, "https://github.com/octo/hello.git")
+				require.NoError(t, cmdWrite([]string{"main/example.txt", "--text", "staged\n"}, io.Discard))
+				gitForTest(t, "--in", "main", "--", "add", "example.txt")
+				require.NoError(t, cmdWrite([]string{"main/example.txt", "--text", "unstaged\n"}, io.Discard))
+				require.NoError(t, cmdWrite([]string{"main/untracked", "--text", "not committed\n"}, io.Discard))
+			},
+			wantCommand: "ghmock run --gh <gh-a> --gh <gh-b> --in main --timeout 30s -- git status --porcelain=v1",
+			want: []resultSummary{
+				{Version: "gh version 0.0.0-a", Stdout: "MM example.txt\n?? untracked\n"},
+				{Version: "gh version 0.0.0-b", Stdout: "MM example.txt\n?? untracked\n"},
+			},
+		},
+		{
+			name:     "missing Git fixture is an error",
+			variants: []string{"a"},
+			opts:     runOptions{in: "feature", args: []string{"git", "status"}},
+			wantErr:  "no Git fixture yet; prepare it with ghmock repo, git or write",
 		},
 		{
 			name:        "gh gets an isolated environment, logged in with a fake token",
@@ -693,12 +1076,19 @@ version: "1"
 			// Neither should reach gh.
 			t.Setenv("GH_TOKEN", "caller-token")
 			t.Setenv("GITHUB_TOKEN", "caller-token")
+			callerConfig := t.TempDir()
+			writeConfigFixture(t, callerConfig, map[string][]byte{"hosts.yml": []byte("caller configuration")})
+			t.Setenv("GH_CONFIG_DIR", callerConfig)
 
 			st := &state{dir: t.TempDir()}
+			if tt.setup != nil {
+				tt.setup(t, st)
+			}
 			if tt.responses != nil {
 				require.NoError(t, st.saveResponses(tt.responses))
 			}
 			opts := tt.opts
+			opts.configDir = strings.ReplaceAll(opts.configDir, "<state>", st.dir)
 			if opts.timeout == 0 {
 				opts.timeout = 30 * time.Second
 			}
@@ -728,9 +1118,13 @@ version: "1"
 			}
 
 			rec, results, err := runAll(st, chk, opts)
-			if tt.wantErr != "" {
+			if tt.wantErr != "" || tt.wantErrContains != "" {
 				require.Error(t, err)
-				assert.Equal(t, tt.wantErr, replacer.Replace(err.Error()))
+				if tt.wantErrContains != "" {
+					assert.Contains(t, err.Error(), tt.wantErrContains)
+				} else {
+					assert.Equal(t, tt.wantErr, replacer.Replace(err.Error()))
+				}
 				return
 			}
 			require.NoError(t, err)
@@ -784,6 +1178,7 @@ version: "1"
 			require.NoError(t, err)
 			require.Equal(t, []runRecord{rec}, saved)
 			command := rec.Command
+			command = strings.ReplaceAll(command, st.dir, "<state>")
 			for i, b := range opts.binaries {
 				command = strings.ReplaceAll(command, b, "<gh-"+tt.variants[i]+">")
 			}
@@ -794,6 +1189,7 @@ version: "1"
 					Binary: opts.binaries[i], Path: r.path, Version: r.version, ExitCode: r.exitCode,
 					TimedOut: r.timedOut, Stdout: r.stdout, Stderr: r.stderr,
 					Terminal: r.terminal, TerminalOutput: r.terminalOutput, Steps: r.steps, UnusedKeys: r.unusedKeys,
+					Git: r.git, Config: r.config,
 				})
 			}
 			assert.Equal(t, outcomes, rec.Results)
@@ -813,7 +1209,20 @@ version: "1"
 			} else {
 				assert.Empty(t, schemas)
 			}
+			if tt.check != nil {
+				tt.check(t, st, rec)
+			}
 		})
+	}
+}
+
+func writeConfigFixture(t *testing.T, directory string, files map[string][]byte) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(directory, 0o700))
+	for name, data := range files {
+		path := filepath.Join(directory, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+		require.NoError(t, os.WriteFile(path, data, 0o600))
 	}
 }
 
@@ -907,6 +1316,39 @@ func TestPrintReport(t *testing.T) {
 				{version: "candidate", requests: []loggedRequest{{Run: "new", Binary: "new", Seq: 99, Name: "GET /issues", RawQuery: "state=open"}}},
 			},
 			wantDifferences: "[2] candidate:\n  same exit code, output and requests\n",
+		},
+		{
+			name: "raw write bodies are compared without printing binary data",
+			results: []runResult{
+				{path: "/old/gh", version: "old", requests: []loggedRequest{{Seq: 1, Method: "POST", Name: "POST /binary", RawBody: &[]byte{0, 255}, Status: 200, Matched: true, Response: 1, Responses: 1}}},
+				{path: "/new/gh", version: "new", requests: []loggedRequest{{Seq: 1, Method: "POST", Name: "POST /binary", RawBody: &[]byte{0, 254}, Status: 200, Matched: true, Response: 1, Responses: 1}}},
+			},
+			want: fmt.Sprintf(`=== [1] old - /old/gh (baseline)
+$ gh issue view 1
+exit code: 0
+--- stdout
+(empty)
+--- stderr
+(empty)
+--- requests (1)
+1. POST /binary raw body %[1]s -> 200, response 1 of 1
+
+=== [2] new - /new/gh
+$ gh issue view 1
+exit code: 0
+--- stdout
+(empty)
+--- stderr
+(empty)
+--- requests (1)
+1. POST /binary raw body %[2]s -> 200, response 1 of 1
+
+=== differences from [1]
+[2] new:
+  POST /binary sent different data:
+    [1] raw body %[1]s
+    [2] raw body %[2]s
+`, rawBodySummary([]byte{0, 255}), rawBodySummary([]byte{0, 254})),
 		},
 		{
 			name: "one binary",

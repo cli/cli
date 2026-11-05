@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"regexp"
 	"sort"
 	"strings"
@@ -158,7 +159,8 @@ func (r *restRoute) score(parts []string) (int, bool) {
 
 // check compares a response with GitHub's description of it. It returns the
 // problems it found, or a note saying why it couldn't check.
-func (idx *restIndex) check(method, path string, status int, body []byte) ([]string, string) {
+func (idx *restIndex) check(method, path string, resp *response) ([]string, string) {
+	status, body := resp.status(), resp.bodyBytes()
 	route := idx.match(method, path)
 	if route == nil {
 		return nil, "not in GitHub's REST description"
@@ -174,6 +176,25 @@ func (idx *restIndex) check(method, path string, status int, body []byte) ([]str
 
 	trimmed := bytes.TrimSpace(body)
 	media := jsonMedia(ref.Value.Content)
+	if resp.RawBody != nil {
+		contentType, _, err := mime.ParseMediaType(resp.contentType())
+		if err != nil {
+			return []string{fmt.Sprintf("Content-Type: %v", err)}, ""
+		}
+		media = ref.Value.Content.Get(contentType)
+		if media == nil {
+			return []string{fmt.Sprintf("Content-Type: %s is not documented for status %d", contentType, status)}, ""
+		}
+		if !strings.Contains(contentType, "json") {
+			if media.Schema == nil || media.Schema.Value == nil {
+				return nil, "no schema for the raw response body"
+			}
+			if !media.Schema.Value.Type.Is("string") {
+				return nil, fmt.Sprintf("body validation for %s is not supported", contentType)
+			}
+			return restProblems(media.Schema.Value.VisitJSON(string(body), openapi3.MultiErrors(), openapi3.VisitAsResponse())), ""
+		}
+	}
 	if media == nil || media.Schema == nil || media.Schema.Value == nil {
 		if len(trimmed) > 0 {
 			return nil, fmt.Sprintf("GitHub documents no JSON body for status %d", status)
