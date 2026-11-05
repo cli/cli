@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prepares ghmock for the issue-triage agent, which runs gh builds against it
-# to reproduce bug reports. It builds ghmock and gh from the checked-out default
-# branch, downloads the latest gh release and each release the issue reports,
+# to reproduce bug reports. It builds ghmock and gh from the selected checkout,
+# downloads the latest gh release and each release the issue reports,
 # and downloads GitHub's schemas.
 #
 # Everything goes under GHMOCK_ROOT. The agent's sandbox mounts /opt read-only,
@@ -9,7 +9,7 @@
 # build or ghmock itself.
 #
 # Builds land in $GHMOCK_ROOT/builds/<name>/gh:
-#   trunk     built from the checked-out default branch
+#   source    built from the selected checkout, which may be a feature branch
 #   release   the latest release
 #   X.Y.Z     each version the issue reports, such as "gh version X.Y.Z"
 #
@@ -69,11 +69,11 @@ download_schemas() {
 		"$root/bin/ghmock" schemas update
 }
 
-build_trunk() {
+build_source() {
 	local sha
 	sha=$(git rev-parse --short HEAD) || return 1
-	go build -trimpath -ldflags "-X github.com/cli/cli/v2/internal/build.Version=trunk-$sha" \
-		-o "$root/builds/trunk/gh" ./cmd/gh
+	go build -trimpath -ldflags "-X github.com/cli/cli/v2/internal/build.Version=source-$sha" \
+		-o "$root/builds/source/gh" ./cmd/gh
 }
 
 # download_release installs a published cli/cli release, checked against the
@@ -129,7 +129,7 @@ main() {
 	fi
 
 	step "Downloading GitHub's schemas" download_schemas
-	step "Building gh from trunk" build_trunk
+	step "Building gh from the selected checkout" build_source
 
 	local latest
 	if latest=$(gh release view -R cli/cli --json tagName -q .tagName) &&
@@ -138,7 +138,7 @@ main() {
 	fi
 
 	local body version
-	body=$(issue_body) || warn "Reading the issue failed, so only trunk and the latest release are available"
+	body=$(issue_body) || warn "Reading the issue failed, so only the selected source and latest release are available"
 	for version in $(reported_versions "$body"); do
 		step "Downloading gh $version" download_release "$version"
 	done
