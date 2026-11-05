@@ -292,7 +292,7 @@ async function saveComment(api, context, body, previous) {
     requireValue(!previous, "The previous triage comment was removed; refusing to replace it");
   }
   const method = matches.length ? "PATCH" : "POST";
-  const target = matches.length ? `${endpoint}/${matches[0].id}` : endpoint;
+  const target = matches.length ? `repos/${context.repo}/issues/comments/${matches[0].id}` : endpoint;
   try {
     return commentURL(context, await api(method, target, { body }));
   } catch (error) {

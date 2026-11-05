@@ -192,7 +192,7 @@ function fakeAPI(options = {}) {
       if (options.concurrentComment && ++commentReads === 2) comments[0].body += "\nHuman revision.";
       return structuredClone(comments);
     }
-    if ((method === "POST" && endpoint.endsWith("/comments")) || (method === "PATCH" && /\/comments\/\d+$/.test(endpoint))) {
+    if ((method === "POST" && endpoint.endsWith("/comments")) || (method === "PATCH" && /^repos\/octo\/hello\/issues\/comments\/\d+$/.test(endpoint))) {
       const id = method === "POST" ? Math.max(0, ...comments.map(comment => comment.id)) + 1 : Number(endpoint.split("/").at(-1));
       const comment = { ...data, id, user: { login: context.bot }, html_url: `https://github.com/octo/hello/issues/12#issuecomment-${id}` };
       if (method === "POST") comments.push(comment);
@@ -422,7 +422,8 @@ test("publishReport", async t => {
         assert.equal(fake.artifacts.length, 4);
         assert.equal(fake.comments.length, 1);
         assert.doesNotMatch(fake.comments[0].body, /### Reproduction log/);
-        assert.equal(fake.calls.filter(call => call.method === "PATCH" && /\/comments\/\d+$/.test(call.endpoint)).length, 1);
+        assert.deepEqual(fake.calls.filter(call => call.method === "PATCH" && /\/comments\/\d+$/.test(call.endpoint)).map(call => call.endpoint),
+          ["repos/octo/hello/issues/comments/1"]);
         assert.equal(fake.calls.filter(call => call.method === "PATCH" && call.endpoint.includes("/artifacts/")).length, 0);
       },
     },
