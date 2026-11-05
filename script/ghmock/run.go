@@ -59,10 +59,11 @@ type runResult struct {
 	stderr   string
 	requests []loggedRequest
 
-	terminal   bool
-	steps      []terminalStep
-	waiting    bool
-	unusedKeys int
+	terminal       bool
+	terminalOutput string
+	steps          []terminalStep
+	waiting        bool
+	unusedKeys     int
 }
 
 // stringList collects a repeatable string flag.
@@ -164,7 +165,7 @@ func runAll(st *state, chk *checker, opts runOptions) (runRecord, []runResult, e
 		rec.Results = append(rec.Results, runOutcome{
 			Binary: binary, Path: res.path, Version: res.version, ExitCode: res.exitCode,
 			TimedOut: res.timedOut, Stdout: res.stdout, Stderr: res.stderr,
-			Terminal: res.terminal, Steps: res.steps, Waiting: res.waiting, UnusedKeys: res.unusedKeys,
+			Terminal: res.terminal, TerminalOutput: res.terminalOutput, Steps: res.steps, Waiting: res.waiting, UnusedKeys: res.unusedKeys,
 		})
 	}
 
@@ -278,6 +279,7 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *cert
 		res.waiting = term.waiting
 		res.unusedKeys = term.unused
 		res.stdout = hideScratch(term.screen, scratch)
+		res.terminalOutput = hideScratch(term.output, scratch)
 		for _, s := range term.steps {
 			res.steps = append(res.steps, terminalStep{Keys: s.Keys, Screen: hideScratch(s.Screen, scratch)})
 		}

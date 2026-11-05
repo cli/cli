@@ -88,10 +88,11 @@ type runOutcome struct {
 	Stderr   string `json:"stderr"`
 	// Terminal runs keep the screen before each --keys entry in Steps, and
 	// the final screen in Stdout.
-	Terminal   bool           `json:"terminal,omitempty"`
-	Steps      []terminalStep `json:"steps,omitempty"`
-	Waiting    bool           `json:"waiting_for_input,omitempty"`
-	UnusedKeys int            `json:"unused_keys,omitempty"`
+	Terminal       bool           `json:"terminal,omitempty"`
+	TerminalOutput string         `json:"terminal_output,omitempty"`
+	Steps          []terminalStep `json:"steps,omitempty"`
+	Waiting        bool           `json:"waiting_for_input,omitempty"`
+	UnusedKeys     int            `json:"unused_keys,omitempty"`
 }
 
 // state is the folder that holds responses, the request log and the runs

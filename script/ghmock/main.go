@@ -81,10 +81,12 @@ To answer gh's prompts, give --keys for each prompt, such as
 --keys '{enter}' --keys 'my-repo{enter}'. gh then runs in a real terminal, and
 ghmock types each entry once the screen has been still for half a second. Keys
 are {enter} {tab} {space} {backspace} {esc} {up} {down} {left} {right}
-{ctrl-c} {ctrl-d}, and {{ types a brace. --terminal alone shows the first
-prompt: ghmock stops gh when it waits for input with no keys left. The report
-shows the screen before each --keys entry and at the end. stdout and stderr
-share the screen, as they do for a user.
+{ctrl-c} {ctrl-d}, and {{ types a brace. Terminal runs obey --timeout; quiet
+output alone does not mean a prompt is waiting. Use a short --timeout to
+inspect an unanswered prompt. The report retains raw terminal output and
+the screen before each --keys entry and at the end. stdout and stderr share
+the terminal, as they do for a user. Terminal input requires Unix; other
+modes are available on Windows.
 
 GraphQL responses are trimmed to the fields gh asks for, as GitHub does, so one
 stored response can serve gh versions that ask for different fields. Off-schema

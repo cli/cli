@@ -64,6 +64,9 @@ func printResult(w io.Writer, command string, res runResult) {
 		fmt.Fprintf(w, "exit code: %d\n", res.exitCode)
 	}
 	if res.terminal {
+		if res.terminalOutput != "" {
+			printOutput(w, "terminal output", res.terminalOutput)
+		}
 		for i, s := range res.steps {
 			printOutput(w, fmt.Sprintf("screen before --keys %d, %s", i+1, s.Keys), s.Screen)
 		}
@@ -281,6 +284,7 @@ func printDifferences(w io.Writer, base, other runResult, n int) {
 	for _, out := range []struct{ label, a, b string }{
 		{stdoutLabel, base.stdout, other.stdout},
 		{"stderr", base.stderr, other.stderr},
+		{"terminal output", base.terminalOutput, other.terminalOutput},
 	} {
 		if out.a == out.b {
 			continue
@@ -290,6 +294,20 @@ func printDifferences(w io.Writer, base, other runResult, n int) {
 		for _, line := range lineDiff(showEscapes(out.a), showEscapes(out.b)) {
 			fmt.Fprintf(w, "    %s\n", line)
 		}
+	}
+
+	if !slices.Equal(base.steps, other.steps) {
+		same = false
+		fmt.Fprintf(w, "  prompt snapshots differ: %d in [1], %d in [%d]\n", len(base.steps), len(other.steps), n)
+		for i := 0; i < min(len(base.steps), len(other.steps)); i++ {
+			if base.steps[i] != other.steps[i] {
+				fmt.Fprintf(w, "    prompt %d: %s -> %s\n", i+1, showEscapes(base.steps[i].Screen), showEscapes(other.steps[i].Screen))
+			}
+		}
+	}
+	if base.unusedKeys != other.unusedKeys {
+		same = false
+		fmt.Fprintf(w, "  unused keys: %d -> %d\n", base.unusedKeys, other.unusedKeys)
 	}
 
 	baseCounts, otherCounts := countNames(base.requests), countNames(other.requests)

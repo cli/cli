@@ -115,6 +115,29 @@ func fakeGH(args []string) int {
 		}
 	case "stdin":
 		_, _ = io.Copy(os.Stdout, os.Stdin)
+	case "terminal-utf8":
+		data := []byte("\u754c")
+		_, _ = os.Stdout.Write(data[:1])
+		time.Sleep(100 * time.Millisecond)
+		_, _ = os.Stdout.Write(data[1:])
+		fmt.Println()
+	case "terminal-color":
+		code := "31"
+		if os.Getenv("GHMOCK_FAKE_VARIANT") == "green" {
+			code = "32"
+		}
+		fmt.Printf("\x1b[%smsame\x1b[0m\n", code)
+	case "terminal-quiet":
+		time.Sleep(2200 * time.Millisecond)
+		fmt.Println("finished")
+	case "terminal-prompt":
+		if os.Getenv("GHMOCK_FAKE_VARIANT") == "early" {
+			fmt.Println("finished")
+			return 0
+		}
+		fmt.Print("? " + os.Getenv("GHMOCK_FAKE_VARIANT") + " ")
+		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+		fmt.Print("\x1b[2J\x1b[Hfinished\n")
 	case "prompt":
 		if fi, err := os.Stdin.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
 			fmt.Fprintln(os.Stderr, "fake gh: not a terminal")
@@ -317,6 +340,7 @@ func TestRunAll(t *testing.T) {
 		wantErr     string
 		afterAPI    bool
 		resolveOnly bool
+		check       func(*testing.T, *state, runRecord)
 	}{
 		{
 			name:      "a request-free command replaces the last run selection",
@@ -457,11 +481,64 @@ version: "1"
 			}},
 		},
 		{
-			name:        "--terminal stops gh when it waits for input",
+			name:        "an unanswered terminal prompt obeys the configured timeout",
 			variants:    []string{"a"},
-			opts:        runOptions{args: []string{"prompt", "Name"}, terminal: true},
-			wantCommand: "ghmock run --gh <gh-a> --terminal --timeout 30s -- prompt Name",
-			want:        []resultSummary{{Version: "gh version 0.0.0-a", ExitCode: -1, Waiting: true, Stdout: "? Name\n"}},
+			opts:        runOptions{args: []string{"prompt", "Name"}, terminal: true, timeout: 500 * time.Millisecond},
+			wantCommand: "ghmock run --gh <gh-a> --terminal --timeout 500ms -- prompt Name",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", ExitCode: -1, TimedOut: true, Stdout: "? Name\n"}},
+		},
+		{
+			name:        "quiet terminal work is not mistaken for an unanswered prompt",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"terminal-quiet"}, terminal: true, timeout: 4 * time.Second},
+			wantCommand: "ghmock run --gh <gh-a> --terminal --timeout 4s -- terminal-quiet",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", Stdout: "finished\n"}},
+		},
+		{
+			name:        "terminal UTF8 survives read boundaries",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"terminal-utf8"}, terminal: true},
+			wantCommand: "ghmock run --gh <gh-a> --terminal --timeout 30s -- terminal-utf8",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", Stdout: "\u754c\n"}},
+		},
+		{
+			name:        "terminal color remains in captured output and comparisons",
+			variants:    []string{"red", "green"},
+			opts:        runOptions{args: []string{"terminal-color"}, terminal: true},
+			wantCommand: "ghmock run --gh <gh-red> --gh <gh-green> --terminal --timeout 30s -- terminal-color",
+			want:        []resultSummary{{Version: "gh version 0.0.0-red", Stdout: "same\n"}, {Version: "gh version 0.0.0-green", Stdout: "same\n"}},
+			check: func(t *testing.T, _ *state, rec runRecord) {
+				assert.Contains(t, rec.Results[0].TerminalOutput, "\x1b[31m")
+				assert.Contains(t, rec.Results[1].TerminalOutput, "\x1b[32m")
+				assert.Contains(t, rec.Report, "terminal output:")
+			},
+		},
+		{
+			name:        "different prompts remain visible when final screens match",
+			variants:    []string{"Name", "Title"},
+			opts:        runOptions{args: []string{"terminal-prompt"}, terminal: true, keys: []string{"Mona{enter}"}},
+			wantCommand: "ghmock run --gh <gh-Name> --gh <gh-Title> --keys 'Mona{enter}' --timeout 30s -- terminal-prompt",
+			want: []resultSummary{
+				{Version: "gh version 0.0.0-Name", Stdout: "finished\n", Steps: []terminalStep{{Keys: "Mona{enter}", Screen: "? Name\n"}}},
+				{Version: "gh version 0.0.0-Title", Stdout: "finished\n", Steps: []terminalStep{{Keys: "Mona{enter}", Screen: "? Title\n"}}},
+			},
+			check: func(t *testing.T, _ *state, rec runRecord) {
+				assert.Contains(t, rec.Report, "prompt snapshots differ")
+				assert.NotContains(t, rec.Report, "same exit code, output and requests")
+			},
+		},
+		{
+			name:        "unused terminal keys are included in comparisons",
+			variants:    []string{"early", "Name"},
+			opts:        runOptions{args: []string{"terminal-prompt"}, terminal: true, keys: []string{"Mona{enter}"}},
+			wantCommand: "ghmock run --gh <gh-early> --gh <gh-Name> --keys 'Mona{enter}' --timeout 30s -- terminal-prompt",
+			want: []resultSummary{
+				{Version: "gh version 0.0.0-early", Stdout: "finished\n", UnusedKeys: 1},
+				{Version: "gh version 0.0.0-Name", Stdout: "finished\n", Steps: []terminalStep{{Keys: "Mona{enter}", Screen: "? Name\n"}}},
+			},
+			check: func(t *testing.T, _ *state, rec runRecord) {
+				assert.Contains(t, rec.Report, "unused keys: 1 -> 0")
+			},
 		},
 		{
 			name:        "keys gh exits before getting are counted",
@@ -593,9 +670,9 @@ version: "1"
 		},
 	}
 
-	oldSettle, oldWaiting := settleTime, waitingTime
-	settleTime, waitingTime = 150*time.Millisecond, time.Second
-	t.Cleanup(func() { settleTime, waitingTime = oldSettle, oldWaiting })
+	oldSettle := settleTime
+	settleTime = 150 * time.Millisecond
+	t.Cleanup(func() { settleTime = oldSettle })
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -718,10 +795,13 @@ version: "1"
 				outcomes = append(outcomes, runOutcome{
 					Binary: opts.binaries[i], Path: r.path, Version: r.version, ExitCode: r.exitCode,
 					TimedOut: r.timedOut, Stdout: r.stdout, Stderr: r.stderr,
-					Terminal: r.terminal, Steps: r.steps, Waiting: r.waiting, UnusedKeys: r.unusedKeys,
+					Terminal: r.terminal, TerminalOutput: r.terminalOutput, Steps: r.steps, Waiting: r.waiting, UnusedKeys: r.unusedKeys,
 				})
 			}
 			assert.Equal(t, outcomes, rec.Results)
+			if tt.check != nil {
+				tt.check(t, st, rec)
+			}
 			var report strings.Builder
 			printReport(&report, opts, results, nil)
 			assert.Equal(t, report.String(), rec.Report)
