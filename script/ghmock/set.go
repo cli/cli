@@ -175,34 +175,60 @@ func cmdSet(args []string, stdout, stderr io.Writer) error {
 // is saved. It returns a line saying what the check did, or an error listing
 // the problems. A GraphQL response is checked against the query gh last sent
 // for it, so it isn't checked until gh has sent one.
+//
+// With offSchema, the response is saved as off-schema whatever the check finds,
+// so it's sent as stored. The line still says what the check found, because
+// callers report off-schema values and need to know whether they really are.
 func checkBeforeSave(st *state, chk *checker, name string, resp *response, offSchema bool) (string, error) {
-	if offSchema {
-		resp.OffSchema = true
-		return "Schema check: skipped, saved as off-schema", nil
-	}
+	// The checker skips responses marked off-schema, so mark it afterwards.
 	resp.OffSchema = false
+	problems, skipped, err := schemaCheck(st, chk, name, resp)
+	if err != nil {
+		return "", err
+	}
+	resp.OffSchema = offSchema
 
+	switch {
+	case offSchema && len(problems) > 0:
+		return "Schema check: failed, saved as off-schema:\n" + strings.TrimSuffix(indentProblems(problems, "  ", 0), "\n"), nil
+	case offSchema && skipped != "":
+		return "Schema check: skipped, saved as off-schema", nil
+	case offSchema:
+		return "Schema check: passed, but saved as off-schema as asked. It matches GitHub's schema, so it doesn't need --off-schema", nil
+	case len(problems) > 0:
+		return "", fmt.Errorf("the response doesn't match GitHub's schema, so it wasn't saved:\n%sFix it, or pass --off-schema to save it anyway",
+			indentProblems(problems, "  ", 0))
+	case skipped != "":
+		return skipped, nil
+	default:
+		return "Schema check: passed", nil
+	}
+}
+
+// schemaCheck checks resp against GitHub's schema. It returns the problems it
+// found, or, when it couldn't check, a line saying why.
+func schemaCheck(st *state, chk *checker, name string, resp *response) (problems []string, skipped string, err error) {
 	method, target, _ := strings.Cut(name, " ")
-	e := loggedRequest{Name: name, Method: method, Host: apiHost, Path: target}
+	e := loggedRequest{Name: name, Method: method, Host: dotcomAPIHost, Path: target}
 	if method == "graphql" {
 		if _, err := chk.graphQL(); err != nil {
-			return fmt.Sprintf("Schema check: skipped, GraphQL checks are off: %v", err), nil
+			return nil, fmt.Sprintf("Schema check: skipped, GraphQL checks are off: %v", err), nil
 		}
 		query, err := lastQuery(st, name)
 		if err != nil {
-			return "", err
+			return nil, "", err
 		}
 		if query == "" {
-			return fmt.Sprintf("Schema check: not yet, because gh hasn't sent %s; the next run checks it", name), nil
+			return nil, fmt.Sprintf("Schema check: not yet, because gh hasn't sent %s; the next run checks it", name), nil
 		}
-		e = loggedRequest{Name: name, Method: http.MethodPost, Host: apiHost, Path: "/graphql", GraphQL: &graphQLRequest{Query: query}}
+		e = loggedRequest{Name: name, Method: http.MethodPost, Host: dotcomAPIHost, Path: "/graphql", GraphQL: &graphQLRequest{Query: query}}
 	} else {
 		if host, path, ok := strings.Cut(target, "/"); ok && host != "" {
 			e.Host, e.Path = host, "/"+path
 		}
-		if e.Host == apiHost {
+		if isAPIHost(e.Host) {
 			if _, err := chk.rest(); err != nil {
-				return fmt.Sprintf("Schema check: skipped, REST checks are off: %v", err), nil
+				return nil, fmt.Sprintf("Schema check: skipped, REST checks are off: %v", err), nil
 			}
 		}
 	}
@@ -210,12 +236,11 @@ func checkBeforeSave(st *state, chk *checker, name string, resp *response, offSc
 	res := chk.checkResponse(e, resp)
 	switch {
 	case len(res.responseProblems) > 0:
-		return "", fmt.Errorf("the response doesn't match GitHub's schema, so it wasn't saved:\n%sFix it, or pass --off-schema to save it anyway",
-			indentProblems(res.responseProblems, "  ", 0))
+		return res.responseProblems, "", nil
 	case res.note != "":
-		return "Schema check: skipped, " + res.note, nil
+		return nil, "Schema check: skipped, " + res.note, nil
 	default:
-		return "Schema check: passed", nil
+		return nil, "", nil
 	}
 }
 

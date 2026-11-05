@@ -3,7 +3,9 @@ module github.com/cli/cli/v2/ghmock
 go 1.27.0
 
 require (
+	github.com/creack/pty v1.1.24
 	github.com/getkin/kin-openapi v0.152.0
+	github.com/hinshun/vt10x v0.0.0-20220119200601-820417d04eec
 	github.com/stretchr/testify v1.12.1
 	github.com/vektah/gqlparser/v2 v2.5.64
 )

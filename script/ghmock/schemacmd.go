@@ -686,6 +686,8 @@ func editDistance(a, b string) int {
 // again, to the files ghmock uses.
 func cmdSchemas(args []string, stdout, stderr io.Writer) error {
 	switch {
+	case askedForHelp(args):
+		return flag.ErrHelp
 	case len(args) == 0:
 		return newUsageError("missing subcommand; use ghmock schemas update")
 	case args[0] != "update":

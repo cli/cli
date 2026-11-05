@@ -167,7 +167,7 @@ func (q sentQuery) request(name string) loggedRequest {
 	if operation == "<anonymous>" {
 		operation = ""
 	}
-	return loggedRequest{Name: name, Method: http.MethodPost, Host: apiHost, Path: "/graphql",
+	return loggedRequest{Name: name, Method: http.MethodPost, Host: dotcomAPIHost, Path: "/graphql",
 		GraphQL: &graphQLRequest{Query: q.query, Variables: q.vars, Operation: operation}}
 }
 

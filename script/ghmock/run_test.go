@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -89,6 +92,12 @@ func fakeGH(args []string) int {
 			{"GH_TOKEN", os.Getenv("GH_TOKEN")},
 			{"GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN")},
 			{"GH_FORCE_TTY", os.Getenv("GH_FORCE_TTY")},
+			{"NO_COLOR", os.Getenv("NO_COLOR")},
+			{"TERM", os.Getenv("TERM")},
+			{"COLORTERM", os.Getenv("COLORTERM")},
+			{"SSL_CERT_FILE", os.Getenv("SSL_CERT_FILE")},
+			{"SSL_CERT_DIR", os.Getenv("SSL_CERT_DIR")},
+			{"GIT_SSL_CAINFO", os.Getenv("GIT_SSL_CAINFO")},
 			{"HOME", os.Getenv("HOME")},
 			{"PWD", wd},
 		} {
@@ -106,6 +115,22 @@ func fakeGH(args []string) int {
 		}
 	case "stdin":
 		_, _ = io.Copy(os.Stdout, os.Stdin)
+	case "prompt":
+		if fi, err := os.Stdin.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
+			fmt.Fprintln(os.Stderr, "fake gh: not a terminal")
+			return 1
+		}
+		in := bufio.NewReader(os.Stdin)
+		var answers []string
+		for _, question := range args[1:] {
+			fmt.Printf("? %s ", question)
+			line, err := in.ReadString('\n')
+			if err != nil {
+				return 1
+			}
+			answers = append(answers, strings.TrimSpace(line))
+		}
+		fmt.Printf("Answers: %s\n", strings.Join(answers, ", "))
 	case "exit":
 		code, _ := strconv.Atoi(args[1])
 		fmt.Fprintln(os.Stderr, "failing on purpose")
@@ -113,20 +138,42 @@ func fakeGH(args []string) int {
 	case "sleep":
 		time.Sleep(30 * time.Second)
 	case "api":
-		resp, err := http.Get("http://api.github.localhost/" + strings.TrimPrefix(args[1], "/"))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return 1
+		base := "https://api.github.com/"
+		if os.Getenv("GH_HOST") == "github.localhost" {
+			base = "http://api.github.localhost/"
 		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Printf("%d %s\n", resp.StatusCode, strings.TrimSpace(string(body)))
-		if resp.StatusCode >= 300 {
+		return fakeGet(http.DefaultClient, base+strings.TrimPrefix(args[1], "/"))
+	case "get":
+		return fakeGet(http.DefaultClient, args[1])
+	case "untrusted":
+		client := &http.Client{Transport: &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{RootCAs: x509.NewCertPool()},
+		}}
+		if _, err := client.Get(args[1]); err != nil {
+			fmt.Fprintln(os.Stderr, "fake gh: TLS handshake failed")
 			return 1
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "fake gh: unknown command %q\n", args[0])
 		return 2
+	}
+	return 0
+}
+
+// fakeGet prints the status and body of a GET. It fails for an error or a
+// status of 300 or more.
+func fakeGet(client *http.Client, url string) int {
+	resp, err := client.Get(url)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Printf("%d %s\n", resp.StatusCode, strings.TrimSpace(string(body)))
+	if resp.StatusCode >= 300 {
+		return 1
 	}
 	return 0
 }
@@ -137,7 +184,9 @@ func writeFakeGH(t *testing.T, variant string) string {
 	exe, err := os.Executable()
 	require.NoError(t, err)
 	path := filepath.Join(t.TempDir(), "gh-"+variant)
-	script := fmt.Sprintf("#!/bin/sh\nGHMOCK_FAKE_GH=1 GHMOCK_FAKE_VARIANT=%q exec %q \"$@\"\n", variant, exe)
+	// Race-enabled binaries sleep a second before exiting by default, which
+	// would look like gh waiting for input to a terminal run.
+	script := fmt.Sprintf("#!/bin/sh\nGHMOCK_FAKE_GH=1 GHMOCK_FAKE_VARIANT=%q GORACE=atexit_sleep_ms=0 exec %q \"$@\"\n", variant, exe)
 	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
 	return path
 }
@@ -156,15 +205,42 @@ func TestParseRunArgs(t *testing.T) {
 		},
 		{
 			name: "every flag",
-			args: []string{"--gh", "a", "--gh", "b", "--tty", "--logged-out", "--stdin", "token", "--timeout", "5s", "--", "auth", "login"},
+			args: []string{"--gh", "a", "--gh", "b", "--tty", "--logged-out", "--localhost", "--stdin", "token", "--timeout", "5s", "--", "auth", "login"},
 			want: runOptions{
 				binaries:  []string{"a", "b"},
 				tty:       true,
 				stdin:     "token",
 				loggedOut: true,
+				localhost: true,
 				timeout:   5 * time.Second,
 				args:      []string{"auth", "login"},
 			},
+		},
+		{
+			name: "--keys runs gh in a terminal",
+			args: []string{"--gh", "a", "--keys", "my-repo{enter}", "--keys", "{down}{enter}", "--", "repo", "create"},
+			want: runOptions{
+				binaries: []string{"a"},
+				terminal: true,
+				keys:     []string{"my-repo{enter}", "{down}{enter}"},
+				timeout:  time.Minute,
+				args:     []string{"repo", "create"},
+			},
+		},
+		{
+			name:    "--terminal with --tty",
+			args:    []string{"--gh", "a", "--terminal", "--tty", "--", "repo", "create"},
+			wantErr: "--terminal and --keys already give gh a terminal; leave out --tty",
+		},
+		{
+			name:    "--keys with --stdin",
+			args:    []string{"--gh", "a", "--keys", "x", "--stdin", "y", "--", "repo", "create"},
+			wantErr: "in a terminal, gh reads what you type; use --keys instead of --stdin",
+		},
+		{
+			name:    "an unknown key",
+			args:    []string{"--gh", "a", "--keys", "{nope}", "--", "repo", "create"},
+			wantErr: `--keys "{nope}" names an unknown key {nope}; keys are {backspace} {ctrl-c} {ctrl-d} {down} {enter} {esc} {left} {right} {space} {tab} {up}`,
 		},
 		{
 			name: "gh arguments without --",
@@ -216,12 +292,15 @@ func TestParseRunArgs(t *testing.T) {
 func TestRunAll(t *testing.T) {
 	// resultSummary is the part of a run result that tests compare.
 	type resultSummary struct {
-		Version  string
-		ExitCode int
-		TimedOut bool
-		Stdout   string
-		Stderr   string
-		Requests []logSummary
+		Version    string
+		ExitCode   int
+		TimedOut   bool
+		Stdout     string
+		Stderr     string
+		Requests   []logSummary
+		Steps      []terminalStep
+		Waiting    bool
+		UnusedKeys int
 	}
 
 	tests := []struct {
@@ -258,10 +337,48 @@ func TestRunAll(t *testing.T) {
 			wantCommand: "ghmock run --gh <gh-a> --timeout 30s -- env",
 			want: []resultSummary{{
 				Version: "gh version 0.0.0-a",
+				Stdout: `GH_HOST=
+GH_TOKEN=
+GITHUB_TOKEN=
+GH_FORCE_TTY=
+NO_COLOR=
+TERM=
+COLORTERM=
+SSL_CERT_FILE=<scratch>/ghmock-ca.pem
+SSL_CERT_DIR=<scratch>/certs
+GIT_SSL_CAINFO=<scratch>/ghmock-ca.pem
+HOME=<scratch>/home
+PWD=<scratch>/work
+--- <scratch>/config/config.yml
+version: "1"
+--- <scratch>/config/hosts.yml
+github.com:
+    users:
+        monalisa:
+            oauth_token: gho_ghmock-fake-token
+    git_protocol: https
+    oauth_token: gho_ghmock-fake-token
+    user: monalisa
+`,
+			}},
+		},
+		{
+			name:        "--localhost logs gh in to github.localhost and trusts no extra authority",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"env"}, localhost: true},
+			wantCommand: "ghmock run --gh <gh-a> --localhost --timeout 30s -- env",
+			want: []resultSummary{{
+				Version: "gh version 0.0.0-a",
 				Stdout: `GH_HOST=github.localhost
 GH_TOKEN=
 GITHUB_TOKEN=
 GH_FORCE_TTY=
+NO_COLOR=
+TERM=
+COLORTERM=
+SSL_CERT_FILE=
+SSL_CERT_DIR=
+GIT_SSL_CAINFO=
 HOME=<scratch>/home
 PWD=<scratch>/work
 --- <scratch>/config/config.yml
@@ -270,24 +387,30 @@ version: "1"
 github.localhost:
     users:
         monalisa:
-            oauth_token: ghmock-fake-token
+            oauth_token: gho_ghmock-fake-token
     git_protocol: https
-    oauth_token: ghmock-fake-token
+    oauth_token: gho_ghmock-fake-token
     user: monalisa
 `,
 			}},
 		},
 		{
-			name:        "--logged-out skips the login and --tty forces a terminal",
+			name:        "--logged-out skips the login and --tty forces a color terminal",
 			variants:    []string{"a"},
 			opts:        runOptions{args: []string{"env"}, loggedOut: true, tty: true},
 			wantCommand: "ghmock run --gh <gh-a> --tty --logged-out --timeout 30s -- env",
 			want: []resultSummary{{
 				Version: "gh version 0.0.0-a",
-				Stdout: `GH_HOST=github.localhost
+				Stdout: `GH_HOST=
 GH_TOKEN=
 GITHUB_TOKEN=
 GH_FORCE_TTY=120
+NO_COLOR=
+TERM=xterm-256color
+COLORTERM=truecolor
+SSL_CERT_FILE=<scratch>/ghmock-ca.pem
+SSL_CERT_DIR=<scratch>/certs
+GIT_SSL_CAINFO=<scratch>/ghmock-ca.pem
 HOME=<scratch>/home
 PWD=<scratch>/work
 --- <scratch>/config/config.yml
@@ -320,6 +443,41 @@ version: "1"
 			wantCommand: `ghmock run --gh <gh-a> --stdin 'it'\''s secret' --timeout 30s -- stdin`,
 		},
 		{
+			name:        "--keys types at each prompt in a terminal",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"prompt", "Name", "Color"}, terminal: true, keys: []string{"Mona{enter}", "teal{enter}"}},
+			wantCommand: "ghmock run --gh <gh-a> --keys 'Mona{enter}' --keys 'teal{enter}' --timeout 30s -- prompt Name Color",
+			want: []resultSummary{{
+				Version: "gh version 0.0.0-a",
+				Stdout:  "? Name Mona\n? Color teal\nAnswers: Mona, teal\n",
+				Steps: []terminalStep{
+					{Keys: "Mona{enter}", Screen: "? Name\n"},
+					{Keys: "teal{enter}", Screen: "? Name Mona\n? Color\n"},
+				},
+			}},
+		},
+		{
+			name:        "--terminal stops gh when it waits for input",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"prompt", "Name"}, terminal: true},
+			wantCommand: "ghmock run --gh <gh-a> --terminal --timeout 30s -- prompt Name",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", ExitCode: -1, Waiting: true, Stdout: "? Name\n"}},
+		},
+		{
+			name:        "keys gh exits before getting are counted",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"exit", "0"}, terminal: true, keys: []string{"x"}},
+			wantCommand: "ghmock run --gh <gh-a> --keys x --timeout 30s -- exit 0",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", Stdout: "failing on purpose\n", UnusedKeys: 1}},
+		},
+		{
+			name:        "without a terminal, gh can't prompt",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"prompt", "Name"}},
+			wantCommand: "ghmock run --gh <gh-a> --timeout 30s -- prompt Name",
+			want:        []resultSummary{{Version: "gh version 0.0.0-a", ExitCode: 1, Stderr: "fake gh: not a terminal\n"}},
+		},
+		{
 			name:        "gh's exit code and stderr are reported",
 			variants:    []string{"a"},
 			opts:        runOptions{args: []string{"exit", "3"}},
@@ -343,6 +501,54 @@ version: "1"
 				Version:  "gh version 0.0.0-a",
 				Stdout:   "200 {\"name\":\"hello\"}\n",
 				Requests: []logSummary{{Seq: 1, Name: "GET /repos/octo/hello", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			}},
+		},
+		{
+			name:        "--localhost sends requests over plain HTTP",
+			variants:    []string{"a"},
+			responses:   responseSet{"GET /repos/octo/hello": {{Body: json.RawMessage(`{"name":"hello"}`)}}},
+			opts:        runOptions{args: []string{"api", "repos/octo/hello"}, localhost: true},
+			wantCommand: "ghmock run --gh <gh-a> --localhost --timeout 30s -- api repos/octo/hello",
+			want: []resultSummary{{
+				Version:  "gh version 0.0.0-a",
+				Stdout:   "200 {\"name\":\"hello\"}\n",
+				Requests: []logSummary{{Seq: 1, Name: "GET /repos/octo/hello", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			}},
+		},
+		{
+			name:        "requests to other hosts keep the host in their name",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"get", "https://uploads.github.com/upload"}},
+			wantCommand: "ghmock run --gh <gh-a> --timeout 30s -- get https://uploads.github.com/upload",
+			want: []resultSummary{{
+				Version:  "gh version 0.0.0-a",
+				ExitCode: 1,
+				Stdout:   "404 {\"message\":\"ghmock: no response for GET uploads.github.com/upload\"}\n",
+				Requests: []logSummary{{Seq: 1, Name: "GET uploads.github.com/upload", Status: 404}},
+			}},
+		},
+		{
+			name:        "a gh that rejects ghmock's certificate is logged",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"untrusted", "https://api.github.com/zen"}},
+			wantCommand: "ghmock run --gh <gh-a> --timeout 30s -- untrusted https://api.github.com/zen",
+			want: []resultSummary{{
+				Version:  "gh version 0.0.0-a",
+				ExitCode: 1,
+				Stderr:   "fake gh: TLS handshake failed\n",
+				Requests: []logSummary{{Seq: 1, TLSFailed: true}},
+			}},
+		},
+		{
+			name:        "--localhost blocks HTTPS",
+			variants:    []string{"a"},
+			opts:        runOptions{args: []string{"get", "https://api.github.com/zen"}, localhost: true},
+			wantCommand: "ghmock run --gh <gh-a> --localhost --timeout 30s -- get https://api.github.com/zen",
+			want: []resultSummary{{
+				Version:  "gh version 0.0.0-a",
+				ExitCode: 1,
+				Stderr:   "Get \"https://api.github.com/zen\": Forbidden\n",
+				Requests: []logSummary{{Seq: 1, Status: 403, Blocked: true}},
 			}},
 		},
 		{
@@ -386,6 +592,10 @@ version: "1"
 			},
 		},
 	}
+
+	oldSettle, oldWaiting := settleTime, waitingTime
+	settleTime, waitingTime = 150*time.Millisecond, time.Second
+	t.Cleanup(func() { settleTime, waitingTime = oldSettle, oldWaiting })
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -452,12 +662,15 @@ version: "1"
 			var got []resultSummary
 			for _, r := range results {
 				got = append(got, resultSummary{
-					Version:  r.version,
-					ExitCode: r.exitCode,
-					TimedOut: r.timedOut,
-					Stdout:   r.stdout,
-					Stderr:   r.stderr,
-					Requests: summarize(r.requests),
+					Version:    r.version,
+					ExitCode:   r.exitCode,
+					TimedOut:   r.timedOut,
+					Stdout:     r.stdout,
+					Stderr:     r.stderr,
+					Requests:   summarize(r.requests),
+					Steps:      r.steps,
+					Waiting:    r.waiting,
+					UnusedKeys: r.unusedKeys,
 				})
 			}
 			assert.Equal(t, tt.want, got)
@@ -505,6 +718,7 @@ version: "1"
 				outcomes = append(outcomes, runOutcome{
 					Binary: opts.binaries[i], Path: r.path, Version: r.version, ExitCode: r.exitCode,
 					TimedOut: r.timedOut, Stdout: r.stdout, Stderr: r.stderr,
+					Terminal: r.terminal, Steps: r.steps, Waiting: r.waiting, UnusedKeys: r.unusedKeys,
 				})
 			}
 			assert.Equal(t, outcomes, rec.Results)
@@ -691,6 +905,122 @@ graphql IssueProjectItems
 `,
 		},
 		{
+			name: "a terminal run shows the screen before each --keys and at the end",
+			results: []runResult{{
+				path: "/bin/gh", version: "gh version 1.0.0", exitCode: -1, terminal: true, waiting: true,
+				steps:  []terminalStep{{Keys: "{enter}", Screen: "? What would you like to do?\n> Create\n"}},
+				stdout: "? What would you like to do? Create\n? Repository name\n",
+			}},
+			want: `gh version 1.0.0 - /bin/gh
+$ gh issue view 1
+exit code: none, gh was still waiting for input, so ghmock stopped it
+--- screen before --keys 1, {enter}
+? What would you like to do?
+> Create
+--- final screen
+? What would you like to do? Create
+? Repository name
+--- requests (0)
+`,
+		},
+		{
+			name: "escape codes show as \\e",
+			results: []runResult{{
+				path: "/bin/gh", version: "gh version 1.0.0",
+				stdout: "\x1b[33mwarning\x1b[0m\n",
+			}},
+			want: `gh version 1.0.0 - /bin/gh
+$ gh issue view 1
+exit code: 0
+--- stdout
+\e[33mwarning\e[0m
+--- stderr
+(empty)
+--- requests (0)
+`,
+		},
+		{
+			name: "a missing color reset shows in the differences",
+			results: []runResult{
+				{path: "/old/gh", version: "gh version 1.0.0", stdout: "\x1b[43mmatch\n"},
+				{path: "/new/gh", version: "gh version 2.0.0", stdout: "\x1b[43mmatch\x1b[0m\n"},
+			},
+			want: `=== [1] gh version 1.0.0 - /old/gh (baseline)
+$ gh issue view 1
+exit code: 0
+--- stdout
+\e[43mmatch
+--- stderr
+(empty)
+--- requests (0)
+
+=== [2] gh version 2.0.0 - /new/gh
+$ gh issue view 1
+exit code: 0
+--- stdout
+\e[43mmatch\e[0m
+--- stderr
+(empty)
+--- requests (0)
+
+=== differences from [1]
+[2] gh version 2.0.0:
+  stdout:
+    - \e[43mmatch
+    + \e[43mmatch\e[0m
+`,
+		},
+		{
+			name: "with --localhost, requests for another host",
+			results: []runResult{{
+				path: "/bin/gh", version: "gh version 1.0.0", exitCode: 1,
+				stderr: "error validating token: Get \"https://api.github.com/\": Forbidden\n",
+				requests: []loggedRequest{
+					{Seq: 1, Method: "CONNECT", Host: "api.github.com:443", Status: 403, Blocked: true},
+					{Seq: 2, Method: "CONNECT", Host: "api.github.com:443", Status: 403, Blocked: true},
+				},
+			}},
+			want: `gh version 1.0.0 - /bin/gh
+$ gh issue view 1
+exit code: 1
+--- stdout
+(empty)
+--- stderr
+error validating token: Get "https://api.github.com/": Forbidden
+--- requests (2)
+1. CONNECT api.github.com:443 -> blocked
+2. CONNECT api.github.com:443 -> blocked
+--- blocked, because with --localhost ghmock only serves github.localhost
+CONNECT api.github.com:443
+If gh picked that host because of --hostname or a URL, leave out --hostname and use github.localhost in URLs.
+`,
+		},
+		{
+			name: "gh rejects ghmock's certificate",
+			results: []runResult{{
+				path: "/bin/gh", version: "gh version 1.0.0", exitCode: 1,
+				stderr: "x509: certificate signed by unknown authority\n",
+				requests: []loggedRequest{
+					{Seq: 1, Method: "CONNECT", Host: "api.github.com:443", TLSError: "remote error: tls: bad certificate"},
+					{Seq: 2, Method: "CONNECT", Host: "api.github.com:443", TLSError: "remote error: tls: bad certificate"},
+				},
+			}},
+			want: `gh version 1.0.0 - /bin/gh
+$ gh issue view 1
+exit code: 1
+--- stdout
+(empty)
+--- stderr
+x509: certificate signed by unknown authority
+--- requests (2)
+1. CONNECT api.github.com:443 -> TLS handshake failed
+2. CONNECT api.github.com:443 -> TLS handshake failed
+--- gh rejected ghmock's certificate
+api.github.com:443: remote error: tls: bad certificate
+gh must trust ghmock's certificate authority through SSL_CERT_FILE. Some builds ignore it, such as macOS builds made with older Go. Run those with --localhost.
+`,
+		},
+		{
 			name: "schema problems, off-schema responses and notes",
 			results: []runResult{{
 				path: "/bin/gh", version: "gh version 1.0.0",
@@ -717,7 +1047,7 @@ exit code: 0
 --- schema problems
 1. graphql IssueByNumber: the response doesn't match GitHub's schema
    data.viewer.login: missing, but gh asked for it
-1. graphql IssueByNumber: gh's query doesn't match GitHub's schema
+1. graphql IssueByNumber: gh's query doesn't match GitHub's schema, so GitHub would answer with an error
    line 2, column 12: Cannot query field "nope" on type "User".
 4. graphql Big: the response doesn't match GitHub's schema
    problem 1

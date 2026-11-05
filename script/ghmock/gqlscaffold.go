@@ -14,7 +14,7 @@ import (
 const (
 	placeholderTime = "2026-01-01T00:00:00Z"
 	placeholderDate = "2026-01-01"
-	placeholderURL  = "https://github.localhost/owner/name"
+	placeholderURL  = "https://github.com/owner/name"
 	placeholderOID  = "0123456789abcdef0123456789abcdef01234567"
 )
 
@@ -221,7 +221,7 @@ func (s *gqlScaffolder) scalar(scalar, field, parent string) any {
 	case "GitRefname":
 		return "refs/heads/main"
 	case "GitSSHRemote":
-		return "git@github.localhost:owner/name.git"
+		return "git@github.com:owner/name.git"
 	case "HTML":
 		return "<p>" + field + "</p>"
 	case "Base64String":

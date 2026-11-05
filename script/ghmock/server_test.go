@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -20,6 +22,7 @@ type logSummary struct {
 	Status         int
 	Matched        bool
 	Blocked        bool
+	TLSFailed      bool
 	Response       int
 	Responses      int
 	OffSchema      bool
@@ -38,6 +41,7 @@ func summarize(entries []loggedRequest) []logSummary {
 			Status:         e.Status,
 			Matched:        e.Matched,
 			Blocked:        e.Blocked,
+			TLSFailed:      e.TLSError != "",
 			Response:       e.Response,
 			Responses:      e.Responses,
 			OffSchema:      e.OffSchema,
@@ -85,10 +89,15 @@ func TestMockServer(t *testing.T) {
 		name         string
 		responses    responseSet
 		checkSchemas bool
-		calls        []call
-		want         []reply
-		wantLog      []logSummary
-		wantKinds    []string
+		// dotcom gives the server a certificate authority, as without
+		// --localhost, and the client trusts it. untrusted does the same, but
+		// the client trusts nothing.
+		dotcom    bool
+		untrusted bool
+		calls     []call
+		want      []reply
+		wantLog   []logSummary
+		wantKinds []string
 		// wantSent, when set, is the response body each logged request
 		// records as sent to gh.
 		wantSent []string
@@ -230,16 +239,48 @@ func TestMockServer(t *testing.T) {
 			wantLog: []logSummary{{Seq: 1, Name: "POST /repos/octo/hello/issues", Body: `{"title":"Bug"}`, Status: 201, Matched: true, Response: 1, Responses: 1}},
 		},
 		{
-			name:    "plain HTTP to another host is blocked",
+			name:    "with --localhost, plain HTTP to another host is blocked",
 			calls:   []call{{method: "GET", url: "http://example.com/"}},
 			want:    []reply{{status: 403, body: "ghmock: only github.localhost is served"}},
 			wantLog: []logSummary{{Seq: 1, Status: 403, Blocked: true}},
 		},
 		{
-			name:    "HTTPS tunnels are blocked",
+			name:    "with --localhost, HTTPS tunnels are blocked",
 			calls:   []call{{method: "GET", url: "https://api.github.com/zen"}},
 			want:    []reply{{err: true}},
 			wantLog: []logSummary{{Seq: 1, Status: 403, Blocked: true}},
+		},
+		{
+			name:      "HTTPS to api.github.com is answered as the API host",
+			dotcom:    true,
+			responses: responseSet{"GET /repos/octo/hello": {{Body: json.RawMessage(`{"name":"hello"}`)}}},
+			calls:     []call{{method: "GET", url: "https://api.github.com/repos/octo/hello"}},
+			want:      []reply{{status: 200, body: `{"name":"hello"}`}},
+			wantLog:   []logSummary{{Seq: 1, Name: "GET /repos/octo/hello", Status: 200, Matched: true, Response: 1, Responses: 1}},
+		},
+		{
+			name:   "GraphQL over HTTPS is named by operation",
+			dotcom: true,
+			responses: responseSet{"graphql Viewer": {{
+				Body: json.RawMessage(`{"data":{"viewer":{"login":"monalisa"}}}`),
+			}}},
+			calls:   []call{{method: "POST", url: "https://api.github.com/graphql", body: graphQLBody(t, "query Viewer { viewer { login } }")}},
+			want:    []reply{{status: 200, body: `{"data":{"viewer":{"login":"monalisa"}}}`}},
+			wantLog: []logSummary{{Seq: 1, Name: "graphql Viewer", Status: 200, Matched: true, Response: 1, Responses: 1}},
+		},
+		{
+			name:    "HTTPS to another host keeps the host in the name",
+			dotcom:  true,
+			calls:   []call{{method: "POST", url: "https://uploads.github.com/upload", body: "data"}},
+			want:    []reply{{status: 404, body: `{"message":"ghmock: no response for POST uploads.github.com/upload"}`}},
+			wantLog: []logSummary{{Seq: 1, Name: "POST uploads.github.com/upload", Body: "data", Status: 404}},
+		},
+		{
+			name:      "a client that rejects ghmock's certificate is logged",
+			untrusted: true,
+			calls:     []call{{method: "GET", url: "https://api.github.com/zen"}},
+			want:      []reply{{err: true}},
+			wantLog:   []logSummary{{Seq: 1, TLSFailed: true}},
 		},
 		{
 			name: "GraphQL responses are trimmed to the fields gh asked for",
@@ -345,11 +386,25 @@ func TestMockServer(t *testing.T) {
 			if tt.checkSchemas {
 				chk = testChecker(t)
 			}
-			srv, err := startServer(st, chk)
+			var ca *certAuthority
+			if tt.dotcom || tt.untrusted {
+				var err error
+				ca, err = newCertAuthority()
+				require.NoError(t, err)
+			}
+			srv, err := startServer(st, chk, ca)
 			require.NoError(t, err)
 			proxy, err := url.Parse(srv.proxyURL())
 			require.NoError(t, err)
-			client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxy)}}
+			transport := &http.Transport{Proxy: http.ProxyURL(proxy)}
+			if ca != nil {
+				roots := x509.NewCertPool()
+				if !tt.untrusted {
+					roots.AppendCertsFromPEM(ca.certPEM)
+				}
+				transport.TLSClientConfig = &tls.Config{RootCAs: roots}
+			}
+			client := &http.Client{Transport: transport}
 
 			for i, c := range tt.calls {
 				req, err := http.NewRequest(c.method, c.url, strings.NewReader(c.body))

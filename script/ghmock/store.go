@@ -14,7 +14,8 @@ import (
 )
 
 // response is one canned reply to a request. A zero Status means 200.
-// OffSchema marks a response saved without passing the schema check.
+// OffSchema marks a response saved with --off-schema, which is sent as stored,
+// without trimming, whether or not it passes the schema check.
 type response struct {
 	Status    int               `json:"status,omitempty"`
 	Headers   map[string]string `json:"headers,omitempty"`
@@ -38,25 +39,28 @@ type responseSet map[string][]response
 // response wasn't checked. ResponseHeaders and ResponseBody are what gh got,
 // after trimming, because the stored response can change after the run.
 type loggedRequest struct {
-	Run            string          `json:"run"`
-	Binary         string          `json:"binary"`
-	Seq            int             `json:"seq"`
-	Method         string          `json:"method"`
-	Host           string          `json:"host"`
-	Path           string          `json:"path,omitempty"`
-	RawQuery       string          `json:"raw_query,omitempty"`
-	Name           string          `json:"name,omitempty"`
-	GraphQL        *graphQLRequest `json:"graphql,omitempty"`
-	Body           string          `json:"body,omitempty"`
-	Status         int             `json:"status"`
-	Matched        bool            `json:"matched"`
-	Blocked        bool            `json:"blocked,omitempty"`
-	Response       int             `json:"response,omitempty"`
-	Responses      int             `json:"responses,omitempty"`
-	OffSchema      bool            `json:"off_schema,omitempty"`
-	QueryProblems  []string        `json:"query_problems,omitempty"`
-	SchemaProblems []string        `json:"schema_problems,omitempty"`
-	SchemaNote     string          `json:"schema_note,omitempty"`
+	Run      string          `json:"run"`
+	Binary   string          `json:"binary"`
+	Seq      int             `json:"seq"`
+	Method   string          `json:"method"`
+	Host     string          `json:"host"`
+	Path     string          `json:"path,omitempty"`
+	RawQuery string          `json:"raw_query,omitempty"`
+	Name     string          `json:"name,omitempty"`
+	GraphQL  *graphQLRequest `json:"graphql,omitempty"`
+	Body     string          `json:"body,omitempty"`
+	Status   int             `json:"status"`
+	Matched  bool            `json:"matched"`
+	Blocked  bool            `json:"blocked,omitempty"`
+	// TLSError is why gh's TLS handshake with ghmock failed, such as gh not
+	// trusting ghmock's certificate authority.
+	TLSError       string   `json:"tls_error,omitempty"`
+	Response       int      `json:"response,omitempty"`
+	Responses      int      `json:"responses,omitempty"`
+	OffSchema      bool     `json:"off_schema,omitempty"`
+	QueryProblems  []string `json:"query_problems,omitempty"`
+	SchemaProblems []string `json:"schema_problems,omitempty"`
+	SchemaNote     string   `json:"schema_note,omitempty"`
 
 	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
 	ResponseBody    json.RawMessage   `json:"response_body,omitempty"`
@@ -82,6 +86,12 @@ type runOutcome struct {
 	TimedOut bool   `json:"timed_out,omitempty"`
 	Stdout   string `json:"stdout"`
 	Stderr   string `json:"stderr"`
+	// Terminal runs keep the screen before each --keys entry in Steps, and
+	// the final screen in Stdout.
+	Terminal   bool           `json:"terminal,omitempty"`
+	Steps      []terminalStep `json:"steps,omitempty"`
+	Waiting    bool           `json:"waiting_for_input,omitempty"`
+	UnusedKeys int            `json:"unused_keys,omitempty"`
 }
 
 // state is the folder that holds responses, the request log and the runs

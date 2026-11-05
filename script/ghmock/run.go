@@ -22,23 +22,34 @@ import (
 const (
 	defaultTimeout = time.Minute
 
-	// fakeToken is the token gh gets. It authenticates nothing.
-	fakeToken = "ghmock-fake-token"
+	// fakeToken is the token gh gets. It authenticates nothing. Its gho_
+	// prefix marks an OAuth token, as gh auth login stores, which commands
+	// such as gh agent-task require. The hyphens keep it from looking like a
+	// real token to secret scanners.
+	fakeToken = "gho_ghmock-fake-token"
 	// fakeUser is the account gh is logged in as.
 	fakeUser = "monalisa"
+	// caFile is where each run's scratch folder holds ghmock's certificate
+	// authority, the only one gh and git trust.
+	caFile = "ghmock-ca.pem"
 )
 
 // runOptions are the parsed flags of ghmock run.
 type runOptions struct {
 	binaries  []string
 	tty       bool
+	terminal  bool
+	keys      []string
 	stdin     string
 	loggedOut bool
+	localhost bool
 	timeout   time.Duration
 	args      []string
 }
 
-// runResult is what one gh binary did during a run.
+// runResult is what one gh binary did during a run. In a terminal, stdout
+// holds the final screen and stderr is empty, because gh writes both to the
+// screen.
 type runResult struct {
 	path     string
 	version  string
@@ -47,6 +58,11 @@ type runResult struct {
 	stdout   string
 	stderr   string
 	requests []loggedRequest
+
+	terminal   bool
+	steps      []terminalStep
+	waiting    bool
+	unusedKeys int
 }
 
 // stringList collects a repeatable string flag.
@@ -65,13 +81,19 @@ func parseRunArgs(args []string) (runOptions, error) {
 	fs.SetOutput(io.Discard)
 	fs.Var((*stringList)(&opts.binaries), "gh", "gh binary to run; repeat to compare binaries")
 	fs.BoolVar(&opts.tty, "tty", false, "make gh behave as if writing to a 120-column terminal")
+	fs.BoolVar(&opts.terminal, "terminal", false, "run gh in a real terminal, so it can prompt")
+	fs.Var((*stringList)(&opts.keys), "keys", "keys to type at the next prompt, such as my-repo{enter}; repeat for each prompt")
 	fs.StringVar(&opts.stdin, "stdin", "", "text to pass to gh on standard input")
 	fs.BoolVar(&opts.loggedOut, "logged-out", false, "run gh without a token")
+	fs.BoolVar(&opts.localhost, "localhost", false, "use github.localhost over plain HTTP, for gh builds that ignore SSL_CERT_FILE")
 	fs.DurationVar(&opts.timeout, "timeout", defaultTimeout, "how long each gh run may take")
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, usageError{err}
 	}
 	opts.args = fs.Args()
+	if len(opts.keys) > 0 {
+		opts.terminal = true
+	}
 
 	switch {
 	case len(opts.binaries) == 0:
@@ -80,6 +102,15 @@ func parseRunArgs(args []string) (runOptions, error) {
 		return runOptions{}, newUsageError("missing gh arguments; put them after --")
 	case opts.timeout <= 0:
 		return runOptions{}, newUsageError("--timeout must be positive")
+	case opts.terminal && opts.tty:
+		return runOptions{}, newUsageError("--terminal and --keys already give gh a terminal; leave out --tty")
+	case opts.terminal && opts.stdin != "":
+		return runOptions{}, newUsageError("in a terminal, gh reads what you type; use --keys instead of --stdin")
+	}
+	for _, k := range opts.keys {
+		if _, err := parseKeys(k); err != nil {
+			return runOptions{}, usageError{err}
+		}
 	}
 	return opts, nil
 }
@@ -109,9 +140,16 @@ func cmdRun(args []string, stdout, stderr io.Writer) error {
 func runAll(st *state, chk *checker, opts runOptions) (runRecord, []runResult, error) {
 	start := time.Now().UTC()
 	rec := runRecord{ID: newRunID(start), Time: start.Truncate(time.Second), Command: opts.commandLine()}
+	var ca *certAuthority
+	if !opts.localhost {
+		var err error
+		if ca, err = newCertAuthority(); err != nil {
+			return runRecord{}, nil, fmt.Errorf("making a certificate authority: %w", err)
+		}
+	}
 	results := make([]runResult, 0, len(opts.binaries))
 	for _, binary := range opts.binaries {
-		res, err := runBinary(st, chk, binary, opts)
+		res, err := runBinary(st, chk, binary, opts, ca)
 		if err != nil {
 			return runRecord{}, nil, fmt.Errorf("%s: %w", binary, err)
 		}
@@ -126,6 +164,7 @@ func runAll(st *state, chk *checker, opts runOptions) (runRecord, []runResult, e
 		rec.Results = append(rec.Results, runOutcome{
 			Binary: binary, Path: res.path, Version: res.version, ExitCode: res.exitCode,
 			TimedOut: res.timedOut, Stdout: res.stdout, Stderr: res.stderr,
+			Terminal: res.terminal, Steps: res.steps, Waiting: res.waiting, UnusedKeys: res.unusedKeys,
 		})
 	}
 
@@ -153,11 +192,20 @@ func (o runOptions) commandLine() string {
 	if o.tty {
 		parts = append(parts, "--tty")
 	}
+	if o.terminal && len(o.keys) == 0 {
+		parts = append(parts, "--terminal")
+	}
+	for _, k := range o.keys {
+		parts = append(parts, "--keys", shellQuote(k))
+	}
 	if o.stdin != "" {
 		parts = append(parts, "--stdin", shellQuote(o.stdin))
 	}
 	if o.loggedOut {
 		parts = append(parts, "--logged-out")
+	}
+	if o.localhost {
+		parts = append(parts, "--localhost")
 	}
 	if o.timeout != defaultTimeout {
 		parts = append(parts, "--timeout", o.timeout.String())
@@ -178,7 +226,9 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-func runBinary(st *state, chk *checker, binary string, opts runOptions) (runResult, error) {
+// runBinary runs one gh binary in its own scratch folder. With ca, gh uses
+// github.com and trusts only ca; without it, gh uses github.localhost.
+func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *certAuthority) (runResult, error) {
 	path, err := resolveBinary(binary)
 	if err != nil {
 		return runResult{}, err
@@ -190,16 +240,23 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions) (runResu
 	}
 	defer os.RemoveAll(scratch)
 	workDir := filepath.Join(scratch, "work")
-	for _, d := range []string{"home", "tmp", "config", "work"} {
+	for _, d := range []string{"home", "tmp", "config", "work", "certs"} {
 		if err := os.MkdirAll(filepath.Join(scratch, d), 0o755); err != nil {
 			return runResult{}, err
 		}
 	}
-	if err := writeGHConfig(filepath.Join(scratch, "config"), !opts.loggedOut); err != nil {
+	host := mockHost
+	if ca != nil {
+		host = dotcomHost
+		if err := os.WriteFile(filepath.Join(scratch, caFile), ca.certPEM, 0o600); err != nil {
+			return runResult{}, err
+		}
+	}
+	if err := writeGHConfig(filepath.Join(scratch, "config"), host, !opts.loggedOut); err != nil {
 		return runResult{}, err
 	}
 
-	srv, err := startServer(st, chk)
+	srv, err := startServer(st, chk, ca)
 	if err != nil {
 		return runResult{}, err
 	}
@@ -212,20 +269,35 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions) (runResu
 	cmd := exec.CommandContext(ctx, path, opts.args...)
 	cmd.Env = env
 	cmd.Dir = workDir
-	cmd.Stdin = strings.NewReader(opts.stdin)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
 	cmd.WaitDelay = 5 * time.Second
-	runErr := cmd.Run()
+	var runErr error
+	if opts.terminal {
+		var term terminalRun
+		term, runErr = runInTerminal(ctx, cmd, opts.keys)
+		res.terminal = true
+		res.waiting = term.waiting
+		res.unusedKeys = term.unused
+		res.stdout = hideScratch(term.screen, scratch)
+		for _, s := range term.steps {
+			res.steps = append(res.steps, terminalStep{Keys: s.Keys, Screen: hideScratch(s.Screen, scratch)})
+		}
+	} else {
+		cmd.Stdin = strings.NewReader(opts.stdin)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		runErr = cmd.Run()
+		res.stdout = hideScratch(stdout.String(), scratch)
+		res.stderr = hideScratch(stderr.String(), scratch)
+	}
 
 	res.requests = srv.close()
-	res.stdout = hideScratch(stdout.String(), scratch)
-	res.stderr = hideScratch(stderr.String(), scratch)
 	var exitErr *exec.ExitError
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		res.timedOut = true
+		res.exitCode = -1
+	case res.waiting:
 		res.exitCode = -1
 	case errors.As(runErr, &exitErr):
 		res.exitCode = exitErr.ExitCode()
@@ -265,9 +337,9 @@ func resolveBinary(p string) (string, error) {
 }
 
 // buildsDir, when set at build time with -ldflags "-X main.buildsDir=DIR",
-// limits --gh to binaries inside DIR. The issue-triage workflow sets it: its
-// agent's only command is ghmock, and without this, ghmock run --gh /bin/sh
-// would run any program.
+// limits --gh to binaries inside DIR. The issue-triage workflow sets it, so its
+// agent can't name another program, as in ghmock run --gh /bin/sh. It's not a
+// sandbox: gh starts other programs, such as git, with arguments it's given.
 var buildsDir string
 
 // checkBuildsDir checks that a binary is inside buildsDir, after following
@@ -292,11 +364,12 @@ func checkBuildsDir(name, abs string) error {
 }
 
 // writeGHConfig writes gh's config the way gh auth login --insecure-storage
-// leaves it, logged in as fakeUser with fakeToken. A token in GH_TOKEN would
-// also apply to github.com, so gh auth status would check github.com, which
-// ghmock blocks. The config version marks the multi-account migration as
-// done, as it is for anyone who has logged in with a recent gh.
-func writeGHConfig(dir string, loggedIn bool) error {
+// leaves it, logged in to host as fakeUser with fakeToken. That's where a
+// user's login lives. A token in GH_TOKEN would also apply to github.com, so
+// in --localhost runs gh auth status would check github.com too, which ghmock
+// blocks. The config version marks the multi-account migration as done, as it
+// is for anyone who has logged in with a recent gh.
+func writeGHConfig(dir, host string, loggedIn bool) error {
 	if err := os.WriteFile(filepath.Join(dir, "config.yml"), []byte("version: \"1\"\n"), 0o600); err != nil {
 		return err
 	}
@@ -310,7 +383,7 @@ func writeGHConfig(dir string, loggedIn bool) error {
     git_protocol: https
     oauth_token: %[3]s
     user: %[2]s
-`, mockHost, fakeUser, fakeToken)
+`, host, fakeUser, fakeToken)
 	return os.WriteFile(filepath.Join(dir, "hosts.yml"), []byte(hosts), 0o600)
 }
 
@@ -344,7 +417,6 @@ func ghEnv(scratch, proxyURL string, opts runOptions) []string {
 		"XDG_DATA_HOME=" + dir("home/.local/share"),
 		"XDG_STATE_HOME=" + dir("home/.local/state"),
 		"XDG_CACHE_HOME=" + dir("home/.cache"),
-		"GH_HOST=" + mockHost,
 		"HTTP_PROXY=" + proxyURL,
 		"HTTPS_PROXY=" + proxyURL,
 		"http_proxy=" + proxyURL,
@@ -354,7 +426,6 @@ func ghEnv(scratch, proxyURL string, opts runOptions) []string {
 		"GH_NO_UPDATE_NOTIFIER=1",
 		"GH_NO_EXTENSION_UPDATE_NOTIFIER=1",
 		"GH_TELEMETRY=disabled",
-		"GH_PROMPT_DISABLED=1",
 		"GH_SPINNER_DISABLED=1",
 		"GH_PAGER=cat",
 		"PAGER=cat",
@@ -363,13 +434,31 @@ func ghEnv(scratch, proxyURL string, opts runOptions) []string {
 		"GH_EDITOR=true",
 		"EDITOR=true",
 		"VISUAL=true",
-		"NO_COLOR=1",
 		"GIT_TERMINAL_PROMPT=0",
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_CONFIG_GLOBAL=" + dir("home/.gitconfig"),
 	}
+	if opts.localhost {
+		env = append(env, "GH_HOST="+mockHost)
+	} else {
+		// gh and git trust only ghmock's authority, so they can't complete a
+		// TLS handshake with a real host.
+		env = append(env,
+			"SSL_CERT_FILE="+dir(caFile),
+			"SSL_CERT_DIR="+dir("certs"),
+			"GIT_SSL_CAINFO="+dir(caFile),
+		)
+	}
+	if !opts.terminal {
+		// Without a terminal, a prompt would wait for input that never comes.
+		env = append(env, "GH_PROMPT_DISABLED=1")
+	}
 	if opts.tty {
 		env = append(env, "GH_FORCE_TTY=120")
+	}
+	if opts.tty || opts.terminal {
+		// Like most terminals, so gh colors its output as it would for a user.
+		env = append(env, "TERM=xterm-256color", "COLORTERM=truecolor")
 	}
 	return env
 }

@@ -55,13 +55,26 @@ func printNotes(w io.Writer, notes []string) {
 
 func printResult(w io.Writer, command string, res runResult) {
 	fmt.Fprintln(w, command)
-	if res.timedOut {
+	switch {
+	case res.timedOut:
 		fmt.Fprintln(w, "exit code: none, timed out")
-	} else {
+	case res.waiting:
+		fmt.Fprintln(w, "exit code: none, gh was still waiting for input, so ghmock stopped it")
+	default:
 		fmt.Fprintf(w, "exit code: %d\n", res.exitCode)
 	}
-	printOutput(w, "stdout", res.stdout)
-	printOutput(w, "stderr", res.stderr)
+	if res.terminal {
+		for i, s := range res.steps {
+			printOutput(w, fmt.Sprintf("screen before --keys %d, %s", i+1, s.Keys), s.Screen)
+		}
+		printOutput(w, "final screen", res.stdout)
+		if res.unusedKeys > 0 {
+			fmt.Fprintf(w, "gh exited before ghmock typed the last %s.\n", plural(res.unusedKeys, "--keys entry"))
+		}
+	} else {
+		printOutput(w, "stdout", res.stdout)
+		printOutput(w, "stderr", res.stderr)
+	}
 
 	fmt.Fprintf(w, "--- requests (%d)\n", len(res.requests))
 	for _, e := range res.requests {
@@ -73,7 +86,53 @@ func printResult(w io.Writer, command string, res runResult) {
 			fmt.Fprintln(w, name)
 		}
 	}
+	if blocked := blockedNames(res.requests); len(blocked) > 0 {
+		fmt.Fprintln(w, "--- blocked, because with --localhost ghmock only serves github.localhost")
+		for _, name := range blocked {
+			fmt.Fprintln(w, name)
+		}
+		fmt.Fprintln(w, "If gh picked that host because of --hostname or a URL, leave out --hostname and use github.localhost in URLs.")
+	}
+	if failed := tlsFailures(res.requests); len(failed) > 0 {
+		fmt.Fprintln(w, "--- gh rejected ghmock's certificate")
+		for _, f := range failed {
+			fmt.Fprintln(w, f)
+		}
+		fmt.Fprintln(w, "gh must trust ghmock's certificate authority through SSL_CERT_FILE. Some builds ignore it, such as macOS builds made with older Go. Run those with --localhost.")
+	}
 	printProblems(w, res.requests)
+}
+
+// tlsFailures lists, once each and in order, the hosts whose TLS handshake
+// with ghmock failed, with the reason.
+func tlsFailures(requests []loggedRequest) []string {
+	seen := map[string]bool{}
+	var failures []string
+	for _, e := range requests {
+		line := e.Host + ": " + e.TLSError
+		if e.TLSError == "" || seen[line] {
+			continue
+		}
+		seen[line] = true
+		failures = append(failures, line)
+	}
+	return failures
+}
+
+// blockedNames lists, once each and in order, requests ghmock refused because
+// they were for another host.
+func blockedNames(requests []loggedRequest) []string {
+	seen := map[string]bool{}
+	var names []string
+	for _, e := range requests {
+		name := displayName(e)
+		if !e.Blocked || seen[name] {
+			continue
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	return names
 }
 
 // printProblems lists what the schema checks found, request by request.
@@ -103,7 +162,7 @@ func problemGroups(e loggedRequest) []problemGroup {
 		groups = append(groups, problemGroup{"the response doesn't match GitHub's schema", e.SchemaProblems})
 	}
 	if len(e.QueryProblems) > 0 {
-		groups = append(groups, problemGroup{"gh's query doesn't match GitHub's schema", e.QueryProblems})
+		groups = append(groups, problemGroup{"gh's query doesn't match GitHub's schema, so GitHub would answer with an error", e.QueryProblems})
 	}
 	return groups
 }
@@ -128,10 +187,17 @@ func printOutput(w io.Writer, label, text string) {
 		fmt.Fprintln(w, "(empty)")
 		return
 	}
+	text = showEscapes(text)
 	fmt.Fprint(w, text)
 	if !strings.HasSuffix(text, "\n") {
 		fmt.Fprintln(w)
 	}
+}
+
+// showEscapes writes the escape character as \e, so color codes such as
+// \e[33m stay visible in reports and a missing reset can be spotted.
+func showEscapes(text string) string {
+	return strings.ReplaceAll(text, "\x1b", `\e`)
 }
 
 // displayName names a request in reports, including blocked ones.
@@ -157,6 +223,8 @@ func formatRequest(e loggedRequest) string {
 	switch {
 	case e.Blocked:
 		b.WriteString(" -> blocked")
+	case e.TLSError != "":
+		b.WriteString(" -> TLS handshake failed")
 	case e.Matched:
 		fmt.Fprintf(&b, " -> %d, response %d of %d", e.Status, e.Response, e.Responses)
 	default:
@@ -189,7 +257,7 @@ func missingNames(requests []loggedRequest) []string {
 	seen := map[string]bool{}
 	var names []string
 	for _, e := range requests {
-		if e.Matched || e.Blocked || seen[e.Name] {
+		if e.Matched || e.Blocked || e.TLSError != "" || seen[e.Name] {
 			continue
 		}
 		seen[e.Name] = true
@@ -202,12 +270,16 @@ func printDifferences(w io.Writer, base, other runResult, n int) {
 	fmt.Fprintf(w, "[%d] %s:\n", n, other.version)
 	same := true
 
-	if base.exitCode != other.exitCode || base.timedOut != other.timedOut {
+	if exitLabel(base) != exitLabel(other) {
 		same = false
 		fmt.Fprintf(w, "  exit code: %s -> %s\n", exitLabel(base), exitLabel(other))
 	}
+	stdoutLabel := "stdout"
+	if base.terminal {
+		stdoutLabel = "final screen"
+	}
 	for _, out := range []struct{ label, a, b string }{
-		{"stdout", base.stdout, other.stdout},
+		{stdoutLabel, base.stdout, other.stdout},
 		{"stderr", base.stderr, other.stderr},
 	} {
 		if out.a == out.b {
@@ -215,7 +287,7 @@ func printDifferences(w io.Writer, base, other runResult, n int) {
 		}
 		same = false
 		fmt.Fprintf(w, "  %s:\n", out.label)
-		for _, line := range lineDiff(out.a, out.b) {
+		for _, line := range lineDiff(showEscapes(out.a), showEscapes(out.b)) {
 			fmt.Fprintf(w, "    %s\n", line)
 		}
 	}
@@ -294,8 +366,11 @@ func joinLimited(items []string, limit int) string {
 }
 
 func exitLabel(res runResult) string {
-	if res.timedOut {
+	switch {
+	case res.timedOut:
 		return "timed out"
+	case res.waiting:
+		return "waiting for input"
 	}
 	return fmt.Sprint(res.exitCode)
 }

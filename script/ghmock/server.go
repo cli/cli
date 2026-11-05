@@ -2,7 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -18,25 +21,41 @@ const maxRequestBody = 10 << 20
 // fresh server, so every run starts from each request's first response. A nil
 // checker turns schema checks off. GraphQL responses are trimmed to the fields
 // gh asked for, except off-schema ones, which are sent as stored.
+//
+// With a certificate authority, the server answers HTTPS for any host gh opens
+// a tunnel to, so gh can use github.com. Without one, as with --localhost, it
+// serves github.localhost over plain HTTP and blocks everything else.
 type mockServer struct {
 	state    *state
 	checker  *checker
+	ca       *certAuthority
 	listener net.Listener
 	srv      *http.Server
 
+	// tunnels and tunnelSrv answer the requests inside CONNECT tunnels.
+	tunnels    *tunnelListener
+	tunnelSrv  *http.Server
+	handshakes sync.WaitGroup
+
 	mu       sync.Mutex
+	closing  bool
 	cursors  map[string]int
 	requests []loggedRequest
 }
 
-func startServer(st *state, chk *checker) (*mockServer, error) {
+func startServer(st *state, chk *checker, ca *certAuthority) (*mockServer, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
-	m := &mockServer{state: st, checker: chk, listener: ln, cursors: map[string]int{}}
+	m := &mockServer{state: st, checker: chk, ca: ca, listener: ln, cursors: map[string]int{}}
 	m.srv = &http.Server{Handler: m, ReadHeaderTimeout: 10 * time.Second}
 	go func() { _ = m.srv.Serve(ln) }()
+	if ca != nil {
+		m.tunnels = newTunnelListener(ln.Addr())
+		m.tunnelSrv = &http.Server{Handler: m, ReadHeaderTimeout: 10 * time.Second}
+		go func() { _ = m.tunnelSrv.Serve(m.tunnels) }()
+	}
 	return m, nil
 }
 
@@ -67,9 +86,18 @@ func (m *mockServer) proxyURL() string {
 	return "http://" + m.listener.Addr().String()
 }
 
-// close stops the server and returns the requests it saw, in order.
+// close stops the server and returns the requests it saw, in order. It waits
+// for TLS handshakes still under way, so a rejected certificate is logged.
 func (m *mockServer) close() []loggedRequest {
 	_ = m.srv.Close()
+	m.mu.Lock()
+	m.closing = true
+	m.mu.Unlock()
+	m.handshakes.Wait()
+	if m.tunnelSrv != nil {
+		_ = m.tunnelSrv.Close()
+		_ = m.tunnels.Close()
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([]loggedRequest(nil), m.requests...)
@@ -92,8 +120,12 @@ func (m *mockServer) record(e loggedRequest) {
 }
 
 func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// HTTPS goes through CONNECT tunnels, which would reach a real host.
 	if r.Method == http.MethodConnect {
+		if m.ca != nil {
+			m.tunnel(w, r)
+			return
+		}
+		// Without ghmock's authority, a tunnel would reach a real host.
 		m.record(loggedRequest{Method: r.Method, Host: r.Host, Status: http.StatusForbidden, Blocked: true})
 		http.Error(w, "ghmock: HTTPS tunnels are blocked", http.StatusForbidden)
 		return
@@ -109,7 +141,7 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entry := loggedRequest{Method: r.Method, Host: hostname, Path: r.URL.Path, RawQuery: r.URL.RawQuery}
-	if !isMockHost(hostname) {
+	if m.ca == nil && !isMockHost(hostname) {
 		entry.Status = http.StatusForbidden
 		entry.Blocked = true
 		m.record(entry)
@@ -203,6 +235,63 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func responseHasBody(method string, status int) bool {
 	return method != http.MethodHead && status >= 200 &&
 		status != http.StatusNoContent && status != http.StatusNotModified
+}
+
+// tunnel answers a CONNECT as the host gh asked for: it completes the TLS
+// handshake with a certificate from ghmock's authority, then hands the
+// connection to the server that answers the requests inside it.
+func (m *mockServer) tunnel(w http.ResponseWriter, r *http.Request) {
+	hostname := r.Host
+	if h, _, err := net.SplitHostPort(r.Host); err == nil {
+		hostname = h
+	}
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "ghmock: can't open a tunnel", http.StatusInternalServerError)
+		return
+	}
+	conn, rw, err := hj.Hijack()
+	if err != nil {
+		return
+	}
+	if !m.startHandshake() {
+		_ = conn.Close()
+		return
+	}
+	defer m.handshakes.Done()
+	if _, err := rw.WriteString("HTTP/1.1 200 Connection established\r\n\r\n"); err != nil {
+		_ = conn.Close()
+		return
+	}
+	if err := rw.Flush(); err != nil {
+		_ = conn.Close()
+		return
+	}
+
+	tlsConn := tls.Server(&bufferedConn{Conn: conn, r: rw.Reader}, m.ca.serverConfig(hostname))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		_ = tlsConn.Close()
+		// A client that hangs up before the handshake hasn't rejected anything.
+		if !errors.Is(err, io.EOF) {
+			m.record(loggedRequest{Method: http.MethodConnect, Host: r.Host, TLSError: err.Error()})
+		}
+		return
+	}
+	m.tunnels.push(tlsConn)
+}
+
+// startHandshake counts a TLS handshake that close waits for. It returns false
+// once the server is closing.
+func (m *mockServer) startHandshake() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closing {
+		return false
+	}
+	m.handshakes.Add(1)
+	return true
 }
 
 // missingResponse is what gh gets for a request with no stored response. Its

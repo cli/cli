@@ -367,10 +367,31 @@ func TestCmdSet(t *testing.T) {
 			want: `{}`,
 		},
 		{
-			name:       "--off-schema saves it anyway and labels it",
-			args:       []string{"GET /repos/o/r/issues/1", "--body", `{"id":"1"}`, "--off-schema"},
-			wantStdout: "GET /repos/o/r/issues/1: response 1 of 1: status 200, no headers, body 10 bytes, off-schema\nSchema check: skipped, saved as off-schema\n",
-			want:       `{"GET /repos/o/r/issues/1":[{"body":{"id":"1"},"off_schema":true}]}`,
+			name: "--off-schema saves it anyway, labels it and lists the problems",
+			args: []string{"GET /repos/o/r/issues/1", "--body", `{"id":"1"}`, "--off-schema"},
+			wantStdout: "GET /repos/o/r/issues/1: response 1 of 1: status 200, no headers, body 10 bytes, off-schema\n" +
+				"Schema check: failed, saved as off-schema:\n" +
+				"  id: value must be an integer\n" +
+				"  number: missing, but GitHub's description requires it\n" +
+				"  title: missing, but GitHub's description requires it\n" +
+				"  state: missing, but GitHub's description requires it\n" +
+				"  user: missing, but GitHub's description requires it\n" +
+				"  labels: missing, but GitHub's description requires it\n" +
+				"  created_at: missing, but GitHub's description requires it\n",
+			want: `{"GET /repos/o/r/issues/1":[{"body":{"id":"1"},"off_schema":true}]}`,
+		},
+		{
+			name: "--off-schema on a response that passes says the flag isn't needed",
+			args: []string{"GET /repos/o/r/issues/1", "--body", validIssue, "--off-schema"},
+			wantStdout: fmt.Sprintf("GET /repos/o/r/issues/1: response 1 of 1: status 200, no headers, body %d bytes, off-schema\n", len(validIssue)) +
+				"Schema check: passed, but saved as off-schema as asked. It matches GitHub's schema, so it doesn't need --off-schema\n",
+			want: `{"GET /repos/o/r/issues/1":[{"body":` + validIssue + `,"off_schema":true}]}`,
+		},
+		{
+			name:       "--off-schema on a response that can't be checked",
+			args:       []string{"GET /repos/o/r/issues/1", "--status", "502", "--off-schema"},
+			wantStdout: "GET /repos/o/r/issues/1: response 1 of 1: status 502, no headers, body 0 bytes, off-schema\nSchema check: skipped, saved as off-schema\n",
+			want:       `{"GET /repos/o/r/issues/1":[{"status":502,"off_schema":true}]}`,
 		},
 		{
 			name:       "a status GitHub doesn't document isn't checked",

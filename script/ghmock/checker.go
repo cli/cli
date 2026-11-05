@@ -208,7 +208,7 @@ func (c *checker) check(e loggedRequest, resp *response, validateVariables bool)
 	if resp == nil || resp.OffSchema {
 		return res
 	}
-	if e.Host != apiHost {
+	if !isAPIHost(e.Host) {
 		res.note = "not a REST API host"
 		return res
 	}

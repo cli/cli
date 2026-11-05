@@ -11,7 +11,11 @@ import (
 )
 
 const (
-	// mockHost is the GH_HOST value ghmock gives gh.
+	// dotcomHost is the host gh uses by default, which ghmock answers for.
+	dotcomHost = "github.com"
+	// dotcomAPIHost is where gh sends REST and GraphQL calls for github.com.
+	dotcomAPIHost = "api." + dotcomHost
+	// mockHost is the GH_HOST value ghmock gives gh with --localhost.
 	mockHost = "github.localhost"
 	// apiHost is where gh sends REST and GraphQL calls for mockHost.
 	apiHost = "api." + mockHost
@@ -38,21 +42,28 @@ func isMockHost(hostname string) bool {
 	return h == mockHost || strings.HasSuffix(h, "."+mockHost)
 }
 
+// isAPIHost reports whether gh sends REST and GraphQL calls to hostname, for
+// github.com or, with --localhost, for github.localhost.
+func isAPIHost(hostname string) bool {
+	h := strings.ToLower(hostname)
+	return h == dotcomAPIHost || h == apiHost
+}
+
 // requestName returns the name responses are stored under: "graphql Operation"
 // for GraphQL calls and "METHOD /path" for REST calls to the API host. Calls to
-// any other mock host keep the host in the name, such as
-// "POST uploads.github.localhost/upload".
+// any other host keep the host in the name, such as
+// "POST uploads.github.com/upload".
 func requestName(method, hostname, path string, body []byte) (string, *graphQLRequest) {
 	hostname = strings.ToLower(hostname)
 	if path == "" {
 		path = "/"
 	}
-	if method == http.MethodPost && hostname == apiHost && path == "/graphql" {
+	if method == http.MethodPost && isAPIHost(hostname) && path == "/graphql" {
 		if gql := parseGraphQL(body); gql != nil {
 			return "graphql " + gql.operationLabel(), gql
 		}
 	}
-	if hostname == apiHost {
+	if isAPIHost(hostname) {
 		return method + " " + path, nil
 	}
 	return method + " " + hostname + path, nil

@@ -1,17 +1,24 @@
 // Command ghmock runs gh binaries against a fake GitHub API.
 //
-// gh treats GH_HOST=github.localhost as a local development host and sends its
-// API calls there over plain HTTP. ghmock points HTTP_PROXY at a server on
-// localhost, so every call lands on responses ghmock controls, and it records
-// each request. Routing is all it does: ghmock does not block network access,
-// so it must run somewhere with no route to GitHub, such as a gh-aw sandbox.
+// ghmock points HTTPS_PROXY at a server on localhost. When gh opens a tunnel to
+// github.com, or to any other host, ghmock completes the TLS handshake itself,
+// with a certificate from a throwaway authority that gh trusts through
+// SSL_CERT_FILE. So gh behaves as it does against github.com, while every call
+// lands on responses ghmock controls, and ghmock records each request. With
+// --localhost, gh uses github.localhost instead, which it calls over plain
+// HTTP, for gh builds that ignore SSL_CERT_FILE.
+//
+// Routing is all ghmock does: it does not block network access, so it must run
+// somewhere with no route to GitHub, such as a gh-aw sandbox.
 package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 )
 
 const usage = `Usage: ghmock <command> [flags]
@@ -20,7 +27,8 @@ Runs gh binaries against a fake GitHub API and records every request.
 
 Commands:
   run      Run gh against the mock
-           ghmock run --gh PATH [--gh PATH ...] [--tty] [--stdin TEXT] [--logged-out] [--timeout DURATION] -- ARGS
+           ghmock run --gh PATH [--gh PATH ...] [--tty | --terminal] [--keys KEYS ...] [--stdin TEXT]
+                      [--logged-out] [--localhost] [--timeout DURATION] -- ARGS
   set      Change the response for a request
            ghmock set REQUEST [--status N] [--header 'Name: value'] [--body JSON | --body-file PATH]
                               [--at PATH --json VALUE] [--index N | --append] [--off-schema]
@@ -36,15 +44,47 @@ Commands:
   schemas  Download GitHub's schemas again
            ghmock schemas update
 
-Requests are named "METHOD /path" for REST, such as "GET /repos/octo/hello",
-and "graphql OperationName" for GraphQL, such as "graphql IssueByNumber".
+gh talks to ghmock as if it were github.com, so run commands as a report wrote
+them. ghmock answers HTTPS for every host gh connects to, with certificates
+from a throwaway authority that gh trusts through SSL_CERT_FILE. Requests are
+named "METHOD /path" for REST, such as "GET /repos/octo/hello", "graphql
+OperationName" for GraphQL, such as "graphql IssueByNumber", and "METHOD
+host/path" for other hosts, such as "GET uploads.github.com/upload".
 GraphQL requests use operationName when supplied. Comparisons include REST
 query strings and GraphQL query text and variables, for reads and writes.
 The default log selects the latest completed run, even if it made no requests.
 
+GraphQL placeholders are minimal: each list has one item, numbers are 1,
+strings are the field's name and booleans are false, except has...Enabled
+fields. So pageInfo.hasNextPage is false, and gh stops after one page.
+
+When GitHub can't find what a query looks up, such as an organization whose
+login belongs to a user, it answers null plus an errors entry, and gh often
+depends on that error:
+  ghmock set "graphql UserOrgOwner" --at data.organization --json null
+  ghmock set "graphql UserOrgOwner" --at errors --json '[{"type":"NOT_FOUND","path":["organization"],"message":"Could not resolve to an Organization with the login of octo."}]'
+
 ghmock set rejects a response that doesn't match GitHub's schema, unless you
 pass --off-schema. ghmock run reports responses, GraphQL queries and variables
 that don't match.
+GitHub answers a query that doesn't match with an error, but ghmock still sends
+the stored response, so read the report as well as gh's exit code.
+
+ghmock run stops gh after --timeout, a minute by default. For a hang or a loop,
+the report lists the requests gh made before it stopped.
+
+With --tty, gh writes as it would to a 120-column color terminal, with
+TERM=xterm-256color and COLORTERM=truecolor. The report shows each escape
+character as \e, such as \e[33m for yellow and \e[0m for a reset.
+
+To answer gh's prompts, give --keys for each prompt, such as
+--keys '{enter}' --keys 'my-repo{enter}'. gh then runs in a real terminal, and
+ghmock types each entry once the screen has been still for half a second. Keys
+are {enter} {tab} {space} {backspace} {esc} {up} {down} {left} {right}
+{ctrl-c} {ctrl-d}, and {{ types a brace. --terminal alone shows the first
+prompt: ghmock stops gh when it waits for input with no keys left. The report
+shows the screen before each --keys entry and at the end. stdout and stderr
+share the screen, as they do for a user.
 
 GraphQL responses are trimmed to the fields gh asks for, as GitHub does, so one
 stored response can serve gh versions that ask for different fields. Off-schema
@@ -56,6 +96,10 @@ had none, and adds fields gh asked for that a stored GraphQL response lacks. It
 never changes a value that's already there. GraphQL placeholders come from
 gh's query, and REST bodies from GitHub's examples. Change what matters with
 ghmock set, then run gh again.
+
+--localhost makes gh use github.localhost over plain HTTP instead of
+github.com, for gh builds that ignore SSL_CERT_FILE, such as macOS builds made
+with older Go.
 
 The schemas come from $GHMOCK_GRAPHQL_SCHEMA and $GHMOCK_REST_SCHEMA, or are
 downloaded into ghmock's cache folder the first time they're needed. ghmock
@@ -76,6 +120,14 @@ func (e usageError) Unwrap() error { return e.err }
 
 func newUsageError(format string, args ...any) error {
 	return usageError{fmt.Errorf(format, args...)}
+}
+
+// askedForHelp reports whether args include a help flag. Commands that take no
+// flags use it, since only a flag set returns flag.ErrHelp on its own.
+func askedForHelp(args []string) bool {
+	return slices.ContainsFunc(args, func(a string) bool {
+		return a == "-h" || a == "-help" || a == "--help"
+	})
 }
 
 func main() {
@@ -115,6 +167,10 @@ func runMain(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if err == nil {
+		return 0
+	}
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, usage)
 		return 0
 	}
 	fmt.Fprintf(stderr, "ghmock %s: %v\n", args[0], err)

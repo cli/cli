@@ -142,6 +142,9 @@ func printLog(w io.Writer, entries []loggedRequest, full bool) {
 }
 
 func cmdReset(args []string, stdout io.Writer) error {
+	if askedForHelp(args) {
+		return flag.ErrHelp
+	}
 	if len(args) > 0 {
 		return newUsageError("reset takes no arguments")
 	}

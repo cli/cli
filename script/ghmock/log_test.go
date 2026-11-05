@@ -131,7 +131,7 @@ func TestCmdLog(t *testing.T) {
      }
    the response doesn't match GitHub's schema:
      data.viewer.login: missing, but gh asked for it
-   gh's query doesn't match GitHub's schema:
+   gh's query doesn't match GitHub's schema, so GitHub would answer with an error:
      line 2, column 12: Cannot query field "nope" on type "User".
 `,
 		},
@@ -171,6 +171,32 @@ func TestRunMain(t *testing.T) {
 			name:       "help",
 			args:       []string{"help"},
 			wantStdout: usage,
+		},
+		{
+			name:       "help flag on a command",
+			args:       []string{"set", "--help"},
+			wantStdout: usage,
+		},
+		{
+			name:       "help flag after a request name",
+			args:       []string{"scaffold", "graphql IssueByNumber", "-h"},
+			wantStdout: usage,
+		},
+		{
+			name:       "help flag on reset deletes nothing",
+			args:       []string{"reset", "--help"},
+			wantStdout: usage,
+		},
+		{
+			name:       "help flag on schemas update",
+			args:       []string{"schemas", "update", "--help"},
+			wantStdout: usage,
+		},
+		{
+			name:       "help flag after -- belongs to gh",
+			args:       []string{"run", "--", "--help"},
+			wantCode:   2,
+			wantStderr: "ghmock run: at least one --gh is required\n",
 		},
 		{
 			name:       "no command",

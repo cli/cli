@@ -219,7 +219,7 @@ func TestCmdScaffold(t *testing.T) {
 			args:       []string{"graphql RepoIssue"},
 			wantStdout: "graphql RepoIssue: added response 1 of 1 with placeholder values\n",
 			want: `{"graphql RepoIssue":[{"body":{"data":{"repository":{
-				"id":"Repository_1","name":"name","nameWithOwner":"owner/name","url":"https://github.localhost/owner/name","hasIssuesEnabled":true,
+				"id":"Repository_1","name":"name","nameWithOwner":"owner/name","url":"https://github.com/owner/name","hasIssuesEnabled":true,
 				"issue":{"number":1,"title":"title","state":"OPEN","createdAt":"2026-01-01T00:00:00Z","assignees":[{"login":"login"}],"author":{"login":"login"}},
 				"labels":{"nodes":[{"name":"name"}],"totalCount":1}
 			}}}}]}`,
@@ -370,7 +370,7 @@ func TestCmdScaffold(t *testing.T) {
 			name:       "without an example, the body gets placeholders",
 			args:       []string{"GET /"},
 			wantStdout: "GET /: added response 1 of 1 with placeholder values\n",
-			want:       `{"GET /":[{"body":{"current_user_url":"https://github.localhost/owner/name"}}]}`,
+			want:       `{"GET /":[{"body":{"current_user_url":"https://github.com/owner/name"}}]}`,
 		},
 		{
 			name:       "the first documented success status",
