@@ -99,5 +99,6 @@ follow-up-choice requirements; never invent observations or a human commitment.
 Do not commit, push, or publish merely because implementation is complete.
 
 For PR review, use [code-review](.github/skills/code-review/SKILL.md).
+For sandboxed reproductions with `ghmock`, use [ghmock](.github/skills/ghmock/SKILL.md).
 For authorized maintainer debt maintenance, use [tech-debt-burndown](.github/skills/tech-debt-burndown/SKILL.md).
 For terminal demonstration evidence, use [vhs-demo](.github/skills/vhs-demo/SKILL.md).
