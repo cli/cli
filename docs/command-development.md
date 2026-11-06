@@ -27,6 +27,10 @@ The executable starts at [main](../cmd/gh/main.go), delegates to
 [`ghcmd.Main`](../internal/ghcmd/cmd.go), and builds the command tree through
 `root.NewCmdRoot`.
 
+For global rollout flags, constructors can read the immutable
+`Factory.GlobalFlags` snapshot. See [Global feature flags](api-and-hosts.md#global-feature-flags-provisional)
+for the opt-in development API, startup timing, and offline defaults.
+
 Defer repository/Git discovery (`BaseRepo`, `Remotes`, `Branch`) until `RunE` or
 the run function, not construction. In particular, **bind
 `opts.BaseRepo = f.BaseRepo` inside `RunE`**.
