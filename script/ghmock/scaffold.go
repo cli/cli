@@ -220,7 +220,7 @@ func scaffoldGraphQL(chk *checker, name string, responses responseSet, entries [
 	}
 	var ops []parsed
 	for _, q := range queries {
-		_, op, _ := checkGraphQLQuery(schema, q.query, q.request(name).GraphQL.Operation)
+		op, _ := checkGraphQLQuery(schema, q.query, q.request(name).GraphQL.Operation)
 		if op == nil {
 			return nil, fmt.Errorf("gh's query couldn't be read; ghmock log --full shows it")
 		}
