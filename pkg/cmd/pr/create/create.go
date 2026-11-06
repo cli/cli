@@ -82,7 +82,11 @@ type CreateOptions struct {
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
+
+	Exporter cmdutil.Exporter
 }
+
+var createOutputFields = []string{"id", "url", "number"}
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
 // Upcasting to concrete implementations can provide further context on other operations (forking and pushing).
@@ -355,6 +359,10 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
+			if opts.DryRun && opts.Exporter != nil {
+				return cmdutil.FlagErrorf("`--dry-run` is not supported with `--json`")
+			}
+
 			if err := cmdutil.MutuallyExclusive(
 				"`--attach` is not supported when using `--web`",
 				opts.AttachFlag.Changed(),
@@ -406,6 +414,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
 	opts.AttachFlag = attachments.AddFlag(cmd)
+	cmdutil.AddJSONAndJQFlags(cmd, &opts.Exporter, createOutputFields)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -1136,7 +1145,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.PRRefs.BaseRepo(), params)
 	opts.IO.StopProgressIndicator()
-	if pr != nil {
+	if pr != nil && opts.Exporter == nil {
 		fmt.Fprintln(opts.IO.Out, pr.URL)
 	}
 	if err != nil {
@@ -1149,6 +1158,9 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		// failed create leaves the uploaded assets referenced by nothing, so
 		// that error reads first.
 		return errors.Join(uploadErr, err)
+	}
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, pr)
 	}
 	return uploadErr
 }

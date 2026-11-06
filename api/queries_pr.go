@@ -493,10 +493,11 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]any) 
 			createPullRequest(input: $input) {
 				pullRequest {
 					id
+					number
 					url
 				}
 			}
-	}`
+		}`
 
 	inputParams := map[string]any{
 		"repositoryId": repo.ID,
