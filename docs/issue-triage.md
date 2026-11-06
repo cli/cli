@@ -41,6 +41,13 @@ analysis** and take the normal early exit. This availability check does not requ
 a bug reproduction, bug priority, or feasibility study. Do not claim released
 support based only on trunk source.
 
+## Model selection
+
+Leave `engine.model` unset so the workflow uses `gh aw`'s normal model selection.
+`GH_AW_MODEL_AGENT_COPILOT` selects the triage model, and
+`GH_AW_MODEL_DETECTION_COPILOT` selects the security-check model.
+Each falls back to `GH_AW_DEFAULT_MODEL_COPILOT`, then its `gh aw` default.
+
 ## Publishing
 
 The agent calls `publish_triage` once after its label suggestions. The separate
