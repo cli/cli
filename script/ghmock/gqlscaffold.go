@@ -62,11 +62,33 @@ func newGQLScaffolder(schema *ast.Schema) *gqlScaffolder {
 }
 
 // useVariables sets the variables gh sent, which @include and @skip read.
-func (s *gqlScaffolder) useVariables(raw json.RawMessage) {
-	s.vars = nil
+func (s *gqlScaffolder) useVariables(op *ast.OperationDefinition, raw json.RawMessage) error {
+	var err error
+	s.vars, err = operationVariables(op, raw)
+	return err
+}
+
+func operationVariables(op *ast.OperationDefinition, raw json.RawMessage) (map[string]any, error) {
+	var values map[string]any
 	if len(raw) > 0 {
-		_ = json.Unmarshal(raw, &s.vars)
+		if err := json.Unmarshal(raw, &values); err != nil {
+			return nil, fmt.Errorf("reading GraphQL variables: %w", err)
+		}
 	}
+	if values == nil {
+		values = map[string]any{}
+	}
+	for _, def := range op.VariableDefinitions {
+		if _, supplied := values[def.Variable]; supplied || def.DefaultValue == nil {
+			continue
+		}
+		value, err := def.DefaultValue.Value(nil)
+		if err != nil {
+			return nil, fmt.Errorf("reading default for $%s: %w", def.Variable, err)
+		}
+		values[def.Variable] = value
+	}
+	return values, nil
 }
 
 // fillObject adds the fields that sel asks for and obj lacks. With record set,
@@ -93,6 +115,8 @@ func (s *gqlScaffolder) fillObject(path string, obj map[string]any, def *ast.Def
 		case strings.HasPrefix(f.Name, "__"):
 			if !has {
 				obj[key] = s.introspect(f, mergeSelections(fields))
+			} else {
+				obj[key] = s.mergeIntrospection(child, existing, s.introspectionRoot(f), mergeSelections(fields), record)
 			}
 		case has:
 			obj[key] = s.fill(child, existing, f.Definition.Type, mergeSelections(fields))

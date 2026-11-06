@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -19,17 +20,90 @@ type introObject interface {
 // develop stops if the LinkedBranch type has no fields, so placeholders here
 // would change what gh does.
 func (s *gqlScaffolder) introspect(f *ast.Field, sel ast.SelectionSet) any {
+	return s.introValue(s.introspectionRoot(f), sel)
+}
+
+func (s *gqlScaffolder) introspectionRoot(f *ast.Field) introObject {
 	switch f.Name {
 	case "__schema":
-		return s.introValue(introSchema{}, sel)
+		return introSchema{}
 	case "__type":
 		name, _ := s.arguments(f)["name"].(string)
 		if s.schema.Types[name] == nil {
 			return nil
 		}
-		return s.introValue(introType{ast.NamedType(name, nil)}, sel)
+		return introType{ast.NamedType(name, nil)}
 	}
 	return nil
+}
+
+func (s *gqlScaffolder) mergeIntrospection(path string, existing, resolved any, sel ast.SelectionSet, record bool) any {
+	switch source := resolved.(type) {
+	case introObject:
+		dst, ok := existing.(map[string]any)
+		if !ok {
+			return existing
+		}
+		var keys []string
+		groups := map[string][]*ast.Field{}
+		s.collect(sel, s.schema.Types[source.typeName()], &keys, groups)
+		for _, key := range keys {
+			field := groups[key][0]
+			child := path + "." + key
+			value := source.resolve(s, field.Name, s.arguments(field))
+			if field.Name == "__typename" {
+				value = source.typeName()
+			}
+			selections := mergeSelections(groups[key])
+			if previous, found := dst[key]; found {
+				dst[key] = s.mergeIntrospection(child, previous, value, selections, record)
+			} else {
+				dst[key] = s.introValue(value, selections)
+				if record {
+					s.added = append(s.added, child)
+				}
+			}
+		}
+	case []introObject:
+		dst, ok := existing.([]any)
+		if !ok {
+			return existing
+		}
+		nameKeys := []string{"name"}
+		if len(source) > 0 {
+			var keys []string
+			groups := map[string][]*ast.Field{}
+			s.collect(sel, s.schema.Types[source[0].typeName()], &keys, groups)
+			for _, key := range keys {
+				if groups[key][0].Name == "name" && key != "name" {
+					nameKeys = append(nameKeys, key)
+				}
+			}
+		}
+		for i, value := range dst {
+			index := i
+			if object, ok := value.(map[string]any); ok {
+				for _, key := range nameKeys {
+					name, ok := object[key].(string)
+					if !ok {
+						continue
+					}
+					index = -1
+					for j, candidate := range source {
+						if candidate.resolve(s, "name", nil) == name {
+							index = j
+							break
+						}
+					}
+					break
+				}
+			}
+			if index >= 0 && index < len(source) {
+				dst[i] = s.mergeIntrospection(fmt.Sprintf("%s.%d", path, i), value, source[index], sel, record)
+			}
+		}
+	}
+	return existing
 }
 
 // introValue turns a resolved value into JSON, following the selection.

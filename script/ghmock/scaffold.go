@@ -177,10 +177,14 @@ func queriesFor(entries []loggedRequest, name string) []sentQuery {
 	seen := map[string]bool{}
 	var queries []sentQuery
 	for _, e := range entries {
-		if e.Run != run || e.Name != name || e.GraphQL == nil || seen[e.GraphQL.Query] {
+		if e.Run != run || e.Name != name || e.GraphQL == nil {
 			continue
 		}
-		seen[e.GraphQL.Query] = true
+		key := e.GraphQL.Query + "\x00" + compactJSON(e.GraphQL.Variables)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		queries = append(queries, sentQuery{e.GraphQL.Query, e.GraphQL.Variables})
 	}
 	return queries
@@ -219,7 +223,9 @@ func scaffoldGraphQL(chk *checker, name string, responses responseSet, entries [
 		s := newGQLScaffolder(schema)
 		data := map[string]any{}
 		for _, p := range ops {
-			s.useVariables(p.vars)
+			if err := s.useVariables(p.op, p.vars); err != nil {
+				return nil, err
+			}
 			s.fillObject("data", data, rootType(schema, p.op.Operation), p.op.SelectionSet, false)
 		}
 		body, err := json.Marshal(map[string]any{"data": data})
@@ -261,7 +267,9 @@ func scaffoldGraphQL(chk *checker, name string, responses responseSet, entries [
 		}
 		s := newGQLScaffolder(schema)
 		for _, p := range ops {
-			s.useVariables(p.vars)
+			if err := s.useVariables(p.op, p.vars); err != nil {
+				return nil, err
+			}
 			s.fillObject("data", data, rootType(schema, p.op.Operation), p.op.SelectionSet, true)
 		}
 		if len(s.added) == 0 {

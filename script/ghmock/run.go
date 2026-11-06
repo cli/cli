@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -254,7 +255,7 @@ func resolveBinary(p string) (string, error) {
 	if info.IsDir() {
 		return "", fmt.Errorf("%s is a directory", abs)
 	}
-	if info.Mode()&0o111 == 0 {
+	if runtime.GOOS != "windows" && info.Mode()&0o111 == 0 {
 		return "", fmt.Errorf("%s is not executable", abs)
 	}
 	if err := checkBuildsDir(p, abs); err != nil {

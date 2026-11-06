@@ -214,10 +214,6 @@ func TestParseRunArgs(t *testing.T) {
 }
 
 func TestRunAll(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fake gh wrapper needs /bin/sh")
-	}
-
 	// resultSummary is the part of a run result that tests compare.
 	type resultSummary struct {
 		Version  string
@@ -241,6 +237,7 @@ func TestRunAll(t *testing.T) {
 		wantCommand string
 		wantErr     string
 		afterAPI    bool
+		resolveOnly bool
 	}{
 		{
 			name:      "a request-free command replaces the last run selection",
@@ -249,6 +246,10 @@ func TestRunAll(t *testing.T) {
 			opts:      runOptions{args: []string{"--version"}},
 			want:      []resultSummary{{Version: "gh version 0.0.0-a", Stdout: "gh version 0.0.0-a\n"}},
 			afterAPI:  true,
+		},
+		{
+			name:        "PATH executable lookup uses platform permission rules",
+			resolveOnly: true,
 		},
 		{
 			name:        "gh gets an isolated environment, logged in with a fake token",
@@ -388,6 +389,21 @@ version: "1"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.resolveOnly {
+				executable, err := os.Executable()
+				require.NoError(t, err)
+				t.Setenv("PATH", filepath.Dir(executable)+string(os.PathListSeparator)+os.Getenv("PATH"))
+				if runtime.GOOS == "windows" {
+					t.Setenv("PATHEXT", ".EXE")
+				}
+				resolved, err := resolveBinary(filepath.Base(executable))
+				require.NoError(t, err)
+				assert.Equal(t, executable, resolved)
+				return
+			}
+			if runtime.GOOS == "windows" {
+				t.Skip("the fake gh wrapper needs /bin/sh")
+			}
 			// Neither should reach gh.
 			t.Setenv("GH_TOKEN", "caller-token")
 			t.Setenv("GITHUB_TOKEN", "caller-token")

@@ -37,8 +37,9 @@ func trimGraphQL(body []byte, gql *graphQLRequest, schema *ast.Schema) []byte {
 	}
 
 	t := &trimmer{doc: doc, schema: schema}
-	if len(gql.Variables) > 0 {
-		_ = json.Unmarshal(gql.Variables, &t.vars)
+	t.vars, err = operationVariables(doc.Operations[0], gql.Variables)
+	if err != nil {
+		return body
 	}
 	top["data"] = t.object(data, doc.Operations[0].SelectionSet)
 	trimmed, err := json.Marshal(top)

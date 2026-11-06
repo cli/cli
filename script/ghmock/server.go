@@ -149,7 +149,9 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(list) == 0 {
 		status, payload := missingResponse(name, gql != nil)
 		entry.Status = status
-		entry.ResponseBody, _ = json.Marshal(payload)
+		if responseHasBody(r.Method, status) {
+			entry.ResponseBody, _ = json.Marshal(payload)
+		}
 		m.check(&entry, nil)
 		m.record(entry)
 		writeJSON(w, status, payload)
@@ -180,7 +182,7 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	entry.Response = idx + 1
 	entry.Responses = len(list)
 	entry.ResponseHeaders = resp.Headers
-	if json.Valid(payload) {
+	if responseHasBody(r.Method, resp.status()) && json.Valid(payload) {
 		entry.ResponseBody = payload
 	}
 	m.check(&entry, &resp)
@@ -193,9 +195,14 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	}
 	w.WriteHeader(resp.status())
-	if len(payload) > 0 && r.Method != http.MethodHead {
+	if len(payload) > 0 && responseHasBody(r.Method, resp.status()) {
 		_, _ = w.Write(payload)
 	}
+}
+
+func responseHasBody(method string, status int) bool {
+	return method != http.MethodHead && status >= 200 &&
+		status != http.StatusNoContent && status != http.StatusNotModified
 }
 
 // missingResponse is what gh gets for a request with no stored response. Its

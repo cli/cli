@@ -120,6 +120,37 @@ func TestMockServer(t *testing.T) {
 			wantKinds: []string{"mutation"},
 		},
 		{
+			name: "HTTP no-body responses do not record undelivered JSON",
+			responses: responseSet{
+				"GET /no-content":   {{Status: 204, Body: json.RawMessage(`{"ignored":true}`)}},
+				"GET /not-modified": {{Status: 304, Body: json.RawMessage(`{"ignored":true}`)}},
+				"HEAD /matched":     {{Body: json.RawMessage(`{"ignored":true}`)}},
+			},
+			calls: []call{
+				{method: "GET", url: "http://api.github.localhost/no-content"},
+				{method: "GET", url: "http://api.github.localhost/not-modified"},
+				{method: "HEAD", url: "http://api.github.localhost/matched"},
+				{method: "HEAD", url: "http://api.github.localhost/missing"},
+			},
+			want: []reply{{status: 204}, {status: 304}, {status: 200}, {status: 404}},
+			wantLog: []logSummary{
+				{Seq: 1, Name: "GET /no-content", Status: 204, Matched: true, Response: 1, Responses: 1},
+				{Seq: 2, Name: "GET /not-modified", Status: 304, Matched: true, Response: 1, Responses: 1},
+				{Seq: 3, Name: "HEAD /matched", Status: 200, Matched: true, Response: 1, Responses: 1},
+				{Seq: 4, Name: "HEAD /missing", Status: 404},
+			},
+			wantSent: []string{"", "", "", ""},
+		},
+		{
+			name:      "operation defaults are used while trimming conditional fields",
+			responses: responseSet{"graphql Default": {{Body: json.RawMessage(`{"data":{"viewer":{"login":"Mona","name":"Mona"}}}`)}}},
+			calls: []call{{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBody(t,
+				`query Default($show: Boolean = true, $hide: Boolean = false) { viewer { login @include(if:$show) name @skip(if:$hide) } }`)}},
+			want:     []reply{{status: 200, body: `{"data":{"viewer":{"login":"Mona","name":"Mona"}}}`}},
+			wantLog:  []logSummary{{Seq: 1, Name: "graphql Default", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			wantSent: []string{`{"data":{"viewer":{"login":"Mona","name":"Mona"}}}`},
+		},
+		{
 			name: "REST response with status, headers and body",
 			responses: responseSet{"GET /repos/octo/hello": {{
 				Status:  201,

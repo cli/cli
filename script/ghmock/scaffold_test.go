@@ -102,6 +102,60 @@ func TestCmdScaffold(t *testing.T) {
 		want       string
 	}{
 		{
+			name: "same query with different directive variables is not deduplicated",
+			logged: []loggedRequest{
+				gqlEntry("r1", "Include", `query Include($show: Boolean!) { viewer { login @include(if: $show) } }`, `{"show":false}`),
+				gqlEntry("r1", "Include", `query Include($show: Boolean!) { viewer { login @include(if: $show) } }`, `{"show":true}`),
+			},
+			args:       []string{"graphql Include"},
+			wantStdout: "graphql Include: added response 1 of 1 with placeholder values\n",
+			want:       `{"graphql Include":[{"body":{"data":{"viewer":{"login":"login"}}}}]}`,
+		},
+		{
+			name:       "operation defaults control generated selections",
+			logged:     []loggedRequest{gqlEntry("r1", "Default", `query Default($show: Boolean = true) { viewer { login @include(if: $show) } }`, "")},
+			args:       []string{"graphql Default"},
+			wantStdout: "graphql Default: added response 1 of 1 with placeholder values\n",
+			want:       `{"graphql Default":[{"body":{"data":{"viewer":{"login":"login"}}}}]}`,
+		},
+		{
+			name:      "existing introspection values and nulls survive missing-field repair",
+			responses: `{"graphql Type":[{"body":{"data":{"Type":{"name":"Keep","fields":[{"name":"title","description":null}]}}}}]}`,
+			logged: []loggedRequest{gqlEntry("r1", "Type",
+				`query Type { Type: __type(name:"Issue") { name kind fields { name description type { kind } } } }`, "")},
+			args:       []string{"graphql Type"},
+			wantStdout: "graphql Type: response 1 of 1: added data.Type.kind, data.Type.fields.*.type\n",
+			want:       `{"graphql Type":[{"body":{"data":{"Type":{"name":"Keep","kind":"OBJECT","fields":[{"name":"title","description":null,"type":{"kind":"NON_NULL"}}]}}}}]}`,
+		},
+		{
+			name: "different introspection query variants fill one generated object",
+			logged: []loggedRequest{
+				gqlEntry("r1", "Type", `query Type { Type: __type(name:"Issue") { name } }`, ""),
+				gqlEntry("r1", "Type", `query Type { Type: __type(name:"Issue") { kind } }`, ""),
+			},
+			args:       []string{"graphql Type"},
+			wantStdout: "graphql Type: added response 1 of 1 from GitHub's schema\n",
+			want:       `{"graphql Type":[{"body":{"data":{"Type":{"name":"Issue","kind":"OBJECT"}}}}]}`,
+		},
+		{
+			name:      "introspection list identity does not depend on selecting name",
+			responses: `{"graphql Type":[{"body":{"data":{"Type":{"fields":[{"name":"title"}]}}}}]}`,
+			logged: []loggedRequest{gqlEntry("r1", "Type",
+				`query Type { Type: __type(name:"Issue") { fields { type { kind } } } }`, "")},
+			args:       []string{"graphql Type"},
+			wantStdout: "graphql Type: response 1 of 1: added data.Type.fields.*.type\n",
+			want:       `{"graphql Type":[{"body":{"data":{"Type":{"fields":[{"name":"title","type":{"kind":"NON_NULL"}}]}}}}]}`,
+		},
+		{
+			name:      "introspection list identity survives an aliased name selection",
+			responses: `{"graphql Type":[{"body":{"data":{"Type":{"fields":[{"label":"title"}]}}}}]}`,
+			logged: []loggedRequest{gqlEntry("r1", "Type",
+				`query Type { Type: __type(name:"Issue") { fields { label: name type { kind ofType { name } } } } }`, "")},
+			args:       []string{"graphql Type"},
+			wantStdout: "graphql Type: response 1 of 1: added data.Type.fields.*.type\n",
+			want:       `{"graphql Type":[{"body":{"data":{"Type":{"fields":[{"label":"title","type":{"kind":"NON_NULL","ofType":{"name":"String"}}}]}}}}]}`,
+		},
+		{
 			name: "a GraphQL response gets a placeholder for every field gh asked for",
 			logged: []loggedRequest{gqlEntry("r1", "RepoIssue", `query RepoIssue($n: Int!) {
 				repository(owner: "o", name: "r") {
