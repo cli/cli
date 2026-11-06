@@ -218,7 +218,6 @@ func TestRequestName(t *testing.T) {
 			}
 			require.NotNil(t, gql)
 			assert.Equal(t, tt.wantKind, gql.Kind)
-			assert.Equal(t, tt.wantKind == "mutation", (loggedRequest{GraphQL: gql}).isWrite())
 			assert.Equal(t, tt.wantOp, gql.Operation)
 			assert.Equal(t, tt.query, gql.Query)
 			if tt.wantVars == "" {

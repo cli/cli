@@ -55,18 +55,6 @@ type runRecord struct {
 	Time time.Time `json:"time"`
 }
 
-// isWrite reports whether the request asked GitHub to change something.
-func (r loggedRequest) isWrite() bool {
-	if r.GraphQL != nil {
-		return r.GraphQL.Kind == "mutation"
-	}
-	switch r.Method {
-	case "GET", "HEAD", "OPTIONS", "CONNECT":
-		return false
-	}
-	return true
-}
-
 // state is the folder that holds responses and the request log between commands.
 type state struct {
 	dir string

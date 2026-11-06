@@ -31,7 +31,6 @@ type runOptions struct {
 
 // runResult is what one gh binary did during a run.
 type runResult struct {
-	label    string
 	path     string
 	version  string
 	exitCode int
@@ -141,7 +140,7 @@ func runBinary(st *state, binary string, opts runOptions) (runResult, error) {
 		return runResult{}, err
 	}
 	env := ghEnv(scratch, srv.proxyURL(), opts)
-	res := runResult{label: binary, path: path, version: ghVersion(path, env, workDir)}
+	res := runResult{path: path, version: ghVersion(path, env, workDir)}
 	srv.discard()
 
 	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)

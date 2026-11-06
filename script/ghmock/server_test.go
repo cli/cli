@@ -220,7 +220,6 @@ func TestMockServer(t *testing.T) {
 				for i, kind := range tt.wantKinds {
 					require.NotNil(t, logged[i].GraphQL)
 					assert.Equal(t, kind, logged[i].GraphQL.Kind)
-					assert.Equal(t, kind == "mutation", logged[i].isWrite())
 				}
 			}
 		})
