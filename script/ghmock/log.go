@@ -47,14 +47,9 @@ func cmdLog(args []string, stdout io.Writer) error {
 		return err
 	}
 	if !opts.all {
-		runs, err := st.readRuns()
+		entries, err = st.latestRequests(entries)
 		if err != nil {
 			return err
-		}
-		if len(runs) == 0 {
-			entries = lastRun(entries)
-		} else {
-			entries = requestsForRun(entries, runs[len(runs)-1].ID)
 		}
 	}
 	if len(entries) == 0 {
@@ -72,6 +67,17 @@ func cmdLog(args []string, stdout io.Writer) error {
 	}
 	printLog(stdout, entries, opts.full)
 	return nil
+}
+
+func (s *state) latestRequests(entries []loggedRequest) ([]loggedRequest, error) {
+	runs, err := s.readRuns()
+	if err != nil {
+		return nil, err
+	}
+	if len(runs) == 0 {
+		return lastRun(entries), nil
+	}
+	return requestsForRun(entries, runs[len(runs)-1].ID), nil
 }
 
 // lastRun keeps only the entries from the most recent run.

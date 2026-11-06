@@ -23,6 +23,10 @@ func trimGraphQL(body []byte, gql *graphQLRequest, schema *ast.Schema) []byte {
 	if err != nil || len(doc.Operations) == 0 {
 		return body
 	}
+	op := doc.Operations.ForName(gql.Operation)
+	if op == nil {
+		return body
+	}
 	v, err := decodeBody(body)
 	if err != nil {
 		return body
@@ -37,11 +41,11 @@ func trimGraphQL(body []byte, gql *graphQLRequest, schema *ast.Schema) []byte {
 	}
 
 	t := &trimmer{doc: doc, schema: schema}
-	t.vars, err = operationVariables(doc.Operations[0], gql.Variables)
+	t.vars, err = operationVariables(op, gql.Variables)
 	if err != nil {
 		return body
 	}
-	top["data"] = t.object(data, doc.Operations[0].SelectionSet)
+	top["data"] = t.object(data, op.SelectionSet)
 	trimmed, err := json.Marshal(top)
 	if err != nil {
 		return body
@@ -58,13 +62,28 @@ type trimmer struct {
 func (t *trimmer) object(obj map[string]any, sel ast.SelectionSet) map[string]any {
 	typename, _ := obj["__typename"].(string)
 	var keys []string
-	children := map[string]ast.SelectionSet{}
-	t.collect(sel, typename, map[string]bool{}, &keys, children)
+	groups := map[string][]*ast.Field{}
+	t.collect(sel, typename, map[string]bool{}, &keys, groups)
+	if typename == "" {
+		for _, key := range keys {
+			if groups[key][0].Name == "__typename" {
+				typename, _ = obj[key].(string)
+				if typename != "" {
+					break
+				}
+			}
+		}
+		if typename != "" {
+			keys = nil
+			groups = map[string][]*ast.Field{}
+			t.collect(sel, typename, map[string]bool{}, &keys, groups)
+		}
+	}
 
 	out := make(map[string]any, len(keys))
 	for _, key := range keys {
 		if v, ok := obj[key]; ok {
-			out[key] = t.value(v, children[key])
+			out[key] = t.value(v, mergeSelections(groups[key]))
 		}
 	}
 	return out
@@ -91,20 +110,20 @@ func (t *trimmer) value(v any, sel ast.SelectionSet) any {
 // __typename is typename, merging the selections of fields that share a key.
 // visiting guards against fragments that spread themselves, which GitHub
 // would reject.
-func (t *trimmer) collect(sel ast.SelectionSet, typename string, visiting map[string]bool, keys *[]string, children map[string]ast.SelectionSet) {
+func (t *trimmer) collect(sel ast.SelectionSet, typename string, visiting map[string]bool, keys *[]string, groups map[string][]*ast.Field) {
 	for _, item := range sel {
 		switch x := item.(type) {
 		case *ast.Field:
 			if skippedBy(x.Directives, t.vars) {
 				continue
 			}
-			if _, seen := children[x.Alias]; !seen {
+			if _, seen := groups[x.Alias]; !seen {
 				*keys = append(*keys, x.Alias)
 			}
-			children[x.Alias] = append(children[x.Alias], x.SelectionSet...)
+			groups[x.Alias] = append(groups[x.Alias], x)
 		case *ast.InlineFragment:
 			if !skippedBy(x.Directives, t.vars) && t.applies(x.TypeCondition, typename) {
-				t.collect(x.SelectionSet, typename, visiting, keys, children)
+				t.collect(x.SelectionSet, typename, visiting, keys, groups)
 			}
 		case *ast.FragmentSpread:
 			def := t.doc.Fragments.ForName(x.Name)
@@ -112,7 +131,7 @@ func (t *trimmer) collect(sel ast.SelectionSet, typename string, visiting map[st
 				continue
 			}
 			visiting[x.Name] = true
-			t.collect(def.SelectionSet, typename, visiting, keys, children)
+			t.collect(def.SelectionSet, typename, visiting, keys, groups)
 			delete(visiting, x.Name)
 		}
 	}
@@ -133,9 +152,13 @@ func (t *trimmer) applies(cond, typename string) bool {
 // queryFields lists the response paths a query asks for, such as
 // data.repository.issue.title. Fragments are flattened, as they are in the
 // response, and nil means the query couldn't be read.
-func queryFields(query string) map[string]bool {
+func queryFields(query, operation string) map[string]bool {
 	doc, err := parser.ParseQuery(&ast.Source{Name: "query", Input: query})
 	if err != nil || len(doc.Operations) == 0 {
+		return nil
+	}
+	op := doc.Operations.ForName(operation)
+	if op == nil {
 		return nil
 	}
 	fields := map[string]bool{}
@@ -160,7 +183,7 @@ func queryFields(query string) map[string]bool {
 			}
 		}
 	}
-	walk("data", doc.Operations[0].SelectionSet, map[string]bool{})
+	walk("data", op.SelectionSet, map[string]bool{})
 	return fields
 }
 

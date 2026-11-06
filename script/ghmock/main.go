@@ -49,6 +49,7 @@ that don't match.
 GraphQL responses are trimmed to the fields gh asks for, as GitHub does, so one
 stored response can serve gh versions that ask for different fields. Off-schema
 responses are sent as stored.
+Trimming and scaffolding use the selected operation and typename aliases.
 
 ghmock scaffold --missing adds a response for each request in the last run that
 had none, and adds fields gh asked for that a stored GraphQL response lacks. It

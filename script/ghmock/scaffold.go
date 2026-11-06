@@ -64,11 +64,18 @@ func cmdScaffold(args []string, stdout, stderr io.Writer) error {
 
 	targets := []string{opts.name}
 	if opts.missing {
-		last := lastRun(entries)
+		last, err := st.latestRequests(entries)
+		if err != nil {
+			return err
+		}
 		if len(last) == 0 {
+			if len(entries) > 0 {
+				return fmt.Errorf("no requests logged in the latest run; run gh with ghmock run first")
+			}
 			return fmt.Errorf("no requests logged yet; run gh with ghmock run first")
 		}
-		targets = requestNames(last)
+		entries = last
+		targets = requestNames(entries)
 	}
 
 	chk := newChecker(stderr)
@@ -156,7 +163,12 @@ type sentQuery struct {
 }
 
 func (q sentQuery) request(name string) loggedRequest {
-	return loggedRequest{Name: name, Method: http.MethodPost, Host: apiHost, Path: "/graphql", GraphQL: &graphQLRequest{Query: q.query}}
+	operation := strings.TrimPrefix(name, "graphql ")
+	if operation == "<anonymous>" {
+		operation = ""
+	}
+	return loggedRequest{Name: name, Method: http.MethodPost, Host: apiHost, Path: "/graphql",
+		GraphQL: &graphQLRequest{Query: q.query, Variables: q.vars, Operation: operation}}
 }
 
 // queriesFor returns the queries gh sent for a GraphQL request in the most
@@ -208,7 +220,7 @@ func scaffoldGraphQL(chk *checker, name string, responses responseSet, entries [
 	}
 	var ops []parsed
 	for _, q := range queries {
-		_, op, _ := checkGraphQLQuery(schema, q.query)
+		_, op, _ := checkGraphQLQuery(schema, q.query, q.request(name).GraphQL.Operation)
 		if op == nil {
 			return nil, fmt.Errorf("gh's query couldn't be read; ghmock log --full shows it")
 		}

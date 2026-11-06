@@ -96,11 +96,63 @@ func TestCmdScaffold(t *testing.T) {
 		noSchemas  bool
 		responses  string
 		logged     []loggedRequest
+		runs       []runRecord
 		args       []string
 		wantStdout string
 		wantErr    string
 		want       string
 	}{
+		{
+			name:    "cyclic fragments stop before scaffolding",
+			logged:  []loggedRequest{gqlEntry("r1", "Loop", `query Loop { viewer { ...Fields } } fragment Fields on User { login ...Fields }`, "")},
+			args:    []string{"graphql Loop"},
+			wantErr: "gh's query couldn't be read; ghmock log --full shows it",
+			want:    `{}`,
+		},
+		{
+			name: "scaffolding uses the selected second operation",
+			logged: []loggedRequest{gqlEntry("r1", "Second",
+				`query First { viewer { login } } query Second { viewer { name } }`, "")},
+			args:       []string{"graphql Second"},
+			wantStdout: "graphql Second: added response 1 of 1 with placeholder values\n",
+			want:       `{"graphql Second":[{"body":{"data":{"viewer":{"name":"name"}}}}]}`,
+		},
+		{
+			name: "candidate validation retains explicit overrides of variable defaults",
+			logged: []loggedRequest{gqlEntry("r1", "Default",
+				`query Default($show:Boolean = true) { viewer { login name @include(if:$show) } }`, `{"show":false}`)},
+			args:       []string{"graphql Default"},
+			wantStdout: "graphql Default: added response 1 of 1 with placeholder values\n",
+			want:       `{"graphql Default":[{"body":{"data":{"viewer":{"login":"login"}}}}]}`,
+		},
+		{
+			name:      "an existing typename alias chooses the object to repair",
+			responses: `{"graphql Kind":[{"body":{"data":{"repository":{"issueOrPullRequest":{"kind":"Issue"}}}}}]}`,
+			logged: []loggedRequest{gqlEntry("r1", "Kind",
+				`query Kind { repository(owner:"o",name:"r") { issueOrPullRequest(number:1) { kind:__typename ...on PullRequest { number } ...on Issue { title } } } }`, "")},
+			args:       []string{"graphql Kind"},
+			wantStdout: "graphql Kind: response 1 of 1: added data.repository.issueOrPullRequest.title\n",
+			want:       `{"graphql Kind":[{"body":{"data":{"repository":{"issueOrPullRequest":{"kind":"Issue","title":"title"}}}}}]}`,
+		},
+		{
+			name: "--missing uses the completed run rather than a later incomplete query",
+			logged: []loggedRequest{
+				gqlEntry("r1", "Same", `query Same { viewer { login } }`, ""),
+				gqlEntry("r2", "Same", `query Same { viewer { name } }`, ""),
+			},
+			runs:       []runRecord{{ID: "r1"}},
+			args:       []string{"--missing"},
+			wantStdout: "graphql Same: added response 1 of 1 with placeholder values\n",
+			want:       `{"graphql Same":[{"body":{"data":{"viewer":{"login":"login"}}}}]}`,
+		},
+		{
+			name:    "--missing does not reuse requests from before a request-free run",
+			logged:  []loggedRequest{restEntry("r1", "GET /repos/o/r")},
+			runs:    []runRecord{{ID: "r1"}, {ID: "r2"}},
+			args:    []string{"--missing"},
+			wantErr: "no requests logged in the latest run; run gh with ghmock run first",
+			want:    `{}`,
+		},
 		{
 			name: "same query with different directive variables is not deduplicated",
 			logged: []loggedRequest{
@@ -410,6 +462,9 @@ func TestCmdScaffold(t *testing.T) {
 				require.NoError(t, st.saveResponses(responses))
 			}
 			require.NoError(t, st.appendLog(tt.logged))
+			for _, run := range tt.runs {
+				require.NoError(t, st.appendRun(run))
+			}
 
 			var stdout bytes.Buffer
 			err := cmdScaffold(tt.args, &stdout, io.Discard)

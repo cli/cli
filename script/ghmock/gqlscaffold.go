@@ -255,6 +255,18 @@ func (s *gqlScaffolder) concreteType(def *ast.Definition, obj map[string]any, se
 			return t
 		}
 	}
+	var keys []string
+	groups := map[string][]*ast.Field{}
+	s.collect(sel, nil, &keys, groups)
+	for _, key := range keys {
+		if groups[key][0].Name == "__typename" {
+			if name, ok := obj[key].(string); ok {
+				if t := find(name); t != nil {
+					return t
+				}
+			}
+		}
+	}
 	if t := s.fragmentType(sel, find); t != nil {
 		return t
 	}

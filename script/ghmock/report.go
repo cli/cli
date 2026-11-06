@@ -271,7 +271,7 @@ func askedFields(requests []loggedRequest, name string) map[string]bool {
 		if displayName(e) != name || e.GraphQL == nil {
 			continue
 		}
-		paths := queryFields(e.GraphQL.Query)
+		paths := queryFields(e.GraphQL.Query, e.GraphQL.Operation)
 		if paths == nil {
 			continue
 		}

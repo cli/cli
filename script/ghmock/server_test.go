@@ -94,6 +94,17 @@ func TestMockServer(t *testing.T) {
 		wantSent []string
 	}{
 		{
+			name: "typename aliases trim fields from other concrete fragments",
+			responses: responseSet{"graphql Kind": {{Body: json.RawMessage(
+				`{"data":{"repository":{"issueOrPullRequest":{"kind":"Issue","title":"Bug","number":777}}}}`)}}},
+			checkSchemas: true,
+			calls: []call{{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBody(t,
+				`query Kind { repository(owner:"o",name:"r") { issueOrPullRequest(number:1) { kind:__typename ...on Issue { title } ...on PullRequest { number } } } }`)}},
+			want:     []reply{{status: 200, body: `{"data":{"repository":{"issueOrPullRequest":{"kind":"Issue","title":"Bug"}}}}`}},
+			wantLog:  []logSummary{{Seq: 1, Name: "graphql Kind", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			wantSent: []string{`{"data":{"repository":{"issueOrPullRequest":{"kind":"Issue","title":"Bug"}}}}`},
+		},
+		{
 			name:      "request at the body limit is recorded in full",
 			responses: responseSet{"POST /limit": {{Body: json.RawMessage(`{}`)}}},
 			calls:     []call{{method: "POST", url: "http://api.github.localhost/limit", body: limitBody}},

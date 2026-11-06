@@ -558,6 +558,8 @@ func TestPrintReport(t *testing.T) {
 	const variableQuery = `query Issue($number:Int!) { repository(owner:"o",name:"r") { issue(number:$number) { title } } }`
 	const firstQuery = `query Issue { repository(owner:"o",name:"r") { issue(number:1) { title } } }`
 	const secondQuery = `query Issue { repository(owner:"o",name:"r") { issue(number:2) { title } } }`
+	const firstUnusedQuery = `query First { viewer { login } } query Second { viewer { name } }`
+	const secondUnusedQuery = `query First { viewer { id } } query Second { viewer { name } }`
 
 	tests := []struct {
 		name            string
@@ -566,6 +568,14 @@ func TestPrintReport(t *testing.T) {
 		want            string
 		wantDifferences string
 	}{
+		{
+			name: "field summaries use only the selected operation",
+			results: []runResult{
+				{version: "baseline", requests: []loggedRequest{{Name: "graphql Second", GraphQL: &graphQLRequest{Kind: "query", Operation: "Second", Query: firstUnusedQuery}}}},
+				{version: "candidate", requests: []loggedRequest{{Name: "graphql Second", GraphQL: &graphQLRequest{Kind: "query", Operation: "Second", Query: secondUnusedQuery}}}},
+			},
+			wantDifferences: fmt.Sprintf("[2] candidate:\n  graphql Second sent different data:\n    [1] query %q\n    [2] query %q\n", firstUnusedQuery, secondUnusedQuery),
+		},
 		{
 			name: "REST query and opaque body boundaries cannot collide",
 			results: []runResult{
@@ -758,6 +768,9 @@ exit code: 0
   graphql IssueByNumber asked for different fields:
     only [1]: data.repository.issue.body
     only [2]: data.repository.issue.subIssuesSummary
+  graphql IssueByNumber sent different data:
+    [1] query "query IssueByNumber { repository { issue: issueOrPullRequest { ... on Issue { title body } } } }" {"number":1}
+    [2] query "query IssueByNumber { repository { issue: issueOrPullRequest { ... on Issue { title subIssuesSummary { total completed } } } } }" {"number":1}
 `,
 		},
 		{
