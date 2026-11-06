@@ -130,7 +130,7 @@ func (c *checker) check(e loggedRequest, resp *response, validateVariables bool)
 				operation = ""
 			}
 		}
-		doc, op, problems := checkGraphQLQuery(schema, e.GraphQL.Query, operation)
+		op, problems := checkGraphQLQuery(schema, e.GraphQL.Query, operation)
 		res.queryProblems = problems
 		var variables map[string]any
 		if validateVariables {
@@ -159,7 +159,7 @@ func (c *checker) check(e loggedRequest, resp *response, validateVariables bool)
 		case resp.status() != 200:
 			res.note = fmt.Sprintf("status %d has no GraphQL result to check", resp.status())
 		default:
-			res.responseProblems = checkGraphQLResponse(schema, doc, op, resp.Body, variables)
+			res.responseProblems = checkGraphQLResponse(schema, op, resp.Body, variables)
 		}
 		return res
 	}

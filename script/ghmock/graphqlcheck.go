@@ -27,10 +27,10 @@ func loadGraphQLSchema(data []byte, name string) (*ast.Schema, error) {
 // checkGraphQLQuery parses gh's query and validates it against the schema. It
 // returns a usable operation even when validation finds non-cyclic problems,
 // so the response can still be checked where the query is valid.
-func checkGraphQLQuery(schema *ast.Schema, query string, operation ...string) (*ast.QueryDocument, *ast.OperationDefinition, []string) {
+func checkGraphQLQuery(schema *ast.Schema, query, operation string) (*ast.OperationDefinition, []string) {
 	doc, err := parser.ParseQuery(&ast.Source{Name: "query", Input: query})
 	if err != nil {
-		return nil, nil, []string{graphQLErrorText(err)}
+		return nil, []string{graphQLErrorText(err)}
 	}
 
 	rules := validatorrules.NewDefaultRules()
@@ -49,24 +49,20 @@ func checkGraphQLQuery(schema *ast.Schema, query string, operation ...string) (*
 		problems = append(problems, graphQLErrorText(e))
 	}
 	if cyclic {
-		return doc, nil, dedupe(problems)
+		return nil, dedupe(problems)
 	}
 
 	if len(doc.Operations) == 0 {
-		return doc, nil, append(problems, "the query has no operation")
+		return nil, append(problems, "the query has no operation")
 	}
-	if len(operation) > 0 {
-		name := operation[0]
-		if name == "" && len(doc.Operations) > 1 {
-			return doc, nil, append(problems, "operationName is required when the document has multiple operations")
-		}
-		op := doc.Operations.ForName(name)
-		if op == nil {
-			return doc, nil, append(problems, fmt.Sprintf("the query has no operation named %q", name))
-		}
-		return doc, op, dedupe(problems)
+	if operation == "" && len(doc.Operations) > 1 {
+		return nil, append(problems, "operationName is required when the document has multiple operations")
 	}
-	return doc, doc.Operations[0], dedupe(problems)
+	op := doc.Operations.ForName(operation)
+	if op == nil {
+		return nil, append(problems, fmt.Sprintf("the query has no operation named %q", operation))
+	}
+	return op, dedupe(problems)
 }
 
 func exclusiveTypeConflict(schema *ast.Schema, doc *ast.QueryDocument, problem *gqlerror.Error) bool {
@@ -135,7 +131,7 @@ func graphQLErrorText(err error) string {
 
 // checkGraphQLResponse compares a response body with the query gh sent. Paths
 // in problems use the same dotted form as ghmock set --at.
-func checkGraphQLResponse(schema *ast.Schema, doc *ast.QueryDocument, op *ast.OperationDefinition, body []byte, variables map[string]any) []string {
+func checkGraphQLResponse(schema *ast.Schema, op *ast.OperationDefinition, body []byte, variables map[string]any) []string {
 	if len(bytes.TrimSpace(body)) == 0 {
 		return []string{"body: missing, but a GraphQL response needs data or errors"}
 	}
