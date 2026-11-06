@@ -95,6 +95,7 @@ func cmdRun(args []string, stdout io.Writer) error {
 
 // runAll runs each binary in turn and appends its requests to the log.
 func runAll(st *state, opts runOptions) ([]runResult, error) {
+	start := time.Now().UTC()
 	runID := newRunID()
 	results := make([]runResult, 0, len(opts.binaries))
 	for _, binary := range opts.binaries {
@@ -110,6 +111,9 @@ func runAll(st *state, opts runOptions) ([]runResult, error) {
 			return nil, err
 		}
 		results = append(results, res)
+	}
+	if err := st.appendRun(runRecord{ID: runID, Time: start.Truncate(time.Second)}); err != nil {
+		return nil, err
 	}
 	return results, nil
 }

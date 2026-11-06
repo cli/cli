@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // response is one canned reply to a request. A zero Status means 200.
@@ -47,6 +49,12 @@ type loggedRequest struct {
 	Responses int             `json:"responses,omitempty"`
 }
 
+// runRecord keeps the identity of a completed run, including request-free runs.
+type runRecord struct {
+	ID   string    `json:"id"`
+	Time time.Time `json:"time"`
+}
+
 // isWrite reports whether the request asked GitHub to change something.
 func (r loggedRequest) isWrite() bool {
 	if r.GraphQL != nil {
@@ -81,6 +89,10 @@ func (s *state) responsesPath() string {
 
 func (s *state) logPath() string {
 	return filepath.Join(s.dir, "requests.jsonl")
+}
+
+func (s *state) runsPath() string {
+	return filepath.Join(s.dir, "runs.jsonl")
 }
 
 func (s *state) loadResponses() (responseSet, error) {
@@ -124,25 +136,50 @@ func (s *state) saveResponses(responses responseSet) error {
 }
 
 func (s *state) appendLog(entries []loggedRequest) error {
-	if len(entries) == 0 {
+	return appendJSONL(s.logPath(), entries)
+}
+
+func (s *state) readLog() ([]loggedRequest, error) {
+	return readJSONL[loggedRequest](s.logPath())
+}
+
+func (s *state) appendRun(rec runRecord) error {
+	return appendJSONL(s.runsPath(), []runRecord{rec})
+}
+
+func (s *state) readRuns() ([]runRecord, error) {
+	return readJSONL[runRecord](s.runsPath())
+}
+
+// appendJSONL adds items to a file, one JSON object per line.
+func appendJSONL[T any](path string, items []T) error {
+	if len(items) == 0 {
 		return nil
 	}
-	f, err := os.OpenFile(s.logPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
-	enc := json.NewEncoder(f)
-	for _, e := range entries {
-		if err := enc.Encode(e); err != nil {
-			f.Close()
-			return err
-		}
+	if err := writeJSONL(f, items); err != nil {
+		f.Close()
+		return err
 	}
 	return f.Close()
 }
 
-func (s *state) readLog() ([]loggedRequest, error) {
-	f, err := os.Open(s.logPath())
+func writeJSONL[T any](w io.Writer, items []T) error {
+	enc := json.NewEncoder(w)
+	for _, item := range items {
+		if err := enc.Encode(item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// readJSONL reads a file of JSON objects, one per line. A missing file has none.
+func readJSONL[T any](path string) ([]T, error) {
+	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -151,7 +188,7 @@ func (s *state) readLog() ([]loggedRequest, error) {
 	}
 	defer f.Close()
 
-	var entries []loggedRequest
+	var items []T
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024*1024)
 	for scanner.Scan() {
@@ -159,17 +196,17 @@ func (s *state) readLog() ([]loggedRequest, error) {
 		if len(line) == 0 {
 			continue
 		}
-		var e loggedRequest
-		if err := json.Unmarshal(line, &e); err != nil {
-			return nil, fmt.Errorf("reading %s: %w", s.logPath(), err)
+		var item T
+		if err := json.Unmarshal(line, &item); err != nil {
+			return nil, fmt.Errorf("reading %s: %w", path, err)
 		}
-		entries = append(entries, e)
+		items = append(items, item)
 	}
-	return entries, scanner.Err()
+	return items, scanner.Err()
 }
 
 func (s *state) reset() error {
-	for _, p := range []string{s.responsesPath(), s.logPath()} {
+	for _, p := range []string{s.responsesPath(), s.logPath(), s.runsPath()} {
 		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}

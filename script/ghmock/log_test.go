@@ -47,9 +47,23 @@ func TestCmdLog(t *testing.T) {
 	tests := []struct {
 		name    string
 		entries []loggedRequest
+		runs    []runRecord
 		args    []string
 		want    string
 	}{
+		{
+			name:    "the latest run can have no requests",
+			entries: []loggedRequest{first},
+			runs:    []runRecord{{ID: "run-1"}, {ID: "run-2"}},
+			want:    "No requests logged.\n",
+		},
+		{
+			name:    "history remains available after a request-free run",
+			entries: []loggedRequest{first},
+			runs:    []runRecord{{ID: "run-1"}, {ID: "run-2"}},
+			args:    []string{"--all"},
+			want:    "=== run run-1, gh ./old\n1. GET /user -> 200, response 1 of 1\n",
+		},
 		{
 			name: "nothing logged",
 			want: "No requests logged.\n",
@@ -101,6 +115,9 @@ func TestCmdLog(t *testing.T) {
 			dir := t.TempDir()
 			t.Setenv("GHMOCK_DIR", dir)
 			require.NoError(t, (&state{dir: dir}).appendLog(tt.entries))
+			for _, run := range tt.runs {
+				require.NoError(t, (&state{dir: dir}).appendRun(run))
+			}
 
 			var out bytes.Buffer
 			require.NoError(t, cmdLog(tt.args, &out))
@@ -181,6 +198,7 @@ func TestCmdSetAndReset(t *testing.T) {
 	assert.Equal(t, responseSet{"GET /user": {{Status: 401, Headers: map[string]string{"X-Github-Sso": "required"}}}}, responses)
 
 	require.NoError(t, st.appendLog([]loggedRequest{{Run: "r", Name: "GET /user"}}))
+	require.NoError(t, st.appendRun(runRecord{ID: "r"}))
 	out.Reset()
 	require.NoError(t, cmdReset(nil, &out))
 	responses, err = st.loadResponses()
@@ -189,4 +207,7 @@ func TestCmdSetAndReset(t *testing.T) {
 	entries, err := st.readLog()
 	require.NoError(t, err)
 	assert.Empty(t, entries)
+	runs, err := st.readRuns()
+	require.NoError(t, err)
+	assert.Empty(t, runs)
 }

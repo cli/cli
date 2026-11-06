@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -185,7 +186,16 @@ func TestRunAll(t *testing.T) {
 		responses responseSet
 		opts      runOptions
 		want      []resultSummary
+		afterAPI  bool
 	}{
+		{
+			name:      "a request-free command replaces the last run selection",
+			variants:  []string{"a"},
+			responses: responseSet{"GET /user": {{Body: json.RawMessage(`{}`)}}},
+			opts:      runOptions{args: []string{"--version"}},
+			want:      []resultSummary{{Version: "gh version 0.0.0-a", Stdout: "gh version 0.0.0-a\n"}},
+			afterAPI:  true,
+		},
 		{
 			name:     "gh gets an isolated environment with a fake token",
 			variants: []string{"a"},
@@ -277,6 +287,12 @@ func TestRunAll(t *testing.T) {
 			for _, v := range tt.variants {
 				opts.binaries = append(opts.binaries, writeFakeGH(t, v))
 			}
+			if tt.afterAPI {
+				previous := opts
+				previous.args = []string{"api", "user"}
+				_, err := runAll(st, previous)
+				require.NoError(t, err)
+			}
 
 			results, err := runAll(st, opts)
 			require.NoError(t, err)
@@ -296,13 +312,31 @@ func TestRunAll(t *testing.T) {
 
 			logged, err := st.readLog()
 			require.NoError(t, err)
+			runs, err := st.readRuns()
+			require.NoError(t, err)
+			if tt.afterAPI {
+				require.Len(t, runs, 2)
+				require.Len(t, logged, 1)
+				assert.Equal(t, runs[0].ID, logged[0].Run)
+				assert.NotEqual(t, runs[0].ID, runs[1].ID)
+				t.Setenv("GHMOCK_DIR", st.dir)
+				var latest, all bytes.Buffer
+				require.NoError(t, cmdLog(nil, &latest))
+				assert.Equal(t, "No requests logged.\n", latest.String())
+				require.NoError(t, cmdLog([]string{"--all"}, &all))
+				assert.Contains(t, all.String(), "GET /user")
+				return
+			}
+			require.Len(t, runs, 1)
+			assert.NotEmpty(t, runs[0].ID)
+			assert.False(t, runs[0].Time.IsZero())
 			var wantLogged []logSummary
 			for _, w := range tt.want {
 				wantLogged = append(wantLogged, w.Requests...)
 			}
 			assert.Equal(t, wantLogged, summarize(logged))
 			for _, e := range logged {
-				assert.Equal(t, logged[0].Run, e.Run, "one run ID per ghmock run")
+				assert.Equal(t, runs[0].ID, e.Run, "one run ID per ghmock run")
 			}
 		})
 	}
@@ -333,12 +367,61 @@ func TestPrintReport(t *testing.T) {
 			Status:  200, Matched: true, Response: 1, Responses: 1,
 		}
 	}
+	readRequest := func(query, variables string) loggedRequest {
+		return loggedRequest{Name: "graphql Issue", Method: "POST", GraphQL: &graphQLRequest{
+			Kind: "query", Operation: "Issue", Query: query, Variables: json.RawMessage(variables),
+		}}
+	}
+	const variableQuery = `query Issue($number:Int!) { repository(owner:"o",name:"r") { issue(number:$number) { title } } }`
+	const firstQuery = `query Issue { repository(owner:"o",name:"r") { issue(number:1) { title } } }`
+	const secondQuery = `query Issue { repository(owner:"o",name:"r") { issue(number:2) { title } } }`
 
 	tests := []struct {
-		name    string
-		results []runResult
-		want    string
+		name            string
+		results         []runResult
+		want            string
+		wantDifferences string
 	}{
+		{
+			name: "REST query and opaque body boundaries cannot collide",
+			results: []runResult{
+				{version: "baseline", requests: []loggedRequest{{Name: "POST /echo", RawQuery: "a=1", Body: "hello"}}},
+				{version: "candidate", requests: []loggedRequest{{Name: "POST /echo", Body: "?a=1 hello"}}},
+			},
+			wantDifferences: "[2] candidate:\n  POST /echo sent different data:\n    [1] ?a=1 body \"hello\"\n    [2] body \"?a=1 hello\"\n",
+		},
+		{
+			name: "REST read query parameters are compared",
+			results: []runResult{
+				{version: "baseline", requests: []loggedRequest{{Name: "GET /issues", RawQuery: "state=open"}}},
+				{version: "candidate", requests: []loggedRequest{{Name: "GET /issues", RawQuery: "state=closed"}}},
+			},
+			wantDifferences: "[2] candidate:\n  GET /issues sent different data:\n    [1] ?state=open\n    [2] ?state=closed\n",
+		},
+		{
+			name: "GraphQL read variable values are compared",
+			results: []runResult{
+				{version: "baseline", requests: []loggedRequest{readRequest(variableQuery, `{"number":1}`)}},
+				{version: "candidate", requests: []loggedRequest{readRequest(variableQuery, `{"number":2}`)}},
+			},
+			wantDifferences: fmt.Sprintf("[2] candidate:\n  graphql Issue sent different data:\n    [1] query %q {\"number\":1}\n    [2] query %q {\"number\":2}\n", variableQuery, variableQuery),
+		},
+		{
+			name: "GraphQL query text is compared even with the same fields",
+			results: []runResult{
+				{version: "baseline", requests: []loggedRequest{readRequest(firstQuery, "")}},
+				{version: "candidate", requests: []loggedRequest{readRequest(secondQuery, "")}},
+			},
+			wantDifferences: fmt.Sprintf("[2] candidate:\n  graphql Issue sent different data:\n    [1] query %q\n    [2] query %q\n", firstQuery, secondQuery),
+		},
+		{
+			name: "run bookkeeping is not request data",
+			results: []runResult{
+				{version: "baseline", requests: []loggedRequest{{Run: "old", Binary: "old", Seq: 1, Name: "GET /issues", RawQuery: "state=open"}}},
+				{version: "candidate", requests: []loggedRequest{{Run: "new", Binary: "new", Seq: 99, Name: "GET /issues", RawQuery: "state=open"}}},
+			},
+			wantDifferences: "[2] candidate:\n  same exit code, output and requests\n",
+		},
 		{
 			name: "one binary",
 			results: []runResult{{
@@ -450,7 +533,13 @@ ok
 		t.Run(tt.name, func(t *testing.T) {
 			var buf strings.Builder
 			printReport(&buf, opts, tt.results)
-			assert.Equal(t, tt.want, buf.String())
+			if tt.wantDifferences != "" {
+				_, differences, ok := strings.Cut(buf.String(), "=== differences from [1]\n")
+				require.True(t, ok)
+				assert.Equal(t, tt.wantDifferences, differences)
+			} else {
+				assert.Equal(t, tt.want, buf.String())
+			}
 		})
 	}
 }

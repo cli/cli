@@ -41,14 +41,19 @@ func summarize(entries []loggedRequest) []logSummary {
 	return out
 }
 
-func graphQLBody(t *testing.T, query string) string {
+func graphQLBody(t *testing.T, query string, operation ...string) string {
 	t.Helper()
-	data, err := json.Marshal(map[string]string{"query": query})
+	payload := map[string]string{"query": query}
+	if len(operation) > 0 {
+		payload["operationName"] = operation[0]
+	}
+	data, err := json.Marshal(payload)
 	require.NoError(t, err)
 	return string(data)
 }
 
 func TestMockServer(t *testing.T) {
+	limitBody := strings.Repeat("x", maxRequestBody)
 	type call struct {
 		method string
 		url    string
@@ -67,7 +72,34 @@ func TestMockServer(t *testing.T) {
 		calls     []call
 		want      []reply
 		wantLog   []logSummary
+		wantKinds []string
 	}{
+		{
+			name:      "request at the body limit is recorded in full",
+			responses: responseSet{"POST /limit": {{Body: json.RawMessage(`{}`)}}},
+			calls:     []call{{method: "POST", url: "http://api.github.localhost/limit", body: limitBody}},
+			want:      []reply{{status: 200, body: `{}`}},
+			wantLog:   []logSummary{{Seq: 1, Name: "POST /limit", Body: limitBody, Status: 200, Matched: true, Response: 1, Responses: 1}},
+		},
+		{
+			name:      "oversized request is rejected before fixture matching",
+			responses: responseSet{"POST /limit": {{Body: json.RawMessage(`{}`)}}},
+			calls:     []call{{method: "POST", url: "http://api.github.localhost/limit", body: limitBody + "x"}},
+			want:      []reply{{status: 413, body: `{"message":"ghmock: request body exceeds 10 MiB"}`}},
+			wantLog:   []logSummary{{Seq: 1, Status: 413}},
+		},
+		{
+			name: "wire operationName selects a later mutation response",
+			responses: responseSet{
+				"graphql First":  {{Body: json.RawMessage(`{"data":{"viewer":{"login":"wrong"}}}`)}},
+				"graphql Second": {{Body: json.RawMessage(`{"data":{"closeIssue":{"issue":{"title":"Bug"}}}}`)}},
+			},
+			calls: []call{{method: "POST", url: "http://api.github.localhost/graphql", body: graphQLBody(t,
+				`query First { viewer { login } } mutation Second { closeIssue(input:{issueId:"1"}) { issue { title } } }`, "Second")}},
+			want:      []reply{{status: 200, body: `{"data":{"closeIssue":{"issue":{"title":"Bug"}}}}`}},
+			wantLog:   []logSummary{{Seq: 1, Name: "graphql Second", Status: 200, Matched: true, Response: 1, Responses: 1}},
+			wantKinds: []string{"mutation"},
+		},
 		{
 			name: "REST response with status, headers and body",
 			responses: responseSet{"GET /repos/octo/hello": {{
@@ -181,7 +213,16 @@ func TestMockServer(t *testing.T) {
 				}
 			}
 
-			assert.Equal(t, tt.wantLog, summarize(srv.close()))
+			logged := srv.close()
+			assert.Equal(t, tt.wantLog, summarize(logged))
+			if tt.wantKinds != nil {
+				require.Len(t, logged, len(tt.wantKinds))
+				for i, kind := range tt.wantKinds {
+					require.NotNil(t, logged[i].GraphQL)
+					assert.Equal(t, kind, logged[i].GraphQL.Kind)
+					assert.Equal(t, kind == "mutation", logged[i].isWrite())
+				}
+			}
 		})
 	}
 }

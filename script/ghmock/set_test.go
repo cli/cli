@@ -143,6 +143,30 @@ func TestApplySet(t *testing.T) {
 		wantErr   string
 	}{
 		{
+			name:      "--json rejects a trailing array delimiter",
+			responses: `{}`,
+			opts:      setOptions{name: "graphql A", at: "a", value: `1]`},
+			wantErr:   "--json is not valid JSON: unexpected data after the JSON value",
+		},
+		{
+			name:      "--json rejects a trailing object delimiter",
+			responses: `{}`,
+			opts:      setOptions{name: "graphql A", at: "a", value: `{"x":1}}`},
+			wantErr:   "--json is not valid JSON: unexpected data after the JSON value",
+		},
+		{
+			name:      "--json rejects multiple values",
+			responses: `{}`,
+			opts:      setOptions{name: "graphql A", at: "a", value: `1 2`},
+			wantErr:   "--json is not valid JSON: unexpected data after the JSON value",
+		},
+		{
+			name:      "--json accepts trailing whitespace",
+			responses: `{}`,
+			opts:      setOptions{name: "graphql A", at: "a", value: "1 \n\t"},
+			want:      `[{"body":{"a":1}}]`,
+		},
+		{
 			name:      "creates the first response",
 			responses: `{}`,
 			opts:      setOptions{name: "GET /x", status: 404, body: `{"message":"Not Found"}`, bodySet: true},

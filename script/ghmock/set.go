@@ -283,7 +283,8 @@ func decodeJSON(data []byte, v any) error {
 	if err := dec.Decode(v); err != nil {
 		return err
 	}
-	if dec.More() {
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
 		return fmt.Errorf("unexpected data after the JSON value")
 	}
 	return nil

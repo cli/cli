@@ -90,11 +90,17 @@ func (m *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBody))
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBody+1))
 	if err != nil {
 		entry.Status = http.StatusBadRequest
 		m.record(entry)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "ghmock: reading request body: " + err.Error()})
+		return
+	}
+	if len(body) > maxRequestBody {
+		entry.Status = http.StatusRequestEntityTooLarge
+		m.record(entry)
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"message": "ghmock: request body exceeds 10 MiB"})
 		return
 	}
 	name, gql := requestName(r.Method, hostname, r.URL.Path, body)

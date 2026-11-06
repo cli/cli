@@ -10,18 +10,81 @@ import (
 
 func TestRequestName(t *testing.T) {
 	tests := []struct {
-		name      string
-		method    string
-		host      string
-		path      string
-		query     string
-		variables string
-		rawBody   string
-		wantName  string
-		wantKind  string
-		wantOp    string
-		wantVars  string
+		name        string
+		method      string
+		host        string
+		path        string
+		query       string
+		variables   string
+		selected    string
+		rawBody     string
+		wantGraphQL bool
+		wantName    string
+		wantKind    string
+		wantOp      string
+		wantVars    string
 	}{
+		{
+			name:     "operationName selects a later mutation",
+			method:   "POST",
+			host:     apiHost,
+			path:     "/graphql",
+			query:    `query First { viewer { login } } mutation Second { closeIssue(input:{issueId:"1"}) { issue { title } } }`,
+			selected: "Second",
+			wantName: "graphql Second",
+			wantKind: "mutation",
+			wantOp:   "Second",
+		},
+		{
+			name:     "operationName can select a later query",
+			method:   "POST",
+			host:     apiHost,
+			path:     "/graphql",
+			query:    `query First { viewer { login } } query Second { viewer { name } }`,
+			selected: "Second",
+			wantName: "graphql Second",
+			wantKind: "query",
+			wantOp:   "Second",
+		},
+		{
+			name:        "missing operationName does not select the first of several",
+			method:      "POST",
+			host:        apiHost,
+			path:        "/graphql",
+			query:       `query First { viewer { login } } query Second { viewer { name } }`,
+			wantName:    "graphql <anonymous>",
+			wantGraphQL: true,
+		},
+		{
+			name:        "unknown operationName does not select another operation",
+			method:      "POST",
+			host:        apiHost,
+			path:        "/graphql",
+			query:       `query First { viewer { login } }`,
+			selected:    "Missing",
+			wantName:    "graphql Missing",
+			wantOp:      "Missing",
+			wantGraphQL: true,
+		},
+		{
+			name:        "unparseable query text is retained for diagnostics",
+			method:      "POST",
+			host:        apiHost,
+			path:        "/graphql",
+			query:       `query {`,
+			wantName:    "graphql <anonymous>",
+			wantGraphQL: true,
+		},
+		{
+			name:     "operation-like fragment names are not declarations",
+			method:   "POST",
+			host:     apiHost,
+			path:     "/graphql",
+			query:    `fragment mutation on Issue { title } query Actual { repository { issue(number:1) { ...mutation } } }`,
+			wantName: "graphql Actual",
+			wantKind: "query",
+			wantOp:   "Actual",
+		},
 		{
 			name:     "REST call to the API host",
 			method:   "GET",
@@ -135,6 +198,9 @@ func TestRequestName(t *testing.T) {
 			body := []byte(tt.rawBody)
 			if tt.query != "" {
 				payload := map[string]any{"query": tt.query}
+				if tt.selected != "" {
+					payload["operationName"] = tt.selected
+				}
 				if tt.variables != "" {
 					payload["variables"] = json.RawMessage(tt.variables)
 				}
@@ -146,12 +212,13 @@ func TestRequestName(t *testing.T) {
 			name, gql := requestName(tt.method, tt.host, tt.path, body)
 
 			assert.Equal(t, tt.wantName, name)
-			if tt.wantKind == "" {
+			if tt.wantKind == "" && !tt.wantGraphQL {
 				assert.Nil(t, gql)
 				return
 			}
 			require.NotNil(t, gql)
 			assert.Equal(t, tt.wantKind, gql.Kind)
+			assert.Equal(t, tt.wantKind == "mutation", (loggedRequest{GraphQL: gql}).isWrite())
 			assert.Equal(t, tt.wantOp, gql.Operation)
 			assert.Equal(t, tt.query, gql.Query)
 			if tt.wantVars == "" {

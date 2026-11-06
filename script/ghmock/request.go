@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/parser"
 )
 
 const (
@@ -57,8 +60,9 @@ func requestName(method, hostname, path string, body []byte) (string, *graphQLRe
 
 func parseGraphQL(body []byte) *graphQLRequest {
 	var payload struct {
-		Query     string          `json:"query"`
-		Variables json.RawMessage `json:"variables"`
+		Query         string          `json:"query"`
+		Variables     json.RawMessage `json:"variables"`
+		OperationName string          `json:"operationName"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil || payload.Query == "" {
 		return nil
@@ -67,106 +71,21 @@ func parseGraphQL(body []byte) *graphQLRequest {
 	if trimmed := bytes.TrimSpace(vars); len(trimmed) == 0 || string(trimmed) == "null" {
 		vars = nil
 	}
-	kind, name := operationName(payload.Query)
+	kind, name := operationName(payload.Query, payload.OperationName)
 	return &graphQLRequest{Kind: kind, Operation: name, Query: payload.Query, Variables: vars}
 }
 
-// operationName returns the kind and name of the first operation in a GraphQL
-// document. It skips fragment definitions, comments and strings, and treats a
-// bare selection set as an anonymous query.
-func operationName(doc string) (kind, name string) {
-	depth := 0
-	fragmentPending := false
-	for i := 0; i < len(doc); {
-		c := doc[i]
-		switch {
-		case c == '#':
-			for i < len(doc) && doc[i] != '\n' {
-				i++
-			}
-			continue
-		case c == '"':
-			i = skipString(doc, i)
-			continue
-		case c == '{':
-			if depth == 0 {
-				if !fragmentPending {
-					return "query", ""
-				}
-				fragmentPending = false
-			}
-			depth++
-		case c == '}':
-			depth--
-		case isNameStart(c):
-			j := i
-			for j < len(doc) && isNameChar(doc[j]) {
-				j++
-			}
-			if depth == 0 {
-				switch word := doc[i:j]; word {
-				case "query", "mutation", "subscription":
-					k := skipIgnored(doc, j)
-					m := k
-					if m < len(doc) && isNameStart(doc[m]) {
-						for m < len(doc) && isNameChar(doc[m]) {
-							m++
-						}
-					}
-					return word, doc[k:m]
-				case "fragment":
-					fragmentPending = true
-				}
-			}
-			i = j
-			continue
-		}
-		i++
+// operationName resolves the requested operation, or the document's sole
+// operation when no name is supplied. Invalid selections retain the supplied
+// name without claiming a kind or selecting a different operation.
+func operationName(query, selected string) (kind, name string) {
+	doc, err := parser.ParseQuery(&ast.Source{Input: query})
+	if err != nil {
+		return "", selected
 	}
-	return "query", ""
-}
-
-// skipString returns the index just past the string starting at doc[i],
-// handling escapes and """block strings""".
-func skipString(doc string, i int) int {
-	if strings.HasPrefix(doc[i:], `"""`) {
-		if end := strings.Index(doc[i+3:], `"""`); end >= 0 {
-			return i + 3 + end + 3
-		}
-		return len(doc)
+	op := doc.Operations.ForName(selected)
+	if op == nil {
+		return "", selected
 	}
-	for j := i + 1; j < len(doc); j++ {
-		switch doc[j] {
-		case '\\':
-			j++
-		case '"':
-			return j + 1
-		}
-	}
-	return len(doc)
-}
-
-// skipIgnored skips whitespace, commas and comments.
-func skipIgnored(doc string, i int) int {
-	for i < len(doc) {
-		switch doc[i] {
-		case ' ', '\t', '\n', '\r', ',':
-			i++
-		case '#':
-			for i < len(doc) && doc[i] != '\n' {
-				i++
-			}
-		default:
-			return i
-		}
-	}
-	return i
-}
-
-func isNameStart(c byte) bool {
-	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-}
-
-func isNameChar(c byte) bool {
-	return isNameStart(c) || (c >= '0' && c <= '9')
+	return string(op.Operation), op.Name
 }

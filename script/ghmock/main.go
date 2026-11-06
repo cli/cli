@@ -30,6 +30,9 @@ Commands:
 
 Requests are named "METHOD /path" for REST, such as "GET /repos/octo/hello",
 and "graphql OperationName" for GraphQL, such as "graphql IssueByNumber".
+GraphQL requests use operationName when supplied. Comparisons include REST
+query strings and GraphQL query text and variables, for reads and writes.
+The default log selects the latest completed run, even if it made no requests.
 
 State lives in $GHMOCK_DIR, or in a ghmock folder in the system temp directory.
 ghmock exits non-zero only when ghmock itself fails. gh's exit code is in the report.

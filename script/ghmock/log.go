@@ -45,7 +45,15 @@ func cmdLog(args []string, stdout io.Writer) error {
 		return err
 	}
 	if !opts.all {
-		entries = lastRun(entries)
+		runs, err := st.readRuns()
+		if err != nil {
+			return err
+		}
+		if len(runs) == 0 {
+			entries = lastRun(entries)
+		} else {
+			entries = requestsForRun(entries, runs[len(runs)-1].ID)
+		}
 	}
 	if len(entries) == 0 {
 		fmt.Fprintln(stdout, "No requests logged.")
@@ -69,10 +77,13 @@ func lastRun(entries []loggedRequest) []loggedRequest {
 	if len(entries) == 0 {
 		return nil
 	}
-	last := entries[len(entries)-1].Run
+	return requestsForRun(entries, entries[len(entries)-1].Run)
+}
+
+func requestsForRun(entries []loggedRequest, runID string) []loggedRequest {
 	var kept []loggedRequest
 	for _, e := range entries {
-		if e.Run == last {
+		if e.Run == runID {
 			kept = append(kept, e)
 		}
 	}

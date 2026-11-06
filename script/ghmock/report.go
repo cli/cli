@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 )
 
@@ -146,14 +147,14 @@ func printDifferences(w io.Writer, base, other runResult, n int) {
 	}
 
 	for _, name := range unionNames(base.requests, other.requests) {
-		a, b := writePayloads(base.requests, name), writePayloads(other.requests, name)
-		if len(a) == 0 || len(b) == 0 || equalStrings(a, b) {
+		a, b := requestPayloads(base.requests, name), requestPayloads(other.requests, name)
+		if len(a) == 0 || len(b) == 0 || slices.Equal(a, b) {
 			continue
 		}
 		same = false
 		fmt.Fprintf(w, "  %s sent different data:\n", name)
-		fmt.Fprintf(w, "    [1] %s\n", truncate(strings.Join(a, " | "), maxShownBody))
-		fmt.Fprintf(w, "    [%d] %s\n", n, truncate(strings.Join(b, " | "), maxShownBody))
+		fmt.Fprintf(w, "    [1] %s\n", truncate(formatPayloads(a), maxShownBody))
+		fmt.Fprintf(w, "    [%d] %s\n", n, truncate(formatPayloads(b), maxShownBody))
 	}
 
 	if same {
@@ -192,32 +193,55 @@ func unionNames(a, b []loggedRequest) []string {
 	return names
 }
 
-// writePayloads returns the data each write request with this name sent.
-func writePayloads(requests []loggedRequest, name string) []string {
-	var payloads []string
+type requestPayload struct {
+	rawQuery, body, query, variables string
+	graphQL                          bool
+}
+
+// requestPayloads preserves field boundaries when comparing request data.
+func requestPayloads(requests []loggedRequest, name string) []requestPayload {
+	var payloads []requestPayload
 	for _, e := range requests {
-		if displayName(e) != name || !e.isWrite() {
+		if displayName(e) != name {
 			continue
 		}
+		p := requestPayload{rawQuery: e.RawQuery}
 		if e.GraphQL != nil {
-			payloads = append(payloads, compactJSON(e.GraphQL.Variables))
+			p.graphQL = true
+			p.query = e.GraphQL.Query
+			p.variables = compactJSON(e.GraphQL.Variables)
 		} else {
-			payloads = append(payloads, compactJSON([]byte(e.Body)))
+			p.body = compactJSON([]byte(e.Body))
 		}
+		payloads = append(payloads, p)
 	}
 	return payloads
 }
 
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
+func formatPayloads(payloads []requestPayload) string {
+	var formatted []string
+	for _, p := range payloads {
+		var parts []string
+		if p.rawQuery != "" {
+			parts = append(parts, "?"+p.rawQuery)
 		}
+		if p.graphQL {
+			if p.query != "" {
+				parts = append(parts, fmt.Sprintf("query %q", p.query))
+			}
+			if p.variables != "" {
+				parts = append(parts, p.variables)
+			}
+		} else if p.body != "" {
+			if p.rawQuery != "" || !json.Valid([]byte(p.body)) {
+				parts = append(parts, fmt.Sprintf("body %q", p.body))
+			} else {
+				parts = append(parts, p.body)
+			}
+		}
+		formatted = append(formatted, strings.Join(parts, " "))
 	}
-	return true
+	return strings.Join(formatted, " | ")
 }
 
 // lineDiff lists the lines removed from a ("- ") and added in b ("+ ").
