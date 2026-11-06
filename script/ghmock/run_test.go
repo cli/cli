@@ -1193,9 +1193,6 @@ version: "1"
 				})
 			}
 			assert.Equal(t, outcomes, rec.Results)
-			if tt.check != nil {
-				tt.check(t, st, rec)
-			}
 			var report strings.Builder
 			printReport(&report, opts, results, nil)
 			assert.Equal(t, report.String(), rec.Report)

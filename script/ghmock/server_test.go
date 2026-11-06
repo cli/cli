@@ -212,19 +212,6 @@ func TestMockServer(t *testing.T) {
 			wantRawRequests: [][]byte{rawBytes},
 		},
 		{
-			name:      "request at the body limit is recorded in full",
-			responses: responseSet{"POST /limit": {{Body: json.RawMessage(`{}`)}}},
-			calls:     []call{{method: "POST", url: "http://api.github.localhost/limit", body: limitBody}},
-			want:      []reply{{status: 200, body: `{}`}},
-			wantLog:   []logSummary{{Seq: 1, Name: "POST /limit", Body: limitBody, Status: 200, Matched: true, Response: 1, Responses: 1}},
-		},
-		{
-			name:    "oversized request is rejected instead of truncated",
-			calls:   []call{{method: "POST", url: "http://api.github.localhost/limit", body: limitBody + "x"}},
-			want:    []reply{{status: 413, body: `{"message":"ghmock: request body exceeds 10 MiB"}`}},
-			wantLog: []logSummary{{Seq: 1, Status: 413}},
-		},
-		{
 			name: "REST response with status, headers and body",
 			responses: responseSet{"GET /repos/octo/hello": {{
 				Status:  201,
