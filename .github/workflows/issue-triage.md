@@ -85,11 +85,9 @@ steps:
 
 strict: false
 
-# Pinned because auto picked a model that, in trials, skipped the triage skills
-# and the duplicate search. gpt-6.1-sol did both for a similar cost.
+# Use gh-aw's repository model variables and built-in defaults.
 engine:
   id: copilot
-  model: gpt-6.1-sol
 
 tools:
   # ghmock, for reproducing bug reports. It runs gh against a fake API. gh-aw
