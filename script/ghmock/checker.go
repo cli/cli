@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/validator"
 )
 
 // checker compares queries and responses with GitHub's published schemas. It
@@ -107,14 +108,48 @@ type checkResult struct {
 // nil when no response was stored. Off-schema responses aren't checked, but
 // gh's query still is.
 func (c *checker) checkRequest(e loggedRequest, resp *response) checkResult {
+	return c.check(e, resp, true)
+}
+
+// Response-only saves reconstruct query text, not the original variable payload.
+func (c *checker) checkResponse(e loggedRequest, resp *response) checkResult {
+	return c.check(e, resp, false)
+}
+
+func (c *checker) check(e loggedRequest, resp *response, validateVariables bool) checkResult {
 	var res checkResult
 	if e.GraphQL != nil {
 		schema, err := c.graphQL()
 		if err != nil {
 			return res
 		}
-		doc, op, problems := checkGraphQLQuery(schema, e.GraphQL.Query)
+		operation := e.GraphQL.Operation
+		if !validateVariables && operation == "" && strings.HasPrefix(e.Name, "graphql ") {
+			operation = strings.TrimPrefix(e.Name, "graphql ")
+			if operation == "<anonymous>" {
+				operation = ""
+			}
+		}
+		doc, op, problems := checkGraphQLQuery(schema, e.GraphQL.Query, operation)
 		res.queryProblems = problems
+		var variables map[string]any
+		if validateVariables {
+			variables = map[string]any{}
+			var variablesErr error
+			if len(e.GraphQL.Variables) > 0 {
+				variablesErr = json.Unmarshal(e.GraphQL.Variables, &variables)
+			}
+			if variablesErr == nil && op != nil && len(problems) == 0 {
+				var coerced map[string]any
+				coerced, variablesErr = validator.VariableValues(schema, op, variables)
+				if variablesErr == nil {
+					variables = coerced
+				}
+			}
+			if variablesErr != nil {
+				res.queryProblems = append(res.queryProblems, "variables: "+variablesErr.Error())
+			}
+		}
 		if resp == nil || resp.OffSchema {
 			return res
 		}
@@ -124,7 +159,7 @@ func (c *checker) checkRequest(e loggedRequest, resp *response) checkResult {
 		case resp.status() != 200:
 			res.note = fmt.Sprintf("status %d has no GraphQL result to check", resp.status())
 		default:
-			res.responseProblems = checkGraphQLResponse(schema, doc, op, resp.Body)
+			res.responseProblems = checkGraphQLResponse(schema, doc, op, resp.Body, variables)
 		}
 		return res
 	}

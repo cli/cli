@@ -321,6 +321,36 @@ func TestCmdSet(t *testing.T) {
 		want       string
 	}{
 		{
+			name: "response-only saves retain unknown conditional selections",
+			logged: []loggedRequest{{
+				Run: "r", Seq: 1, Method: "POST", Host: apiHost, Path: "/graphql", Name: "graphql Conditional",
+				GraphQL: &graphQLRequest{Kind: "query", Operation: "Conditional", Query: `query Conditional($x:Boolean!) { viewer { login } viewer @include(if:$x) { name } }`},
+			}},
+			args:       []string{"graphql Conditional", "--body", `{"data":{"viewer":{"login":"monalisa"}}}`},
+			wantStdout: "graphql Conditional: response 1 of 1: status 200, no headers, body 40 bytes\nSchema check: passed\n",
+			want:       `{"graphql Conditional":[{"body":{"data":{"viewer":{"login":"monalisa"}}}}]}`,
+		},
+		{
+			name: "response-only saves do not assume an operation default was used",
+			logged: []loggedRequest{{
+				Run: "r", Seq: 1, Method: "POST", Host: apiHost, Path: "/graphql", Name: "graphql Conditional",
+				GraphQL: &graphQLRequest{Kind: "query", Operation: "Conditional", Query: `query Conditional($x:Boolean = true) { viewer { login } viewer @include(if:$x) { name } }`},
+			}},
+			args:       []string{"graphql Conditional", "--body", `{"data":{"viewer":{"login":"monalisa"}}}`},
+			wantStdout: "graphql Conditional: response 1 of 1: status 200, no headers, body 40 bytes\nSchema check: passed\n",
+			want:       `{"graphql Conditional":[{"body":{"data":{"viewer":{"login":"monalisa"}}}}]}`,
+		},
+		{
+			name: "response-only saves select the named operation",
+			logged: []loggedRequest{{
+				Run: "r", Seq: 1, Method: "POST", Host: apiHost, Path: "/graphql", Name: "graphql IssueTitle",
+				GraphQL: &graphQLRequest{Kind: "query", Operation: "IssueTitle", Query: `query Other { viewer { login } } ` + issueQuery},
+			}},
+			args:       []string{"graphql IssueTitle", "--body", validTitle},
+			wantStdout: fmt.Sprintf("graphql IssueTitle: response 1 of 1: status 200, no headers, body %d bytes\nSchema check: passed\n", len(validTitle)),
+			want:       `{"graphql IssueTitle":[{"body":` + validTitle + `}]}`,
+		},
+		{
 			name:       "a REST response that matches GitHub's description",
 			args:       []string{"GET /repos/o/r/issues/1", "--body", validIssue},
 			wantStdout: fmt.Sprintf("GET /repos/o/r/issues/1: response 1 of 1: status 200, no headers, body %d bytes\nSchema check: passed\n", len(validIssue)),

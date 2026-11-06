@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -24,9 +25,9 @@ func loadGraphQLSchema(data []byte, name string) (*ast.Schema, error) {
 }
 
 // checkGraphQLQuery parses gh's query and validates it against the schema. It
-// returns the document and its first operation even when validation finds
-// problems, so the response can still be checked where the query is valid.
-func checkGraphQLQuery(schema *ast.Schema, query string) (*ast.QueryDocument, *ast.OperationDefinition, []string) {
+// returns a usable operation even when validation finds non-cyclic problems,
+// so the response can still be checked where the query is valid.
+func checkGraphQLQuery(schema *ast.Schema, query string, operation ...string) (*ast.QueryDocument, *ast.OperationDefinition, []string) {
 	doc, err := parser.ParseQuery(&ast.Source{Name: "query", Input: query})
 	if err != nil {
 		return nil, nil, []string{graphQLErrorText(err)}
@@ -35,17 +36,91 @@ func checkGraphQLQuery(schema *ast.Schema, query string) (*ast.QueryDocument, *a
 	rules := validatorrules.NewDefaultRules()
 	// GitHub accepts fragments on different types that ask for one field name
 	// with different types, such as state on both Issue and PullRequest. gh
-	// relies on that, and this rule would reject it.
-	rules.RemoveRule(validatorrules.OverlappingFieldsCanBeMergedRule.Name)
+	// relies on that; retain other overlapping-field checks.
 	var problems []string
+	cyclic := false
 	for _, e := range validator.ValidateWithRules(schema, doc, rules) {
+		if exclusiveTypeConflict(schema, doc, e) {
+			continue
+		}
+		if e.Rule == validatorrules.NoFragmentCyclesRule.Name {
+			cyclic = true
+		}
 		problems = append(problems, graphQLErrorText(e))
+	}
+	if cyclic {
+		return doc, nil, dedupe(problems)
 	}
 
 	if len(doc.Operations) == 0 {
 		return doc, nil, append(problems, "the query has no operation")
 	}
+	if len(operation) > 0 {
+		name := operation[0]
+		if name == "" && len(doc.Operations) > 1 {
+			return doc, nil, append(problems, "operationName is required when the document has multiple operations")
+		}
+		op := doc.Operations.ForName(name)
+		if op == nil {
+			return doc, nil, append(problems, fmt.Sprintf("the query has no operation named %q", name))
+		}
+		return doc, op, dedupe(problems)
+	}
 	return doc, doc.Operations[0], dedupe(problems)
+}
+
+func exclusiveTypeConflict(schema *ast.Schema, doc *ast.QueryDocument, problem *gqlerror.Error) bool {
+	if problem.Rule != validatorrules.OverlappingFieldsCanBeMergedRule.Name ||
+		!strings.Contains(problem.Message, "conflicting types") || len(problem.Locations) != 1 {
+		return false
+	}
+	var fields []*ast.Field
+	var second *ast.Field
+	var collect func(ast.SelectionSet)
+	collect = func(sel ast.SelectionSet) {
+		for _, item := range sel {
+			switch field := item.(type) {
+			case *ast.Field:
+				fields = append(fields, field)
+				if (gqlerror.Location{Line: field.Position.Line, Column: field.Position.Column}) == problem.Locations[0] {
+					second = field
+				}
+				collect(field.SelectionSet)
+			case *ast.InlineFragment:
+				collect(field.SelectionSet)
+			}
+		}
+	}
+	for _, op := range doc.Operations {
+		collect(op.SelectionSet)
+	}
+	for _, fragment := range doc.Fragments {
+		collect(fragment.SelectionSet)
+	}
+	if second == nil || second.Definition == nil || second.ObjectDefinition.Kind != ast.Object ||
+		!schema.Types[second.Definition.Type.Name()].IsLeafType() {
+		return false
+	}
+	matched := false
+	for _, first := range fields {
+		if first == second || first.Definition == nil || first.Alias != second.Alias {
+			continue
+		}
+		message := fmt.Sprintf(
+			"Fields %q conflict because they return conflicting types %q and %q. Use different aliases on the fields to fetch both if this was intentional.",
+			first.Alias, first.Definition.Type.String(), second.Definition.Type.String())
+		if message != problem.Message {
+			continue
+		}
+		// The pinned validator reports only the second field's location. Every
+		// possible match must be the concrete-type exception, not an interface.
+		if first.ObjectDefinition.Kind != ast.Object || first.ObjectDefinition.Name == second.ObjectDefinition.Name ||
+			!schema.Types[first.Definition.Type.Name()].IsLeafType() {
+			return false
+		}
+		matched = true
+	}
+	return matched
 }
 
 func graphQLErrorText(err error) string {
@@ -60,7 +135,7 @@ func graphQLErrorText(err error) string {
 
 // checkGraphQLResponse compares a response body with the query gh sent. Paths
 // in problems use the same dotted form as ghmock set --at.
-func checkGraphQLResponse(schema *ast.Schema, doc *ast.QueryDocument, op *ast.OperationDefinition, body []byte) []string {
+func checkGraphQLResponse(schema *ast.Schema, doc *ast.QueryDocument, op *ast.OperationDefinition, body []byte, variables map[string]any) []string {
 	if len(bytes.TrimSpace(body)) == 0 {
 		return []string{"body: missing, but a GraphQL response needs data or errors"}
 	}
@@ -73,7 +148,7 @@ func checkGraphQLResponse(schema *ast.Schema, doc *ast.QueryDocument, op *ast.Op
 		return []string{fmt.Sprintf("body: should be an object, but is %s", describeJSON(v))}
 	}
 
-	w := &gqlWalker{schema: schema}
+	w := &gqlWalker{schema: schema, variables: variables}
 	errs, hasErrors := top["errors"]
 	if hasErrors {
 		w.checkErrors(errs)
@@ -96,7 +171,7 @@ func checkGraphQLResponse(schema *ast.Schema, doc *ast.QueryDocument, op *ast.Op
 		w.addf("data", "should be an object, but is %s", describeJSON(data))
 		return dedupe(w.problems)
 	}
-	w.checkObject("data", obj, root, op.SelectionSet)
+	w.checkObject("data", obj, root, op.SelectionSet, true)
 	return dedupe(w.problems)
 }
 
@@ -113,8 +188,9 @@ func rootType(schema *ast.Schema, op ast.Operation) *ast.Definition {
 
 // gqlWalker walks a response alongside the query that asked for it.
 type gqlWalker struct {
-	schema   *ast.Schema
-	problems []string
+	schema    *ast.Schema
+	variables map[string]any
+	problems  []string
 }
 
 func (w *gqlWalker) addf(path, format string, args ...any) {
@@ -126,6 +202,9 @@ func (w *gqlWalker) checkErrors(v any) {
 	if !ok {
 		w.addf("errors", "should be a list, but is %s", describeJSON(v))
 		return
+	}
+	if len(list) == 0 {
+		w.addf("errors", "must contain at least one error")
 	}
 	for i, item := range list {
 		path := fmt.Sprintf("errors.%d", i)
@@ -140,8 +219,8 @@ func (w *gqlWalker) checkErrors(v any) {
 	}
 }
 
-// selected is a field the query asked for. Fields in fragments that might not
-// apply, and fields with @include or @skip, aren't required. Fields in
+// selected is a field the query asked for. Fields in fragments or directives
+// that might not apply aren't required. Fields in
 // fragments for a type the response doesn't name aren't checked either,
 // because two fragments can ask for one key with different types.
 type selected struct {
@@ -157,7 +236,10 @@ func (w *gqlWalker) collectFields(sel ast.SelectionSet, concrete *ast.Definition
 	for _, s := range sel {
 		switch s := s.(type) {
 		case *ast.Field:
-			*out = append(*out, selected{field: s, required: required && !conditional(s.Directives), checked: checked})
+			included, known := directiveCondition(s.Directives, w.variables)
+			if included {
+				*out = append(*out, selected{field: s, required: required && known, checked: checked})
+			}
 		case *ast.InlineFragment:
 			w.collectFragment(s.TypeCondition, s.Directives, s.SelectionSet, concrete, required, checked, out)
 		case *ast.FragmentSpread:
@@ -169,7 +251,11 @@ func (w *gqlWalker) collectFields(sel ast.SelectionSet, concrete *ast.Definition
 }
 
 func (w *gqlWalker) collectFragment(cond string, dirs ast.DirectiveList, sel ast.SelectionSet, concrete *ast.Definition, required, checked bool, out *[]selected) {
-	required = required && !conditional(dirs)
+	included, known := directiveCondition(dirs, w.variables)
+	if !included {
+		return
+	}
+	required = required && known
 	switch {
 	case cond == "":
 	case concrete == nil:
@@ -180,8 +266,33 @@ func (w *gqlWalker) collectFragment(cond string, dirs ast.DirectiveList, sel ast
 	w.collectFields(sel, concrete, required, checked, out)
 }
 
-func conditional(dirs ast.DirectiveList) bool {
-	return dirs.ForName("include") != nil || dirs.ForName("skip") != nil
+func directiveCondition(dirs ast.DirectiveList, variables map[string]any) (included, known bool) {
+	known = true
+	for _, name := range []string{"include", "skip"} {
+		d := dirs.ForName(name)
+		if d == nil {
+			continue
+		}
+		arg := d.Arguments.ForName("if")
+		if arg == nil {
+			known = false
+			continue
+		}
+		if variables == nil && arg.Value.Kind == ast.Variable {
+			known = false
+			continue
+		}
+		value, err := arg.Value.Value(variables)
+		condition, ok := value.(bool)
+		if err != nil || !ok {
+			known = false
+			continue
+		}
+		if name == "skip" && condition || name == "include" && !condition {
+			return false, true
+		}
+	}
+	return true, known
 }
 
 // isA reports whether an object of type concrete is also of type name, which
@@ -202,22 +313,38 @@ func (w *gqlWalker) isA(concrete *ast.Definition, name string) bool {
 	return false
 }
 
-func (w *gqlWalker) checkObject(path string, obj map[string]any, def *ast.Definition, sel ast.SelectionSet) {
+func (w *gqlWalker) checkObject(path string, obj map[string]any, def *ast.Definition, sel ast.SelectionSet, required bool) {
 	concrete := def
 	if def.IsAbstractType() {
 		concrete = nil
-		if name, ok := obj["__typename"].(string); ok {
+		keys := []string{"__typename"}
+		var candidates []selected
+		w.collectFields(sel, nil, false, false, &candidates)
+		for _, candidate := range candidates {
+			if candidate.field.Name == "__typename" && candidate.field.Alias != "__typename" {
+				keys = append(keys, candidate.field.Alias)
+			}
+		}
+		for _, key := range keys {
+			name, ok := obj[key].(string)
+			if !ok {
+				continue
+			}
 			if t := w.schema.Types[name]; t != nil && t.Kind == ast.Object && w.isA(t, def.Name) {
+				if concrete != nil && concrete != t {
+					w.addf(path+"."+key, "is %q, but this object's type is %s", name, concrete.Name)
+					continue
+				}
 				concrete = t
 			} else {
-				w.addf(path+".__typename", "%q isn't a type %s can be; it can be %s",
+				w.addf(path+"."+key, "%q isn't a type %s can be; it can be %s",
 					name, def.Name, listNames(possibleTypeNames(w.schema, def), 10))
 			}
 		}
 	}
 
 	var fields []selected
-	w.collectFields(sel, concrete, true, true, &fields)
+	w.collectFields(sel, concrete, required, true, &fields)
 	for _, f := range fields {
 		if f.field.Definition == nil && f.field.Name != "__typename" {
 			// The query asks for a field the schema doesn't have. That's
@@ -244,11 +371,11 @@ func (w *gqlWalker) checkObject(path string, obj map[string]any, def *ast.Defini
 			}
 			continue
 		}
-		w.checkValue(child, val, f.field.Definition.Type, f.field.SelectionSet)
+		w.checkValue(child, val, f.field.Definition.Type, f.field.SelectionSet, f.required)
 	}
 }
 
-func (w *gqlWalker) checkValue(path string, val any, typ *ast.Type, sel ast.SelectionSet) {
+func (w *gqlWalker) checkValue(path string, val any, typ *ast.Type, sel ast.SelectionSet, required bool) {
 	if val == nil {
 		if typ.NonNull {
 			w.addf(path, "is null, but GitHub's schema says it can't be (%s)", typ.String())
@@ -262,7 +389,7 @@ func (w *gqlWalker) checkValue(path string, val any, typ *ast.Type, sel ast.Sele
 			return
 		}
 		for i, item := range list {
-			w.checkValue(fmt.Sprintf("%s.%d", path, i), item, typ.Elem, sel)
+			w.checkValue(fmt.Sprintf("%s.%d", path, i), item, typ.Elem, sel, required)
 		}
 		return
 	}
@@ -284,7 +411,7 @@ func (w *gqlWalker) checkValue(path string, val any, typ *ast.Type, sel ast.Sele
 			w.addf(path, "should be an object (%s), but is %s", def.Name, describeJSON(val))
 			return
 		}
-		w.checkObject(path, obj, def, sel)
+		w.checkObject(path, obj, def, sel, required)
 	}
 }
 

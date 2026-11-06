@@ -39,7 +39,8 @@ query strings and GraphQL query text and variables, for reads and writes.
 The default log selects the latest completed run, even if it made no requests.
 
 ghmock set rejects a response that doesn't match GitHub's schema, unless you
-pass --off-schema. ghmock run reports responses and gh queries that don't match.
+pass --off-schema. ghmock run reports responses, GraphQL queries and variables
+that don't match.
 
 The schemas come from $GHMOCK_GRAPHQL_SCHEMA and $GHMOCK_REST_SCHEMA, or are
 downloaded into ghmock's cache folder the first time they're needed.

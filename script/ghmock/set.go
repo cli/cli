@@ -207,7 +207,7 @@ func checkBeforeSave(st *state, chk *checker, name string, resp *response, offSc
 		}
 	}
 
-	res := chk.checkRequest(e, resp)
+	res := chk.checkResponse(e, resp)
 	switch {
 	case len(res.responseProblems) > 0:
 		return "", fmt.Errorf("the response doesn't match GitHub's schema, so it wasn't saved:\n%sFix it, or pass --off-schema to save it anyway",

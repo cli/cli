@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,8 +11,17 @@ import (
 func TestCheckRequest(t *testing.T) {
 	chk := testChecker(t)
 
-	gql := func(query string) loggedRequest {
-		return loggedRequest{Method: "POST", Host: apiHost, Path: "/graphql", GraphQL: &graphQLRequest{Query: query}}
+	gql := func(query string, variables ...string) loggedRequest {
+		e := loggedRequest{Method: "POST", Host: apiHost, Path: "/graphql", GraphQL: &graphQLRequest{Query: query}}
+		if len(variables) > 0 {
+			e.GraphQL.Variables = json.RawMessage(variables[0])
+		}
+		return e
+	}
+	operation := func(query, name string) loggedRequest {
+		e := gql(query)
+		e.GraphQL.Operation = name
+		return e
 	}
 	rest := func(method, path string) loggedRequest {
 		return loggedRequest{Method: method, Host: apiHost, Path: path}
@@ -21,13 +31,159 @@ func TestCheckRequest(t *testing.T) {
 	}
 	const issueQuery = `query { repository(owner: "o", name: "r") { issue(number: 1) { number title state assignees { login } } } }`
 	const unionQuery = `query { repository(owner: "o", name: "r") { issueOrPullRequest(number: 1) { __typename ... on Issue { title } ... on PullRequest { number } } } }`
+	const aliasUnionQuery = `query { repository(owner: "o", name: "r") { issueOrPullRequest(number: 1) { kind: __typename ... on Issue { title } ... on PullRequest { number } } } }`
+	const twoOperations = `query First { viewer { login } } query Second { viewer { name } }`
 
 	tests := []struct {
-		name string
-		req  loggedRequest
-		resp *response
-		want checkResult
+		name              string
+		req               loggedRequest
+		resp              *response
+		want              checkResult
+		responseOnly      bool
+		wantQueryContains string
 	}{
+		{
+			name: "unknown variable types are reported without coercion",
+			req:  gql(`query Bad($x: Missing) { viewer { login name @include(if:$x) } }`),
+			resp: reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+			want: checkResult{queryProblems: []string{
+				`line 1, column 11: Unknown type "Missing".`,
+				`line 1, column 58: Variable "$x" of type "Missing" used in position expecting type "Boolean!".`,
+			}},
+		},
+		{
+			name:              "a required GraphQL variable is missing",
+			req:               gql(`query($x: Boolean!) { viewer { login name @include(if: $x) } }`),
+			resp:              reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+			wantQueryContains: "variable.x",
+		},
+		{
+			name:              "a GraphQL variable has the wrong type",
+			req:               gql(`query($x: Boolean!) { viewer { login name @include(if: $x) } }`, `{"x":"true"}`),
+			resp:              reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+			wantQueryContains: "variable.x",
+		},
+		{
+			name:              "variables must be an object",
+			req:               gql(`query { viewer { login } }`, `[]`),
+			resp:              reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+			wantQueryContains: "variables:",
+		},
+		{
+			name:         "response-only checks do not invent missing request variables",
+			req:          gql(`query($x: Boolean!) { viewer { login } viewer @include(if:$x) { name } }`),
+			resp:         reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+			responseOnly: true,
+		},
+		{
+			name:         "response-only checks do not assume default variable inputs",
+			req:          gql(`query($x: Boolean = true) { viewer { login } viewer @include(if:$x) { name } }`),
+			resp:         reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+			responseOnly: true,
+		},
+		{
+			name: "supplied true makes conditional fields required",
+			req:  gql(`query($x: Boolean!) { viewer { name @include(if:$x) } }`, `{"x":true}`),
+			resp: reply(200, `{"data":{"viewer":{}}}`),
+			want: checkResult{responseProblems: []string{`data.viewer.name: missing, but gh asked for it`}},
+		},
+		{
+			name: "operation variable defaults determine included fields",
+			req:  gql(`query($x: Boolean = true) { viewer { name @include(if:$x) } }`),
+			resp: reply(200, `{"data":{"viewer":{}}}`),
+			want: checkResult{responseProblems: []string{`data.viewer.name: missing, but gh asked for it`}},
+		},
+		{
+			name: "operation variable defaults can exclude fields",
+			req:  gql(`query($x: Boolean = false) { viewer { login name @include(if:$x) } }`),
+			resp: reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+		},
+		{
+			name: "a skipped repeated parent does not require its children",
+			req:  gql(`query { viewer { login } viewer @skip(if:true) { name } }`),
+			resp: reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+		},
+		{
+			name: "a supplied variable excludes repeated parent children",
+			req:  gql(`query($x: Boolean!) { viewer { login } viewer @include(if:$x) { name } }`, `{"x":false}`),
+			resp: reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+		},
+		{
+			name: "a skipped fragment does not require its children",
+			req:  gql(`query { viewer { login } ...More @skip(if:true) } fragment More on Query { viewer { name } }`),
+			resp: reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+		},
+		{
+			name:              "same-object response key conflicts remain invalid",
+			req:               gql(`query { viewer { x:login x:name } }`),
+			wantQueryContains: `Fields "x" conflict`,
+		},
+		{
+			name:              "same-object leaf type conflicts remain invalid",
+			req:               gql(`query { repository(owner:"o",name:"r") { issue(number:1) { x:title x:number } } }`),
+			wantQueryContains: `Fields "x" conflict`,
+		},
+		{
+			name:              "cyclic fragments are diagnosed without response traversal",
+			req:               gql(`query { viewer { ...Loop } } fragment Loop on User { login ...Loop }`),
+			resp:              reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
+			wantQueryContains: `Cannot spread fragment "Loop"`,
+			want:              checkResult{note: "gh's query couldn't be read"},
+		},
+		{
+			name: "a selected second operation determines required response fields",
+			req:  operation(twoOperations, "Second"),
+			resp: reply(200, `{"data":{"viewer":{"name":"Mona"}}}`),
+		},
+		{
+			name:              "multiple operations require operationName",
+			req:               gql(twoOperations),
+			resp:              reply(200, `{"data":{"viewer":{}}}`),
+			wantQueryContains: "operationName is required",
+			want:              checkResult{note: "gh's query couldn't be read"},
+		},
+		{
+			name:              "an unknown operationName is diagnosed",
+			req:               operation(twoOperations, "Missing"),
+			resp:              reply(200, `{"data":{"viewer":{}}}`),
+			wantQueryContains: `no operation named "Missing"`,
+			want:              checkResult{note: "gh's query couldn't be read"},
+		},
+		{
+			name: "aliased typename makes matching fragment fields required",
+			req:  gql(aliasUnionQuery),
+			resp: reply(200, `{"data":{"repository":{"issueOrPullRequest":{"kind":"Issue"}}}}`),
+			want: checkResult{responseProblems: []string{`data.repository.issueOrPullRequest.title: missing, but gh asked for it`}},
+		},
+		{
+			name: "an impossible aliased typename is diagnosed at its alias",
+			req:  gql(aliasUnionQuery),
+			resp: reply(200, `{"data":{"repository":{"issueOrPullRequest":{"kind":"Commit"}}}}`),
+			want: checkResult{responseProblems: []string{`data.repository.issueOrPullRequest.kind: "Commit" isn't a type IssueOrPullRequest can be; it can be Issue, PullRequest`}},
+		},
+		{
+			name: "typename aliases in named fragments select concrete types",
+			req:  gql(`query { repository(owner:"o",name:"r") { issueOrPullRequest(number:1) { ...Kind ...on Issue { title } } } } fragment Kind on IssueOrPullRequest { kind:__typename }`),
+			resp: reply(200, `{"data":{"repository":{"issueOrPullRequest":{"kind":"Issue","title":"Bug"}}}}`),
+		},
+		{
+			name: "typename aliases cannot disagree on the concrete type",
+			req:  gql(`query { repository(owner:"o",name:"r") { issueOrPullRequest(number:1) { __typename kind:__typename } } }`),
+			resp: reply(200, `{"data":{"repository":{"issueOrPullRequest":{"__typename":"Issue","kind":"PullRequest"}}}}`),
+			want: checkResult{responseProblems: []string{`data.repository.issueOrPullRequest.kind: is "PullRequest", but this object's type is Issue`}},
+		},
+		{
+			name: "an empty errors list does not substitute for data",
+			req:  gql(`query { viewer { login } }`),
+			resp: reply(200, `{"errors":[]}`),
+			want: checkResult{responseProblems: []string{`errors: must contain at least one error`}},
+		},
+		{
+			name: "null data with an empty errors list is invalid",
+			req:  gql(`query { viewer { login } }`),
+			resp: reply(200, `{"data":null,"errors":[]}`),
+			want: checkResult{responseProblems: []string{`errors: must contain at least one error`}},
+		},
 		{
 			name: "a GraphQL response that matches the query",
 			req:  gql(`query { viewer { login name } }`),
@@ -112,8 +268,8 @@ func TestCheckRequest(t *testing.T) {
 			want: checkResult{responseProblems: []string{`data.viewer.__typename: is "Bot", but this object's type is User`}},
 		},
 		{
-			name: "fields under @include aren't required",
-			req:  gql(`query ($x: Boolean!) { viewer { login name @include(if: $x) } }`),
+			name: "excluded fields under @include aren't required",
+			req:  gql(`query ($x: Boolean!) { viewer { login name @include(if: $x) } }`, `{"x":false}`),
 			resp: reply(200, `{"data":{"viewer":{"login":"monalisa"}}}`),
 		},
 		{
@@ -259,7 +415,18 @@ func TestCheckRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, chk.checkRequest(tt.req, tt.resp))
+			var got checkResult
+			if tt.responseOnly {
+				got = chk.checkResponse(tt.req, tt.resp)
+			} else {
+				got = chk.checkRequest(tt.req, tt.resp)
+			}
+			if tt.wantQueryContains != "" {
+				assert.Len(t, got.queryProblems, 1)
+				assert.Contains(t, strings.Join(got.queryProblems, "\n"), tt.wantQueryContains)
+				got.queryProblems = nil
+			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
