@@ -71,11 +71,11 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 		return err
 	}
 
-	// Forward the port so that it is reachable over the tunnel's web forwarding origin.
-	// Visibility is deliberately left unset, which Dev Tunnels treats as private for a
-	// newly created port. A port that already exists keeps its current access control,
-	// because createTunnelPort ignores the resulting conflict, so the visibility of the
-	// port is verified below rather than assumed.
+	// Forward the port so it is reachable over the tunnel's web forwarding origin.
+	// Leaving visibility unset makes Dev Tunnels create a private port, but an existing
+	// port keeps whatever access control it already has, because createTunnelPort
+	// ignores the resulting conflict. jupyterWebForwardingURL therefore reads the
+	// visibility back and verifies it.
 	opts := portforwarder.ForwardPortOpts{
 		Port: serverPort,
 	}
@@ -95,9 +95,15 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 
 	fmt.Fprintln(a.io.Out, targetURL)
 
-	// The browser reaches JupyterLab over the tunnel's web forwarding origin rather than
-	// through this process, so there is no local listener left to wait on. Block until the
-	// user interrupts, which keeps the port forwarded for the lifetime of the command.
+	// Block until the user interrupts, holding this command's connection to the codespace
+	// open in the meantime.
+	//
+	// Exiting closes that connection but does not unregister the tunnel port or stop
+	// JupyterLab, and the browser reaches JupyterLab through the tunnel service rather than
+	// through this process. Exiting therefore does not end browser access, for as long as
+	// the codespace and JupyterLab remain available. The previous implementation also left
+	// the tunnel port registered; what changed is that the browser now holds an address that
+	// does not depend on this process, instead of a local one that died with it.
 	<-ctx.Done()
 
 	return nil
@@ -105,20 +111,21 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 
 // jupyterWebForwardingURL builds the URL to open for the forwarded JupyterLab port.
 //
-// The origin is taken from the tunnel's own web forwarding URI, never from the
-// codespace. Only the path and query of the codespace-reported server URL are reused,
-// because those carry the JupyterLab auth token. The codespace is untrusted here: it
-// supplies both the port and the server URL, so previously it could choose the origin
-// that its own content was rendered on in the user's browser.
+// The origin comes from the tunnel's own web forwarding URI. The codespace supplies only
+// the path, query and fragment, which carry the JupyterLab auth token. The codespace is
+// untrusted here: it reports both the port and the server URL, so letting it supply the
+// origin would let it choose the origin its own content runs on in the user's browser.
 //
-// The origin comes from the port's own PortForwardingURIs rather than from the
-// name-and-port pattern used by portInfo.BrowseURL, because the tunnel service generates
-// it for the host that is actually serving the port. That keeps the URL correct when the
-// forwarding domain is not the default one, such as on GitHub Enterprise Server.
+// Reading the origin from the port's PortForwardingURIs keeps the URL correct wherever the
+// forwarding domain differs from the default, such as on GitHub Enterprise Server, because
+// the tunnel service generates that URI for the host actually serving the port. This is why
+// it is preferred over the name-and-port pattern in portInfo.BrowseURL.
 //
-// The port must be private. Forwarding does not change the access control of a port
-// that already exists, so a port left public by an earlier forward, or by the codespace
-// itself, would otherwise expose the JupyterLab auth token on a publicly reachable URL.
+// The port must be private, as it is when the tunnel service creates it here. Forwarding an
+// existing port leaves its access control unchanged, so a port left public by an earlier
+// forward, or by the codespace itself, would otherwise put the JupyterLab auth token on a
+// URL that is reachable without the private-port authentication gate. The check reflects the
+// port's visibility at the moment the URL is built and does not constrain it afterwards.
 func jupyterWebForwardingURL(ctx context.Context, fwd portforwarder.PortForwarder, serverPort int, serverURL string) (string, error) {
 	ports, err := fwd.ListPorts(ctx)
 	if err != nil {
