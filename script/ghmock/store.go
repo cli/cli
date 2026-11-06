@@ -91,8 +91,9 @@ type runOutcome struct {
 	Terminal       bool           `json:"terminal,omitempty"`
 	TerminalOutput string         `json:"terminal_output,omitempty"`
 	Steps          []terminalStep `json:"steps,omitempty"`
-	Waiting        bool           `json:"waiting_for_input,omitempty"`
-	UnusedKeys     int            `json:"unused_keys,omitempty"`
+	// Waiting preserves input-waiting evidence in older saved runs.
+	Waiting    bool `json:"waiting_for_input,omitempty"`
+	UnusedKeys int  `json:"unused_keys,omitempty"`
 }
 
 // state is the folder that holds responses, the request log and the runs

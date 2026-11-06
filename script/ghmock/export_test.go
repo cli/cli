@@ -44,6 +44,24 @@ func TestParseExportArgs(t *testing.T) {
 
 func TestCmdExport(t *testing.T) {
 	start := time.Date(2026, 11, 2, 20, 54, 40, 0, time.UTC)
+	const legacyRunJSON = `{
+		"id": "20261102T205540Z-bbbbbb",
+		"time": "2026-11-02T20:55:40Z",
+		"command": "ghmock run --gh ./bin/gh --terminal --keys {enter} -- repo create",
+		"results": [{
+			"binary": "./bin/gh",
+			"path": "/bin/gh",
+			"version": "gh version 1.0.0",
+			"exit_code": -1,
+			"terminal": true,
+			"waiting_for_input": true
+		}],
+		"report": "gh version 1.0.0 - /bin/gh\n$ gh repo create\nexit code: none, gh was still waiting for input, so ghmock stopped it\n"
+	}`
+	var legacyRun runRecord
+	require.NoError(t, json.Unmarshal([]byte(legacyRunJSON), &legacyRun))
+	require.Len(t, legacyRun.Results, 1)
+	assert.True(t, legacyRun.Results[0].Waiting)
 	runs := []runRecord{
 		{
 			ID: "20261102T205440Z-aaaaaa", Time: start, Command: "ghmock run --gh ./bin/gh -- issue view 1",
@@ -54,11 +72,7 @@ func TestCmdExport(t *testing.T) {
 			Results: []runOutcome{{Binary: "./bin/gh", Path: "/bin/gh", Version: "gh version 1.0.0", Stdout: "title:\tBug\n"}},
 			Report:  "gh version 1.0.0 - /bin/gh\n$ gh issue view 1\nexit code: 0\n",
 		},
-		{
-			ID: "20261102T205540Z-bbbbbb", Time: start.Add(time.Minute), Command: "ghmock run --gh ./bin/gh --logged-out -- auth status",
-			Results: []runOutcome{{Binary: "./bin/gh", Path: "/bin/gh", Version: "gh version 1.0.0", ExitCode: 1}},
-			Report:  "gh version 1.0.0 - /bin/gh\n$ gh auth status\nexit code: 1\n",
-		},
+		legacyRun,
 	}
 	entries := []loggedRequest{
 		{Run: runs[0].ID, Binary: "./bin/gh", Seq: 1, Method: "POST", Name: "graphql IssueByNumber", Status: 200, Matched: true,
@@ -79,11 +93,11 @@ $ gh issue view 1
 exit code: 0
 
 ### Run 20261102T205540Z-bbbbbb at 2026-11-02T20:55:40Z
-$ ghmock run --gh ./bin/gh --logged-out -- auth status
+$ ghmock run --gh ./bin/gh --terminal --keys {enter} -- repo create
 
 gh version 1.0.0 - /bin/gh
-$ gh auth status
-exit code: 1
+$ gh repo create
+exit code: none, gh was still waiting for input, so ghmock stopped it
 `
 
 	tests := []struct {

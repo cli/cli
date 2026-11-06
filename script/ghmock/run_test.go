@@ -322,7 +322,6 @@ func TestRunAll(t *testing.T) {
 		Stderr     string
 		Requests   []logSummary
 		Steps      []terminalStep
-		Waiting    bool
 		UnusedKeys int
 	}
 
@@ -746,7 +745,6 @@ version: "1"
 					Stderr:     r.stderr,
 					Requests:   summarize(r.requests),
 					Steps:      r.steps,
-					Waiting:    r.waiting,
 					UnusedKeys: r.unusedKeys,
 				})
 			}
@@ -795,7 +793,7 @@ version: "1"
 				outcomes = append(outcomes, runOutcome{
 					Binary: opts.binaries[i], Path: r.path, Version: r.version, ExitCode: r.exitCode,
 					TimedOut: r.timedOut, Stdout: r.stdout, Stderr: r.stderr,
-					Terminal: r.terminal, TerminalOutput: r.terminalOutput, Steps: r.steps, Waiting: r.waiting, UnusedKeys: r.unusedKeys,
+					Terminal: r.terminal, TerminalOutput: r.terminalOutput, Steps: r.steps, UnusedKeys: r.unusedKeys,
 				})
 			}
 			assert.Equal(t, outcomes, rec.Results)
@@ -987,13 +985,13 @@ graphql IssueProjectItems
 		{
 			name: "a terminal run shows the screen before each --keys and at the end",
 			results: []runResult{{
-				path: "/bin/gh", version: "gh version 1.0.0", exitCode: -1, terminal: true, waiting: true,
+				path: "/bin/gh", version: "gh version 1.0.0", exitCode: -1, terminal: true, timedOut: true,
 				steps:  []terminalStep{{Keys: "{enter}", Screen: "? What would you like to do?\n> Create\n"}},
 				stdout: "? What would you like to do? Create\n? Repository name\n",
 			}},
 			want: `gh version 1.0.0 - /bin/gh
 $ gh issue view 1
-exit code: none, gh was still waiting for input, so ghmock stopped it
+exit code: none, timed out
 --- screen before --keys 1, {enter}
 ? What would you like to do?
 > Create

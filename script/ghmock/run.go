@@ -62,7 +62,6 @@ type runResult struct {
 	terminal       bool
 	terminalOutput string
 	steps          []terminalStep
-	waiting        bool
 	unusedKeys     int
 }
 
@@ -165,7 +164,7 @@ func runAll(st *state, chk *checker, opts runOptions) (runRecord, []runResult, e
 		rec.Results = append(rec.Results, runOutcome{
 			Binary: binary, Path: res.path, Version: res.version, ExitCode: res.exitCode,
 			TimedOut: res.timedOut, Stdout: res.stdout, Stderr: res.stderr,
-			Terminal: res.terminal, TerminalOutput: res.terminalOutput, Steps: res.steps, Waiting: res.waiting, UnusedKeys: res.unusedKeys,
+			Terminal: res.terminal, TerminalOutput: res.terminalOutput, Steps: res.steps, UnusedKeys: res.unusedKeys,
 		})
 	}
 
@@ -276,7 +275,6 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *cert
 		var term terminalRun
 		term, runErr = runInTerminal(ctx, cmd, opts.keys)
 		res.terminal = true
-		res.waiting = term.waiting
 		res.unusedKeys = term.unused
 		res.stdout = hideScratch(term.screen, scratch)
 		res.terminalOutput = hideScratch(term.output, scratch)
@@ -298,8 +296,6 @@ func runBinary(st *state, chk *checker, binary string, opts runOptions, ca *cert
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		res.timedOut = true
-		res.exitCode = -1
-	case res.waiting:
 		res.exitCode = -1
 	case errors.As(runErr, &exitErr):
 		res.exitCode = exitErr.ExitCode()

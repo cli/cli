@@ -64,9 +64,8 @@ type terminalStep struct {
 }
 
 type terminalRun struct {
-	steps   []terminalStep
-	screen  string
-	output  string
-	waiting bool
-	unused  int
+	steps  []terminalStep
+	screen string
+	output string
+	unused int
 }

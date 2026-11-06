@@ -58,8 +58,6 @@ func printResult(w io.Writer, command string, res runResult) {
 	switch {
 	case res.timedOut:
 		fmt.Fprintln(w, "exit code: none, timed out")
-	case res.waiting:
-		fmt.Fprintln(w, "exit code: none, gh was still waiting for input, so ghmock stopped it")
 	default:
 		fmt.Fprintf(w, "exit code: %d\n", res.exitCode)
 	}
@@ -384,11 +382,8 @@ func joinLimited(items []string, limit int) string {
 }
 
 func exitLabel(res runResult) string {
-	switch {
-	case res.timedOut:
+	if res.timedOut {
 		return "timed out"
-	case res.waiting:
-		return "waiting for input"
 	}
 	return fmt.Sprint(res.exitCode)
 }
