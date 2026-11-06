@@ -1,0 +1,37 @@
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Prepare a branch to PR
+cd $SCRIPT_NAME-$RANDOM_STRING
+
+exec git config user.name gh-acceptance-test-user
+exec git config user.email gh-acceptance-test-user@foo.bar
+
+exec git checkout -b feature-branch
+exec git commit --allow-empty -m 'Empty Commit 1'
+exec git push -u origin feature-branch
+
+# Set browser to echo to capture URLs
+exec gh config set browser echo
+
+# Create PR in --web mode; no title/body should be supplied via URL query params
+exec gh pr create --web
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=&expand=1
+
+# Add more commits
+exec git commit --allow-empty -m 'Empty Commit 2'
+exec git commit --allow-empty -m 'Empty Commit 3'
+exec git push -u origin feature-branch
+
+# Create PR in --web mode; more commits should have no effect on the URL
+exec gh pr create --web
+stdout https://$GH_HOST/$ORG/$SCRIPT_NAME-$RANDOM_STRING/compare/main\.\.\.feature-branch\?body=&expand=1
