@@ -68,6 +68,23 @@ sudo apt install gh
 > curl -fsSL -o - https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --show-keys
 > ```
 
+> [!TIP]
+> On some Ubuntu systems, `apt` will default to installing an outdated (and broken) version of the
+> gh client from the official Ubuntu ESM repositories, even after following the instructions above.
+> 
+> To force use of the official GitHub repository, add the following file as `/etc/apt/preferences.d/gh`:
+> 
+> ```text
+> # gh: prefer GitHub official apt repo over Ubuntu ESM pin (510).
+> # ESM gh 2.45.x is broken vs current GitHub APIs - see https://github.com/cli/cli/issues/11992.
+> # Canonical documents this remedy: https://documentation.ubuntu.com/pro-client/en/latest/explanations/about_esm/
+> Package: gh
+> Pin: origin cli.github.com
+> Pin-Priority: 600
+> ```
+
+
+
 ### RPM
 
 RPM packages are hosted on the [GitHub CLI marketing site](https://cli.github.com) for various operating systems including:
