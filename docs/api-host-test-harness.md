@@ -166,8 +166,9 @@ step in any debugging session:
 | `dial tcp 127.0.0.1:443: connection refused` for `api.github.com` | The code under test ignored `api_host` and went to the canonical host. A real product failure. |
 | `x509: certificate signed by unknown authority` for `gh-gateway.internal` | The request *reached* the gateway but the caller did not trust the harness CA. A harness defect, usually `SSL_CERT_FILE` not being propagated into a subprocess. |
 
-Note that `gh auth status` reports any transport failure as "The token in
-hosts.yml is invalid". Do not read that message literally while debugging.
+Note that `gh auth status` surfaces a failed token check by printing the
+underlying error verbatim, so a transport failure appears there as one of the
+signatures above rather than as a verdict about the token.
 
 Two flakes are pre-existing and unrelated to `api_host`: `repo-archive-unarchive`
 (server-side), and `search-issues`, which depends on the search index catching up

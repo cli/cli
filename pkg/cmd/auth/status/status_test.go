@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -188,15 +190,15 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+				reg.Register(httpmock.REST("GET", "api/v3/"),
+					httpmock.StatusJSONResponse(401, map[string]string{"message": "Bad credentials"}))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
 				ghe.io
 				  X Failed to log in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
-				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
-				  - To re-authenticate, run: gh auth refresh -h ghe.io
+				  - Could not verify the token in GH_CONFIG_DIR/hosts.yml: HTTP 401: Bad credentials (https://ghe.io/api/v3/)
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
 			`),
 		},
@@ -233,16 +235,56 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+				reg.Register(httpmock.REST("GET", "api/v3/"),
+					httpmock.StatusJSONResponse(401, map[string]string{"message": "Bad credentials"}))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
 				ghe.io
 				  X Failed to log in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
-				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
-				  - To re-authenticate, run: gh auth refresh -h ghe.io
+				  - Could not verify the token in GH_CONFIG_DIR/hosts.yml: HTTP 401: Bad credentials (https://ghe.io/api/v3/)
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+			`),
+		},
+		{
+			name: "transport failure reports the error instead of a token verdict",
+			opts: StatusOptions{},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), func(*http.Request) (*http.Response, error) {
+					return nil, &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connect: connection refused")}
+				})
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Failed to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Could not verify the token in GH_CONFIG_DIR/hosts.yml: Get "https://api.github.com/": dial tcp: connect: connection refused
+				  - To forget about this account, run: gh auth logout -h github.com -u monalisa
+			`),
+		},
+		{
+			name: "multi-line error is indented under the entry",
+			opts: StatusOptions{},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""),
+					httpmock.StatusJSONResponse(502, map[string]string{"message": "upstream failed\nretry later"}))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Failed to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Could not verify the token in GH_CONFIG_DIR/hosts.yml: HTTP 502: upstream failed (https://api.github.com/)
+				    retry later
+				  - To forget about this account, run: gh auth logout -h github.com -u monalisa
 			`),
 		},
 		{
@@ -405,20 +447,20 @@ func Test_statusRun(t *testing.T) {
 				loginRefreshable(t, c, "github.com", "monalisa", "gho_stale", "ghr_abc", &past, &rtFuture)
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), httpmock.StatusStringResponse(503, "Service Unavailable"))
+				reg.Register(httpmock.REST("GET", ""),
+					httpmock.StatusJSONResponse(503, map[string]string{"message": "Service Unavailable"}))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
 				github.com
 				  X Failed to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
-				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
-				  - To re-authenticate, run: gh auth refresh -h github.com
+				  - Could not verify the token in GH_CONFIG_DIR/hosts.yml: HTTP 503: Service Unavailable (https://api.github.com/)
 				  - To forget about this account, run: gh auth logout -h github.com -u monalisa
 			`),
 		},
 		{
-			name: "no-refresh reports an unexpired expiring token that fails as invalid",
+			name: "no-refresh reports an unexpired expiring token that is rejected",
 			opts: StatusOptions{NoRefresh: true},
 			now:  time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
 			cfgStubs: func(t *testing.T, c gh.Config) {
@@ -426,15 +468,15 @@ func Test_statusRun(t *testing.T) {
 				loginRefreshable(t, c, "github.com", "monalisa", "gho_revoked", "ghr_abc", &future, nil)
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), httpmock.StatusStringResponse(401, "Bad credentials"))
+				reg.Register(httpmock.REST("GET", ""),
+					httpmock.StatusJSONResponse(401, map[string]string{"message": "Bad credentials"}))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
 				github.com
 				  X Failed to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
-				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
-				  - To re-authenticate, run: gh auth refresh -h github.com
+				  - Could not verify the token in GH_CONFIG_DIR/hosts.yml: HTTP 401: Bad credentials (https://api.github.com/)
 				  - To forget about this account, run: gh auth logout -h github.com -u monalisa
 			`),
 		},
@@ -631,7 +673,8 @@ func Test_statusRun(t *testing.T) {
 				// Get scopes for monalisa-ghe-2
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
 				// Error getting scopes for monalisa-ghe
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(404, "{}"))
+				reg.Register(httpmock.REST("GET", "api/v3/"),
+					httpmock.StatusJSONResponse(404, map[string]string{"message": "Not Found"}))
 				// Get username for monalisa-ghe-2
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
@@ -663,8 +706,7 @@ func Test_statusRun(t *testing.T) {
 
 				  X Failed to log in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: false
-				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
-				  - To re-authenticate, run: gh auth refresh -h ghe.io
+				  - Could not verify the token in GH_CONFIG_DIR/hosts.yml: HTTP 404: Not Found (https://ghe.io/api/v3/)
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
 			`),
 		},
@@ -737,7 +779,8 @@ func Test_statusRun(t *testing.T) {
 				// Get scopes for monalisa-2
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 				// Error getting scopes for monalisa-ghe-2
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(404, "{}"))
+				reg.Register(httpmock.REST("GET", "api/v3/"),
+					httpmock.StatusJSONResponse(404, map[string]string{"message": "Not Found"}))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
@@ -751,8 +794,7 @@ func Test_statusRun(t *testing.T) {
 				ghe.io
 				  X Failed to log in to ghe.io account monalisa-ghe-2 (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
-				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
-				  - To re-authenticate, run: gh auth refresh -h ghe.io
+				  - Could not verify the token in GH_CONFIG_DIR/hosts.yml: HTTP 404: Not Found (https://ghe.io/api/v3/)
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe-2
 			`),
 		},
