@@ -21,6 +21,8 @@ not public issues or pull requests.
 | Change API gateway routing | [`api_host`](api-host.md) and its [test harness](api-host-test-harness.md) |
 | Run or change live acceptance tests | [Acceptance README](../acceptance/README.md); running these requires explicitly authorized resources and credentials |
 | Prepare a pull request | [PR template](../.github/PULL_REQUEST_TEMPLATE.md) |
+| Maintain automated issue triage | [Issue triage reports](issue-triage.md) |
+| Reproduce command behavior against synthetic API, Git or configuration data | [`ghmock` skill](../.github/skills/ghmock/SKILL.md) |
 
 Acceptance tests create and modify real GitHub resources. They are not part of
 the ordinary unit-test loop; read their setup and cleanup requirements before

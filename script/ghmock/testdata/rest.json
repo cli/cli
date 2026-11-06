@@ -1,0 +1,569 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ghmock test description",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/binary": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Binary response",
+            "content": {
+              "application/octet-stream": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/archive": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "ZIP response",
+            "content": {
+              "application/zip": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "operationId": "meta/root",
+        "summary": "GitHub API Root",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/root"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}": {
+      "get": {
+        "operationId": "repos/get",
+        "summary": "Get a repository",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/full-repository"
+                },
+                "example": {
+                  "id": 1,
+                  "name": "Hello-World",
+                  "owner": {
+                    "login": "octocat",
+                    "id": 1
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/not_found"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "repos/delete",
+        "summary": "Delete a repository",
+        "responses": {
+          "204": {
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/issues/{issue_number}": {
+      "get": {
+        "operationId": "issues/get",
+        "summary": "Get an issue",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/issue"
+                },
+                "examples": {
+                  "default": {
+                    "$ref": "#/components/examples/issue"
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified"
+          },
+          "404": {
+            "$ref": "#/components/responses/not_found"
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/issues/comments": {
+      "get": {
+        "operationId": "issues/list-comments-for-repo",
+        "summary": "List issue comments for a repository",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/simple-user"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/contents/{path}": {
+      "get": {
+        "operationId": "repos/get-content",
+        "summary": "Get repository content",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/content-file"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "type": "file",
+                      "encoding": "base64",
+                      "path": "README.md",
+                      "content": "encoded content ..."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/issues": {
+      "post": {
+        "operationId": "issues/create",
+        "summary": "Create an issue",
+        "responses": {
+          "201": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/issue"
+                },
+                "examples": {
+                  "default": {
+                    "$ref": "#/components/examples/issue"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/not_found"
+          }
+        }
+      }
+    },
+    "/zen": {
+      "get": {
+        "operationId": "meta/get-zen",
+        "summary": "Get the Zen of GitHub",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user": {
+      "get": {
+        "operationId": "users/get-authenticated",
+        "summary": "Get the authenticated user",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/private-user"
+                    },
+                    {
+                      "$ref": "#/components/schemas/public-user"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "user_view_type",
+                    "mapping": {
+                      "private": "#/components/schemas/private-user",
+                      "public": "#/components/schemas/public-user"
+                    }
+                  }
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "login": "octocat",
+                      "id": 1,
+                      "plan": {
+                        "name": "pro"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "operationId": "activity/list-public-events",
+        "summary": "List public events",
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "actor": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "repo": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "not_found": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/basic-error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "root": {
+        "type": "object",
+        "properties": {
+          "current_user_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "current_user_url"
+        ]
+      },
+      "basic-error": {
+        "title": "Basic Error",
+        "description": "Basic Error",
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "documentation_url": {
+            "type": "string"
+          }
+        }
+      },
+      "simple-user": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "login",
+          "id"
+        ]
+      },
+      "nullable-simple-user": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "login",
+          "id"
+        ]
+      },
+      "issue": {
+        "description": "Issues are a great way to keep track of tasks.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/nullable-simple-user"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "color": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "title",
+          "state",
+          "user",
+          "labels",
+          "created_at"
+        ]
+      },
+      "minimal-repository": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/simple-user"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "owner"
+        ]
+      },
+      "full-repository": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/minimal-repository"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "subscribers_count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "subscribers_count"
+            ]
+          }
+        ]
+      },
+      "content-file": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "file"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "encoding": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "path",
+          "content"
+        ]
+      },
+      "private-user": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "user_view_type": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "space": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "space"
+            ]
+          }
+        },
+        "required": [
+          "login",
+          "id",
+          "plan"
+        ]
+      },
+      "public-user": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "user_view_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "login",
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "examples": {
+      "issue": {
+        "value": {
+          "id": 1,
+          "number": 1347,
+          "title": "Found a bug",
+          "body": "I'm having a problem with this.",
+          "state": "open",
+          "user": {
+            "login": "octocat",
+            "id": 1
+          },
+          "labels": [
+            {
+              "name": "bug",
+              "color": "f29513"
+            }
+          ],
+          "created_at": "2011-04-22T13:33:48Z"
+        }
+      }
+    }
+  }
+}
