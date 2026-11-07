@@ -302,12 +302,84 @@ async function saveComment(api, context, body, previous) {
   }
 }
 
+function literalCodeAt(content, end) {
+  const lines = content.slice(0, end).split("\n");
+  // Keep containers literal instead of partially parsing their nested Markdown.
+  if (lines.some(line => /^[ \t]*(?:>|[-+*][ \t]+|[0-9]+[.)][ \t]+)/.test(line))) return true;
+  let fence = "";
+  let inline = 0;
+  for (const line of lines) {
+    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && !marker[2].trim()) fence = "";
+      continue;
+    }
+    if (marker) {
+      fence = marker[1];
+      inline = 0;
+      continue;
+    }
+    for (let index = 0; index < line.length; index++) {
+      if (!inline && line[index] === "\\") {
+        index++;
+        continue;
+      }
+      if (line[index] !== "`") continue;
+      let next = index + 1;
+      while (line[next] === "`") next++;
+      const length = next - index;
+      if (!inline) inline = length;
+      else if (inline === length) inline = 0;
+      index = next - 1;
+    }
+  }
+  return Boolean(fence || inline || /^(?: {4}|\t)/.test(lines.at(-1)));
+}
+
+function fixtureURLAt(content, start) {
+  const suffix = content.slice(start);
+  const quote = content[start - 1];
+  const closing = { '"': '"', "'": "'", "`": "`", "<": ">" }[quote];
+  const markdownLink = !literalCodeAt(content, start) && /\]\(\s*$/.test(content.slice(0, start));
+  let parentheses = 0;
+  let end = 0;
+  for (; end < suffix.length; end++) {
+    const character = suffix[end];
+    if (/\s/.test(character) || character === closing) break;
+    if ((closing || markdownLink) && character === "\\") {
+      end++;
+      continue;
+    }
+    if (markdownLink && character === "(") parentheses++;
+    if (markdownLink && character === ")") {
+      if (parentheses === 0) break;
+      parentheses--;
+    }
+  }
+  const value = suffix.slice(0, end);
+  // Markdown escapes punctuation; those backslashes are not URL path separators.
+  return markdownLink ? value.replace(/\\([\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e])/g, "$1") : value;
+}
+
 async function checkPublicReferences(api, context, report) {
   const target = await api("GET", `repos/${context.repo}`);
   requireValue(typeof target.private === "boolean", "Could not verify the target repository's visibility");
   if (target.private) return;
   const content = [report.comment, ...Object.values(report.documents)].join("\n");
   const repositories = new Set();
+  // GitHub account names cannot contain periods, so this exact owner is fixture-only.
+  const isFixture = repo => repo.split("/")[0].toLowerCase() === "example.invalid";
+  for (const match of content.matchAll(/https:\/\/github\.com\/example\.invalid[/\\]/gi)) {
+    // Markdown unescaping must not hide an owner escape in literal output.
+    const literal = new URL(content.slice(match.index).match(/^\S+/)[0]);
+    requireValue(isFixture(literal.pathname.slice(1)),
+      "A fixture URL escapes the synthetic repository owner; refusing publication");
+    const url = new URL(fixtureURLAt(content, match.index));
+    requireValue(!/%(?:25|2f|5c)/i.test(url.pathname),
+      "A fixture URL contains an ambiguous encoded path; refusing publication");
+    requireValue(isFixture(url.pathname.slice(1)),
+      "A fixture URL escapes the synthetic repository owner; refusing publication");
+  }
   for (const match of content.matchAll(/https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?=[/#?\s)]|$)/g)) {
     repositories.add(match[1]);
   }
@@ -316,6 +388,7 @@ async function checkPublicReferences(api, context, report) {
   }
   for (const repo of repositories) {
     if (repo === context.repo) continue;
+    if (isFixture(repo)) continue;
     const referenced = await api("GET", `repos/${repo}`);
     requireValue(referenced.private === false, "A report references a non-public repository; refusing publication");
   }

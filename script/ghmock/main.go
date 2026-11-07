@@ -48,19 +48,23 @@ Commands:
   export   Write runs, requests and responses to a folder or portable archive
            ghmock export [--archive] [PATH]
   schema   Look up a GraphQL type or field, or a REST request, in GitHub's schemas
-           ghmock schema Issue | Issue.title | 'GET /repos/octo/hello' [--status N] [--at PATH]
+           ghmock schema Issue | Issue.title | 'GET /repos/example.invalid/hello' [--status N] [--at PATH]
   schemas  Download GitHub's schemas again
            ghmock schemas update
 
 gh talks to ghmock as if it were github.com, so run commands as a report wrote
 them. ghmock answers HTTPS for every host gh connects to, with certificates
 from a throwaway authority that gh trusts through SSL_CERT_FILE. Requests are
-named "METHOD /path" for REST, such as "GET /repos/octo/hello", "graphql
+named "METHOD /path" for REST, such as "GET /repos/example.invalid/hello", "graphql
 OperationName" for GraphQL, such as "graphql IssueByNumber", and "METHOD
 host/path" for other hosts, such as "GET uploads.github.com/upload".
 GraphQL requests use operationName when supplied. Comparisons include REST
 query strings and GraphQL query text and variables, for reads and writes.
 The default log selects the latest completed run, even if it made no requests.
+
+Use example.invalid/hello for synthetic repositories. GitHub account names
+cannot contain periods, so these URLs cannot identify a real repository.
+Keep github.com as the host.
 
 GraphQL placeholders are minimal: each list has one item, numbers are 1,
 strings are the field's name and booleans are false, except has...Enabled
@@ -144,8 +148,8 @@ an existing file. Extract into an empty folder; portable linked worktrees need
 Git 2.48 or newer. Explicit directory exports keep their existing behavior.
 
 Git uses real repositories, not canned command output:
-  ghmock repo octo/hello
-  ghmock git -- clone https://github.com/octo/hello.git main
+  ghmock repo example.invalid/hello
+  ghmock git -- clone https://github.com/example.invalid/hello.git main
   ghmock write main/example.txt --text 'first version'
   ghmock git --in main -- add example.txt
   ghmock git --in main -- commit -m 'Add example'

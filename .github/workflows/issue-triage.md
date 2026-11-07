@@ -433,13 +433,18 @@ them:
   or setup couldn't get it.
 
 1. Choose the `gh` command the report describes. For API-only commands outside a
-   checkout, use `-R owner/repo`, with a placeholder such as `octo/hello` unless the
+   checkout, use `-R owner/repo`, with a placeholder such as `example.invalid/hello` unless the
    name matters. For local Git behavior, prepare remotes with `ghmock repo`, files
    with `ghmock write`, and commits, branches and worktrees with `ghmock git`. Use
    `ghmock run --in DIR` to select the checkout or worktree, not `-R` as a substitute
    for local state. Each build gets its own copy of the complete Git fixture. `gh`
    talks to ghmock as if it were github.com, so keep the report's `--hostname` flags
    and github.com URLs as written.
+   Use `example.invalid` as the owner of synthetic GitHub repositories, including
+   repository URLs returned by API fixtures. GitHub account names cannot contain
+   periods, so this exact owner identifies test data without a live visibility
+   lookup. Keep `github.com` as the host and copy captured output unchanged.
+   Other repository references must still be verifiably public.
    For account or configuration cases, supply a synthetic directory with
    `--config-dir DIR`. Each build receives its own writable copy. Never copy real
    credentials. This supplies files, not an OS keyring.
