@@ -61,6 +61,13 @@ documents, not the archives managed by `gh run download`. The publishing job use
 a checksum-pinned `gh` release and a repository-scoped GitHub App token with
 `issues: write`. The agent does not receive that token.
 
+Synthetic repositories use the owner `example.invalid`, including URLs returned
+by reproduction fixtures. GitHub account names cannot contain periods, so the
+publisher skips live visibility lookups only for that exact owner. Captured
+commands and output remain unchanged. Other GitHub references, including those
+inside command output, still block public publication when they are private or
+their visibility cannot be verified.
+
 Artifact numbers are tracked per report type in checksum-protected bot comment
 metadata. The latest verified comment identifies the current report of each type.
 Ownership checks also use the bot identity, content checksum, and

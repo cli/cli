@@ -14,7 +14,8 @@ import (
 const (
 	placeholderTime = "2026-01-01T00:00:00Z"
 	placeholderDate = "2026-01-01"
-	placeholderURL  = "https://github.com/owner/name"
+	placeholderRepo = "example.invalid/name"
+	placeholderURL  = "https://github.com/" + placeholderRepo
 	placeholderOID  = "0123456789abcdef0123456789abcdef01234567"
 )
 
@@ -221,7 +222,7 @@ func (s *gqlScaffolder) scalar(scalar, field, parent string) any {
 	case "GitRefname":
 		return "refs/heads/main"
 	case "GitSSHRemote":
-		return "git@github.com:owner/name.git"
+		return "git@github.com:" + placeholderRepo + ".git"
 	case "HTML":
 		return "<p>" + field + "</p>"
 	case "Base64String":
@@ -229,7 +230,7 @@ func (s *gqlScaffolder) scalar(scalar, field, parent string) any {
 	}
 	if field == "nameWithOwner" {
 		// gh splits this at the slash.
-		return "owner/name"
+		return placeholderRepo
 	}
 	return field
 }

@@ -219,7 +219,7 @@ func TestCmdScaffold(t *testing.T) {
 			args:       []string{"graphql RepoIssue"},
 			wantStdout: "graphql RepoIssue: added response 1 of 1 with placeholder values\n",
 			want: `{"graphql RepoIssue":[{"body":{"data":{"repository":{
-				"id":"Repository_1","name":"name","nameWithOwner":"owner/name","url":"https://github.com/owner/name","hasIssuesEnabled":true,
+				"id":"Repository_1","name":"name","nameWithOwner":"example.invalid/name","url":"https://github.com/example.invalid/name","hasIssuesEnabled":true,
 				"issue":{"number":1,"title":"title","state":"OPEN","createdAt":"2026-01-01T00:00:00Z","assignees":[{"login":"login"}],"author":{"login":"login"}},
 				"labels":{"nodes":[{"name":"name"}],"totalCount":1}
 			}}}}]}`,
@@ -285,7 +285,7 @@ func TestCmdScaffold(t *testing.T) {
 			args:       []string{"graphql RepoName"},
 			wantStdout: "graphql RepoName: response 1 of 1: added data.repository.nameWithOwner, data.repository.labels\n",
 			want: `{"graphql RepoName":[{"body":{"data":{"repository":{
-				"name":"hello","nameWithOwner":"owner/name","issue":null,"labels":{"totalCount":1}
+				"name":"hello","nameWithOwner":"example.invalid/name","issue":null,"labels":{"totalCount":1}
 			}}}}]}`,
 		},
 		{
@@ -325,7 +325,7 @@ func TestCmdScaffold(t *testing.T) {
 			},
 			args:       []string{"graphql RepoName"},
 			wantStdout: "graphql RepoName: added response 1 of 1 with placeholder values\n",
-			want:       `{"graphql RepoName":[{"body":{"data":{"repository":{"name":"name","nameWithOwner":"owner/name"}}}}]}`,
+			want:       `{"graphql RepoName":[{"body":{"data":{"repository":{"name":"name","nameWithOwner":"example.invalid/name"}}}}]}`,
 		},
 		{
 			name: "only the most recent run that sent the request counts",
@@ -370,7 +370,7 @@ func TestCmdScaffold(t *testing.T) {
 			name:       "without an example, the body gets placeholders",
 			args:       []string{"GET /"},
 			wantStdout: "GET /: added response 1 of 1 with placeholder values\n",
-			want:       `{"GET /":[{"body":{"current_user_url":"https://github.com/owner/name"}}]}`,
+			want:       `{"GET /":[{"body":{"current_user_url":"https://github.com/example.invalid/name"}}]}`,
 		},
 		{
 			name:       "the first documented success status",

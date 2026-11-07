@@ -308,6 +308,15 @@ async function checkPublicReferences(api, context, report) {
   if (target.private) return;
   const content = [report.comment, ...Object.values(report.documents)].join("\n");
   const repositories = new Set();
+  // GitHub account names cannot contain periods, so this exact owner is fixture-only.
+  const isFixture = repo => repo.split("/")[0].toLowerCase() === "example.invalid";
+  for (const match of content.matchAll(/https:\/\/github\.com\/example\.invalid[/\\]/gi)) {
+    const url = new URL(content.slice(match.index).match(/^\S+/)[0]);
+    requireValue(!/%(?:25|2f|5c)/i.test(url.pathname),
+      "A fixture URL contains an ambiguous encoded path; refusing publication");
+    requireValue(isFixture(url.pathname.slice(1)),
+      "A fixture URL escapes the synthetic repository owner; refusing publication");
+  }
   for (const match of content.matchAll(/https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?=[/#?\s)]|$)/g)) {
     repositories.add(match[1]);
   }
@@ -316,6 +325,7 @@ async function checkPublicReferences(api, context, report) {
   }
   for (const repo of repositories) {
     if (repo === context.repo) continue;
+    if (isFixture(repo)) continue;
     const referenced = await api("GET", `repos/${repo}`);
     requireValue(referenced.private === false, "A report references a non-public repository; refusing publication");
   }

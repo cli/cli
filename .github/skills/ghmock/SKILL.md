@@ -22,6 +22,13 @@ Use synthetic accounts, tokens, repositories and files. Never copy the
 operator's configuration, credentials or Git checkout into a fixture.
 Configuration fixtures do not isolate an OS keyring.
 
+Use `example.invalid` as the owner of synthetic GitHub repositories, including
+their API response URLs. GitHub account names cannot contain periods, so this
+namespace cannot refer to a real account. The triage publisher recognizes it as
+test data without rewriting captured output or looking up a real repository.
+Keep `github.com` as the host. If the reported repository name matters to the
+behavior, preserve it; real GitHub references still require visibility checks.
+
 Use a task-owned `GHMOCK_DIR`; the default temporary state directory may be
 shared with another investigation. `ghmock reset` deletes all responses, logs,
 saved runs and retained Git/configuration state there.
@@ -100,7 +107,7 @@ Repeat `--gh` to run equivalent conditions through separate executables:
 
 ```sh
 ghmock run --gh "$REPORTED_BUILD" --gh "$RELEASE_BUILD" --gh "$SOURCE_BUILD" \
-  --timeout 30s -- pr view 123 -R octo/hello
+  --timeout 30s -- pr view 123 -R example.invalid/hello
 ```
 
 Identify which build is the baseline. Compare the reported exit statuses,
@@ -114,8 +121,8 @@ data.
 Prepare remotes, files, commits, branches and linked worktrees with the helper:
 
 ```sh
-ghmock repo octo/hello
-ghmock git -- clone https://github.com/octo/hello.git main
+ghmock repo example.invalid/hello
+ghmock git -- clone https://github.com/example.invalid/hello.git main
 ghmock write main/example.txt --text 'first version'
 ghmock git --in main -- add example.txt
 ghmock git --in main -- commit -m 'Add example'

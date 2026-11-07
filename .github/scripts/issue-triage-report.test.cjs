@@ -28,6 +28,34 @@ const duplicateInput = () => {
   });
   return data;
 };
+const fixtureURL = "https://github.com/example.invalid/hello/pull/1";
+const fixtureInput = () => {
+  const data = input();
+  Object.assign(decision(data), {
+    outcome: "partial",
+    comment: `**Partly reproduced on 2.46.0 and 2.103.3.**
+
+Using test data, both builds created the pull request before requesting reviewers:
+
+\`\`\`console
+$ gh pr create -f -r monalisa
+${fixtureURL}
+\`\`\`
+
+**Exit status:** \`0\`.
+
+The test did not reproduce GitHub's automatic CODEOWNERS assignment.`,
+    reproduction_log: `Synthetic repository: \`example.invalid/hello\`.
+
+\`\`\`console
+$ gh pr create -f -r monalisa
+${fixtureURL}
+\`\`\`
+
+Both builds exited 0. Captured stdout: \`${fixtureURL}\`.`,
+  });
+  return data;
+};
 
 test("parseReport", async t => {
   const cases = [
@@ -171,6 +199,7 @@ function fakeAPI(options = {}) {
     if (failure) throw failure instanceof Error ? failure : new Error("Injected request failure");
     if (endpoint === "repos/octo/hello") return { private: options.private ?? true };
     if (endpoint === "repos/hidden/project") return { private: true };
+    if (endpoint === "repos/public/project") return { private: false };
     if (endpoint === "repos/octo/hello/issues/12") return { state: options.closed ? "closed" : "open", locked: false, ...(options.pr ? { pull_request: {} } : {}) };
     if (method === "GET" && endpoint.includes("/artifacts?")) return structuredClone(artifacts);
     if (method === "GET" && /\/artifacts\/\d+$/.test(endpoint)) {
@@ -630,6 +659,89 @@ test("publishReport", async t => {
     {
       name: "pull requests are not changed",
       options: { pr: true }, error: /not pull requests/,
+    },
+    {
+      name: "synthetic PR output publishes unchanged without a repository lookup",
+      data: fixtureInput,
+      options: { private: false },
+      check: ({ result, fake, files }) => {
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.artifacts.length, 4);
+        assert.equal(fake.comments.length, 1);
+        assert.ok(files["comment.md"].includes(`$ gh pr create -f -r monalisa\n${fixtureURL}\n`));
+        assert.ok(files["reproduction_log.md"].includes(`Captured stdout: \`${fixtureURL}\``));
+        assert.equal(fake.calls.filter(call => call.endpoint.startsWith("repos/example.invalid/")).length, 0);
+      },
+    },
+    {
+      name: "synthetic shorthand and mixed-case owners do not need visibility lookups",
+      data: fixtureInput,
+      options: { private: false },
+      change: data => decision(data).duplicate_analysis += "\nFixture: EXAMPLE.INVALID/hello#1.",
+      check: ({ result, fake }) => {
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.calls.filter(call => call.endpoint.startsWith("repos/EXAMPLE.INVALID/")).length, 0);
+      },
+    },
+    {
+      name: "public references alongside fixture output are still checked",
+      data: fixtureInput,
+      options: { private: false },
+      change: data => decision(data).investigation_notes = "See [source](https://github.com/public/project/blob/main/file.go).",
+      check: ({ result, fake }) => {
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.calls.filter(call => call.endpoint === "repos/public/project").length, 1);
+      },
+    },
+    ...[
+      "/../../hidden/project/issues/1",
+      "/%2e%2e/%2e%2e/hidden/project/issues/1",
+      "/..%2f..%2fhidden/project/issues/1",
+      "/%252e%252e/%252e%252e/hidden/project/issues/1",
+      "\\..\\..\\hidden\\project\\issues\\1",
+      "/step)/../../../hidden/project/issues/1",
+    ].map(suffix => ({
+      name: `fixture URL cannot escape its owner through ${suffix}`,
+      data: fixtureInput,
+      options: { private: false },
+      change: data => decision(data).investigation_notes = `See https://github.com/example.invalid/hello${suffix}`,
+      error: /fixture URL/,
+    })),
+    {
+      name: "ordinary fixture paths and encoded filename characters remain publishable",
+      data: fixtureInput,
+      options: { private: false },
+      change: data => decision(data).investigation_notes = "See https://github.com/example.invalid/hello/blob/main/.github/file%20name.md.",
+      check: ({ result }) => assert.deepEqual(result.failures, []),
+    },
+    {
+      name: "adjacent fixture links cannot hide a canonical owner escape",
+      data: fixtureInput,
+      options: { private: false },
+      change: data => decision(data).investigation_notes = "[a](https://github.com/example.invalid/hello)[b](https://github.com/example.invalid/hello/../../hidden/project/issues/1)",
+      error: /fixture URL/,
+    },
+    ...["example.invalid-extra", "prefix-example.invalid", "missing"].map(owner => ({
+      name: `${owner} is not the synthetic owner and a visibility 404 still blocks publication`,
+      data: fixtureInput,
+      options: { private: false, fail: (method, endpoint) =>
+        method === "GET" && endpoint === `repos/${owner}/project` && httpError(404) },
+      change: data => decision(data).investigation_notes = `See https://github.com/${owner}/project/issues/1.`,
+      error: /HTTP 404/,
+    })),
+    {
+      name: "private references in literal output are not exempted by the fixture namespace",
+      data: fixtureInput,
+      options: { private: false },
+      change: data => decision(data).reproduction_log += "\n```text\nhttps://github.com/hidden/project/pull/1\n```",
+      error: /non-public repository/,
+    },
+    {
+      name: "private shorthand alongside fixture output still blocks publication",
+      data: fixtureInput,
+      options: { private: false },
+      change: data => decision(data).investigation_notes = "See hidden/project#1.",
+      error: /non-public repository/,
     },
     {
       name: "private references block public publication",

@@ -26,6 +26,7 @@ func TestParseRepoArgs(t *testing.T) {
 		err  string
 	}{
 		{name: "defaults", args: []string{"octo/hello"}, want: repoOptions{name: "octo/hello", branch: "main"}},
+		{name: "synthetic namespace", args: []string{"example.invalid/hello"}, want: repoOptions{name: "example.invalid/hello", branch: "main"}},
 		{name: "host and branch", args: []string{"example.com/octo/hello.git", "--branch", "topic/one"}, want: repoOptions{name: "example.com/octo/hello.git", branch: "topic/one"}},
 		{name: "missing name", err: `invalid repository ""; use [HOST/]OWNER/REPO`},
 		{name: "path traversal", args: []string{"octo/.."}, err: `invalid repository "octo/.."; use [HOST/]OWNER/REPO`},
@@ -55,8 +56,10 @@ func TestCmdRepo(t *testing.T) {
 		branch    string
 		err       string
 		relative  bool
+		repo      string
 	}{
 		{name: "empty remote", args: []string{"octo/hello"}, host: dotcomHost, branch: "main"},
+		{name: "synthetic namespace", args: []string{"example.invalid/hello"}, host: dotcomHost, branch: "main", repo: "example.invalid/hello"},
 		{name: "relative state directory", args: []string{"octo/hello"}, host: dotcomHost, branch: "main", relative: true},
 		{name: "custom host and branch", args: []string{"example.com/octo/hello", "--branch", "topic/one"}, host: "example.com", branch: "topic/one"},
 		{name: "never overwrites", args: []string{"octo/hello"}, duplicate: true, err: "already exists"},
@@ -80,10 +83,14 @@ func TestCmdRepo(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, fmt.Sprintf("Created %s/octo/hello (branch %s)\nHTTPS: https://%s/octo/hello.git\nSSH: git@%s:octo/hello.git\n", tt.host, tt.branch, tt.host, tt.host), out.String())
+			repo := tt.repo
+			if repo == "" {
+				repo = "octo/hello"
+			}
+			assert.Equal(t, fmt.Sprintf("Created %s/%s (branch %s)\nHTTPS: https://%s/%s.git\nSSH: git@%s:%s.git\n", tt.host, repo, tt.branch, tt.host, repo, tt.host, repo), out.String())
 			st, err := openState()
 			require.NoError(t, err)
-			head, err := os.ReadFile(filepath.Join(gitRepoPath(st.gitFixtureDir(), tt.host, "octo/hello"), "HEAD"))
+			head, err := os.ReadFile(filepath.Join(gitRepoPath(st.gitFixtureDir(), tt.host, repo), "HEAD"))
 			require.NoError(t, err)
 			assert.Equal(t, "ref: refs/heads/"+tt.branch+"\n", string(head))
 		})
@@ -252,6 +259,11 @@ func TestCmdGit(t *testing.T) {
 			assert.Equal(t, "SSH", requests[0].Method)
 			assert.Equal(t, "git-upload-pack", requests[0].Git.Service)
 			assert.NotZero(t, requests[0].Git.ExitCode)
+		}},
+		{name: "synthetic namespace uses real Git transport", run: func(t *testing.T, st *state) {
+			require.NoError(t, cmdRepo([]string{"example.invalid/hello"}, io.Discard))
+			gitForTest(t, "--", "clone", "--quiet", "https://github.com/example.invalid/hello.git", "main")
+			assert.Equal(t, "https://github.com/example.invalid/hello.git\n", gitForTest(t, "--in", "main", "--", "remote", "get-url", "origin"))
 		}},
 		{name: "HTTPS clone fetch and push transfer real commits", run: func(t *testing.T, st *state) {
 			prepareGitRepo(t, "https://github.com/octo/hello.git")
