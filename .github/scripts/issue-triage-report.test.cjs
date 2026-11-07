@@ -683,6 +683,28 @@ test("publishReport", async t => {
         assert.equal(fake.calls.filter(call => call.endpoint.startsWith("repos/EXAMPLE.INVALID/")).length, 0);
       },
     },
+    ...[
+      {
+        name: "compact JSON keeps encoded non-URL values outside fixture validation",
+        output: `\`\`\`json\n["${fixtureURL}","feature%2Fbranch"]\n\`\`\``,
+      },
+      {
+        name: "adjacent Markdown links keep encoded paths outside the fixture URL",
+        output: "[fixture](https://github.com/example.invalid/hello/blob/main/file(one).md)[escaped](https://github.com/example.invalid/hello/blob/main/file\\(two\\).md)[docs](https://example.com/feature%2Fbranch)",
+      },
+    ].map(({ name, output }) => ({
+      name,
+      data: fixtureInput,
+      options: { private: false },
+      change: data => decision(data).reproduction_log += `\n${output}`,
+      check: ({ result, fake, files }) => {
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.artifacts.length, 4);
+        assert.equal(fake.comments.length, 1);
+        assert.ok(files["reproduction_log.md"].includes(output));
+        assert.equal(fake.calls.filter(call => call.endpoint.startsWith("repos/example.invalid/")).length, 0);
+      },
+    })),
     {
       name: "public references alongside fixture output are still checked",
       data: fixtureInput,
