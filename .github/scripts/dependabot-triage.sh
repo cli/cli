@@ -89,10 +89,11 @@ select_worklist() {
 		number=$(printf '%s' "$entry" | jq -r '.number')
 		head=$(printf '%s' "$entry" | jq -r '.head_sha')
 
+		# Match the marker's content, not its surrounding Markdown emphasis.
 		# shellcheck disable=SC2016
 		assessed=$(gh api "repos/$GITHUB_REPOSITORY/issues/$number/comments" --paginate \
 			--jq '.[] | select(.user.login == "cli-triage[bot]") | .body' |
-			grep -oE '_Assessed at head commit `[0-9a-f]{40}`\._' |
+			grep -oE 'Assessed at head commit `[0-9a-f]{40}`\.' |
 			tail -1 | grep -oE '[0-9a-f]{40}' || true)
 
 		if [ "$assessed" = "$head" ]; then

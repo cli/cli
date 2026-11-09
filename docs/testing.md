@@ -31,6 +31,15 @@ Report blocked checks honestly. These checks are not full CI parity; see
 [CI and live acceptance tests](#ci-and-live-acceptance-tests-are-different) below.
 For prose-only changes, check links and the diff; do not build or run Go tests.
 
+Workflow helper scripts have isolated tests using Node.js's built-in test runner.
+Run them with:
+
+```sh
+node --test .github/scripts/*.test.cjs
+```
+
+These tests stub GitHub calls and do not dispatch workflows or modify live resources.
+
 ## Choose the behavioral seam
 
 Command suites generally separate constructor tests from run-function tests.
