@@ -384,6 +384,72 @@ func TestPrMerge_blocked(t *testing.T) {
 		`, "`"), output.Stderr())
 }
 
+func TestPrMerge_unknown(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "UNKNOWN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge")
+	require.EqualError(t, err, "SilentError")
+
+	assert.Empty(t, output.String())
+	assert.Equal(t, heredoc.Docf(`
+		X Pull request OWNER/REPO#1 is not mergeable: the merge state is unknown.
+		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
+		To use administrator privileges to immediately merge the pull request, add the %[1]s--admin%[1]s flag.
+		`, "`"), output.Stderr())
+}
+
+func TestPrMerge_unknownAdmin(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "UNKNOWN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]any) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+		}),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, nil, "main", true, "pr merge 1 --admin --merge")
+	require.NoError(t, err)
+
+	assert.Empty(t, output.String())
+	assert.Equal(t, "✓ Merged pull request OWNER/REPO#1 (The title of the PR)\n", output.Stderr())
+}
+
 func TestPrMerge_dirty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

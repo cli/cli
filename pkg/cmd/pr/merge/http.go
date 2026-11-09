@@ -24,6 +24,7 @@ const (
 	MergeStateStatusDirty    = "DIRTY"
 	MergeStateStatusHasHooks = "HAS_HOOKS"
 	MergeStateStatusMerged   = "MERGED"
+	MergeStateStatusUnknown  = "UNKNOWN"
 	MergeStateStatusUnstable = "UNSTABLE"
 )
 

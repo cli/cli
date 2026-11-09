@@ -790,6 +790,11 @@ func blockedReason(status string, useAdmin bool) string {
 		return "the head branch is not up to date with the base branch"
 	case MergeStateStatusDirty:
 		return "the merge commit cannot be cleanly created"
+	case MergeStateStatusUnknown:
+		if useAdmin {
+			return ""
+		}
+		return "the merge state is unknown"
 	default:
 		return ""
 	}
@@ -797,7 +802,7 @@ func blockedReason(status string, useAdmin bool) string {
 
 func allowsAdminOverride(status string) bool {
 	switch status {
-	case MergeStateStatusBlocked, MergeStateStatusBehind:
+	case MergeStateStatusBlocked, MergeStateStatusBehind, MergeStateStatusUnknown:
 		return true
 	default:
 		return false
