@@ -422,15 +422,20 @@ denies a whole command line that includes any other program, such as `mkdir`, `s
 it off with `head`. It explains responses that placeholders don't cover, such as GraphQL
 errors and pagination.
 
-The `gh` builds are at `/opt/ghmock/builds/<name>/gh`, and `ls /opt/ghmock/builds` lists
-them:
+Read `/opt/ghmock/builds.txt` for the verified executable paths and versions.
+Preparation has already run `gh version` for each listed build. Use those recorded
+versions; do not run version probes or execute the binaries directly. Builds that
+are not listed are unavailable for this run. An empty inventory says so explicitly.
+If the inventory is missing, say the prepared builds could not be verified.
 
-- `source`: built from the selected checkout, identified by its commit in the version
-  output. A manually selected feature branch is not the default branch.
+The inventory uses these build names:
+
+- `source`: built from the selected checkout, identified by its commit in the recorded
+  version. A manually selected feature branch is not the default branch.
 - `release`: the latest release.
 - `<version>`, such as `2.95.0`: each version the issue reports, such as in a
-  `gh version` line. If that path doesn't exist, the version isn't a published release
-  or setup couldn't get it.
+  `gh version` line. A version missing from the inventory isn't a published release
+  or preparation couldn't verify it.
 
 1. Choose the `gh` command the report describes. For API-only commands outside a
    checkout, use `-R owner/repo`, with a placeholder such as `example.invalid/hello` unless the
