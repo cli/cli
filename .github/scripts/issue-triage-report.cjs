@@ -76,18 +76,20 @@ function parseReport(output, context, sanitize) {
   requireValue(["duplicate", "other", ...Object.keys(openings)].includes(item.outcome), "Invalid triage outcome");
 
   const labels = output.items.filter(item => item.type === "add_labels").flatMap(item => {
-    requireValue(item.item_number === context.issue, "Label suggestions target a different issue");
-    requireValue(!item.repo || item.repo === context.repo, "Label suggestions target a different repository");
-    requireValue(Array.isArray(item.labels), "Label suggestions must be a list");
+    requireValue(item.item_number === context.issue, "Label updates target a different issue");
+    requireValue(!item.repo || item.repo === context.repo, "Label updates target a different repository");
+    requireValue(Array.isArray(item.labels), "Label updates must be a list");
     return item.labels;
   });
-  requireValue(labels.length <= 3, "At most three label suggestions are allowed");
-  requireValue(new Set(labels.map(label => label.name)).size === labels.length, "Do not repeat label suggestions");
+  requireValue(labels.length <= 3, "At most three label updates are allowed");
+  requireValue(new Set(labels.map(label => label.name)).size === labels.length, "Do not repeat label updates");
   for (const label of labels) {
-    requireValue(label.suggest === true && ["HIGH", "MEDIUM", "LOW"].includes(label.confidence), "Labels must be suggestions with confidence");
-    requireValue(/^[a-z][a-z0-9-]*$/.test(label.name) && label.name !== "needs-triage", "Invalid label suggestion");
+    // gh-aw omits suggest:false when normalizing collected outputs.
+    requireValue((label.suggest === false || label.suggest === undefined) &&
+      ["HIGH", "MEDIUM", "LOW"].includes(label.confidence), "Labels must apply directly with confidence");
+    requireValue(/^[a-z][a-z0-9-]*$/.test(label.name) && label.name !== "needs-triage", "Invalid label update");
     label.rationale = text(label.rationale, "label rationale", 600, sanitize);
-    requireValue(label.rationale.length > 0, "Label suggestions need a reason");
+    requireValue(label.rationale.length > 0, "Label updates need a reason");
   }
 
   const documents = {};
@@ -98,13 +100,13 @@ function parseReport(output, context, sanitize) {
   requireValue(documents.duplicate_analysis, "Include the duplicate search result or its limitation");
   if (labels.length) {
     documents.label_reasoning = labels.map(label =>
-      `## \`${label.name}\`\n\n${label.rationale}\n\nConfidence: ${label.confidence.toLowerCase()}. Suggestion only.`
+      `## \`${label.name}\`\n\n${label.rationale}\n\nConfidence: ${label.confidence.toLowerCase()}.`
     ).join("\n\n");
   }
 
   let comment;
   if (item.outcome === "duplicate") {
-    requireValue(labels.length === 1 && labels[0].name === "duplicate", "A duplicate can suggest only duplicate");
+    requireValue(labels.length === 1 && labels[0].name === "duplicate", "A duplicate can apply only duplicate");
     requireValue(!documents.reproduction_log && !documents.investigation_notes, "Stop investigation after finding a duplicate");
     requireValue(/^[1-9]\d*$/.test(item.duplicate_issue ?? "") && Number(item.duplicate_issue) !== context.issue, "Choose another issue as the duplicate");
     const reason = text(item.duplicate_reason ?? "", "duplicate reason", 500, sanitize);
@@ -112,14 +114,14 @@ function parseReport(output, context, sanitize) {
     requireValue(!item.comment, "The duplicate comment is generated from duplicate_issue and duplicate_reason");
     comment = `I believe this is a duplicate of [#${item.duplicate_issue}](https://github.com/cli/cli/issues/${item.duplicate_issue}) because ${reason}.`;
   } else {
-    requireValue(!labels.some(label => label.name === "duplicate"), "Only a confirmed duplicate may suggest duplicate");
+    requireValue(!labels.some(label => label.name === "duplicate"), "Only a confirmed duplicate may apply duplicate");
     comment = text(item.comment, "comment", 2500, sanitize);
     requireValue(comment, "Include a short comment");
     const blocks = fencedBlocks(comment);
     requireValue(blocks.length <= 1 && blocks.every(block => block.length <= 5), "Use at most one five-line command/output block");
     const prose = comment.replace(/```[\s\S]*?```/g, "").replace(/`[^`]*`/g, "");
     requireValue(!/<\/?[A-Za-z!]/.test(prose), "Do not supply HTML or details blocks in the visible comment");
-    requireValue(!/\b(?:no (?:matching |clear )?duplicates?|duplicate (?:search|analysis|check)|suggest(?:ing|ed)? (?:the )?labels?|priority-[123]|off-schema|scaffold(?:ed|ing)?)\b/i.test(prose),
+    requireValue(!/\b(?:no (?:matching |clear )?duplicates?|duplicate (?:search|analysis|check)|(?:suggest(?:ing|ed)?|apply|applying|applied) (?:the )?labels?|priority-[123]|off-schema|scaffold(?:ed|ing)?)\b/i.test(prose),
       "Keep label reasoning, negative duplicate discussion, and test machinery out of the visible comment");
     if (openings[item.outcome]) {
       requireValue(comment.startsWith(`**${openings[item.outcome]} `), "Start with the selected reproduction outcome in bold");

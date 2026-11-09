@@ -7,7 +7,7 @@ const comment = "**Reproducible on 2.83.2.**\n\nUsing test data for a failed wor
 const input = () => ({
   items: [
     { type: "add_labels", item_number: 12, labels: [
-      { name: "bug", rationale: "The command returned success for a failed run.", confidence: "HIGH", suggest: true },
+      { name: "bug", rationale: "The command returned success for a failed run.", confidence: "HIGH", suggest: false },
     ] },
     { type: "publish_triage", outcome: "reproduced", comment,
       duplicate_analysis: "Searched open and closed issues. The closest report concerned a different command.",
@@ -20,7 +20,7 @@ const identity = text => text;
 const decision = data => data.items.find(item => item.type === "publish_triage");
 const duplicateInput = () => {
   const data = input();
-  data.items[0].labels = [{ name: "duplicate", rationale: "Both reports describe the same log flag behavior.", confidence: "HIGH", suggest: true }];
+  data.items[0].labels = [{ name: "duplicate", rationale: "Both reports describe the same log flag behavior.", confidence: "HIGH", suggest: false }];
   Object.assign(decision(data), {
     outcome: "duplicate", comment: "", duplicate_issue: "10",
     duplicate_reason: "both reports describe a successful exit for failed-run logs",
@@ -64,7 +64,7 @@ test("parseReport", async t => {
       check: report => {
         assert.equal(report.comment, comment);
         assert.equal(Object.keys(report.documents).length, 4);
-        assert.match(report.documents.label_reasoning, /The command returned success for a failed run/);
+        assert.equal(report.documents.label_reasoning, "## `bug`\n\nThe command returned success for a failed run.\n\nConfidence: high.");
         assert.ok(wordCount(report.comment) < 130);
       },
     },
@@ -105,7 +105,7 @@ test("parseReport", async t => {
       },
     },
     {
-      name: "other issue with no label suggestions",
+      name: "other issue with no label updates",
       change: data => {
         data.items.shift();
         Object.assign(decision(data), { outcome: "other", comment: "This would add a new option.", reproduction_log: "", investigation_notes: "" });
@@ -135,7 +135,34 @@ test("parseReport", async t => {
     { name: "no second comment", change: data => data.items.push({ type: "add_comment" }), error: /another comment/ },
     { name: "spam cannot publish", change: data => data.items.push({ type: "apply_suspected_spam" }), error: /spam action/ },
     { name: "unknown outcome", change: data => decision(data).outcome = "confirmed", error: /Invalid triage outcome/ },
-    { name: "labels are suggestions", change: data => data.items[0].labels[0].suggest = false, error: /suggestions/ },
+    { name: "label suggestions are rejected", change: data => data.items[0].labels[0].suggest = true, error: /apply directly/ },
+    {
+      name: "normalized direct labels omit suggest",
+      change: data => delete data.items[0].labels[0].suggest,
+      check: report => assert.equal(report.documents.label_reasoning, "## `bug`\n\nThe command returned success for a failed run.\n\nConfidence: high."),
+    },
+    { name: "direct label mode cannot be text", change: data => data.items[0].labels[0].suggest = "false", error: /apply directly/ },
+    { name: "direct label mode cannot be null", change: data => data.items[0].labels[0].suggest = null, error: /apply directly/ },
+    {
+      name: "normalized duplicate labels omit suggest",
+      data: duplicateInput,
+      change: data => delete data.items[0].labels[0].suggest,
+      check: report => assert.match(report.comment, /^I believe this is a duplicate of/),
+    },
+    { name: "direct labels still need confidence", change: data => delete data.items[0].labels[0].confidence, error: /confidence/ },
+    { name: "direct labels still need a reason", change: data => data.items[0].labels[0].rationale = "", error: /need a reason/ },
+    {
+      name: "three direct labels include the command family",
+      change: data => data.items[0].labels.push(
+        { name: "priority-3", rationale: "The failure affects a limited workflow.", confidence: "MEDIUM", suggest: false },
+        { name: "gh-run", rationale: "The report concerns gh run view.", confidence: "HIGH", suggest: false },
+      ),
+      check: report => {
+        assert.match(report.documents.label_reasoning, /## `gh-run`/);
+        assert.match(report.documents.label_reasoning, /Confidence: medium\./);
+        assert.doesNotMatch(report.documents.label_reasoning, /Suggestion only/);
+      },
+    },
     { name: "wrong label issue", change: data => data.items[0].item_number = 99, error: /different issue/ },
     { name: "wrong label repository", change: data => data.items[0].repo = "another/repo", error: /different repository/ },
     { name: "label cap", change: data => data.items[0].labels = Array(4).fill(data.items[0].labels[0]), error: /At most three/ },
@@ -146,7 +173,7 @@ test("parseReport", async t => {
     { name: "duplicate stops reproduction", data: duplicateInput, change: data => decision(data).reproduction_log = "Ran commands.", error: /Stop investigation/ },
     { name: "duplicate is another issue", data: duplicateInput, change: data => decision(data).duplicate_issue = "12", error: /another issue/ },
     { name: "duplicate reason is one sentence", data: duplicateInput, change: data => decision(data).duplicate_reason = "This is similar. Also another thing.", error: /one sentence/ },
-    { name: "uncertain match cannot suggest duplicate", change: data => data.items[0].labels[0].name = "duplicate", error: /Only a confirmed duplicate/ },
+    { name: "uncertain match cannot apply duplicate", change: data => data.items[0].labels[0].name = "duplicate", error: /Only a confirmed duplicate/ },
     { name: "no backend in reports", change: data => decision(data).reproduction_log += "\nghmock run", error: /not the test backend/ },
     {
       name: "a backend name in a hidden link destination is not visible prose",
@@ -162,6 +189,7 @@ test("parseReport", async t => {
     { name: "no backend in labels", change: data => data.items[0].labels[0].rationale = "ghmock showed it", error: /not the test backend/ },
     { name: "no negative search prose", change: data => decision(data).comment += "\nNo duplicate found.", error: /negative duplicate/ },
     { name: "no label prose", change: data => decision(data).comment += "\nSuggesting labels for this.", error: /label reasoning/ },
+    { name: "no applied-label prose", change: data => decision(data).comment += "\nApplied labels for this.", error: /label reasoning/ },
     { name: "wrong result heading", change: data => decision(data).outcome = "not_reproduced", error: /selected reproduction outcome/ },
     { name: "include reproduction log", change: data => decision(data).reproduction_log = "", error: /reproduction log/ },
     { name: "command must be gh", change: data => decision(data).comment = comment.replace("$ gh ", "$ curl "), error: /actual gh command/ },
@@ -200,7 +228,7 @@ function fakeAPI(options = {}) {
     if (endpoint === "repos/octo/hello") return { private: options.private ?? true };
     if (endpoint === "repos/hidden/project") return { private: true };
     if (endpoint === "repos/public/project") return { private: false };
-    if (endpoint === "repos/octo/hello/issues/12") return { state: options.closed ? "closed" : "open", locked: false, ...(options.pr ? { pull_request: {} } : {}) };
+    if (endpoint === "repos/octo/hello/issues/12") return { state: options.closed ? "closed" : "open", locked: options.locked ?? false, ...(options.pr ? { pull_request: {} } : {}) };
     if (method === "GET" && endpoint.includes("/artifacts?")) return structuredClone(artifacts);
     if (method === "GET" && /\/artifacts\/\d+$/.test(endpoint)) {
       detailReads++;
@@ -431,6 +459,23 @@ test("publishReport", async t => {
         assert.doesNotMatch(files["comment.md"], /<details>|Reproduction log|Investigation notes/);
       },
     },
+    ...["invalid", "off-topic"].map(label => ({
+      name: `${label} reports publish while the issue is open`,
+      change: data => {
+        data.items[0].labels[0].name = label;
+        Object.assign(decision(data), {
+          outcome: "other", comment: "This issue does not describe a supported GitHub CLI workflow.",
+          reproduction_log: "", investigation_notes: "",
+        });
+      },
+      check: ({ result, fake, files }) => {
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.artifacts.length, 2);
+        assert.equal(fake.comments.length, 1);
+        assert.match(files["label_reasoning.md"], new RegExp(`## \`${label}\``));
+        assert.doesNotMatch(files["label_reasoning.md"], /Suggestion only/);
+      },
+    })),
     {
       name: "partial artifact failure falls back without repeating successful writes",
       options: { fail: (method, endpoint, data) => method === "POST" && data?.name === "Reproduction log" },
@@ -655,6 +700,10 @@ test("publishReport", async t => {
     {
       name: "closed issues are not changed",
       options: { closed: true }, error: /closed or locked/,
+    },
+    {
+      name: "locked issues are not changed",
+      options: { locked: true }, error: /closed or locked/,
     },
     {
       name: "pull requests are not changed",

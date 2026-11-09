@@ -2,15 +2,15 @@
 description: |
   Agentic issue-triage for GitHub CLI. On newly opened issues it follows the
   team's shared triage skills (hosted in desktop/gh-cli-and-desktop-shared-workflows)
-  and suggests the minimal correct end-state labels (with issue-intents rationale and
-  confidence) so a maintainer can approve them, plus one short, plain-language comment.
+  and applies the minimal correct end-state labels (with issue-intents rationale and
+  confidence), plus one short, plain-language comment.
   Separate issue artifacts hold duplicate analysis, label reasoning, reproduction
   logs, and investigation notes. Bug reports include a minimal observed reproduction.
   Confirmed duplicates stop before further investigation. The objective is to drive the
   issue to a state where the needs-triage label is automatically removed.
 
-  Spam is the one exception to suggest-only: `suspected-spam` is applied directly so
-  the shared close-suspected-spam job can comment and close.
+  Spam keeps its separate `suspected-spam` action so the shared close-suspected-spam
+  job can comment and close without a triage report.
 
 # The cli/cli spam criteria. Imported rather than fetched on demand because
 # every issue needs them: you cannot conclude an issue is NOT spam without
@@ -101,6 +101,14 @@ tools:
     toolsets: [repos, issues, discussions]
     allowed-repos: ["desktop/gh-cli-and-desktop-shared-workflows", "cli/cli"]
     min-integrity: none
+
+jobs:
+  safe_outputs:
+    # Publish before labels can trigger the shared closing workflows.
+    needs: [publish_triage]
+    if: >-
+      !contains(needs.agent.outputs.output_types, 'add_labels') ||
+      needs.publish_triage.result == 'success'
 
 safe-outputs:
   # Preserve the reporting behavior from the v0.83.4 runtime.
@@ -329,7 +337,7 @@ When you apply `suspected-spam`:
   the closure message.
 
 Be conservative. A false positive closes a real user's issue, so when the evidence is
-mixed, suggest `more-info-needed` instead and let a human decide.
+mixed, apply `more-info-needed` instead and let a human decide.
 
 ## Step 3: Search for duplicates, then stop on a confirmed match
 
@@ -344,7 +352,7 @@ keywords, then discard the current issue from the results.
 
 If a candidate describes the same problem or requested behavior with high confidence:
 
-- Suggest only `duplicate`, with `suggest: true`, its reason, and confidence.
+- Apply only `duplicate`, with `suggest: false`, its reason, and confidence.
 - Call `publish_triage` with `outcome: duplicate`, the candidate's number in
   `duplicate_issue`, and a single sentence fragment in `duplicate_reason`.
 - Include the search evidence in `duplicate_analysis`. Do not supply `comment`,
@@ -376,9 +384,9 @@ or claim released support from trunk-only evidence.
 - Compare the desired behavior, not just the proposed flag or syntax. Distinguish
   full support, partial support, workarounds, and support that is not released yet.
 - If the behavior is already supported, give a short answer with a verified way to
-  use it. Do not suggest `enhancement` for the supported behavior.
+  use it. Do not apply `enhancement` for the supported behavior.
 - If only part is supported, separate it from the remaining gap. Check duplicates
-  for that gap before suggesting an enhancement. Ask for clarification only when
+  for that gap before applying `enhancement`. Ask for clarification only when
   it would identify a useful missing requirement.
 - If you cannot verify support, record that uncertainty rather than assuming the
   feature is absent. Do not call a workaround full support when it misses an
@@ -481,20 +489,26 @@ Preserve its arguments and shell quoting. If you reduce the command to make a sm
 example, run that reduced case before reporting it. Do not imply that test data was
 read from live GitHub: briefly say "using test data" when that distinction matters.
 
-## Step 6: Choose and suggest labels
+## Step 6: Choose and apply labels
 
-For a non-spam, non-duplicate issue, use `add-labels` to suggest appropriate labels (max 3,
-only from the allowlist above). **Emit these labels as suggestions requiring maintainer
-approval - never apply them directly.** Emit each label as an object with `name`,
-`rationale`, `confidence`, and `suggest: true`.
+For a non-spam, non-duplicate issue, use `add-labels` to apply appropriate labels (max 3,
+only from the allowlist above). **Apply labels directly, not as suggestions requiring
+maintainer approval.** Emit each label as an object with `name`, `rationale`,
+`confidence`, and `suggest: false`.
+
+The publishing job must succeed before these labels are applied. Invalid or missing
+reports block label application. Existing label-driven actions still run:
+`invalid` and `off-topic` close issues, while other labels can
+post standard comments, remove `needs-triage`, or start the no-response timer.
+Applying `duplicate` does not close the issue.
 
 When an issue concerns a specific `gh` command or command family, include the most
-specific matching `gh-*` command label as one of the suggestions. Suggest at most one
+specific matching `gh-*` command label as one of the labels. Apply at most one
 command label, choosing the primary affected command when several are mentioned. The
 command label counts toward the existing three-label maximum; do not omit it merely to
 leave an unused slot.
 
-Complete label suggestions before `publish_triage`. Its **Label reasoning** artifact
+Submit label decisions before `publish_triage`. Its **Label reasoning** artifact
 is generated from these same reasons and confidence values. Do not repeat them in
 the visible comment or submit a second label-reasoning document.
 
@@ -554,7 +568,7 @@ The same check returned failure as expected on 2.103.3.
 ```
 
 For the actual submission, use a fenced `console` block rather than the indentation
-used to nest this example. Do not discuss suggested labels or negative duplicate
+used to nest this example. Do not discuss label decisions or negative duplicate
 searches in `comment`. Do not mention ghmock, raw response setup, or internal
 artifact paths. Do not supply details blocks or artifact links; the publisher adds them.
 
@@ -570,7 +584,7 @@ artifact paths. Do not supply details blocks or artifact links; the publisher ad
 
 Each field becomes its own Markdown issue artifact. Do not combine reports or fill
 empty categories. The publisher separately generates **Label reasoning** from the
-label suggestions. Describe evidence and conclusions, not private model reasoning.
+label decisions. Describe evidence and conclusions, not private model reasoning.
 
 Readable reports must not mention ghmock. Exact launcher commands, response setup,
 and raw logs stay in the downloadable evidence. Refer to it as "run evidence" and
@@ -584,12 +598,12 @@ Do not use branch links, bare paths, or guessed SHAs.
 ## Constraints
 
 - Apply at most 3 labels from the allowlist. Do not invent labels.
-- `suspected-spam` is the only label you may apply directly. Everything else is a
-  suggestion.
+- Apply labels directly with `suggest: false`, rationale, and confidence.
+  `suspected-spam` uses its separate action.
 - Do not add or remove `needs-triage` - the shared triage workflows own that label.
 - Be conservative: when unsure, prefer fewer labels or none.
 - Do not classify into more than one branch at once (e.g., not both bug and enhancement).
-- For duplicates: suggest `duplicate` and link the original issue in your comment.
+- For duplicates: apply only `duplicate` and link the original issue in your comment.
 
 ---
 
