@@ -1,6 +1,7 @@
 package root
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -50,18 +51,36 @@ func NewCmdShellAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *co
 	return cmd
 }
 
+type aliasExpansionStackKey struct{}
+
 func NewCmdAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   aliasName,
 		Short: fmt.Sprintf("Alias for %q", text.Truncate(80, aliasValue)),
 		RunE: func(c *cobra.Command, args []string) error {
+			// Context is stored on the root by ExecuteContext; cobra does not
+			// copy it onto the matched child, so read it from Root().
+			ctx := context.Background()
+			if root := c.Root(); root != nil {
+				ctx = root.Context()
+			}
+			path := c.CommandPath()
+			stack, _ := ctx.Value(aliasExpansionStackKey{}).([]string)
+			for _, prev := range stack {
+				if prev == path {
+					cycle := append(append([]string{}, stack...), path)
+					return fmt.Errorf("infinite alias expansion: %s", strings.Join(cycle, " -> "))
+				}
+			}
+			ctx = context.WithValue(ctx, aliasExpansionStackKey{}, append(append([]string{}, stack...), path))
+
 			expandedArgs, err := expandAlias(aliasValue, args)
 			if err != nil {
 				return err
 			}
 			root := c.Root()
 			root.SetArgs(expandedArgs)
-			return root.Execute()
+			return root.ExecuteContext(ctx)
 		},
 		GroupID:            "alias",
 		DisableFlagParsing: true,
