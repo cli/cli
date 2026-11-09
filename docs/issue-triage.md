@@ -48,6 +48,18 @@ Leave `engine.model` unset so the workflow uses `gh aw`'s normal model selection
 `GH_AW_MODEL_DETECTION_COPILOT` selects the security-check model.
 Each falls back to `GH_AW_DEFAULT_MODEL_COPILOT`, then its `gh aw` default.
 
+## Prepared builds
+
+Trusted preparation records each executable's path and observed `gh version`
+line in `/opt/ghmock/builds.txt`. This includes the selected source build, the
+latest release alias, and any prepared reported releases. Failed version checks
+produce a warning and are omitted; no available builds produces an explicit
+empty inventory. Preparation remains nonfatal.
+
+The agent reads this inventory instead of discovering versions by running the
+binaries directly. Like the prepared executables, the inventory is mounted
+read-only in the sandbox. The existing shell permissions are unchanged.
+
 ## Publishing
 
 The agent calls `publish_triage` once after its label suggestions. The separate
@@ -116,6 +128,12 @@ The publisher has no npm dependencies. Its table tests use fake API clients:
 
 ```sh
 node --test .github/scripts/issue-triage-report.test.cjs
+```
+
+The preparation inventory tests use temporary directories and local fake builds:
+
+```sh
+node --test .github/scripts/issue-triage-ghmock.test.cjs
 ```
 
 Command display is covered by the existing `ghmock` run table:

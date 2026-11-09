@@ -12,6 +12,7 @@
 #   source    built from the selected checkout, which may be a feature branch
 #   release   the latest release
 #   X.Y.Z     each version the issue reports, such as "gh version X.Y.Z"
+# Verified executable paths and version lines are recorded in $GHMOCK_ROOT/builds.txt.
 #
 # Reproducing is an extra for triage, so this script never fails the job.
 # Whatever it can't prepare is left out, and the agent says what's missing.
@@ -120,6 +121,36 @@ issue_body() {
 	fi
 }
 
+# Direct build execution isn't allowlisted in the agent's sandbox, so verify
+# versions here rather than making the agent discover them.
+record_builds() {
+	local inventory binary version
+	inventory=$(mktemp "$root/builds.txt.XXXXXX") || return 1
+	for binary in "$root"/builds/*/gh; do
+		[ -x "$binary" ] || continue
+		if version=$("$binary" version) && [[ "$version" =~ ^gh\ version\ [^[:space:]]+ ]]; then
+			if ! printf '%s\n%s\n\n' "$binary" "${version%%$'\n'*}" >>"$inventory"; then
+				rm -f "$inventory"
+				return 1
+			fi
+		else
+			warn "Reading the version of $binary failed, so it isn't listed in the build inventory"
+		fi
+	done
+	if [ ! -s "$inventory" ]; then
+		if ! printf '%s\n' "No verified gh builds are available." >"$inventory"; then
+			rm -f "$inventory"
+			return 1
+		fi
+	fi
+	if ! chmod 644 "$inventory" || [ -d "$root/builds.txt" ] || ! mv "$inventory" "$root/builds.txt"; then
+		rm -f "$inventory"
+		return 1
+	fi
+	echo "Verified builds for the triage agent:"
+	cat "$root/builds.txt"
+}
+
 main() {
 	step "Creating $root" prepare_root || return 0
 	# Without ghmock, nothing else is any use.
@@ -142,9 +173,9 @@ main() {
 	for version in $(reported_versions "$body"); do
 		step "Downloading gh $version" download_release "$version"
 	done
-
-	echo "Builds for the triage agent:"
-	ls -1 "$root/builds"
 }
 
-main
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+	main
+	step "Recording prepared gh build versions" record_builds || exit 0
+fi
