@@ -172,6 +172,10 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
 	}
 
+	if e.Error != "" {
+		sb.WriteString(fmt.Sprintf("  - Error: %s\n", e.Error))
+	}
+
 	return sb.String()
 }
 
@@ -398,9 +402,6 @@ func statusRun(opts *StatusOptions) error {
 		fmt.Fprintf(stream, "%s\n", cs.Bold(hostname))
 		for i, entry := range entries {
 			fmt.Fprintf(stream, "%s", entry.String(cs))
-			if opts.IO.IsStderrTTY() && entry.Error != "" {
-				fmt.Fprintf(stream, "  - Error: %s\n", entry.Error)
-			}
 			if i < len(entries)-1 {
 				fmt.Fprint(stream, "\n")
 			}

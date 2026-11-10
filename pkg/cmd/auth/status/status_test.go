@@ -1112,9 +1112,7 @@ func Test_statusRun_errorDiagnostic(t *testing.T) {
 						  - Active account: true
 						  - The token in GH_TOKEN is invalid.
 					`)
-					if stderrTTY {
-						wantErrOut += fmt.Sprintf("  - Error: %s\n", tt.wantError)
-					}
+					wantErrOut += fmt.Sprintf("  - Error: %s\n", tt.wantError)
 					assert.Equal(t, wantErrOut, stderr.String())
 				})
 			}
