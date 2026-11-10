@@ -136,6 +136,54 @@ func Test_parseFields_nested(t *testing.T) {
 	`), "\n"), string(jsonData))
 }
 
+func Test_parseFields_nested_with_null(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	// Test case from issue #14983: gh api panics with nil pointer dereference
+	// when a magic field with literal value 'null' is used on nested array key
+	opts := ApiOptions{
+		IO: ios,
+		MagicFields: []string{
+			"a[][b]=null",
+			"a[][b]=x",
+		},
+	}
+
+	params, err := parseFields(&opts)
+	if err != nil {
+		t.Fatalf("parseFields error: %v", err)
+	}
+
+	// Expected: {"a":[{"b":null},{"b":"x"}]}
+	jsonData, err := json.Marshal(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := `{"a":[{"b":null},{"b":"x"}]}`
+	assert.Equal(t, expected, string(jsonData))
+}
+
+func Test_parseFields_magic_null_single(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	// Single null value should work
+	opts := ApiOptions{
+		IO: ios,
+		MagicFields: []string{
+			"field=null",
+		},
+	}
+
+	params, err := parseFields(&opts)
+	if err != nil {
+		t.Fatalf("parseFields error: %v", err)
+	}
+
+	expected := map[string]any{"field": nil}
+	assert.Equal(t, expected, params)
+}
+
 func Test_parseFields_errors(t *testing.T) {
 	ios, stdin, _, _ := iostreams.Test()
 	fmt.Fprint(stdin, "pasted contents")

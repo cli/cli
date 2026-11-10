@@ -140,11 +140,14 @@ func addParamsSlice(m map[string]any, prevkey, newkey string) (map[string]any, e
 				if lastMap, ok := lastItem.(map[string]any); ok {
 					if _, keyExists := lastMap[newkey]; !keyExists {
 						return lastMap, nil
+					} else if lastMap[newkey] == nil {
+						goto createNew
 					} else if reflect.TypeOf(lastMap[newkey]).Kind() == reflect.Slice {
 						return lastMap, nil
 					}
 				}
 			}
+		createNew:
 			newMap := make(map[string]any)
 			m[prevkey] = append(existSlice, newMap)
 			return newMap, nil
