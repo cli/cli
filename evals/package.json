@@ -1,0 +1,23 @@
+{
+  "name": "gh-event-evals",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
+    "test": "npm run build && node --test dist/*.test.js",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "1.0.15",
+    "@microsoft/vally": "0.19.0",
+    "@microsoft/vally-cli": "0.19.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.6",
+    "typescript": "5.9.3"
+  }
+}

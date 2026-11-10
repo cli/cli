@@ -1,0 +1,230 @@
+#!/bin/bash
+# Runs the event evals with `vally eval`. This script only translates options into vally's own
+# flags, stages the selected skill, and reports leftover cleanup; vally does the running and
+# reporting, and evals/dist/*-plugin.js supply the executor and graders.
+set -euo pipefail
+directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+checkout=$(CDPATH= cd -- "$directory/.." && pwd -P)
+vally="$directory/node_modules/.bin/vally"
+
+usage() {
+  cat <<'EOF'
+Usage: evals/run --live --gh PATH --model MODEL [options] SCENARIO...
+       evals/run --list
+       evals/run --live --cleanup PATH/TO/resources.json
+
+Options:
+  --live                 Explicitly authorize live resources in GH_EVAL_ORG
+  --gh PATH              Already-built gh binary the agent uses
+  --gh-skill DIR         The gh skill directory (this or --gh-skill-ref is required for --skill on/both)
+  --gh-skill-ref REV:PATH The gh skill from a Git revision, as a directory or its SKILL.md (e.g. trunk:skills/gh)
+  --model MODEL          Copilot model for the agent; graders use the same model
+  --skill on|off|both    Skill configurations to run (default: both)
+  --design-probe         Run the design-probe stimuli instead of the normal ones
+  --variant NAME         Run a named stimulus variant (eval, design-probe, raw-api)
+  --runs N               Trials per stimulus (default: from eval.yml)
+  --agent-budget DURATION Override the agent working budget for development runs
+  --output DIR           Results root outside the checkout (default: ~/.local/state/gh-event-evals)
+  -- ARGS...             Extra arguments passed to vally eval unchanged
+
+Live runs need GH_EVAL_HOST=github.com, GH_EVAL_ORG, GH_EVAL_TOKEN, and
+COPILOT_GITHUB_TOKEN, plus GH_EVAL_ACTOR_TOKEN for suites with a second actor,
+such as events. No operator credentials are inferred.
+EOF
+}
+
+if [ ! -x "$vally" ] || [ ! -f "$directory/dist/executor-plugin.js" ]; then
+  printf '%s\n' 'Build the evals first: npm --prefix evals ci && npm --prefix evals run build' >&2
+  exit 2
+fi
+
+live=false gh= skill_dir= skill_ref= model= skills=both variant=eval runs= cleanup= list=false agent_budget=
+output="${XDG_STATE_HOME:-$HOME/.local/state}/gh-event-evals"
+scenarios=() extra=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --help|-h) usage; exit 0 ;;
+    --list) list=true; shift ;;
+    --live) live=true; shift ;;
+    --gh) gh=${2:?--gh needs a path}; shift 2 ;;
+    --gh-skill) skill_dir=${2:?--gh-skill needs a directory}; shift 2 ;;
+    --gh-skill-ref) skill_ref=${2:?--gh-skill-ref needs REV:PATH}; shift 2 ;;
+    --model) model=${2:?--model needs a model}; shift 2 ;;
+    --skill) skills=${2:?--skill needs on, off, or both}; shift 2 ;;
+    --design-probe) variant=design-probe; shift ;;
+    --variant) variant=${2:?--variant needs a name}; shift 2 ;;
+    --runs) runs=${2:?--runs needs a number}; shift 2 ;;
+    --agent-budget) agent_budget=${2:?--agent-budget needs a duration}; shift 2 ;;
+    --output) output=${2:?--output needs a directory}; shift 2 ;;
+    --cleanup) cleanup=${2:?--cleanup needs a resources.json path}; shift 2 ;;
+    --) shift; extra=("$@"); break ;;
+    -*) printf 'Unknown option: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
+    *) scenarios+=("$1"); shift ;;
+  esac
+done
+
+if [ "$list" = true ]; then
+  for definition in "$directory"/suites/events/*/eval.yml; do
+    basename "$(dirname "$definition")"
+  done
+  exit 0
+fi
+if [ "$live" != true ]; then
+  printf '%s\n' 'Live operations create real GitHub resources; pass --live to authorize them.' >&2
+  exit 2
+fi
+if [ -n "$cleanup" ]; then
+  exec node "$directory/dist/cleanup.js" "$cleanup"
+fi
+
+case "$skills" in
+  on|off|both) ;;
+  *) printf '%s\n' '--skill must be on, off, or both' >&2; exit 2 ;;
+esac
+case "$variant" in
+  eval|design-probe|raw-api) ;;
+  *) printf '%s\n' '--variant must be one of: eval, design-probe, raw-api' >&2; exit 2 ;;
+esac
+if [ -z "$gh" ] || [ -z "$model" ] || [ ${#scenarios[@]} -eq 0 ]; then
+  usage >&2
+  exit 2
+fi
+if [ ! -f "$gh" ] || [ ! -x "$gh" ]; then
+  printf 'gh binary does not exist or is not executable: %s\nRun make from the repository root.\n' "$gh" >&2
+  exit 2
+fi
+if [ -n "$skill_dir" ] && [ -n "$skill_ref" ]; then
+  printf '%s\n' 'Use either --gh-skill or --gh-skill-ref, not both' >&2
+  exit 2
+fi
+skill_object= skill_name=
+if [ "$skills" != off ] && [ -n "$skill_ref" ]; then
+  # A ref name cannot contain ":", so the first one separates the revision from the path.
+  skill_rev=${skill_ref%%:*} skill_path=${skill_ref#*:}
+  skill_path=${skill_path%/}
+  if [ "$skill_rev" = "$skill_ref" ] || [ -z "$skill_rev" ] || [ -z "$skill_path" ]; then
+    printf '%s\n' '--gh-skill-ref must be REV:PATH, such as trunk:skills/gh' >&2
+    exit 2
+  fi
+  if ! skill_commit=$(git -C "$checkout" rev-parse --verify --quiet "$skill_rev^{commit}"); then
+    printf 'Unknown Git revision for --gh-skill-ref: %s\n' "$skill_rev" >&2
+    exit 2
+  fi
+  # Pin the commit so a moving ref such as trunk is read once and can be recorded.
+  skill_object=$skill_commit:$skill_path
+  case "$(git -C "$checkout" cat-file -t "$skill_object" 2>/dev/null)" in
+    tree) skill_name=$(basename -- "$skill_path"); git -C "$checkout" cat-file -e "$skill_object/SKILL.md" 2>/dev/null ;;
+    blob) skill_name=$(basename -- "$(dirname -- "$skill_path")"); [ "$(basename -- "$skill_path")" = SKILL.md ] ;;
+    *) false ;;
+  esac || {
+    printf '%s\n' '--gh-skill-ref must name a skill directory containing SKILL.md, or its SKILL.md file' >&2
+    exit 2
+  }
+  case "$skill_name" in .|..|/) skill_name=gh ;; esac
+elif [ "$skills" != off ] && { [ -z "$skill_dir" ] || [ ! -f "$skill_dir/SKILL.md" ]; }; then
+  printf '%s\n' '--gh-skill must be a skill directory containing SKILL.md (or use --gh-skill-ref) for --skill on/both' >&2
+  exit 2
+fi
+specs=()
+for scenario in "${scenarios[@]}"; do
+  spec="$directory/suites/events/$scenario/eval.yml"
+  if [ ! -f "$spec" ]; then
+    printf 'Unknown scenario: %s (see evals/run --list)\n' "$scenario" >&2
+    exit 2
+  fi
+  specs+=(--eval-spec "$spec")
+done
+
+output=$(node -e '
+const path = require("node:path"), fs = require("node:fs");
+let ancestor = path.resolve(process.argv[1]);
+const missing = [];
+for (;;) {
+  try { ancestor = fs.realpathSync(ancestor); break; }
+  catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    missing.unshift(path.basename(ancestor));
+    ancestor = path.dirname(ancestor);
+  }
+}
+console.log(path.join(ancestor, ...missing));' "$output")
+case "$output/" in
+  "$checkout"/*) printf '%s\n' '--output must be outside the checkout' >&2; exit 2 ;;
+esac
+mkdir -p "$output"
+
+export GH_EVAL_GH
+GH_EVAL_GH=$(CDPATH= cd -- "$(dirname -- "$gh")" && pwd -P)/$(basename -- "$gh")
+if [ -n "$agent_budget" ]; then export GH_EVAL_AGENT_BUDGET=$agent_budget; fi
+
+# vally runs from an empty directory, so neither the agent nor vally picks up this checkout's
+# AGENTS.md, .vally.yaml, or other configuration.
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/gh-event-evals.XXXXXX")
+trap 'rm -rf "$scratch"' EXIT
+mkdir "$scratch/work" "$scratch/skills"
+unset GH_EVAL_SKILL_SOURCE
+if [ -n "$skill_object" ]; then
+  mkdir "$scratch/skills/$skill_name"
+  if [ "$(git -C "$checkout" cat-file -t "$skill_object")" = tree ]; then
+    git -C "$checkout" archive --format=tar "$skill_object" | tar -x -C "$scratch/skills/$skill_name"
+  else
+    git -C "$checkout" cat-file blob "$skill_object" > "$scratch/skills/$skill_name/SKILL.md"
+  fi
+  export GH_EVAL_SKILL_SOURCE="$skill_object (from $skill_ref)"
+elif [ "$skills" != off ]; then
+  cp -R "$skill_dir" "$scratch/skills/$(basename -- "$skill_dir")"
+  export GH_EVAL_SKILL_SOURCE
+  GH_EVAL_SKILL_SOURCE=$(CDPATH= cd -- "$skill_dir" && pwd -P)
+fi
+if [ -n "${GH_EVAL_SKILL_SOURCE:-}" ]; then printf 'gh skill: %s\n' "$GH_EVAL_SKILL_SOURCE" >&2; fi
+
+node "$directory/dist/cleanup.js" --unfinished "$output"
+
+# vally cleans up live resources on INT or TERM. Ctrl+C reaches it directly, while TERM and HUP are forwarded. Either
+# way, wait for it to finish and do not start the next configuration. When this script runs as a background job, bash
+# ignores INT and the trap has no effect, so vally exiting from a signal also counts as an interruption.
+vally_pid=
+interrupted=
+stop() {
+  interrupted=$1
+  # vally cleans up only on INT or TERM, so HUP reaches it as TERM.
+  if [ "$1" != INT ] && [ -n "$vally_pid" ]; then kill -s TERM "$vally_pid" 2>/dev/null || true; fi
+}
+trap 'stop INT' INT
+trap 'stop TERM' TERM
+trap 'stop HUP' HUP
+
+# vally waits only --shutdown-timeout for the trial's teardown after a signal. One GitHub request with retries can take
+# about 3 minutes, so allow enough time for cleanup. A second Ctrl+C still exits at once.
+status=0
+for configuration in off on; do
+  if [ "$skills" != both ] && [ "$skills" != "$configuration" ]; then continue; fi
+  arguments=(eval "${specs[@]}"
+    --executor-plugin "$directory/dist/executor-plugin.js"
+    --grader-plugin "$directory/dist/grader-plugin.js"
+    --model "$model" --tag "variant=$variant"
+    --workers 1 --max-retries 0 --shutdown-timeout 5m
+    --work-dir "$scratch/work" --output-dir "$output/skill-$configuration")
+  if [ -n "$runs" ]; then arguments+=(--runs "$runs"); fi
+  if [ "$configuration" = on ]; then arguments+=(--skill-dir "$scratch/skills"); fi
+  printf '\n== gh skill %s ==\n' "$configuration" >&2
+  (cd "$scratch/work" && exec "$vally" "${arguments[@]}" ${extra[@]+"${extra[@]}"}) &
+  vally_pid=$!
+  code=0
+  wait "$vally_pid" || code=$?
+  while kill -0 "$vally_pid" 2>/dev/null; do
+    code=0
+    wait "$vally_pid" || code=$?
+  done
+  vally_pid=
+  if [ "$code" -ne 0 ]; then status=$code; fi
+  if [ -n "$interrupted" ] || [ "$code" -gt 128 ]; then break; fi
+done
+
+node "$directory/dist/cleanup.js" --unfinished "$output"
+case "$interrupted" in
+  INT) exit 130 ;;
+  TERM) exit 143 ;;
+  HUP) exit 129 ;;
+esac
+exit "$status"
