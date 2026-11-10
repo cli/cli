@@ -3,12 +3,12 @@
 [Development guides](README.md)
 
 The [issue-triage workflow](../.github/workflows/issue-triage.md) runs `gh` against
-test data. It suggests labels for maintainer approval, posts one short comment,
+test data. It applies labels directly, posts one short comment,
 and attaches separate Markdown reports when applicable:
 
 - **Duplicate analysis:** search evidence and limitations.
 - **Label reasoning:** generated from the same reasons and confidence sent to the
-  label suggestion system, not a second explanation written by the agent.
+  issue-intent label update, not a second explanation written by the agent.
 - **Reproduction log:** test conditions, actual `gh` commands, output, exit
   statuses, tested versions, and coverage limits.
 - **Investigation notes:** source evidence, likely causes, alternatives, and
@@ -19,9 +19,24 @@ collapsed **Supporting reports** summary. It shows a small command/output exampl
 not the test backend's setup. Test data must not be presented as live GitHub data.
 The raw evidence remains a workflow download.
 
-A confirmed duplicate takes an early exit: suggest only `duplicate`, publish the
+Comments may explain how to use labeling commands. Narration of the triage run's
+own label decisions belongs in **Label reasoning**, not the visible comment.
+
+A confirmed duplicate takes an early exit: apply only `duplicate`, publish the
 one-sentence explanation, and stop. No source investigation, reproduction, or
 automatic issue closure follows that decision.
+
+Label decisions keep their rationale and confidence, with `suggest: false`.
+The pinned runtime omits that false value from collected outputs and GraphQL
+updates. The publisher accepts either form and rejects `suggest: true`.
+The existing allowlist and three-label maximum are unchanged. A matching `gh-*`
+command-family label still counts toward that maximum.
+
+Existing label-driven actions remain active. `invalid` and `off-topic` close
+issues. `enhancement` posts the standard backlog comment. `unable-to-reproduce`
+requests more information, and `more-info-needed` starts the existing 14-day
+no-response timer. End-state labels still remove `needs-triage`.
+Spam keeps its separate direct-label action and shared closure message.
 
 ## Feature requests
 
@@ -30,8 +45,8 @@ using command help, documentation, or released source. Distinguish full support
 from partial support, a workaround, or unreleased behavior. A historical issue's
 claim that a feature is missing is not proof that it is still missing.
 
-If the behavior is supported, give a short verified answer rather than suggesting
-an enhancement for it. If a gap remains, check that gap for duplicates and suggest
+If the behavior is supported, give a short verified answer rather than applying
+`enhancement` for it. If a gap remains, check that gap for duplicates and label
 only genuinely new work. Ask for clarification only when it would help identify
 the gap. Do not promise implementation.
 
@@ -62,9 +77,17 @@ read-only in the sandbox. The existing shell permissions are unchanged.
 
 ## Publishing
 
-The agent calls `publish_triage` once after its label suggestions. The separate
+The agent calls `publish_triage` once after submitting its label decisions. The separate
 publishing job runs only after the security check succeeds. It checks out trusted
 source at the workflow's commit, not files modified by the agent.
+
+The native label job depends on `publish_triage` through `jobs.safe_outputs.needs`.
+When label outputs are present, that job also requires the publisher job to succeed.
+Missing reports, rejected output, or publishing failures block label application.
+Reports finish publishing before `invalid` or `off-topic` can trigger the shared
+closing workflows. The publisher still refuses closed or locked issues; it does
+not write reports after label-driven closure. Native outputs without labels and
+the separate spam action do not require a report.
 
 [The publisher](../.github/scripts/issue-triage-report.cjs) validates the output
 and uses the pinned gh-aw sanitizer. It creates Markdown issue artifacts through
@@ -108,8 +131,11 @@ further action, not blindly retried. If a reconciliation read also returns 404,
 the write remains unverified and is reported as a failure, not retried.
 
 Comments record whether publication completed and a checksum of the submitted
-content. A completed run is a no-op on retry, before any report reads or writes.
-An older run cannot replace reports after a newer run has published.
+content, including label reasons and confidence. A completed run is a no-op on
+retry only when the current content matches, before any report reads or writes.
+Changed decisions require a new run, so an earlier publication cannot authorize
+different labels. An older run cannot replace reports after a newer run has
+published.
 
 A partial run can repair its missing reports and update its existing fallback
 comment when the submitted content is unchanged. The bot-owned comment must still
