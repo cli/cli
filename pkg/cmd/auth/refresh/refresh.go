@@ -212,8 +212,11 @@ func refreshRun(opts *RefreshOptions) error {
 		//   - Refresh token rejected (expired or revoked): the dead credential is cleared and we proceed to re-auth,
 		//     which re-establishes the credential from scratch.
 		//   - Transient refresh failure or no refresher configured: the token stays as-is and GetScopes may fail.
+		//   - Refresh skipped because the state directory is not writable: the current token is returned with an
+		//     error, but it may still be valid within the refresh window, so we still try to read its scopes.
 		var scopesPreserved bool
-		if oldCredential, _, err := authCfg.ActiveTokenWithRefresh(hostname); err == nil && oldCredential.Token != "" {
+		oldCredential, refreshStatus, err := authCfg.ActiveTokenWithRefresh(hostname)
+		if (err == nil || refreshStatus == gh.RefreshStatusSkipped) && oldCredential.Token != "" {
 			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldCredential.Token); err == nil {
 				scopesPreserved = true
 				for s := range strings.SplitSeq(oldScopes, ",") {

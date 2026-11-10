@@ -23,6 +23,10 @@ const (
 	RefreshStatusExpired RefreshStatus = "refresh-expired"
 	// RefreshStatusUnnecessary indicates that the token does not need to be refreshed.
 	RefreshStatusUnnecessary RefreshStatus = "refresh-unnecessary"
+	// RefreshStatusSkipped indicates that the token needed a refresh but gh did not attempt it because the environment
+	// does not allow it, for example when a sandbox makes gh's state directory read-only. The current token is used as
+	// is, and the refresh is expected to succeed once gh runs where it can write its state.
+	RefreshStatusSkipped RefreshStatus = "refresh-skipped"
 )
 
 // Credential is a resolved authentication token together with its source and, when the token is refreshable, the OAuth

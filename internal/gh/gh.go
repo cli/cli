@@ -157,6 +157,10 @@ const (
 	RefreshStatusExpired = auth.RefreshStatusExpired
 	// RefreshStatusUnnecessary indicates that the token does not need to be refreshed.
 	RefreshStatusUnnecessary = auth.RefreshStatusUnnecessary
+	// RefreshStatusSkipped indicates that the token needed a refresh but gh did not attempt it because the environment
+	// does not allow it, for example when a sandbox makes gh's state directory read-only. The current token is used as
+	// is, and the refresh is expected to succeed once gh runs where it can write its state.
+	RefreshStatusSkipped = auth.RefreshStatusSkipped
 )
 
 // RefreshableCredential is an OAuth token pair that gh can renew, together with the expiration metadata returned by its
@@ -224,6 +228,10 @@ type AuthConfig interface {
 	// its access token is expiring, renews and persists it. It may return a non-empty credential with an error, such
 	// as when refreshing fails. The caller decides whether to use the returned credential.
 	ActiveTokenWithRefresh(hostname string) (credential Credential, refreshResult RefreshStatus, err error)
+
+	// Warnings returns the deduplicated warnings recorded so far in this process, such as a skipped token refresh, in
+	// the order they were first recorded. Callers are expected to show them to the user before gh exits.
+	Warnings() []string
 
 	// ActiveToken retrieves the active credential for the given hostname, searching environment variables, general
 	// configuration, and finally encrypted storage. It returns the last stored token as-is, including the current
