@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,13 +36,16 @@ type ViewOptions struct {
 	Comments    bool
 
 	Now func() time.Time
+
+	InvokingAgent string
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
-		IO:      f.IOStreams,
-		Browser: f.Browser,
-		Now:     time.Now,
+		IO:            f.IOStreams,
+		Browser:       f.Browser,
+		Now:           time.Now,
+		InvokingAgent: f.InvokingAgent,
 	}
 
 	cmd := &cobra.Command{
@@ -57,6 +61,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			and reviews. When output is piped or redirected, only comments and reviews are printed.
 
 			With %[1]s--web%[1]s flag, open the pull request in a web browser instead.
+
+			This command shows a snapshot. To wait for a pull request on %[1]sgithub.com%[1]s to be reviewed, merged, or closed,
+			use %[1]sgh event listen%[1]s instead of polling.
+			Changes made before the listener starts are not reported, so read the pull request once it is listening.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -107,6 +115,11 @@ func viewRun(opts *ViewOptions) error {
 		findOptions.Fields = []string{"url"}
 	} else if opts.Exporter != nil {
 		findOptions.Fields = opts.Exporter.Fields()
+		// The agent hint is skipped for merged or closed pull requests, which needs the state even when it was not
+		// requested. The exporter still writes only the requested fields.
+		if opts.InvokingAgent != "" && !slices.Contains(findOptions.Fields, "state") {
+			findOptions.Fields = slices.Concat(findOptions.Fields, []string{"state"})
+		}
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -122,6 +135,8 @@ func viewRun(opts *ViewOptions) error {
 		}
 		return opts.Browser.Browse(openURL)
 	}
+
+	printEventListenHint(opts, baseRepo, pr)
 
 	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err == nil {

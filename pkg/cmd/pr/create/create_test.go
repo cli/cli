@@ -475,6 +475,37 @@ func Test_createRun(t *testing.T) {
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 		{
+			name: "agent gets event listen hint",
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]any) {}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.InvokingAgent = "copilot-cli"
+				return func() {}
+			},
+			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "" +
+				"hint: if you need to wait for this pull request to be reviewed, merged, or closed before continuing, use this instead of polling:\n" +
+				"    gh event listen --resource https://github.com/OWNER/REPO/pull/12 --event com.github.pull_request.review.submitted.v1,com.github.pull_request.state.changed.v1\n" +
+				"  - It prints the first event as a JSON line on stdout and exits; run it again to wait for the next one.\n" +
+				"  - Add `--timeout` to stop waiting after a while, for example `--timeout 30m`; it then exits with status 8.\n" +
+				"  - Events carry no details; read the pull request to see what changed.\n" +
+				"  - It misses changes made before it starts, so read the pull request once it is running.\n" +
+				"  - See `gh event listen --help` for other event types.\n" +
+				"  - Event subscriptions are in preview and may not be enabled for your account.\n",
+		},
+		{
 			name: "same head and base branch should error",
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.TitleProvided = true

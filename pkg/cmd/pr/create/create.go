@@ -26,6 +26,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
+	eventShared "github.com/cli/cli/v2/pkg/cmd/event/shared"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -82,6 +83,8 @@ type CreateOptions struct {
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
+
+	InvokingAgent string
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
@@ -210,6 +213,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 		Browser:          f.Browser,
 		Prompter:         f.Prompter,
 		TitledEditSurvey: shared.TitledEditSurvey(&shared.UserEditor{Config: f.Config, IO: f.IOStreams}),
+		InvokingAgent:    f.InvokingAgent,
 	}
 
 	var bodyFile string
@@ -1149,6 +1153,9 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		// failed create leaves the uploaded assets referenced by nothing, so
 		// that error reads first.
 		return errors.Join(uploadErr, err)
+	}
+	if opts.InvokingAgent != "" {
+		eventShared.PrintListenHint(opts.IO.ErrOut, pr.URL)
 	}
 	return uploadErr
 }
