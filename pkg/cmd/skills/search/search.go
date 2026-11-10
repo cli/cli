@@ -120,6 +120,17 @@ func NewCmdSearch(f *cmdutil.Factory, telemetry ghtelemetry.EventRecorder, runF 
 				return cmdutil.FlagErrorf("invalid limit: %d", opts.Limit)
 			}
 
+			// The pagination helpers multiply the page and limit values and use
+			// the results as slice bounds, so reject combinations that overflow
+			// int instead of letting the arithmetic wrap around.
+			if _, overflowed := checkedProduct(opts.Page, opts.Limit, 3); overflowed {
+				return cmdutil.FlagErrorf(
+					"invalid page and limit: page %d with limit %d is out of range",
+					opts.Page,
+					opts.Limit,
+				)
+			}
+
 			opts.Owner = strings.TrimSpace(opts.Owner)
 			if opts.Owner != "" && !couldBeOwner(opts.Owner) {
 				return cmdutil.FlagErrorf("invalid owner %q: must be a valid GitHub username or organization", opts.Owner)
@@ -368,11 +379,31 @@ func noResults(opts *SearchOptions, msg string) error {
 // potentially a repo fetch (stars), so keeping this small matters for
 // performance. Pre-ranking ensures the best candidates are at the top.
 func truncateForProcessing(skills []skillResult, page, limit int) []skillResult {
-	maxToProcess := page * limit * 3
+	maxToProcess, overflowed := checkedProduct(page, limit, 3)
+	if overflowed {
+		// The working set does not fit in an int, so there is nothing to trim:
+		// keep every result.
+		return skills
+	}
 	if len(skills) > maxToProcess {
 		return skills[:maxToProcess]
 	}
 	return skills
+}
+
+// checkedProduct multiplies the given non-negative values, reporting whether
+// the result overflows int. The page and limit values come from the user and
+// their products are used as slice bounds, so an overflow has to be detected
+// rather than allowed to wrap around into a negative number.
+func checkedProduct(values ...int) (int, bool) {
+	product := 1
+	for _, value := range values {
+		if value != 0 && product > math.MaxInt/value {
+			return 0, true
+		}
+		product *= value
+	}
+	return product, false
 }
 
 // enrichSkills fetches descriptions and star counts concurrently.
@@ -407,12 +438,23 @@ func enrichSkills(client *api.Client, host string, skills []skillResult) {
 // paginate slices results to the requested page window.
 func paginate(skills []skillResult, page, limit int) ([]skillResult, int) {
 	total := len(skills)
-	totalPages := (total + limit - 1) / limit
-	start := (page - 1) * limit
+	totalPages := total / limit
+	if total%limit != 0 {
+		totalPages++
+	}
+	start, overflowed := checkedProduct(page-1, limit)
+	if overflowed {
+		// The start index does not fit in an int, so it is past the end of
+		// any result set.
+		return nil, totalPages
+	}
 	if start >= total {
 		return nil, totalPages
 	}
-	end := min(start+limit, total)
+	end := total
+	if limit < total-start {
+		end = start + limit
+	}
 	return skills[start:end], totalPages
 }
 
@@ -750,9 +792,12 @@ func fetchPrimaryPages(client *api.Client, host, query string, displayPage, disp
 	// page fetching conservative. Two pages (200 results) provides a
 	// good buffer for typical filter rates while staying well within
 	// the rate-limit budget.
-	needed := displayPage * displayLimit * 3
-	numPages := max((needed+searchPageSize-1)/searchPageSize, 1)
 	maxAPIPages := maxResults / searchPageSize
+	needed, overflowed := checkedProduct(displayPage, displayLimit, 3)
+	numPages := maxAPIPages
+	if !overflowed {
+		numPages = max((needed+searchPageSize-1)/searchPageSize, 1)
+	}
 	if numPages > maxAPIPages {
 		numPages = maxAPIPages
 	}

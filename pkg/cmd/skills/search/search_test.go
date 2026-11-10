@@ -2,6 +2,7 @@ package search
 
 import (
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"testing"
@@ -98,6 +99,21 @@ func TestNewCmdSearch(t *testing.T) {
 			name:    "invalid limit negative",
 			args:    "terraform --limit -1",
 			wantErr: "invalid limit: -1",
+		},
+		{
+			name:    "page too large",
+			args:    "terraform --page 9223372036854775807 --limit 2",
+			wantErr: "invalid page and limit: page 9223372036854775807 with limit 2 is out of range",
+		},
+		{
+			name:    "limit too large",
+			args:    "terraform --limit 4000000000000000000",
+			wantErr: "invalid page and limit: page 1 with limit 4000000000000000000 is out of range",
+		},
+		{
+			name:    "page and limit overflow",
+			args:    "terraform --page 2026277576509488133 --limit 7",
+			wantErr: "invalid page and limit: page 2026277576509488133 with limit 7 is out of range",
 		},
 	}
 
@@ -716,4 +732,25 @@ func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 		"skill_search_install must not record the search query")
 	assert.Empty(t, installEvent.Dimensions["owner"],
 		"skill_search_install must not record the search owner filter")
+}
+
+func TestTruncateForProcessing_Overflow(t *testing.T) {
+	skills := make([]skillResult, 5)
+
+	// page*limit*3 overflows int and used to wrap negative, producing a
+	// negative slice bound and a panic.
+	assert.Len(t, truncateForProcessing(skills, math.MaxInt, 2), 5)
+	assert.Len(t, truncateForProcessing(skills, 2026277576509488133, 7), 5)
+}
+
+func TestPaginate_Overflow(t *testing.T) {
+	skills := make([]skillResult, 5)
+
+	got, totalPages := paginate(skills, 2026277576509488133, 7)
+	assert.Empty(t, got)
+	assert.Equal(t, 1, totalPages)
+
+	got, totalPages = paginate(skills, math.MaxInt, 2)
+	assert.Empty(t, got)
+	assert.Equal(t, 3, totalPages)
 }
