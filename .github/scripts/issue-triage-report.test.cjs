@@ -28,6 +28,15 @@ const duplicateInput = () => {
   });
   return data;
 };
+const supportInput = () => {
+  const data = input();
+  Object.assign(decision(data), {
+    outcome: "other",
+    comment: "Use `gh issue edit 23 --add-label bug` to apply labels to an existing issue.",
+    reproduction_log: "", investigation_notes: "",
+  });
+  return data;
+};
 const fixtureURL = "https://github.com/example.invalid/hello/pull/1";
 const fixtureInput = () => {
   const data = input();
@@ -112,6 +121,20 @@ test("parseReport", async t => {
       },
       check: report => assert.deepEqual(Object.keys(report.documents), ["duplicate_analysis"]),
     },
+    ...[
+      "Use `gh issue edit 23 --add-label bug` to apply labels to an existing issue.",
+      "Apply labels with `gh issue edit 23 --add-label bug`.",
+      "Applying labels requires repository write access.",
+      "For applying labels, use `gh issue edit 23 --add-label bug`.",
+      "If you applied labels to the wrong issue, remove them with `gh issue edit 23 --remove-label bug`.",
+      "I recommend `gh issue edit 23 --add-label bug` for applying labels.",
+      "Labels are applied with `gh issue edit 23 --add-label bug`.",
+    ].map(comment => ({
+      name: `labeling guidance is allowed: ${comment}`,
+      data: supportInput,
+      change: data => decision(data).comment = comment,
+      check: report => assert.equal(report.comment, comment),
+    })),
     {
       name: "no output is explicit",
       change: data => decision(data).comment = comment.replace("test\ttest\tsimulated failure\n", "").replace("**Exit status:**", "**Output:** none.\n\n**Exit status:**"),
@@ -190,6 +213,22 @@ test("parseReport", async t => {
     { name: "no negative search prose", change: data => decision(data).comment += "\nNo duplicate found.", error: /negative duplicate/ },
     { name: "no label prose", change: data => decision(data).comment += "\nSuggesting labels for this.", error: /label reasoning/ },
     { name: "no applied-label prose", change: data => decision(data).comment += "\nApplied labels for this.", error: /label reasoning/ },
+    ...[
+      "I applied the labels.",
+      "I will apply labels to this issue.",
+      "I'm applying the labels now.",
+      "We have already applied the labels.",
+      "This triage run will apply labels.",
+      "Applied labels.",
+      "Applying labels now.",
+      "Labels have been applied to this issue.",
+      "Labels were applied.",
+    ].map(comment => ({
+      name: `triage label narration is rejected: ${comment}`,
+      data: supportInput,
+      change: data => decision(data).comment = comment,
+      error: /label reasoning/,
+    })),
     { name: "wrong result heading", change: data => decision(data).outcome = "not_reproduced", error: /selected reproduction outcome/ },
     { name: "include reproduction log", change: data => decision(data).reproduction_log = "", error: /reproduction log/ },
     { name: "command must be gh", change: data => decision(data).comment = comment.replace("$ gh ", "$ curl "), error: /actual gh command/ },
@@ -306,6 +345,16 @@ test("publishReport", async t => {
         assert.match(files["comment.md"], /<summary>Supporting reports<\/summary>/);
         assert.doesNotMatch(files["comment.md"].split("<details>")[0], /duplicate|label|priority/i);
         assert.equal(fake.comments[0].body, files["comment.md"]);
+      },
+    },
+    {
+      name: "labeling support guidance publishes unchanged",
+      data: supportInput,
+      check: ({ result, fake, files }) => {
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.artifacts.length, 2);
+        assert.equal(fake.comments.length, 1);
+        assert.ok(files["comment.md"].startsWith(decision(supportInput()).comment));
       },
     },
     {
@@ -427,18 +476,64 @@ test("publishReport", async t => {
       },
     },
     {
-      name: "a completed readable publication is not changed by a rerun",
+      name: "a completed readable publication accepts only matching input",
       check: async ({ fake }) => {
         const original = structuredClone(fake.artifacts);
         const writes = fake.calls.filter(call => call.method !== "GET").length;
-        const changed = input();
-        decision(changed).investigation_notes = "Different evidence on a rerun.";
-        const result = await publishReport(parseReport(changed, context, identity), context, fake.api, () => {});
+        const result = await publishReport(parseReport(input(), context, identity), context, fake.api, () => {});
         assert.match(result.skipped, /already completed/);
         assert.deepEqual(fake.artifacts, original);
         assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
       },
     },
+    ...[
+      { name: "investigation notes", change: data => decision(data).investigation_notes = "Different evidence on a rerun." },
+      { name: "visible comment", change: data => decision(data).comment += "\nThe command also returned the requested log." },
+      { name: "closing label", change: data => data.items[0].labels[0].name = "invalid" },
+      { name: "label rationale", change: data => data.items[0].labels[0].rationale = "Different reasoning for this label." },
+      { name: "label confidence", change: data => data.items[0].labels[0].confidence = "MEDIUM" },
+    ].flatMap(({ name, change }) => [false, true].map(unreadable => ({
+      name: `completed retry rejects changed ${name}${unreadable ? " with unreadable artifacts" : ""}`,
+      options: unreadable ? { fail: (method, endpoint) => method === "GET" && endpoint.includes("/artifacts?") && httpError(404) } : {},
+      check: async ({ fake }) => {
+        const artifacts = structuredClone(fake.artifacts);
+        const comments = structuredClone(fake.comments);
+        const writes = fake.calls.filter(call => call.method !== "GET").length;
+        const reads = fake.calls.filter(call => call.method === "GET" && call.endpoint.includes("/artifacts")).length;
+        const changed = input();
+        change(changed);
+        await assert.rejects(publishReport(parseReport(changed, context, identity), context, fake.api, () => {}), /retry differs/);
+        assert.deepEqual(fake.artifacts, artifacts);
+        assert.deepEqual(fake.comments, comments);
+        assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
+        assert.equal(fake.calls.filter(call => call.method === "GET" && call.endpoint.includes("/artifacts")).length, reads);
+      },
+    }))),
+    {
+      name: "completed retry accepts equivalent normalized label decisions",
+      check: async ({ fake }) => {
+        const normalized = input();
+        delete normalized.items[0].labels[0].suggest;
+        const writes = fake.calls.filter(call => call.method !== "GET").length;
+        const result = await publishReport(parseReport(normalized, context, identity), context, fake.api, () => {});
+        assert.match(result.skipped, /already completed/);
+        assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
+      },
+    },
+    {
+      name: "a current-run comment without publication state cannot authorize labels",
+      options: { comments: [oldComment({ runId: context.runId })] },
+      error: /no publication state/,
+    },
+    ...["closed", "locked"].map(state => ({
+      name: `a completed publication still rejects an issue that is now ${state}`,
+      check: async ({ fake }) => {
+        fake.options[state] = true;
+        const writes = fake.calls.filter(call => call.method !== "GET").length;
+        await assert.rejects(publishReport(parseReport(input(), context, identity), context, fake.api, () => {}), /closed or locked/);
+        assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
+      },
+    })),
     {
       name: "an older run cannot replace a newer run's evidence",
       check: async ({ fake }) => {
@@ -521,6 +616,18 @@ test("publishReport", async t => {
         fake.options.fail = undefined;
         const changed = input();
         decision(changed).reproduction_log = "Different reproduction evidence.";
+        const writes = fake.calls.filter(call => call.method !== "GET").length;
+        await assert.rejects(publishReport(parseReport(changed, context, identity), context, fake.api, () => {}), /retry differs/);
+        assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);
+      },
+    },
+    {
+      name: "partial retries cannot change label decisions",
+      options: { fail: (method, endpoint, data) => method === "POST" && data?.name === "Reproduction log" },
+      check: async ({ fake }) => {
+        fake.options.fail = undefined;
+        const changed = input();
+        changed.items[0].labels[0].name = "off-topic";
         const writes = fake.calls.filter(call => call.method !== "GET").length;
         await assert.rejects(publishReport(parseReport(changed, context, identity), context, fake.api, () => {}), /retry differs/);
         assert.equal(fake.calls.filter(call => call.method !== "GET").length, writes);

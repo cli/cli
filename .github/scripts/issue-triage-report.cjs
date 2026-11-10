@@ -121,7 +121,13 @@ function parseReport(output, context, sanitize) {
     requireValue(blocks.length <= 1 && blocks.every(block => block.length <= 5), "Use at most one five-line command/output block");
     const prose = comment.replace(/```[\s\S]*?```/g, "").replace(/`[^`]*`/g, "");
     requireValue(!/<\/?[A-Za-z!]/.test(prose), "Do not supply HTML or details blocks in the visible comment");
-    requireValue(!/\b(?:no (?:matching |clear )?duplicates?|duplicate (?:search|analysis|check)|(?:suggest(?:ing|ed)?|apply|applying|applied) (?:the )?labels?|priority-[123]|off-schema|scaffold(?:ed|ing)?)\b/i.test(prose),
+    const narratesLabels = [
+      /\b(?:I|we|this (?:triage(?: run)?|workflow|run))(?:['\u2019](?:m|re|ve|ll)|\s+(?:am|are|is|have|has|will))?(?:\s+(?:already|just|now))?\s+(?:apply|applying|applied)\b[^.!?\n]*\blabels?\b/i,
+      /(?:^|[.!?\n])\s*(?:applying|applied)\s+(?:the\s+)?labels?(?=\s*(?:[.!?\n]|$)|\s+(?:now|here|for this|to this)\b)/i,
+      /\blabels?\s+(?:are|were|have been|will be|are being)\s+applied(?=\s*(?:[.!?\n]|$)|\s+(?:now|here|to this|for this|by (?:this )?(?:triage|workflow|run))\b)/i,
+    ].some(pattern => pattern.test(prose));
+    requireValue(!narratesLabels &&
+      !/\b(?:no (?:matching |clear )?duplicates?|duplicate (?:search|analysis|check)|suggest(?:ing|ed)? (?:the )?labels?|priority-[123]|off-schema|scaffold(?:ed|ing)?)\b/i.test(prose),
       "Keep label reasoning, negative duplicate discussion, and test machinery out of the visible comment");
     if (openings[item.outcome]) {
       requireValue(comment.startsWith(`**${openings[item.outcome]} `), "Start with the selected reproduction outcome in bold");
@@ -426,6 +432,8 @@ async function publishReport(report, context, api, writeFile) {
     requireValue(typeof publication.state?.complete === "boolean" &&
       /^[a-f0-9]{64}$/.test(publication.state?.input ?? ""),
     "This run has no publication state; start a new run instead of changing its reports");
+    requireValue(publication.state.input === inputHash,
+      "The retry differs from the publication; start a new run instead");
     if (publication.state.complete) {
       result.artifacts = Object.fromEntries(Object.entries(known).map(([key, number]) =>
         [key, `https://github.com/${context.repo}/issues/${context.issue}/artifacts/${number}`]));
@@ -435,8 +443,6 @@ async function publishReport(report, context, api, writeFile) {
       writeFile("result.json", JSON.stringify(result, null, 2));
       return result;
     }
-    requireValue(publication.state.input === inputHash,
-      "The retry differs from the partial publication; start a new run instead");
   }
   for (const [key, body] of Object.entries(documents)) {
     let warned = false;

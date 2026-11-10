@@ -49,7 +49,9 @@ restricted agent shell. Provide cached schemas through
 them. Do not disable checks to hide missing schemas.
 
 Run `ghmock --help` and read the complete output before using the helper. In the
-issue-triage environment, list `/opt/ghmock/builds` to discover available builds.
+issue-triage environment, read `/opt/ghmock/builds.txt` for the executable paths
+and versions already verified by preparation. Use that inventory instead of
+running version probes; builds absent from it are unavailable for the run.
 `source` is the selected checkout, not necessarily the default branch. Record
 the actual versions and revisions; do not assume a reported build is available.
 
