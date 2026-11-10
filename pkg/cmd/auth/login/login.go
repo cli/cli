@@ -147,6 +147,13 @@ func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, r
 			}
 
 			if tokenStdin {
+				// Reading a terminal until EOF looks like a hang, because nothing
+				// prompts for the token and input only ends when the user sends EOF.
+				// A pasted token also lands in the terminal input line, which leaks
+				// it into shell history and the scrollback buffer.
+				if opts.IO.IsStdinTTY() {
+					return cmdutil.FlagErrorf("`--with-token` must be used noninteractively, for example `gh auth login --with-token < mytoken.txt`\nTo paste a token interactively, run `gh auth login` instead.")
+				}
 				defer opts.IO.In.Close()
 				token, err := io.ReadAll(opts.IO.In)
 				if err != nil {
