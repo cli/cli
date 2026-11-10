@@ -1,6 +1,7 @@
 package search
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -101,19 +102,21 @@ func TestNewCmdSearch(t *testing.T) {
 			wantErr: "invalid limit: -1",
 		},
 		{
+			// math.MaxInt is used so that the case overflows on 32-bit
+			// targets as well, where the literal above would not compile.
 			name:    "page too large",
-			args:    "terraform --page 9223372036854775807 --limit 2",
-			wantErr: "invalid page and limit: page 9223372036854775807 with limit 2 is out of range",
+			args:    fmt.Sprintf("terraform --page %d --limit 2", math.MaxInt),
+			wantErr: fmt.Sprintf("invalid page and limit: page %d with limit 2 is out of range", math.MaxInt),
 		},
 		{
 			name:    "limit too large",
-			args:    "terraform --limit 4000000000000000000",
-			wantErr: "invalid page and limit: page 1 with limit 4000000000000000000 is out of range",
+			args:    fmt.Sprintf("terraform --limit %d", math.MaxInt),
+			wantErr: fmt.Sprintf("invalid page and limit: page 1 with limit %d is out of range", math.MaxInt),
 		},
 		{
 			name:    "page and limit overflow",
-			args:    "terraform --page 2026277576509488133 --limit 7",
-			wantErr: "invalid page and limit: page 2026277576509488133 with limit 7 is out of range",
+			args:    fmt.Sprintf("terraform --page %d --limit 7", math.MaxInt),
+			wantErr: fmt.Sprintf("invalid page and limit: page %d with limit 7 is out of range", math.MaxInt),
 		},
 	}
 
@@ -738,19 +741,73 @@ func TestTruncateForProcessing_Overflow(t *testing.T) {
 	skills := make([]skillResult, 5)
 
 	// page*limit*3 overflows int and used to wrap negative, producing a
-	// negative slice bound and a panic.
+	// negative slice bound and a panic. math.MaxInt is used so that the
+	// product overflows on 32-bit targets too.
 	assert.Len(t, truncateForProcessing(skills, math.MaxInt, 2), 5)
-	assert.Len(t, truncateForProcessing(skills, 2026277576509488133, 7), 5)
+	assert.Len(t, truncateForProcessing(skills, math.MaxInt, 7), 5)
 }
 
 func TestPaginate_Overflow(t *testing.T) {
 	skills := make([]skillResult, 5)
 
-	got, totalPages := paginate(skills, 2026277576509488133, 7)
+	got, totalPages := paginate(skills, math.MaxInt, 7)
 	assert.Empty(t, got)
 	assert.Equal(t, 1, totalPages)
 
 	got, totalPages = paginate(skills, math.MaxInt, 2)
 	assert.Empty(t, got)
 	assert.Equal(t, 3, totalPages)
+}
+
+func TestAPIPageCount(t *testing.T) {
+	maxAPIPages := maxResults / searchPageSize
+
+	tests := []struct {
+		name         string
+		displayPage  int
+		displayLimit int
+		want         int
+	}{
+		{
+			name:         "single page",
+			displayPage:  1,
+			displayLimit: 15,
+			want:         1,
+		},
+		{
+			name:         "second page",
+			displayPage:  3,
+			displayLimit: 15,
+			want:         2,
+		},
+		{
+			name:         "exact page boundary",
+			displayPage:  1,
+			displayLimit: 34,
+			want:         2,
+		},
+		{
+			// The product overflows, so the maximum number of API pages is
+			// used.
+			name:         "overflowing product",
+			displayPage:  math.MaxInt,
+			displayLimit: 2,
+			want:         maxAPIPages,
+		},
+		{
+			// The product fits in an int, but adding searchPageSize-1 to it
+			// would overflow. math.MaxInt/3 keeps the case valid on 32-bit
+			// targets too, where the overflow happens in int32 instead.
+			name:         "rounding overflows",
+			displayPage:  1,
+			displayLimit: math.MaxInt / 3,
+			want:         maxAPIPages,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, apiPageCount(tt.displayPage, tt.displayLimit))
+		})
+	}
 }

@@ -784,6 +784,21 @@ func executeSearch(client *api.Client, host, query string, page, pageSize int) (
 	return &result, err
 }
 
+// apiPageCount returns the number of Code Search API pages needed to cover the
+// requested display page, clamped to the maximum number of pages the API allows
+// us to fetch.
+func apiPageCount(displayPage, displayLimit int) int {
+	maxAPIPages := maxResults / searchPageSize
+	needed, overflowed := checkedProduct(displayPage, displayLimit, 3)
+	if overflowed {
+		return maxAPIPages
+	}
+	// Ceiling division, written so that adding searchPageSize-1 to needed
+	// cannot overflow for large page and limit values.
+	numPages := max((needed-1)/searchPageSize+1, 1)
+	return min(numPages, maxAPIPages)
+}
+
 // fetchPrimaryPages fetches enough API pages from GitHub Code Search to
 // cover the requested display page, accounting for filtering losses.
 func fetchPrimaryPages(client *api.Client, host, query string, displayPage, displayLimit int) ([]codeSearchItem, int, error) {
@@ -792,15 +807,7 @@ func fetchPrimaryPages(client *api.Client, host, query string, displayPage, disp
 	// page fetching conservative. Two pages (200 results) provides a
 	// good buffer for typical filter rates while staying well within
 	// the rate-limit budget.
-	maxAPIPages := maxResults / searchPageSize
-	needed, overflowed := checkedProduct(displayPage, displayLimit, 3)
-	numPages := maxAPIPages
-	if !overflowed {
-		numPages = max((needed+searchPageSize-1)/searchPageSize, 1)
-	}
-	if numPages > maxAPIPages {
-		numPages = maxAPIPages
-	}
+	numPages := apiPageCount(displayPage, displayLimit)
 
 	var allItems []codeSearchItem
 	var totalCount int
