@@ -398,6 +398,9 @@ func statusRun(opts *StatusOptions) error {
 		fmt.Fprintf(stream, "%s\n", cs.Bold(hostname))
 		for i, entry := range entries {
 			fmt.Fprintf(stream, "%s", entry.String(cs))
+			if opts.IO.IsStderrTTY() && entry.Error != "" {
+				fmt.Fprintf(stream, "  - Error: %s\n", entry.Error)
+			}
 			if i < len(entries)-1 {
 				fmt.Fprint(stream, "\n")
 			}
