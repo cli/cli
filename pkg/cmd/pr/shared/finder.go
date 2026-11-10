@@ -597,6 +597,13 @@ func preloadPrChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullReq
 			return err
 		}
 
+		if resp.Node == nil {
+			return fmt.Errorf("could not read the status checks of the pull request")
+		}
+		if len(resp.Node.StatusCheckRollup.Nodes) == 0 {
+			return fmt.Errorf("could not read the status checks of the pull request")
+		}
+
 		result := resp.Node.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
 		statusCheckRollup.Nodes = append(
 			statusCheckRollup.Nodes,

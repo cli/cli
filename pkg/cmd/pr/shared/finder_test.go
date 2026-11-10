@@ -13,6 +13,8 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/cli/cli/v2/api"
 )
 
 func TestParseURL(t *testing.T) {
@@ -1007,4 +1009,82 @@ func (s *stubProgressIndicator) StartProgressIndicator() {
 
 func (s *stubProgressIndicator) StopProgressIndicator() {
 	s.stopCalled = true
+}
+
+func TestPreloadPrChecks(t *testing.T) {
+	tests := []struct {
+		name         string
+		responses    []string
+		wantErr      string
+		wantCheckLen int
+	}{
+		{
+			name: "appends contexts across pages",
+			responses: []string{
+				`{"data":{"node":{"statusCheckRollup":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[{"__typename":"CheckRun","name":"build"}],"pageInfo":{"hasNextPage":true,"endCursor":"PAGE2"}}}}}]}}}}`,
+				`{"data":{"node":{"statusCheckRollup":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[{"__typename":"StatusContext","context":"lint"}],"pageInfo":{"hasNextPage":false}}}}}]}}}}`,
+			},
+			wantCheckLen: 3,
+		},
+		{
+			name: "missing pull request node in response",
+			responses: []string{
+				`{"data":{"node":null}}`,
+			},
+			wantErr: "could not read the status checks of the pull request",
+		},
+		{
+			name: "empty status check rollup nodes in response",
+			responses: []string{
+				`{"data":{"node":{"statusCheckRollup":{"nodes":[]}}}}`,
+			},
+			wantErr: "could not read the status checks of the pull request",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			for _, r := range tt.responses {
+				reg.Register(httpmock.GraphQL("PullRequestStatusChecks"), httpmock.StringResponse(r))
+			}
+
+			pr := &api.PullRequest{
+				ID: "PR_ID",
+				StatusCheckRollup: struct {
+					Nodes []api.StatusCheckRollupNode
+				}{
+					Nodes: []api.StatusCheckRollupNode{
+						{
+							Commit: api.StatusCheckRollupCommit{
+								StatusCheckRollup: api.CommitStatusCheckRollup{
+									Contexts: api.CheckContexts{
+										Nodes: []api.CheckContext{
+											{TypeName: "CheckRun", Name: "first"},
+										},
+										PageInfo: struct {
+											HasNextPage bool
+											EndCursor   string
+										}{
+											HasNextPage: true,
+											EndCursor:   "PAGE2",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			err := preloadPrChecks(&http.Client{Transport: reg}, ghrepo.New("OWNER", "REPO"), pr)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Len(t, pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes, tt.wantCheckLen)
+		})
+	}
 }
