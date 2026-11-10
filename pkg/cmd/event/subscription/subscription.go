@@ -5,6 +5,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/event/subscription/create"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/event/subscription/list"
+	cmdView "github.com/cli/cli/v2/pkg/cmd/event/subscription/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -24,5 +25,6 @@ func NewCmdSubscription(f *cmdutil.Factory) *cobra.Command {
 
 	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
+	cmd.AddCommand(cmdView.NewCmdView(f, nil))
 	return cmd
 }
