@@ -135,6 +135,7 @@ func Test_statusRun(t *testing.T) {
 				github.com
 				  X Timeout trying to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
+				  - Error: Get "https://api.github.com/": context deadline exceeded
 			`),
 		},
 		{
@@ -198,6 +199,7 @@ func Test_statusRun(t *testing.T) {
 				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth refresh -h ghe.io
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+				  - Error: HTTP 400 (https://ghe.io/api/v3/)
 			`),
 		},
 		{
@@ -243,6 +245,7 @@ func Test_statusRun(t *testing.T) {
 				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth refresh -h ghe.io
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+				  - Error: HTTP 400 (https://ghe.io/api/v3/)
 			`),
 		},
 		{
@@ -370,6 +373,7 @@ func Test_statusRun(t *testing.T) {
 				  - Token expires: 2000-01-01T00:00:00Z (expired about 2 days ago)
 				  - Refresh token expires: 2000-01-13T00:00:00Z (in about 10 days)
 				  - To refresh it, run gh auth status (without --no-refresh)
+				  - Error: HTTP 401 (https://api.github.com/)
 			`),
 		},
 		{
@@ -393,6 +397,7 @@ func Test_statusRun(t *testing.T) {
 				  - Token expires: 2000-01-01T00:00:00Z (expired about 2 days ago)
 				  - Refresh token expires: 2000-01-02T00:00:00Z (expired about 1 day ago)
 				  - To re-authenticate, run: gh auth login -h github.com
+				  - Error: HTTP 401 (https://api.github.com/)
 			`),
 		},
 		{
@@ -415,6 +420,7 @@ func Test_statusRun(t *testing.T) {
 				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth refresh -h github.com
 				  - To forget about this account, run: gh auth logout -h github.com -u monalisa
+				  - Error: HTTP 503 (https://api.github.com/)
 			`),
 		},
 		{
@@ -436,6 +442,7 @@ func Test_statusRun(t *testing.T) {
 				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth refresh -h github.com
 				  - To forget about this account, run: gh auth logout -h github.com -u monalisa
+				  - Error: HTTP 401 (https://api.github.com/)
 			`),
 		},
 		{
@@ -481,6 +488,7 @@ func Test_statusRun(t *testing.T) {
 				  - Active account: true
 				  - The stored expiring credential was removed because its refresh token is no longer valid.
 				  - To re-authenticate, run: gh auth login -h github.com
+				  - Error: refresh token for github.com was rejected; the stored credential was removed
 			`),
 		},
 		{
@@ -666,6 +674,7 @@ func Test_statusRun(t *testing.T) {
 				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth refresh -h ghe.io
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+				  - Error: HTTP 404 (https://ghe.io/api/v3/)
 			`),
 		},
 		{
@@ -754,6 +763,7 @@ func Test_statusRun(t *testing.T) {
 				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth refresh -h ghe.io
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe-2
+				  - Error: HTTP 404 (https://ghe.io/api/v3/)
 			`),
 		},
 		{
@@ -1035,6 +1045,78 @@ func Test_statusRun(t *testing.T) {
 			require.Equal(t, tt.wantErrOut, errorOutput)
 			require.Equal(t, tt.wantOut, output)
 		})
+	}
+}
+
+func Test_statusRun_errorDiagnostic(t *testing.T) {
+	tests := []struct {
+		name      string
+		responder httpmock.Responder
+		wantError string
+	}{
+		{
+			name:      "unauthorized",
+			responder: httpmock.StatusStringResponse(401, "Bad credentials"),
+			wantError: `non-200 OK status code:  body: "Bad credentials"`,
+		},
+		{
+			name:      "rate limit",
+			responder: httpmock.StatusStringResponse(403, "API rate limit exceeded"),
+			wantError: `non-200 OK status code:  body: "API rate limit exceeded"`,
+		},
+		{
+			name:      "server error",
+			responder: httpmock.StatusStringResponse(503, "Service Unavailable"),
+			wantError: `non-200 OK status code:  body: "Service Unavailable"`,
+		},
+		{
+			name: "network error",
+			responder: func(*http.Request) (*http.Response, error) {
+				return nil, fmt.Errorf("dial tcp: no such host")
+			},
+			wantError: `Post "https://api.github.com/graphql": dial tcp: no such host`,
+		},
+		{
+			name:      "GraphQL rate limit",
+			responder: httpmock.StringResponse(`{"errors":[{"type":"RATE_LIMIT","message":"API rate limit exceeded"}]}`),
+			wantError: "GraphQL: API rate limit exceeded",
+		},
+	}
+
+	for _, tt := range tests {
+		for _, stderrTTY := range []bool{false, true} {
+			for _, stdoutTTY := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/stderrTTY=%t/stdoutTTY=%t", tt.name, stderrTTY, stdoutTTY), func(t *testing.T) {
+					cfg, _ := config.NewIsolatedTestConfig(t, "")
+					t.Setenv("GH_TOKEN", "gho_abc123")
+					ios, _, stdout, stderr := iostreams.Test()
+					ios.SetStdinTTY(false)
+					ios.SetStdoutTTY(stdoutTTY)
+					ios.SetStderrTTY(stderrTTY)
+					reg := &httpmock.Registry{}
+					defer reg.Verify(t)
+					reg.Register(httpmock.GraphQL(`query UserCurrent\b`), tt.responder)
+					opts := &StatusOptions{
+						IO:     ios,
+						Config: func() (gh.Config, error) { return cfg, nil },
+						HttpClient: func() (*http.Client, error) {
+							return &http.Client{Transport: reg}, nil
+						},
+					}
+
+					require.ErrorIs(t, statusRun(opts), cmdutil.SilentError)
+					assert.Empty(t, stdout.String())
+					wantErrOut := heredoc.Doc(`
+						github.com
+						  X Failed to log in to github.com using token (GH_TOKEN)
+						  - Active account: true
+						  - The token in GH_TOKEN is invalid.
+					`)
+					wantErrOut += fmt.Sprintf("  - Error: %s\n", tt.wantError)
+					assert.Equal(t, wantErrOut, stderr.String())
+				})
+			}
+		}
 	}
 }
 

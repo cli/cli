@@ -172,6 +172,10 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
 	}
 
+	if e.Error != "" {
+		sb.WriteString(fmt.Sprintf("  - Error: %s\n", e.Error))
+	}
+
 	return sb.String()
 }
 
