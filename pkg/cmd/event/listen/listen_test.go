@@ -314,6 +314,27 @@ func TestListenRun(t *testing.T) {
 			`),
 		},
 		{
+			name:       "stops without creating the subscription again when it is deleted",
+			opts:       ListenOptions{Resource: resource, Events: []string{fooType}},
+			streams:    []string{endFrame("subscription_ended", "deleted")},
+			wantErrMsg: "subscription sub_1 was deleted\nTo keep listening, run the command again to create a new subscription.",
+			wantStderr: heredoc.Doc(`
+				Listening for events.
+				Changes made before this point are not reported; read the current state now.
+			`),
+			wantCreates: 1,
+		},
+		{
+			name:       "stops and advises listening by resource when a subscription passed by ID is deleted",
+			opts:       ListenOptions{Subscription: "sub_1"},
+			streams:    []string{endFrame("subscription_ended", "deleted")},
+			wantErrMsg: "subscription sub_1 was deleted\n" + resubscribeAdviceMsg,
+			wantStderr: heredoc.Doc(`
+				Listening for events.
+				Changes made before this point are not reported; read the current state now.
+			`),
+		},
+		{
 			name:       "stops when access is revoked",
 			opts:       ListenOptions{Resource: resource, Events: []string{fooType}},
 			streams:    []string{endFrame("subscription_ended", "access_revoked")},

@@ -38,6 +38,7 @@ const (
 	firstEventNote    = "Exited after the first event. Run the command again to wait for the next event."
 	// The command does not fetch the subscription, so it cannot name its event types.
 	resubscribeAdvice = "To keep listening, run the command again with `--resource` and the same `--event` types the subscription was created with."
+	rerunAdvice       = "To keep listening, run the command again to create a new subscription."
 	endFrameEvent     = "github.stream.end"
 	minReconnectDelay = time.Second
 	maxReconnectDelay = 30 * time.Second
@@ -362,6 +363,13 @@ func (l *listener) listen(ctx context.Context) error {
 			resubscribed = true
 		case end.Outcome == "subscription_ended" && end.Reason == "expired":
 			return fmt.Errorf("subscription %s expired\n%s", l.opts.Subscription, resubscribeAdvice)
+		case end.Outcome == "subscription_ended" && end.Reason == "deleted":
+			// A deleted subscription is not created again: deleting it is how its listeners are stopped on purpose.
+			advice := rerunAdvice
+			if l.opts.Subscription != "" {
+				advice = resubscribeAdvice
+			}
+			return fmt.Errorf("subscription %s was deleted\n%s", l.subscriptionID, advice)
 		case end.Outcome == "subscription_ended" && end.Reason == "access_revoked":
 			return errors.New("the subscription ended because access to the resource was revoked")
 		default:
