@@ -196,6 +196,15 @@ func publishRun(opts *PublishOptions) error {
 		return err
 	}
 
+	// Discovery uses "." when the supplied directory is itself a skill.
+	if len(skills) == 1 && skills[0].Path == "." && opts.GitClient != nil {
+		dirGitClient := opts.GitClient.Copy()
+		dirGitClient.RepoDir = dir
+		if dirGitClient.PathFromRoot(context.Background()) != "" {
+			return fmt.Errorf("%s is a skill directory within a repository; gh skill publish must target the repository root", dir)
+		}
+	}
+
 	for _, skill := range skills {
 		dirName := path.Base(skill.Path)
 		skillPath := filepath.Join(dir, filepath.FromSlash(skill.Path), "SKILL.md")
