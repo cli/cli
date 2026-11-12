@@ -1,13 +1,21 @@
 package close
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -548,4 +556,157 @@ func TestRunClose_JSON(t *testing.T) {
 		t,
 		`{"number":1,"url":"http://a-url.com","shortDescription":"","public":false,"closed":false,"title":"a title","id":"","readme":"","items":{"totalCount":0},"fields":{"totalCount":0},"owner":{"type":"User","login":"monalisa"}}`,
 		stdout.String())
+}
+
+func TestRunClose_InteractiveProjectFilter(t *testing.T) {
+	tests := []struct {
+		name       string
+		reopen     bool
+		wantOption string
+		wantID     string
+		wantClosed bool
+		wantURL    string
+	}{
+		{
+			name:       "close offers open projects",
+			wantOption: "Open Project (#1)",
+			wantID:     "open-project-ID",
+			wantClosed: true,
+			wantURL:    "http://open-url.com",
+		},
+		{
+			name:       "undo offers closed projects",
+			reopen:     true,
+			wantOption: "Closed Project (#2)",
+			wantID:     "closed-project-ID",
+			wantURL:    "http://closed-url.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			registerInteractiveCloseResponses(tt.wantID, tt.wantClosed, tt.wantURL)
+
+			pm := &prompter.PrompterMock{}
+			pm.SelectFunc = func(prompt, _ string, options []string) (int, error) {
+				switch prompt {
+				case "Which owner would you like to use?":
+					return prompter.IndexFor(options, "monalisa")
+				case "Which project would you like to use?":
+					assert.Equal(t, []string{tt.wantOption}, options)
+					return 0, nil
+				default:
+					return -1, prompter.NoSuchPromptErr(prompt)
+				}
+			}
+
+			client := queries.NewTestClient(queries.WithPrompter(pm))
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+
+			err := runClose(closeConfig{
+				io:     ios,
+				opts:   closeOpts{reopen: tt.reopen},
+				client: client,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantURL+"\n", stdout.String())
+		})
+	}
+}
+
+func registerInteractiveCloseResponses(projectID string, closed bool, projectURL string) {
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]any{
+			"query":     "query ViewerLoginAndOrgs.*",
+			"variables": map[string]any{"after": nil},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
+					"id": "viewer-ID", "login": "monalisa",
+					"organizations": map[string]any{"nodes": []any{}},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]any{
+			"query": "query ViewerProjects.*",
+			"variables": map[string]any{
+				"after": nil, "afterFields": nil, "afterItems": nil,
+				"first": 30, "firstFields": 0, "firstItems": 0,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"viewer": map[string]any{
+					"login": "monalisa",
+					"projectsV2": map[string]any{
+						"totalCount": 2,
+						"nodes": []map[string]any{
+							{"id": "open-project-ID", "number": 1, "title": "Open Project", "closed": false},
+							{"id": "closed-project-ID", "number": 2, "title": "Closed Project", "closed": true},
+						},
+					},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		AddMatcher(matchProjectStateMutation(projectID, closed)).
+		Reply(200).
+		JSON(map[string]any{
+			"data": map[string]any{
+				"updateProjectV2": map[string]any{
+					"projectV2": map[string]any{"url": projectURL},
+				},
+			},
+		})
+}
+
+func TestMatchProjectStateMutation_MissingClosed(t *testing.T) {
+	req, err := http.NewRequest(http.MethodPost, "/graphql", strings.NewReader(`{"query":"mutation CloseProjectV2","variables":{"input":{"projectId":"project-ID"}}}`))
+	require.NoError(t, err)
+
+	matched, err := matchProjectStateMutation("project-ID", false)(req, nil)
+
+	assert.False(t, matched)
+	assert.EqualError(t, err, "variables.input.closed is missing")
+}
+
+func matchProjectStateMutation(projectID string, closed bool) gock.MatchFunc {
+	return func(req *http.Request, _ *gock.Request) (bool, error) {
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return false, fmt.Errorf("read project state mutation request: %w", err)
+		}
+		var payload struct {
+			Query     string `json:"query"`
+			Variables struct {
+				Input struct {
+					ProjectID string `json:"projectId"`
+					Closed    *bool  `json:"closed"`
+				} `json:"input"`
+			} `json:"variables"`
+		}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return false, fmt.Errorf("decode project state mutation request: %w", err)
+		}
+		if payload.Variables.Input.Closed == nil {
+			return false, errors.New("variables.input.closed is missing")
+		}
+		return strings.Contains(payload.Query, "mutation CloseProjectV2") &&
+			payload.Variables.Input.ProjectID == projectID &&
+			*payload.Variables.Input.Closed == closed, nil
+	}
 }
