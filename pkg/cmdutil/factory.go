@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/globalflags"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -18,6 +19,10 @@ type Factory struct {
 	AppVersion     string
 	ExecutablePath string
 	InvokingAgent  string
+
+	// GlobalFlags is fixed before command construction. Its zero value keeps
+	// constructors and documentation generation offline with disabled defaults.
+	GlobalFlags globalflags.Snapshot
 
 	Browser           browser.Browser
 	ExtensionManager  extensions.ExtensionManager
