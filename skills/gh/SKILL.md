@@ -1,6 +1,6 @@
 ---
 name: gh
-description: Patterns for invoking the GitHub CLI (gh) from agents. Covers structured output, pagination, repo targeting, search vs list, gh api fallback.
+description: "Use for any GitHub task done through gh: issues, PRs, search, gh api, attaching images or videos to issues, PRs and comments, discussions, reading repo files without cloning, and issue types, sub-issues and blocked-by links. Covers features newer than most agents' training data, plus structured output, pagination and repo targeting."
 ---
 
 # Reference
