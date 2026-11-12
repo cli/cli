@@ -6,8 +6,8 @@ charm.land/glamour/v2 v2.0.2-0.20261015065741-010543cac1a0 h1:pnfN6r+BBGd0G4aRPG
 charm.land/glamour/v2 v2.0.2-0.20261015065741-010543cac1a0/go.mod h1:wqGcmrnBmbunm0/LszemUKpYwWxvPPBkEno7KusMy6s=
 charm.land/huh/v2 v2.0.3 h1:2cJsMqEPwSywGHvdlKsJyQKPtSJLVnFKyFbsYZTlLkU=
 charm.land/huh/v2 v2.0.3/go.mod h1:93eEveeeqn47MwiC3tf+2atZ2l7Is88rAtmZNZ8x9Wc=
-charm.land/lipgloss/v2 v2.0.6 h1:EaGKeuA8FvF+v2BT5VmZd2LoYLaMZJXA5n34th8nCIQ=
-charm.land/lipgloss/v2 v2.0.6/go.mod h1:ipDDJNSGa1hlwDtSfW1s2/xR8Vdhbut4PXh2zEKZd0Q=
+charm.land/lipgloss/v2 v2.1.0 h1:RLCNLhSQST+NPOmvUSbRWZ3UFOXsf3ZXFmJ5E/2tHEU=
+charm.land/lipgloss/v2 v2.1.0/go.mod h1:wwfOgrNqUA9yjL8nmG6BIO0qQnmkEgJ8ISptbme83gI=
 cloud.google.com/go v0.123.0 h1:2NAUJwPR47q+E35uaJeYoNhuNEM9kM8SjgRgdeOJUSE=
 cloud.google.com/go v0.123.0/go.mod h1:xBoMV08QcqUGuPW65Qfm1o9Y4zKZBpGS+7bImXLTAZU=
 cloud.google.com/go/auth v0.24.1-0.20261001053825-dbc26066f70a h1:jW1ZLFy9oa5ai8LOI40z6s+DL1cO/L1KSm9hVGnibn8=
