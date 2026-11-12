@@ -279,6 +279,16 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 			return preloadPrClosingIssuesReferences(httpClient, f.baseRefRepo, pr)
 		})
 	}
+	if fields.Contains("files") {
+		g.Go(func() error {
+			return preloadPrFiles(httpClient, f.baseRefRepo, pr)
+		})
+	}
+	if fields.Contains("commits") {
+		g.Go(func() error {
+			return preloadPrCommits(httpClient, f.baseRefRepo, pr)
+		})
+	}
 	if fields.Contains("statusCheckRollup") {
 		g.Go(func() error {
 			return preloadPrChecks(httpClient, f.baseRefRepo, pr)
@@ -557,6 +567,97 @@ func preloadPrClosingIssuesReferences(client *http.Client, repo ghrepo.Interface
 	}
 
 	pr.ClosingIssuesReferences.PageInfo.HasNextPage = false
+	return nil
+}
+
+func preloadPrFiles(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+	if !pr.Files.PageInfo.HasNextPage {
+		return nil
+	}
+
+	type response struct {
+		Node struct {
+			PullRequest struct {
+				Files struct {
+					Nodes    []api.PullRequestFile
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
+				} `graphql:"files(first: 100, after: $endCursor)"`
+			} `graphql:"...on PullRequest"`
+		} `graphql:"node(id: $id)"`
+	}
+
+	variables := map[string]interface{}{
+		"id":        githubv4.ID(pr.ID),
+		"endCursor": githubv4.String(pr.Files.PageInfo.EndCursor),
+	}
+
+	gql := api.NewClientFromHTTP(client)
+
+	for {
+		var query response
+		err := gql.Query(repo.RepoHost(), "FilesForPullRequest", &query, variables)
+		if err != nil {
+			return err
+		}
+
+		pr.Files.Nodes = append(pr.Files.Nodes, query.Node.PullRequest.Files.Nodes...)
+
+		if !query.Node.PullRequest.Files.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Node.PullRequest.Files.PageInfo.EndCursor)
+	}
+
+	pr.Files.PageInfo.HasNextPage = false
+	return nil
+}
+
+func preloadPrCommits(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+	if !pr.Commits.PageInfo.HasNextPage {
+		return nil
+	}
+
+	type response struct {
+		Node struct {
+			PullRequest struct {
+				Commits struct {
+					Nodes    []api.PullRequestCommit
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
+				} `graphql:"commits(first: 100, after: $endCursor)"`
+			} `graphql:"...on PullRequest"`
+		} `graphql:"node(id: $id)"`
+	}
+
+	variables := map[string]interface{}{
+		"id":        githubv4.ID(pr.ID),
+		"endCursor": githubv4.String(pr.Commits.PageInfo.EndCursor),
+	}
+
+	gql := api.NewClientFromHTTP(client)
+
+	for {
+		var query response
+		err := gql.Query(repo.RepoHost(), "CommitsForPullRequest", &query, variables)
+		if err != nil {
+			return err
+		}
+
+		pr.Commits.Nodes = append(pr.Commits.Nodes, query.Node.PullRequest.Commits.Nodes...)
+		pr.Commits.TotalCount = len(pr.Commits.Nodes)
+
+		if !query.Node.PullRequest.Commits.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Node.PullRequest.Commits.PageInfo.EndCursor)
+	}
+
+	pr.Commits.PageInfo.HasNextPage = false
 	return nil
 }
 

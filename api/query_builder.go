@@ -150,7 +150,8 @@ var prFiles = shortenQuery(`
 			deletions,
 			path,
 			changeType
-		}
+		},
+		pageInfo{hasNextPage,endCursor}
 	}
 `)
 
@@ -171,7 +172,8 @@ var prCommits = shortenQuery(`
 				committedDate,
 				authoredDate
 			}
-		}
+		},
+		pageInfo{hasNextPage,endCursor}
 	}
 `)
 
