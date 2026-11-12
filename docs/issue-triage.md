@@ -7,8 +7,8 @@ test data. It applies labels directly, posts one short comment,
 and attaches separate Markdown reports when applicable:
 
 - **Duplicate analysis:** search evidence and limitations.
-- **Label reasoning:** generated from the same reasons and confidence sent to the
-  issue-intent label update, not a second explanation written by the agent.
+- **Label reasoning:** generated from the label decisions' reasons and confidence,
+  not a second explanation written by the agent.
 - **Reproduction log:** test conditions, actual `gh` commands, output, exit
   statuses, tested versions, and coverage limits.
 - **Investigation notes:** source evidence, likely causes, alternatives, and
@@ -27,8 +27,11 @@ one-sentence explanation, and stop. No source investigation, reproduction, or
 automatic issue closure follows that decision.
 
 Label decisions keep their rationale and confidence, with `suggest: false`.
-The pinned runtime omits that false value from collected outputs and GraphQL
-updates. The publisher accepts either form and rejects `suggest: true`.
+The pinned runtime omits that false value from collected outputs.
+The publisher accepts either form and rejects `suggest: true`.
+Native label updates disable issue intents and use REST with label name strings.
+Rationale and confidence remain in **Label reasoning**, not GitHub's issue-intent
+metadata.
 The existing allowlist and three-label maximum are unchanged. A matching `gh-*`
 command-family label still counts toward that maximum.
 

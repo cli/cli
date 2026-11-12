@@ -2,8 +2,8 @@
 description: |
   Agentic issue-triage for GitHub CLI. On newly opened issues it follows the
   team's shared triage skills (hosted in desktop/gh-cli-and-desktop-shared-workflows)
-  and applies the minimal correct end-state labels (with issue-intents rationale and
-  confidence), plus one short, plain-language comment.
+  and applies the minimal correct end-state labels (with rationale and confidence
+  in reports), plus one short, plain-language comment.
   Separate issue artifacts hold duplicate analysis, label reasoning, reproduction
   logs, and investigation notes. Bug reports include a minimal observed reproduction.
   Confirmed duplicates stop before further investigation. The objective is to drive the
@@ -42,8 +42,8 @@ permissions:
   issues: read
   copilot-requests: write
 
-# GH_AW_RUNTIME_FEATURES enables native issue-intent rationale/confidence at runtime.
-# It is INERT unless a repo admin sets the repository variable to `issue_intents`.
+# Preserve the runtime feature setting. Add-labels disables native issue intents
+# below; its rationale and confidence stay in the triage reports.
 #
 # The schema paths are populated by setup. The export path is the approved
 # final artifact destination, so the agent never needs to resolve runner paths.
@@ -119,7 +119,7 @@ safe-outputs:
     client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
     private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
   add-labels:
-    issue-intent: true
+    issue-intent: false
     max: 3
     target: ${{ github.event.issue.number || inputs.issue_number }}
     allowed:
