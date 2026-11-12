@@ -82,6 +82,8 @@ type CreateOptions struct {
 	AttachFlag  *attachments.Flag
 	AttachEvent *attachments.TelemetryEvent
 	Assets      []attachments.UserAsset
+
+	Exporter cmdutil.Exporter
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
@@ -275,6 +277,7 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 			$ gh pr create --template "pull_request_template.md"
 			$ gh pr create --attach './login.png#The login error state'
 			$ gh pr create --attach ./before.png --attach ./after.png
+			$ gh pr create --json url,number,title --jq '.title'
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
@@ -355,6 +358,14 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
+			if opts.Exporter != nil && opts.WebMode {
+				return cmdutil.FlagErrorf("`--json` and `--jq` are not supported when using `--web`")
+			}
+
+			if opts.Exporter != nil && opts.DryRun {
+				return cmdutil.FlagErrorf("`--json` and `--jq` are not supported when using `--dry-run`")
+			}
+
 			if err := cmdutil.MutuallyExclusive(
 				"`--attach` is not supported when using `--web`",
 				opts.AttachFlag.Changed(),
@@ -406,6 +417,8 @@ func NewCmdCreate(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, 
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
 	opts.AttachFlag = attachments.AddFlag(cmd)
+
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -561,7 +574,9 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
+		return finishSubmit(*opts, *ctx, func() (*api.PullRequest, error) {
+			return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
+		})
 	}
 
 	if opts.RecoverFile != "" {
@@ -687,11 +702,15 @@ func createRun(opts *CreateOptions) error {
 
 	if action == shared.SubmitDraftAction {
 		state.Draft = true
-		return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
+		return finishSubmit(*opts, *ctx, func() (*api.PullRequest, error) {
+			return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
+		})
 	}
 
 	if action == shared.SubmitAction {
-		return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
+		return finishSubmit(*opts, *ctx, func() (*api.PullRequest, error) {
+			return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
+		})
 	}
 
 	err = errors.New("expected to cancel, preview, or submit")
@@ -1089,7 +1108,7 @@ func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
 	return remotes, nil
 }
 
-func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support, uploader *attachments.Uploader) error {
+func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support, uploader *attachments.Uploader) (*api.PullRequest, error) {
 	client := ctx.Client
 
 	params := map[string]any{
@@ -1102,19 +1121,19 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	}
 
 	if params["title"] == "" {
-		return errors.New("pull request title must not be blank")
+		return nil, errors.New("pull request title must not be blank")
 	}
 
 	err := shared.AddMetadataToIssueParams(client, ctx.PRRefs.BaseRepo(), params, &state, projectV1Support)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if opts.DryRun {
 		if opts.IO.IsStdoutTTY() {
-			return renderPullRequestTTY(opts.IO, params, &state)
+			return nil, renderPullRequestTTY(opts.IO, params, &state)
 		} else {
-			return renderPullRequestPlain(opts.IO.Out, params, &state)
+			return nil, renderPullRequestPlain(opts.IO.Out, params, &state)
 		}
 	}
 
@@ -1127,7 +1146,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		// pushed by now, so the message says what was not created rather than
 		// claiming the run had no effect.
 		if err != nil && uploadResult.Uploaded == 0 {
-			return fmt.Errorf("%w\nno pull request was created", err)
+			return nil, fmt.Errorf("%w\nno pull request was created", err)
 		}
 		uploadErr = err
 		params["body"] = body
@@ -1136,7 +1155,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.PRRefs.BaseRepo(), params)
 	opts.IO.StopProgressIndicator()
-	if pr != nil {
+	if pr != nil && opts.Exporter == nil {
 		fmt.Fprintln(opts.IO.Out, pr.URL)
 	}
 	if err != nil {
@@ -1148,9 +1167,40 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		// A failed upload and a failed create have different remedies, and a
 		// failed create leaves the uploaded assets referenced by nothing, so
 		// that error reads first.
-		return errors.Join(uploadErr, err)
+		return pr, errors.Join(uploadErr, err)
 	}
-	return uploadErr
+	return pr, uploadErr
+}
+
+// finishSubmit runs the submit function and handles JSON export after creation.
+// When an Exporter is configured, it re-fetches the PR with the requested fields
+// before writing JSON output, since CreatePullRequest only returns id and url.
+func finishSubmit(opts CreateOptions, ctx CreateContext, submitFn func() (*api.PullRequest, error)) error {
+	pr, err := submitFn()
+	if err != nil {
+		return err
+	}
+
+	if opts.Exporter == nil {
+		return nil
+	}
+
+	// If the submit succeeded but the PR is nil (shouldn't normally happen),
+	// or we're in dry-run mode, we can't export JSON.
+	if pr == nil {
+		return nil
+	}
+
+	// Re-fetch the PR with the fields requested by the exporter.
+	fetchedPR, _, err := opts.Finder.Find(shared.FindOptions{
+		Selector: pr.URL,
+		Fields:   opts.Exporter.Fields(),
+	})
+	if err != nil {
+		return err
+	}
+
+	return opts.Exporter.Write(opts.IO, fetchedPR)
 }
 
 func renderPullRequestPlain(w io.Writer, params map[string]any, state *shared.IssueMetadataState) error {
