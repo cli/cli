@@ -215,6 +215,46 @@ func TestSearchIssuesAndAdvancedSearch(t *testing.T) {
 	}
 }
 
+// TestSearchIssues_paginationLimit tests that the per-page limit shrinks on
+// subsequent pages when using --search with --limit > 100 (issue #13906).
+func TestSearchIssues_paginationLimit(t *testing.T) {
+	reg := &httpmock.Registry{}
+	httpClient := &http.Client{}
+	httpmock.ReplaceTripper(httpClient, reg)
+	client := api.NewClientFromHTTP(httpClient)
+
+	// First page: 100 issues returned, hasNextPage=true
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.StringResponse(`{
+			"data": {
+				"search": {
+					"issueCount": 150,
+					"nodes": [{"title": "issue1"}],
+					"pageInfo": {"hasNextPage": true, "endCursor": "ENDCURSOR"}
+				}
+			}
+		}`),
+	)
+
+	// Second page: should request last: 50 (not 100)
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.GraphQLQuery(`{"data":{"search":{"issueCount":150,"nodes":[],"pageInfo":{"hasNextPage":false}}}}`,
+			func(query string, vars map[string]any) {
+				if vars["limit"] != float64(50) {
+					t.Errorf("expected second page limit=50, got %v", vars["limit"])
+				}
+			}),
+	)
+
+	repo := ghrepo.New("OWNER", "REPO")
+	_, err := searchIssues(client, fd.AdvancedIssueSearchSupportedAsOnlyBackend(), repo, prShared.FilterOptions{Search: "repo:OWNER/REPO state:open"}, 150)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSearchIssues_rejectsPullRequestQualifiers(t *testing.T) {
 	tests := []struct {
 		name   string

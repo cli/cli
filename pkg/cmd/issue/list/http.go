@@ -212,7 +212,7 @@ loop:
 			break
 		}
 		variables["after"] = resp.Search.PageInfo.EndCursor
-		variables["perPage"] = min(perPage, limit-len(ic.Issues))
+		variables["limit"] = min(perPage, limit-len(ic.Issues))
 	}
 
 	return &ic, nil
