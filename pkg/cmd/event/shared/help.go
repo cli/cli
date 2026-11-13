@@ -17,6 +17,7 @@ var EventTypes = []EventType{
 	{"com.github.pull_request.state.changed.v1", "the pull request was merged, closed, reopened, marked ready for review, or converted to draft"},
 	{"com.github.pull_request.head.changed.v1", "the head branch changed, for example after a push"},
 	{"com.github.pull_request.merge_conflict.v1", "the pull request has a merge conflict"},
+	{"com.github.pull_request.check_suite.status.changed.v1", "a check suite on the head commit completed, such as a CI workflow"},
 }
 
 // EventTypeDescription returns the description of the named event type, or an empty string if it is unknown.

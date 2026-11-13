@@ -94,7 +94,11 @@ func NewCmdListen(f *cmdutil.Factory, runF func(*ListenOptions) error) *cobra.Co
 			%[2]s
 
 			Events are thin single line JSON objects with their %[1]sdata.api_url%[1]s pointing at the object that changed,
-			such as the review or the pull request. Fetch it to learn what changed.
+			such as the review, the pull request, or the check suite. Fetch it to learn what changed.
+
+			A pull request usually has several check suites, and each one sends its own event when it completes, with
+			its %[1]sdata.conclusion%[1]s, such as %[1]ssuccess%[1]s or %[1]sfailure%[1]s. To wait for all checks,
+			read the pull request checks after each event, for example with %[1]sgh pr checks%[1]s.
 
 			Use %[1]s--jq%[1]s or %[1]s--template%[1]s to format each event; see %[1]sgh help formatting%[1]s.
 
@@ -116,6 +120,9 @@ func NewCmdListen(f *cmdutil.Factory, runF func(*ListenOptions) error) *cobra.Co
 
 			# Wait for a pull request to be merged or closed
 			$ gh event listen --resource https://github.com/OWNER/REPO/pull/123 --event com.github.pull_request.state.changed.v1
+
+			# Wait for the next check suite to complete and print its conclusion
+			$ gh event listen --resource https://github.com/OWNER/REPO/pull/123 --event com.github.pull_request.check_suite.status.changed.v1 --jq .data.conclusion
 
 			# Keep printing reviews and state changes until stopped
 			$ gh event listen --resource https://github.com/OWNER/REPO/pull/123 --follow --event com.github.pull_request.review.submitted.v1,com.github.pull_request.state.changed.v1

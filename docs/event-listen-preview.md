@@ -19,7 +19,7 @@ gh event listen --subscription SUBSCRIPTION_ID
 
 ## Output and readiness
 
-Events are thin: `type` says what changed and `data.api_url` points at the changed object, such as the review or the pull request. Consumers fetch it when they need details.
+Events are thin: `type` says what changed and `data.api_url` points at the changed object, such as the review, the pull request, or the check suite. Consumers fetch it when they need details. Check suite events also carry `data.conclusion`; a pull request usually has several check suites, each sending its own event, so consumers waiting for all checks read them after each event.
 
 `--jq` and `--template` format each event separately, like `gh api`. They are mutually exclusive and validated before subscribing. jq results are printed one per line, with strings unquoted. An expression or template that fails on an event ends the command rather than reconnecting. Output is JSON whether or not stdout is a terminal.
 

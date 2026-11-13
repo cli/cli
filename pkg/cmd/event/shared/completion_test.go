@@ -34,7 +34,7 @@ func TestCompleteEventTypes(t *testing.T) {
 		},
 		{
 			name:       "suggests nothing for an unknown type",
-			toComplete: "com.github.check_suite",
+			toComplete: "com.github.issue",
 			want:       nil,
 		},
 	}
