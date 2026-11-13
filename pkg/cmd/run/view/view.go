@@ -97,6 +97,8 @@ type ViewOptions struct {
 	Prompt   bool
 	Exporter cmdutil.Exporter
 
+	InvokingAgent string
+
 	Now func() time.Time
 }
 
@@ -107,6 +109,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Prompter:   f.Prompter,
 		Now:        time.Now,
 		Browser:    f.Browser,
+
+		InvokingAgent: f.InvokingAgent,
 	}
 
 	cmd := &cobra.Command{
@@ -125,6 +129,12 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			Additionally, due to similar platform constraints, some log lines may not be
 			associated with a specific step within a job. In these cases, the step name will
 			appear as %[1]sUNKNOWN STEP%[1]s in the log output.
+
+			This command shows a snapshot. To wait for the workflow runs of a pull request on %[1]sgithub.com%[1]s to
+			finish, use %[1]sgh event listen%[1]s with the
+			%[1]scom.github.pull_request.check_suite.status.changed.v1%[1]s event instead of polling this command. Each
+			check suite, such as a workflow run, sends its own event when it completes. Changes made before the listener
+			starts are not reported, so read the checks once it is listening.
 		`, "`", maxAPILogFetchers),
 		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
@@ -283,6 +293,11 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.Exporter != nil {
+		if opts.InvokingAgent != "" && run.Status != shared.Completed {
+			if number, err := shared.PullRequestForRun(client, repo, *run); err == nil {
+				printEventListenHint(opts, repo, run, number)
+			}
+		}
 		return opts.Exporter.Write(opts.IO, run)
 	}
 
@@ -350,6 +365,7 @@ func runView(opts *ViewOptions) error {
 	number, err := shared.PullRequestForRun(client, repo, *run)
 	if err == nil {
 		prNumber = fmt.Sprintf(" %s#%d", ghrepo.FullName(repo), number)
+		printEventListenHint(opts, repo, run, number)
 	}
 
 	var artifacts []shared.Artifact
