@@ -192,27 +192,28 @@ test("parseReport", async t => {
     { name: "repeated labels", change: data => data.items[0].labels.push({ ...data.items[0].labels[0] }), error: /repeat label/ },
     { name: "keep needs-triage", change: data => data.items[0].labels[0].name = "needs-triage", error: /Invalid label/ },
     { name: "duplicate-only labels", data: duplicateInput, change: data => data.items[0].labels[0].name = "bug", error: /only duplicate/ },
-    { name: "duplicate stops source investigation", data: duplicateInput, change: data => decision(data).investigation_notes = "More research.", error: /Stop investigation/ },
-    { name: "duplicate stops reproduction", data: duplicateInput, change: data => decision(data).reproduction_log = "Ran commands.", error: /Stop investigation/ },
+    { name: "duplicate source investigation records a warning", data: duplicateInput, change: data => decision(data).investigation_notes = "More research.", warning: /Stop investigation/ },
+    { name: "duplicate reproduction records a warning", data: duplicateInput, change: data => decision(data).reproduction_log = "Ran commands.", warning: /Stop investigation/ },
     { name: "duplicate is another issue", data: duplicateInput, change: data => decision(data).duplicate_issue = "12", error: /another issue/ },
-    { name: "duplicate reason is one sentence", data: duplicateInput, change: data => decision(data).duplicate_reason = "This is similar. Also another thing.", error: /one sentence/ },
+    { name: "duplicate sentence guidance is nonblocking", data: duplicateInput, change: data => decision(data).duplicate_reason = "This is similar. Also another thing.", warning: /one sentence/ },
+    { name: "duplicate still needs a reason", data: duplicateInput, change: data => decision(data).duplicate_reason = "", error: /reason for the duplicate/ },
     { name: "uncertain match cannot apply duplicate", change: data => data.items[0].labels[0].name = "duplicate", error: /Only a confirmed duplicate/ },
-    { name: "no backend in reports", change: data => decision(data).reproduction_log += "\nghmock run", error: /not the test backend/ },
+    { name: "backend wording in reports is nonblocking", change: data => decision(data).reproduction_log += "\nghmock run", warning: /not the test backend/ },
     {
       name: "a backend name in a hidden link destination is not visible prose",
       change: data => decision(data).reproduction_log += "\n[Run evidence](https://github.com/octo/ghmock-trials/actions/runs/123)",
       check: report => assert.match(report.documents.reproduction_log, /\[Run evidence\]\(https:\/\/github.com\/octo\/ghmock-trials\/actions\/runs\/123\)/),
     },
-    { name: "visible backend link labels are still rejected", change: data => decision(data).reproduction_log += "\n[ghmock](https://github.com/octo/hello)", error: /not the test backend/ },
+    { name: "visible backend link labels record a warning", change: data => decision(data).reproduction_log += "\n[ghmock](https://github.com/octo/hello)", warning: /not the test backend/ },
     {
       name: "literal angle brackets in output are not hidden HTML",
       change: data => decision(data).comment = comment.replace("test\ttest\tsimulated failure", "error: expected <run-id>"),
       check: report => assert.match(report.comment, /error: expected <run-id>/),
     },
-    { name: "no backend in labels", change: data => data.items[0].labels[0].rationale = "ghmock showed it", error: /not the test backend/ },
-    { name: "no negative search prose", change: data => decision(data).comment += "\nNo duplicate found.", error: /negative duplicate/ },
-    { name: "no label prose", change: data => decision(data).comment += "\nSuggesting labels for this.", error: /label reasoning/ },
-    { name: "no applied-label prose", change: data => decision(data).comment += "\nApplied labels for this.", error: /label reasoning/ },
+    { name: "backend wording in label reasons is nonblocking", change: data => data.items[0].labels[0].rationale = "ghmock showed it", warning: /not the test backend/ },
+    { name: "negative search prose is nonblocking", change: data => decision(data).comment += "\nNo duplicate found.", warning: /negative duplicate/ },
+    { name: "label prose is nonblocking", change: data => decision(data).comment += "\nSuggesting labels for this.", warning: /label reasoning/ },
+    { name: "applied-label prose is nonblocking", change: data => decision(data).comment += "\nApplied labels for this.", warning: /label reasoning/ },
     ...[
       "I applied the labels.",
       "I will apply labels to this issue.",
@@ -224,24 +225,32 @@ test("parseReport", async t => {
       "Labels have been applied to this issue.",
       "Labels were applied.",
     ].map(comment => ({
-      name: `triage label narration is rejected: ${comment}`,
+      name: `triage label narration records a warning: ${comment}`,
       data: supportInput,
       change: data => decision(data).comment = comment,
-      error: /label reasoning/,
+      warning: /label reasoning/,
     })),
-    { name: "wrong result heading", change: data => decision(data).outcome = "not_reproduced", error: /selected reproduction outcome/ },
-    { name: "include reproduction log", change: data => decision(data).reproduction_log = "", error: /reproduction log/ },
-    { name: "command must be gh", change: data => decision(data).comment = comment.replace("$ gh ", "$ curl "), error: /actual gh command/ },
-    { name: "include output", change: data => decision(data).comment = comment.replace("test\ttest\tsimulated failure\n", ""), error: /captured output/ },
-    { name: "include exit status", change: data => decision(data).comment = comment.replace("**Exit status:**", "Status:"), error: /exit status separately/ },
-    { name: "no hidden top-level text", change: data => decision(data).comment += "\n<details>More.</details>", error: /HTML/ },
-    { name: "visible budget includes footer", change: data => decision(data).comment += "\n" + "word ".repeat(125), error: /150 words/ },
-    { name: "one small code block", change: data => decision(data).comment += "\n```text\nmore\n```", error: /one five-line/ },
-    { name: "trim output", change: data => decision(data).comment = comment.replace("test\ttest\tsimulated failure", "one\ntwo\nthree\nfour\nfive"), error: /five-line/ },
-    { name: "balanced code", change: data => decision(data).comment += "\n```", error: /Close the code fence/ },
-    { name: "no em dashes", change: data => decision(data).comment += "\nOne\u2014two.", error: /ordinary hyphens/ },
+    { name: "result-heading wording is nonblocking", change: data => decision(data).outcome = "not_reproduced", warning: /selected reproduction outcome/ },
+    { name: "missing reproduction log is nonblocking", change: data => decision(data).reproduction_log = "", warning: /reproduction log/ },
+    { name: "command-display guidance is nonblocking", change: data => decision(data).comment = comment.replace("$ gh ", "$ curl "), warning: /actual gh command/ },
+    { name: "missing captured output is nonblocking", change: data => decision(data).comment = comment.replace("test\ttest\tsimulated failure\n", ""), warning: /captured output/ },
+    { name: "exit-status wording is nonblocking", change: data => decision(data).comment = comment.replace("**Exit status:**", "Status:"), warning: /exit status separately/ },
+    { name: "sanitized details formatting is nonblocking", change: data => decision(data).comment += "\n<details>More.</details>", warning: /HTML/ },
+    { name: "visible word budget is nonblocking", change: data => decision(data).comment += "\n" + "word ".repeat(125), warning: /150 words/ },
+    { name: "multiple code blocks are nonblocking", change: data => decision(data).comment += "\n```text\nmore\n```", warning: /one five-line/ },
+    { name: "long command output is nonblocking", change: data => decision(data).comment = comment.replace("test\ttest\tsimulated failure", "one\ntwo\nthree\nfour\nfive"), warning: /five-line/ },
+    { name: "unclosed code fence is nonblocking", change: data => decision(data).comment += "\n```", warning: /Close the code fence/ },
+    { name: "alternative code fences are nonblocking", change: data => decision(data).comment = comment.replaceAll("```", "~~~"), warning: /plain three-backtick/ },
+    { name: "hyphen preference is nonblocking", change: data => decision(data).comment += "\nOne\u2014two.", warning: /ordinary hyphens/ },
+    { name: "missing duplicate search report is nonblocking", change: data => decision(data).duplicate_analysis = "", warning: /duplicate search result/ },
+    { name: "preferred comment length is nonblocking", data: supportInput, change: data => decision(data).comment = "x".repeat(2501), warning: /2500 characters/ },
+    { name: "preferred label reason length is nonblocking", change: data => data.items[0].labels[0].rationale = "x".repeat(601), warning: /600 characters/ },
     { name: "no control characters", change: data => decision(data).comment += "\u001b[0m", error: /control characters/ },
-    { name: "bounded report body", change: data => decision(data).duplicate_analysis = "x".repeat(10001), error: /10000 characters/ },
+    { name: "no bidirectional control characters", change: data => decision(data).comment += "\u202e", error: /control characters/ },
+    { name: "preferred report length is nonblocking", change: data => decision(data).duplicate_analysis = "x".repeat(10001), warning: /10000 characters/ },
+    { name: "unusable comment type still fails", change: data => decision(data).comment = {}, error: /must be text/ },
+    { name: "empty comment still fails", change: data => decision(data).comment = "", error: /Include a short comment/ },
+    { name: "real publication size bound still fails", change: data => decision(data).comment = "x".repeat(60001), error: /publication limit/ },
   ];
   for (const entry of cases) await t.test(entry.name, () => {
     const data = (entry.data ?? input)();
@@ -249,6 +258,10 @@ test("parseReport", async t => {
     if (entry.error) assert.throws(() => parseReport(data, context, entry.sanitize ?? identity), entry.error);
     else {
       const report = parseReport(data, context, entry.sanitize ?? identity);
+      if (entry.warning) {
+        assert.ok(report.warnings.some(warning => entry.warning.test(warning.message)),
+          `Missing warning ${entry.warning}: ${JSON.stringify(report.warnings)}`);
+      }
       entry.check?.(report);
     }
   });
@@ -355,6 +368,57 @@ test("publishReport", async t => {
         assert.equal(fake.artifacts.length, 2);
         assert.equal(fake.comments.length, 1);
         assert.ok(files["comment.md"].startsWith(decision(supportInput()).comment));
+      },
+    },
+    ...[false, true].map(staged => ({
+      name: `formatting warnings do not block ${staged ? "preview" : "publication"} or rewrite commands`,
+      data: supportInput,
+      staged,
+      change: data => decision(data).comment =
+        "Use these commands to create and append templates:\n\n```console\n$ gh repo gitignore view Python > .gitignore\n```\n\n```console\n$ gh repo gitignore view Node >> .gitignore\n```",
+      check: ({ result, fake, files }) => {
+        assert.deepEqual(result.failures, []);
+        assert.ok(result.warnings.some(warning => /one five-line/.test(warning.message)));
+        assert.deepEqual(JSON.parse(files["result.json"]).warnings, result.warnings);
+        assert.match(files["comment.md"], /```console\n\$ gh repo gitignore view Python > \.gitignore\n```/);
+        assert.match(files["comment.md"], /```console\n\$ gh repo gitignore view Node >> \.gitignore\n```/);
+        assert.doesNotMatch(files["comment.md"], /one five-line|warning/i);
+        assert.equal(fake.comments.length, staged ? 0 : 1);
+        if (staged) assert.equal(fake.calls.length, 0);
+      },
+    })),
+    {
+      name: "quality warnings do not bypass private-reference protection",
+      data: supportInput,
+      options: { private: false },
+      change: data => decision(data).comment += "\nOne\u2014two. See https://github.com/hidden/project/issues/1.",
+      error: /non-public repository/,
+    },
+    {
+      name: "rendered report size is checked before any API writes",
+      change: data => decision(data).duplicate_analysis = "x".repeat(59999),
+      error: /publication limit/,
+    },
+    {
+      name: "rendered comment size is checked before any API writes",
+      data: supportInput,
+      change: data => decision(data).comment = "x".repeat(59999),
+      error: /publication limit/,
+    },
+    {
+      name: "complete comment envelope size is checked before artifact writes",
+      change: data => Object.assign(decision(data), { outcome: "other", comment: "x".repeat(59800) }),
+      error: /publication limit/,
+    },
+    {
+      name: "long comments within the complete envelope budget still publish",
+      change: data => Object.assign(decision(data), { outcome: "other", comment: "x".repeat(58000) }),
+      check: ({ result, fake }) => {
+        assert.deepEqual(result.failures, []);
+        assert.equal(fake.artifacts.length, 4);
+        assert.equal(fake.comments.length, 1);
+        assert.ok(fake.comments[0].body.length <= 60000);
+        assert.ok(result.warnings.some(warning => /2500 characters/.test(warning.message)));
       },
     },
     {

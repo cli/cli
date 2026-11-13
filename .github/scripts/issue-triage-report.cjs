@@ -17,6 +17,7 @@ const openings = {
 };
 const digest = text => createHash("sha256").update(text).digest("hex");
 const missingArtifact = Symbol("Artifact read returned HTTP 404");
+const publicationLimit = 60000;
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
@@ -34,18 +35,19 @@ function wordCount(markdown) {
     .trim().split(/\s+/).filter(Boolean).length;
 }
 
-function text(value, field, limit, sanitize) {
+function text(value, field, limit, sanitize, quality) {
   requireValue(typeof value === "string", `${field} must be text`);
-  requireValue(value.length <= limit, `${field} exceeds ${limit} characters`);
+  requireValue(value.length <= publicationLimit, `${field} exceeds the publication limit`);
   requireValue(!/[\u0000-\u0008\u000b-\u001f\u007f\u202a-\u202e\u2066-\u2069]/u.test(value), `${field} contains control characters`);
-  requireValue(!/\bghmock\b/i.test(linkLabels(value)), `${field} must describe gh, not the test backend`);
-  requireValue(!value.includes("\u2014"), `${field} must use ordinary hyphens`);
+  quality(!/\bghmock\b/i.test(linkLabels(value)), "Describe gh, not the test backend", field);
+  quality(!value.includes("\u2014"), "Use ordinary hyphens", field);
   const clean = sanitize(value).trim();
-  requireValue(clean.length <= limit, `${field} is too long after sanitization`);
+  requireValue(clean.length <= publicationLimit, `${field} exceeds the publication limit after sanitization`);
+  quality(value.length <= limit && clean.length <= limit, `Prefer at most ${limit} characters`, field);
   return clean;
 }
 
-function fencedBlocks(markdown) {
+function fencedBlocks(markdown, quality) {
   const blocks = [];
   let current = null;
   for (const line of markdown.split("\n")) {
@@ -56,14 +58,20 @@ function fencedBlocks(markdown) {
         current = null;
       }
     } else if (current !== null) current.push(line);
-    else requireValue(!/^\s*(?:```|~~~)/.test(line), "Use a plain three-backtick code fence");
+    else quality(!/^\s*(?:```|~~~)/.test(line), "Use a plain three-backtick code fence");
   }
-  requireValue(current === null, "Close the code fence");
+  quality(current === null, "Close the code fence");
   return blocks;
 }
 
 // All routing and resource identities come from the job, never the agent's text.
 function parseReport(output, context, sanitize) {
+  const warnings = [];
+  const quality = (condition, message, report = "comment") => {
+    if (!condition && !warnings.some(warning => warning.report === report && warning.message === message)) {
+      warnings.push({ report, message });
+    }
+  };
   requireValue(output && Array.isArray(output.items), "Missing safe-output items");
   requireValue(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(context.repo), "Invalid target repository");
   requireValue(Number.isSafeInteger(context.issue) && context.issue > 0, "Invalid target issue");
@@ -88,16 +96,16 @@ function parseReport(output, context, sanitize) {
     requireValue((label.suggest === false || label.suggest === undefined) &&
       ["HIGH", "MEDIUM", "LOW"].includes(label.confidence), "Labels must apply directly with confidence");
     requireValue(/^[a-z][a-z0-9-]*$/.test(label.name) && label.name !== "needs-triage", "Invalid label update");
-    label.rationale = text(label.rationale, "label rationale", 600, sanitize);
+    label.rationale = text(label.rationale, "label rationale", 600, sanitize, quality);
     requireValue(label.rationale.length > 0, "Label updates need a reason");
   }
 
   const documents = {};
   for (const key of ["duplicate_analysis", "reproduction_log", "investigation_notes"]) {
-    const body = text(item[key] ?? "", key, 10000, sanitize);
+    const body = text(item[key] ?? "", key, 10000, sanitize, quality);
     if (body) documents[key] = body;
   }
-  requireValue(documents.duplicate_analysis, "Include the duplicate search result or its limitation");
+  quality(documents.duplicate_analysis, "Include the duplicate search result or its limitation", "duplicate_analysis");
   if (labels.length) {
     documents.label_reasoning = labels.map(label =>
       `## \`${label.name}\`\n\n${label.rationale}\n\nConfidence: ${label.confidence.toLowerCase()}.`
@@ -107,43 +115,44 @@ function parseReport(output, context, sanitize) {
   let comment;
   if (item.outcome === "duplicate") {
     requireValue(labels.length === 1 && labels[0].name === "duplicate", "A duplicate can apply only duplicate");
-    requireValue(!documents.reproduction_log && !documents.investigation_notes, "Stop investigation after finding a duplicate");
+    quality(!documents.reproduction_log && !documents.investigation_notes, "Stop investigation after finding a duplicate", "duplicate_analysis");
     requireValue(/^[1-9]\d*$/.test(item.duplicate_issue ?? "") && Number(item.duplicate_issue) !== context.issue, "Choose another issue as the duplicate");
-    const reason = text(item.duplicate_reason ?? "", "duplicate reason", 500, sanitize);
-    requireValue(reason && !/\n|[.!?](?:\s|$)/.test(reason.replace(/`[^`]*`/g, "")), "Give one sentence fragment explaining the duplicate, without ending punctuation");
+    const reason = text(item.duplicate_reason ?? "", "duplicate reason", 500, sanitize, quality);
+    requireValue(reason, "Include the reason for the duplicate decision");
+    quality(!/\n|[.!?](?:\s|$)/.test(reason.replace(/`[^`]*`/g, "")), "Give one sentence fragment explaining the duplicate, without ending punctuation");
     requireValue(!item.comment, "The duplicate comment is generated from duplicate_issue and duplicate_reason");
     comment = `I believe this is a duplicate of [#${item.duplicate_issue}](https://github.com/cli/cli/issues/${item.duplicate_issue}) because ${reason}.`;
   } else {
     requireValue(!labels.some(label => label.name === "duplicate"), "Only a confirmed duplicate may apply duplicate");
-    comment = text(item.comment, "comment", 2500, sanitize);
+    comment = text(item.comment, "comment", 2500, sanitize, quality);
     requireValue(comment, "Include a short comment");
-    const blocks = fencedBlocks(comment);
-    requireValue(blocks.length <= 1 && blocks.every(block => block.length <= 5), "Use at most one five-line command/output block");
+    const blocks = fencedBlocks(comment, quality);
+    quality(blocks.length <= 1 && blocks.every(block => block.length <= 5), "Use at most one five-line command/output block");
     const prose = comment.replace(/```[\s\S]*?```/g, "").replace(/`[^`]*`/g, "");
-    requireValue(!/<\/?[A-Za-z!]/.test(prose), "Do not supply HTML or details blocks in the visible comment");
+    quality(!/<\/?[A-Za-z!]/.test(prose), "Do not supply HTML or details blocks in the visible comment");
     const narratesLabels = [
       /\b(?:I|we|this (?:triage(?: run)?|workflow|run))(?:['\u2019](?:m|re|ve|ll)|\s+(?:am|are|is|have|has|will))?(?:\s+(?:already|just|now))?\s+(?:apply|applying|applied)\b[^.!?\n]*\blabels?\b/i,
       /(?:^|[.!?\n])\s*(?:applying|applied)\s+(?:the\s+)?labels?(?=\s*(?:[.!?\n]|$)|\s+(?:now|here|for this|to this)\b)/i,
       /\blabels?\s+(?:are|were|have been|will be|are being)\s+applied(?=\s*(?:[.!?\n]|$)|\s+(?:now|here|to this|for this|by (?:this )?(?:triage|workflow|run))\b)/i,
     ].some(pattern => pattern.test(prose));
-    requireValue(!narratesLabels &&
+    quality(!narratesLabels &&
       !/\b(?:no (?:matching |clear )?duplicates?|duplicate (?:search|analysis|check)|suggest(?:ing|ed)? (?:the )?labels?|priority-[123]|off-schema|scaffold(?:ed|ing)?)\b/i.test(prose),
       "Keep label reasoning, negative duplicate discussion, and test machinery out of the visible comment");
     if (openings[item.outcome]) {
-      requireValue(comment.startsWith(`**${openings[item.outcome]} `), "Start with the selected reproduction outcome in bold");
-      requireValue(/^\*\*[^*\n]+\*\*(?:\n|$)/.test(comment), "Keep the complete result heading in bold");
+      quality(comment.startsWith(`**${openings[item.outcome]} `), "Start with the selected reproduction outcome in bold");
+      quality(/^\*\*[^*\n]+\*\*(?:\n|$)/.test(comment), "Keep the complete result heading in bold");
       if (item.outcome !== "blocked") {
-        requireValue(documents.reproduction_log, "Include the reproduction log");
-        requireValue(blocks.length === 1 && /^\$ gh \S/.test(blocks[0][0] ?? ""), "Show the actual gh command");
-        requireValue(blocks[0].length > 1 || /\b(?:no output|printed nothing|output:(?:\*\*)?\s*none)/i.test(comment), "Show captured output, or explicitly say the command printed nothing");
-        requireValue(/\*\*Exit status:\*\* (?:`-?\d+`|not available)/.test(comment), "State the recorded exit status separately");
+        quality(documents.reproduction_log, "Include the reproduction log", "reproduction_log");
+        quality(blocks.some(block => /^\$ gh \S/.test(block[0] ?? "")), "Show the actual gh command");
+        quality(blocks.some(block => block.length > 1) || /\b(?:no output|printed nothing|output:(?:\*\*)?\s*none)/i.test(comment), "Show captured output, or explicitly say the command printed nothing");
+        quality(/\*\*Exit status:\*\* (?:`-?\d+`|not available)/.test(comment), "State the recorded exit status separately");
       }
     }
   }
   const runURL = `https://github.com/${context.repo}/actions/runs/${context.runId}`;
   const footer = `[Generated by issue triage](${runURL}).`;
-  requireValue(wordCount(`${comment}\nSupporting reports\n${footer}`) <= 150, "The visible comment exceeds 150 words, including attribution");
-  return { outcome: item.outcome, comment, documents, footer, runURL };
+  quality(wordCount(`${comment}\nSupporting reports\n${footer}`) <= 150, "The visible comment exceeds 150 words, including attribution");
+  return { outcome: item.outcome, comment, documents, footer, runURL, warnings };
 }
 
 function marker(context, kind, body) {
@@ -287,6 +296,13 @@ function renderComment(report, links, failed) {
   return `${body}\n\n${report.footer}`;
 }
 
+function renderPublication(report, context, links, failed, known, inputHash) {
+  const state = `<!-- gh-aw-triage-publication:${JSON.stringify({ input: inputHash, complete: failed.length === 0 })} -->`;
+  const registry = `<!-- gh-aw-triage-reports:${JSON.stringify(known)} -->`;
+  return mark(context, `comment-${context.runId}`,
+    `${renderComment(report, links, failed)}\n\n${state}\n\n${registry}`);
+}
+
 async function saveComment(api, context, body, previous) {
   const endpoint = `repos/${context.repo}/issues/${context.issue}/comments`;
   const identity = `<!-- gh-aw-triage:${context.workflow}:${context.issue}:comment-${context.runId}:`;
@@ -405,15 +421,20 @@ async function checkPublicReferences(api, context, report) {
 // Preview and publication use the same rendered documents. Only API writes differ.
 async function publishReport(report, context, api, writeFile) {
   const result = { staged: context.staged, artifacts: {}, failures: [], comment: null };
+  if (report.warnings?.length) result.warnings = [...report.warnings];
+  requireValue(mark(context, `comment-${context.runId}`, renderComment(report, {}, [])).length <= publicationLimit,
+    "Comment exceeds the publication limit");
   const documents = {};
   for (const key of Object.keys(reports)) {
     if (!report.documents[key]) continue;
     documents[key] = mark(context, key, `${report.documents[key]}\n\n${report.footer}`);
+    requireValue(documents[key].length <= publicationLimit, `${reports[key]} exceeds the publication limit`);
     writeFile(`${key}.md`, documents[key]);
   }
   if (context.staged) {
     const links = Object.fromEntries(Object.keys(documents).map(key => [key, `${key}.md`]));
     const body = mark(context, `comment-${context.runId}`, renderComment(report, links, []));
+    requireValue(body.length <= publicationLimit, "Comment exceeds the publication limit");
     writeFile("comment.md", body);
     result.artifacts = links;
     result.comment = "comment.md";
@@ -444,6 +465,13 @@ async function publishReport(report, context, api, writeFile) {
       return result;
     }
   }
+  // Artifact numbers are not known until writes return; reserve their full valid width.
+  const plannedNumbers = Object.fromEntries([...new Set([...Object.keys(known), ...Object.keys(documents)])]
+    .map(key => [key, Number.MAX_SAFE_INTEGER]));
+  const plannedLinks = Object.fromEntries(Object.keys(documents).map(key =>
+    [key, `https://github.com/${context.repo}/issues/${context.issue}/artifacts/${plannedNumbers[key]}`]));
+  requireValue(renderPublication(report, context, plannedLinks, [], plannedNumbers, inputHash).length <= publicationLimit,
+    "Comment and report references exceed the publication limit");
   for (const [key, body] of Object.entries(documents)) {
     let warned = false;
     const onNotFound = () => {
@@ -459,11 +487,9 @@ async function publishReport(report, context, api, writeFile) {
       result.failures.push({ report: key, message: error.message });
     }
   }
-  const state = `<!-- gh-aw-triage-publication:${JSON.stringify({ input: inputHash, complete: result.failures.length === 0 })} -->`;
-  const registry = `<!-- gh-aw-triage-reports:${JSON.stringify(known)} -->`;
-  const body = mark(context, `comment-${context.runId}`,
-    `${renderComment(report, result.artifacts, result.failures.map(failure => failure.report))}\n\n${state}\n\n${registry}`);
-  requireValue(body.length <= 60000, "Comment and fallback reports exceed the publication limit");
+  const body = renderPublication(report, context, result.artifacts,
+    result.failures.map(failure => failure.report), known, inputHash);
+  requireValue(body.length <= publicationLimit, "Comment and fallback reports exceed the publication limit");
   writeFile("comment.md", body);
   try {
     result.comment = await saveComment(api, context, body, publication?.comment);
@@ -515,7 +541,7 @@ async function run({ env, sanitize, core }) {
   core.setOutput("status", result.staged || result.skipped ? "skipped" : result.failures.length ? "failure" : "success");
   if (!result.staged && result.comment) core.setOutput("url", result.comment);
   if (result.skipped) core.notice(result.skipped);
-  for (const warning of result.warnings ?? []) core.warning(`${reports[warning.report]}: ${warning.message}`);
+  for (const warning of result.warnings ?? []) core.warning(`${reports[warning.report] ?? warning.report}: ${warning.message}`);
   for (const failure of result.failures) core.error(`${reports[failure.report]}: ${failure.message}`);
   if (result.failures.length) core.setFailed("Some report artifacts could not be published; their contents remain in the review files and comment fallback.");
 }
