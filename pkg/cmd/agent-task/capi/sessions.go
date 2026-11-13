@@ -221,7 +221,11 @@ func (c *CAPIClient) ListLatestSessionsForViewer(ctx context.Context, limit int)
 	pageSize := defaultSessionsPerPage
 
 	seenResources := make(map[int64]struct{})
-	latestSessions := make([]session, 0, limit)
+	// The limit is user-provided and unbounded. Sizing this buffer with it would
+	// reserve that many sessions up front, so a large --limit aborts the process
+	// with "runtime: out of memory" before the first request is made. Only the
+	// page that is about to be fetched is worth reserving.
+	latestSessions := make([]session, 0, pageSize)
 	for page := 1; ; page++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sessionsURL.String(), http.NoBody)
 		if err != nil {

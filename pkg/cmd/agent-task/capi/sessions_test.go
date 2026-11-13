@@ -1185,6 +1185,31 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 	}
 }
 
+// A --limit with no upper bound used to size the session buffer directly, so a
+// huge value aborted the process with "runtime: out of memory" before any
+// request was made. The limit must never be turned into an allocation by itself.
+func TestListLatestSessionsForViewerHugeLimit(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.Register(
+		httpmock.WithHost(
+			httpmock.QueryMatcher("GET", "agents/sessions", url.Values{
+				"page_number": {"1"},
+				"page_size":   {"50"},
+			}),
+			"api.githubcopilot.com",
+		),
+		httpmock.StringResponse(`{"sessions":[]}`),
+	)
+	defer reg.Verify(t)
+
+	httpClient := &http.Client{Transport: reg}
+	capiClient := NewCAPIClient(httpClient, stubAuthConfig{}, "github.com", "https://api.githubcopilot.com")
+
+	sessions, err := capiClient.ListLatestSessionsForViewer(context.Background(), 2_000_000_000)
+	require.NoError(t, err)
+	require.Empty(t, sessions)
+}
+
 func TestListSessionsByResourceIDRequiresResource(t *testing.T) {
 	client := &CAPIClient{}
 
