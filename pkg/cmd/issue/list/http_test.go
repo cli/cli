@@ -224,23 +224,24 @@ func TestSearchIssues_paginationLimit(t *testing.T) {
 	client := api.NewClientFromHTTP(httpClient)
 
 	// First page: 100 issues returned, hasNextPage=true
-	reg.Register(
-		httpmock.GraphQL(`query IssueSearch\b`),
-		httpmock.StringResponse(`{
-			"data": {
-				"search": {
-					"issueCount": 150,
-					"nodes": [{"title": "issue1"}],
-					"pageInfo": {"hasNextPage": true, "endCursor": "ENDCURSOR"}
+		reg.Register(
+			httpmock.GraphQL(`query IssueSearch\b`),
+			httpmock.StringResponse(`{
+				"data": {
+					"repository": {"hasIssuesEnabled": true},
+					"search": {
+						"issueCount": 150,
+						"nodes": [{"title": "issue1"},{"title": "issue2"},{"title": "issue3"},{"title": "issue4"},{"title": "issue5"},{"title": "issue6"},{"title": "issue7"},{"title": "issue8"},{"title": "issue9"},{"title": "issue10"},{"title": "issue11"},{"title": "issue12"},{"title": "issue13"},{"title": "issue14"},{"title": "issue15"},{"title": "issue16"},{"title": "issue17"},{"title": "issue18"},{"title": "issue19"},{"title": "issue20"},{"title": "issue21"},{"title": "issue22"},{"title": "issue23"},{"title": "issue24"},{"title": "issue25"},{"title": "issue26"},{"title": "issue27"},{"title": "issue28"},{"title": "issue29"},{"title": "issue30"},{"title": "issue31"},{"title": "issue32"},{"title": "issue33"},{"title": "issue34"},{"title": "issue35"},{"title": "issue36"},{"title": "issue37"},{"title": "issue38"},{"title": "issue39"},{"title": "issue40"},{"title": "issue41"},{"title": "issue42"},{"title": "issue43"},{"title": "issue44"},{"title": "issue45"},{"title": "issue46"},{"title": "issue47"},{"title": "issue48"},{"title": "issue49"},{"title": "issue50"},{"title": "issue51"},{"title": "issue52"},{"title": "issue53"},{"title": "issue54"},{"title": "issue55"},{"title": "issue56"},{"title": "issue57"},{"title": "issue58"},{"title": "issue59"},{"title": "issue60"},{"title": "issue61"},{"title": "issue62"},{"title": "issue63"},{"title": "issue64"},{"title": "issue65"},{"title": "issue66"},{"title": "issue67"},{"title": "issue68"},{"title": "issue69"},{"title": "issue70"},{"title": "issue71"},{"title": "issue72"},{"title": "issue73"},{"title": "issue74"},{"title": "issue75"},{"title": "issue76"},{"title": "issue77"},{"title": "issue78"},{"title": "issue79"},{"title": "issue80"},{"title": "issue81"},{"title": "issue82"},{"title": "issue83"},{"title": "issue84"},{"title": "issue85"},{"title": "issue86"},{"title": "issue87"},{"title": "issue88"},{"title": "issue89"},{"title": "issue90"},{"title": "issue91"},{"title": "issue92"},{"title": "issue93"},{"title": "issue94"},{"title": "issue95"},{"title": "issue96"},{"title": "issue97"},{"title": "issue98"},{"title": "issue99"},{"title": "issue100"}],
+						"pageInfo": {"hasNextPage": true, "endCursor": "ENDCURSOR"}
+					}
 				}
-			}
-		}`),
-	)
+			}`),
+		)
 
 	// Second page: should request last: 50 (not 100)
 	reg.Register(
 		httpmock.GraphQL(`query IssueSearch\b`),
-		httpmock.GraphQLQuery(`{"data":{"search":{"issueCount":150,"nodes":[],"pageInfo":{"hasNextPage":false}}}}`,
+		httpmock.GraphQLQuery(`{"data":{"repository":{"hasIssuesEnabled":true},"search":{"issueCount":150,"nodes":[],"pageInfo":{"hasNextPage":false}}}}`,
 			func(query string, vars map[string]any) {
 				if vars["limit"] != float64(50) {
 					t.Errorf("expected second page limit=50, got %v", vars["limit"])
