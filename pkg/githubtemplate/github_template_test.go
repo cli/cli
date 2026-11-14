@@ -93,6 +93,7 @@ func TestFindNonLegacy(t *testing.T) {
 				".github/PULL_REQUEST_TEMPLATE/one.md",
 				".github/PULL_REQUEST_TEMPLATE/two.md",
 				".github/PULL_REQUEST_TEMPLATE/three.md",
+				".github/PULL_REQUEST_TEMPLATE/nested.md/ignored.md",
 				"docs/pull_request_template.md",
 			},
 			args: args{
