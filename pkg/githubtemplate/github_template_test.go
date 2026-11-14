@@ -137,6 +137,32 @@ func TestFindNonLegacy(t *testing.T) {
 		})
 		os.RemoveAll(tmpdir)
 	}
+
+	t.Run("Symlinked template files in subdirectory are ignored", func(t *testing.T) {
+		templateDir := path.Join(tmpdir, ".github", "PULL_REQUEST_TEMPLATE")
+		if err := os.MkdirAll(templateDir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(tmpdir)
+
+		realTemplate := path.Join(templateDir, "valid.md")
+		if err := os.WriteFile(realTemplate, []byte("valid template"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		secretFile := path.Join(tmpdir, "secret.txt")
+		if err := os.WriteFile(secretFile, []byte("secret"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		symlinkTemplate := path.Join(templateDir, "linked.md")
+		if err := os.Symlink(secretFile, symlinkTemplate); err != nil {
+			t.Skipf("symlinks not supported: %v", err)
+		}
+
+		want := []string{realTemplate}
+		if got := FindNonLegacy(tmpdir, "PULL_REQUEST_TEMPLATE"); !reflect.DeepEqual(got, want) {
+			t.Errorf("FindNonLegacy() = %v, want %v", got, want)
+		}
+	})
 }
 
 func TestFindLegacy(t *testing.T) {
