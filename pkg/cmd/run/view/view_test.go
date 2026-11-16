@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -2758,6 +2760,89 @@ var sadJobRunLogOutput = fmt.Sprintf("%s%s", barfTheQuuxLogOutput, quuxTheBarfLo
 var expectedRunLogOutput = fmt.Sprintf("%s%s", coolJobRunLogOutput, sadJobRunLogOutput)
 var expectedRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", coolJobRunWithNoStepLogsLogOutput, sadJobRunWithNoStepLogsLogOutput)
 var expectedLegacyRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", legacyCoolJobRunWithNoStepLogsLogOutput, legacySadJobRunWithNoStepLogsLogOutput)
+
+func TestCopyLogWithLinePrefix(t *testing.T) {
+	longLine := strings.Repeat("x", 70_000)
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name: "empty log",
+		},
+		{
+			name:  "multiple lines",
+			input: "first\nsecond\n",
+			want:  "job\tstep\tfirst\njob\tstep\tsecond\n",
+		},
+		{
+			name:  "empty lines",
+			input: "\n\n",
+			want:  "job\tstep\t\njob\tstep\t\n",
+		},
+		{
+			name:  "CRLF lines",
+			input: "first\r\nsecond\r\n",
+			want:  "job\tstep\tfirst\njob\tstep\tsecond\n",
+		},
+		{
+			name:  "no final newline",
+			input: "last",
+			want:  "job\tstep\tlast\n",
+		},
+		{
+			name:  "final carriage return",
+			input: "last\r",
+			want:  "job\tstep\tlast\n",
+		},
+		{
+			name:  "long line followed by marker",
+			input: longLine + "\nAFTER-LONG-LINE\n",
+			want:  "job\tstep\t" + longLine + "\njob\tstep\tAFTER-LONG-LINE\n",
+		},
+		{
+			name:  "long line without final newline",
+			input: longLine,
+			want:  "job\tstep\t" + longLine + "\n",
+		},
+		{
+			name:  "long CRLF line",
+			input: longLine + "\r\nAFTER-LONG-LINE\r\n",
+			want:  "job\tstep\t" + longLine + "\njob\tstep\tAFTER-LONG-LINE\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			err := copyLogWithLinePrefix(&buf, strings.NewReader(tt.input), "job\tstep\t")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, buf.String())
+		})
+	}
+}
+
+func TestCopyLogWithLinePrefix_ReadError(t *testing.T) {
+	wantErr := errors.New("reading log failed")
+	r := io.MultiReader(strings.NewReader("first\npartial"), iotest.ErrReader(wantErr))
+	var buf bytes.Buffer
+
+	err := copyLogWithLinePrefix(&buf, r, "job\tstep\t")
+
+	require.ErrorIs(t, err, wantErr)
+	assert.Equal(t, "job\tstep\tfirst\njob\tstep\tpartial\n", buf.String())
+}
+
+func TestCopyLogWithLinePrefix_WriteError(t *testing.T) {
+	r, w := io.Pipe()
+	require.NoError(t, r.Close())
+	defer w.Close()
+
+	err := copyLogWithLinePrefix(w, strings.NewReader("first\nsecond\n"), "job\tstep\t")
+
+	require.ErrorIs(t, err, io.ErrClosedPipe)
+}
 
 func TestCopyLogWithLinePrefix_TerminalEscapeSequences(t *testing.T) {
 	tests := []struct {
