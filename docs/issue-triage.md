@@ -14,7 +14,7 @@ and attaches separate Markdown reports when applicable:
 - **Investigation notes:** source evidence, likely causes, alternatives, and
   remaining questions.
 
-The visible comment is limited to 150 words, including attribution and the
+The visible comment should stay within 150 words, including attribution and the
 collapsed **Supporting reports** summary. It shows a small command/output example,
 not the test backend's setup. Test data must not be presented as live GitHub data.
 The raw evidence remains a workflow download.
@@ -86,7 +86,8 @@ source at the workflow's commit, not files modified by the agent.
 
 The native label job depends on `publish_triage` through `jobs.safe_outputs.needs`.
 When label outputs are present, that job also requires the publisher job to succeed.
-Missing reports, rejected output, or publishing failures block label application.
+Missing publication output, unsafe or unusable output, and publishing failures
+block label application.
 Reports finish publishing before `invalid` or `off-topic` can trigger the shared
 closing workflows. The publisher still refuses closed or locked issues; it does
 not write reports after label-driven closure. Native outputs without labels and
@@ -98,6 +99,17 @@ and uses the pinned gh-aw sanitizer. It creates Markdown issue artifacts through
 documents, not the archives managed by `gh run download`. The publishing job uses
 a checksum-pinned `gh` release and a repository-scoped GitHub App token with
 `issues: write`. The agent does not receive that token.
+
+The final validator is a publication safety gate, not an agent feedback loop.
+Wrong targets, unauthorized or ambiguous actions, unusable payloads, unsafe text
+or references, ownership conflicts, stale decisions, and submission size limits
+remain failures. Sanitization and the security check remain mandatory.
+
+Formatting and quality preferences are nonblocking. Extra or long code blocks,
+heading and exit-status wording, prose style, missing supporting narrative, and
+preferred lengths produce job warnings and entries in `result.json`. They do not
+change the submitted evidence, add public warning banners, or block publication
+and subsequent labels. The prompt still specifies the desired output.
 
 Synthetic repositories use the owner `example.invalid`, including URLs returned
 by reproduction fixtures. GitHub account names cannot contain periods, so the

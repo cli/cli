@@ -544,6 +544,8 @@ For bug reports, choose the outcome that the evidence supports and start exactly
 
 Use `other` for feature requests or support questions, with a short response suited
 to the issue. Duplicates follow the separate early-exit rule.
+For feature and support answers, prefer one compact example. Put related commands
+in the same block rather than creating a separate block for each command.
 
 Show the smallest useful command and output in one `console` block of at most five
 lines. Its first line starts with `$ gh `. Copy output exactly, trimming unrelated
