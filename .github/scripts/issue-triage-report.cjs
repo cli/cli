@@ -468,10 +468,16 @@ async function publishReport(report, context, api, writeFile) {
   // Artifact numbers are not known until writes return; reserve their full valid width.
   const plannedNumbers = Object.fromEntries([...new Set([...Object.keys(known), ...Object.keys(documents)])]
     .map(key => [key, Number.MAX_SAFE_INTEGER]));
-  const plannedLinks = Object.fromEntries(Object.keys(documents).map(key =>
+  const documentKeys = Object.keys(documents);
+  const plannedLinks = Object.fromEntries(documentKeys.map(key =>
     [key, `https://github.com/${context.repo}/issues/${context.issue}/artifacts/${plannedNumbers[key]}`]));
-  requireValue(renderPublication(report, context, plannedLinks, [], plannedNumbers, inputHash).length <= publicationLimit,
-    "Comment and report references exceed the publication limit");
+  // Each upload can leave either a link or its full fallback body in the comment.
+  for (let mask = 0; mask < 2 ** documentKeys.length; mask++) {
+    const failed = documentKeys.filter((key, index) => mask & (1 << index));
+    const links = Object.fromEntries(Object.entries(plannedLinks).filter(([key]) => !failed.includes(key)));
+    requireValue(renderPublication(report, context, links, failed, plannedNumbers, inputHash).length <= publicationLimit,
+      "Comment and fallback reports exceed the publication limit");
+  }
   for (const [key, body] of Object.entries(documents)) {
     let warned = false;
     const onNotFound = () => {
