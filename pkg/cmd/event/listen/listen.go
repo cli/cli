@@ -420,9 +420,7 @@ func (l *listener) watchIdle(body io.ReadCloser) io.ReadCloser {
 // or nil when the stream ended without one, and errCountReached once the event limit was printed.
 func (l *listener) readEvents(body io.Reader) (*streamEnd, error) {
 	l.delivered = false
-	// Event data is JSON, which the API client sanitizes only for JSON responses. Sanitizing it here, rather than
-	// printing through ContentOut, keeps the escape sequences that --template helpers such as color generate.
-	reader := eventstream.NewFrameReader(transform.NewReader(body, &asciisanitizer.Sanitizer{JSON: true}))
+	reader := eventstream.NewFrameReader(body)
 	reader.OnComment = func(string) { l.delivered = true }
 	for {
 		frame, err := reader.Next()
@@ -433,17 +431,30 @@ func (l *listener) readEvents(body io.Reader) (*streamEnd, error) {
 			return nil, err
 		}
 
+		// Event data is JSON, which the API client sanitizes only for JSON responses. Sanitizing it here, rather than
+		// printing through ContentOut, keeps the escape sequences that --template helpers such as color generate.
+		// Each frame's data is sanitized as a whole: sanitizing the stream instead would hold back the end of a frame
+		// until the server sends more bytes, delaying each event until the next heartbeat.
+		data, _, sanitizeErr := transform.String(&asciisanitizer.Sanitizer{JSON: true}, frame.Data)
+
 		if frame.Event == endFrameEvent {
+			if sanitizeErr != nil {
+				return nil, fmt.Errorf("invalid end of stream frame: %w", sanitizeErr)
+			}
 			var end streamEnd
-			if err := json.Unmarshal([]byte(frame.Data), &end); err != nil {
+			if err := json.Unmarshal([]byte(data), &end); err != nil {
 				return nil, fmt.Errorf("invalid end of stream frame: %w", err)
 			}
 			return &end, nil
 		}
 
 		l.delivered = true
+		if sanitizeErr != nil {
+			fmt.Fprintf(l.opts.IO.ErrOut, "warning: skipped an event that is not valid UTF-8: %v\n", sanitizeErr)
+			continue
+		}
 		var event bytes.Buffer
-		if err := json.Compact(&event, []byte(frame.Data)); err != nil {
+		if err := json.Compact(&event, []byte(data)); err != nil {
 			fmt.Fprintf(l.opts.IO.ErrOut, "warning: skipped an event that is not valid JSON: %v\n", err)
 			continue
 		}

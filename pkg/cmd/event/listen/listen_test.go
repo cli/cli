@@ -631,6 +631,47 @@ func TestReadEventsSkipsInvalidJSON(t *testing.T) {
 	assert.Contains(t, stderr.String(), "warning: skipped an event that is not valid JSON")
 }
 
+func TestReadEventsPrintsEventBeforeMoreBytesArrive(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+	l := &listener{opts: &ListenOptions{IO: ios}}
+
+	// The stream sends one complete frame and then nothing more, as a server does between heartbeats.
+	body, w := io.Pipe()
+	t.Cleanup(func() { w.Close() })
+	go func() { _, _ = w.Write([]byte(fooEvent)) }()
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := l.readEvents(body)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, errCountReached)
+		assert.Equal(t, fooLine, stdout.String())
+	case <-time.After(5 * time.Second):
+		w.Close()
+		<-done
+		t.Fatal("the event was not printed until the stream sent more bytes")
+	}
+}
+
+func TestReadEventsSanitizesEachFrame(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+	l := &listener{opts: &ListenOptions{IO: ios, Follow: true}}
+
+	stream := "event: x\ndata: {\"title\": \"\x1b[31mraw\", \"escaped\": \"\\u001b[31m\"}\n\n" +
+		"event: x\ndata: {\"title\": \"\xff\"}\n\n" +
+		fooEvent
+	end, err := l.readEvents(strings.NewReader(stream))
+
+	require.NoError(t, err)
+	assert.Nil(t, end)
+	assert.Equal(t, `{"title":"^[[31mraw","escaped":"^[[31m"}`+"\n"+fooLine, stdout.String())
+	assert.Contains(t, stderr.String(), "warning: skipped an event that is not valid UTF-8")
+}
+
 func TestRetryAfter(t *testing.T) {
 	tests := []struct {
 		name string
