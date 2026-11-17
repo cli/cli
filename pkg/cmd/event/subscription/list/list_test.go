@@ -221,3 +221,29 @@ func TestListHeader(t *testing.T) {
 	assert.Equal(t, "Showing 1 event subscription", listHeader(1, 30))
 	assert.Equal(t, "Showing the 30 most recent event subscriptions", listHeader(30, 30))
 }
+
+func TestListRunDefaultHost(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+	cfg := config.NewMockConfig()
+	authCfg := cfg.Authentication()
+	authCfg.SetDefaultHost("example.com", "GH_HOST")
+	cfg.AuthenticationFunc = func() gh.AuthConfig { return authCfg }
+	clientErr := errors.New("event subscriptions are only supported on github.com")
+	var gotHost string
+	opts := &ListOptions{
+		IO:     ios,
+		Config: func() (gh.Config, error) { return cfg, nil },
+		EventClient: func(host string) (client.EventClient, error) {
+			gotHost = host
+			return nil, clientErr
+		},
+		Limit: 30,
+	}
+
+	err := listRun(context.Background(), opts)
+
+	require.ErrorIs(t, err, clientErr)
+	assert.Equal(t, "example.com", gotHost)
+	assert.Empty(t, stdout.String())
+	assert.Empty(t, stderr.String())
+}
