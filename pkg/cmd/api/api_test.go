@@ -819,6 +819,7 @@ func Test_apiRun_eventListenHint(t *testing.T) {
 		hostname string
 		status   int
 		want     string
+		wantErr  error
 	}{
 		{name: "agent reading pull request reviews", agent: "copilot-cli", path: "repos/OWNER/REPO/pulls/7/reviews", want: hint},
 		{name: "agent reading a pull request with a query", agent: "copilot-cli", path: "/repos/OWNER/REPO/pulls/7?per_page=1", want: hint},
@@ -829,7 +830,7 @@ func Test_apiRun_eventListenHint(t *testing.T) {
 		{name: "agent reading a pull request by its absolute API URL", agent: "copilot-cli", path: "https://api.github.com/repos/OWNER/REPO/pulls/7/reviews?per_page=1", want: hint},
 		{name: "agent reading a pull request by its absolute API URL while targeting another host", agent: "copilot-cli", path: "https://api.github.com/repos/OWNER/REPO/pulls/7", hostname: "ghe.example.com", want: hint},
 		{name: "agent reading a pull request by an absolute URL on another host", agent: "copilot-cli", path: "https://ghe.example.com/api/v3/repos/OWNER/REPO/pulls/7"},
-		{name: "agent reading a missing pull request", agent: "copilot-cli", path: "repos/OWNER/REPO/pulls/7", status: 404},
+		{name: "agent reading a missing pull request", agent: "copilot-cli", path: "repos/OWNER/REPO/pulls/7", status: 404, want: "gh: HTTP 404\n", wantErr: cmdutil.SilentError},
 		{name: "no agent", path: "repos/OWNER/REPO/pulls/7"},
 	}
 	for _, tt := range tests {
@@ -857,8 +858,14 @@ func Test_apiRun_eventListenHint(t *testing.T) {
 				},
 			}
 
-			_ = apiRun(opts)
-			assert.Equal(t, tt.want, strings.TrimPrefix(stderr.String(), "gh: HTTP 404\n"))
+			err := apiRun(opts)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.want, stderr.String())
 		})
 	}
 }
