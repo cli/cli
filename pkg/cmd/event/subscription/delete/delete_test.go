@@ -1,16 +1,69 @@
 package delete
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/event/client"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewCmdDelete(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    string
+		wantID  string
+		wantErr string
+	}{
+		{
+			name:   "id",
+			args:   "sub_1",
+			wantID: "sub_1",
+		},
+		{
+			name:    "no id",
+			wantErr: "subscription ID required",
+		},
+		{
+			name:    "more than one id",
+			args:    "sub_1 sub_2",
+			wantErr: "too many arguments",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			var gotOpts *DeleteOptions
+			cmd := NewCmdDelete(&cmdutil.Factory{IOStreams: ios}, func(opts *DeleteOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			args, err := shlex.Split(tt.args)
+			require.NoError(t, err)
+			cmd.SetArgs(args)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err = cmd.ExecuteC()
+
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				assert.Nil(t, gotOpts)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantID, gotOpts.ID)
+		})
+	}
+}
 
 func TestDeleteRun(t *testing.T) {
 	tests := []struct {
