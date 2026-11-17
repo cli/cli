@@ -14,7 +14,7 @@
     "@github/copilot-sdk": "1.0.15",
     "@microsoft/vally": "0.19.0",
     "@microsoft/vally-cli": "0.19.0",
-    "zod": "4.3.6"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@types/node": "22.18.6",
