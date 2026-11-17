@@ -17,6 +17,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdWatch(t *testing.T) {
@@ -474,7 +475,7 @@ func TestWatchRun_eventListenHint(t *testing.T) {
 				InvokingAgent: tt.invokingAgent,
 			}
 
-			assert.NoError(t, watchRun(opts))
+			require.NoError(t, watchRun(opts))
 			assert.Contains(t, stdout.String(), "OWNER/REPO#2898")
 			if tt.wantHint {
 				assert.Contains(t, stderr.String(),
