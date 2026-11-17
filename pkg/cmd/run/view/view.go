@@ -599,10 +599,10 @@ func copyLogWithLinePrefix(w io.Writer, r io.Reader, prefix string) error {
 				return writeErr
 			}
 		}
+		if err == io.EOF {
+			return nil
+		}
 		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
 			return err
 		}
 	}

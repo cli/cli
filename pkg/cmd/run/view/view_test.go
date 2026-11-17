@@ -2763,85 +2763,94 @@ var expectedLegacyRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", legacyCoolJobRun
 
 func TestCopyLogWithLinePrefix(t *testing.T) {
 	longLine := strings.Repeat("x", 70_000)
+	readErr := errors.New("reading log failed")
+	r, w := io.Pipe()
+	require.NoError(t, r.Close())
+	defer w.Close()
+
 	tests := []struct {
-		name  string
-		input string
-		want  string
+		name    string
+		input   io.Reader
+		writer  io.Writer
+		want    string
+		wantErr error
 	}{
 		{
-			name: "empty log",
+			name:   "empty log",
+			input:  strings.NewReader(""),
+			writer: io.Discard,
 		},
 		{
-			name:  "multiple lines",
-			input: "first\nsecond\n",
-			want:  "job\tstep\tfirst\njob\tstep\tsecond\n",
+			name:   "multiple lines",
+			input:  strings.NewReader("first\nsecond\n"),
+			writer: io.Discard,
+			want:   "job\tstep\tfirst\njob\tstep\tsecond\n",
 		},
 		{
-			name:  "empty lines",
-			input: "\n\n",
-			want:  "job\tstep\t\njob\tstep\t\n",
+			name:   "empty lines",
+			input:  strings.NewReader("\n\n"),
+			writer: io.Discard,
+			want:   "job\tstep\t\njob\tstep\t\n",
 		},
 		{
-			name:  "CRLF lines",
-			input: "first\r\nsecond\r\n",
-			want:  "job\tstep\tfirst\njob\tstep\tsecond\n",
+			name:   "CRLF lines",
+			input:  strings.NewReader("first\r\nsecond\r\n"),
+			writer: io.Discard,
+			want:   "job\tstep\tfirst\njob\tstep\tsecond\n",
 		},
 		{
-			name:  "no final newline",
-			input: "last",
-			want:  "job\tstep\tlast\n",
+			name:   "no final newline",
+			input:  strings.NewReader("last"),
+			writer: io.Discard,
+			want:   "job\tstep\tlast\n",
 		},
 		{
-			name:  "final carriage return",
-			input: "last\r",
-			want:  "job\tstep\tlast\n",
+			name:   "final carriage return",
+			input:  strings.NewReader("last\r"),
+			writer: io.Discard,
+			want:   "job\tstep\tlast\n",
 		},
 		{
-			name:  "long line followed by marker",
-			input: longLine + "\nAFTER-LONG-LINE\n",
-			want:  "job\tstep\t" + longLine + "\njob\tstep\tAFTER-LONG-LINE\n",
+			name:   "long line followed by marker",
+			input:  strings.NewReader(longLine + "\nAFTER-LONG-LINE\n"),
+			writer: io.Discard,
+			want:   "job\tstep\t" + longLine + "\njob\tstep\tAFTER-LONG-LINE\n",
 		},
 		{
-			name:  "long line without final newline",
-			input: longLine,
-			want:  "job\tstep\t" + longLine + "\n",
+			name:   "long line without final newline",
+			input:  strings.NewReader(longLine),
+			writer: io.Discard,
+			want:   "job\tstep\t" + longLine + "\n",
 		},
 		{
-			name:  "long CRLF line",
-			input: longLine + "\r\nAFTER-LONG-LINE\r\n",
-			want:  "job\tstep\t" + longLine + "\njob\tstep\tAFTER-LONG-LINE\n",
+			name:   "long CRLF line",
+			input:  strings.NewReader(longLine + "\r\nAFTER-LONG-LINE\r\n"),
+			writer: io.Discard,
+			want:   "job\tstep\t" + longLine + "\njob\tstep\tAFTER-LONG-LINE\n",
+		},
+		{
+			name:    "read error after partial line",
+			input:   io.MultiReader(strings.NewReader("first\npartial"), iotest.ErrReader(readErr)),
+			writer:  io.Discard,
+			want:    "job\tstep\tfirst\njob\tstep\tpartial\n",
+			wantErr: readErr,
+		},
+		{
+			name:    "write error",
+			input:   strings.NewReader("first\nsecond\n"),
+			writer:  w,
+			wantErr: io.ErrClosedPipe,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			err := copyLogWithLinePrefix(&buf, strings.NewReader(tt.input), "job\tstep\t")
-			require.NoError(t, err)
+			err := copyLogWithLinePrefix(io.MultiWriter(tt.writer, &buf), tt.input, "job\tstep\t")
+			require.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.want, buf.String())
 		})
 	}
-}
-
-func TestCopyLogWithLinePrefix_ReadError(t *testing.T) {
-	wantErr := errors.New("reading log failed")
-	r := io.MultiReader(strings.NewReader("first\npartial"), iotest.ErrReader(wantErr))
-	var buf bytes.Buffer
-
-	err := copyLogWithLinePrefix(&buf, r, "job\tstep\t")
-
-	require.ErrorIs(t, err, wantErr)
-	assert.Equal(t, "job\tstep\tfirst\njob\tstep\tpartial\n", buf.String())
-}
-
-func TestCopyLogWithLinePrefix_WriteError(t *testing.T) {
-	r, w := io.Pipe()
-	require.NoError(t, r.Close())
-	defer w.Close()
-
-	err := copyLogWithLinePrefix(w, strings.NewReader("first\nsecond\n"), "job\tstep\t")
-
-	require.ErrorIs(t, err, io.ErrClosedPipe)
 }
 
 func TestCopyLogWithLinePrefix_TerminalEscapeSequences(t *testing.T) {
