@@ -29,11 +29,11 @@ export async function replay(path: string): Promise<ReplayResult> {
   const evidence = parseTrialEvidence(JSON.parse(await readFile(source, "utf8")));
   const load = async () => evidence;
   const input = { trajectory: trajectory(source) };
-  const graders = await Promise.all([
-    new EventTaskGrader(load).grade(input),
-    new EventRouteGrader(load).grade(input),
-    new NoPollingGrader(load).grade(input),
-  ]);
+  // Raw-API stimuli ask for a direct API stream, so, as in their eval.yml, they skip the route and polling checks.
+  const selected = evidence.variant === "raw-api"
+    ? [new EventTaskGrader(load)]
+    : [new EventTaskGrader(load), new EventRouteGrader(load), new NoPollingGrader(load)];
+  const graders = await Promise.all(selected.map(grader => grader.grade(input)));
   return { path: source, scenario: evidence.scenario, passed: graders.every(result => result.passed), graders };
 }
 

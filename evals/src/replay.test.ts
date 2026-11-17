@@ -39,6 +39,21 @@ test("offline replay catches a missed review and actor-delivery regressions", as
   assert.equal(deliveryResult.graders.find(grader => grader.name === "event-route")?.passed, false);
 });
 
+test("offline replay skips the route and polling checks for raw-API trials", async t => {
+  const root = await mkdtemp(join(tmpdir(), "gh-replay-"));
+  t.after(() => rm(root, { recursive: true }));
+  const rawAPI = { ...JSON.parse(await readFile(fixture, "utf8")), version: 3, variant: "raw-api" };
+  // A delivery the route check rejects, which a raw-API trial must not be failed for.
+  rawAPI.snapshot.actions.find((action: { kind: string }) => action.kind === "approval").trigger = "wait";
+  const path = join(root, "raw-api.json");
+  await writeFile(path, JSON.stringify(rawAPI));
+
+  const result = await replay(path);
+
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.graders.map(grader => [grader.name, grader.passed]), [["event-task", true]]);
+});
+
 test("the replay CLI accepts an artifact directory and uses no credential environment", async t => {
   const root = await mkdtemp(join(tmpdir(), "gh-replay-cli-"));
   t.after(() => rm(root, { recursive: true }));
