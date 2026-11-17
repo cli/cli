@@ -278,6 +278,26 @@ func TestListRun(t *testing.T) {
 			wantErrMsg: "no labels found in OWNER/REPO",
 		},
 		{
+			name: "empty label list json",
+			tty:  true,
+			opts: &listOptions{
+				Exporter: func() cmdutil.Exporter {
+					exporter := cmdutil.NewJSONExporter()
+					exporter.SetFields([]string{"name"})
+					return exporter
+				}(),
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.StringResponse(`
+						{"data":{"repository":{"labels":{"totalCount":0,"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}`,
+					),
+				)
+			},
+			wantStdout: "[]\n",
+		},
+		{
 			name: "empty label list search",
 			tty:  true,
 			opts: &listOptions{Query: listQueryOptions{Query: "test"}},
@@ -291,6 +311,27 @@ func TestListRun(t *testing.T) {
 			},
 			wantErr:    true,
 			wantErrMsg: "no labels in OWNER/REPO matched your search",
+		},
+		{
+			name: "empty label list search json",
+			tty:  true,
+			opts: &listOptions{
+				Query: listQueryOptions{Query: "test"},
+				Exporter: func() cmdutil.Exporter {
+					exporter := cmdutil.NewJSONExporter()
+					exporter.SetFields([]string{"name"})
+					return exporter
+				}(),
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.StringResponse(`
+						{"data":{"repository":{"labels":{"totalCount":0,"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}`,
+					),
+				)
+			},
+			wantStdout: "[]\n",
 		},
 		{
 			name:       "web mode",

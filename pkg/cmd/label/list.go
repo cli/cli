@@ -113,7 +113,7 @@ func listRun(opts *listOptions) error {
 		return err
 	}
 
-	if len(labels) == 0 {
+	if len(labels) == 0 && opts.Exporter == nil {
 		if opts.Query.Query != "" {
 			return cmdutil.NewNoResultsError(fmt.Sprintf("no labels in %s matched your search", ghrepo.FullName(baseRepo)))
 		}
