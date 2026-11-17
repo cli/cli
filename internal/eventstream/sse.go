@@ -137,27 +137,31 @@ func (r *FrameReader) Next() (Frame, error) {
 func newLineSplitter() bufio.SplitFunc {
 	var skipLF bool
 	return func(data []byte, atEOF bool) (int, []byte, error) {
+		// The skipped LF is consumed in the same call rather than returned on its own: a nil token makes the Scanner
+		// read again before splitting what it has buffered, which would hold back a complete line until more arrives.
+		var skipped int
 		if skipLF && len(data) > 0 {
 			skipLF = false
 			if data[0] == '\n' {
-				return 1, nil, nil
+				skipped = 1
+				data = data[1:]
 			}
 		}
 		if i := bytes.IndexAny(data, "\r\n"); i >= 0 {
 			if data[i] == '\r' {
 				if i+1 < len(data) {
 					if data[i+1] == '\n' {
-						return i + 2, data[:i], nil
+						return skipped + i + 2, data[:i], nil
 					}
 				} else {
 					skipLF = true
 				}
 			}
-			return i + 1, data[:i], nil
+			return skipped + i + 1, data[:i], nil
 		}
 		if atEOF && len(data) > 0 {
-			return len(data), data, nil
+			return skipped + len(data), data, nil
 		}
-		return 0, nil, nil
+		return skipped, nil, nil
 	}
 }

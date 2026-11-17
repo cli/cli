@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"testing/iotest"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/stretchr/testify/assert"
@@ -175,6 +176,37 @@ func TestFrameReader(t *testing.T) {
 				assert.Equal(t, tt.wantComments, comments)
 			})
 		}
+	}
+}
+
+func TestFrameReaderSplitCRLFWithBufferedFrameEnd(t *testing.T) {
+	// The CR arrives alone, and the LF that completes it arrives together with the blank line that ends the frame.
+	// The stream then stays open, as it does between heartbeats.
+	body, w := io.Pipe()
+	t.Cleanup(func() { w.Close() })
+	go func() {
+		_, _ = w.Write([]byte("data: a\r"))
+		_, _ = w.Write([]byte("\n\r\n"))
+	}()
+
+	type result struct {
+		frame Frame
+		err   error
+	}
+	done := make(chan result, 1)
+	go func() {
+		frame, err := NewFrameReader(body).Next()
+		done <- result{frame, err}
+	}()
+
+	select {
+	case res := <-done:
+		require.NoError(t, res.err)
+		assert.Equal(t, Frame{Event: "message", Data: "a"}, res.frame)
+	case <-time.After(5 * time.Second):
+		w.Close()
+		<-done
+		t.Fatal("the frame was not returned until the stream sent more bytes")
 	}
 }
 
