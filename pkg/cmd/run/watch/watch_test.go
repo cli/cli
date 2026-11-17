@@ -417,20 +417,47 @@ func TestWatchRun(t *testing.T) {
 		})
 	}
 }
-
 func TestWatchRun_eventListenHint(t *testing.T) {
+	const pullRequestNodes = `{"number": 2898, "headRepository": {"owner": {"login": "OWNER"}, "name": "REPO"}}`
+
 	tests := []struct {
 		name          string
+		host          string
 		invokingAgent string
+		completed     bool
+		pullRequests  string
+		wantStdout    string
 		wantHint      bool
 	}{
 		{
 			name:          "agent watching a pull request run",
 			invokingAgent: "copilot-cli",
+			pullRequests:  pullRequestNodes,
+			wantStdout:    "OWNER/REPO#2898",
 			wantHint:      true,
 		},
 		{
-			name: "user watching a pull request run",
+			name:         "user watching a pull request run",
+			pullRequests: pullRequestNodes,
+			wantStdout:   "OWNER/REPO#2898",
+		},
+		{
+			name:          "agent watching a completed run",
+			invokingAgent: "copilot-cli",
+			completed:     true,
+			wantStdout:    "has already completed",
+		},
+		{
+			name:          "agent watching a run without a pull request",
+			invokingAgent: "copilot-cli",
+			wantStdout:    "trunk CI · 2\n",
+		},
+		{
+			name:          "agent watching a pull request run on an unsupported host",
+			host:          "octocorp.ghe.com",
+			invokingAgent: "copilot-cli",
+			pullRequests:  pullRequestNodes,
+			wantStdout:    "OWNER/REPO#2898",
 		},
 	}
 
@@ -438,27 +465,38 @@ func TestWatchRun_eventListenHint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
-			reg.Register(
-				httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
-				httpmock.JSONResponse(shared.TestRunWithCommit(2, shared.InProgress, "", "commit2")))
-			reg.Register(
-				httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
-				httpmock.JSONResponse(shared.TestWorkflow))
-			reg.Register(
-				httpmock.GraphQL(`query PullRequestForRun`),
-				httpmock.StringResponse(`{"data": {"repository": {"pullRequests": {"nodes": [
-					{"number": 2898, "headRepository": {"owner": {"login": "OWNER"}, "name": "REPO"}}
-				]}}}}`))
-			reg.Register(
-				httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
-				httpmock.JSONResponse(shared.TestRun(2, shared.Completed, shared.Success)))
-			reg.Register(
-				httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
-				httpmock.JSONResponse(shared.TestWorkflow))
-			reg.Register(
-				httpmock.REST("GET", "runs/2/jobs"),
-				httpmock.JSONResponse(shared.JobsPayload{Jobs: []shared.Job{}}))
+			if tt.completed {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(shared.TestRun(2, shared.Completed, shared.Success)))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			} else {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(shared.TestRunWithCommit(2, shared.InProgress, "", "commit2")))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestForRun`),
+					httpmock.StringResponse(`{"data": {"repository": {"pullRequests": {"nodes": [`+tt.pullRequests+`]}}}}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(shared.TestRun(2, shared.Completed, shared.Success)))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "runs/2/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{Jobs: []shared.Job{}}))
+			}
 
+			host := tt.host
+			if host == "" {
+				host = "github.com"
+			}
 			ios, _, stdout, stderr := iostreams.Test()
 			opts := &WatchOptions{
 				IO: ios,
@@ -466,7 +504,7 @@ func TestWatchRun_eventListenHint(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				BaseRepo: func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName("OWNER/REPO")
+					return ghrepo.NewWithHost("OWNER", "REPO", host), nil
 				},
 				Now: func() time.Time {
 					return time.Date(2021, 2, 23, 5, 50, 0, 0, time.UTC)
@@ -476,7 +514,7 @@ func TestWatchRun_eventListenHint(t *testing.T) {
 			}
 
 			require.NoError(t, watchRun(opts))
-			assert.Contains(t, stdout.String(), "OWNER/REPO#2898")
+			assert.Contains(t, stdout.String(), tt.wantStdout)
 			if tt.wantHint {
 				assert.Contains(t, stderr.String(),
 					"gh event listen --resource https://github.com/OWNER/REPO/pull/2898 --event com.github.pull_request.check_suite.status.changed.v1\n")
