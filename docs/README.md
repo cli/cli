@@ -20,6 +20,8 @@ not public issues or pull requests.
 | Work with API clients, host selection, and GHES capabilities | [API and hosts](api-and-hosts.md) |
 | Change API gateway routing | [`api_host`](api-host.md) and its [test harness](api-host-test-harness.md) |
 | Run or change live acceptance tests | [Acceptance README](../acceptance/README.md); running these requires explicitly authorized resources and credentials |
+| Run local agent evals, such as the event-driven ones | [Agent evals](../evals/README.md); optional tooling with explicit live-resource authorization |
+| Work on event listening (preview) | [Event listening preview](event-listen-preview.md) |
 | Prepare a pull request | [PR template](../.github/PULL_REQUEST_TEMPLATE.md) |
 | Maintain automated issue triage | [Issue triage reports](issue-triage.md) |
 | Reproduce command behavior against synthetic API, Git or configuration data | [`ghmock` skill](../.github/skills/ghmock/SKILL.md) |

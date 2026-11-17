@@ -1,0 +1,70 @@
+name: notify-review
+description: >-
+  Start with an unreviewed PR in a fresh private repository. A separately
+  authenticated actor submits a review while the agent is waiting. The agent
+  should notify the user through the dedicated event-based gh route.
+defaults:
+  executor:
+    name: gh-agent
+    config:
+      suite: events
+      scenario: notify-review
+  runs: 1
+  # Whole trial, including fixture setup, observation, and cleanup.
+  timeout: 10m
+# All graders must pass: observable outcome, event route, no polling, and semantic review.
+scoring:
+  threshold: 1
+  timeout: 5m
+stimuli:
+  - name: notify-review
+    tags:
+      variant: eval
+    constraints: &constraints
+      # The agent's working budget; the second actor's fallback is a third of it.
+      max_agent_duration: 5m
+    prompt: &prompt "Wait for this PR to be reviewed: {{PR_URL}}, then let me know what they said"
+    rubric: &rubric
+      - Notify the user of the actual submitted review, not just promise to notify later.
+      - Use a dedicated event-based gh command to observe a review arriving during this run.
+      - Direct API subscriptions, custom SSE clients, and polling are not the required route.
+      - With the gh skill available, do not establish polling-based waiting.
+      - Reading the PR once a listener is running, to catch changes made before it attached, is allowed and is not polling.
+      - Without the skill, discovery polling is allowed, but switch to the dedicated wait.
+      - Initial inspection and reads to interpret thin events after a wait returns are allowed.
+    graders: &graders
+      - type: event-task
+      - type: event-route
+      - type: no-polling
+      - type: semantic-review
+  - name: notify-review-design-probe
+    tags:
+      variant: design-probe
+    constraints: *constraints
+    prompt: |
+      Let me know when someone reviews my PR: {{PR_URL}}
+
+      For this design exercise, assume GitHub CLI has an undocumented capability to wait for pull request changes using events instead of polling. Try to make use of it; no command syntax is provided.
+    rubric: *rubric
+    graders: *graders
+  - name: notify-review-raw-api
+    tags:
+      variant: raw-api
+    constraints: *constraints
+    prompt: |
+      Wait for this PR to be reviewed: {{PR_URL}}, then let me know what they said
+
+      GitHub has a preview Event Subscriptions API, enabled for your account, that streams pull request events instead of polling. Send a GitHub bearer token with every request.
+
+      - `POST https://api.github.com/event-subscriptions` with `{"resource_url": "<pull request web URL>", "event_types": [...]}` creates a subscription that expires after 24 hours. The response includes `id`, `url`, and `events_url`.
+      - `GET <events_url>` with `Accept: text/event-stream` streams Server-Sent Events. Each event has an `event:` line with its type and a `data:` line with a CloudEvent JSON object, whose `data.api_url` is the REST URL of the changed pull request or review. Events carry no other details. The server sends a comment line at least every 15 seconds, and may end the stream with a `github.stream.end` event.
+      - Event types: `com.github.pull_request.review.submitted.v1`, `com.github.pull_request.state.changed.v1`, `com.github.pull_request.head.changed.v1`, `com.github.pull_request.merge_conflict.v1`.
+      - The stream is live-only: events from before it connects are not delivered.
+      - `DELETE <url>` deletes the subscription.
+    rubric:
+      - Notify the user of the actual submitted review, not just promise to notify later.
+      - Observe the change through the Event Subscriptions API stream described in the prompt, not by polling.
+      - Initial inspection, one read once the stream is connected, and reads to interpret an event after it arrives are allowed and are not polling.
+    graders:
+      - type: event-task
+      - type: semantic-review

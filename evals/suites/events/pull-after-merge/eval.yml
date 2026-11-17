@@ -1,0 +1,73 @@
+name: pull-after-merge
+description: >-
+  Start on local main with an open PR whose change has not landed. A separately
+  authenticated actor merges the PR while the agent waits. Verify that local
+  main and its working file contain the merged change, not just that git pull ran.
+defaults:
+  executor:
+    name: gh-agent
+    config:
+      suite: events
+      scenario: pull-after-merge
+  runs: 1
+  # Whole trial, including fixture setup, observation, and cleanup.
+  timeout: 10m
+# All graders must pass: observable outcome, event route, no polling, and semantic review.
+scoring:
+  threshold: 1
+  timeout: 5m
+stimuli:
+  - name: pull-after-merge
+    tags:
+      variant: eval
+    constraints: &constraints
+      # The agent's working budget; the second actor's fallback is a third of it.
+      max_agent_duration: 5m
+    prompt: "Once this PR is merged, pull the latest main: {{PR_URL}}"
+    rubric: &rubric
+      - Wait for the PR to merge and confirm that it merged rather than merely closed.
+      - Only then update local main to include the actual merged change.
+      - An up-to-date pull before the confirmed merge is still premature.
+      - Observe the change through a dedicated event-based gh command, not direct API subscriptions.
+      - With the gh skill available, do not establish polling-based waiting.
+      - Reading the PR once a listener is running, to catch changes made before it attached, is allowed and is not polling.
+      - Without the skill, discovery polling is allowed before switching to the dedicated wait.
+      - Reads after an event to determine the PR state are allowed and are not polling.
+    graders: &graders
+      - type: event-task
+      - type: event-route
+      - type: no-polling
+      - type: semantic-review
+  - name: pull-after-merge-design-probe
+    tags:
+      variant: design-probe
+    constraints: *constraints
+    prompt: |
+      Once this PR is merged, pull the latest main: {{PR_URL}}
+
+      For this design exercise, assume GitHub CLI has an undocumented capability to wait for pull request changes using events instead of polling. Try to make use of it; no command syntax is provided.
+    rubric: *rubric
+    graders: *graders
+  - name: pull-after-merge-raw-api
+    tags:
+      variant: raw-api
+    constraints: *constraints
+    prompt: |
+      Once this PR is merged, pull the latest main: {{PR_URL}}
+
+      GitHub has a preview Event Subscriptions API, enabled for your account, that streams pull request events instead of polling. Send a GitHub bearer token with every request.
+
+      - `POST https://api.github.com/event-subscriptions` with `{"resource_url": "<pull request web URL>", "event_types": [...]}` creates a subscription that expires after 24 hours. The response includes `id`, `url`, and `events_url`.
+      - `GET <events_url>` with `Accept: text/event-stream` streams Server-Sent Events. Each event has an `event:` line with its type and a `data:` line with a CloudEvent JSON object, whose `data.api_url` is the REST URL of the changed pull request or review. Events carry no other details. The server sends a comment line at least every 15 seconds, and may end the stream with a `github.stream.end` event.
+      - Event types: `com.github.pull_request.review.submitted.v1`, `com.github.pull_request.state.changed.v1`, `com.github.pull_request.head.changed.v1`, `com.github.pull_request.merge_conflict.v1`.
+      - The stream is live-only: events from before it connects are not delivered.
+      - `DELETE <url>` deletes the subscription.
+    rubric:
+      - Wait for the PR to merge and confirm that it merged rather than merely closed.
+      - Only then update local main to include the actual merged change.
+      - An up-to-date pull before the confirmed merge is still premature.
+      - Observe the change through the Event Subscriptions API stream described in the prompt, not by polling.
+      - Initial inspection, one read once the stream is connected, and reads to interpret an event after it arrives are allowed and are not polling.
+    graders:
+      - type: event-task
+      - type: semantic-review

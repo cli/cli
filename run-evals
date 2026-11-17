@@ -1,0 +1,126 @@
+#!/bin/bash
+set +x
+set -euo pipefail
+
+runner=${GH_EVAL_RUNNER:-}
+if [ -z "$runner" ]; then
+  root=${GH_EVAL_REPO_ROOT:-$(git rev-parse --show-toplevel)}
+  runner="$root/evals/run"
+fi
+if [ ! -x "$runner" ]; then
+  printf 'Eval entrypoint is not executable: %s\n' "$runner" >&2
+  exit 2
+fi
+
+live=false
+cleanup_only=false
+expect_value=false
+for argument do
+  if [ "$expect_value" = true ]; then
+    expect_value=false
+    continue
+  fi
+  case "$argument" in
+    --) break ;;
+    --help|-h|--list) exec "$runner" "$@" ;;
+    --live) live=true ;;
+    --cleanup) cleanup_only=true; expect_value=true ;;
+    --gh|--gh-skill|--gh-skill-ref|--model|--skill|--runs|--agent-budget|--output) expect_value=true ;;
+  esac
+done
+if [ "$live" = false ]; then
+  exec "$runner" "$@"
+fi
+
+gh_path=
+gh_requested=false
+expect_gh_path=false
+for argument do
+  if [ "$expect_gh_path" = true ]; then
+    gh_path=$argument
+    expect_gh_path=false
+    continue
+  fi
+  case "$argument" in
+    --gh) gh_requested=true; expect_gh_path=true ;;
+    --gh=*) gh_requested=true; gh_path=${argument#--gh=} ;;
+  esac
+done
+if [ "$gh_requested" = true ]; then
+  if [ "$expect_gh_path" = true ] || [ -z "$gh_path" ]; then
+    printf '%s\n' '--gh requires the path to an already-built binary.' >&2
+    exit 2
+  fi
+  if [ ! -f "$gh_path" ]; then
+    printf 'gh binary does not exist: %s\nRun make from the repository root, or supply another built binary with --gh.\n' "$gh_path" >&2
+    exit 2
+  fi
+  if [ ! -x "$gh_path" ]; then
+    printf 'gh binary is not executable: %s\nSupply an executable built binary with --gh.\n' "$gh_path" >&2
+    exit 2
+  fi
+fi
+
+export GH_EVAL_HOST=${GH_EVAL_HOST:-github.com}
+export GH_EVAL_ORG=${GH_EVAL_ORG:-gh-evals-sandbox}
+
+fail() {
+  printf '%s\n' "$*" >&2
+  exit 2
+}
+
+check_token() {
+  if [[ -z "$2" || "$2" == *[[:space:]]* ]]; then
+    fail "$1 must contain one non-empty token, without whitespace."
+  fi
+}
+
+# Never fall back to the operator's GitHub identity. Every credential must be explicit.
+[ -n "${GH_EVAL_TOKEN:-}" ] \
+  || fail 'Set GH_EVAL_TOKEN to a preview-enabled user token for the dedicated eval account.'
+check_token GH_EVAL_TOKEN "$GH_EVAL_TOKEN"
+export GH_EVAL_TOKEN
+
+if [ "$cleanup_only" = false ]; then
+  [ -n "${COPILOT_GITHUB_TOKEN:-}" ] \
+    || fail 'Set COPILOT_GITHUB_TOKEN explicitly for model access.'
+  check_token COPILOT_GITHUB_TOKEN "$COPILOT_GITHUB_TOKEN"
+  export COPILOT_GITHUB_TOKEN
+fi
+
+# Only suites with a second actor need this identity; those suites refuse to start a trial without it. Cleanup takes
+# the same fixture default, so a retry with the same credentials deletes repositories as the identity that made them.
+if [ -n "${GH_EVAL_ACTOR_TOKEN:-}" ]; then
+  check_token GH_EVAL_ACTOR_TOKEN "$GH_EVAL_ACTOR_TOKEN"
+  export GH_EVAL_ACTOR_TOKEN
+  GH_EVAL_FIXTURE_TOKEN=${GH_EVAL_FIXTURE_TOKEN:-$GH_EVAL_ACTOR_TOKEN}
+fi
+if [ -n "${GH_EVAL_FIXTURE_TOKEN:-}" ]; then
+  check_token GH_EVAL_FIXTURE_TOKEN "$GH_EVAL_FIXTURE_TOKEN"
+  export GH_EVAL_FIXTURE_TOKEN
+fi
+
+# Ctrl+C already reaches every process in the foreground group, so only TERM and HUP, which usually target this
+# process alone, are forwarded. Either way, keep waiting so the eval can clean up its live resources first.
+child=
+forward() {
+  if [ -n "$child" ] && kill -0 "$child" 2>/dev/null; then
+    kill -s "$1" "$child"
+  fi
+}
+trap : INT
+trap 'forward TERM' TERM
+trap 'forward HUP' HUP
+
+"$runner" "$@" &
+child=$!
+set +e
+wait "$child"
+status=$?
+while kill -0 "$child" 2>/dev/null; do
+  wait "$child"
+  status=$?
+done
+set -e
+child=
+exit "$status"

@@ -28,7 +28,12 @@ func NewCmdPR(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder) *cob
 	cmd := &cobra.Command{
 		Use:   "pr <command>",
 		Short: "Manage pull requests",
-		Long:  "Work with GitHub pull requests.",
+		Long: heredoc.Docf(`
+			Work with GitHub pull requests.
+
+			To wait for a pull request on %[1]sgithub.com%[1]s to be reviewed, merged, or closed, use %[1]sgh event listen%[1]s instead of polling.
+			Changes made before the listener starts are not reported, so read the pull request once it is listening.
+		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh pr checkout 353
 			$ gh pr create --fill

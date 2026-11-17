@@ -17,6 +17,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdWatch(t *testing.T) {
@@ -413,6 +414,113 @@ func TestWatchRun(t *testing.T) {
 				t.Errorf("got stdout:\n%q\nwant:\n%q", got, tt.wantOut)
 			}
 			reg.Verify(t)
+		})
+	}
+}
+func TestWatchRun_eventListenHint(t *testing.T) {
+	const pullRequestNodes = `{"number": 2898, "headRepository": {"owner": {"login": "OWNER"}, "name": "REPO"}}`
+
+	tests := []struct {
+		name          string
+		host          string
+		invokingAgent string
+		completed     bool
+		pullRequests  string
+		wantStdout    string
+		wantHint      bool
+	}{
+		{
+			name:          "agent watching a pull request run",
+			invokingAgent: "copilot-cli",
+			pullRequests:  pullRequestNodes,
+			wantStdout:    "OWNER/REPO#2898",
+			wantHint:      true,
+		},
+		{
+			name:         "user watching a pull request run",
+			pullRequests: pullRequestNodes,
+			wantStdout:   "OWNER/REPO#2898",
+		},
+		{
+			name:          "agent watching a completed run",
+			invokingAgent: "copilot-cli",
+			completed:     true,
+			wantStdout:    "has already completed",
+		},
+		{
+			name:          "agent watching a run without a pull request",
+			invokingAgent: "copilot-cli",
+			wantStdout:    "trunk CI · 2\n",
+		},
+		{
+			name:          "agent watching a pull request run on an unsupported host",
+			host:          "octocorp.ghe.com",
+			invokingAgent: "copilot-cli",
+			pullRequests:  pullRequestNodes,
+			wantStdout:    "OWNER/REPO#2898",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.completed {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(shared.TestRun(2, shared.Completed, shared.Success)))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			} else {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(shared.TestRunWithCommit(2, shared.InProgress, "", "commit2")))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestForRun`),
+					httpmock.StringResponse(`{"data": {"repository": {"pullRequests": {"nodes": [`+tt.pullRequests+`]}}}}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(shared.TestRun(2, shared.Completed, shared.Success)))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "runs/2/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{Jobs: []shared.Job{}}))
+			}
+
+			host := tt.host
+			if host == "" {
+				host = "github.com"
+			}
+			ios, _, stdout, stderr := iostreams.Test()
+			opts := &WatchOptions{
+				IO: ios,
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.NewWithHost("OWNER", "REPO", host), nil
+				},
+				Now: func() time.Time {
+					return time.Date(2021, 2, 23, 5, 50, 0, 0, time.UTC)
+				},
+				RunID:         "2",
+				InvokingAgent: tt.invokingAgent,
+			}
+
+			require.NoError(t, watchRun(opts))
+			assert.Contains(t, stdout.String(), tt.wantStdout)
+			if tt.wantHint {
+				assert.Contains(t, stderr.String(),
+					"gh event listen --resource https://github.com/OWNER/REPO/pull/2898 --event com.github.pull_request.check_suite.status.changed.v1\n")
+			} else {
+				assert.Empty(t, stderr.String())
+			}
 		})
 	}
 }

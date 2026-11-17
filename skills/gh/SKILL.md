@@ -309,6 +309,50 @@ Sometimes useful data isn't on the typed commands. Examples:
   `{owner}/{repo}` placeholder is filled in for you when run from a repo
   with detected remotes; pass them literally if you want determinism.
 
+## Waiting for pull request changes (preview)
+
+Use `gh event listen` rather than repeated `gh pr view` or `gh api` reads when waiting for a review, approval, merge, or close. It waits without polling and prints one CloudEvent JSON object per line on stdout as events arrive.
+
+```sh
+gh event listen --resource https://github.com/OWNER/REPO/pull/NUMBER --event com.github.pull_request.review.submitted.v1 --timeout 30m
+gh event listen --resource https://github.com/OWNER/REPO/pull/NUMBER --event com.github.pull_request.state.changed.v1 --timeout 30m
+```
+
+`--resource` takes the pull request URL. `--event` takes full event type names, separated by commas or by repeating the flag: `com.github.pull_request.review.submitted.v1` (a review was submitted), `com.github.pull_request.state.changed.v1` (merged, closed, reopened, marked ready for review, or converted to draft), `com.github.pull_request.head.changed.v1` (the head branch changed), `com.github.pull_request.merge_conflict.v1` (a merge conflict appeared), and `com.github.pull_request.check_suite.status.changed.v1` (a check suite, such as a CI workflow, completed). By default the command exits after the first event; `--count N` exits after N events, and `--follow` keeps listening until stopped. For a one-off wait, such as a single review, merge, or close, use the default, and once the event arrives and you have read the result, finish the task instead of waiting for more. A background listener with `--follow` never exits, so it cannot wake you when an event arrives; read its output yourself, or use the default one-shot listener when you need to be woken by the event. `--timeout` takes seconds or a duration such as `10m`, and exits with code 8 when no event arrived in time; a timeout is not confirmation that anything happened.
+
+Events are thin: the `type` says what kind of change happened and `data.api_url` points at the object that changed, such as the review, the pull request, or the check suite. Read it once after each event to learn what changed, for example `gh api URL` or `gh pr view NUMBER --json reviews,state,mergedAt`. A comment or requested change is not an approval, and a pull request closed without merging is not permission to pull. If you were waiting for a merge and the pull request closes without merging, stop and tell the user rather than waiting for it to be reopened. Initial inspection and event-triggered reads are not polling.
+
+To wait for CI, listen for `com.github.pull_request.check_suite.status.changed.v1`. A pull request usually has several check suites, and each sends its own event when it completes, with `data.conclusion` such as `success` or `failure`. One event does not mean all checks are done: after each event, read the checks once with `gh pr checks NUMBER`, and stop when none are pending. Use `--follow`, or run the one-shot listener again, to wait for the remaining suites.
+
+The API is live-only: events that happened before the stream attached are never delivered. Start the listener as a separate first tool call, before inspecting the PR. Do not launch the stream and initial snapshot in the same parallel batch. Wait until stderr reports that the listener is listening for events, then take the initial snapshot. A generic "background command started" message is not enough. This ordering closes the gap between reading the state and listening for changes.
+
+### Responding to reviews until approval
+
+Use this only when you must handle several rounds of review on the same pull request. To wait for a single review, use the one-shot listener above. For a review loop, start one long-running listener in the background with `--follow`:
+
+```sh
+gh event listen --resource https://github.com/OWNER/REPO/pull/NUMBER --event com.github.pull_request.review.submitted.v1,com.github.pull_request.state.changed.v1 --follow --timeout 30m
+```
+
+1. After the listener reports that it is listening, read the reviews once (`gh pr view NUMBER --json reviews,reviewDecision,headRefOid`) and address any change requests you have not handled. Remember the review IDs you have handled.
+2. Push the fix, then check the listener's output for new events. Each review event means one more read of the reviews; handle any review you have not seen. Events that arrived while you were working are already in the output.
+3. Stop when the newest review approves the current head and there is no outstanding change request. Then stop the listener.
+
+Do not re-read the PR without a new event; the listener tells you when to look.
+
+The command creates a subscription for the PR and event types, or reuses an existing one for the same set, and reconnects on its own if the stream drops. Events during a reconnect are lost, so each time the listener reports that it is listening again, read the state once. Subscriptions expire after 24 hours, and each account can hold a limited number at a time, so reuse the same set of event types rather than creating variations. To attach another listener to an existing subscription, pass its ID with `--subscription`. `--jq` and `--template` format each event, for example `--jq '.data.api_url'`. Events are only available on github.com, and this preview needs a user account enabled for the Event Subscriptions API.
+
+### Managing subscriptions
+
+```sh
+gh event subscription list
+gh event subscription view ID
+gh event subscription create --resource https://github.com/OWNER/REPO/pull/NUMBER --event com.github.pull_request.review.submitted.v1
+gh event subscription delete ID
+```
+
+`list` shows your active subscriptions with their resource, event types, and expiry, and `view` shows one of them. `list`, `view`, and `create` support `--json` with the fields `id`, `resourceUrl`, `eventTypes`, `createdAt`, `expiresAt`, `url`, and `eventsUrl`. If creating a subscription fails because the subscription limit may have been reached, list the subscriptions, delete one, and try again. Deleting a subscription only stops its events, and every subscription expires within 24 hours anyway. There is no need to delete a subscription after a listener finishes; it expires on its own. `create` takes the same `--resource` and `--event` as `gh event listen` and does not listen. It prints only the subscription ID to stdout, so another process can attach with `gh event listen --subscription ID`. Creation is idempotent: the same resource and event types give the same subscription.
+
 ## Authentication
 
 - `gh auth status` prints the active host(s), user, and which env var (if

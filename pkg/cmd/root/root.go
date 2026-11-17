@@ -22,6 +22,7 @@ import (
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
 	copilotCmd "github.com/cli/cli/v2/pkg/cmd/copilot"
 	discussionCmd "github.com/cli/cli/v2/pkg/cmd/discussion"
+	eventCmd "github.com/cli/cli/v2/pkg/cmd/event"
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
@@ -143,6 +144,7 @@ func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, ve
 	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
 	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
+	cmd.AddCommand(eventCmd.NewCmdEvent(f))
 	cmd.AddCommand(searchCmd.NewCmdSearch(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(variableCmd.NewCmdVariable(f))

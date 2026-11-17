@@ -1,0 +1,144 @@
+{
+  "version": 2,
+  "scenario": "review-loop",
+  "skill": true,
+  "calls": [
+    {
+      "id": "gh:stream",
+      "kind": "gh",
+      "arguments": [
+        "event",
+        "listen",
+        "--resource",
+        "https://github.com/sandbox/run/pull/1",
+        "--events",
+        "review,state"
+      ],
+      "startedAt": 5000,
+      "endedAt": 60000,
+      "success": false,
+      "exitCode": 2,
+      "output": [
+        {
+          "stream": "stdout",
+          "at": 32000,
+          "text": "{\"specversion\":\"1.0\",\"id\":\"event-2\",\"type\":\"com.github.pull_request.review.submitted.v1\",\"source\":\"https://api.github.com/repositories/123\",\"subject\":\"pull_requests/456\",\"data\":{\"api_url\":\"https://api.github.com/repositories/123/pulls/1/reviews/101\"}}\n"
+        },
+        {
+          "stream": "stdout",
+          "at": 52000,
+          "text": "{\"specversion\":\"1.0\",\"id\":\"event-3\",\"type\":\"com.github.pull_request.review.submitted.v1\",\"source\":\"https://api.github.com/repositories/123\",\"subject\":\"pull_requests/456\",\"data\":{\"api_url\":\"https://api.github.com/repositories/123/pulls/1/reviews/102\"}}\n"
+        }
+      ]
+    },
+    {
+      "id": "gh:snapshot",
+      "kind": "gh",
+      "arguments": [
+        "pr",
+        "view",
+        "1",
+        "--json",
+        "reviews,reviewDecision,headRefOid"
+      ],
+      "startedAt": 6000,
+      "endedAt": 7000,
+      "success": true,
+      "exitCode": 0,
+      "output": [
+        {
+          "stream": "stdout",
+          "at": 7000,
+          "text": "{\"reviewDecision\":\"CHANGES_REQUESTED\",\"headRefOid\":\"initial\",\"reviews\":[{\"id\":\"PRR_node\",\"state\":\"CHANGES_REQUESTED\",\"body\":\"First fix\",\"commit\":{\"oid\":\"initial\"}}]}\n"
+        }
+      ]
+    }
+  ],
+  "snapshot": {
+    "observedUntil": 70000,
+    "pr": {
+      "number": 1,
+      "html_url": "https://github.com/sandbox/run/pull/1",
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "merge_commit_sha": null,
+      "head": {
+        "sha": "fix-two",
+        "ref": "topic"
+      },
+      "base": {
+        "ref": "main",
+        "repo": {
+          "id": 123,
+          "full_name": "sandbox/run"
+        }
+      }
+    },
+    "greeting": "Hello, GitHub!\n",
+    "localGreeting": "Hello, GitHub!\n",
+    "mainContainsMerge": false,
+    "currentBranch": "topic",
+    "actions": [
+      {
+        "kind": "review",
+        "at": 2000,
+        "pr": 1,
+        "head": "initial",
+        "trigger": "after-tool",
+        "reviewId": 100
+      },
+      {
+        "kind": "fix",
+        "at": 20000,
+        "pr": 1,
+        "head": "fix-one",
+        "trigger": "verification"
+      },
+      {
+        "kind": "review",
+        "at": 30000,
+        "pr": 1,
+        "head": "fix-one",
+        "trigger": "wait",
+        "callId": "gh:stream",
+        "reviewId": 101
+      },
+      {
+        "kind": "fix",
+        "at": 40000,
+        "pr": 1,
+        "head": "fix-two",
+        "trigger": "verification"
+      },
+      {
+        "kind": "approval",
+        "at": 40000,
+        "pr": 1,
+        "head": "fix-two",
+        "trigger": "after-fix",
+        "reviewId": 102
+      }
+    ],
+    "reviews": [
+      {
+        "id": 100,
+        "state": "CHANGES_REQUESTED",
+        "commit_id": "initial",
+        "body": "First fix"
+      },
+      {
+        "id": 101,
+        "state": "CHANGES_REQUESTED",
+        "commit_id": "fix-one",
+        "body": "Second fix"
+      },
+      {
+        "id": 102,
+        "state": "APPROVED",
+        "commit_id": "fix-two",
+        "body": "Approved"
+      }
+    ]
+  }
+}

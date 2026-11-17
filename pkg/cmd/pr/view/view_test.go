@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -661,6 +662,82 @@ func TestPRView_tty_wrappedLink(t *testing.T) {
 	assert.Contains(t, stdout.String(),
 		"\x1b]8;id=105816246;https://user-images.githubusercontent.com/1532486/119571265-fe41be00-bd65-11eb-8c99-a3eaec2a9b1c.png\ahttps://user-images.githubusercontent.com/1532486/119571265-fe41be00-bd65-\x1b]8;;\a  \n"+
 			"  \x1b]8;id=105816246;https://user-images.githubusercontent.com/1532486/119571265-fe41be00-bd65-11eb-8c99-a3eaec2a9b1c.png\a11eb-8c99-a3eaec2a9b1c.png\x1b]8;;\a")
+}
+
+func TestPRView_eventListenHint(t *testing.T) {
+	const hint = "hint: if you need to wait for this pull request to be reviewed, merged, or closed before continuing, use this instead of polling:\n" +
+		"    gh event listen --resource https://github.com/OWNER/REPO/pull/123 --event com.github.pull_request.review.submitted.v1,com.github.pull_request.state.changed.v1\n" +
+		"  - It prints the first event as a JSON line on stdout and exits; run it again to wait for the next one.\n" +
+		"  - Add `--timeout` to stop waiting after a while, for example `--timeout 30m`; it then exits with status 8.\n" +
+		"  - Events carry no details; read the pull request to see what changed.\n" +
+		"  - It misses changes made before it starts, so read the pull request once it is running.\n" +
+		"  - See `gh event listen --help` for other event types.\n" +
+		"  - Event subscriptions are in preview and may not be enabled for your account.\n"
+	tests := []struct {
+		name       string
+		agent      string
+		state      string
+		host       string
+		jsonFields []string
+		wantFields []string
+		wantStdout string
+		want       string
+	}{
+		{name: "agent viewing an open pull request", agent: "copilot-cli", state: "OPEN", want: hint},
+		{name: "agent viewing a pull request on another host", agent: "copilot-cli", state: "OPEN", host: "ghe.example.com"},
+		{name: "agent viewing a merged pull request", agent: "copilot-cli", state: "MERGED"},
+		{name: "agent viewing a closed pull request", agent: "copilot-cli", state: "CLOSED"},
+		{name: "no agent", state: "OPEN"},
+		{
+			name: "agent exporting an open pull request without the state field", agent: "copilot-cli", state: "OPEN",
+			jsonFields: []string{"number"}, wantFields: []string{"number", "state"}, wantStdout: "{\"number\":123}\n", want: hint,
+		},
+		{
+			name: "agent exporting a merged pull request without the state field", agent: "copilot-cli", state: "MERGED",
+			jsonFields: []string{"number"}, wantFields: []string{"number", "state"}, wantStdout: "{\"number\":123}\n",
+		},
+		{
+			name: "agent exporting a closed pull request without the state field", agent: "copilot-cli", state: "CLOSED",
+			jsonFields: []string{"number"}, wantFields: []string{"number", "state"}, wantStdout: "{\"number\":123}\n",
+		},
+		{
+			name: "agent exporting the state field", agent: "copilot-cli", state: "MERGED",
+			jsonFields: []string{"number", "state"}, wantFields: []string{"number", "state"},
+			wantStdout: "{\"number\":123,\"state\":\"MERGED\"}\n",
+		},
+		{
+			name: "no agent exporting without the state field", state: "OPEN",
+			jsonFields: []string{"number"}, wantFields: []string{"number"}, wantStdout: "{\"number\":123}\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			finder := shared.NewMockFinder("123", &api.PullRequest{
+				Number: 123,
+				State:  tt.state,
+			}, ghrepo.NewWithHost("OWNER", "REPO", cmp.Or(tt.host, "github.com")))
+			opts := &ViewOptions{
+				IO:            ios,
+				Finder:        finder,
+				SelectorArg:   "123",
+				Now:           time.Now,
+				InvokingAgent: tt.agent,
+			}
+			if tt.jsonFields != nil {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(tt.jsonFields)
+				opts.Exporter = exporter
+				finder.ExpectFields(tt.wantFields)
+			}
+
+			require.NoError(t, viewRun(opts))
+			assert.Equal(t, tt.want, stderr.String())
+			if tt.jsonFields != nil {
+				assert.Equal(t, tt.wantStdout, stdout.String())
+			}
+		})
+	}
 }
 
 func TestPRView_web_currentBranch(t *testing.T) {

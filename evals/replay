@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ ! -f "$directory/dist/replay.js" ]; then
+  printf '%s\n' 'Build the evals first: npm --prefix evals run build' >&2
+  exit 2
+fi
+exec node "$directory/dist/replay.js" "$@"

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -797,6 +798,74 @@ func Test_apiRun(t *testing.T) {
 			if stderr.String() != tt.stderr {
 				t.Errorf("expected error output %q, got %q", tt.stderr, stderr.String())
 			}
+		})
+	}
+}
+
+func Test_apiRun_eventListenHint(t *testing.T) {
+	const hint = "hint: if you need to wait for this pull request to be reviewed, merged, or closed before continuing, use this instead of polling:\n" +
+		"    gh event listen --resource https://github.com/OWNER/REPO/pull/7 --event com.github.pull_request.review.submitted.v1,com.github.pull_request.state.changed.v1\n" +
+		"  - It prints the first event as a JSON line on stdout and exits; run it again to wait for the next one.\n" +
+		"  - Add `--timeout` to stop waiting after a while, for example `--timeout 30m`; it then exits with status 8.\n" +
+		"  - Events carry no details; read the pull request to see what changed.\n" +
+		"  - It misses changes made before it starts, so read the pull request once it is running.\n" +
+		"  - See `gh event listen --help` for other event types.\n" +
+		"  - Event subscriptions are in preview and may not be enabled for your account.\n"
+	tests := []struct {
+		name     string
+		agent    string
+		method   string
+		path     string
+		hostname string
+		status   int
+		want     string
+		wantErr  error
+	}{
+		{name: "agent reading pull request reviews", agent: "copilot-cli", path: "repos/OWNER/REPO/pulls/7/reviews", want: hint},
+		{name: "agent reading a pull request with a query", agent: "copilot-cli", path: "/repos/OWNER/REPO/pulls/7?per_page=1", want: hint},
+		{name: "agent writing to a pull request", agent: "copilot-cli", method: "POST", path: "repos/OWNER/REPO/pulls/7/reviews"},
+		{name: "agent reading pull request list", agent: "copilot-cli", path: "repos/OWNER/REPO/pulls"},
+		{name: "agent reading an issue", agent: "copilot-cli", path: "repos/OWNER/REPO/issues/7"},
+		{name: "agent reading a pull request on another host", agent: "copilot-cli", path: "repos/OWNER/REPO/pulls/7", hostname: "ghe.example.com"},
+		{name: "agent reading a pull request by its absolute API URL", agent: "copilot-cli", path: "https://api.github.com/repos/OWNER/REPO/pulls/7/reviews?per_page=1", want: hint},
+		{name: "agent reading a pull request by its absolute API URL while targeting another host", agent: "copilot-cli", path: "https://api.github.com/repos/OWNER/REPO/pulls/7", hostname: "ghe.example.com", want: hint},
+		{name: "agent reading a pull request by an absolute URL on another host", agent: "copilot-cli", path: "https://ghe.example.com/api/v3/repos/OWNER/REPO/pulls/7"},
+		{name: "agent reading a missing pull request", agent: "copilot-cli", path: "repos/OWNER/REPO/pulls/7", status: 404, want: "gh: HTTP 404\n", wantErr: cmdutil.SilentError},
+		{name: "no agent", path: "repos/OWNER/REPO/pulls/7"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, stderr := iostreams.Test()
+			opts := &ApiOptions{
+				IO:                  ios,
+				InvokingAgent:       tt.agent,
+				RequestMethod:       cmp.Or(tt.method, "GET"),
+				RequestMethodPassed: tt.method != "",
+				RequestPath:         tt.path,
+				Hostname:            tt.hostname,
+				Silent:              true,
+				Config:              func() (gh.Config, error) { return config.NewMockConfig(), nil },
+				HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
+					var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: cmp.Or(tt.status, 200),
+							Body:       io.NopCloser(strings.NewReader("{}")),
+							Header:     http.Header{"Content-Type": []string{"application/json"}},
+							Request:    req,
+						}, nil
+					}
+					return &http.Client{Transport: tr}, nil
+				},
+			}
+
+			err := apiRun(opts)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.want, stderr.String())
 		})
 	}
 }

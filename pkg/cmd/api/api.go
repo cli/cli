@@ -321,6 +321,7 @@ func apiRun(opts *ApiOptions) error {
 	if err != nil {
 		return fmt.Errorf("unable to expand placeholder in path: %w", err)
 	}
+	endpoint := requestPath
 	method := opts.RequestMethod
 	requestHeaders := opts.RequestHeaders
 	var requestBody any
@@ -471,7 +472,11 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	return tmpl.Flush()
+	if err := tmpl.Flush(); err != nil {
+		return err
+	}
+	printEventListenHint(opts, host, method, endpoint)
+	return nil
 }
 
 var jsonContentTypeRE = regexp.MustCompile(`[/+]json(;|$)`)

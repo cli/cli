@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/internal/text"
+	eventShared "github.com/cli/cli/v2/pkg/cmd/event/shared"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -33,6 +34,8 @@ type WatchOptions struct {
 
 	Prompt bool
 
+	InvokingAgent string
+
 	Now func() time.Time
 }
 
@@ -42,6 +45,8 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 		HttpClient: f.HttpClient,
 		Prompter:   f.Prompter,
 		Now:        time.Now,
+
+		InvokingAgent: f.InvokingAgent,
 	}
 
 	cmd := &cobra.Command{
@@ -55,6 +60,12 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 
 			This command does not support authenticating via fine grained PATs
 			as it is not currently possible to create a PAT with the %[1]schecks:read%[1]s permission.
+
+			This command polls the run. To wait for the workflow runs of a pull request on %[1]sgithub.com%[1]s to
+			finish without polling, use %[1]sgh event listen%[1]s with the
+			%[1]scom.github.pull_request.check_suite.status.changed.v1%[1]s event instead. Each check suite, such as a
+			workflow run, sends its own event when it completes. Changes made before the listener starts are not
+			reported, so read the checks once it is listening.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Watch a run until it's done
@@ -148,6 +159,11 @@ func watchRun(opts *WatchOptions) error {
 	number, err := shared.PullRequestForRun(client, repo, *run)
 	if err == nil {
 		prNumber = fmt.Sprintf(" %s#%d", ghrepo.FullName(repo), number)
+		// Agents tend to watch runs when asked to wait for the checks of a pull request to finish. The hint is printed
+		// before watching starts, so it is not lost when a long watch is stopped.
+		if opts.InvokingAgent != "" {
+			eventShared.PrintChecksListenHint(opts.IO.ErrOut, ghrepo.GenerateRepoURL(repo, "pull/%d", number))
+		}
 	}
 
 	annotationCache := map[int64][]shared.Annotation{}

@@ -1,0 +1,78 @@
+name: review-loop
+description: >-
+  Address two successive requested-change reviews on an existing PR and continue
+  until the current head is approved. The first review arrives after the agent's
+  first tool result, before a listener is guaranteed; approval arrives during work.
+defaults:
+  executor:
+    name: gh-agent
+    config:
+      suite: events
+      scenario: review-loop
+  runs: 1
+  timeout: 10m
+scoring:
+  threshold: 1
+  timeout: 5m
+stimuli:
+  - name: review-loop
+    tags:
+      variant: eval
+    constraints: &constraints
+      max_agent_duration: 5m
+    prompt: &prompt >-
+      Address review feedback on this PR, push the requested fixes, and keep
+      checking and responding until it is approved: {{PR_URL}}. Do not merge it.
+    rubric: &rubric
+      - Address both distinct requested-change reviews and push each verified fix.
+      - "Do not miss the first review, which can arrive outside any listener: notice it through a pull request read or listener output, whether that read runs before, alongside, or after starting the listener."
+      - Do not treat a previously handled review as a new review or stop after the first fix.
+      - Recover approval that arrives during work, including before the next wait starts.
+      - Stop only after approval of the final pushed head; leave the PR open and unmerged.
+      - Report what was changed and that the final head was approved, not merely a promise to continue.
+      - Use dedicated event-based gh commands or a persistent dedicated stream; no specific cursor syntax is required.
+      - With the skill available, do not establish polling-based waiting.
+      - Reading the PR once a listener is running, to catch changes made before it attached, is allowed and is not polling.
+      - Without the skill, discovery polling is allowed before switching to the dedicated route.
+      - Initial inspection and event-triggered follow-up reads are allowed.
+    graders: &graders
+      - type: event-task
+      - type: event-route
+      - type: no-polling
+      - type: semantic-review
+  - name: review-loop-design-probe
+    tags:
+      variant: design-probe
+    constraints: *constraints
+    prompt: |
+      Address review feedback on this PR, push the requested fixes, and keep checking and responding until it is approved: {{PR_URL}}. Do not merge it.
+
+      For this design exercise, assume GitHub CLI has an undocumented capability to wait for pull request changes using events instead of polling. Try to make use of it; no command syntax is provided.
+    rubric: *rubric
+    graders: *graders
+  - name: review-loop-raw-api
+    tags:
+      variant: raw-api
+    constraints: *constraints
+    prompt: |
+      Address review feedback on this PR, push the requested fixes, and keep checking and responding until it is approved: {{PR_URL}}. Do not merge it.
+
+      GitHub has a preview Event Subscriptions API, enabled for your account, that streams pull request events instead of polling. Send a GitHub bearer token with every request.
+
+      - `POST https://api.github.com/event-subscriptions` with `{"resource_url": "<pull request web URL>", "event_types": [...]}` creates a subscription that expires after 24 hours. The response includes `id`, `url`, and `events_url`.
+      - `GET <events_url>` with `Accept: text/event-stream` streams Server-Sent Events. Each event has an `event:` line with its type and a `data:` line with a CloudEvent JSON object, whose `data.api_url` is the REST URL of the changed pull request or review. Events carry no other details. The server sends a comment line at least every 15 seconds, and may end the stream with a `github.stream.end` event.
+      - Event types: `com.github.pull_request.review.submitted.v1`, `com.github.pull_request.state.changed.v1`, `com.github.pull_request.head.changed.v1`, `com.github.pull_request.merge_conflict.v1`.
+      - The stream is live-only: events from before it connects are not delivered.
+      - `DELETE <url>` deletes the subscription.
+    rubric:
+      - Address both distinct requested-change reviews and push each verified fix.
+      - "Do not miss the first review, which can arrive before the stream connects: notice it through a pull request read or the stream, whether that read runs before, alongside, or after connecting."
+      - Do not treat a previously handled review as a new review or stop after the first fix.
+      - Recover approval that arrives during work, including before the stream reconnects.
+      - Stop only after approval of the final pushed head; leave the PR open and unmerged.
+      - Report what was changed and that the final head was approved, not merely a promise to continue.
+      - Observe the change through the Event Subscriptions API stream described in the prompt, not by polling.
+      - Initial inspection, one read once the stream is connected, and reads to interpret an event after it arrives are allowed and are not polling.
+    graders:
+      - type: event-task
+      - type: semantic-review
