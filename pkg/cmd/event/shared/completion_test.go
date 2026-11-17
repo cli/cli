@@ -10,6 +10,7 @@ func TestCompleteEventTypes(t *testing.T) {
 	const (
 		review = "com.github.pull_request.review.submitted.v1\ta review was submitted"
 		head   = "com.github.pull_request.head.changed.v1\tthe head branch changed, for example after a push"
+		checks = "com.github.pull_request.check_suite.status.changed.v1\ta check suite on the head commit completed, such as a CI workflow"
 	)
 
 	tests := []struct {
@@ -21,6 +22,11 @@ func TestCompleteEventTypes(t *testing.T) {
 			name:       "matches by prefix",
 			toComplete: "com.github.pull_request.re",
 			want:       []string{review},
+		},
+		{
+			name:       "matches a check suite event",
+			toComplete: "com.github.pull_request.ch",
+			want:       []string{checks},
 		},
 		{
 			name:       "completes the last item and skips the chosen ones",
