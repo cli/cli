@@ -714,8 +714,12 @@ func TestRetryAfter(t *testing.T) {
 			err:  unavailableErr,
 		},
 		{
-			name: "date instead of seconds",
+			name: "date in the past",
 			err:  httpError(http.StatusServiceUnavailable, "", http.Header{"Retry-After": {"Wed, 21 Oct 2015 07:28:00 GMT"}}),
+		},
+		{
+			name: "not a number or a date",
+			err:  httpError(http.StatusServiceUnavailable, "", http.Header{"Retry-After": {"soon"}}),
 		},
 		{
 			name: "not an HTTP error",
@@ -727,6 +731,17 @@ func TestRetryAfter(t *testing.T) {
 			assert.Equal(t, tt.want, retryAfter(tt.err))
 		})
 	}
+}
+
+func TestRetryAfterFutureDate(t *testing.T) {
+	date := time.Now().Add(time.Hour).UTC().Format(http.TimeFormat)
+	err := httpError(http.StatusServiceUnavailable, "", http.Header{"Retry-After": {date}})
+
+	got := retryAfter(err)
+
+	// The header has a resolution of one second, so up to a second of the hour may already have passed.
+	assert.Greater(t, got, time.Hour-2*time.Second)
+	assert.LessOrEqual(t, got, time.Hour)
 }
 
 func TestListenRunResourceHost(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -523,17 +524,21 @@ func isRetryable(err error) bool {
 	return ok
 }
 
-// retryAfter returns the delay requested by the Retry-After header of an HTTP error, in seconds, or zero.
+// retryAfter returns the delay requested by the Retry-After header of an HTTP error, or zero. The header holds
+// either a number of seconds or an HTTP date to retry after.
 func retryAfter(err error) time.Duration {
 	httpErr, ok := errors.AsType[api.HTTPError](err)
 	if !ok || httpErr.HTTPError == nil {
 		return 0
 	}
-	seconds, convErr := strconv.Atoi(httpErr.Headers.Get("Retry-After"))
-	if convErr != nil || seconds <= 0 {
-		return 0
+	value := httpErr.Headers.Get("Retry-After")
+	if seconds, convErr := strconv.Atoi(value); convErr == nil {
+		return max(time.Duration(seconds)*time.Second, 0)
 	}
-	return time.Duration(seconds) * time.Second
+	if date, parseErr := http.ParseTime(value); parseErr == nil {
+		return max(time.Until(date), 0)
+	}
+	return 0
 }
 
 // idleReader closes the underlying stream once it has been idle for the timeout. Reads then fail with an idle
