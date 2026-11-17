@@ -5,5 +5,10 @@
   "description": "Pinned terminal prerequisites for the cli-exercise skill",
   "dependencies": {
     "tuistory": "0.11.0"
+  },
+  "overrides": {
+    "tuistory": {
+      "zod": "4.6.6"
+    }
   }
 }
