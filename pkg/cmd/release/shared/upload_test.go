@@ -84,9 +84,10 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 	tries := 0
 	client := &http.Client{Transport: funcTripper(func(req *http.Request) (*http.Response, error) {
 		tries++
-		if tries == 1 {
+		switch tries {
+		case 1:
 			return nil, errors.New("made up exception")
-		} else if tries == 2 {
+		case 2:
 			return &http.Response{
 				Request:    req,
 				StatusCode: 500,
