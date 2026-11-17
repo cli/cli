@@ -59,6 +59,13 @@ func TestStandardSearchString(t *testing.T) {
 			out: `"quote keywords"`,
 		},
 		{
+			name: "leaves already quoted keywords alone",
+			query: Query{
+				Keywords: []string{`"quoted term"`},
+			},
+			out: `"quoted term"`,
+		},
+		{
 			name: "quotes keywords that are qualifiers",
 			query: Query{
 				Keywords: []string{"quote:keywords", "quote:multiword keywords"},

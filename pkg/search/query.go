@@ -284,7 +284,12 @@ func (q Qualifiers) Map() map[string][]string {
 }
 
 func quote(s string) string {
-	if strings.ContainsAny(s, " \"\t\r\n") {
+	if strings.Contains(s, `"`) {
+		// The value is already written in the search syntax, so wrapping it again
+		// or escaping the quotes would send a literal \" to the API.
+		return s
+	}
+	if strings.ContainsAny(s, " \t\r\n") {
 		return fmt.Sprintf("%q", s)
 	}
 	return s
