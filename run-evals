@@ -86,13 +86,14 @@ if [ "$cleanup_only" = false ]; then
     || fail 'Set COPILOT_GITHUB_TOKEN explicitly for model access.'
   check_token COPILOT_GITHUB_TOKEN "$COPILOT_GITHUB_TOKEN"
   export COPILOT_GITHUB_TOKEN
+fi
 
-  # Only suites with a second actor need this identity; those suites refuse to start a trial without it.
-  if [ -n "${GH_EVAL_ACTOR_TOKEN:-}" ]; then
-    check_token GH_EVAL_ACTOR_TOKEN "$GH_EVAL_ACTOR_TOKEN"
-    export GH_EVAL_ACTOR_TOKEN
-    GH_EVAL_FIXTURE_TOKEN=${GH_EVAL_FIXTURE_TOKEN:-$GH_EVAL_ACTOR_TOKEN}
-  fi
+# Only suites with a second actor need this identity; those suites refuse to start a trial without it. Cleanup takes
+# the same fixture default, so a retry with the same credentials deletes repositories as the identity that made them.
+if [ -n "${GH_EVAL_ACTOR_TOKEN:-}" ]; then
+  check_token GH_EVAL_ACTOR_TOKEN "$GH_EVAL_ACTOR_TOKEN"
+  export GH_EVAL_ACTOR_TOKEN
+  GH_EVAL_FIXTURE_TOKEN=${GH_EVAL_FIXTURE_TOKEN:-$GH_EVAL_ACTOR_TOKEN}
 fi
 if [ -n "${GH_EVAL_FIXTURE_TOKEN:-}" ]; then
   check_token GH_EVAL_FIXTURE_TOKEN "$GH_EVAL_FIXTURE_TOKEN"
