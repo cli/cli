@@ -2877,9 +2877,11 @@ func TestViewRun_eventListenHint(t *testing.T) {
 
 	tests := []struct {
 		name          string
+		host          string
 		run           shared.Run
 		invokingAgent string
 		exporter      cmdutil.Exporter
+		noPullRequest bool
 		wantStderr    string
 	}{
 		{
@@ -2894,6 +2896,20 @@ func TestViewRun_eventListenHint(t *testing.T) {
 			invokingAgent: "copilot-cli",
 			exporter:      jsonExporter,
 			wantStderr:    wantHint,
+		},
+		{
+			name:          "agent viewing an in-progress run without a pull request as JSON",
+			run:           inProgressRun,
+			invokingAgent: "copilot-cli",
+			exporter:      jsonExporter,
+			noPullRequest: true,
+		},
+		{
+			name:          "agent viewing an in-progress run on an unsupported host as JSON",
+			host:          "octocorp.ghe.com",
+			run:           inProgressRun,
+			invokingAgent: "copilot-cli",
+			exporter:      jsonExporter,
 		},
 		{
 			name:          "agent viewing a completed run",
@@ -2916,12 +2932,14 @@ func TestViewRun_eventListenHint(t *testing.T) {
 			reg.Register(
 				httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
 				httpmock.JSONResponse(shared.TestWorkflow))
-			if tt.exporter == nil || tt.wantStderr != "" {
+			if tt.exporter == nil || tt.invokingAgent != "" {
+				pullRequests := `{"number": 2898, "headRepository": {"owner": {"login": "OWNER"}, "name": "REPO"}}`
+				if tt.noPullRequest {
+					pullRequests = ""
+				}
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
-					httpmock.StringResponse(`{"data": {"repository": {"pullRequests": {"nodes": [
-						{"number": 2898, "headRepository": {"owner": {"login": "OWNER"}, "name": "REPO"}}
-					]}}}}`))
+					httpmock.StringResponse(`{"data": {"repository": {"pullRequests": {"nodes": [`+pullRequests+`]}}}}`))
 			}
 			if tt.exporter == nil {
 				reg.Register(
@@ -2932,6 +2950,10 @@ func TestViewRun_eventListenHint(t *testing.T) {
 					httpmock.StringResponse(`{}`))
 			}
 
+			host := tt.host
+			if host == "" {
+				host = "github.com"
+			}
 			ios, _, stdout, stderr := iostreams.Test()
 			opts := &ViewOptions{
 				IO: ios,
@@ -2939,7 +2961,7 @@ func TestViewRun_eventListenHint(t *testing.T) {
 					return &http.Client{Transport: reg}, nil
 				},
 				BaseRepo: func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName("OWNER/REPO")
+					return ghrepo.NewWithHost("OWNER", "REPO", host), nil
 				},
 				Now: func() time.Time {
 					return time.Date(2021, 2, 23, 5, 50, 0, 0, time.UTC)
