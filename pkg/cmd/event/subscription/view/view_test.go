@@ -1,6 +1,7 @@
 package view
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsonfieldstest"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,6 +28,68 @@ func TestJSONFields(t *testing.T) {
 		"url",
 		"eventsUrl",
 	})
+}
+
+func TestNewCmdView(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       string
+		wantID     string
+		wantFields []string
+		wantErr    string
+	}{
+		{
+			name:   "id",
+			args:   "sub_1",
+			wantID: "sub_1",
+		},
+		{
+			name:       "id with json fields",
+			args:       "sub_1 --json id,expiresAt",
+			wantID:     "sub_1",
+			wantFields: []string{"id", "expiresAt"},
+		},
+		{
+			name:    "no id",
+			wantErr: "subscription ID required",
+		},
+		{
+			name:    "more than one id",
+			args:    "sub_1 sub_2",
+			wantErr: "too many arguments",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			var gotOpts *ViewOptions
+			cmd := NewCmdView(&cmdutil.Factory{IOStreams: ios}, func(opts *ViewOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			args, err := shlex.Split(tt.args)
+			require.NoError(t, err)
+			cmd.SetArgs(args)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err = cmd.ExecuteC()
+
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				assert.Nil(t, gotOpts)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantID, gotOpts.ID)
+			if tt.wantFields == nil {
+				assert.Nil(t, gotOpts.Exporter)
+			} else {
+				assert.Equal(t, tt.wantFields, gotOpts.Exporter.Fields())
+			}
+		})
+	}
 }
 
 func TestViewRun(t *testing.T) {
