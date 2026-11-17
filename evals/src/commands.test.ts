@@ -78,9 +78,18 @@ test("event types are collected from repeated --event flags and the earlier --ev
 
 test("a GraphQL status read is recognized wherever its query field sits among repeated fields", () => {
   const query = "query=query($o:String!){repository(owner:$o,name:\"r\"){pullRequest(number:1){reviewDecision}}}";
-  const expected = statusRead(call(["api", "graphql", "-f", query]));
+  const expected = statusRead(call(["api", "graphql", "-f", query, "-f", "o=sandbox"]));
   assert.ok(expected);
   assert.equal(statusRead(call(["api", "graphql", "-f", query, "-f", "o=sandbox", "-F", "n=1"])), expected);
   assert.equal(statusRead(call(["api", "graphql", "-F", "o=sandbox", `-f${query}`])), expected);
   assert.equal(statusRead(call(["api", "graphql", "--raw-field", "o=sandbox", `--field=${query}`])), expected);
+});
+
+test("GraphQL status reads of different pull requests with the same query are told apart", () => {
+  const query = "query=query($o:String!,$n:Int!){repository(owner:$o,name:\"r\"){pullRequest(number:$n){reviewDecision}}}";
+  const first = statusRead(call(["api", "graphql", "-f", query, "-F", "o=sandbox", "-F", "n=1"]));
+  assert.ok(first);
+  assert.equal(statusRead(call(["api", "graphql", "-F", "n=1", "-f", query, "-F", "o=sandbox"])), first);
+  assert.notEqual(statusRead(call(["api", "graphql", "-f", query, "-F", "o=sandbox", "-F", "n=2"])), first);
+  assert.notEqual(statusRead(call(["api", "graphql", "-f", query, "-F", "o=other", "-F", "n=1"])), first);
 });

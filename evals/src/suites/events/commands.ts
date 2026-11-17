@@ -103,6 +103,11 @@ export function statusRead(call: Call): string | undefined {
       return `api:${path}`;
     }
     const query = fields.find(field => field.startsWith("query="));
-    if (path === "graphql" && query?.includes("pullRequest") && !/\bmutation\b/.test(query)) return `graphql:${query}`;
+    if (path === "graphql" && query?.includes("pullRequest") && !/\bmutation\b/.test(query)) {
+      // The bindings of the query's variables tell apart reads of different pull requests with the same query.
+      const variables = new Set(Array.from(query.matchAll(/\$(\w+)/g), match => match[1]));
+      const bindings = fields.filter(field => field !== query && variables.has(field.split("=")[0])).sort();
+      return JSON.stringify(["graphql", query, bindings]);
+    }
   }
 }
