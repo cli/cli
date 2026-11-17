@@ -693,6 +693,32 @@ func TestReadEventsSanitizesEachFrame(t *testing.T) {
 	assert.Contains(t, stderr.String(), "warning: skipped an event that is not valid UTF-8")
 }
 
+func TestReadEventsSanitizesEndFrame(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+	l := &listener{opts: &ListenOptions{IO: ios}}
+
+	stream := "event: github.stream.end\ndata: {\"outcome\":\"subscription_ended\",\"reason\":\"\x1b[31mraw \\u001b[31mescaped\"}\n\n"
+	end, err := l.readEvents(strings.NewReader(stream))
+
+	require.NoError(t, err)
+	assert.Equal(t, &streamEnd{Outcome: "subscription_ended", Reason: "^[[31mraw ^[[31mescaped"}, end)
+	assert.Empty(t, stdout.String())
+	assert.Empty(t, stderr.String())
+}
+
+func TestReadEventsEndFrameNotValidUTF8(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+	l := &listener{opts: &ListenOptions{IO: ios, Follow: true}}
+
+	stream := "event: github.stream.end\ndata: {\"outcome\":\"subscription_ended\",\"reason\":\"\xff\"}\n\n" + fooEvent
+	end, err := l.readEvents(strings.NewReader(stream))
+
+	require.ErrorContains(t, err, "invalid end of stream frame: invalid UTF-8 string")
+	assert.Nil(t, end)
+	assert.Empty(t, stdout.String())
+	assert.Empty(t, stderr.String())
+}
+
 func TestRetryAfter(t *testing.T) {
 	tests := []struct {
 		name string
