@@ -75,7 +75,8 @@ func TestCreateRun(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		tty        bool
+		stdoutTTY  bool
+		stderrTTY  bool
 		jsonFields []string
 		created    bool
 		createErr  error
@@ -85,16 +86,31 @@ func TestCreateRun(t *testing.T) {
 	}{
 		{
 			name:       "created on a tty",
-			tty:        true,
+			stdoutTTY:  true,
+			stderrTTY:  true,
 			created:    true,
 			wantOut:    "sub_1\n",
 			wantErrOut: "✓ Created subscription sub_1, which expires in about 1 day\n",
 		},
 		{
 			name:       "reused on a tty",
-			tty:        true,
+			stdoutTTY:  true,
+			stderrTTY:  true,
 			wantOut:    "sub_1\n",
 			wantErrOut: "✓ Reused existing subscription sub_1, which expires in about 1 day\n",
+		},
+		{
+			name:       "stdout captured while stderr is a tty",
+			stderrTTY:  true,
+			created:    true,
+			wantOut:    "sub_1\n",
+			wantErrOut: "✓ Created subscription sub_1, which expires in about 1 day\n",
+		},
+		{
+			name:      "stderr redirected while stdout is a tty",
+			stdoutTTY: true,
+			created:   true,
+			wantOut:   "sub_1\n",
 		},
 		{
 			name:    "not tty prints only the ID",
@@ -126,8 +142,8 @@ func TestCreateRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
-			ios.SetStdoutTTY(tt.tty)
-			ios.SetStderrTTY(tt.tty)
+			ios.SetStdoutTTY(tt.stdoutTTY)
+			ios.SetStderrTTY(tt.stderrTTY)
 			var gotHost, gotResource string
 			var gotTypes []string
 			opts := &CreateOptions{
