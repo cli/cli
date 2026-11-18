@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/build"
+	"github.com/cli/cli/v2/internal/catrust"
 	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
@@ -34,6 +36,7 @@ import (
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	xcolor "github.com/cli/go-gh/v2/pkg/x/color"
 	"github.com/cli/safeexec"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 )
@@ -49,6 +52,16 @@ const (
 )
 
 func Main() exitCode {
+	// Install before config migration or update-check goroutines can use HTTP.
+	for _, transport := range []*http.RoundTripper{&http.DefaultTransport, &remote.DefaultTransport} {
+		secured, err := catrust.NewTransport(*transport)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to configure HTTPS certificate policy: %s\n", err)
+			return exitError
+		}
+		*transport = secured
+	}
+
 	buildDate := build.Date
 	buildVersion := build.Version
 	hasDebug, _ := utils.IsDebugEnabled()
