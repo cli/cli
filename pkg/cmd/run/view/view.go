@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -604,9 +605,21 @@ func displayLogSegments(w io.Writer, segments []logSegment) error {
 
 func copyLogWithLinePrefix(w io.Writer, r io.Reader, prefix string) error {
 	sanitized := transform.NewReader(r, &asciisanitizer.Sanitizer{})
-	scanner := bufio.NewScanner(sanitized)
-	for scanner.Scan() {
-		fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
+	reader := bufio.NewReader(sanitized)
+	for {
+		line, err := reader.ReadString('\n')
+		if len(line) > 0 {
+			line = strings.TrimSuffix(line, "\n")
+			line = strings.TrimSuffix(line, "\r")
+			if _, writeErr := fmt.Fprintf(w, "%s%s\n", prefix, line); writeErr != nil {
+				return writeErr
+			}
+		}
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
 	}
-	return nil
 }
