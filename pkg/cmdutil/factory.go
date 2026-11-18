@@ -41,6 +41,9 @@ type Factory struct {
 	// auth and other headers. This is meant to be used in situations where the
 	// client needs to specify the headers itself (e.g. during login).
 	PlainHttpClient func() (*http.Client, error)
+	// OAuthAppHttpClient does not attach user authentication or log HTTP traffic,
+	// since app-authenticated requests can carry credentials in their bodies.
+	OAuthAppHttpClient func() (*http.Client, error)
 	// ExternalHttpClient is an HTTP client for talking to non-GitHub hosts
 	// It includes debug logging and a User-Agent header but does not attach any
 	// authentication tokens or GitHub-specific headers.

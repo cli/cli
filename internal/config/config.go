@@ -602,41 +602,57 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 	// Run under the shared refresh lock so logout wins any race with an in-flight refresh: a concurrent refresh
 	// cannot persist a rotated credential after logout has removed the account and reported success.
 	return c.withFreshConfigForRefresh(func(lockErr error) error {
-		users := c.UsersForHost(hostname)
-
-		// The user's per-user keyring records are not covered by removing config keys, so delete them explicitly.
-		// Historically the per-user token was only removed in the single-user branch, leaking it when logging out of a
-		// multi-user host.
-		_ = keyring.Delete(refreshableServiceName(hostname), username)
-		_ = keyring.Delete(keyringServiceName(hostname), username)
-
-		// If there is only one (or zero) users, then we remove the host
-		// and unset the keyring tokens.
-		if len(users) < 2 {
-			_ = c.cfg.Remove([]string{hostsKey, hostname})
-			_ = keyring.Delete(keyringServiceName(hostname), "")
-			return ghConfig.Write(c.cfg)
-		}
-
-		// Otherwise, we remove the user from this host
-		_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
-
-		// This error is ignorable because we already know there is an active user for the host
-		activeUser, _ := c.ActiveUser(hostname)
-
-		// If the user we're removing isn't active, then we just write the config
-		if activeUser != username {
-			return ghConfig.Write(c.cfg)
-		}
-
-		// Otherwise we get the first user in the slice that isn't the user we're removing
-		switchUserIdx := slices.IndexFunc(users, func(n string) bool {
-			return n != username
-		})
-
-		// And activate them
-		return c.activateUser(hostname, users[switchUserIdx])
+		return c.logout(hostname, username)
 	})
+}
+
+// LogoutWithCredential coordinates credential-dependent cleanup with concurrent refreshes.
+// Local credentials are retained if locking, lookup, or beforeLogout fails.
+func (c *AuthConfig) LogoutWithCredential(hostname, username string, beforeLogout func(gh.Credential) error) error {
+	if beforeLogout == nil {
+		return errors.New("logout credential callback is required")
+	}
+	return c.withFreshConfigForRefresh(func(lockErr error) error {
+		if lockErr != nil {
+			return fmt.Errorf("could not lock authentication credentials: %w", lockErr)
+		}
+		if !slices.Contains(c.UsersForHost(hostname), username) {
+			return fmt.Errorf("not logged in to %s account %s", hostname, username)
+		}
+		credential, err := c.TokenForUser(hostname, username)
+		if err != nil {
+			return err
+		}
+		if err := beforeLogout(credential); err != nil {
+			return err
+		}
+		return c.logout(hostname, username)
+	})
+}
+
+func (c *AuthConfig) logout(hostname, username string) error {
+	users := c.UsersForHost(hostname)
+
+	// Per-user keyring records are not covered by removing config keys.
+	_ = keyring.Delete(refreshableServiceName(hostname), username)
+	_ = keyring.Delete(keyringServiceName(hostname), username)
+
+	if len(users) < 2 {
+		_ = c.cfg.Remove([]string{hostsKey, hostname})
+		_ = keyring.Delete(keyringServiceName(hostname), "")
+		return ghConfig.Write(c.cfg)
+	}
+
+	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
+	activeUser, _ := c.ActiveUser(hostname)
+	if activeUser != username {
+		return ghConfig.Write(c.cfg)
+	}
+
+	switchUserIdx := slices.IndexFunc(users, func(n string) bool {
+		return n != username
+	})
+	return c.activateUser(hostname, users[switchUserIdx])
 }
 
 func (c *AuthConfig) activateUser(hostname, user string) error {
