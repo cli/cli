@@ -46,6 +46,52 @@ func TestIOStreams_pager(t *testing.T) {
 	}
 }
 
+func TestIOStreams_StartPager_emptyArgs(t *testing.T) {
+	tests := []struct {
+		name         string
+		pagerCommand string
+	}{
+		{
+			name:         "comment only",
+			pagerCommand: "#",
+		},
+		{
+			name:         "comment with text",
+			pagerCommand: "# a comment with no executable",
+		},
+		{
+			name:         "spaces only",
+			pagerCommand: "   ",
+		},
+		{
+			name:         "tabs and newlines",
+			pagerCommand: "\t\r\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, _ := Test()
+			ios.SetStdoutTTY(true)
+			ios.SetPager(tt.pagerCommand)
+
+			if err := ios.StartPager(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if _, err := fmt.Fprintln(ios.Out, "hello world"); err != nil {
+				t.Fatalf("failed to write to Out: %v", err)
+			}
+
+			ios.StopPager()
+
+			if got := stdout.String(); got != "hello world\n" {
+				t.Errorf("expected %q, got %q", "hello world\n", got)
+			}
+		})
+	}
+}
+
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GH_WANT_HELPER_PROCESS") != "1" {
 		return

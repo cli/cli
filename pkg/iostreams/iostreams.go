@@ -223,6 +223,9 @@ func (s *IOStreams) StartPager() error {
 	if err != nil {
 		return err
 	}
+	if len(pagerArgs) == 0 {
+		return nil
+	}
 
 	pagerEnv := os.Environ()
 	for i, p := range slices.Backward(pagerEnv) {
