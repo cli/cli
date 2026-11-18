@@ -97,6 +97,9 @@ func NewCmdListen(f *cmdutil.Factory, runF func(*ListenOptions) error) *cobra.Co
 			Events are thin single line JSON objects with their %[1]sdata.api_url%[1]s pointing at the object that changed,
 			such as the review, the pull request, or the check suite. Fetch it to learn what changed.
 
+			An event can occasionally be delivered more than once. Reading the current state after each event, as above,
+			keeps a repeated event harmless.
+
 			A pull request usually has several check suites, and each one sends its own event when it completes, with
 			its %[1]sdata.conclusion%[1]s, such as %[1]ssuccess%[1]s or %[1]sfailure%[1]s. To wait for all checks,
 			read the pull request checks after each event, for example with %[1]sgh pr checks%[1]s.
