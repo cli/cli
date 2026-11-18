@@ -6,72 +6,71 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"runtime"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
-func Test_typeForFilename(t *testing.T) {
+func Test_typeForFile(t *testing.T) {
+	cs, teardown := run.Stub()
+	defer teardown(t)
+	wantBinaryMimeType := "application/octet-stream"
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		cs.Register("file -bEL --mime-type -- octocat-linux-arm64", 0, "application/x-pie-executable\n")
+		wantBinaryMimeType = "application/x-pie-executable"
+	}
 	tests := []struct {
-		name string
-		file string
-		want string
+		filename string
+		want     string
 	}{
 		{
-			name: "tar",
-			file: "ball.tar",
-			want: "application/x-tar",
+			filename: "ball.tar",
+			want:     "application/x-tar",
 		},
 		{
-			name: "tgz",
-			file: "ball.tgz",
-			want: "application/x-gtar",
+			filename: "ball.tgz",
+			want:     "application/x-gtar",
 		},
 		{
-			name: "tar.gz",
-			file: "ball.tar.gz",
-			want: "application/x-gtar",
+			filename: "ball.tar.gz",
+			want:     "application/x-gtar",
 		},
 		{
-			name: "bz2",
-			file: "ball.tar.bz2",
-			want: "application/x-bzip2",
+			filename: "ball.tar.bz2",
+			want:     "application/x-bzip2",
 		},
 		{
-			name: "zip",
-			file: "archive.zip",
-			want: "application/zip",
+			filename: "archive.zip",
+			want:     "application/zip",
 		},
 		{
-			name: "js",
-			file: "app.js",
-			want: "application/javascript",
+			filename: "app.js",
+			want:     "application/javascript",
 		},
 		{
-			name: "dmg",
-			file: "apple.dmg",
-			want: "application/x-apple-diskimage",
+			filename: "apple.dmg",
+			want:     "application/x-apple-diskimage",
 		},
 		{
-			name: "rpm",
-			file: "package.rpm",
-			want: "application/x-rpm",
+			filename: "package.rpm",
+			want:     "application/x-rpm",
 		},
 		{
-			name: "deb",
-			file: "package.deb",
-			want: "application/x-debian-package",
+			filename: "package.deb",
+			want:     "application/x-debian-package",
 		},
 		{
-			name: "no extension",
-			file: "myfile",
-			want: "application/octet-stream",
+			filename: "octocat-linux-arm64",
+			want:     wantBinaryMimeType,
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.file, func(t *testing.T) {
-			if got := typeForFilename(tt.file); got != tt.want {
-				t.Errorf("typeForFilename() = %v, want %v", got, tt.want)
+		t.Run(tt.filename, func(t *testing.T) {
+			if got := typeForFile(tt.filename, tt.filename); got != tt.want {
+				t.Errorf("typeForFile() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -9,12 +9,15 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/internal/safeurl"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"golang.org/x/sync/errgroup"
@@ -47,33 +50,33 @@ func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
 
 	for _, arg := range args {
 		var label string
-		fn := arg
+		file_path := arg
 		if idx := strings.IndexRune(arg, '#'); idx > 0 {
-			fn = arg[0:idx]
+			file_path = arg[0:idx]
 			label = arg[idx+1:]
 		}
 
 		var fi os.FileInfo
-		fi, err = os.Stat(fn)
+		fi, err = os.Stat(file_path)
 		if err != nil {
 			return
 		}
 
 		assets = append(assets, &AssetForUpload{
 			Open: func() (io.ReadCloser, error) {
-				return os.Open(fn)
+				return os.Open(file_path)
 			},
 			Size:     fi.Size(),
 			Name:     fi.Name(),
 			Label:    label,
-			MIMEType: typeForFilename(fi.Name()),
+			MIMEType: typeForFile(fi.Name(), file_path),
 		})
 	}
 	return
 }
 
-func typeForFilename(fn string) string {
-	ext := fileExt(fn)
+func typeForFile(name string, path string) string {
+	ext := fileExt(name)
 	switch ext {
 	case ".zip":
 		return "application/zip"
@@ -93,11 +96,13 @@ func typeForFilename(fn string) string {
 		return "application/x-debian-package"
 	}
 
-	t := mime.TypeByExtension(ext)
-	if t == "" {
-		return "application/octet-stream"
+	if t := mime.TypeByExtension(ext); t != "" {
+		return t
 	}
-	return t
+	if t := execFileMimeType(path); t != "" {
+		return t
+	}
+	return "application/octet-stream"
 }
 
 func fileExt(fn string) string {
@@ -106,6 +111,23 @@ func fileExt(fn string) string {
 		return ".tar.gz"
 	}
 	return path.Ext(fn)
+}
+
+func execFileMimeType(path string) string {
+	switch runtime.GOOS {
+	case "darwin", "linux":
+	default:
+		return ""
+	}
+	cmd := exec.Command("file", "-bEL", "--mime-type", "--", path)
+	out, err := run.PrepareCmd(cmd).Output()
+	if err == nil {
+		firstLine, _, _ := strings.Cut(string(out), "\n")
+		if mimeType := strings.TrimSpace(firstLine); mimeType != "" {
+			return mimeType
+		}
+	}
+	return ""
 }
 
 func ConcurrentUpload(httpClient *http.Client, hostname string, uploadURL safeurl.SafeURL, numWorkers int, assets []*AssetForUpload) error {
