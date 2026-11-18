@@ -74,3 +74,9 @@ Before changing tests, read [Testing](testing.md). Cover the relevant selected
 and default-host paths (including a non-`github.com` host), and supported versus
 unsupported capability behavior. Assert the actual destination, not merely that
 a mocked response was consumed.
+
+Shared HTTP, OCI, and telemetry Unix-socket transports apply the
+[`CA-key policy`](../internal/catrust/transport.go) after normal TLS verification,
+including on resumed sessions. Host roots and proxy settings are preserved.
+An allowed verified chain is sufficient. The separate Codespaces tunnel
+WebSocket connections are not covered.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/barista/observability"
 	"github.com/cli/cli/v2/internal/build"
+	"github.com/cli/cli/v2/internal/catrust"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -74,10 +75,14 @@ func newCmdSendTelemetry(f *cmdutil.Factory, runF func(*SendTelemetryOptions) er
 }
 
 func runSendTelemetry(ctx context.Context, opts *SendTelemetryOptions) error {
+	transport, err := handleUnixDomainSocket(opts.HTTPUnixSocket)
+	if err != nil {
+		return fmt.Errorf("configuring telemetry HTTP transport: %w", err)
+	}
 	httpClient := &http.Client{
 		Timeout: 2 * time.Second,
 		Transport: &userAgentTransport{
-			base:      handleUnixDomainSocket(opts.HTTPUnixSocket),
+			base:      transport,
 			userAgent: fmt.Sprintf("GitHub CLI %s", build.Version),
 		},
 	}
@@ -103,7 +108,7 @@ func runSendTelemetry(ctx context.Context, opts *SendTelemetryOptions) error {
 		}
 	}
 
-	_, err := client.RecordEvents(ctx, &observability.RecordEventsRequest{
+	_, err = client.RecordEvents(ctx, &observability.RecordEventsRequest{
 		Events: events,
 	})
 	return err
@@ -119,17 +124,17 @@ func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error
 	return t.base.RoundTrip(req)
 }
 
-func handleUnixDomainSocket(socketPath string) http.RoundTripper {
+func handleUnixDomainSocket(socketPath string) (http.RoundTripper, error) {
 	if socketPath == "" {
-		return http.DefaultTransport
+		return http.DefaultTransport, nil
 	}
 
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return (&net.Dialer{}).DialContext(ctx, "unix", socketPath)
 	}
 
-	return &http.Transport{
+	return catrust.NewTransport(&http.Transport{
 		DialContext:       dialContext,
 		DisableKeepAlives: true,
-	}
+	})
 }

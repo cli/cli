@@ -2,9 +2,17 @@ package sendtelemetry
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"io"
+	"net"
+	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -110,6 +118,8 @@ func TestRunSendTelemetry(t *testing.T) {
 	tests := []struct {
 		name       string
 		payload    telemetry.SendTelemetryPayload
+		unixSocket bool
+		https      bool
 		serverErr  error
 		wantErr    bool
 		assertFunc func(t *testing.T, req *observability.RecordEventsRequest)
@@ -160,6 +170,22 @@ func TestRunSendTelemetry(t *testing.T) {
 			},
 		},
 		{
+			name:       "posts over a Unix socket",
+			unixSocket: true,
+			payload: telemetry.SendTelemetryPayload{
+				Events: []telemetry.PayloadEvent{{Type: "test"}},
+			},
+		},
+		{
+			name:       "HTTPS over a Unix socket retains TLS verification and CA policy",
+			unixSocket: true,
+			https:      true,
+			wantErr:    true,
+			payload: telemetry.SendTelemetryPayload{
+				Events: []telemetry.PayloadEvent{{Type: "test"}},
+			},
+		},
+		{
 			name: "empty events list produces no request",
 			payload: telemetry.SendTelemetryPayload{
 				Events: []telemetry.PayloadEvent{},
@@ -175,20 +201,65 @@ func TestRunSendTelemetry(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockTelemetryAPI{err: tt.serverErr}
 			handler := observability.NewTelemetryAPIServer(mock)
-			server := httptest.NewServer(handler)
+			server := httptest.NewUnstartedServer(handler)
 			defer server.Close()
+			var socketPath string
+			if tt.unixSocket {
+				if runtime.GOOS == "windows" {
+					t.Skip("Unix-socket fixture requires a Unix platform")
+				}
+				dir, err := os.MkdirTemp("", "gh-telemetry-")
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, os.Remove(dir)) })
+				socketPath = filepath.Join(dir, "socket")
+				listener, err := net.Listen("unix", socketPath)
+				require.NoError(t, err)
+				require.NoError(t, server.Listener.Close())
+				server.Listener = listener
+			}
+			if tt.https {
+				server.StartTLS()
+				rt, err := handleUnixDomainSocket(socketPath)
+				require.NoError(t, err)
+				transport, ok := rt.(*http.Transport)
+				require.True(t, ok)
+				require.NotNil(t, transport.TLSClientConfig)
+				assert.Nil(t, transport.TLSClientConfig.RootCAs)
+				require.NotNil(t, transport.TLSClientConfig.VerifyConnection)
+				// emSign ECC Root CA - G3: https://repository.emsign.com/certs/emSignECCRootCAG3.crt
+				spki, err := hex.DecodeString("3076301006072a8648ce3d020106052b810400220362000423a50cb82d12f528f3b1b2dde20212809e395f494d9fc925345974ecbb061ce7c072afe8ae2fe141548714a84ab2e87c82e65b6ab5dcb375ce8b06d08623bf46d58e0f3f04f4d71c927ef6a563c2f55f8e2e4fa11819022b320a82647d1693d1")
+				require.NoError(t, err)
+				require.ErrorContains(t, transport.TLSClientConfig.VerifyConnection(tls.ConnectionState{
+					VerifiedChains: [][]*x509.Certificate{{{RawSubjectPublicKeyInfo: spki}}},
+				}), "distrusted CA")
+			} else {
+				server.Start()
+			}
 
 			opts := &SendTelemetryOptions{
 				TelemetryEndpointURL: server.URL,
 				PayloadJSON:          mustMarshal(t, tt.payload),
+				HTTPUnixSocket:       socketPath,
+			}
+			if tt.unixSocket {
+				opts.TelemetryEndpointURL = "http://telemetry.invalid"
+				if tt.https {
+					opts.TelemetryEndpointURL = "https://telemetry.invalid"
+				}
 			}
 
 			err := runSendTelemetry(context.Background(), opts)
 			if tt.wantErr {
 				require.Error(t, err)
+				if tt.https {
+					require.ErrorContains(t, err, "x509:")
+				}
 				return
 			}
 			require.NoError(t, err)
+			if tt.unixSocket {
+				require.NotNil(t, mock.request)
+			}
 
 			if tt.assertFunc != nil {
 				tt.assertFunc(t, mock.request)
