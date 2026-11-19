@@ -33,7 +33,7 @@ builds:
 
   - id: linux #build:linux
     goos: [linux]
-    goarch: ["386", arm, amd64, arm64]
+    goarch: ["386", arm, amd64, arm64, s390x]
     env:
       - CGO_ENABLED=0
     hooks:
