@@ -159,68 +159,31 @@ func logoutRun(opts *LogoutOptions) error {
 		return cmdutil.SilentError
 	}
 
-	// We can ignore the error here because a host must always have an active user
-	preLogoutActiveUser, _ := authCfg.ActiveUser(hostname)
-
-	cs := opts.IO.ColorScheme()
-	revoked := false
-	warning := "Authentication token was not revoked."
-	advice := ""
+	result := logoutResult{warning: "Authentication token was not revoked."}
 	if opts.NoRevoke {
+		// A configured host must have an active user.
+		result.preLogoutActiveUser, _ = authCfg.ActiveUser(hostname)
 		if err := authCfg.Logout(hostname, username); err != nil {
 			return err
 		}
 	} else {
-		localLogoutStarted := false
-		err := authCfg.LogoutWithCredential(hostname, username, func(credential gh.Credential) error {
-			preLogoutActiveUser, _ = authCfg.ActiveUser(hostname)
-			switch {
-			case strings.HasPrefix(credential.Token, string(gh.TokenTypeOAuth)):
-				client, err := opts.OAuthAppHttpClient()
-				if err != nil {
-					return err
-				}
-				ctx := opts.Context
-				if ctx == nil {
-					ctx = context.Background()
-				}
-				if err := authflow.RevokeToken(ctx, client, hostname, credential.Token); err != nil {
-					return fmt.Errorf("failed to revoke GitHub CLI OAuth token: %w", err)
-				}
-				revoked = true
-				fmt.Fprintf(opts.IO.ErrOut, "%s Revoked GitHub CLI OAuth token for %s (%s)\n",
-					cs.SuccessIcon(), cs.Bold(username), hostname)
-			case strings.HasPrefix(credential.Token, string(gh.TokenTypePersonalAccess)),
-				strings.HasPrefix(credential.Token, string(gh.TokenTypeFineGrainedPAT)):
-				warning = "Personal access token was not revoked."
-				advice = "Revoke it at " + ghinstance.HostPrefix(hostname) + "settings/tokens"
-			case strings.HasPrefix(credential.Token, string(gh.TokenTypeUserToServer)),
-				strings.HasPrefix(credential.Token, string(gh.TokenTypeServerToServer)):
-				warning = "GitHub App token was not revoked."
-				advice = "Revoke it through the app that issued it."
-			}
-			localLogoutStarted = true
-			return nil
-		})
+		result, err = logoutWithRevocation(opts, authCfg, hostname, username)
 		if err != nil {
-			if localLogoutStarted {
-				return err
-			}
-			recovery := shellquote.Join("gh", "auth", "logout", "--hostname", hostname, "--user", username, "--no-revoke")
-			return fmt.Errorf("%w\nLocal credentials were kept.\nRetry, or log out locally without revoking:\n  %s", err, recovery)
+			return err
 		}
 	}
 
 	postLogoutActiveUser, _ := authCfg.ActiveUser(hostname)
-	hasSwitchedToNewUser := preLogoutActiveUser != postLogoutActiveUser &&
+	hasSwitchedToNewUser := result.preLogoutActiveUser != postLogoutActiveUser &&
 		postLogoutActiveUser != ""
 
+	cs := opts.IO.ColorScheme()
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s account %s\n",
 		cs.SuccessIcon(), hostname, cs.Bold(username))
-	if !revoked {
-		fmt.Fprintf(opts.IO.ErrOut, "%s %s\n", cs.WarningIcon(), warning)
-		if advice != "" {
-			fmt.Fprintf(opts.IO.ErrOut, "  %s\n", advice)
+	if !result.revoked {
+		fmt.Fprintf(opts.IO.ErrOut, "%s %s\n", cs.WarningIcon(), result.warning)
+		if result.advice != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "  %s\n", result.advice)
 		}
 	}
 
@@ -230,4 +193,52 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 
 	return nil
+}
+
+type logoutResult struct {
+	preLogoutActiveUser string
+	revoked             bool
+	warning             string
+	advice              string
+}
+
+func logoutWithRevocation(opts *LogoutOptions, authCfg gh.AuthConfig, hostname, username string) (logoutResult, error) {
+	result := logoutResult{warning: "Authentication token was not revoked."}
+	localLogoutStarted := false
+	err := authCfg.LogoutWithCredential(hostname, username, func(credential gh.Credential) error {
+		result.preLogoutActiveUser, _ = authCfg.ActiveUser(hostname)
+		switch {
+		case strings.HasPrefix(credential.Token, string(gh.TokenTypeOAuth)):
+			client, err := opts.OAuthAppHttpClient()
+			if err != nil {
+				return err
+			}
+			ctx := opts.Context
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			if err := authflow.RevokeToken(ctx, client, hostname, credential.Token); err != nil {
+				return fmt.Errorf("failed to revoke GitHub CLI OAuth token: %w", err)
+			}
+			result.revoked = true
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintf(opts.IO.ErrOut, "%s Revoked GitHub CLI OAuth token for %s (%s)\n",
+				cs.SuccessIcon(), cs.Bold(username), hostname)
+		case strings.HasPrefix(credential.Token, string(gh.TokenTypePersonalAccess)),
+			strings.HasPrefix(credential.Token, string(gh.TokenTypeFineGrainedPAT)):
+			result.warning = "Personal access token was not revoked."
+			result.advice = "Revoke it at " + ghinstance.HostPrefix(hostname) + "settings/tokens"
+		case strings.HasPrefix(credential.Token, string(gh.TokenTypeUserToServer)),
+			strings.HasPrefix(credential.Token, string(gh.TokenTypeServerToServer)):
+			result.warning = "GitHub App token was not revoked."
+			result.advice = "Revoke it through the app that issued it."
+		}
+		localLogoutStarted = true
+		return nil
+	})
+	if err != nil && !localLogoutStarted {
+		recovery := shellquote.Join("gh", "auth", "logout", "--hostname", hostname, "--user", username, "--no-revoke")
+		err = fmt.Errorf("%w\nLocal credentials were kept.\nRetry, or log out locally without revoking:\n  %s", err, recovery)
+	}
+	return result, err
 }
