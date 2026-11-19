@@ -4,7 +4,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExpandAlias(t *testing.T) {
@@ -120,4 +123,50 @@ func TestExpandShellAlias(t *testing.T) {
 			assert.Equal(t, tt.wantExpanded, gotExpanded)
 		})
 	}
+}
+
+func TestNewCmdAlias_cyclicRecursion(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	rootCmd := &cobra.Command{Use: "gh"}
+	rootCmd.AddGroup(&cobra.Group{ID: "alias", Title: "Alias commands"})
+	aliasCmd := NewCmdAlias(ios, "mine", "mine")
+	rootCmd.AddCommand(aliasCmd)
+	rootCmd.SetArgs([]string{"mine"})
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "infinite alias expansion: gh mine -> gh mine")
+}
+
+func TestNewCmdAlias_mutualRecursion(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	rootCmd := &cobra.Command{Use: "gh"}
+	rootCmd.AddGroup(&cobra.Group{ID: "alias", Title: "Alias commands"})
+	fooCmd := NewCmdAlias(ios, "foo", "bar")
+	barCmd := NewCmdAlias(ios, "bar", "foo")
+	rootCmd.AddCommand(fooCmd)
+	rootCmd.AddCommand(barCmd)
+	rootCmd.SetArgs([]string{"foo"})
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "infinite alias expansion: gh foo -> gh bar -> gh foo")
+}
+
+func TestNewCmdAlias_nonCyclic(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	rootCmd := &cobra.Command{Use: "gh"}
+	rootCmd.AddGroup(&cobra.Group{ID: "alias", Title: "Alias commands"})
+	var executed bool
+	targetCmd := &cobra.Command{
+		Use: "target",
+		Run: func(cmd *cobra.Command, args []string) {
+			executed = true
+		},
+	}
+	aliasCmd := NewCmdAlias(ios, "alias-target", "target")
+	rootCmd.AddCommand(targetCmd)
+	rootCmd.AddCommand(aliasCmd)
+	rootCmd.SetArgs([]string{"alias-target"})
+	err := rootCmd.Execute()
+	require.NoError(t, err)
+	assert.True(t, executed)
 }

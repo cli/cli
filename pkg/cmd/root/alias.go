@@ -1,11 +1,13 @@
 package root
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/cli/cli/v2/internal/run"
@@ -50,18 +52,37 @@ func NewCmdShellAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *co
 	return cmd
 }
 
+type aliasExecutionKey struct{}
+
 func NewCmdAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   aliasName,
 		Short: fmt.Sprintf("Alias for %q", text.Truncate(80, aliasValue)),
 		RunE: func(c *cobra.Command, args []string) error {
+			cmdPath := c.CommandPath()
+			ctx := c.Root().Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			var visited []string
+			if v, ok := ctx.Value(aliasExecutionKey{}).([]string); ok {
+				visited = v
+			}
+			for _, prev := range visited {
+				if prev == cmdPath {
+					return fmt.Errorf("infinite alias expansion: %s -> %s", strings.Join(visited, " -> "), cmdPath)
+				}
+			}
+			newVisited := append(slices.Clone(visited), cmdPath)
+			newCtx := context.WithValue(ctx, aliasExecutionKey{}, newVisited)
+
 			expandedArgs, err := expandAlias(aliasValue, args)
 			if err != nil {
 				return err
 			}
 			root := c.Root()
 			root.SetArgs(expandedArgs)
-			return root.Execute()
+			return root.ExecuteContext(newCtx)
 		},
 		GroupID:            "alias",
 		DisableFlagParsing: true,
