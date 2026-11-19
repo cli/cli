@@ -774,6 +774,50 @@ func TestReleaseFeatures(t *testing.T) {
 	}
 }
 
+func TestAuthFeatures(t *testing.T) {
+	tests := []struct {
+		hostname         string
+		installedVersion string
+		metaStatus       int
+		wantExpiring     bool
+		wantErr          bool
+	}{
+		{hostname: "github.com", wantExpiring: true},
+		{hostname: "tenant.ghe.com", wantExpiring: true},
+		{hostname: "github.example.com", installedVersion: "3.19.0"},
+		{hostname: "github.example.com", installedVersion: "3.22.999"},
+		{hostname: "github.example.com", installedVersion: "3.23.0", wantExpiring: true},
+		{hostname: "github.example.com", installedVersion: "3.24.0", wantExpiring: true},
+		{hostname: "github.example.com", installedVersion: "invalid", wantErr: true},
+		{hostname: "github.example.com", wantErr: true},
+		{hostname: "github.example.com", metaStatus: http.StatusServiceUnavailable, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.hostname+"/"+tt.installedVersion, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.installedVersion != "" || tt.wantErr {
+				response := httpmock.JSONResponse(map[string]string{"installed_version": tt.installedVersion})
+				if tt.metaStatus != 0 {
+					response = httpmock.StatusStringResponse(tt.metaStatus, `{"message":"Service Unavailable"}`)
+				}
+				reg.Register(
+					httpmock.WithHost(httpmock.REST("GET", "api/v3/meta"), tt.hostname),
+					response,
+				)
+			}
+
+			features, err := NewDetector(&http.Client{Transport: reg}, tt.hostname).AuthFeatures()
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantExpiring, features.ExpiringTokens)
+		})
+	}
+}
+
 func TestActionsFeatures(t *testing.T) {
 	tests := []struct {
 		name         string
