@@ -107,13 +107,18 @@ func TestShouldUseExpiring(t *testing.T) {
 		want       bool
 	}{
 		{
-			name: "disabled by default",
-			want: false,
+			name: "enabled by default",
+			want: true,
 		},
 		{
 			name:       "enabled by configuration",
 			configured: "enabled",
 			want:       true,
+		},
+		{
+			name:       "disabled by configuration",
+			configured: "disabled",
+			want:       false,
 		},
 		{
 			name:       "explicit flag enables disabled configuration",
@@ -460,19 +465,17 @@ func TestLogin(t *testing.T) {
 			},
 		},
 		{
-			name: "interactive, explicit --expiring forces the web flow instead of offering token paste",
+			name: "interactive, --web skips the authentication-method choice",
 			opts: LoginOptions{
-				Hostname:                    "example.com",
-				Interactive:                 true,
-				Expiring:                    true,
-				ExpiringExplicitlyRequested: true,
-				GitProtocol:                 "ssh",
-				SkipSSHKeyPrompt:            true,
+				Hostname:         "example.com",
+				Interactive:      true,
+				Web:              true,
+				Expiring:         true,
+				GitProtocol:      "ssh",
+				SkipSSHKeyPrompt: true,
 				Prompter: &prompter.PrompterMock{
 					SelectFunc: func(prompt, _ string, _ []string) (int, error) {
-						// --expiring must not reach the authentication-method choice, since a pasted token can
-						// never be refreshable. Any such prompt here is a regression.
-						t.Errorf("unexpected Select prompt under --expiring: %q", prompt)
+						t.Errorf("unexpected Select prompt under --web: %q", prompt)
 						return -1, prompter.NoSuchPromptErr(prompt)
 					},
 				},
@@ -498,12 +501,10 @@ func TestLogin(t *testing.T) {
 			},
 		},
 		{
-			name: "interactive, config-derived expiring still offers token paste",
+			name: "interactive, expiring credentials still offer token paste",
 			opts: LoginOptions{
-				Hostname:    "example.com",
-				Interactive: true,
-				// Expiring is true from the expiring_credentials config, but the flag was not passed, so the
-				// authentication-method choice must still be offered and include the token-paste option.
+				Hostname:         "example.com",
+				Interactive:      true,
 				Expiring:         true,
 				GitProtocol:      "ssh",
 				SkipSSHKeyPrompt: true,

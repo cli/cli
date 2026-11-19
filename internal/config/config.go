@@ -797,8 +797,8 @@ editor:
 prompt: enabled
 # Preference for editor-based interactive prompting. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
 prefer_editor_prompt: disabled
-# Whether to prefer expiring credentials that gh refreshes automatically when logging in, without passing --expiring. Supported values: enabled, disabled
-expiring_credentials: disabled
+# Whether to prefer expiring credentials that gh refreshes automatically when logging in. Supported values: enabled, disabled
+expiring_credentials: enabled
 # A pager program to send command output to, e.g. "less". If blank, will refer to environment. Set the value to "cat" to disable the pager.
 pager:
 # Aliases allow you to create nicknames for gh commands
@@ -891,7 +891,7 @@ var Options = []ConfigOption{
 	{
 		Key:           expiringCredentialsKey,
 		Description:   "toggle preference for expiring credentials that gh refreshes automatically when logging in",
-		DefaultValue:  "disabled",
+		DefaultValue:  "enabled",
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.ExpiringCredentials(hostname).Value
