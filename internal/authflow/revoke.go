@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safeurl"
 )
 
 // RevokeToken deletes one access token belonging to the GitHub CLI OAuth app.
@@ -31,8 +32,12 @@ func RevokeToken(ctx context.Context, client *http.Client, hostname, token strin
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	basicAuth := base64.StdEncoding.EncodeToString([]byte(oauthClientID + ":" + oauthClientSecret))
+	path, err := safeurl.JoinPath("applications", oauthClientID, "token")
+	if err != nil {
+		return err
+	}
 	resp, err := api.NewClientFromHTTP(client).RequestWithContext(
-		ctx, hostname, http.MethodDelete, "applications/"+oauthClientID+"/token", bytes.NewReader(body),
+		ctx, hostname, http.MethodDelete, path.String(), bytes.NewReader(body),
 		api.WithHeader("Authorization", "Basic "+basicAuth),
 		api.WithHeader("Accept", "application/vnd.github+json"),
 		api.WithHeader("Content-Type", "application/json"),
