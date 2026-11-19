@@ -232,16 +232,16 @@ printf "%sReady? Press Enter to begin%s (q to quit): " "$BOLD" "$RESET"
 read -r ans; [ "$ans" = "q" ] && exit 0
 echo; divider; echo
 
-# --- Step: login with --expiring -------------------------------------------
-label "Given" "a clean auth state for $HOST"
-label "When" "we log in requesting an expiring credential"
+# --- Step: login requests an expiring credential by default ----------------
+label "Given" "a clean auth state for $HOST without an expiring_credentials opt-out"
+label "When" "we log in using the default token preference"
 label "Then" "login succeeds and reports it received an expiring refreshable token"
-cmdline "$GH_DISPLAY auth login --hostname $HOST --expiring --clipboard $STORE_FLAG"
+cmdline "$GH_DISPLAY auth login --hostname $HOST --web --clipboard $STORE_FLAG"
 note   "  (--clipboard copies the one-time code, so you can just paste it into the browser.)"
 confirm_run
 run_interactive \
-  "$GH_DISPLAY auth login --hostname $HOST --expiring --clipboard $STORE_FLAG" \
-  "\"$GH\" auth login --hostname \"$HOST\" --expiring --clipboard $STORE_FLAG"
+  "$GH_DISPLAY auth login --hostname $HOST --web --clipboard $STORE_FLAG" \
+  "\"$GH\" auth login --hostname \"$HOST\" --web --clipboard $STORE_FLAG"
 
 label "Expected:"
 manual "login succeeds with no error"

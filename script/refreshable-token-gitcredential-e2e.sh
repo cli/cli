@@ -347,19 +347,19 @@ echo; divider; echo
 # Scenarios
 # ===========================================================================
 
-# --- Step: log in over HTTPS requesting an expiring credential --------------
-label "Given" "a clean auth state for $HOST, using default storage"
-label "When" "we log in over HTTPS requesting an expiring credential"
+# --- Step: log in over HTTPS with the default token preference --------------
+label "Given" "a clean auth state for $HOST without an expiring_credentials opt-out"
+label "When" "we log in over HTTPS using the default token preference"
 label "Then" "login succeeds, reports an expiring refreshable token, and sets git protocol to https"
-cmdline "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --expiring --clipboard"
+cmdline "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --web --clipboard"
 note   "  (HTTPS is required: the git credential helper only applies to https remotes.)"
 note   "  (--clipboard copies the one-time code, so you can just paste it into the browser.)"
 note   "  (Storage is left at the default; this flow does not depend on the storage type.)"
-note_bold "  ACTION: during login gh asks \"Authenticate Git with your GitHub credentials?\". Confirm it (answer Yes) so gh configures git to use this build as the credential helper for $HOST."
+note_bold "  ACTION: if prompted, choose \"Set up gh as your Git credential helper (recommended)\" so Git uses this build for $HOST."
 confirm_run
 run_interactive \
-  "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --expiring --clipboard" \
-  "\"$GH\" auth login --hostname \"$HOST\" --git-protocol https --expiring --clipboard"
+  "$GH_DISPLAY auth login --hostname $HOST --git-protocol https --web --clipboard" \
+  "\"$GH\" auth login --hostname \"$HOST\" --git-protocol https --web --clipboard"
 
 label "Expected:"
 assert_err_contains "login reports an expiring refreshable token" "refreshable token"

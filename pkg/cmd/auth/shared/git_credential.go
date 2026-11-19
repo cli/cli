@@ -98,7 +98,7 @@ func (flow *GitCredentialFlow) Prompt(hostname string, expiring bool) error {
 func (flow *GitCredentialFlow) promptExpiring(hostname string, configuredHelperErr error) error {
 	cs := flow.IO.ColorScheme()
 	fmt.Fprintf(flow.IO.ErrOut,
-		"%s You asked for an expiring token, which gh refreshes automatically. For that to work, gh must be your "+
+		"%s This login requests an expiring token, which gh refreshes automatically. For that to work, gh must be your "+
 			"Git credential helper for %s. Otherwise Git will not learn about refreshed tokens and your HTTPS Git "+
 			"operations will start to fail once the current token expires, within hours.\n",
 		cs.WarningIcon(), hostname)
@@ -191,7 +191,7 @@ func (flow *GitCredentialFlow) ShouldSetup() bool {
 //     controls presentation.
 //
 // This is the earliest point where both facts are known: whether the token is refreshable is decided by the server
-// during the auth flow, so the --expiring preference alone cannot determine it beforehand. Setup is only reached
+// during the auth flow, so the requested token type alone cannot determine it beforehand. Setup is only reached
 // when the user already opted into git setup during the interactive prompt, so prompting again here is safe.
 func (flow *GitCredentialFlow) Setup(hostname, username, authToken string, refreshable bool) (string, error) {
 	// If there is no credential helper configured then we will set ourselves up as

@@ -47,11 +47,6 @@ type LoginOptions struct {
 	CopyToClipboard  bool
 	Expiring         bool
 
-	// ExpiringExplicitlyRequested reports that the user passed --expiring to force expiring credentials. A pasted
-	// token can never be expiring, so the paste option is suppressed only in this case. A config-derived preference
-	// (expiring_credentials enabled) does not suppress paste: choosing it simply yields a non-expiring token.
-	ExpiringExplicitlyRequested bool
-
 	Telemetry ghtelemetry.InvocationRecorder
 
 	// AuthFlow is indirected so tests can stub the interactive authorization. When nil, authflow.AuthFlow is used.
@@ -69,8 +64,7 @@ func ShouldCopyToClipboard(cfg gh.Config, flagValue *bool) bool {
 }
 
 // ShouldUseExpiring resolves whether to prefer expiring credentials that gh refreshes automatically. An explicit
-// --expiring flag value wins; when the flag is unset it falls back to the expiring_credentials config setting
-// for the host.
+// preference wins; otherwise it falls back to the expiring_credentials config setting for the host.
 func ShouldUseExpiring(cfg gh.Config, flagValue *bool, hostname string) bool {
 	if flagValue != nil {
 		return *flagValue
@@ -87,9 +81,7 @@ func Login(opts *LoginOptions) error {
 	// Choose how to authenticate before anything that depends on expiring intent. A pasted token can never be
 	// expiring, so the effective intent is only known once the method is chosen.
 	var authMode int
-	if opts.Web || opts.ExpiringExplicitlyRequested {
-		// When the user explicitly passes --expiring, force the web flow so the paste option cannot silently ignore
-		// that request. A config-derived preference does not suppress paste: choosing it yields a non-expiring token.
+	if opts.Web {
 		authMode = 0
 	} else if opts.Interactive {
 		options := []string{"Login with a web browser", "Paste an authentication token"}

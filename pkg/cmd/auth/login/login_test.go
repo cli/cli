@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
@@ -37,6 +38,8 @@ func stubHomeDir(t *testing.T, dir string) {
 }
 
 func Test_NewCmdLogin(t *testing.T) {
+	const expiringDeprecation = "Flag --expiring has been deprecated, expiring credentials are now the default; use `--no-expiring` to opt out\n"
+
 	tests := []struct {
 		name        string
 		cli         string
@@ -45,6 +48,7 @@ func Test_NewCmdLogin(t *testing.T) {
 		defaultHost string
 		wants       LoginOptions
 		wantsErr    bool
+		wantStderr  string
 	}{
 		{
 			name:  "nontty, with-token",
@@ -166,16 +170,50 @@ func Test_NewCmdLogin(t *testing.T) {
 			cli:  "--expiring",
 			wants: LoginOptions{
 				Hostname: "github.com",
-				Expiring: new(true),
 			},
+			wantStderr: expiringDeprecation,
 		},
 		{
-			name: "nontty expiring disabled",
+			name: "nontty deprecated expiring=false is ignored",
 			cli:  "--expiring=false",
+			wants: LoginOptions{
+				Hostname: "github.com",
+			},
+			wantStderr: expiringDeprecation,
+		},
+		{
+			name: "nontty no-expiring",
+			cli:  "--no-expiring",
 			wants: LoginOptions{
 				Hostname: "github.com",
 				Expiring: new(false),
 			},
+		},
+		{
+			name: "nontty no-expiring=false",
+			cli:  "--no-expiring=false",
+			wants: LoginOptions{
+				Hostname: "github.com",
+				Expiring: new(true),
+			},
+		},
+		{
+			name: "deprecated expiring does not override no-expiring",
+			cli:  "--no-expiring --expiring",
+			wants: LoginOptions{
+				Hostname: "github.com",
+				Expiring: new(false),
+			},
+			wantStderr: expiringDeprecation,
+		},
+		{
+			name: "deprecated expiring=false does not override no-expiring=false",
+			cli:  "--expiring=false --no-expiring=false",
+			wants: LoginOptions{
+				Hostname: "github.com",
+				Expiring: new(true),
+			},
+			wantStderr: expiringDeprecation,
 		},
 		{
 			name:     "tty web",
@@ -201,9 +239,24 @@ func Test_NewCmdLogin(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:     "expiring and with-token",
-			cli:      "--expiring --with-token",
-			wantsErr: true,
+			name:  "deprecated expiring and with-token",
+			cli:   "--expiring --with-token",
+			stdin: "abc123\n",
+			wants: LoginOptions{
+				Hostname: "github.com",
+				Token:    "abc123",
+			},
+			wantStderr: expiringDeprecation,
+		},
+		{
+			name:  "no-expiring and with-token",
+			cli:   "--no-expiring --with-token",
+			stdin: "abc123\n",
+			wants: LoginOptions{
+				Hostname: "github.com",
+				Token:    "abc123",
+				Expiring: new(false),
+			},
 		},
 		{
 			name:     "tty one scope",
@@ -299,7 +352,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			}
 
 			argv, err := shlex.Split(tt.cli)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var gotOpts *LoginOptions
 			cmd := NewCmdLogin(f, nil, func(opts *LoginOptions) error {
@@ -311,15 +364,16 @@ func Test_NewCmdLogin(t *testing.T) {
 
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
+			stderr := &bytes.Buffer{}
+			cmd.SetOut(stderr)
+			cmd.SetErr(stderr)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, tt.wants.Token, gotOpts.Token)
 			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
@@ -328,6 +382,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			assert.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
 			assert.Equal(t, tt.wants.Clipboard, gotOpts.Clipboard)
 			assert.Equal(t, tt.wants.Expiring, gotOpts.Expiring)
+			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }
@@ -340,11 +395,13 @@ func Test_loginRun_nontty(t *testing.T) {
 		httpStubs               func(*httpmock.Registry)
 		cfgStubs                func(*testing.T, gh.Config)
 		expiringCredentialsCfg  string
+		authResult              *authflow.AuthResult
 		wantRequestRefreshToken *bool
 		wantHosts               string
 		wantErr                 string
 		wantStderr              string
 		wantSecureToken         string
+		wantRefreshToken        string
 	}{
 		{
 			name: "insecure with token",
@@ -498,10 +555,43 @@ func Test_loginRun_nontty(t *testing.T) {
 			wantSecureToken: "newUserToken",
 		},
 		{
-			name: "explicit --expiring requests a refresh token via the web flow",
+			name: "--no-expiring=false overrides disabled configuration",
 			opts: &LoginOptions{
 				Hostname: "github.com",
 				Expiring: new(true),
+			},
+			expiringCredentialsCfg:  "disabled",
+			wantRequestRefreshToken: new(true),
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                    user: monalisa
+            `),
+			wantStderr:      "✓ Authentication complete.\n! Host did not issue an expiring refreshable token\n✓ Logged in as monalisa\n",
+			wantSecureToken: "xyz456",
+		},
+		{
+			name: "--no-expiring overrides enabled configuration",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Expiring: new(false),
+			},
+			expiringCredentialsCfg:  "enabled",
+			wantRequestRefreshToken: new(false),
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                    user: monalisa
+            `),
+			wantStderr:      "✓ Authentication complete.\n✓ Logged in as monalisa\n",
+			wantSecureToken: "xyz456",
+		},
+		{
+			name: "default requests a refresh token but accepts a non-expiring token",
+			opts: &LoginOptions{
+				Hostname: "github.com",
 			},
 			wantRequestRefreshToken: new(true),
 			wantHosts: heredoc.Doc(`
@@ -514,38 +604,32 @@ func Test_loginRun_nontty(t *testing.T) {
 			wantSecureToken: "xyz456",
 		},
 		{
-			name: "explicit --expiring=false does not request a refresh token",
+			name: "default stores a refreshable credential",
 			opts: &LoginOptions{
 				Hostname: "github.com",
-				Expiring: new(false),
 			},
-			wantRequestRefreshToken: new(false),
+			authResult: &authflow.AuthResult{
+				Token:    "xyz456",
+				Username: "monalisa",
+				Refreshable: &gh.Credential{
+					Token:                 "xyz456",
+					RefreshToken:          "ghr_refresh",
+					ExpiresAt:             new(time.Date(2030, 1, 1, 8, 0, 0, 0, time.UTC)),
+					RefreshTokenExpiresAt: new(time.Date(2031, 1, 1, 0, 0, 0, 0, time.UTC)),
+				},
+			},
+			wantRequestRefreshToken: new(true),
 			wantHosts: heredoc.Doc(`
                 github.com:
                     users:
                         monalisa:
                     user: monalisa
             `),
-			wantStderr:      "✓ Authentication complete.\n✓ Logged in as monalisa\n",
-			wantSecureToken: "xyz456",
+			wantStderr:       "✓ Authentication complete.\n✓ Received expiring refreshable token\n✓ Logged in as monalisa\n",
+			wantRefreshToken: "ghr_refresh",
 		},
 		{
-			name: "unset --expiring without config does not request a refresh token",
-			opts: &LoginOptions{
-				Hostname: "github.com",
-			},
-			wantRequestRefreshToken: new(false),
-			wantHosts: heredoc.Doc(`
-                github.com:
-                    users:
-                        monalisa:
-                    user: monalisa
-            `),
-			wantStderr:      "✓ Authentication complete.\n✓ Logged in as monalisa\n",
-			wantSecureToken: "xyz456",
-		},
-		{
-			name: "unset --expiring with expiring_credentials enabled requests a refresh token",
+			name: "enabled configuration requests a refresh token",
 			opts: &LoginOptions{
 				Hostname: "github.com",
 			},
@@ -558,6 +642,37 @@ func Test_loginRun_nontty(t *testing.T) {
                     user: monalisa
             `),
 			wantStderr:      "✓ Authentication complete.\n! Host did not issue an expiring refreshable token\n✓ Logged in as monalisa\n",
+			wantSecureToken: "xyz456",
+		},
+		{
+			name: "disabled configuration does not request a refresh token",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+			},
+			expiringCredentialsCfg:  "disabled",
+			wantRequestRefreshToken: new(false),
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                    user: monalisa
+            `),
+			wantStderr:      "✓ Authentication complete.\n✓ Logged in as monalisa\n",
+			wantSecureToken: "xyz456",
+		},
+		{
+			name: "default on an enterprise host warns about support",
+			opts: &LoginOptions{
+				Hostname: "github.example.com",
+			},
+			wantRequestRefreshToken: new(true),
+			wantHosts: heredoc.Doc(`
+                github.example.com:
+                    users:
+                        monalisa:
+                    user: monalisa
+            `),
+			wantStderr:      "! github.example.com may not support expiring tokens\n✓ Authentication complete.\n! Host did not issue an expiring refreshable token\n✓ Logged in as monalisa\n",
 			wantSecureToken: "xyz456",
 		},
 	}
@@ -584,6 +699,9 @@ func Test_loginRun_nontty(t *testing.T) {
 			if tt.wantRequestRefreshToken != nil {
 				tt.opts.AuthFlow = func(_ *http.Client, _ string, _ *iostreams.IOStreams, _ string, _ []string, _ bool, _ browser.Browser, _ bool, requestRefreshToken bool) (*authflow.AuthResult, error) {
 					gotRequestRefreshToken = &requestRefreshToken
+					if tt.authResult != nil {
+						return tt.authResult, nil
+					}
 					return &authflow.AuthResult{Token: "xyz456", Username: "monalisa"}, nil
 				}
 			}
@@ -614,9 +732,9 @@ func Test_loginRun_nontty(t *testing.T) {
 
 			err := loginRun(tt.opts)
 			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
+				require.EqualError(t, err, tt.wantErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if tt.wantRequestRefreshToken != nil {
@@ -633,6 +751,12 @@ func Test_loginRun_nontty(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
 			assert.Equal(t, tt.wantSecureToken, secureToken)
+			if tt.wantRefreshToken != "" {
+				credential, err := cfg.Authentication().TokenForUser(tt.opts.Hostname, "monalisa")
+				require.NoError(t, err)
+				assert.Equal(t, tt.authResult.Token, credential.Token)
+				assert.Equal(t, tt.wantRefreshToken, credential.RefreshToken)
+			}
 		})
 	}
 }
@@ -933,112 +1057,6 @@ func Test_loginRun_Survey(t *testing.T) {
 				assert.Regexp(t, tt.wantErrOut, stderr.String())
 			}
 			reg.Verify(t)
-		})
-	}
-}
-
-func Test_loginRun_expiringHint(t *testing.T) {
-	stubHomeDir(t, t.TempDir())
-
-	const hint = "! Did you know that expiring tokens can be requested with --expiring? Read more at https://gh.io/gh-expiring-tokens\n"
-
-	tests := []struct {
-		name                   string
-		hostname               string
-		stderrTTY              bool
-		expiring               *bool
-		expiringCredentialsCfg string
-		wantHint               bool
-	}{
-		{
-			name:      "shown when no preference is set",
-			hostname:  "github.com",
-			stderrTTY: true,
-			wantHint:  true,
-		},
-		{
-			name:      "not shown when stderr is not a TTY",
-			hostname:  "github.com",
-			stderrTTY: false,
-		},
-		{
-			name:      "not shown when --expiring=false is passed",
-			hostname:  "github.com",
-			stderrTTY: true,
-			expiring:  new(false),
-		},
-		{
-			name:                   "not shown when expiring_credentials is enabled",
-			hostname:               "github.com",
-			stderrTTY:              true,
-			expiringCredentialsCfg: "enabled",
-		},
-		{
-			name:      "not shown for an enterprise host",
-			hostname:  "rebecca.chambers",
-			stderrTTY: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ios, _, _, stderr := iostreams.Test()
-			ios.SetStderrTTY(tt.stderrTTY)
-
-			cfg, _ := config.NewIsolatedTestConfig(t, "")
-			if tt.expiringCredentialsCfg != "" {
-				cfg.Set("", "expiring_credentials", tt.expiringCredentialsCfg)
-			}
-
-			scopesPath := ""
-			if tt.hostname != "github.com" {
-				scopesPath = "api/v3/"
-			}
-			reg := &httpmock.Registry{}
-			defer reg.Verify(t)
-			reg.Register(httpmock.REST("GET", scopesPath), httpmock.ScopesResponder("repo,read:org"))
-			reg.Register(
-				httpmock.GraphQL(`query UserCurrent\b`),
-				httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
-
-			pm := &prompter.PrompterMock{
-				SelectFunc: func(prompt, _ string, opts []string) (int, error) {
-					switch prompt {
-					case "What is your preferred protocol for Git operations on this host?":
-						return prompter.IndexFor(opts, "HTTPS")
-					case "How would you like to authenticate GitHub CLI?":
-						return prompter.IndexFor(opts, "Paste an authentication token")
-					}
-					return -1, prompter.NoSuchPromptErr(prompt)
-				},
-				AuthTokenFunc: func() (string, error) { return "def456", nil },
-				ConfirmFunc:   func(_ string, _ bool) (bool, error) { return false, nil },
-			}
-
-			opts := &LoginOptions{
-				IO:              ios,
-				Config:          func() (gh.Config, error) { return cfg, nil },
-				HttpClient:      func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
-				PlainHttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
-				Prompter:        pm,
-				GitClient:       &git.Client{GitPath: "some/path/git"},
-				Hostname:        tt.hostname,
-				Interactive:     true,
-				InsecureStorage: true,
-				Expiring:        tt.expiring,
-				helperConfig: &gitcredentials.FakeHelperConfig{
-					SelfExecutablePath: "/path/to/gh",
-					Helpers:            map[string]gitcredentials.Helper{},
-				},
-			}
-
-			require.NoError(t, loginRun(opts))
-
-			if tt.wantHint {
-				assert.Regexp(t, "^"+regexp.QuoteMeta(hint), stderr.String())
-			} else {
-				assert.NotContains(t, stderr.String(), "Did you know")
-			}
 		})
 	}
 }

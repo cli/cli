@@ -67,6 +67,7 @@ func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, r
 	}
 
 	var tokenStdin bool
+	var noExpiring *bool
 
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -104,13 +105,12 @@ func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, r
 			prompting to create and upload a new key if one is not found. This can be skipped with
 			%[1]s--skip-ssh-key%[1]s flag.
 
-			Use %[1]s--expiring%[1]s to prefer expiring credentials that gh refreshes automatically.
+			By default, %[1]sgh%[1]s requests expiring credentials and refreshes them automatically.
+			Use %[1]s--no-expiring%[1]s to prefer a non-expiring token, or set the %[1]sexpiring_credentials%[1]s
+			configuration to %[1]sdisabled%[1]s. Pass %[1]s--no-expiring=false%[1]s to override that configuration.
 			This is a preference, not a guarantee: whether expiring tokens are issued depends on the
 			host and the OAuth app configuration. A host without support issues a non-expiring token
-			instead, and a host configured for them may issue expiring tokens even without the flag.
-			Enable the %[1]sexpiring_credentials%[1]s configuration to prefer expiring credentials
-			without passing %[1]s--expiring%[1]s every time, and pass %[1]s--expiring=false%[1]s to request a
-			non-expiring token even when that configuration is enabled.
+			instead, and a host configured for them may issue expiring tokens even when not requested.
 			When using expiring credentials for git operations, git 2.46 or newer is recommended so
 			gh can mark the token as non-cacheable; with older git a credential caching helper may store
 			and reuse an expired token.
@@ -125,6 +125,9 @@ func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, r
 			# Open a browser to authenticate and copy one-time OAuth code to clipboard
 			$ gh auth login --web --clipboard
 
+			# Authenticate without requesting an expiring token
+			$ gh auth login --no-expiring
+
 			# Authenticate against github.com by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
 
@@ -135,6 +138,9 @@ func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, r
 			if opts.Telemetry != nil {
 				opts.Telemetry.SetSampleRate(ghtelemetry.SAMPLE_ALL)
 			}
+			if noExpiring != nil {
+				opts.Expiring = new(!*noExpiring)
+			}
 
 			if tokenStdin && opts.Web {
 				return cmdutil.FlagErrorf("specify only one of `--web` or `--with-token`")
@@ -142,10 +148,6 @@ func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, r
 			if tokenStdin && len(opts.Scopes) > 0 {
 				return cmdutil.FlagErrorf("specify only one of `--scopes` or `--with-token`")
 			}
-			if tokenStdin && opts.Expiring != nil && *opts.Expiring {
-				return cmdutil.FlagErrorf("specify only one of `--expiring` or `--with-token`")
-			}
-
 			if tokenStdin {
 				defer opts.IO.In.Close()
 				token, err := io.ReadAll(opts.IO.In)
@@ -192,7 +194,9 @@ func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, r
 
 	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
 	cmd.Flags().BoolVar(&opts.SkipSSHKeyPrompt, "skip-ssh-key", false, "Skip generate/upload SSH key prompt")
-	cmdutil.NilBoolFlag(cmd, &opts.Expiring, "expiring", "", "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
+	cmdutil.NilBoolFlag(cmd, &noExpiring, "no-expiring", "", "Do not request expiring credentials")
+	cmd.Flags().Bool("expiring", false, "Prefer expiring credentials that gh refreshes automatically, if the host supports them")
+	_ = cmd.Flags().MarkDeprecated("expiring", "expiring credentials are now the default; use `--no-expiring` to opt out")
 
 	return cmd
 }
@@ -249,14 +253,6 @@ func loginRun(opts *LoginOptions) error {
 		return loginErr
 	}
 
-	// Nudge users towards expiring tokens unless they have already expressed a preference, either with the flag or
-	// the config. Enterprise Server hosts are skipped because they may not support expiring tokens.
-	if opts.IO.IsStderrTTY() && opts.Expiring == nil && !ghauth.IsEnterprise(hostname) && !shared.ShouldUseExpiring(cfg, nil, hostname) {
-		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s Did you know that expiring tokens can be requested with %s? Read more at %s\n",
-			cs.WarningIcon(), cs.Bold("--expiring"), "https://gh.io/gh-expiring-tokens")
-	}
-
 	helperConfig := opts.helperConfig
 	if helperConfig == nil {
 		helperConfig = &gitcredentials.HelperConfig{
@@ -285,13 +281,12 @@ func loginRun(opts *LoginOptions) error {
 				GitClient: opts.GitClient,
 			},
 		},
-		SecureStorage:               !opts.InsecureStorage,
-		SkipSSHKeyPrompt:            opts.SkipSSHKeyPrompt,
-		CopyToClipboard:             copyToClipboard,
-		Expiring:                    shared.ShouldUseExpiring(cfg, opts.Expiring, hostname),
-		ExpiringExplicitlyRequested: opts.Expiring != nil && *opts.Expiring,
-		Telemetry:                   opts.Telemetry,
-		AuthFlow:                    opts.AuthFlow,
+		SecureStorage:    !opts.InsecureStorage,
+		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
+		CopyToClipboard:  copyToClipboard,
+		Expiring:         shared.ShouldUseExpiring(cfg, opts.Expiring, hostname),
+		Telemetry:        opts.Telemetry,
+		AuthFlow:         opts.AuthFlow,
 	})
 }
 
