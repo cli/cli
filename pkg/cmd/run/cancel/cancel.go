@@ -123,7 +123,7 @@ func runCancel(opts *CancelOptions) error {
 	err = cancelWorkflowRun(client, repo, fmt.Sprintf("%d", run.ID), force)
 	if err != nil {
 		if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
-			if httpErr.StatusCode == http.StatusConflict {
+			if httpErr.StatusCode == http.StatusConflict && run.Status == shared.Completed {
 				err = fmt.Errorf("Cannot cancel a workflow run that is completed")
 			}
 		}
