@@ -106,8 +106,9 @@ func NewCmdLogin(f *cmdutil.Factory, telemetry ghtelemetry.InvocationRecorder, r
 
 			Use %[1]s--expiring%[1]s to prefer expiring credentials that gh refreshes automatically.
 			This is a preference, not a guarantee: whether expiring tokens are issued depends on the
-			host and the OAuth app configuration. A host without support issues a non-expiring token
-			instead, and a host configured for them may issue expiring tokens even without the flag.
+			host and the OAuth app configuration. GitHub Enterprise Server requires version 3.23 or
+			later; earlier versions receive a non-expiring token instead. A host configured for them
+			may issue expiring tokens even without the flag.
 			Enable the %[1]sexpiring_credentials%[1]s configuration to prefer expiring credentials
 			without passing %[1]s--expiring%[1]s every time, and pass %[1]s--expiring=false%[1]s to request a
 			non-expiring token even when that configuration is enabled.

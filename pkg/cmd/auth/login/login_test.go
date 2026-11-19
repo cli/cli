@@ -341,6 +341,7 @@ func Test_loginRun_nontty(t *testing.T) {
 		cfgStubs                func(*testing.T, gh.Config)
 		expiringCredentialsCfg  string
 		wantRequestRefreshToken *bool
+		wantOAuthScopes         string
 		wantHosts               string
 		wantErr                 string
 		wantStderr              string
@@ -560,6 +561,31 @@ func Test_loginRun_nontty(t *testing.T) {
 			wantStderr:      "✓ Authentication complete.\n! Host did not issue an expiring refreshable token\n✓ Logged in as monalisa\n",
 			wantSecureToken: "xyz456",
 		},
+		{
+			name: "configured expiring credentials fall back on GHES before 3.23",
+			opts: &LoginOptions{
+				Hostname:  "github.example.com",
+				Clipboard: new(false),
+			},
+			expiringCredentialsCfg: "enabled",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.WithHost(httpmock.REST("GET", "api/v3/meta"), "github.example.com"),
+					httpmock.JSONResponse(map[string]string{"installed_version": "3.19.0"}))
+			},
+			wantOAuthScopes: "repo read:org gist",
+			wantHosts:       "github.example.com:\n    users:\n        monalisa:\n    user: monalisa\n",
+			wantSecureToken: "xyz456",
+			wantStderr: heredoc.Doc(`
+                ! Expiring tokens require GitHub Enterprise Server 3.23 or later. Requesting a non-expiring token instead.
+
+                ! First copy your one-time code: CODE
+                Open this URL to continue in your web browser: https://github.example.com/login/device
+                ✓ Authentication complete.
+                ! Host did not issue an expiring refreshable token
+                ✓ Logged in as monalisa
+            `),
+		},
 	}
 
 	for _, tt := range tests {
@@ -598,6 +624,27 @@ func Test_loginRun_nontty(t *testing.T) {
 			}
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
+			}
+			if tt.wantOAuthScopes != "" {
+				reg.Register(
+					httpmock.WithHost(httpmock.REST("POST", "login/device/code"), tt.opts.Hostname),
+					func(req *http.Request) (*http.Response, error) {
+						require.NoError(t, req.ParseForm())
+						assert.Equal(t, tt.wantOAuthScopes, req.Form.Get("scope"))
+						return httpmock.JSONResponse(map[string]any{
+							"device_code":      "DEVICE",
+							"user_code":        "CODE",
+							"verification_uri": "https://github.example.com/login/device",
+							"expires_in":       600,
+							"interval":         1,
+						})(req)
+					})
+				reg.Register(
+					httpmock.WithHost(httpmock.REST("POST", "login/oauth/access_token"), tt.opts.Hostname),
+					httpmock.JSONResponse(map[string]string{"access_token": "xyz456", "token_type": "bearer"}))
+				reg.Register(
+					httpmock.WithHost(httpmock.GraphQL("query"), tt.opts.Hostname),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			}
 
 			for k, v := range tt.env {

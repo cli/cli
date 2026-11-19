@@ -10,6 +10,7 @@ import (
 	"github.com/atotto/clipboard"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -36,8 +37,8 @@ type AuthResult struct {
 // AuthFlow initiates an OAuth device or web application flow to acquire a
 // token. The provided HTTP client should be a plain client that does not set
 // auth or other headers. When requestRefreshToken is true, gh asks the server
-// for an expiring, refreshable credential; the server may still issue a
-// non-expiring token, in which case AuthResult.Refreshable is nil.
+// for an expiring, refreshable credential on supported hosts; the server may
+// still issue a non-expiring token, in which case AuthResult.Refreshable is nil.
 func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, b browser.Browser, isCopyToClipboard bool, requestRefreshToken bool) (*AuthResult, error) {
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
@@ -48,6 +49,18 @@ func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams
 	host, err := oauth.NewGitHubHost(ghinstance.HostPrefix(oauthHost))
 	if err != nil {
 		return nil, err
+	}
+
+	// TODO expiringTokensCleanup
+	if requestRefreshToken {
+		features, err := featuredetection.NewDetector(httpClient, oauthHost).AuthFeatures()
+		if err != nil {
+			return nil, err
+		}
+		requestRefreshToken = features.ExpiringTokens
+		if !requestRefreshToken {
+			fmt.Fprintf(w, "%s Expiring tokens require GitHub Enterprise Server 3.23 or later. Requesting a non-expiring token instead.\n", cs.WarningIcon())
+		}
 	}
 
 	flow := &oauth.Flow{

@@ -36,6 +36,10 @@ func (md *DisabledDetectorMock) ActionsFeatures() (ActionsFeatures, error) {
 	return ActionsFeatures{}, nil
 }
 
+func (md *DisabledDetectorMock) AuthFeatures() (AuthFeatures, error) {
+	return AuthFeatures{}, nil
+}
+
 type EnabledDetectorMock struct{}
 
 func (md *EnabledDetectorMock) IssueFeatures() (IssueFeatures, error) {
@@ -72,6 +76,10 @@ func (md *EnabledDetectorMock) ActionsFeatures() (ActionsFeatures, error) {
 	return ActionsFeatures{
 		DispatchRunDetails: true,
 	}, nil
+}
+
+func (md *EnabledDetectorMock) AuthFeatures() (AuthFeatures, error) {
+	return AuthFeatures{ExpiringTokens: true}, nil
 }
 
 type AdvancedIssueSearchDetectorMock struct {

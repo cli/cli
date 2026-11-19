@@ -21,6 +21,7 @@ type Detector interface {
 	SearchFeatures() (SearchFeatures, error)
 	ReleaseFeatures() (ReleaseFeatures, error)
 	ActionsFeatures() (ActionsFeatures, error)
+	AuthFeatures() (AuthFeatures, error)
 }
 
 type IssueFeatures struct {
@@ -172,6 +173,13 @@ type ActionsFeatures struct {
 	// On older API versions (e.g. GHES 3.20 or earlier), this new field is not
 	// supported and setting it will cause an error.
 	DispatchRunDetails bool
+}
+
+// AuthFeatures describes the host's OAuth capabilities.
+type AuthFeatures struct {
+	// TODO expiringTokensCleanup - remove once GHES 3.22 support ends.
+	// ExpiringTokens indicates support for offline_access, available on GHES 3.23+.
+	ExpiringTokens bool
 }
 
 type detector struct {
@@ -564,6 +572,22 @@ func (d *detector) ActionsFeatures() (ActionsFeatures, error) {
 
 	return ActionsFeatures{
 		DispatchRunDetails: false,
+	}, nil
+}
+
+// AuthFeatures checks the unauthenticated meta endpoint for GHES support.
+func (d *detector) AuthFeatures() (AuthFeatures, error) {
+	if !ghauth.IsEnterprise(d.host) {
+		return AuthFeatures{ExpiringTokens: true}, nil
+	}
+
+	hostVersion, err := resolveEnterpriseVersion(d.httpClient, d.host)
+	if err != nil {
+		return AuthFeatures{}, err
+	}
+
+	return AuthFeatures{
+		ExpiringTokens: hostVersion.GreaterThanOrEqual(version.Must(version.NewVersion("3.23.0"))),
 	}, nil
 }
 

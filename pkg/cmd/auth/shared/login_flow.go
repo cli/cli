@@ -18,7 +18,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
-	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const defaultSSHKeyTitle = "GitHub CLI"
@@ -107,12 +106,6 @@ func Login(opts *LoginOptions) error {
 	// Begin the auth-state telemetry event. It is nil for disabled telemetry or enterprise hosts, and all event methods
 	// are nil-tolerant, so the calls below stay unconditional.
 	authEvent := BeginAuthTelemetry(opts.Telemetry, "login", hostname, expiring)
-
-	// A GitHub Enterprise Server host may not support expiring tokens. Surface this once the hostname is known, from
-	// interactive selection or the --hostname flag, so the user understands they may receive a non-expiring token.
-	if expiring && ghauth.IsEnterprise(hostname) {
-		fmt.Fprintf(opts.IO.ErrOut, "%s %s may not support expiring tokens\n", cs.WarningIcon(), hostname)
-	}
 
 	gitProtocol := strings.ToLower(opts.GitProtocol)
 	if opts.Interactive && gitProtocol == "" {
