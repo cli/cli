@@ -607,15 +607,13 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 }
 
 // LogoutWithCredential coordinates credential-dependent cleanup with concurrent refreshes.
-// Local credentials are retained if locking, lookup, or beforeLogout fails.
-func (c *AuthConfig) LogoutWithCredential(hostname, username string, beforeLogout func(gh.Credential) error) error {
+// The callback receives any advisory-lock error and decides whether cleanup can proceed.
+// Local credentials are retained if lookup or beforeLogout fails.
+func (c *AuthConfig) LogoutWithCredential(hostname, username string, beforeLogout func(gh.Credential, error) error) error {
 	if beforeLogout == nil {
 		return errors.New("logout credential callback is required")
 	}
 	return c.withFreshConfigForRefresh(func(lockErr error) error {
-		if lockErr != nil {
-			return fmt.Errorf("could not lock authentication credentials: %w", lockErr)
-		}
 		if !slices.Contains(c.UsersForHost(hostname), username) {
 			return fmt.Errorf("not logged in to %s account %s", hostname, username)
 		}
@@ -623,7 +621,7 @@ func (c *AuthConfig) LogoutWithCredential(hostname, username string, beforeLogou
 		if err != nil {
 			return err
 		}
-		if err := beforeLogout(credential); err != nil {
+		if err := beforeLogout(credential, lockErr); err != nil {
 			return err
 		}
 		return c.logout(hostname, username)

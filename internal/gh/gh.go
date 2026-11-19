@@ -295,11 +295,11 @@ type AuthConfig interface {
 	// It will remove the auth token from the encrypted storage if it exists there.
 	Logout(hostname, username string) error
 
-	// LogoutWithCredential reads the selected user's latest credential and calls beforeLogout under the
-	// refresh lock, then removes local authentication only if the callback succeeds. It fails without
-	// removing credentials if locking, lookup, or the callback fails. The callback must not reenter
-	// authentication operations that acquire the refresh lock.
-	LogoutWithCredential(hostname, username string, beforeLogout func(Credential) error) error
+	// LogoutWithCredential reloads the selected user's credential under the refresh mutex and attempts
+	// the advisory lock. It passes any advisory-lock error to beforeLogout, which decides whether work
+	// can proceed without that lock. Local authentication is removed only if lookup and the callback
+	// succeed. The callback must not reenter operations that acquire the refresh lock.
+	LogoutWithCredential(hostname, username string, beforeLogout func(Credential, error) error) error
 
 	// UsersForHost retrieves a list of users configured for a specific host.
 	UsersForHost(hostname string) []string

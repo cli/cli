@@ -515,6 +515,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 		setupConfig   func(*testing.T, gh.Config)
 		initialConfig string
 		clientErr     error
+		lockErr       error
 	}{
 		{
 			name: "logs out specified user when one known host",
@@ -739,6 +740,24 @@ func Test_logoutRun_nontty(t *testing.T) {
 			wantStderr: "✓ Logged out of github.com account monalisa\n! Authentication token was not revoked.\n",
 		},
 		{
+			name:        "OAuth revocation requires the advisory lock",
+			opts:        &LogoutOptions{},
+			cfgHosts:    []hostUsers{{"github.com", []user{{"monalisa", "gho_saved"}}}},
+			lockErr:     errors.New("locking unavailable"),
+			retain:      true,
+			assertToken: hasActiveToken("github.com", "gho_saved"),
+			wantErr:     "could not lock authentication credentials: locking unavailable" + logoutRetryHint,
+		},
+		{
+			name:        "PAT logout does not require the advisory lock",
+			opts:        &LogoutOptions{},
+			cfgHosts:    []hostUsers{{"github.com", []user{{"monalisa", "ghp_saved"}}}},
+			lockErr:     errors.New("locking unavailable"),
+			wantHosts:   "{}\n",
+			assertToken: hasNoToken("github.com"),
+			wantStderr:  "✓ Logged out of github.com account monalisa\n! Personal access token was not revoked.\n  Revoke it at https://github.com/settings/tokens\n",
+		},
+		{
 			name:        "client setup failure retains credentials",
 			opts:        &LogoutOptions{},
 			cfgHosts:    []hostUsers{{"github.com", []user{{"monalisa", "gho_saved"}}}},
@@ -873,8 +892,16 @@ func Test_logoutRun_nontty(t *testing.T) {
 			}
 			var before bytes.Buffer
 			readConfigs(io.Discard, &before)
+			var commandCfg gh.Config = cfg
+			if tt.lockErr != nil {
+				commandCfg = &ghmock.ConfigMock{
+					AuthenticationFunc: func() gh.AuthConfig {
+						return logoutLockErrorAuthConfig{AuthConfig: cfg.Authentication(), lockErr: tt.lockErr}
+					},
+				}
+			}
 			tt.opts.Config = func() (gh.Config, error) {
-				return cfg, nil
+				return commandCfg, nil
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
@@ -962,6 +989,17 @@ func Test_logoutRun_nontty(t *testing.T) {
 			}
 		})
 	}
+}
+
+type logoutLockErrorAuthConfig struct {
+	gh.AuthConfig
+	lockErr error
+}
+
+func (c logoutLockErrorAuthConfig) LogoutWithCredential(hostname, username string, beforeLogout func(gh.Credential, error) error) error {
+	return c.AuthConfig.LogoutWithCredential(hostname, username, func(credential gh.Credential, _ error) error {
+		return beforeLogout(credential, c.lockErr)
+	})
 }
 
 func hasNoToken(hostname string) tokenAssertion {

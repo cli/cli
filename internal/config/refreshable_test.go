@@ -410,7 +410,8 @@ func TestLogoutWithCredential(t *testing.T) {
 		{name: "fresh keyring refreshable credential", secure: true, refreshable: true, wantCallback: true},
 		{name: "failed revocation retains plaintext pair", refreshable: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
 		{name: "failed revocation retains keyring pair", secure: true, refreshable: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
-		{name: "failed lock retains credentials", lockErr: lockErr, wantErr: "could not lock authentication credentials: locking unavailable"},
+		{name: "callback can reject an unavailable lock", lockErr: lockErr, callbackErr: lockErr, wantErr: "locking unavailable", wantCallback: true},
+		{name: "callback can allow local cleanup without the advisory lock", lockErr: lockErr, wantCallback: true},
 		{name: "failed reload retains credentials", reloadErr: reloadErr, wantErr: "could not reload configuration: cannot reload"},
 		{name: "removed selection does not remove another account", removeUser: true, wantErr: "not logged in to github.com account test-user"},
 		{name: "lookup failure does not use active token", removeToken: true, wantErr: "no token found for 'test-user'"},
@@ -464,11 +465,16 @@ func TestLogoutWithCredential(t *testing.T) {
 				return nil
 			}
 			called := false
-			err = authCfg.LogoutWithCredential("github.com", "test-user", func(credential gh.Credential) error {
+			err = authCfg.LogoutWithCredential("github.com", "test-user", func(credential gh.Credential, callbackLockErr error) error {
 				called = true
-				require.True(t, locked)
+				require.Equal(t, tt.lockErr == nil, locked)
+				require.ErrorIs(t, callbackLockErr, tt.lockErr)
 				require.False(t, authCfg.refreshMu.TryLock())
-				require.Equal(t, "gho_fresh", credential.Token)
+				wantToken := "gho_fresh"
+				if tt.lockErr != nil {
+					wantToken = "gho_old"
+				}
+				require.Equal(t, wantToken, credential.Token)
 				if tt.refreshable {
 					require.Equal(t, "ghr_fresh", credential.RefreshToken)
 				}
