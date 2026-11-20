@@ -43,6 +43,7 @@ func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, err
 	f.TelemetryDisabler = telemetryDisabler
 	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
+	f.OAuthAppHttpClient = oauthAppHttpClientFunc(appVersion, invokingAgent, telemetryDisabler)
 	f.ExternalHttpClient = externalHttpClientFunc(ios, appVersion)
 	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
 	f.Remotes = remotesFunc(f)    // Depends on Config, and GitClient
@@ -239,6 +240,19 @@ func tokenRefresherHttpClientFunc(ios *iostreams.IOStreams, appVersion string, i
 			TelemetryDisabler:  telemetryDisabler,
 		}
 		return api.NewHTTPClient(opts)
+	}
+}
+
+func oauthAppHttpClientFunc(appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
+	return func() (*http.Client, error) {
+		return api.NewHTTPClient(api.HTTPClientOptions{
+			AppVersion:         appVersion,
+			InvokingAgent:      invokingAgent,
+			SkipDefaultHeaders: true,
+			TelemetryDisabler:  telemetryDisabler,
+			// Leave Log nil and ignore verbose tracing: request bodies contain live credentials.
+			LogHeadlineOnly: true,
+		})
 	}
 }
 
