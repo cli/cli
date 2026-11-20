@@ -537,7 +537,7 @@ func TestDevelopRun(t *testing.T) {
 			wantErr: `could not find branch "does-not-exist-branch" in OWNER/REPO`,
 		},
 		{
-			name: "develop with empty linked branch name response returns an error",
+			name: "develop with null linked branch response returns an error",
 			opts: &DevelopOptions{
 				Name:        "my-branch",
 				BaseBranch:  "main",
@@ -567,7 +567,7 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`))
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
-					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":""}}}}}`,
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":null}}}`,
 						func(inputs map[string]any) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "SOMEID", inputs["issueId"])
@@ -576,7 +576,7 @@ func TestDevelopRun(t *testing.T) {
 						}),
 				)
 			},
-			wantErr: "failed to create linked branch: API returned empty branch name",
+			wantErr: "failed to create linked branch: branch \"my-branch\" may already exist in OWNER/REPO",
 		},
 		{
 			name: "develop new branch outside of local git repo",

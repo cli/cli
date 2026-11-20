@@ -266,6 +266,9 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 	}
 
 	if branchName == "" {
+		if opts.Name != "" {
+			return fmt.Errorf("failed to create linked branch: branch %q may already exist in %s", opts.Name, ghrepo.FullName(branchRepo))
+		}
 		return fmt.Errorf("failed to create linked branch: API returned empty branch name")
 	}
 
