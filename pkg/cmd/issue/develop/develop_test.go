@@ -579,6 +579,36 @@ func TestDevelopRun(t *testing.T) {
 			wantErr: "failed to create linked branch: branch \"my-branch\" may already exist in OWNER/REPO",
 		},
 		{
+			name: "develop without name with null linked branch response returns an error",
+			opts: &DevelopOptions{
+				BaseBranch:  "main",
+				IssueNumber: 123,
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":null}}}`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "OID", inputs["oid"])
+						}),
+				)
+			},
+			wantErr: "failed to create linked branch: API returned empty branch name",
+		},
+		{
 			name: "develop new branch outside of local git repo",
 			opts: &DevelopOptions{
 				IssueNumber: 123,
