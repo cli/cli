@@ -537,7 +537,7 @@ func TestDevelopRun(t *testing.T) {
 			wantErr: `could not find branch "does-not-exist-branch" in OWNER/REPO`,
 		},
 		{
-			name: "develop with empty linked branch name response returns an error",
+			name: "develop with null linked branch response returns an error",
 			opts: &DevelopOptions{
 				Name:        "my-branch",
 				BaseBranch:  "main",
@@ -567,12 +567,42 @@ func TestDevelopRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`))
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
-					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":""}}}}}`,
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":null}}}`,
 						func(inputs map[string]any) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "SOMEID", inputs["issueId"])
 							assert.Equal(t, "OID", inputs["oid"])
 							assert.Equal(t, "my-branch", inputs["name"])
+						}),
+				)
+			},
+			wantErr: "failed to create linked branch: branch \"my-branch\" may already exist in OWNER/REPO",
+		},
+		{
+			name: "develop without name with null linked branch response returns an error",
+			opts: &DevelopOptions{
+				BaseBranch:  "main",
+				IssueNumber: 123,
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":null}}}`,
+						func(inputs map[string]any) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "OID", inputs["oid"])
 						}),
 				)
 			},
