@@ -503,7 +503,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]any) 
 	}
 	for key, val := range params {
 		switch key {
-		case "title", "body", "draft", "baseRefName", "headRefName", "maintainerCanModify":
+		case "title", "body", "draft", "baseRefName", "headRefName", "maintainerCanModify", "headRepositoryId":
 			inputParams[key] = val
 		}
 	}
