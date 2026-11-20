@@ -403,6 +403,8 @@ func TestLogoutWithCredential(t *testing.T) {
 		removeToken  bool
 		wantErr      string
 		wantCallback bool
+		replace      bool
+		invalidPair  bool
 	}{
 		{name: "fresh plaintext credential", wantCallback: true},
 		{name: "fresh keyring credential", secure: true, wantCallback: true},
@@ -410,6 +412,11 @@ func TestLogoutWithCredential(t *testing.T) {
 		{name: "fresh keyring refreshable credential", secure: true, refreshable: true, wantCallback: true},
 		{name: "failed revocation retains plaintext pair", refreshable: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
 		{name: "failed revocation retains keyring pair", secure: true, refreshable: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "failed revocation retains replacement plaintext pair", refreshable: true, replace: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "failed revocation retains replacement keyring pair", secure: true, refreshable: true, replace: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "replacement requires the advisory lock", refreshable: true, replace: true, lockErr: lockErr, wantErr: "could not lock authentication credentials: locking unavailable", wantCallback: true},
+		{name: "replacement requires a refreshable original credential", replace: true, wantErr: "cannot replace a non-refreshable logout credential", wantCallback: true},
+		{name: "incomplete replacement preserves the original pair", refreshable: true, replace: true, invalidPair: true, wantErr: "refresh token is empty", wantCallback: true},
 		{name: "callback can reject an unavailable lock", lockErr: lockErr, callbackErr: lockErr, wantErr: "locking unavailable", wantCallback: true},
 		{name: "callback can allow local cleanup without the advisory lock", lockErr: lockErr, wantCallback: true},
 		{name: "failed reload retains credentials", reloadErr: reloadErr, wantErr: "could not reload configuration: cannot reload"},
@@ -464,8 +471,8 @@ func TestLogoutWithCredential(t *testing.T) {
 				}
 				return nil
 			}
-			called := false
-			err = authCfg.LogoutWithCredential("github.com", "test-user", func(credential gh.Credential, callbackLockErr error) error {
+			called, replacementSaved := false, false
+			err = authCfg.LogoutWithCredential("github.com", "test-user", func(credential gh.Credential, callbackLockErr error, save func(gh.RefreshableCredential) error) error {
 				called = true
 				require.Equal(t, tt.lockErr == nil, locked)
 				require.ErrorIs(t, callbackLockErr, tt.lockErr)
@@ -476,9 +483,29 @@ func TestLogoutWithCredential(t *testing.T) {
 				}
 				require.Equal(t, wantToken, credential.Token)
 				if tt.refreshable {
-					require.Equal(t, "ghr_fresh", credential.RefreshToken)
+					wantRefresh := "ghr_fresh"
+					if tt.lockErr != nil {
+						wantRefresh = "ghr_old"
+					}
+					require.Equal(t, wantRefresh, credential.RefreshToken)
 				}
 				require.Contains(t, authCfg.UsersForHost("github.com"), "test-user")
+				if tt.replace {
+					replacement := gh.RefreshableCredential{AccessToken: "gho_rotated", RefreshToken: "ghr_rotated"}
+					if tt.invalidPair {
+						replacement.RefreshToken = ""
+					}
+					if err := save(replacement); err != nil {
+						return err
+					}
+					replacementSaved = true
+					require.True(t, locked)
+					stored, err := authCfg.TokenForUser("github.com", "test-user")
+					require.NoError(t, err)
+					require.Equal(t, replacement.AccessToken, stored.Token)
+					require.Equal(t, replacement.RefreshToken, stored.RefreshToken)
+					require.Equal(t, credential.Source, stored.Source)
+				}
 				return tt.callbackErr
 			})
 			require.Equal(t, tt.wantCallback, called)
@@ -494,9 +521,19 @@ func TestLogoutWithCredential(t *testing.T) {
 					if tt.lockErr != nil || tt.reloadErr != nil {
 						wantToken = "gho_old"
 					}
+					if replacementSaved {
+						wantToken = "gho_rotated"
+					}
 					require.Equal(t, wantToken, credential.Token)
 					if tt.refreshable {
-						require.Equal(t, "ghr_fresh", credential.RefreshToken)
+						wantRefresh := "ghr_fresh"
+						if tt.lockErr != nil || tt.reloadErr != nil {
+							wantRefresh = "ghr_old"
+						}
+						if replacementSaved {
+							wantRefresh = "ghr_rotated"
+						}
+						require.Equal(t, wantRefresh, credential.RefreshToken)
 					}
 				}
 			} else {

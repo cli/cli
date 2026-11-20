@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/authflow"
@@ -54,6 +55,11 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 
 			If revocation fails, including when it cannot be confirmed, local credentials
 			are kept so you can retry. The command exits with an error.
+
+			If a refreshable OAuth token is not found, this command refreshes it once,
+			saves the replacement credentials, and retries revocation.
+			If saving fails, it attempts to revoke the replacement and returns an error
+			requiring you to sign in again.
 
 			Use %[1]s--no-revoke%[1]s for local-only logout, without a network request.
 			This still prints a warning that the token was not revoked.
@@ -205,7 +211,8 @@ type logoutResult struct {
 func logoutWithRevocation(opts *LogoutOptions, authCfg gh.AuthConfig, hostname, username string) (logoutResult, error) {
 	result := logoutResult{warning: "Authentication token was not revoked."}
 	localLogoutStarted := false
-	err := authCfg.LogoutWithCredential(hostname, username, func(credential gh.Credential, lockErr error) error {
+	var saveErr error
+	err := authCfg.LogoutWithCredential(hostname, username, func(credential gh.Credential, lockErr error, save func(gh.RefreshableCredential) error) error {
 		result.preLogoutActiveUser, _ = authCfg.ActiveUser(hostname)
 		switch {
 		case strings.HasPrefix(credential.Token, string(gh.TokenTypeOAuth)):
@@ -220,13 +227,52 @@ func logoutWithRevocation(opts *LogoutOptions, authCfg gh.AuthConfig, hostname, 
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			if err := authflow.RevokeToken(ctx, client, hostname, credential.Token); err != nil {
+			ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			defer cancel()
+			err = authflow.RevokeToken(ctx, client, hostname, credential.Token)
+			if errors.Is(err, authflow.ErrTokenNotFound) && credential.IsRefreshable() {
+				refreshClient := *client
+				transport := client.Transport
+				if transport == nil {
+					transport = http.DefaultTransport
+				}
+				refreshClient.Transport = logoutContextTransport{ctx: ctx, base: transport}
+				refreshClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+					return http.ErrUseLastResponse
+				}
+				renewed, refreshErr := authflow.NewTokenRefresher(&refreshClient).Refresh(credential.RefreshToken, hostname)
+				if refreshErr != nil {
+					// OAuth error messages can echo credentials. Only include known-safe causes.
+					switch {
+					case errors.Is(refreshErr, gh.ErrRefreshTokenInvalid):
+						return fmt.Errorf("could not refresh token for revocation: %w", gh.ErrRefreshTokenInvalid)
+					case errors.Is(refreshErr, context.DeadlineExceeded):
+						return errors.New("could not refresh token for revocation: request timed out")
+					case errors.Is(refreshErr, context.Canceled):
+						return fmt.Errorf("could not refresh token for revocation: %w", context.Canceled)
+					default:
+						return errors.New("could not refresh token for revocation")
+					}
+				}
+				saveErr = save(renewed)
+				// Also revoke an unsaved replacement: refreshing already invalidated the old pair.
+				err = authflow.RevokeToken(ctx, client, hostname, renewed.AccessToken)
+			}
+			if err == nil {
+				result.revoked = true
+				cs := opts.IO.ColorScheme()
+				fmt.Fprintf(opts.IO.ErrOut, "%s Revoked GitHub CLI OAuth token for %s (%s)\n",
+					cs.SuccessIcon(), cs.Bold(username), hostname)
+			}
+			if saveErr != nil {
+				if err != nil {
+					err = fmt.Errorf("could not revoke unsaved replacement: %w", err)
+				}
+				return errors.Join(fmt.Errorf("could not save refreshed credentials: %w", saveErr), err)
+			}
+			if err != nil {
 				return fmt.Errorf("failed to revoke GitHub CLI OAuth token: %w", err)
 			}
-			result.revoked = true
-			cs := opts.IO.ColorScheme()
-			fmt.Fprintf(opts.IO.ErrOut, "%s Revoked GitHub CLI OAuth token for %s (%s)\n",
-				cs.SuccessIcon(), cs.Bold(username), hostname)
 		case strings.HasPrefix(credential.Token, string(gh.TokenTypePersonalAccess)),
 			strings.HasPrefix(credential.Token, string(gh.TokenTypeFineGrainedPAT)):
 			result.warning = "Personal access token was not revoked."
@@ -240,8 +286,21 @@ func logoutWithRevocation(opts *LogoutOptions, authCfg gh.AuthConfig, hostname, 
 		return nil
 	})
 	if err != nil && !localLogoutStarted {
+		if saveErr != nil {
+			login := shellquote.Join("gh", "auth", "login", "--hostname", hostname)
+			return result, fmt.Errorf("%w\nRefreshed credentials could not be saved. Sign in again with:\n  %s", err, login)
+		}
 		recovery := shellquote.Join("gh", "auth", "logout", "--hostname", hostname, "--user", username, "--no-revoke")
 		err = fmt.Errorf("%w\nLocal credentials were kept.\nRetry, or log out locally without revoking:\n  %s", err, recovery)
 	}
 	return result, err
+}
+
+type logoutContextTransport struct {
+	ctx  context.Context
+	base http.RoundTripper
+}
+
+func (t logoutContextTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.base.RoundTrip(req.WithContext(t.ctx))
 }

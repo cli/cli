@@ -16,6 +16,9 @@ import (
 	"github.com/cli/cli/v2/internal/safeurl"
 )
 
+// ErrTokenNotFound reports a 404 from targeted token revocation.
+var ErrTokenNotFound = errors.New("HTTP 404 (Not Found)")
+
 // RevokeToken deletes one access token belonging to the GitHub CLI OAuth app.
 // The client must not attach user authentication or log credential-bearing bodies.
 func RevokeToken(ctx context.Context, client *http.Client, hostname, token string) error {
@@ -46,6 +49,9 @@ func RevokeToken(ctx context.Context, client *http.Client, hostname, token strin
 	if err != nil {
 		if httpErr, ok := errors.AsType[api.HTTPError](err); ok {
 			// A server error message may echo the access token supplied in the body.
+			if httpErr.StatusCode == http.StatusNotFound {
+				return ErrTokenNotFound
+			}
 			return fmt.Errorf("HTTP %d (%s)", httpErr.StatusCode, http.StatusText(httpErr.StatusCode))
 		}
 		var netErr net.Error
