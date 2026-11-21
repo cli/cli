@@ -214,8 +214,20 @@ func TestNewCmdInstall(t *testing.T) {
 
 // --- HTTP stub helpers ---
 
-// stubResolveVersion registers API stubs for latest release + tag resolution.
+// stubResolveVersion registers API stubs for the repository lookup and
+// latest release + tag resolution.
 func stubResolveVersion(reg *httpmock.Registry, owner, repo, tag, sha string) {
+	stubRepository(reg, owner, repo, httpmock.StringResponse(`{"id": 1}`))
+	stubResolveLatestTag(reg, owner, repo, tag, sha)
+}
+
+// stubRepository registers the repository lookup made on every remote install.
+func stubRepository(reg *httpmock.Registry, owner, repo string, resp httpmock.Responder) {
+	reg.Register(httpmock.REST("GET", fmt.Sprintf("repos/%s/%s", owner, repo)), resp)
+}
+
+// stubResolveLatestTag registers API stubs for latest release + tag resolution.
+func stubResolveLatestTag(reg *httpmock.Registry, owner, repo, tag, sha string) {
 	reg.Register(
 		httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/releases/latest", owner, repo)),
 		httpmock.StringResponse(fmt.Sprintf(`{"tag_name": %q}`, tag)),
@@ -655,6 +667,7 @@ func TestInstallRun(t *testing.T) {
 			name:  "remote install with pin flag resolves version",
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
+				stubRepository(reg, "monalisa", "skills-repo", httpmock.StringResponse(`{"id": 1}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads%2Fv2.0.0"),
 					httpmock.StatusStringResponse(404, "not found"))
@@ -765,6 +778,7 @@ func TestInstallRun(t *testing.T) {
 			name:  "remote install with inline version parses name and version",
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
+				stubRepository(reg, "monalisa", "skills-repo", httpmock.StringResponse(`{"id": 1}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads%2Fv1.2.0"),
 					httpmock.StatusStringResponse(404, "not found"))
@@ -1711,6 +1725,71 @@ func TestInstallRun_AllInstallsRemoteSkills(t *testing.T) {
 	require.FileExists(t, filepath.Join(targetDir, "git-commit", "SKILL.md"))
 }
 
+func TestInstallRun_RepositoryID(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoResp httpmock.Responder
+		wantErr  string
+		wantMeta string
+	}{
+		{
+			name:     "records the repository ID",
+			repoResp: httpmock.StringResponse(`{"id": 1296269}`),
+			wantMeta: `github-repo-id: "1296269"`,
+		},
+		{
+			name:     "fails when the repository can't be looked up",
+			repoResp: httpmock.StatusStringResponse(500, "server error"),
+			wantErr:  "could not look up repository monalisa/skills-repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			homeDir := t.TempDir()
+			t.Setenv("HOME", homeDir)
+			t.Setenv("USERPROFILE", homeDir)
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			stubRepository(reg, "monalisa", "skills-repo", tt.repoResp)
+			stubResolveLatestTag(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+			if tt.wantErr == "" {
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			}
+
+			ios, _, _, _ := iostreams.Test()
+			targetDir := t.TempDir()
+
+			err := installRun(&InstallOptions{
+				IO:           ios,
+				HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+				GitClient:    &git.Client{RepoDir: t.TempDir()},
+				SkillSource:  "monalisa/skills-repo",
+				SkillName:    "git-commit",
+				Force:        true,
+				Agent:        "github-copilot",
+				Scope:        "project",
+				ScopeChanged: true,
+				Dir:          targetDir,
+				Telemetry:    &telemetry.NoOpService{},
+			})
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				assert.NoFileExists(t, filepath.Join(targetDir, "git-commit", "SKILL.md"))
+				return
+			}
+			require.NoError(t, err)
+			data, err := os.ReadFile(filepath.Join(targetDir, "git-commit", "SKILL.md"))
+			require.NoError(t, err)
+			assert.Contains(t, string(data), tt.wantMeta)
+		})
+	}
+}
+
 func TestInstallProgress(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 
@@ -2613,7 +2692,7 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 	tests := []struct {
 		name           string
 		visibility     string
-		visibilityErr  bool
+		wantUnknown    bool
 		wantSkillNames string
 	}{
 		{
@@ -2630,8 +2709,9 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			visibility: "internal",
 		},
 		{
-			name:          "API error omits visibility and skill names",
-			visibilityErr: true,
+			name:        "unrecognized visibility omits visibility and skill names",
+			visibility:  "unexpected",
+			wantUnknown: true,
 		},
 	}
 
@@ -2640,23 +2720,14 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 
-			stubResolveVersion(reg, "monalisa", "octocat-skills", "v1.0.0", "abc123")
+			stubRepository(reg, "monalisa", "octocat-skills", httpmock.JSONResponse(map[string]any{
+				"id":         1,
+				"visibility": tt.visibility,
+			}))
+			stubResolveLatestTag(reg, "monalisa", "octocat-skills", "v1.0.0", "abc123")
 			stubDiscoverTree(reg, "monalisa", "octocat-skills", "abc123",
 				singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 			stubInstallFiles(reg, "monalisa", "octocat-skills", "treeSHA", "blobSHA", gitCommitContent)
-			if tt.visibilityErr {
-				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills"),
-					httpmock.StatusStringResponse(500, "server error"),
-				)
-			} else {
-				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills"),
-					httpmock.JSONResponse(map[string]any{
-						"visibility": tt.visibility,
-					}),
-				)
-			}
 
 			ios, _, _, _ := iostreams.Test()
 			ios.SetStdoutTTY(true)
@@ -2689,9 +2760,9 @@ func TestInstallRun_TelemetryVisibility(t *testing.T) {
 			// skill_host_type is always recorded (categorized, no raw hostname for enterprise/tenancy).
 			assert.Equal(t, "github.com", event.Dimensions["skill_host_type"])
 
-			if tt.visibilityErr {
+			if tt.wantUnknown {
 				assert.Equal(t, "unknown", event.Dimensions["repo_visibility"],
-					"visibility fetch errors should emit repo_visibility=\"unknown\" so the fallback is distinguishable from a successful fetch")
+					"unrecognized visibilities should emit repo_visibility=\"unknown\" so the fallback is distinguishable from a successful fetch")
 			} else {
 				assert.Equal(t, tt.visibility, event.Dimensions["repo_visibility"])
 			}
@@ -2724,7 +2795,11 @@ func TestInstallRun_TelemetryMultipleSkills(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
 
-	stubResolveVersion(reg, "monalisa", "octocat-skills", "v1.0.0", "abc123")
+	stubRepository(reg, "monalisa", "octocat-skills", httpmock.JSONResponse(map[string]any{
+		"id":         1,
+		"visibility": "public",
+	}))
+	stubResolveLatestTag(reg, "monalisa", "octocat-skills", "v1.0.0", "abc123")
 	treeJSON := `{"path": "skills/git-commit", "type": "tree", "sha": "treeGC"}, ` +
 		`{"path": "skills/git-commit/SKILL.md", "type": "blob", "sha": "blobGC"}, ` +
 		`{"path": "skills/code-review", "type": "tree", "sha": "treeCR"}, ` +
@@ -2743,13 +2818,6 @@ func TestInstallRun_TelemetryMultipleSkills(t *testing.T) {
 
 	stubInstallFiles(reg, "monalisa", "octocat-skills", "treeGC", "blobGC", gitCommitContent)
 	stubInstallFiles(reg, "monalisa", "octocat-skills", "treeCR", "blobCR", codeReviewContent)
-
-	reg.Register(
-		httpmock.REST("GET", "repos/monalisa/octocat-skills"),
-		httpmock.JSONResponse(map[string]any{
-			"visibility": "public",
-		}),
-	)
 
 	ios, _, _, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)

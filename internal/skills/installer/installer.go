@@ -27,6 +27,7 @@ type Options struct {
 	Host       string // GitHub API hostname
 	Owner      string
 	Repo       string
+	RepoID     int64  // immutable GitHub repository ID (0 if unknown)
 	Ref        string // resolved ref name
 	SHA        string // resolved commit SHA
 	PinnedRef  string // user-supplied --pin value (empty if unpinned)
@@ -292,7 +293,7 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 		}
 
 		if filepath.Base(relPath) == "SKILL.md" {
-			content, err = frontmatter.InjectGitHubMetadata(content, opts.Host, opts.Owner, opts.Repo, opts.Ref, skill.TreeSHA, opts.PinnedRef, skill.Path)
+			content, err = frontmatter.InjectGitHubMetadata(content, opts.Host, opts.Owner, opts.Repo, opts.RepoID, opts.Ref, skill.TreeSHA, opts.PinnedRef, skill.Path)
 			if err != nil {
 				return fmt.Errorf("could not inject metadata: %w", err)
 			}

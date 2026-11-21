@@ -3,6 +3,7 @@ package frontmatter
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/internal/skills/source"
@@ -65,9 +66,10 @@ func Parse(content string) (*ParseResult, error) {
 // InjectGitHubMetadata adds GitHub tracking metadata to the spec-defined
 // "metadata" map in frontmatter. Keys are prefixed with "github-" to avoid
 // collisions with other tools' metadata.
+// repoID is the repository's immutable GitHub ID; 0 means unknown.
 // pinnedRef is the user's explicit --pin value; empty string means unpinned.
 // skillPath is the skill's source path in the repo (e.g. "skills/author/my-skill").
-func InjectGitHubMetadata(content string, host, owner, repo, ref, treeSHA, pinnedRef, skillPath string) (string, error) {
+func InjectGitHubMetadata(content string, host, owner, repo string, repoID int64, ref, treeSHA, pinnedRef, skillPath string) (string, error) {
 	result, err := Parse(content)
 	if err != nil {
 		return "", err
@@ -83,6 +85,11 @@ func InjectGitHubMetadata(content string, host, owner, repo, ref, treeSHA, pinne
 	}
 	delete(meta, "github-owner")
 	meta["github-repo"] = source.BuildRepoURL(host, owner, repo)
+	if repoID != 0 {
+		meta["github-repo-id"] = strconv.FormatInt(repoID, 10)
+	} else {
+		delete(meta, "github-repo-id")
+	}
 	meta["github-ref"] = ref
 	delete(meta, "github-sha")
 	meta["github-tree-sha"] = treeSHA
@@ -115,6 +122,7 @@ func InjectLocalMetadata(content string, sourcePath string) (string, error) {
 	}
 	delete(meta, "github-owner")
 	delete(meta, "github-repo")
+	delete(meta, "github-repo-id")
 	delete(meta, "github-ref")
 	delete(meta, "github-sha")
 	delete(meta, "github-tree-sha")

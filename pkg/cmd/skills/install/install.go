@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -280,27 +279,31 @@ func installRun(opts *InstallOptions) error {
 		return err
 	}
 
-	// Kick off the visibility fetch in parallel with the install work so
-	// the extra API roundtrip doesn't add latency on the critical path.
-	// The result is consumed when the telemetry event is emitted below.
-	// Capture repo fields now to avoid a data race if opts.repo is
-	// swapped during an upstream redirect.
-	type visResult struct {
-		vis discovery.RepoVisibility
-		err error
+	// Fetch the repository in parallel with resolving the version so the
+	// extra API roundtrip doesn't add latency on the critical path. Its ID
+	// is recorded with the installed skills, so that updates only come from
+	// this repository, and its visibility is used for telemetry.
+	type repoResult struct {
+		repo *discovery.Repository
+		err  error
 	}
-	visCh := make(chan visResult, 1)
-	visOwner := opts.repo.RepoOwner()
-	visRepo := opts.repo.RepoName()
+	repoCh := make(chan repoResult, 1)
+	repoOwner, repoName := opts.repo.RepoOwner(), opts.repo.RepoName()
 	go func() {
-		vis, err := discovery.FetchRepoVisibility(apiClient, hostname, visOwner, visRepo)
-		visCh <- visResult{vis: vis, err: err}
+		repo, err := discovery.FetchRepository(apiClient, hostname, repoOwner, repoName)
+		repoCh <- repoResult{repo: repo, err: err}
 	}()
 
 	resolved, err := resolveVersion(opts, apiClient, hostname)
 	if err != nil {
 		return err
 	}
+
+	repoResp := <-repoCh
+	if repoResp.err != nil {
+		return fmt.Errorf("could not look up repository %s: %w", ghrepo.FullName(opts.repo), repoResp.err)
+	}
+	repository := repoResp.repo
 
 	var selectedSkills []discovery.Skill
 
@@ -349,13 +352,9 @@ func installRun(opts *InstallOptions) error {
 		}
 		if upstreamRepo != nil {
 			redirectDims := map[string]string{}
-			select {
-			case r := <-visCh:
-				if r.err == nil && r.vis == discovery.RepoVisibilityPublic {
-					redirectDims["from_owner"] = visOwner
-					redirectDims["from_repo"] = visRepo
-				}
-			case <-time.After(visibilityWaitTimeout):
+			if repository.Visibility == discovery.RepoVisibilityPublic {
+				redirectDims["from_owner"] = opts.repo.RepoOwner()
+				redirectDims["from_repo"] = opts.repo.RepoName()
 			}
 			opts.Telemetry.Record(ghtelemetry.Event{
 				Type:       "skill_upstream_redirect",
@@ -402,6 +401,7 @@ func installRun(opts *InstallOptions) error {
 			Host:       hostname,
 			Owner:      opts.repo.RepoOwner(),
 			Repo:       opts.repo.RepoName(),
+			RepoID:     repository.ID,
 			Ref:        resolved.Ref,
 			SHA:        resolved.SHA,
 			PinnedRef:  opts.Pin,
@@ -436,19 +436,14 @@ func installRun(opts *InstallOptions) error {
 		"skill_host_type": ghinstance.CategorizeHost(opts.repo.RepoHost()),
 		"upstream_source": upstreamSource,
 	}
-	select {
-	case r := <-visCh:
-		if r.err == nil {
-			dims["repo_visibility"] = string(r.vis)
-			if r.vis == discovery.RepoVisibilityPublic {
-				dims["skill_owner"] = opts.repo.RepoOwner()
-				dims["skill_repo"] = opts.repo.RepoName()
-				dims["skill_names"] = mapSkillsToNames(selectedSkills)
-			}
-		} else {
-			dims["repo_visibility"] = "unknown"
+	if vis := repository.Visibility; vis != "" {
+		dims["repo_visibility"] = string(vis)
+		if vis == discovery.RepoVisibilityPublic {
+			dims["skill_owner"] = opts.repo.RepoOwner()
+			dims["skill_repo"] = opts.repo.RepoName()
+			dims["skill_names"] = mapSkillsToNames(selectedSkills)
 		}
-	case <-time.After(visibilityWaitTimeout):
+	} else {
 		dims["repo_visibility"] = "unknown"
 	}
 	opts.Telemetry.Record(ghtelemetry.Event{
@@ -458,14 +453,6 @@ func installRun(opts *InstallOptions) error {
 
 	return nil
 }
-
-// visibilityWaitTimeout is how long to wait at telemetry-emit time for
-// the in-flight repo visibility fetch before giving up and emitting
-// repo_visibility="unknown". By this point the command has already done
-// several serial API calls and (for install) a git sparse-checkout, so
-// the fetch has almost always completed; this budget is a short safety
-// net for the case where that single REST call has stalled.
-const visibilityWaitTimeout = 200 * time.Millisecond
 
 func mapSkillsToNames(skills []discovery.Skill) string {
 	names := make([]string, len(skills))

@@ -70,6 +70,7 @@ func TestInjectGitHubMetadata(t *testing.T) {
 		host           string
 		owner          string
 		repo           string
+		repoID         int64
 		ref            string
 		treeSHA        string
 		pinnedRef      string
@@ -89,12 +90,14 @@ func TestInjectGitHubMetadata(t *testing.T) {
 			host:      "github.com",
 			owner:     "monalisa",
 			repo:      "octocat-skills",
+			repoID:    12345,
 			ref:       "refs/tags/v1.0.0",
 			treeSHA:   "tree456",
 			pinnedRef: "",
 			skillPath: "skills/my-skill",
 			wantContains: []string{
 				"github-repo: https://github.com/monalisa/octocat-skills",
+				`github-repo-id: "12345"`,
 				"github-ref: refs/tags/v1.0.0",
 				"github-tree-sha: tree456",
 				"github-path: skills/my-skill",
@@ -146,7 +149,7 @@ func TestInjectGitHubMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := InjectGitHubMetadata(tt.content, tt.host, tt.owner, tt.repo, tt.ref, tt.treeSHA, tt.pinnedRef, tt.skillPath)
+			got, err := InjectGitHubMetadata(tt.content, tt.host, tt.owner, tt.repo, tt.repoID, tt.ref, tt.treeSHA, tt.pinnedRef, tt.skillPath)
 			require.NoError(t, err)
 			for _, s := range tt.wantContains {
 				assert.Contains(t, got, s)
