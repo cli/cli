@@ -1,6 +1,8 @@
 package shared
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -91,5 +93,59 @@ func TestFollow(t *testing.T) {
 				require.Empty(t, stderr, "expected no stderr output")
 			}
 		})
+	}
+}
+
+func TestRenderEscapesToolCallArguments(t *testing.T) {
+	const seq = "\x1b]0;x\a"
+
+	tests := []struct {
+		name string
+		tool string
+		args map[string]string
+	}{
+		{name: "setup step name", tool: "run_setup", args: map[string]string{"name": seq}},
+		{name: "bash description and command", tool: "bash", args: map[string]string{"description": seq, "command": seq}},
+		{name: "view path", tool: "view", args: map[string]string{"path": "/home/runner/work/o/r/" + seq}},
+		{name: "thought", tool: "think", args: map[string]string{"thought": seq}},
+		{name: "progress commit message and description", tool: "report_progress", args: map[string]string{"commitMessage": seq, "prDescription": seq}},
+		{name: "created file path and text", tool: "create", args: map[string]string{"path": "/home/runner/work/o/r/" + seq, "file_text": seq}},
+		{name: "edited file path", tool: "str_replace", args: map[string]string{"path": "/home/runner/work/o/r/" + seq}},
+		{name: "unknown tool name", tool: "tool" + seq, args: map[string]string{}},
+	}
+
+	for _, tt := range tests {
+		for _, tty := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s tty=%t", tt.name, tty), func(t *testing.T) {
+				args, err := json.Marshal(tt.args)
+				require.NoError(t, err)
+
+				entry := map[string]any{
+					"object": "chat.completion.chunk",
+					"choices": []any{map[string]any{
+						"delta": map[string]any{
+							"role":    "assistant",
+							"content": "done",
+							"tool_calls": []any{map[string]any{
+								"function": map[string]any{"name": tt.tool, "arguments": string(args)},
+							}},
+						},
+					}},
+				}
+				line, err := json.Marshal(entry)
+				require.NoError(t, err)
+
+				ios, _, stdout, stderr := iostreams.Test()
+				ios.SetStdoutTTY(tty)
+
+				_, err = NewLogRenderer().Render([]byte("data: "+string(line)), stdout, ios)
+				require.NoError(t, err)
+
+				assert.Contains(t, stdout.String(), "^[]0;x^G")
+				assert.NotContains(t, stdout.String(), "\a")
+				assert.NotContains(t, stdout.String(), "\x1b]")
+				assert.NotContains(t, stderr.String(), "\x1b")
+			})
+		}
 	}
 }

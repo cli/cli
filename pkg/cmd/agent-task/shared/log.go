@@ -118,7 +118,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 		}
 
 		for _, tc := range choice.Delta.ToolCalls {
-			name := tc.Function.Name
+			name := tc.Function.Name.Raw()
 			if name == "" {
 				continue
 			}
@@ -128,7 +128,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 			switch name {
 			case "run_setup":
 				if v := unmarshal[runSetupToolArgs](args); v != nil {
-					renderToolCallTitle(w, cs, v.Name, "")
+					renderToolCallTitle(w, cs, v.Name.String(), "")
 					continue
 				}
 			case "view":
@@ -137,24 +137,24 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 					fmt.Fprintf(io.ErrOut, "\nfailed to parse 'view' tool call arguments: %v\n", err)
 					continue
 				}
-				renderToolCallTitle(w, cs, fmt.Sprintf("View %s", cs.Bold(relativeFilePath(args.Path))), "")
+				renderToolCallTitle(w, cs, fmt.Sprintf("View %s", cs.Bold(relativeFilePath(args.Path.String()))), "")
 
 				content := stripDiffFormat(choice.Delta.Content.String())
 
-				if err := renderFileContentAsMarkdown(args.Path, content, w, io); err != nil {
+				if err := renderFileContentAsMarkdown(args.Path.String(), content, w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render viewed file content: %v\n\n", err)
 					fmt.Fprintln(io.ErrOut, content) // raw fallback
 				}
 			case "bash":
 				if v := unmarshal[bashToolArgs](args); v != nil {
-					if v.Description != "" {
-						renderToolCallTitle(w, cs, "Bash", v.Description)
+					if !v.Description.Empty() {
+						renderToolCallTitle(w, cs, "Bash", v.Description.String())
 					} else {
 						renderToolCallTitle(w, cs, "Run Bash command", "")
 					}
 
 					contentWithCommand := choice.Delta.Content.String()
-					if v.Command != "" {
+					if !v.Command.Empty() {
 						contentWithCommand = fmt.Sprintf("$ %s\n%s", v.Command, choice.Delta.Content.String())
 					}
 					if err := renderFileContentAsMarkdown("commands.sh", contentWithCommand, w, io); err != nil {
@@ -202,7 +202,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 
 				// NOTE: omit the delta.content since it's the same as thought
 				renderToolCallTitle(w, cs, "Thought", "")
-				if err := renderRawMarkdown(args.Thought, w, io); err != nil {
+				if err := renderRawMarkdown(args.Thought.String(), w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render thought: %v\n", err)
 				}
 			case "report_progress":
@@ -212,9 +212,9 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 					continue
 				}
 
-				renderToolCallTitle(w, cs, "Progress update", cs.Bold(args.CommitMessage))
-				if args.PrDescription != "" {
-					if err := renderRawMarkdown(args.PrDescription, w, io); err != nil {
+				renderToolCallTitle(w, cs, "Progress update", cs.Bold(args.CommitMessage.String()))
+				if !args.PrDescription.Empty() {
+					if err := renderRawMarkdown(args.PrDescription.String(), w, io); err != nil {
 						fmt.Fprintf(io.ErrOut, "\nfailed to render PR description: %v\n", err)
 					}
 				}
@@ -233,9 +233,9 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 					fmt.Fprintf(io.ErrOut, "\nfailed to parse 'create' tool call arguments: %v\n", err)
 					continue
 				}
-				renderToolCallTitle(w, cs, "Create", cs.Bold(relativeFilePath(args.Path)))
+				renderToolCallTitle(w, cs, "Create", cs.Bold(relativeFilePath(args.Path.String())))
 
-				if err := renderFileContentAsMarkdown(args.Path, args.FileText, w, io); err != nil {
+				if err := renderFileContentAsMarkdown(args.Path.String(), args.FileText.String(), w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render created file content: %v\n\n", err)
 					fmt.Fprintln(io.ErrOut, args.FileText)
 				}
@@ -246,7 +246,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 					continue
 				}
 
-				renderToolCallTitle(w, cs, "Edit", cs.Bold(relativeFilePath(args.Path)))
+				renderToolCallTitle(w, cs, "Edit", cs.Bold(relativeFilePath(args.Path.String())))
 				if err := renderFileContentAsMarkdown("output.diff", choice.Delta.Content.String(), w, io); err != nil {
 					fmt.Fprintf(io.ErrOut, "\nfailed to render str_replace diff: %v\n\n", err)
 					fmt.Fprintln(io.ErrOut, choice.Delta.Content.String())
@@ -254,7 +254,7 @@ func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.I
 			default:
 				// Unknown tool call. For example for "codeql_checker":
 				// NOTE: omit the delta.content since we don't know how large could that be
-				renderGenericToolCall(w, cs, name)
+				renderGenericToolCall(w, cs, tc.Function.Name)
 
 				// If it's JSON, treat it as such, otherwise we skip whatever the content is.
 				_ = renderContentAsJSONMarkdown("Output:", choice.Delta.Content.String(), w, io)
@@ -484,8 +484,8 @@ var genericToolCallNamesToTitles = map[string]string{
 	"github-mcp-server-list_workflows":                 "List GitHub Actions workflows",
 }
 
-func renderGenericToolCall(w io.Writer, cs *iostreams.ColorScheme, name string) {
-	toolName, ok := genericToolCallNamesToTitles[name]
+func renderGenericToolCall(w io.Writer, cs *iostreams.ColorScheme, name iostreams.Untrusted) {
+	toolName, ok := genericToolCallNamesToTitles[name.Raw()]
 	if !ok {
 		toolName = fmt.Sprintf("Call to %s", name)
 	}
@@ -505,8 +505,8 @@ type chatCompletionChunkEntry struct {
 			Role          string              `json:"role"`
 			ToolCalls     []struct {
 				Function struct {
-					Name      string `json:"name"`
-					Arguments string `json:"arguments"`
+					Name      iostreams.Untrusted `json:"name"`
+					Arguments string              `json:"arguments"`
 				} `json:"function"`
 				Index int    `json:"index"`
 				ID    string `json:"id"`
@@ -517,13 +517,16 @@ type chatCompletionChunkEntry struct {
 	} `json:"choices"`
 }
 
+// Tool call arguments are JSON encoded inside each log entry, so decoding them
+// can produce control characters. Fields that get printed are Untrusted.
+
 type runSetupToolArgs struct {
-	Name string `json:"name"`
+	Name iostreams.Untrusted `json:"name"`
 }
 
 type bashToolArgs struct {
-	Command     string `json:"command"`
-	Description string `json:"description"`
+	Command     iostreams.Untrusted `json:"command"`
+	Description iostreams.Untrusted `json:"description"`
 }
 
 type readBashToolArgs struct {
@@ -553,25 +556,25 @@ type stopAsyncBashToolArgs struct {
 }
 
 type viewToolArgs struct {
-	Path string `json:"path"`
+	Path iostreams.Untrusted `json:"path"`
 }
 type thinkToolArgs struct {
-	SessionID string `json:"sessionId"`
-	Thought   string `json:"thought"`
+	SessionID string              `json:"sessionId"`
+	Thought   iostreams.Untrusted `json:"thought"`
 }
 
 type reportProgressToolArgs struct {
-	CommitMessage string `json:"commitMessage"`
-	PrDescription string `json:"prDescription"`
+	CommitMessage iostreams.Untrusted `json:"commitMessage"`
+	PrDescription iostreams.Untrusted `json:"prDescription"`
 }
 
 type createToolArgs struct {
-	FileText string `json:"file_text"`
-	Path     string `json:"path"`
+	FileText iostreams.Untrusted `json:"file_text"`
+	Path     iostreams.Untrusted `json:"path"`
 }
 
 type strReplaceToolArgs struct {
-	NewStr string `json:"new_str"`
-	OldStr string `json:"old_str"`
-	Path   string `json:"path"`
+	NewStr string              `json:"new_str"`
+	OldStr string              `json:"old_str"`
+	Path   iostreams.Untrusted `json:"path"`
 }
