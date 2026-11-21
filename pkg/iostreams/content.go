@@ -7,16 +7,28 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 )
 
 // contentSniffLen is how many leading bytes are inspected to classify content as
 // binary or textual, matching the sample size used by [http.DetectContentType].
 const contentSniffLen = 512
 
-// ContainsEscapeSequence reports whether b contains an ANSI escape byte (0x1B),
-// which can manipulate a terminal when printed.
+// ContainsEscapeSequence reports whether b contains an ANSI escape byte (0x1B)
+// or a UTF-8-encoded C1 control character (U+0080 to U+009F), either of which
+// can start a sequence that manipulates a terminal when printed.
 func ContainsEscapeSequence(b []byte) bool {
-	return bytes.IndexByte(b, 0x1B) >= 0
+	if bytes.IndexByte(b, 0x1B) >= 0 {
+		return true
+	}
+	for len(b) > 0 {
+		r, size := utf8.DecodeRune(b)
+		if r >= 0x80 && r <= 0x9F {
+			return true
+		}
+		b = b[size:]
+	}
+	return false
 }
 
 // BinaryContentType reports whether content appears to be binary and, if so,
