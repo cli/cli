@@ -782,7 +782,7 @@ func listAvailableSkills(opts *InstallOptions, skills []discovery.Skill, sel ski
 	table := tableprinter.New(opts.IO, tableprinter.WithHeader("SKILL", "DESCRIPTION"))
 	for _, s := range skills {
 		table.AddField(s.DisplayName())
-		desc := s.Description
+		desc := iostreams.NewUntrusted(s.Description).String()
 		if isTTY {
 			desc = text.Truncate(descWidth, desc)
 		}
@@ -861,7 +861,7 @@ func skillSearchFunc(skills []discovery.Skill, labelWidth int) func(string) prom
 			keys[i] = s.DisplayName()
 			label := s.DisplayName()
 			if s.Description != "" {
-				label = fmt.Sprintf("%s - %s", label, text.RemoveExcessiveWhitespace(s.Description))
+				label = fmt.Sprintf("%s - %s", label, text.RemoveExcessiveWhitespace(iostreams.NewUntrusted(s.Description).String()))
 			}
 			labels[i] = text.Truncate(labelWidth, label)
 		}
@@ -1168,11 +1168,12 @@ func printTreeDir(w io.Writer, cs *iostreams.ColorScheme, dir, indent string) {
 			childIndent = "    "
 		}
 		name := entry.Name()
+		displayName := iostreams.NewUntrusted(name).String()
 		if entry.IsDir() {
-			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Muted(connector), cs.Bold(name+"/"))
+			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Muted(connector), cs.Bold(displayName+"/"))
 			printTreeDir(w, cs, filepath.Join(dir, name), indent+cs.Muted(childIndent))
 		} else {
-			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Muted(connector), name)
+			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Muted(connector), displayName)
 		}
 	}
 }
@@ -1334,7 +1335,7 @@ func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname 
 	}
 
 	cs := opts.IO.ColorScheme()
-	upstreamLabel := ghrepo.FullName(upstreamRepo)
+	upstreamLabel := iostreams.NewUntrusted(ghrepo.FullName(upstreamRepo)).String()
 	repoSource := ghrepo.FullName(opts.repo)
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s This skill was originally published in %s\n", cs.WarningIcon(), upstreamLabel)

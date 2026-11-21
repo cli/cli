@@ -2999,3 +2999,89 @@ func TestInstallRun_UpstreamDetection(t *testing.T) {
 		})
 	}
 }
+
+func TestListAvailableSkillsEscapesDescriptionControlCharacters(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+	skills := []discovery.Skill{{Name: "poc", Description: "a\x1b[31mb"}}
+
+	require.NoError(t, listAvailableSkills(&InstallOptions{IO: ios}, skills, skillSelector{sourceHint: "monalisa/skills"}))
+
+	assert.NotContains(t, stdout.String(), "\x1b")
+	assert.Contains(t, stdout.String(), "a^[[31mb")
+}
+
+func TestSkillSearchFuncEscapesDescriptionControlCharacters(t *testing.T) {
+	skills := []discovery.Skill{{Name: "poc", Description: "a\x1b[31mb"}}
+
+	result := skillSearchFunc(skills, 80)("")
+
+	require.Len(t, result.Labels, 1)
+	assert.Equal(t, "poc - a^[[31mb", result.Labels[0])
+}
+
+func TestPrintFileTreeEscapesFileNameControlCharacters(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "poc", "a\x1b[31mdir"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "poc", "a\x1b[31mdir", "b\x1b[31mfile"), nil, 0o644))
+	ios, _, _, _ := iostreams.Test()
+	var out bytes.Buffer
+
+	printFileTree(&out, ios.ColorScheme(), dir, []string{"poc"})
+
+	assert.NotContains(t, out.String(), "\x1b")
+	assert.Contains(t, out.String(), "a^[[31mdir/")
+	assert.Contains(t, out.String(), "b^[[31mfile")
+}
+
+func TestInstallRun_UpstreamDetectionEscapesRepoControlCharacters(t *testing.T) {
+	content := heredoc.Doc(`
+		---
+		name: git-commit
+		description: Writes commits
+		metadata:
+		  github-repo: "monalisa/a\e[31mb"
+		---
+		# Git Commit
+	`)
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+	stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+		singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+	stubContentsAPI(reg, "monalisa", "skills-repo", "skills/git-commit/SKILL.md", content)
+	stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", content)
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	ios, _, _, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStdinTTY(true)
+	ios.SetStderrTTY(true)
+	var gotChoices []string
+	opts := &InstallOptions{
+		IO:         ios,
+		HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitClient:  &git.Client{RepoDir: t.TempDir()},
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(_ string, _ string, choices []string) (int, error) {
+				gotChoices = choices
+				return 0, nil
+			},
+		},
+		Telemetry:    &telemetry.NoOpService{},
+		SkillSource:  "monalisa/skills-repo",
+		SkillName:    "git-commit",
+		Agent:        "github-copilot",
+		Scope:        "project",
+		ScopeChanged: true,
+		Dir:          t.TempDir(),
+	}
+
+	require.NoError(t, installRun(opts))
+
+	assert.NotContains(t, stderr.String(), "\x1b[31m")
+	assert.Contains(t, stderr.String(), "originally published in monalisa/a^[[31mb")
+	require.Len(t, gotChoices, 2)
+	assert.Equal(t, "monalisa/a^[[31mb (upstream)", gotChoices[1])
+}
