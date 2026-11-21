@@ -500,6 +500,66 @@ func TestHTTPClientSanitizeControlCharactersC1(t *testing.T) {
 	assert.Equal(t, "monalisa¡", issue.Author.Login)
 }
 
+func TestHTTPClientVerboseLogSanitizesTextBody(t *testing.T) {
+	const textBody = "\x1b]0;title\x1b\\\x1b[31mred\x1b[0m"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprint(w, textBody)
+	}))
+	defer ts.Close()
+
+	tests := []struct {
+		name      string
+		newClient func(log io.Writer) (*http.Client, error)
+	}{
+		{
+			name: "GitHub client",
+			newClient: func(log io.Writer) (*http.Client, error) {
+				return NewHTTPClient(HTTPClientOptions{Log: log, LogColorize: true, LogVerboseHTTP: true})
+			},
+		},
+		{
+			name: "external client under GH_DEBUG=api",
+			newClient: func(log io.Writer) (*http.Client, error) {
+				t.Setenv("GH_DEBUG", "api")
+				return NewExternalHTTPClient(ExternalHTTPClientOptions{Log: log, LogColorize: true})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var log strings.Builder
+			client, err := tt.newClient(&log)
+			require.NoError(t, err)
+
+			res, err := client.Get(ts.URL)
+			require.NoError(t, err)
+			body, err := io.ReadAll(res.Body)
+			res.Body.Close()
+			require.NoError(t, err)
+
+			assert.Equal(t, textBody, string(body))
+			assert.NotContains(t, log.String(), "\x1b")
+			assert.Contains(t, log.String(), "^[]0;title^[\\^[[31mred^[[0m")
+		})
+	}
+}
+
+func TestNewHTTPClientVerboseWithoutLog(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	client, err := NewHTTPClient(HTTPClientOptions{LogVerboseHTTP: true})
+	require.NoError(t, err)
+
+	res, err := client.Get(ts.URL)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNoContent, res.StatusCode)
+}
+
 func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
