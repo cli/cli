@@ -248,6 +248,9 @@ func updateRun(opts *UpdateOptions) error {
 
 	var updates []pendingUpdate
 	var pinned []installedSkill
+	// checkFailures counts skills whose source could not be checked. Those
+	// skills are not "up to date"; the command must not report success.
+	var checkFailures int
 
 	type repoKey struct{ host, owner, repo string }
 	repoSkills := make(map[repoKey][]discovery.Skill)
@@ -266,6 +269,7 @@ func updateRun(opts *UpdateOptions) error {
 		key := repoKey{s.repoHost, s.owner, s.repo}
 
 		if repoErrors[key] {
+			checkFailures++
 			continue
 		}
 
@@ -274,6 +278,7 @@ func updateRun(opts *UpdateOptions) error {
 			resolved, resolveErr := discovery.ResolveRef(apiClient, s.repoHost, s.owner, s.repo, "")
 			if resolveErr != nil {
 				repoErrors[key] = true
+				checkFailures++
 				opts.IO.StopProgressIndicator()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: could not resolve %s/%s: %v\n", cs.WarningIcon(), s.name, s.owner, s.repo, resolveErr)
 				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
@@ -284,6 +289,7 @@ func updateRun(opts *UpdateOptions) error {
 			skills, discoverErr := discovery.DiscoverSkills(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA)
 			if discoverErr != nil {
 				repoErrors[key] = true
+				checkFailures++
 				opts.IO.StopProgressIndicator()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, discoverErr)
 				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
@@ -293,6 +299,7 @@ func updateRun(opts *UpdateOptions) error {
 		}
 
 		resolved := repoRefs[key]
+		found := false
 		for _, remote := range repoSkills[key] {
 			matched := false
 			if s.sourcePath != "" {
@@ -300,15 +307,25 @@ func updateRun(opts *UpdateOptions) error {
 			} else {
 				matched = remote.InstallName() == s.name
 			}
-			if matched && (remote.TreeSHA != s.treeSHA || opts.Force) {
+			if !matched {
+				continue
+			}
+			found = true
+			if remote.TreeSHA != s.treeSHA || opts.Force {
 				updates = append(updates, pendingUpdate{
 					local:    s,
 					newSHA:   remote.TreeSHA,
 					resolved: resolved,
 					skill:    remote,
 				})
-				break
 			}
+			break
+		}
+		if !found {
+			checkFailures++
+			opts.IO.StopProgressIndicator()
+			fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: not found in %s/%s\n", cs.WarningIcon(), s.name, s.owner, s.repo)
+			opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
 		}
 	}
 
@@ -341,6 +358,10 @@ func updateRun(opts *UpdateOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s %s has no GitHub metadata. Run `gh skill update %s` interactively to add metadata, or reinstall to enable updates\n", cs.WarningIcon(), name, name)
 	}
 
+	if checkFailures > 0 && len(updates) == 0 {
+		return fmt.Errorf("failed to check %d skill(s) for updates", checkFailures)
+	}
+
 	if len(updates) == 0 {
 		if opts.Force && opts.DryRun {
 			fmt.Fprintf(opts.IO.ErrOut, "All skills are up to date. Use --force without --dry-run to re-download anyway.\n")
@@ -364,6 +385,10 @@ func updateRun(opts *UpdateOptions) error {
 		}
 	}
 	fmt.Fprintln(opts.IO.ErrOut)
+
+	if checkFailures > 0 {
+		return fmt.Errorf("failed to check %d skill(s) for updates", checkFailures)
+	}
 
 	if opts.DryRun {
 		return nil

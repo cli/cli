@@ -1205,6 +1205,94 @@ func TestUpdateRun(t *testing.T) {
 			wantStderr: "1 update(s) available:",
 			wantStdout: "pinned-skill",
 		},
+		{
+			name: "resolve failure is not success",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "fixture")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: fixture
+					metadata:
+					  github-repo: https://github.com/monalisa/octocat-skills
+					  github-path: skills/fixture
+					  github-tree-sha: abc123def456
+					---
+				`)), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
+					httpmock.StatusStringResponse(500, `{"message":"boom"}`),
+				)
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(false)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					Dir:       dir,
+					All:       true,
+					DryRun:    true,
+					Skills:    []string{"fixture"},
+				}
+			},
+			wantErr:    "failed to check 1 skill(s) for updates",
+			wantStderr: "could not resolve monalisa/octocat-skills",
+		},
+		{
+			name: "missing source path is not up to date",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "fixture")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: fixture
+					metadata:
+					  github-repo: https://github.com/monalisa/octocat-skills
+					  github-path: skills/fixture
+					  github-tree-sha: abc123def456
+					---
+				`)), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags%2Fv1.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "commitsha123", "type": "commit"}}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/commitsha123"),
+					httpmock.StringResponse(`{"sha": "commitsha123", "tree": [{"path": "skills/other-skill/SKILL.md", "type": "blob", "sha": "blobsha1"}, {"path": "skills/other-skill", "type": "tree", "sha": "othersha"}, {"path": "skills", "type": "tree", "sha": "treeshaX"}], "truncated": false}`),
+				)
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(false)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					Dir:       dir,
+					All:       true,
+					DryRun:    true,
+					Skills:    []string{"fixture"},
+				}
+			},
+			wantErr:    "failed to check 1 skill(s) for updates",
+			wantStderr: "not found in monalisa/octocat-skills",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1232,6 +1320,9 @@ func TestUpdateRun(t *testing.T) {
 			}
 			if tt.wantStderr != "" {
 				assert.Contains(t, stderr.String(), tt.wantStderr)
+			}
+			if tt.wantErr != "" {
+				assert.NotContains(t, stderr.String(), "All skills are up to date.")
 			}
 			if tt.wantStdout != "" {
 				assert.Contains(t, stdout.String(), tt.wantStdout)
