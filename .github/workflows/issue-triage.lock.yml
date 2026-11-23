@@ -1491,7 +1491,7 @@ jobs:
           path: ${{ runner.temp }}/gh-aw/safe-jobs/
       - name: Create GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
@@ -1566,7 +1566,7 @@ jobs:
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Generate GitHub App token
         id: safe-outputs-app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
           private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
@@ -2267,7 +2267,7 @@ jobs:
       - name: Create GitHub App token
         id: app-token
         if: env.GH_AW_SAFE_OUTPUTS_STAGED != 'true'
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
@@ -2424,7 +2424,7 @@ jobs:
           path: ${{ runner.temp }}/gh-aw/safeoutputs/upload-artifacts/
       - name: Generate GitHub App token
         id: safe-outputs-app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ secrets.CLI_TRIAGE_APP_CLIENT_ID }}
           private-key: ${{ secrets.CLI_TRIAGE_APP_PRIVATE_KEY }}
