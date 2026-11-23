@@ -51,18 +51,24 @@ jobs:
           sudo ln -sf /opt/ghmock/bin/ghmock /usr/local/bin/ghmock
           printf 'cli/cli %s\n' "$GHMOCK_REF" > /opt/ghmock/revision.txt
           ghmock --help | head -3
-      - name: Install VHS, ttyd and ffmpeg
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install cli-exercise prerequisites
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
-          curl -fsSL -o "$RUNNER_TEMP/vhs.deb" \
-            https://github.com/charmbracelet/vhs/releases/download/v0.12.1/vhs_0.12.1_amd64.deb
-          echo "30a9b2746f19522387eace24f427208b5dc4ce2413d334147a0b89a2304cfbe4  $RUNNER_TEMP/vhs.deb" | sha256sum -c -
-          sudo apt-get install -y -qq "$RUNNER_TEMP/vhs.deb"
-          curl -fsSL -o "$RUNNER_TEMP/ttyd" \
-            https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64
-          echo "8a217c968aba172e0dbf3f34447218dc015bc4d5e59bf51db2f2cd12b7be4f55  $RUNNER_TEMP/ttyd" | sha256sum -c -
-          sudo install -m 0755 "$RUNNER_TEMP/ttyd" /usr/local/bin/ttyd
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          sudo mkdir -p /opt/cli-exercise
+          sudo chown "$(id -u):$(id -g)" /opt/cli-exercise
+          cp .github/skills/cli-exercise/scripts/package{,-lock}.json /opt/cli-exercise/
+          npm ci --prefix /opt/cli-exercise --ignore-scripts
+          GOENV=off GOWORK=off GOTOOLCHAIN=local GOMODCACHE=/opt/cli-exercise/gomodcache \
+            go -C .github/skills/cli-exercise/tool build -mod=readonly \
+            -trimpath -buildvcs=false -o "$RUNNER_TEMP/cli-exercise" .
       - name: Verify the recording toolchain
-        run: .github/skills/vhs-demo/scripts/preflight.sh
+        run: |
+          "$RUNNER_TEMP/cli-exercise" --skill-root .github/skills/cli-exercise \
+            preflight check --module-root /opt/cli-exercise/node_modules \
+            --format mp4 --output "$RUNNER_TEMP/cli-exercise-preflight.json"

@@ -39,10 +39,9 @@ trials. Keep a run log of the exact commands, expected and actual observations,
 and exit status for each trial. The run log, not the recording, is the evidence
 for this gate. Use `ghmock`, installed by the repository's setup steps, as
 "ghmock reproduction" below describes. Separately, record an MP4 of the
-representative control and affected commands for human review, and upload it
-with `upload_attachment`. The MP4 is supplemental: the agent does not need to
-visually inspect it, and it cannot substitute for the run log. Write numbered
-manual steps. A synthetic
+representative control and affected commands for human review and, when safe
+and authorized, upload it with `upload_attachment`. The MP4 is supplemental
+and cannot substitute for the run log. Write numbered manual steps. A synthetic
 fixture is allowed for a client-side defect only if disclosed and sourced from
 docs, existing fixtures, or an observed response; it cannot prove server, auth,
 or platform behavior. Fail, naming what is missing, if the symptom depends on
@@ -64,11 +63,15 @@ issue-supplied commands require an externally enforced network/filesystem
 sandbox. State the ghmock revision, each gh build
 SHA-256, and that the fixture is synthetic (owner `example.invalid`).
 
-*Recording.* Follow the isolation and recording guidance in
-[vhs-demo](../vhs-demo/SKILL.md). Show the representative control and affected
-commands running against equivalent synthetic fixture state. Keep the
-recording as a human-review artifact; do not make visual inspection or video
-quality a condition of passing the reproduction gate.
+*Recording.* Use [cli-exercise](../cli-exercise/SKILL.md) to record the
+representative control and affected commands against equivalent synthetic
+fixture state. Follow its preflight, isolation, capture and evidence guidance.
+In the hosted setup, select `/opt/cli-exercise/node_modules` for preflight and
+set `GOMODCACHE=/opt/cli-exercise/gomodcache` when building the helper.
+Keep the recording as a human-review artifact; do not make visual inspection or
+video quality a condition of passing the reproduction gate. If the recording
+cannot be safely produced and reviewed for handoff, report that limitation
+separately instead of uploading unverified media.
 
 **2. Root cause.** Trace the call path. List at least two plausible causes,
 including the reporter's, and run probes that change one variable at a time.
@@ -116,7 +119,8 @@ agent must read the full raw comment, including the collapsed block.
 
 1. `## Bug readiness: <outcome>` and one sentence why.
 2. **Reproduce**: numbered commands with expected vs actual, backed by the run
-   log; include the recording URL on its own line for human review.
+   log; include the recording URL on its own line for human review, or explain
+   why it is unavailable.
 3. **Cause**: permalink at the full SHA and the mechanism.
 4. **Fix**: change boundary, the contract it restores, and what must not change.
 5. **Tests**: the seam and the cases to add.
