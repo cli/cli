@@ -5,6 +5,11 @@
       "version": "v3.3.0",
       "sha": "64ab729a6294000f5aa4a4bc0b73d1f32bc45510"
     },
+    "actions/setup-go@v7.1.0": {
+      "repo": "actions/setup-go",
+      "version": "v7.1.0",
+      "sha": "d8cbb8045d7f43706b9177cceb36c1f91a6644d5"
+    },
     "github/gh-aw-actions/setup-cli@v1.0.1": {
       "repo": "github/gh-aw-actions/setup-cli",
       "version": "v1.0.1",
