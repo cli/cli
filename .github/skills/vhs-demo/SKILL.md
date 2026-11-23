@@ -1,13 +1,13 @@
 ---
 name: vhs-demo
-description: Use when creating a terminal GIF, recording a CLI demonstration, authoring a VHS tape, or producing visual before/after evidence for reviewers.
+description: Use when creating a terminal GIF or MP4, recording a CLI demonstration, authoring a VHS tape, or producing visual before/after evidence for reviewers.
 compatibility: Requires VHS 0.11.0+, ffmpeg, ffprobe, ttyd, and a VHS-supported shell.
 ---
 
 # VHS Demo
 
-Produce a short, repeatable GIF that shows real commands and unedited output from
-caller-selected executables. The GIF is evidence of one observed flow, not proof
+Produce a short, repeatable GIF or MP4 that shows real commands and unedited output from
+caller-selected executables. The recording is evidence of one observed flow, not proof
 of general correctness and not a replacement for tests.
 
 ## Evidence contract
@@ -33,7 +33,10 @@ Record the intended audience or destination, the behavior to evidence, exact
 visible commands, required initial state, and any size constraint. Storyboard
 the visible beats and their approximate duration before writing the tape.
 
-Prefer one coherent claim per GIF. Use a synthetic supporting service or fixture
+Honor the caller's required format. Bug Agent Readiness requires an MP4;
+a companion GIF does not replace it. Use VHS for both, not a different recorder.
+
+Prefer one coherent claim per recording. Use a synthetic supporting service or fixture
 only when the real product cannot safely or deterministically reach the required
 state; disclose and remove it afterward. The visible command must still run the
 selected real executable. Never substitute a fake or wrapper that generates
@@ -74,7 +77,7 @@ path and put it ahead of the tape's `PATH`. Do not trust aliases or the ordinary
 ### 3. Isolate the take
 
 Use the platform's secure temporary-directory API to create one workspace per
-GIF. Keep the tape, GIF, fixtures, config, command mappings, and inspection
+recording. Keep the tape, media, fixtures, config, command mappings, and inspection
 frames there, never in the repository.
 
 Use synthetic names, repositories, hosts, and content. Remap home and config
@@ -93,10 +96,16 @@ set a generic prompt; confirm both with a probe before trusting prompt waits or
 
 ### 4. Author and render the tape
 
+Plan inspection before rendering. For static output, a low frame rate can help
+keep a take inspectable, but it can also omit completed output. Honor the
+caller's requirements and verify the actual frames. Do not lower frame rate
+for a claim that depends on transients.
+
 Adapt this structure, replacing every placeholder:
 
 ```text
 Output "<ABSOLUTE_TEMP_PATH>/demo.gif"
+Output "<ABSOLUTE_TEMP_PATH>/demo.mp4"
 Require <SHELL_COMMAND>
 Set Shell <SHELL_COMMAND>
 Set Width <WIDTH_FOR_CONTENT>
@@ -143,11 +152,14 @@ instead of shrinking or clipping text.
 
 Run `vhs <tape>`. A parse or directive failure after preflight is an
 incompatibility: report it rather than deleting a safeguard.
+Keep the output directives for the requested formats; when both are needed,
+render both from the same tape invocation. Check that each requested file exists
+and is nonempty. A successful GIF render alone does not satisfy an MP4 request.
 
 ### 5. Inspect the evidence
 
 From the repository root, pass the matching helper an inspection directory
-outside the repository:
+outside the repository for GIFs:
 
 ```sh
 .github/skills/vhs-demo/scripts/inspect.sh <demo.gif> <inspection-dir>
@@ -157,8 +169,8 @@ outside the repository:
 & .\.github\skills\vhs-demo\scripts\inspect.ps1 <demo.gif> <inspection-dir>
 ```
 
-The helper rejects repository paths, verifies GIF metadata, and extracts
-native-resolution first, final, one-frame-per-second, and every-frame sequences.
+The helpers reject repository paths and extract native-resolution frames. For
+MP4, inspect the recording directly or extract frames with `ffmpeg`.
 
 Inspect the images and the tape together. Confirm executable selection, visible
 commands, unedited output, intentional wrapping, readable monospaced text,
@@ -166,11 +178,11 @@ clean first and final frames, useful pacing, and absence of secrets, private
 paths, real hosts, identities, notifications, and hidden setup. Inspect every
 frame when checking privacy or any spinner, crash, exit, relaunch, or other
 transient claim. Fix unsafe input at its source and rerender. Never redact the
-GIF after capture.
+recording after capture.
 
 ### 6. Return evidence
 
-Report the absolute tape and GIF paths; dimensions, duration, frame count when
+Report the absolute tape and requested media paths; dimensions, duration, frame count when
 available, and size; visible commands; each executable's path, version,
 revision/source, and hash when recorded; whether sampled or all frames were
 inspected; the intended use; and any limitation on what the demo proves.

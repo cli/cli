@@ -26,3 +26,43 @@ jobs:
         uses: github/gh-aw-actions/setup-cli@221ba4f4319de6b8e809d1a15528b3ae6a818aa5 # v1.0.1
         with:
           version: v1.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # ghmock routes API and Git traffic but is not a sandbox.
+      - name: Install ghmock and GitHub schemas
+        env:
+          GHMOCK_REF: 233b470d3a189e89cf6fa69624e11c3fa9387d81
+        run: |
+          set -euo pipefail
+          export GOTOOLCHAIN=auto
+          src="$RUNNER_TEMP/cli-ghmock"
+          git init -q "$src"
+          git -C "$src" remote add origin https://github.com/cli/cli.git
+          git -C "$src" fetch -q --depth 1 origin "$GHMOCK_REF"
+          git -C "$src" checkout -q FETCH_HEAD
+          sudo mkdir -p /opt/ghmock/bin /opt/ghmock/schemas
+          sudo chown -R "$(id -u):$(id -g)" /opt/ghmock
+          go -C "$src/script/ghmock" build -o /opt/ghmock/bin/ghmock .
+          GHMOCK_GRAPHQL_SCHEMA=/opt/ghmock/schemas/schema.docs.graphql \
+            GHMOCK_REST_SCHEMA=/opt/ghmock/schemas/api.github.com.json \
+            /opt/ghmock/bin/ghmock schemas update
+          sudo ln -sf /opt/ghmock/bin/ghmock /usr/local/bin/ghmock
+          printf 'cli/cli %s\n' "$GHMOCK_REF" > /opt/ghmock/revision.txt
+          ghmock --help | head -3
+      - name: Install VHS, ttyd and ffmpeg
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          curl -fsSL -o "$RUNNER_TEMP/vhs.deb" \
+            https://github.com/charmbracelet/vhs/releases/download/v0.12.1/vhs_0.12.1_amd64.deb
+          echo "30a9b2746f19522387eace24f427208b5dc4ce2413d334147a0b89a2304cfbe4  $RUNNER_TEMP/vhs.deb" | sha256sum -c -
+          sudo apt-get install -y -qq "$RUNNER_TEMP/vhs.deb"
+          curl -fsSL -o "$RUNNER_TEMP/ttyd" \
+            https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64
+          echo "8a217c968aba172e0dbf3f34447218dc015bc4d5e59bf51db2f2cd12b7be4f55  $RUNNER_TEMP/ttyd" | sha256sum -c -
+          sudo install -m 0755 "$RUNNER_TEMP/ttyd" /usr/local/bin/ttyd
+      - name: Verify the recording toolchain
+        run: .github/skills/vhs-demo/scripts/preflight.sh
