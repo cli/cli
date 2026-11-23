@@ -223,6 +223,26 @@ func TestRerun(t *testing.T) {
 			wantOut: "✓ Requested rerun (failed jobs) of run 1234\n",
 		},
 		{
+			name: "arg including onlyFailed when workflow metadata returns 404",
+			tty:  true,
+			opts: &RerunOptions{
+				RunID:      "1234",
+				OnlyFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.StatusStringResponse(404, "not found"))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/rerun-failed-jobs"),
+					httpmock.StringResponse("{}"))
+			},
+			wantOut: "✓ Requested rerun (failed jobs) of run 1234\n",
+		},
+		{
 			name: "arg including a specific job",
 			tty:  true,
 			opts: &RerunOptions{

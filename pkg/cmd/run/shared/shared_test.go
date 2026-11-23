@@ -58,6 +58,27 @@ func TestGetAnnotations404(t *testing.T) {
 	assert.Equal(t, result, []Annotation{})
 }
 
+func TestGetRunWorkflow404(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+		httpmock.JSONResponse(FailedRun))
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+		httpmock.StatusStringResponse(404, "not found"))
+
+	httpClient := &http.Client{Transport: reg}
+	apiClient := api.NewClientFromHTTP(httpClient)
+	repo := ghrepo.New("OWNER", "REPO")
+
+	run, err := GetRun(apiClient, repo, "1234", 0)
+	require.NoError(t, err)
+	assert.Equal(t, FailedRun.ID, run.ID)
+	assert.Equal(t, "", run.WorkflowName())
+}
+
 func TestRun_Duration(t *testing.T) {
 	now, _ := time.Parse(time.RFC3339, "2022-07-20T11:22:58Z")
 

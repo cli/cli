@@ -586,7 +586,13 @@ func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uin
 
 	// Set name to workflow name
 	workflow, err := workflowShared.GetWorkflow(client, repo, result.WorkflowID)
-	if err != nil {
+	var httpErr api.HTTPError
+	if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		// If the workflow lookup returns 404, this is likely an organization or
+		// enterprise ruleset workflow whose metadata is not accessible from the
+		// consumer repository. Leave workflowName empty, matching GetRunsWithFilter.
+		result.workflowName = ""
+	} else if err != nil {
 		return nil, err
 	} else {
 		result.workflowName = workflow.Name
