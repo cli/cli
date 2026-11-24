@@ -414,7 +414,9 @@ func TestLogoutWithCredential(t *testing.T) {
 		{name: "failed revocation retains keyring pair", secure: true, refreshable: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
 		{name: "failed revocation retains replacement plaintext pair", refreshable: true, replace: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
 		{name: "failed revocation retains replacement keyring pair", secure: true, refreshable: true, replace: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
-		{name: "replacement requires the advisory lock", refreshable: true, replace: true, lockErr: lockErr, wantErr: "could not lock authentication credentials: locking unavailable", wantCallback: true},
+		{name: "replacement proceeds without the advisory lock", refreshable: true, replace: true, lockErr: lockErr, wantCallback: true},
+		{name: "failed revocation retains renewed keyring pair without advisory locking", secure: true, refreshable: true, replace: true, lockErr: lockErr, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "read-only state directory does not prevent saving the replacement", refreshable: true, replace: true, lockErr: &fs.PathError{Op: "mkdir", Path: "state", Err: syscall.EROFS}, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
 		{name: "replacement requires a refreshable original credential", replace: true, wantErr: "cannot replace a non-refreshable logout credential", wantCallback: true},
 		{name: "incomplete replacement preserves the original pair", refreshable: true, replace: true, invalidPair: true, wantErr: "refresh token is empty", wantCallback: true},
 		{name: "callback can reject an unavailable lock", lockErr: lockErr, callbackErr: lockErr, wantErr: "locking unavailable", wantCallback: true},
@@ -499,7 +501,7 @@ func TestLogoutWithCredential(t *testing.T) {
 						return err
 					}
 					replacementSaved = true
-					require.True(t, locked)
+					require.Equal(t, tt.lockErr == nil, locked)
 					stored, err := authCfg.TokenForUser("github.com", "test-user")
 					require.NoError(t, err)
 					require.Equal(t, replacement.AccessToken, stored.Token)

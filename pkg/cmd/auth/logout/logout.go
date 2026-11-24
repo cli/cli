@@ -212,13 +212,10 @@ func logoutWithRevocation(opts *LogoutOptions, authCfg gh.AuthConfig, hostname, 
 	result := logoutResult{warning: "Authentication token was not revoked."}
 	localLogoutStarted := false
 	var saveErr error
-	err := authCfg.LogoutWithCredential(hostname, username, func(credential gh.Credential, lockErr error, save func(gh.RefreshableCredential) error) error {
+	err := authCfg.LogoutWithCredential(hostname, username, func(credential gh.Credential, _ error, save func(gh.RefreshableCredential) error) error {
 		result.preLogoutActiveUser, _ = authCfg.ActiveUser(hostname)
 		switch {
 		case strings.HasPrefix(credential.Token, string(gh.TokenTypeOAuth)):
-			if lockErr != nil {
-				return fmt.Errorf("could not lock authentication credentials: %w", lockErr)
-			}
 			client, err := opts.OAuthAppHttpClient()
 			if err != nil {
 				return err

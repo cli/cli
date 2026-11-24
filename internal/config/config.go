@@ -607,8 +607,8 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 }
 
 // LogoutWithCredential coordinates credential-dependent cleanup with concurrent refreshes.
-// The callback receives any advisory-lock error and decides whether cleanup can proceed.
-// It can save a replacement refreshable credential under the same lock before revoking it.
+// Advisory locking is best effort, matching Logout. The callback receives the lock outcome
+// and can save a replacement refreshable credential under the refresh mutex before revoking it.
 // Callback failures retain the most recently saved credentials.
 func (c *AuthConfig) LogoutWithCredential(hostname, username string, beforeLogout func(gh.Credential, error, func(gh.RefreshableCredential) error) error) error {
 	if beforeLogout == nil {
@@ -623,9 +623,6 @@ func (c *AuthConfig) LogoutWithCredential(hostname, username string, beforeLogou
 			return err
 		}
 		save := func(renewed gh.RefreshableCredential) error {
-			if lockErr != nil {
-				return fmt.Errorf("could not lock authentication credentials: %w", lockErr)
-			}
 			if !credential.IsRefreshable() {
 				return errors.New("cannot replace a non-refreshable logout credential")
 			}
