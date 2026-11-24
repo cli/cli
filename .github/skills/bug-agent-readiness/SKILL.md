@@ -58,13 +58,15 @@ incomplete, stale, or contradictory. Also block if the result does not clearly
 establish both bug classification and reproduction. Identify the precise gap
 and stop.
 
-**2. Root cause.** Use the triage evidence as the symptom baseline; do not
-repeat its end-to-end reproduction. Trace the relevant call path and identify
-at least two plausible causes, including the reporter's when one is proposed.
-Use focused source inspection and targeted probes only when needed to
-distinguish causes. Pass with the file and symbol, the mechanism, the affected
-callers, and evidence that rules out the alternatives. Code reading alone does
-not pass.
+**2. Root cause.** Use the triage reproduction steps and observed results as
+the primary evidence, without repeating the end-to-end reproduction. Trace the
+call path those steps exercise and propose the cause that explains the observed
+behavior. Then check the reporter's proposed cause, if any, and any other
+credible alternatives against that evidence. Use focused source inspection and
+targeted probes only when they're needed to tell the causes apart. Pass with
+the file and symbol, the mechanism, the affected callers, and evidence that
+confirms the cause and rules out each credible alternative. Code reading alone
+does not pass.
 
 **3. Contract and remedy.** Cite intended behavior from acceptance criteria,
 maintainer statements, help or docs, tests, or neighboring behavior; the
