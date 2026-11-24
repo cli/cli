@@ -9,16 +9,19 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -115,6 +118,7 @@ func Test_NewCmdLogout(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				GitClient: &git.Client{GitPath: "some/path/git"},
 			}
 			ios.SetStdinTTY(tt.tty)
 			ios.SetStdoutTTY(tt.tty)
@@ -141,6 +145,7 @@ func Test_NewCmdLogout(t *testing.T) {
 			require.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
 			require.Equal(t, tt.wants.Username, gotOpts.Username)
 			require.Equal(t, tt.wants.NoRevoke, gotOpts.NoRevoke)
+			require.Same(t, f.GitClient, gotOpts.GitClient)
 		})
 	}
 }
@@ -177,6 +182,8 @@ func Test_logoutRun_tty(t *testing.T) {
 		wantStderr    string
 		retain        bool
 		setupConfig   func(*testing.T, gh.Config)
+		gitHostname   string
+		gitExitStatus int
 	}{
 		{
 			name: "logs out prompted user when multiple known hosts with one user each",
@@ -267,6 +274,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantHosts:   "github.com:\n    users:\n        monalisa:\n            oauth_token: abc123\n    git_protocol: ssh\n    oauth_token: abc123\n    user: monalisa\n",
 			assertToken: hasNoToken("ghe.io"),
 			wantErrOut:  regexp.MustCompile(`Logged out of ghe.io account monalisa-ghe`),
+			gitHostname: "ghe.io",
 		},
 		{
 			name:          "logs out specified user that is using secure storage",
@@ -375,6 +383,15 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantStderr:  "✓ Logged out of github.com account monalisa\n! Authentication token was not revoked.\n",
 		},
 		{
+			name:          "credential helper failure warns after local-only logout",
+			opts:          &LogoutOptions{NoRevoke: true},
+			cfgHosts:      []hostUsers{{"github.com", []user{{"monalisa", "gho_saved"}}}},
+			gitExitStatus: 1,
+			wantHosts:     "{}\n",
+			assertToken:   hasNoToken("github.com"),
+			wantStderr:    "! Failed to remove credentials from git credential helper: failed to run git: git credential reject exited with status 1\n✓ Logged out of github.com account monalisa\n! Authentication token was not revoked.\n",
+		},
+		{
 			name: "not found retains the keyring credential",
 			opts: &LogoutOptions{},
 			cfgHosts: []hostUsers{
@@ -451,6 +468,18 @@ func Test_logoutRun_tty(t *testing.T) {
 				require.NotEmpty(t, tt.wantHTTPHost, "unexpected revocation client construction")
 				return &http.Client{Transport: reg}, nil
 			}
+			gitHostname := ""
+			if tt.wantErr == "" {
+				gitHostname = tt.gitHostname
+				if gitHostname == "" {
+					gitHostname = "github.com"
+				}
+			}
+			tt.opts.GitClient = stubCredentialReject(t, gitHostname, tt.gitExitStatus, func() {
+				var hosts bytes.Buffer
+				readConfigs(io.Discard, &hosts)
+				require.Equal(t, tt.wantHosts, hosts.String(), "local logout must precede Git credential rejection")
+			})
 
 			err := logoutRun(tt.opts)
 			require.Empty(t, stdout.String())
@@ -522,6 +551,8 @@ func Test_logoutRun_nontty(t *testing.T) {
 		refreshBody   string
 		refreshErr    error
 		saveFails     bool
+		gitHostname   string
+		gitExitStatus int
 	}{
 		{
 			name: "logs out specified user when one known host",
@@ -672,6 +703,19 @@ func Test_logoutRun_nontty(t *testing.T) {
 			wantHosts:     "{}\n",
 			assertToken:   hasNoToken("enterprise.example.com"),
 			wantStderr:    "✓ Revoked GitHub CLI OAuth token for monalisa (enterprise.example.com)\n✓ Logged out of enterprise.example.com account monalisa\n",
+			gitHostname:   "enterprise.example.com",
+		},
+		{
+			name:          "credential helper failure warns after revocation and local logout",
+			opts:          &LogoutOptions{},
+			cfgHosts:      []hostUsers{{"github.com", []user{{"monalisa", "gho_saved"}}}},
+			httpStatus:    204,
+			wantHTTPHost:  "api.github.com",
+			wantHTTPToken: "gho_saved",
+			gitExitStatus: 1,
+			wantHosts:     "{}\n",
+			assertToken:   hasNoToken("github.com"),
+			wantStderr:    "✓ Revoked GitHub CLI OAuth token for monalisa (github.com)\n! Failed to remove credentials from git credential helper: failed to run git: git credential reject exited with status 1\n✓ Logged out of github.com account monalisa\n",
 		},
 		{
 			name: "revokes before switching the active account",
@@ -694,11 +738,12 @@ func Test_logoutRun_nontty(t *testing.T) {
 			wantStderr: "✓ Logged out of github.com account monalisa\n! Personal access token was not revoked.\n  Revoke it at https://github.com/settings/tokens\n",
 		},
 		{
-			name:       "fine-grained PAT warning uses the selected host",
-			opts:       &LogoutOptions{},
-			cfgHosts:   []hostUsers{{"enterprise.example.com", []user{{"monalisa", "github_pat_saved"}}}},
-			wantHosts:  "{}\n",
-			wantStderr: "✓ Logged out of enterprise.example.com account monalisa\n! Personal access token was not revoked.\n  Revoke it at https://enterprise.example.com/settings/tokens\n",
+			name:        "fine-grained PAT warning uses the selected host",
+			opts:        &LogoutOptions{},
+			cfgHosts:    []hostUsers{{"enterprise.example.com", []user{{"monalisa", "github_pat_saved"}}}},
+			wantHosts:   "{}\n",
+			wantStderr:  "✓ Logged out of enterprise.example.com account monalisa\n! Personal access token was not revoked.\n  Revoke it at https://enterprise.example.com/settings/tokens\n",
+			gitHostname: "enterprise.example.com",
 		},
 		{
 			name:       "GitHub App token warns without HTTP",
@@ -870,6 +915,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 			wantHosts:     "{}\n",
 			assertToken:   hasNoToken("enterprise.example.com"),
 			wantStderr:    "✓ Revoked GitHub CLI OAuth token for monalisa (enterprise.example.com)\n✓ Logged out of enterprise.example.com account monalisa\n",
+			gitHostname:   "enterprise.example.com",
 		},
 		{
 			name:          "failed deletion after refresh retains the replacement pair for retry",
@@ -1170,6 +1216,18 @@ func Test_logoutRun_nontty(t *testing.T) {
 				require.NotEmpty(t, tt.wantHTTPHost, "unexpected revocation client construction")
 				return &http.Client{Transport: reg}, nil
 			}
+			gitHostname := ""
+			if tt.wantErr == "" && tt.wantErrMatch == nil {
+				gitHostname = tt.gitHostname
+				if gitHostname == "" {
+					gitHostname = "github.com"
+				}
+			}
+			tt.opts.GitClient = stubCredentialReject(t, gitHostname, tt.gitExitStatus, func() {
+				var hosts bytes.Buffer
+				readConfigs(io.Discard, &hosts)
+				require.Equal(t, tt.wantHosts, hosts.String(), "local logout must precede Git credential rejection")
+			})
 
 			err := logoutRun(tt.opts)
 			require.Empty(t, stdout.String())
@@ -1231,6 +1289,25 @@ func Test_logoutRun_nontty(t *testing.T) {
 			}
 		})
 	}
+}
+
+func stubCredentialReject(t *testing.T, hostname string, exitStatus int, verifyLogout func()) *git.Client {
+	t.Helper()
+	cs, restoreRun := run.Stub()
+	t.Cleanup(func() { restoreRun(t) })
+	if hostname != "" {
+		cs.Register(`git credential reject`, exitStatus, "", func([]string) { verifyLogout() })
+	}
+	prepareCmd := run.PrepareCmd
+	run.PrepareCmd = func(cmd *exec.Cmd) run.Runnable {
+		require.Equal(t, []string{"credential", "reject"}, cmd.Args[1:])
+		require.NotNil(t, cmd.Stdin)
+		input, err := io.ReadAll(cmd.Stdin)
+		require.NoError(t, err)
+		require.Equal(t, "protocol=https\nhost="+hostname+"\n", string(input))
+		return prepareCmd(cmd)
+	}
+	return &git.Client{GitPath: "some/path/git"}
 }
 
 type logoutLockErrorAuthConfig struct {
