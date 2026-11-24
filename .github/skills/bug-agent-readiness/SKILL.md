@@ -24,9 +24,10 @@ label and the reporter's proposed fix are leads, not evidence.
 - For a qualifying triaged bug, assess every remaining gate. Stop when triage
   explicitly classifies the issue as a duplicate or not a bug, or reports that
   it was not reproduced.
-- Allowed: the handoff comment and one label swap, subject to the caller's
-  authorization. Do not upload a recording, commit, push, open PRs, or edit the
-  issue; remove temporary tests and the candidate fix before finishing.
+- Allowed: the handoff artifact and the outcome label, subject to the caller's
+  authorization. Never post an issue comment. Do not upload a recording,
+  commit, push, open PRs, or otherwise edit the issue; remove temporary tests
+  and the candidate fix before finishing.
 
 ## Gates
 
@@ -98,17 +99,26 @@ helpers, destructive state, concurrency, contract changes, new dependencies),
 `not-ready` if any gate fails, else `blocked` if any gate is blocked, else
 `ready`.
 
-## Handoff comment
+## Handoff artifact
 
 Write for the agent that will fix the bug. No JSON or probe dumps.
 
-Format: the comment is for the fixing agent, so keep it unobtrusive. Line 1 is
-`<!-- readiness-assessment -->` outside any block. Put the entire assessment
-(verdict, triage, cause, fix boundary, tests, risk, blockers or unblock actions,
-footer) inside one `<details><summary>Agent assessment</summary>` block. Follow
-the opening tag with a blank line, the Markdown below, and `</details>`. Nothing
-else is visible. Do not drop any required evidence or gate. The fixing agent
-must read the full raw comment, including the collapsed block.
+Publish the handoff as an issue artifact, not a comment, so a `blocked` or
+`not-ready` result does not add noise to the issue thread. When authorized, use
+the `github-artifacts` MCP `issue_artifact_write` tool to create exactly one
+`generic` artifact named `Bug readiness assessment` on the assessed issue.
+Never update or delete other artifacts, including triage evidence.
+
+Then use `issue_artifact_read` on the returned issue-scoped artifact number and
+confirm it is on the assessed issue with the expected name, type, and content.
+Apply any caller-authorized outcome label only after that readback succeeds. If
+creation or readback is unavailable, fails, or is ambiguous, do not post a
+comment as a fallback, do not change labels, and do not blindly retry an
+uncertain write; report the publication blocker in the run result.
+
+Format: plain Markdown with no collapsed or `<details>` markup. Line 1 is
+`<!-- readiness-assessment -->`. Include the entire assessment below; do not
+drop any required evidence or gate.
 
 1. `## Bug readiness: <outcome>` and one sentence why.
 2. **Triage**: link to the triage result and each artifact read; summarize its
