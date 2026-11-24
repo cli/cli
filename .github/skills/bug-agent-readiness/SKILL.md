@@ -37,14 +37,26 @@ say what and how to unblock).
 repository's issue-triage process. Verify its source and that it applies to this
 issue, is complete, and is not superseded by a later result. It must explicitly
 classify the issue as a bug, state that the reported behavior was reproduced,
-and include or link to the supporting triage evidence. Review the linked
-evidence when available. A `bug` label alone, reporter evidence, a
-reproduction-only note, or a readiness assessment is not a triage result. If
-the result is absent, incomplete, stale, contradictory, or does not clearly
-establish both bug classification and reproduction, mark this gate `blocked`,
-identify the precise gap, and stop.
-If triage clearly reports a duplicate, a non-bug, or a failure to reproduce,
-mark the issue `not-ready` and stop.
+and include or link to supporting triage evidence. The comment and its linked
+**Label reasoning** and **Reproduction log** artifacts may together establish
+classification and reproduction. Read each relevant linked artifact; a link
+title, summary, or claim that an artifact exists is not evidence. The comment
+and artifacts must be from the same publication for this issue and agree on the
+symptom, classification, and reproduction.
+
+Check current labels and later triage or maintainer statements for evidence that
+the result is superseded. Missing label-event history alone does not block; do
+not infer that no intervening label change occurred. A `bug` label alone,
+reporter evidence, a reproduction-only note, or a readiness assessment is not
+a triage result.
+
+If the latest triage clearly reports a duplicate, a non-bug, or a failure to
+reproduce, mark the issue `not-ready` and stop. Otherwise, a conflicting
+current label or later contradictory statement blocks the gate, as does a
+result or relevant linked artifact that is absent, inaccessible, unread,
+incomplete, stale, or contradictory. Also block if the result does not clearly
+establish both bug classification and reproduction. Identify the precise gap
+and stop.
 
 **2. Root cause.** Use the triage evidence as the symptom baseline; do not
 repeat its end-to-end reproduction. Trace the relevant call path and identify
@@ -97,8 +109,8 @@ else is visible. Do not drop any required evidence or gate. The fixing agent
 must read the full raw comment, including the collapsed block.
 
 1. `## Bug readiness: <outcome>` and one sentence why.
-2. **Triage**: link to the triage result and summarize its bug classification,
-   reproduction outcome, and supporting evidence.
+2. **Triage**: link to the triage result and each artifact read; summarize its
+   bug classification, reproduction outcome, and supporting evidence.
 3. **Cause**: permalink at the full SHA, the mechanism, and why the triage
    evidence supports the diagnosis.
 4. **Fix**: change boundary, the contract it restores, and what must not change.
