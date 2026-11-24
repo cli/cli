@@ -930,7 +930,73 @@ func TestUpdateRun(t *testing.T) {
 				require.NoError(t, err)
 				assert.Contains(t, string(content), "Old content")
 			},
+			wantErr:    "SilentError",
 			wantStderr: "Skipping code-review: could not resolve monalisa/octocat-skills",
+		},
+		{
+			name: "errors after updating other skills when a repository can't be looked up",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				homeDir := t.TempDir()
+				t.Setenv("HOME", homeDir)
+				t.Setenv("USERPROFILE", homeDir)
+				for name, content := range map[string]string{
+					"code-review": heredoc.Doc(`
+						---
+						name: code-review
+						metadata:
+						  github-repo: https://github.com/monalisa/octocat-skills
+						  github-repo-id: "1"
+						  github-tree-sha: oldsha000
+						  github-path: skills/code-review
+						---
+						Old content
+					`),
+					"hubot-skill": heredoc.Doc(`
+						---
+						name: hubot-skill
+						metadata:
+						  github-repo: https://github.com/hubot/hubot-skills
+						  github-repo-id: "2"
+						  github-tree-sha: oldsha111
+						  github-path: skills/hubot-skill
+						---
+						Old hubot content
+					`),
+				} {
+					skillDir := filepath.Join(dir, name)
+					require.NoError(t, os.MkdirAll(skillDir, 0o755))
+					require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(content), 0o644))
+				}
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubCodeReviewUpdate(reg)
+				reg.Register(
+					httpmock.REST("GET", "repos/hubot/hubot-skills"),
+					httpmock.StatusStringResponse(404, `{"message": "Not Found"}`))
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(false)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewMockConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					Dir:       dir,
+					All:       true,
+				}
+			},
+			verify: func(t *testing.T, dir string) {
+				t.Helper()
+				content, err := os.ReadFile(filepath.Join(dir, "hubot-skill", "SKILL.md"))
+				require.NoError(t, err)
+				assert.Contains(t, string(content), "Old hubot content")
+			},
+			wantErr:    "SilentError",
+			wantStderr: "Skipping hubot-skill: could not resolve hubot/hubot-skills",
+			wantStdout: "Updated code-review",
 		},
 		{
 			name: "namespaced skill with --dir updates in-place",

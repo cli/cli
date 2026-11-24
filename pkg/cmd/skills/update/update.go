@@ -254,7 +254,10 @@ func updateRun(opts *UpdateOptions) error {
 		prompted[s.dir] = promptedEntry{name: s.name, source: owner + "/" + repo}
 	}
 
-	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+	startProgress := func() {
+		opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+	}
+	startProgress()
 
 	var updates []pendingUpdate
 	var pinned []installedSkill
@@ -264,7 +267,7 @@ func updateRun(opts *UpdateOptions) error {
 	repoRefs := make(map[repoKey]*discovery.ResolvedRef)
 	repoIDs := make(map[repoKey]int64)
 	repoErrors := make(map[repoKey]bool)
-	var refused bool
+	var refused, lookupFailed bool
 
 	for _, s := range installed {
 		if s.owner == "" || s.repo == "" {
@@ -286,9 +289,10 @@ func updateRun(opts *UpdateOptions) error {
 			repo, repoErr := discovery.FetchRepository(apiClient, s.repoHost, s.owner, s.repo)
 			if repoErr != nil {
 				repoErrors[key] = true
+				lookupFailed = true
 				opts.IO.StopProgressIndicator()
-				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: could not resolve %s/%s: %v\n", cs.WarningIcon(), s.name, s.owner, s.repo, repoErr)
-				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: could not resolve %s/%s: %v\n", cs.FailureIcon(), s.name, s.owner, s.repo, repoErr)
+				startProgress()
 				continue
 			}
 			repoIDs[key] = repo.ID
@@ -298,7 +302,7 @@ func updateRun(opts *UpdateOptions) error {
 				repoErrors[key] = true
 				opts.IO.StopProgressIndicator()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: could not resolve %s/%s: %v\n", cs.WarningIcon(), s.name, s.owner, s.repo, resolveErr)
-				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+				startProgress()
 				continue
 			}
 			repoRefs[key] = resolved
@@ -308,7 +312,7 @@ func updateRun(opts *UpdateOptions) error {
 				repoErrors[key] = true
 				opts.IO.StopProgressIndicator()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, discoverErr)
-				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+				startProgress()
 				continue
 			}
 			repoSkills[key] = skills
@@ -321,7 +325,7 @@ func updateRun(opts *UpdateOptions) error {
 			refused = true
 			opts.IO.StopProgressIndicator()
 			fmt.Fprintf(opts.IO.ErrOut, "%s Not updating %s: %s/%s is not the repository it was installed from. To use the new repository, reinstall the skill with `gh skill install`\n", cs.FailureIcon(), s.name, s.owner, s.repo)
-			opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+			startProgress()
 			continue
 		}
 
@@ -347,6 +351,7 @@ func updateRun(opts *UpdateOptions) error {
 	}
 
 	opts.IO.StopProgressIndicator()
+	skippedWithError := refused || lookupFailed
 
 	// Warn about prompted skills that weren't found in the remote repo
 	for _, entry := range prompted {
@@ -376,7 +381,7 @@ func updateRun(opts *UpdateOptions) error {
 	}
 
 	if len(updates) == 0 {
-		if refused {
+		if skippedWithError {
 			return cmdutil.SilentError
 		}
 		if opts.Force && opts.DryRun {
@@ -410,7 +415,7 @@ func updateRun(opts *UpdateOptions) error {
 	}
 
 	if opts.DryRun {
-		if refused {
+		if skippedWithError {
 			return cmdutil.SilentError
 		}
 		return nil
@@ -444,7 +449,7 @@ func updateRun(opts *UpdateOptions) error {
 		}
 	}
 
-	if failed || refused {
+	if failed || skippedWithError {
 		return cmdutil.SilentError
 	}
 
