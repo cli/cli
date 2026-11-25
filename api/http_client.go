@@ -11,6 +11,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/auth"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
@@ -76,9 +77,7 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	}
 
 	if opts.LogVerboseHTTP || debugEnabled {
-		clientOpts.Log = opts.Log
-		clientOpts.LogColorize = opts.LogColorize
-		clientOpts.LogVerboseHTTP = opts.LogVerboseHTTP
+		setLog(&clientOpts, opts.Log, opts.LogColorize, opts.LogVerboseHTTP)
 	}
 
 	ua := fmt.Sprintf("GitHub CLI %s", opts.AppVersion)
@@ -145,9 +144,7 @@ func NewExternalHTTPClient(opts ExternalHTTPClientOptions) (*http.Client, error)
 	}
 
 	if logVerboseHTTP || debugEnabled {
-		clientOpts.Log = opts.Log
-		clientOpts.LogColorize = opts.LogColorize
-		clientOpts.LogVerboseHTTP = logVerboseHTTP
+		setLog(&clientOpts, opts.Log, opts.LogColorize, logVerboseHTTP)
 	}
 
 	clientOpts.Headers = map[string]string{
@@ -160,6 +157,30 @@ func NewExternalHTTPClient(opts ExternalHTTPClientOptions) (*http.Client, error)
 	}
 
 	return client, nil
+}
+
+// setLog configures the HTTP logger. A verbose log includes response headers and bodies as the server sent them, so
+// its output is sanitized. It isn't colorized, since sanitizing would also neutralize the colors.
+func setLog(clientOpts *ghAPI.ClientOptions, log io.Writer, colorize, verbose bool) {
+	if verbose && log != nil {
+		log = sanitizingWriter{w: log}
+		colorize = false
+	}
+	clientOpts.Log = log
+	clientOpts.LogColorize = colorize
+	clientOpts.LogVerboseHTTP = verbose
+}
+
+// sanitizingWriter neutralizes terminal escape sequences and other control characters written through it.
+type sanitizingWriter struct {
+	w io.Writer
+}
+
+func (s sanitizingWriter) Write(p []byte) (int, error) {
+	if _, err := io.WriteString(s.w, iostreams.NewUntrustedBytes(p).String()); err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
 
 func NewCachedHTTPClient(httpClient *http.Client, ttl time.Duration) *http.Client {
