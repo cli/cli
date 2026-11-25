@@ -339,8 +339,18 @@ func TestInstall(t *testing.T) {
 		stubs         func(*httpmock.Registry)
 		onProgress    func(done, total int)
 		wantInstalled []string
+		wantLockKeys  []string
 		wantErr       string
 	}{
+		{
+			name: "namespaced skill records flat name in lockfile",
+			skills: []discovery.Skill{
+				{Namespace: "alice", Name: "deploy", Path: "skills/alice/deploy", TreeSHA: "tree-dep"},
+			},
+			stubs: func(reg *httpmock.Registry) { stubTreeAndBlob(reg, "tree-dep") },
+			wantInstalled: []string{"alice/deploy"},
+			wantLockKeys:  []string{"deploy"},
+		},
 		{
 			name: "single skill calls OnProgress",
 			skills: []discovery.Skill{
@@ -439,8 +449,19 @@ func TestInstall(t *testing.T) {
 			lockPath := filepath.Join(homeDir, ".agents", ".skill-lock.json")
 			lockData, err := os.ReadFile(lockPath)
 			require.NoError(t, err, "lockfile should have been written")
-			for _, name := range tt.wantInstalled {
+			expectedLockKeys := tt.wantLockKeys
+			if expectedLockKeys == nil {
+				expectedLockKeys = tt.wantInstalled
+			}
+			for _, name := range expectedLockKeys {
 				assert.Contains(t, string(lockData), name)
+			}
+			if len(tt.wantLockKeys) > 0 {
+				for _, name := range tt.wantInstalled {
+					if name != expectedLockKeys[0] {
+						assert.NotContains(t, string(lockData), fmt.Sprintf("%q:", name))
+					}
+				}
 			}
 			if tt.onProgress != nil {
 				assert.True(t, progressCount.Load() > 0, "OnProgress should have been called")

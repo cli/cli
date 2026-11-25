@@ -636,6 +636,7 @@ func TestInstallRun(t *testing.T) {
 				}
 			},
 			wantStdout: "Installed bob/xlsx-pro",
+			wantStderr: "xlsx-pro/",
 		},
 		{
 			name:  "remote install with invalid repo argument errors",

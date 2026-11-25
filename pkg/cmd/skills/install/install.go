@@ -1147,8 +1147,9 @@ func printFileTree(w io.Writer, cs *iostreams.ColorScheme, dir string, skillName
 	}
 	fmt.Fprintln(w)
 	for _, name := range skillNames {
-		skillDir := filepath.Join(dir, filepath.FromSlash(name))
-		fmt.Fprintf(w, "  %s\n", cs.Bold(name+"/"))
+		dirName := filepath.Base(filepath.FromSlash(name))
+		skillDir := filepath.Join(dir, dirName)
+		fmt.Fprintf(w, "  %s\n", cs.Bold(dirName+"/"))
 		printTreeDir(w, cs, skillDir, "  ")
 	}
 }
