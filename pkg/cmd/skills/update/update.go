@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -45,6 +46,7 @@ type installedSkill struct {
 	repoHost    string
 	owner       string
 	repo        string
+	repoID      int64  // repository ID at install time (0 = not recorded)
 	treeSHA     string // tree SHA at install time
 	pinned      string // explicit pin value (empty = unpinned)
 	sourcePath  string // original path in source repo (e.g. "skills/author/name")
@@ -57,6 +59,7 @@ type installedSkill struct {
 // pendingUpdate describes a single skill that has an available update.
 type pendingUpdate struct {
 	local    installedSkill
+	repoID   int64  // current ID of the repository at the recorded owner/name
 	newSHA   string // new tree SHA from remote
 	resolved *discovery.ResolvedRef
 	skill    discovery.Skill
@@ -88,6 +91,13 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			Pinned skills (installed with %[1]s--pin%[1]s) are skipped with a notice.
 			Use %[1]s--unpin%[1]s to clear the pinned version and include those skills
 			in the update.
+
+			A skill is only updated from the repository it was installed from. If
+			its owner and name now belong to a different repository, for example
+			after the original owner was renamed and someone else took the old name,
+			the skill is not updated. Reinstall it to use the new repository.
+			Skills installed by an earlier version of GitHub CLI have no recorded
+			repository, so they are updated with a warning.
 
 			Skills without GitHub metadata (e.g. installed manually or by another
 			tool) are prompted for their source repository in interactive mode.
@@ -244,7 +254,10 @@ func updateRun(opts *UpdateOptions) error {
 		prompted[s.dir] = promptedEntry{name: s.name, source: owner + "/" + repo}
 	}
 
-	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+	startProgress := func() {
+		opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+	}
+	startProgress()
 
 	var updates []pendingUpdate
 	var pinned []installedSkill
@@ -252,7 +265,9 @@ func updateRun(opts *UpdateOptions) error {
 	type repoKey struct{ host, owner, repo string }
 	repoSkills := make(map[repoKey][]discovery.Skill)
 	repoRefs := make(map[repoKey]*discovery.ResolvedRef)
+	repoIDs := make(map[repoKey]int64)
 	repoErrors := make(map[repoKey]bool)
+	var refused, lookupFailed bool
 
 	for _, s := range installed {
 		if s.owner == "" || s.repo == "" {
@@ -271,12 +286,23 @@ func updateRun(opts *UpdateOptions) error {
 
 		// Resolve ref and discover skills once per repo
 		if _, ok := repoRefs[key]; !ok {
+			repo, repoErr := discovery.FetchRepository(apiClient, s.repoHost, s.owner, s.repo)
+			if repoErr != nil {
+				repoErrors[key] = true
+				lookupFailed = true
+				opts.IO.StopProgressIndicator()
+				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: could not resolve %s/%s: %v\n", cs.FailureIcon(), s.name, s.owner, s.repo, repoErr)
+				startProgress()
+				continue
+			}
+			repoIDs[key] = repo.ID
+
 			resolved, resolveErr := discovery.ResolveRef(apiClient, s.repoHost, s.owner, s.repo, "")
 			if resolveErr != nil {
 				repoErrors[key] = true
 				opts.IO.StopProgressIndicator()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: could not resolve %s/%s: %v\n", cs.WarningIcon(), s.name, s.owner, s.repo, resolveErr)
-				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+				startProgress()
 				continue
 			}
 			repoRefs[key] = resolved
@@ -286,10 +312,21 @@ func updateRun(opts *UpdateOptions) error {
 				repoErrors[key] = true
 				opts.IO.StopProgressIndicator()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, discoverErr)
-				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+				startProgress()
 				continue
 			}
 			repoSkills[key] = skills
+		}
+
+		// The owner and name can be reused by a different repository, for
+		// example after a rename, so only update from the repository the
+		// skill was installed from.
+		if s.repoID != 0 && s.repoID != repoIDs[key] {
+			refused = true
+			opts.IO.StopProgressIndicator()
+			fmt.Fprintf(opts.IO.ErrOut, "%s Not updating %s: %s/%s is not the repository it was installed from. To use the new repository, reinstall the skill with `gh skill install`\n", cs.FailureIcon(), s.name, s.owner, s.repo)
+			startProgress()
+			continue
 		}
 
 		resolved := repoRefs[key]
@@ -303,6 +340,7 @@ func updateRun(opts *UpdateOptions) error {
 			if matched && (remote.TreeSHA != s.treeSHA || opts.Force) {
 				updates = append(updates, pendingUpdate{
 					local:    s,
+					repoID:   repoIDs[key],
 					newSHA:   remote.TreeSHA,
 					resolved: resolved,
 					skill:    remote,
@@ -313,6 +351,7 @@ func updateRun(opts *UpdateOptions) error {
 	}
 
 	opts.IO.StopProgressIndicator()
+	skippedWithError := refused || lookupFailed
 
 	// Warn about prompted skills that weren't found in the remote repo
 	for _, entry := range prompted {
@@ -342,6 +381,9 @@ func updateRun(opts *UpdateOptions) error {
 	}
 
 	if len(updates) == 0 {
+		if skippedWithError {
+			return cmdutil.SilentError
+		}
 		if opts.Force && opts.DryRun {
 			fmt.Fprintf(opts.IO.ErrOut, "All skills are up to date. Use --force without --dry-run to re-download anyway.\n")
 		} else {
@@ -365,7 +407,17 @@ func updateRun(opts *UpdateOptions) error {
 	}
 	fmt.Fprintln(opts.IO.ErrOut)
 
+	for _, u := range updates {
+		if _, ok := prompted[u.local.dir]; ok || u.local.repoID != 0 {
+			continue
+		}
+		fmt.Fprintf(opts.IO.ErrOut, "%s %s has no recorded repository, so it can't be confirmed that %s/%s is the repository it was installed from\n", cs.WarningIcon(), u.local.name, u.local.owner, u.local.repo)
+	}
+
 	if opts.DryRun {
+		if skippedWithError {
+			return cmdutil.SilentError
+		}
 		return nil
 	}
 
@@ -397,7 +449,7 @@ func updateRun(opts *UpdateOptions) error {
 		}
 	}
 
-	if failed {
+	if failed || skippedWithError {
 		return cmdutil.SilentError
 	}
 
@@ -437,6 +489,7 @@ func updateSkillInPlace(opts *UpdateOptions, u pendingUpdate, apiClient *api.Cli
 		Host:    u.local.repoHost,
 		Owner:   u.local.owner,
 		Repo:    u.local.repo,
+		RepoID:  u.repoID,
 		Ref:     u.resolved.Ref,
 		SHA:     u.resolved.SHA,
 		Skills:  []discovery.Skill{u.skill},
@@ -633,9 +686,36 @@ func parseInstalledSkill(data []byte, name, dir string, host *registry.AgentHost
 		s.treeSHA, _ = result.Metadata.Meta["github-tree-sha"].(string)
 		s.pinned, _ = result.Metadata.Meta["github-pinned"].(string)
 		s.sourcePath, _ = result.Metadata.Meta["github-path"].(string)
+		if s.metadataErr == nil {
+			s.repoID, s.metadataErr = parseRepoID(result.Metadata.Meta["github-repo-id"])
+		}
 	}
 
 	return s, true
+}
+
+// parseRepoID parses the github-repo-id metadata value. A missing value
+// returns 0, as skills installed by earlier versions don't record it.
+func parseRepoID(v any) (int64, error) {
+	var id int64
+	switch v := v.(type) {
+	case nil:
+		return 0, nil
+	case int:
+		id = int64(v)
+	case string:
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid github-repo-id %q", v)
+		}
+		id = parsed
+	default:
+		return 0, fmt.Errorf("invalid github-repo-id %v", v)
+	}
+	if id <= 0 {
+		return 0, fmt.Errorf("invalid github-repo-id %d", id)
+	}
+	return id, nil
 }
 
 // promptForSkillOrigin asks the user for the source repository of a skill

@@ -203,6 +203,35 @@ func FetchRepoVisibility(client *api.Client, host, owner, repo string) (RepoVisi
 	return parseRepoVisibility(resp.Visibility)
 }
 
+// Repository holds the repository fields that skills commands rely on.
+type Repository struct {
+	// ID is GitHub's immutable repository ID. Unlike the owner and name, it
+	// can't be taken over by another repository after a rename.
+	ID int64
+	// Visibility is empty when the API returns an unknown visibility.
+	Visibility RepoVisibility
+}
+
+// FetchRepository returns the repository's ID and visibility.
+func FetchRepository(client *api.Client, host, owner, repo string) (*Repository, error) {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo)
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		ID         int64  `json:"id"`
+		Visibility string `json:"visibility"`
+	}
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+		return nil, err
+	}
+	if resp.ID == 0 {
+		return nil, fmt.Errorf("could not determine the ID of repository %s/%s", owner, repo)
+	}
+	vis, _ := parseRepoVisibility(resp.Visibility)
+	return &Repository{ID: resp.ID, Visibility: vis}, nil
+}
+
 // ResolveRef determines the git ref to use for a given owner/repo.
 // Priority: explicit version > latest release tag > default branch.
 func ResolveRef(client *api.Client, host, owner, repo, version string) (*ResolvedRef, error) {
