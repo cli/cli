@@ -9,6 +9,8 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/internal/codespaces/connection"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestListPorts(t *testing.T) {
@@ -26,6 +28,40 @@ func TestListPorts(t *testing.T) {
 	err := a.ListPorts(ctx, selector, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestListPorts_escapesControlSequencesInLabel(t *testing.T) {
+	tests := []struct {
+		name string
+		tty  bool
+	}{
+		{name: "tty", tty: true},
+		{name: "not tty", tty: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockApi := GetMockApi(false)
+			mockApi.GetCodespaceRepositoryContentsFunc = func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
+				return []byte(`{"portsAttributes":{"0":{"label":"web \u001b]0;title\u0007end"}}}`), nil
+			}
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
+
+			a := &App{
+				io:        ios,
+				apiClient: mockApi,
+			}
+
+			selector := &CodespaceSelector{api: a.apiClient, codespaceName: "codespace-name"}
+			err := a.ListPorts(t.Context(), selector, nil)
+			require.NoError(t, err)
+
+			assert.Contains(t, stdout.String(), `web ^[]0;title^Gend`)
+			assert.NotContains(t, stdout.String(), "\x1b]")
+			assert.NotContains(t, stdout.String(), "\a")
+		})
 	}
 }
 
