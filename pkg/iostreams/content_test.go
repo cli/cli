@@ -48,6 +48,11 @@ func TestBinaryContentType(t *testing.T) {
 func TestContainsEscapeSequence(t *testing.T) {
 	assert.False(t, ContainsEscapeSequence([]byte("plain text")))
 	assert.True(t, ContainsEscapeSequence([]byte("danger\x1b[31m")))
+	assert.False(t, ContainsEscapeSequence([]byte("café — 日本")))
+	assert.True(t, ContainsEscapeSequence([]byte("danger\u009b31m")))
+	assert.True(t, ContainsEscapeSequence([]byte("danger\u009d0;title\u009c")))
+	assert.True(t, ContainsEscapeSequence([]byte("danger\u0080")))
+	assert.False(t, ContainsEscapeSequence([]byte("lone byte \x9b")))
 }
 
 func TestCopyGuardedContent(t *testing.T) {
@@ -84,6 +89,12 @@ func TestCopyGuardedContent(t *testing.T) {
 			name:      "text with escape is refused when piped",
 			content:   []byte("danger\x1b[31mtext"),
 			isTTY:     false,
+			wantErrIs: ErrEscapeSequence,
+		},
+		{
+			name:      "text with C1 control is refused",
+			content:   []byte("danger\u009b31mtext"),
+			isTTY:     true,
 			wantErrIs: ErrEscapeSequence,
 		},
 		{
