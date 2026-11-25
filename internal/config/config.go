@@ -9,8 +9,11 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/keyring"
 	o "github.com/cli/cli/v2/pkg/option"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
@@ -271,6 +274,15 @@ type AuthConfig struct {
 	warningsMu sync.Mutex
 	// warnings collects deduplicated messages, such as a skipped token refresh, for the user to see before gh exits.
 	warnings []string
+	// telemetry records token refresh attempts. It is nil until SetTelemetryRecorder is called, in which case nothing
+	// is recorded.
+	telemetry ghtelemetry.InvocationRecorder
+	// sleep pauses between the re-reads that follow a rejected refresh token. It is nil in production, where
+	// credentialRotatedByPeer falls back to time.Sleep. Tests set it to a no-op so a rejection does not slow them down.
+	sleep func(time.Duration)
+	// telemetryCommand is the command path reported with token refresh attempts. It is stored atomically because a
+	// background goroutine, such as the update check, may refresh a token while the command is still being resolved.
+	telemetryCommand atomic.Pointer[string]
 }
 
 // Warnings returns the deduplicated warnings recorded so far in this process, such as a skipped token refresh, in the
@@ -294,6 +306,18 @@ func (c *AuthConfig) addWarning(msg string) {
 // AuthConfig, a refresher set once remains available to every later caller.
 func (c *AuthConfig) SetTokenRefresher(refresher gh.TokenRefresher) {
 	c.refresher = refresher
+}
+
+// SetTelemetryRecorder supplies the recorder used to report token refresh attempts. Because Authentication returns a
+// single shared AuthConfig, a recorder set once remains available to every later caller.
+func (c *AuthConfig) SetTelemetryRecorder(recorder ghtelemetry.InvocationRecorder) {
+	c.telemetry = recorder
+}
+
+// SetTelemetryCommand sets the command reported with token refresh attempts, such as "gh auth token". Callers must
+// not pass user-defined names, like those of extensions or aliases.
+func (c *AuthConfig) SetTelemetryCommand(command string) {
+	c.telemetryCommand.Store(&command)
 }
 
 // ActiveTokenType reports what kind of credential the active token is, so a
@@ -602,41 +626,66 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 	// Run under the shared refresh lock so logout wins any race with an in-flight refresh: a concurrent refresh
 	// cannot persist a rotated credential after logout has removed the account and reported success.
 	return c.withFreshConfigForRefresh(func(lockErr error) error {
-		users := c.UsersForHost(hostname)
-
-		// The user's per-user keyring records are not covered by removing config keys, so delete them explicitly.
-		// Historically the per-user token was only removed in the single-user branch, leaking it when logging out of a
-		// multi-user host.
-		_ = keyring.Delete(refreshableServiceName(hostname), username)
-		_ = keyring.Delete(keyringServiceName(hostname), username)
-
-		// If there is only one (or zero) users, then we remove the host
-		// and unset the keyring tokens.
-		if len(users) < 2 {
-			_ = c.cfg.Remove([]string{hostsKey, hostname})
-			_ = keyring.Delete(keyringServiceName(hostname), "")
-			return ghConfig.Write(c.cfg)
-		}
-
-		// Otherwise, we remove the user from this host
-		_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
-
-		// This error is ignorable because we already know there is an active user for the host
-		activeUser, _ := c.ActiveUser(hostname)
-
-		// If the user we're removing isn't active, then we just write the config
-		if activeUser != username {
-			return ghConfig.Write(c.cfg)
-		}
-
-		// Otherwise we get the first user in the slice that isn't the user we're removing
-		switchUserIdx := slices.IndexFunc(users, func(n string) bool {
-			return n != username
-		})
-
-		// And activate them
-		return c.activateUser(hostname, users[switchUserIdx])
+		return c.logout(hostname, username)
 	})
+}
+
+// LogoutWithCredential coordinates credential-dependent cleanup with concurrent refreshes.
+// Advisory locking is best effort, matching Logout. The callback receives the lock outcome
+// and can save a replacement refreshable credential under the refresh mutex before revoking it.
+// Callback failures retain the most recently saved credentials.
+func (c *AuthConfig) LogoutWithCredential(hostname, username string, beforeLogout func(gh.Credential, error, func(gh.RefreshableCredential) error) error) error {
+	if beforeLogout == nil {
+		return errors.New("logout credential callback is required")
+	}
+	return c.withFreshConfigForRefresh(func(lockErr error) error {
+		if !slices.Contains(c.UsersForHost(hostname), username) {
+			return fmt.Errorf("not logged in to %s account %s", hostname, username)
+		}
+		credential, err := c.TokenForUser(hostname, username)
+		if err != nil {
+			return err
+		}
+		save := func(renewed gh.RefreshableCredential) error {
+			if !credential.IsRefreshable() {
+				return errors.New("cannot replace a non-refreshable logout credential")
+			}
+			replacement := credentialFromRefreshable(renewed, credential.Source)
+			if err := validateRefreshableCredential(replacement); err != nil {
+				return err
+			}
+			return c.persistRefreshedCredential(hostname, username, replacement, credential.Source == gh.TokenSourceKeyring)
+		}
+		if err := beforeLogout(credential, lockErr, save); err != nil {
+			return err
+		}
+		return c.logout(hostname, username)
+	})
+}
+
+func (c *AuthConfig) logout(hostname, username string) error {
+	users := c.UsersForHost(hostname)
+
+	// Per-user keyring records are not covered by removing config keys.
+	_ = keyring.Delete(refreshableServiceName(hostname), username)
+	_ = keyring.Delete(keyringServiceName(hostname), username)
+
+	if len(users) < 2 {
+		_ = c.cfg.Remove([]string{hostsKey, hostname})
+		_ = keyring.Delete(keyringServiceName(hostname), "")
+		return ghConfig.Write(c.cfg)
+	}
+
+	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
+	activeUser, _ := c.ActiveUser(hostname)
+	if activeUser != username {
+		return ghConfig.Write(c.cfg)
+	}
+
+	switchUserIdx := slices.IndexFunc(users, func(n string) bool {
+		return n != username
+	})
+	return c.activateUser(hostname, users[switchUserIdx])
 }
 
 func (c *AuthConfig) activateUser(hostname, user string) error {

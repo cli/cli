@@ -2,10 +2,13 @@ package factory
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
@@ -437,6 +440,64 @@ func TestTokenRefresherHttpClient(t *testing.T) {
 	assert.Contains(t, logOutput, "* Request to "+ts.URL)
 	assert.NotContains(t, logOutput, "> POST")
 	assert.NotContains(t, logOutput, "< HTTP")
+}
+
+func TestOAuthAppHttpClientDoesNotLogCredentials(t *testing.T) {
+	config.NewIsolatedTestConfig(t, "")
+	t.Setenv("GH_DEBUG", "api")
+	t.Setenv("GH_TOKEN", "gho_unrelated_user")
+
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	originalStderr := os.Stderr
+	os.Stderr = writer
+	t.Cleanup(func() {
+		os.Stderr = originalStderr
+		reader.Close()
+		writer.Close()
+	})
+	receivedHeaders := make(chan http.Header, 2)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders <- r.Header.Clone()
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Test-Secret", "response-secret")
+		w.WriteHeader(http.StatusInternalServerError)
+		if _, err := io.WriteString(w, `{"message":"gho_sensitive_token app-secret response-secret"}`); err != nil {
+			t.Errorf("write response: %v", err)
+		}
+	}))
+	defer ts.Close()
+
+	client, err := oauthAppHttpClientFunc("v1.2.3", "test-agent", &telemetry.NoOpService{})()
+	require.NoError(t, err)
+	for _, withAppAuth := range []bool{false, true} {
+		req, err := http.NewRequest(http.MethodDelete, ts.URL,
+			strings.NewReader(`{"access_token":"gho_sensitive_token"}`))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		if withAppAuth {
+			req.SetBasicAuth("app-client", "app-secret")
+		}
+		res, err := client.Do(req)
+		require.NoError(t, err)
+		_, err = io.Copy(io.Discard, res.Body)
+		require.NoError(t, err)
+		require.NoError(t, res.Body.Close())
+		require.Equal(t, http.StatusInternalServerError, res.StatusCode)
+		headers := <-receivedHeaders
+		if withAppAuth {
+			require.Equal(t, req.Header.Get("Authorization"), headers.Get("Authorization"))
+		} else {
+			require.Empty(t, headers.Get("Authorization"))
+		}
+		require.Equal(t, "GitHub CLI v1.2.3 Agent/test-agent", headers.Get("User-Agent"))
+		require.Equal(t, "2022-11-28", headers.Get("X-GitHub-Api-Version"))
+	}
+	require.NoError(t, writer.Close())
+	os.Stderr = originalStderr
+	logged, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	require.Empty(t, string(logged))
 }
 
 func TestNewGitClient(t *testing.T) {

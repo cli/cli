@@ -388,6 +388,167 @@ func TestLogoutAcquiresRefreshLock(t *testing.T) {
 	require.True(t, unlocked, "logout must release the shared refresh lock")
 }
 
+func TestLogoutWithCredential(t *testing.T) {
+	callbackErr := errors.New("revocation failed")
+	lockErr := errors.New("locking unavailable")
+	reloadErr := errors.New("cannot reload")
+	tests := []struct {
+		name         string
+		secure       bool
+		refreshable  bool
+		callbackErr  error
+		lockErr      error
+		reloadErr    error
+		removeUser   bool
+		removeToken  bool
+		wantErr      string
+		wantCallback bool
+		replace      bool
+		invalidPair  bool
+	}{
+		{name: "fresh plaintext credential", wantCallback: true},
+		{name: "fresh keyring credential", secure: true, wantCallback: true},
+		{name: "fresh plaintext refreshable credential", refreshable: true, wantCallback: true},
+		{name: "fresh keyring refreshable credential", secure: true, refreshable: true, wantCallback: true},
+		{name: "failed revocation retains plaintext pair", refreshable: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "failed revocation retains keyring pair", secure: true, refreshable: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "failed revocation retains replacement plaintext pair", refreshable: true, replace: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "failed revocation retains replacement keyring pair", secure: true, refreshable: true, replace: true, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "replacement proceeds without the advisory lock", refreshable: true, replace: true, lockErr: lockErr, wantCallback: true},
+		{name: "failed revocation retains renewed keyring pair without advisory locking", secure: true, refreshable: true, replace: true, lockErr: lockErr, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "read-only state directory does not prevent saving the replacement", refreshable: true, replace: true, lockErr: &fs.PathError{Op: "mkdir", Path: "state", Err: syscall.EROFS}, callbackErr: callbackErr, wantErr: "revocation failed", wantCallback: true},
+		{name: "replacement requires a refreshable original credential", replace: true, wantErr: "cannot replace a non-refreshable logout credential", wantCallback: true},
+		{name: "incomplete replacement preserves the original pair", refreshable: true, replace: true, invalidPair: true, wantErr: "refresh token is empty", wantCallback: true},
+		{name: "callback can reject an unavailable lock", lockErr: lockErr, callbackErr: lockErr, wantErr: "locking unavailable", wantCallback: true},
+		{name: "callback can allow local cleanup without the advisory lock", lockErr: lockErr, wantCallback: true},
+		{name: "failed reload retains credentials", reloadErr: reloadErr, wantErr: "could not reload configuration: cannot reload"},
+		{name: "removed selection does not remove another account", removeUser: true, wantErr: "not logged in to github.com account test-user"},
+		{name: "lookup failure does not use active token", removeToken: true, wantErr: "no token found for 'test-user'"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authCfg := newTestAuthConfig(t)
+			_, err := authCfg.Login("github.com", "other-user", "other-token", "https", false)
+			require.NoError(t, err)
+			if tt.refreshable {
+				_, err = authCfg.LoginRefreshable("github.com", "test-user",
+					gh.Credential{Token: "gho_old", RefreshToken: "ghr_old"}, "https", tt.secure)
+			} else {
+				_, err = authCfg.Login("github.com", "test-user", "gho_old", "https", tt.secure)
+			}
+			require.NoError(t, err)
+
+			locked, unlocked := false, false
+			authCfg.acquireRefreshLock = func(context.Context, string) (func(), error) {
+				if tt.lockErr != nil {
+					return nil, tt.lockErr
+				}
+				locked = true
+				return func() { locked, unlocked = false, true }, nil
+			}
+			authCfg.reloadConfig = func() error {
+				if tt.reloadErr != nil {
+					return tt.reloadErr
+				}
+				if tt.removeUser {
+					return authCfg.cfg.Remove([]string{hostsKey, "github.com", usersKey, "test-user"})
+				}
+				if tt.removeToken {
+					return authCfg.cfg.Remove([]string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey})
+				}
+				if !locked {
+					return nil
+				}
+				if tt.refreshable {
+					credential := gh.Credential{Token: "gho_fresh", RefreshToken: "ghr_fresh"}
+					if tt.secure {
+						setRefreshableKeyring(t, "github.com", "test-user", credential)
+					} else {
+						authCfg.setRefreshableInConfig("github.com", "test-user", credential)
+					}
+				} else if tt.secure {
+					require.NoError(t, keyring.Set(keyringServiceName("github.com"), "test-user", "gho_fresh"))
+				} else {
+					authCfg.cfg.Set([]string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey}, "gho_fresh")
+				}
+				return nil
+			}
+			called, replacementSaved := false, false
+			err = authCfg.LogoutWithCredential("github.com", "test-user", func(credential gh.Credential, callbackLockErr error, save func(gh.RefreshableCredential) error) error {
+				called = true
+				require.Equal(t, tt.lockErr == nil, locked)
+				require.ErrorIs(t, callbackLockErr, tt.lockErr)
+				require.False(t, authCfg.refreshMu.TryLock())
+				wantToken := "gho_fresh"
+				if tt.lockErr != nil {
+					wantToken = "gho_old"
+				}
+				require.Equal(t, wantToken, credential.Token)
+				if tt.refreshable {
+					wantRefresh := "ghr_fresh"
+					if tt.lockErr != nil {
+						wantRefresh = "ghr_old"
+					}
+					require.Equal(t, wantRefresh, credential.RefreshToken)
+				}
+				require.Contains(t, authCfg.UsersForHost("github.com"), "test-user")
+				if tt.replace {
+					replacement := gh.RefreshableCredential{AccessToken: "gho_rotated", RefreshToken: "ghr_rotated"}
+					if tt.invalidPair {
+						replacement.RefreshToken = ""
+					}
+					if err := save(replacement); err != nil {
+						return err
+					}
+					replacementSaved = true
+					require.Equal(t, tt.lockErr == nil, locked)
+					stored, err := authCfg.TokenForUser("github.com", "test-user")
+					require.NoError(t, err)
+					require.Equal(t, replacement.AccessToken, stored.Token)
+					require.Equal(t, replacement.RefreshToken, stored.RefreshToken)
+					require.Equal(t, credential.Source, stored.Source)
+				}
+				return tt.callbackErr
+			})
+			require.Equal(t, tt.wantCallback, called)
+			require.False(t, locked)
+			require.Equal(t, tt.lockErr == nil, unlocked)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				require.Contains(t, authCfg.UsersForHost("github.com"), "other-user")
+				if !tt.removeUser && !tt.removeToken {
+					credential, err := authCfg.TokenForUser("github.com", "test-user")
+					require.NoError(t, err)
+					wantToken := "gho_fresh"
+					if tt.lockErr != nil || tt.reloadErr != nil {
+						wantToken = "gho_old"
+					}
+					if replacementSaved {
+						wantToken = "gho_rotated"
+					}
+					require.Equal(t, wantToken, credential.Token)
+					if tt.refreshable {
+						wantRefresh := "ghr_fresh"
+						if tt.lockErr != nil || tt.reloadErr != nil {
+							wantRefresh = "ghr_old"
+						}
+						if replacementSaved {
+							wantRefresh = "ghr_rotated"
+						}
+						require.Equal(t, wantRefresh, credential.RefreshToken)
+					}
+				}
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, []string{"other-user"}, authCfg.UsersForHost("github.com"))
+				_, err = authCfg.TokenForUser("github.com", "test-user")
+				require.Error(t, err)
+				require.Equal(t, "other-token", authCfg.ActiveToken("github.com").Token)
+			}
+		})
+	}
+}
+
 func TestLogoutReloadsFreshConfigBeforeRemovingCredentials(t *testing.T) {
 	// A concurrent refresh can persist a rotated credential while logout is in flight. Because logout reloads the
 	// freshest config under the lock before deleting, it sees and removes whatever the refresh just wrote. Pin that
@@ -1002,6 +1163,92 @@ func TestActiveTokenWithRefresh(t *testing.T) {
 		// short-circuiting on a missing credential.
 		_, _, _ = authCfg.ActiveTokenWithRefresh(host)
 		require.Len(t, refresher.RefreshCalls(), 2)
+	})
+
+	t.Run("adopts a credential another process stored when the refresh token is rejected", func(t *testing.T) {
+		// A peer that took a different lock file (for example, under a different XDG_STATE_HOME) can spend the same
+		// refresh token first and store its replacement in the shared store. The rejected process must adopt that
+		// replacement rather than delete it, whether or not it held its own lock.
+		tests := []struct {
+			name      string
+			lockErr   error
+			secure    bool
+			storePeer func(t *testing.T, authCfg *AuthConfig, credential gh.Credential)
+		}{
+			{
+				name:   "keyring storage with the lock held",
+				secure: true,
+				storePeer: func(t *testing.T, authCfg *AuthConfig, credential gh.Credential) {
+					setRefreshableKeyring(t, host, user, credential)
+				},
+			},
+			{
+				name:    "plaintext storage without the lock",
+				lockErr: errors.New("advisory locking unavailable"),
+				storePeer: func(t *testing.T, authCfg *AuthConfig, credential gh.Credential) {
+					authCfg.setRefreshableInConfig(host, user, credential)
+				},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				authCfg := newTestAuthConfig(t)
+				authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+					return func() {}, tt.lockErr
+				}
+				future := time.Now().Add(8 * time.Hour)
+				peer := gh.Credential{Token: "peer-access", RefreshToken: "peer-refresh", ExpiresAt: &future}
+				refresher := &ghmock.TokenRefresherMock{
+					RefreshFunc: func(refreshToken string, hostname string) (gh.RefreshableCredential, error) {
+						tt.storePeer(t, authCfg, peer)
+						return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
+					},
+				}
+				authCfg.SetTokenRefresher(refresher)
+				loginRefreshableWithExpiry(t, authCfg, host, user, "old-access", "old-refresh", time.Now().Add(-time.Hour), tt.secure)
+
+				credential, status, err := authCfg.ActiveTokenWithRefresh(host)
+
+				require.NoError(t, err)
+				require.Equal(t, gh.RefreshStatusUnnecessary, status)
+				require.Equal(t, "peer-access", credential.Token)
+				require.Equal(t, "peer-refresh", credential.RefreshToken)
+				stored, _, err := authCfg.refreshableForUser(host, user)
+				require.NoError(t, err)
+				require.Equal(t, "peer-refresh", stored.RefreshToken)
+				require.Len(t, refresher.RefreshCalls(), 1)
+			})
+		}
+	})
+
+	t.Run("adopts a replacement stored while rechecking after the refresh token is rejected", func(t *testing.T) {
+		// The peer may still be writing its replacement when the server rejects our exchange, so the store is read
+		// again after short pauses before the credential is removed.
+		authCfg := newTestAuthConfig(t)
+		future := time.Now().Add(8 * time.Hour)
+		var pauses []time.Duration
+		authCfg.sleep = func(d time.Duration) {
+			pauses = append(pauses, d)
+			if d > 0 && len(pauses) == 2 {
+				setRefreshableKeyring(t, host, user, gh.Credential{Token: "peer-access", RefreshToken: "peer-refresh", ExpiresAt: &future})
+			}
+		}
+		authCfg.SetTokenRefresher(&ghmock.TokenRefresherMock{
+			RefreshFunc: func(refreshToken string, hostname string) (gh.RefreshableCredential, error) {
+				return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
+			},
+		})
+		loginRefreshableWithExpiry(t, authCfg, host, user, "old-access", "old-refresh", time.Now().Add(-time.Hour), true)
+
+		credential, status, err := authCfg.ActiveTokenWithRefresh(host)
+
+		require.NoError(t, err)
+		require.Equal(t, gh.RefreshStatusUnnecessary, status)
+		require.Equal(t, "peer-access", credential.Token)
+		require.Len(t, pauses, 2)
+		stored, _, err := authCfg.refreshableForUser(host, user)
+		require.NoError(t, err)
+		require.Equal(t, "peer-refresh", stored.RefreshToken)
 	})
 
 	t.Run("skips the refresh when the lock file is inaccessible", func(t *testing.T) {

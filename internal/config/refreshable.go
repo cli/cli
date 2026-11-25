@@ -406,9 +406,10 @@ func credentialFromRefreshable(renewed gh.RefreshableCredential, source string) 
 
 // refreshCredentialForUser renews the given refreshable credential when its access token is expiring and persists the
 // renewal to the same storage the credential already lives in. The caller supplies the already-resolved credential. It
-// returns the credential to use and the outcome: RefreshStatusUnnecessary when the token is still valid,
-// RefreshStatusInapplicable when no refresher is configured, RefreshStatusExpired when the server rejected the refresh
-// token (in which case the user's stored credential is removed so re-authentication is required), RefreshStatusFailed
+// returns the credential to use and the outcome: RefreshStatusUnnecessary when the token is still valid or another
+// process replaced the stored credential (see credentialRotatedByPeer), RefreshStatusInapplicable when no refresher is
+// configured, RefreshStatusExpired when the server rejected the refresh token and no replacement was stored (in which
+// case the user's stored credential is removed so re-authentication is required), RefreshStatusFailed
 // when the exchange or persistence fails for a transient reason, RefreshStatusSkipped when the refresh lock file is
 // inaccessible (see isRefreshLockInaccessible), and RefreshStatusDone when a renewed credential was stored. The
 // re-read, token exchange, and write run as one unit under the cross-process refresh lock so concurrent gh processes
@@ -423,14 +424,28 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 
 	result := credential
 	status := gh.RefreshStatusFailed
+
+	attempt := refreshAttempt{
+		outcome: refreshOutcomeIncomplete,
+		lock:    refreshLockStateUnknown,
+		storage: refreshStorageUnknown,
+	}
+	defer func() { c.recordRefreshAttempt(hostname, attempt) }()
+	started := time.Now()
+
 	err := c.withFreshConfigForRefresh(func(lockErr error) error {
+		attempt.lockWait = time.Since(started)
+		attempt.lock = refreshLockState(lockErr)
 		lockHeld := lockErr == nil
 		// Re-read under the lock: another gh process may have refreshed the credential while we waited for it.
 		current, secure, err := c.refreshableForUser(hostname, username)
 		if err != nil {
+			attempt.outcome = refreshOutcomeReadFailed
 			return err
 		}
+		attempt.storage = refreshStorageType(secure)
 		if !accessTokenNeedsRefresh(current, timeNow()) {
+			attempt.outcome = refreshOutcomeAlreadyFresh
 			result = current
 			status = gh.RefreshStatusUnnecessary
 			return nil
@@ -441,6 +456,7 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 		// attempt the exchange and keep presenting the current access token. Even if it looks expired, the server
 		// may still accept it (for example under clock skew), so let the server decide.
 		if isRefreshLockInaccessible(lockErr) {
+			attempt.outcome = refreshOutcomeSkipped
 			result = current
 			status = gh.RefreshStatusSkipped
 			c.addWarning(fmt.Sprintf(
@@ -455,51 +471,82 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 			// handling below, including gating destructive cleanup on lockHeld.
 			result = gh.Credential{}
 			status = gh.RefreshStatusExpired
+			attempt.outcome = refreshOutcomeRejectedKept
 			if lockHeld {
-				_ = c.removeCredentialForUser(hostname, username)
+				attempt.outcome = refreshOutcomeRejectedRemoved
+				if c.removeCredentialForUser(hostname, username) != nil {
+					attempt.outcome = refreshOutcomeRejectedRemoveFailed
+				}
 			}
 			return gh.ErrRefreshTokenInvalid
 		}
+		exchangeStarted := time.Now()
 		renewed, err := c.refresher.Refresh(current.RefreshToken, hostname)
+		attempt.exchange = time.Since(exchangeStarted)
 		if err != nil {
 			result = current
 			// A refresh token the server rejects can never succeed on retry, so classify it distinctly from a
 			// transient failure to let callers advise re-authentication instead of a pointless retry.
-			if errors.Is(err, gh.ErrRefreshTokenInvalid) {
-				status = gh.RefreshStatusExpired
-				// The credential is now useless: we only reach a refresh because the access token is expiring or
-				// already expired, and the refresh token that could renew it has just been rejected, so no future
-				// call can revive it. Remove this user's stored credential so subsequent *WithRefresh callers
-				// resolve no refresh token and stop re-sending a request the server will always reject, which could
-				// otherwise hammer the token endpoint on every gh invocation.
-				//
-				// We deliberately wipe only this user's records and leave the active-user pointer and the rest of
-				// the host configuration alone, rather than reusing Logout. On a multi-user host Logout would
-				// silently switch the active account to a different user as a side effect of a token refresh, so a
-				// subsequent request would be sent as someone else entirely. That is a surprising and potentially
-				// dangerous behaviour. Leaving a dangling active user with no token is a deliberately broken state:
-				// gh treats it as unauthenticated and the user must run 'gh auth login' again before using gh.
-				//
-				// The removal only runs when the cross-process lock was held. Without the lock a rejection is
-				// ambiguous: a peer may have already spent this same single-use refresh token and be about to
-				// persist the replacement. Deleting here could race that peer and discard its valid credential,
-				// forcing a needless re-authentication. When the lock is unavailable we therefore leave storage
-				// untouched and let the peer's write stand, while still reporting the rejection so the caller can
-				// advise re-authentication. Removal is best effort even when attempted: a failure does not change
-				// the reported status, and we return an empty credential because the stored one is being discarded.
-				result = gh.Credential{}
-				if lockHeld {
-					_ = c.removeCredentialForUser(hostname, username)
+			if !errors.Is(err, gh.ErrRefreshTokenInvalid) {
+				attempt.outcome = refreshOutcomeExchangeFailed
+				return err
+			}
+
+			// A rejection does not prove the stored credential is dead. Another gh process may have spent the same
+			// refresh token moments earlier and stored its replacement, even though we held the lock: processes that
+			// resolve different state directories (for example, a different XDG_STATE_HOME or HOME) take different
+			// lock files while sharing the same keyring or hosts.yml. Re-read the store before giving up, and adopt
+			// a credential whose refresh token differs from the rejected one instead of deleting it. Its access token
+			// was just issued, so it is used as is, and the server decides whether it is still valid.
+			recheckStarted := time.Now()
+			rotated, ok := c.credentialRotatedByPeer(hostname, username, current.RefreshToken)
+			attempt.recheck = time.Since(recheckStarted)
+			if ok {
+				attempt.outcome = refreshOutcomeRejectedAdopted
+				result = rotated
+				status = gh.RefreshStatusUnnecessary
+				return nil
+			}
+
+			status = gh.RefreshStatusExpired
+			// The credential is now useless: we only reach a refresh because the access token is expiring or
+			// already expired, and the refresh token that could renew it has just been rejected, so no future
+			// call can revive it. Remove this user's stored credential so subsequent *WithRefresh callers
+			// resolve no refresh token and stop re-sending a request the server will always reject, which could
+			// otherwise hammer the token endpoint on every gh invocation.
+			//
+			// We deliberately wipe only this user's records and leave the active-user pointer and the rest of
+			// the host configuration alone, rather than reusing Logout. On a multi-user host Logout would
+			// silently switch the active account to a different user as a side effect of a token refresh, so a
+			// subsequent request would be sent as someone else entirely. That is a surprising and potentially
+			// dangerous behaviour. Leaving a dangling active user with no token is a deliberately broken state:
+			// gh treats it as unauthenticated and the user must run 'gh auth login' again before using gh.
+			//
+			// The removal only runs when the cross-process lock was held. Without the lock a rejection is
+			// ambiguous: a peer may have already spent this same single-use refresh token and be about to
+			// persist the replacement. Deleting here could race that peer and discard its valid credential,
+			// forcing a needless re-authentication. When the lock is unavailable we therefore leave storage
+			// untouched and let the peer's write stand, while still reporting the rejection so the caller can
+			// advise re-authentication. Removal is best effort even when attempted: a failure does not change
+			// the reported status, and we return an empty credential because the stored one is being discarded.
+			result = gh.Credential{}
+			attempt.outcome = refreshOutcomeRejectedKept
+			if lockHeld {
+				attempt.outcome = refreshOutcomeRejectedRemoved
+				if c.removeCredentialForUser(hostname, username) != nil {
+					attempt.outcome = refreshOutcomeRejectedRemoveFailed
 				}
 			}
 			return err
 		}
 		newCredential := credentialFromRefreshable(renewed, current.Source)
 		if err := validateRefreshableCredential(newCredential); err != nil {
+			attempt.outcome = refreshOutcomeInvalidResponse
 			result = current
 			return err
 		}
 		if err := c.persistRefreshedCredential(hostname, username, newCredential, secure); err != nil {
+			attempt.outcome = refreshOutcomePersistFailed
 			// This is a dead-end because the old credential is no longer usable (due to refresh) and the new one is
 			// failed to store.
 			//
@@ -513,11 +560,43 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 			result = current
 			return fmt.Errorf("failed to persist refreshed credential; the user needs to re-authenticate via 'gh auth login': %w", err)
 		}
+		attempt.outcome = refreshOutcomeDone
 		result = newCredential
 		status = gh.RefreshStatusDone
 		return nil
 	})
+	if err != nil && attempt.outcome == refreshOutcomeIncomplete {
+		// withFreshConfigForRefresh only fails without running the callback when reloading the configuration fails.
+		attempt.outcome = refreshOutcomeReloadFailed
+	}
 	return result, status, err
+}
+
+// refreshRejectionRecheckDelays are the pauses before each re-read in credentialRotatedByPeer. The first re-read is
+// immediate; the later ones give a peer that spent the same refresh token moments earlier time to finish storing its
+// replacement, since a keyring write takes tens of milliseconds and can occasionally take much longer.
+var refreshRejectionRecheckDelays = []time.Duration{0, 250 * time.Millisecond, 750 * time.Millisecond}
+
+// credentialRotatedByPeer re-reads the user's stored refreshable credential after the server rejected
+// rejectedRefreshToken, and returns it when its refresh token differs, which means another process (or a new login)
+// replaced the credential. Each attempt reloads the configuration from disk first, so a replacement written to
+// hosts.yml by another process is observed, not just one written to the keyring. It must run under
+// withFreshConfigForRefresh, whose in-place reload contract it relies on.
+func (c *AuthConfig) credentialRotatedByPeer(hostname, username, rejectedRefreshToken string) (gh.Credential, bool) {
+	sleep := c.sleep
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	for _, delay := range refreshRejectionRecheckDelays {
+		sleep(delay)
+		// A failed reload still leaves the keyring readable, so carry on with the in-memory configuration.
+		_ = c.reload()
+		stored, _, err := c.refreshableForUser(hostname, username)
+		if err == nil && stored.RefreshToken != rejectedRefreshToken {
+			return stored, true
+		}
+	}
+	return gh.Credential{}, false
 }
 
 // removeCredentialForUser deletes every stored credential record for the user on the host, covering both the

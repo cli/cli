@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/microsoft/dev-tunnels/go/tunnels"
 	"github.com/muhammadmuzzammil1998/jsonc"
 	"github.com/spf13/cobra"
@@ -115,7 +116,7 @@ func (a *App) ListPorts(ctx context.Context, selector *CodespaceSelector, export
 		// Convert the ACE to a friendly visibility string (private, org, public)
 		visibility := portforwarder.AccessControlEntriesToVisibility(port.Port.AccessControl.Entries)
 
-		tp.AddField(port.Label())
+		tp.AddField(iostreams.NewUntrusted(port.Label()).String())
 		tp.AddField(cs.Yellow(fmt.Sprintf("%d", port.Port.PortNumber)))
 		tp.AddField(visibility)
 		tp.AddField(port.BrowseURL())
