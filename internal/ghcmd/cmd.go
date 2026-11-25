@@ -192,6 +192,10 @@ func Main() exitCode {
 		expandedArgs = append(expandedArgs, "--help")
 	}
 
+	if cfgErr == nil {
+		cfg.Authentication().SetTelemetryCommand(telemetryCommandPath(rootCmd, expandedArgs))
+	}
+
 	rootCmd.SetArgs(expandedArgs)
 
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
@@ -275,6 +279,25 @@ func Main() exitCode {
 func isExtensionCommand(rootCmd *cobra.Command, args []string) bool {
 	c, _, err := rootCmd.Find(args)
 	return err == nil && c != nil && c.GroupID == "extension"
+}
+
+// refreshTelemetryCommands lists the commands reported by name with token refresh attempts. They are the commands that
+// refresh a token directly rather than through the HTTP client.
+var refreshTelemetryCommands = []string{
+	"gh auth git-credential",
+	"gh auth refresh", // While discovering the current token's scopes before re-authenticating.
+	"gh auth status",
+	"gh auth token",
+}
+
+// telemetryCommandPath returns the path of the command that args resolve to when it is in refreshTelemetryCommands,
+// and "other" for any other command, including extensions, aliases, and arguments that resolve to no command.
+func telemetryCommandPath(rootCmd *cobra.Command, args []string) string {
+	c, _, err := rootCmd.Find(args)
+	if err == nil && c != nil && slices.Contains(refreshTelemetryCommands, c.CommandPath()) {
+		return c.CommandPath()
+	}
+	return "other"
 }
 
 // printError writes err to out, followed by usage information when the error

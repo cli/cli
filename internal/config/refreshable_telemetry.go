@@ -110,6 +110,7 @@ func (c *AuthConfig) recordRefreshAttempt(hostname string, attempt refreshAttemp
 	c.telemetry.Record(ghtelemetry.Event{
 		Type: refreshTelemetryEventType,
 		Dimensions: ghtelemetry.Dimensions{
+			"refresh_command":     c.refreshTelemetryCommand(),
 			"refresh_outcome":     attempt.outcome,
 			"refresh_lock":        attempt.lock,
 			"storage_type":        attempt.storage,
@@ -123,6 +124,15 @@ func (c *AuthConfig) recordRefreshAttempt(hostname string, attempt refreshAttemp
 			"recheck_ms":   attempt.recheck.Milliseconds(),
 		},
 	})
+}
+
+// refreshTelemetryCommand returns the command path set by SetTelemetryCommand, or "unknown" when a refresh happens
+// before the command is resolved.
+func (c *AuthConfig) refreshTelemetryCommand() string {
+	if command := c.telemetryCommand.Load(); command != nil {
+		return *command
+	}
+	return "unknown"
 }
 
 func envSet(name string) string {

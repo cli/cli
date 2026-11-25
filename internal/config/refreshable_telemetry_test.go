@@ -184,6 +184,35 @@ func TestRefreshTelemetryReportsDirectoryOverrides(t *testing.T) {
 	require.Equal(t, "true", spy.events[0].Dimensions["xdg_state_home_set"])
 }
 
+func TestRefreshTelemetryReportsCommand(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+		want    string
+	}{
+		{name: "set", command: "gh auth token", want: "gh auth token"},
+		{name: "not set yet", want: "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authCfg := newTestAuthConfig(t)
+			loginRefreshableWithExpiry(t, authCfg, "github.com", "test-user", "old-access", "old-refresh", time.Now().Add(-time.Hour), false)
+			authCfg.SetTokenRefresher(renewingRefresher())
+			if tt.command != "" {
+				authCfg.SetTelemetryCommand(tt.command)
+			}
+			spy := &refreshTelemetrySpy{}
+			authCfg.SetTelemetryRecorder(spy)
+
+			_, _, err := authCfg.ActiveTokenWithRefresh("github.com")
+
+			require.NoError(t, err)
+			require.Len(t, spy.events, 1)
+			require.Equal(t, tt.want, spy.events[0].Dimensions["refresh_command"])
+		})
+	}
+}
+
 func TestRefreshTelemetryRecordsUnfinishedAttempts(t *testing.T) {
 	t.Run("when reloading the configuration fails", func(t *testing.T) {
 		authCfg := newTestAuthConfig(t)

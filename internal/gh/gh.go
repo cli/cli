@@ -326,6 +326,10 @@ type AuthConfig interface {
 	// construction because the telemetry service depends on configuration read through this AuthConfig.
 	SetTelemetryRecorder(recorder ghtelemetry.InvocationRecorder)
 
+	// SetTelemetryCommand sets the command path reported with token refresh attempts. It must never be a user-defined
+	// name, such as that of an extension or alias.
+	SetTelemetryCommand(command string)
+
 	// The following methods are only for testing and that is a design smell we should consider fixing.
 
 	// SetActiveToken will override any token resolution and return the given token and source for all calls to

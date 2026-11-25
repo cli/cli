@@ -721,3 +721,28 @@ func Test_printAuthWarnings(t *testing.T) {
 
 	assert.Equal(t, "! first line\n  second line\n! another warning\n", out.String())
 }
+
+func Test_telemetryCommandPath(t *testing.T) {
+	rootCmd := &cobra.Command{Use: "gh"}
+	authCmd := &cobra.Command{Use: "auth"}
+	authCmd.AddCommand(&cobra.Command{Use: "token", Run: func(*cobra.Command, []string) {}})
+	rootCmd.AddCommand(authCmd)
+	prCmd := &cobra.Command{Use: "pr"}
+	prCmd.AddCommand(&cobra.Command{Use: "list", Run: func(*cobra.Command, []string) {}})
+	rootCmd.AddCommand(prCmd)
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "listed command", args: []string{"auth", "token", "--hostname", "github.com"}, want: "gh auth token"},
+		{name: "unlisted command", args: []string{"pr", "list"}, want: "other"},
+		{name: "unknown command", args: []string{"my-extension"}, want: "other"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, telemetryCommandPath(rootCmd, tt.args))
+		})
+	}
+}
