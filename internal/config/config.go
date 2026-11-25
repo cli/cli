@@ -9,8 +9,11 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/keyring"
 	o "github.com/cli/cli/v2/pkg/option"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
@@ -271,6 +274,15 @@ type AuthConfig struct {
 	warningsMu sync.Mutex
 	// warnings collects deduplicated messages, such as a skipped token refresh, for the user to see before gh exits.
 	warnings []string
+	// telemetry records token refresh attempts. It is nil until SetTelemetryRecorder is called, in which case nothing
+	// is recorded.
+	telemetry ghtelemetry.InvocationRecorder
+	// sleep pauses between the re-reads that follow a rejected refresh token. It is nil in production, where
+	// credentialRotatedByPeer falls back to time.Sleep. Tests set it to a no-op so a rejection does not slow them down.
+	sleep func(time.Duration)
+	// telemetryCommand is the command path reported with token refresh attempts. It is stored atomically because a
+	// background goroutine, such as the update check, may refresh a token while the command is still being resolved.
+	telemetryCommand atomic.Pointer[string]
 }
 
 // Warnings returns the deduplicated warnings recorded so far in this process, such as a skipped token refresh, in the
@@ -294,6 +306,18 @@ func (c *AuthConfig) addWarning(msg string) {
 // AuthConfig, a refresher set once remains available to every later caller.
 func (c *AuthConfig) SetTokenRefresher(refresher gh.TokenRefresher) {
 	c.refresher = refresher
+}
+
+// SetTelemetryRecorder supplies the recorder used to report token refresh attempts. Because Authentication returns a
+// single shared AuthConfig, a recorder set once remains available to every later caller.
+func (c *AuthConfig) SetTelemetryRecorder(recorder ghtelemetry.InvocationRecorder) {
+	c.telemetry = recorder
+}
+
+// SetTelemetryCommand sets the command reported with token refresh attempts, such as "gh auth token". Callers must
+// not pass user-defined names, like those of extensions or aliases.
+func (c *AuthConfig) SetTelemetryCommand(command string) {
+	c.telemetryCommand.Store(&command)
 }
 
 // ActiveTokenType reports what kind of credential the active token is, so a

@@ -13,6 +13,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/pkg/auth"
 	o "github.com/cli/cli/v2/pkg/option"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
@@ -320,6 +321,14 @@ type AuthConfig interface {
 	// refresher depends on the plain HTTP client, which is only available once the command factory has assembled its
 	// dependencies.
 	SetTokenRefresher(refresher TokenRefresher)
+
+	// SetTelemetryRecorder supplies the recorder used to report token refresh attempts. It is provided after
+	// construction because the telemetry service depends on configuration read through this AuthConfig.
+	SetTelemetryRecorder(recorder ghtelemetry.InvocationRecorder)
+
+	// SetTelemetryCommand sets the command path reported with token refresh attempts. It must never be a user-defined
+	// name, such as that of an extension or alias.
+	SetTelemetryCommand(command string)
 
 	// The following methods are only for testing and that is a design smell we should consider fixing.
 
