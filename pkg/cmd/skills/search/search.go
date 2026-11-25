@@ -488,7 +488,7 @@ func renderTable(io *iostreams.IOStreams, skills []skillResult) error {
 	for _, s := range skills {
 		table.AddField(s.Repo)
 		table.AddField(s.qualifiedName())
-		desc := s.Description
+		desc := iostreams.NewUntrusted(s.Description).String()
 		if isTTY {
 			desc = text.Truncate(descWidth, desc)
 		}
@@ -519,7 +519,7 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 		}
 		descStr := ""
 		if s.Description != "" {
-			desc := strings.Join(strings.Fields(s.Description), " ")
+			desc := strings.Join(strings.Fields(iostreams.NewUntrusted(s.Description).String()), " ")
 			descStr = "\n       " + cs.Muted(text.Truncate(descWidth, desc))
 		}
 		options[i] = s.qualifiedName() + "  " + cs.Muted(s.Repo) + starStr + descStr

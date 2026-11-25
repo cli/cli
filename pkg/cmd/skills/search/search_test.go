@@ -717,3 +717,34 @@ func TestSearchRun_TelemetryRecordsInstallFromResults(t *testing.T) {
 	assert.Empty(t, installEvent.Dimensions["owner"],
 		"skill_search_install must not record the search owner filter")
 }
+
+func TestRenderTableEscapesDescriptionControlCharacters(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+	skills := []skillResult{{Repo: "monalisa/skills", SkillName: "poc", Description: "a\x1b[31mb"}}
+
+	require.NoError(t, renderTable(ios, skills))
+
+	assert.NotContains(t, stdout.String(), "\x1b")
+	assert.Contains(t, stdout.String(), "a^[[31mb")
+}
+
+func TestPromptInstallEscapesDescriptionControlCharacters(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	var gotOptions []string
+	opts := &SearchOptions{
+		IO: ios,
+		Prompter: &prompter.PrompterMock{
+			MultiSelectFunc: func(_ string, _ []string, options []string) ([]int, error) {
+				gotOptions = options
+				return nil, nil
+			},
+		},
+	}
+	skills := []skillResult{{Repo: "monalisa/skills", SkillName: "poc", Description: "a\x1b[31mb"}}
+
+	require.NoError(t, promptInstall(opts, skills))
+
+	require.Len(t, gotOptions, 1)
+	assert.NotContains(t, gotOptions[0], "\x1b")
+	assert.Contains(t, gotOptions[0], "a^[[31mb")
+}
