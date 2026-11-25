@@ -474,7 +474,9 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 			attempt.outcome = refreshOutcomeRejectedKept
 			if lockHeld {
 				attempt.outcome = refreshOutcomeRejectedRemoved
-				_ = c.removeCredentialForUser(hostname, username)
+				if c.removeCredentialForUser(hostname, username) != nil {
+					attempt.outcome = refreshOutcomeRejectedRemoveFailed
+				}
 			}
 			return gh.ErrRefreshTokenInvalid
 		}
@@ -531,7 +533,9 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 			attempt.outcome = refreshOutcomeRejectedKept
 			if lockHeld {
 				attempt.outcome = refreshOutcomeRejectedRemoved
-				_ = c.removeCredentialForUser(hostname, username)
+				if c.removeCredentialForUser(hostname, username) != nil {
+					attempt.outcome = refreshOutcomeRejectedRemoveFailed
+				}
 			}
 			return err
 		}

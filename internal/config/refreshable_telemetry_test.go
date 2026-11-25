@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
@@ -104,6 +106,17 @@ func TestRefreshTelemetry(t *testing.T) {
 			name:        "rejected and removed",
 			refresher:   func(*testing.T) gh.TokenRefresher { return rejectingRefresher(nil) },
 			wantOutcome: "rejected_removed",
+			wantLock:    "held",
+			wantStorage: "plaintext",
+		},
+		{
+			name: "rejected but removal failed",
+			refresher: func(t *testing.T) gh.TokenRefresher {
+				return rejectingRefresher(func() {
+					require.NoError(t, os.Chmod(filepath.Join(os.Getenv("GH_CONFIG_DIR"), "hosts.yml"), 0400))
+				})
+			},
+			wantOutcome: "rejected_remove_failed",
 			wantLock:    "held",
 			wantStorage: "plaintext",
 		},

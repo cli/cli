@@ -27,6 +27,9 @@ const (
 	refreshOutcomeRejectedAdopted = "rejected_adopted"
 	// refreshOutcomeRejectedRemoved means the server rejected the refresh token and gh removed the stored credential.
 	refreshOutcomeRejectedRemoved = "rejected_removed"
+	// refreshOutcomeRejectedRemoveFailed means the server rejected the refresh token and gh tried to remove the stored
+	// credential, but writing the configuration failed, so the credential may still be on disk.
+	refreshOutcomeRejectedRemoveFailed = "rejected_remove_failed"
 	// refreshOutcomeRejectedKept means the server rejected the refresh token, but gh kept the stored credential
 	// because it did not hold the lock.
 	refreshOutcomeRejectedKept = "rejected_kept"
