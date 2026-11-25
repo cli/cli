@@ -352,6 +352,19 @@ func TestInstall(t *testing.T) {
 			wantLockKeys:  []string{"deploy"},
 		},
 		{
+			name: "multiple skills with namespaced skill records flat names in lockfile",
+			skills: []discovery.Skill{
+				{Namespace: "alice", Name: "deploy", Path: "skills/alice/deploy", TreeSHA: "tree-dep"},
+				{Name: "code-review", Path: "skills/code-review", TreeSHA: "tree-cr"},
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubTreeAndBlob(reg, "tree-dep")
+				stubTreeAndBlob(reg, "tree-cr")
+			},
+			wantInstalled: []string{"alice/deploy", "code-review"},
+			wantLockKeys:  []string{"deploy", "code-review"},
+		},
+		{
 			name: "single skill calls OnProgress",
 			skills: []discovery.Skill{
 				{Name: "code-review", Path: "skills/code-review", TreeSHA: "tree-cr"},
@@ -458,7 +471,14 @@ func TestInstall(t *testing.T) {
 			}
 			if len(tt.wantLockKeys) > 0 {
 				for _, name := range tt.wantInstalled {
-					if name != expectedLockKeys[0] {
+					found := false
+					for _, k := range expectedLockKeys {
+						if name == k {
+							found = true
+							break
+						}
+					}
+					if !found {
 						assert.NotContains(t, string(lockData), fmt.Sprintf("%q:", name))
 					}
 				}
