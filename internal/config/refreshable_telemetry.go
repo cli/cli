@@ -19,9 +19,9 @@ const refreshTelemetryEventType = "auth_token_refresh"
 const (
 	// refreshOutcomeDone means gh exchanged the refresh token and stored the renewed credential.
 	refreshOutcomeDone = "done"
-	// refreshOutcomePeerRefreshed means the credential re-read under the lock no longer needed a refresh, because
-	// another process renewed it while this one waited.
-	refreshOutcomePeerRefreshed = "peer_refreshed"
+	// refreshOutcomeAlreadyFresh means the credential re-read under the lock no longer needed a refresh. Usually
+	// another process or goroutine renewed it first, but a new login stored in the meantime looks the same.
+	refreshOutcomeAlreadyFresh = "already_fresh"
 	// refreshOutcomeRejectedAdopted means the server rejected the refresh token, but the store then held a different
 	// credential, which gh adopted instead of removing it. See credentialRotatedByPeer.
 	refreshOutcomeRejectedAdopted = "rejected_adopted"
@@ -42,6 +42,9 @@ const (
 	refreshOutcomeReadFailed = "read_failed"
 	// refreshOutcomeReloadFailed means the configuration could not be reloaded from disk under the lock.
 	refreshOutcomeReloadFailed = "reload_failed"
+	// refreshOutcomeIncomplete means the attempt ended without reaching any other outcome, which only a panic can
+	// cause.
+	refreshOutcomeIncomplete = "incomplete"
 )
 
 // Values of the refresh_lock dimension of the auth_token_refresh event.

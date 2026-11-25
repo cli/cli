@@ -426,10 +426,11 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 	status := gh.RefreshStatusFailed
 
 	attempt := refreshAttempt{
-		outcome: refreshOutcomeReloadFailed,
+		outcome: refreshOutcomeIncomplete,
 		lock:    refreshLockStateUnknown,
 		storage: refreshStorageUnknown,
 	}
+	defer func() { c.recordRefreshAttempt(hostname, attempt) }()
 	started := time.Now()
 
 	err := c.withFreshConfigForRefresh(func(lockErr error) error {
@@ -444,7 +445,7 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 		}
 		attempt.storage = refreshStorageType(secure)
 		if !accessTokenNeedsRefresh(current, timeNow()) {
-			attempt.outcome = refreshOutcomePeerRefreshed
+			attempt.outcome = refreshOutcomeAlreadyFresh
 			result = current
 			status = gh.RefreshStatusUnnecessary
 			return nil
@@ -560,7 +561,10 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 		status = gh.RefreshStatusDone
 		return nil
 	})
-	c.recordRefreshAttempt(hostname, attempt)
+	if err != nil && attempt.outcome == refreshOutcomeIncomplete {
+		// withFreshConfigForRefresh only fails without running the callback when reloading the configuration fails.
+		attempt.outcome = refreshOutcomeReloadFailed
+	}
 	return result, status, err
 }
 

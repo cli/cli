@@ -68,7 +68,7 @@ func TestRefreshTelemetry(t *testing.T) {
 				setRefreshableKeyring(t, host, user, gh.Credential{Token: "peer-access", RefreshToken: "peer-refresh", ExpiresAt: &future})
 			},
 			refresher:   func(*testing.T) gh.TokenRefresher { return renewingRefresher() },
-			wantOutcome: "peer_refreshed",
+			wantOutcome: "already_fresh",
 			wantLock:    "held",
 			wantStorage: "keyring",
 		},
@@ -182,6 +182,38 @@ func TestRefreshTelemetryReportsDirectoryOverrides(t *testing.T) {
 	require.Equal(t, "true", spy.events[0].Dimensions["gh_config_dir_set"])
 	require.Equal(t, "false", spy.events[0].Dimensions["xdg_config_home_set"])
 	require.Equal(t, "true", spy.events[0].Dimensions["xdg_state_home_set"])
+}
+
+func TestRefreshTelemetryRecordsUnfinishedAttempts(t *testing.T) {
+	t.Run("when reloading the configuration fails", func(t *testing.T) {
+		authCfg := newTestAuthConfig(t)
+		loginRefreshableWithExpiry(t, authCfg, "github.com", "test-user", "old-access", "old-refresh", time.Now().Add(-time.Hour), false)
+		authCfg.reloadConfig = func() error { return errors.New("reload failed") }
+		authCfg.SetTokenRefresher(renewingRefresher())
+		spy := &refreshTelemetrySpy{}
+		authCfg.SetTelemetryRecorder(spy)
+
+		_, _, err := authCfg.ActiveTokenWithRefresh("github.com")
+
+		require.Error(t, err)
+		require.Len(t, spy.events, 1)
+		require.Equal(t, "reload_failed", spy.events[0].Dimensions["refresh_outcome"])
+	})
+
+	t.Run("when the refresh panics", func(t *testing.T) {
+		authCfg := newTestAuthConfig(t)
+		loginRefreshableWithExpiry(t, authCfg, "github.com", "test-user", "old-access", "old-refresh", time.Now().Add(-time.Hour), false)
+		authCfg.SetTokenRefresher(&ghmock.TokenRefresherMock{
+			RefreshFunc: func(string, string) (gh.RefreshableCredential, error) { panic("boom") },
+		})
+		spy := &refreshTelemetrySpy{}
+		authCfg.SetTelemetryRecorder(spy)
+
+		require.PanicsWithValue(t, "boom", func() { _, _, _ = authCfg.ActiveTokenWithRefresh("github.com") })
+
+		require.Len(t, spy.events, 1)
+		require.Equal(t, "incomplete", spy.events[0].Dimensions["refresh_outcome"])
+	})
 }
 
 func TestRefreshTelemetryNotRecorded(t *testing.T) {
