@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/gh"
@@ -24,6 +25,7 @@ func newTestAuthConfig(t *testing.T) *AuthConfig {
 		reloadConfig: func() error {
 			return nil
 		},
+		sleep: func(time.Duration) {},
 	}
 }
 

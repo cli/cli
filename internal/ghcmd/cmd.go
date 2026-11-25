@@ -130,6 +130,10 @@ func Main() exitCode {
 	// Complete and send events even when returning before Cobra reaches RunE.
 	defer telemetryService.Finish()
 
+	if cfgErr == nil {
+		cfg.Authentication().SetTelemetryRecorder(telemetryService)
+	}
+
 	// Show authentication warnings, such as a skipped token refresh, even when the command succeeds, so the user (or a
 	// calling agent) can fix the cause before the token stops working.
 	if cfgErr == nil {

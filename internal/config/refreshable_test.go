@@ -1165,6 +1165,92 @@ func TestActiveTokenWithRefresh(t *testing.T) {
 		require.Len(t, refresher.RefreshCalls(), 2)
 	})
 
+	t.Run("adopts a credential another process stored when the refresh token is rejected", func(t *testing.T) {
+		// A peer that took a different lock file (for example, under a different XDG_STATE_HOME) can spend the same
+		// refresh token first and store its replacement in the shared store. The rejected process must adopt that
+		// replacement rather than delete it, whether or not it held its own lock.
+		tests := []struct {
+			name      string
+			lockErr   error
+			secure    bool
+			storePeer func(t *testing.T, authCfg *AuthConfig, credential gh.Credential)
+		}{
+			{
+				name:   "keyring storage with the lock held",
+				secure: true,
+				storePeer: func(t *testing.T, authCfg *AuthConfig, credential gh.Credential) {
+					setRefreshableKeyring(t, host, user, credential)
+				},
+			},
+			{
+				name:    "plaintext storage without the lock",
+				lockErr: errors.New("advisory locking unavailable"),
+				storePeer: func(t *testing.T, authCfg *AuthConfig, credential gh.Credential) {
+					authCfg.setRefreshableInConfig(host, user, credential)
+				},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				authCfg := newTestAuthConfig(t)
+				authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
+					return func() {}, tt.lockErr
+				}
+				future := time.Now().Add(8 * time.Hour)
+				peer := gh.Credential{Token: "peer-access", RefreshToken: "peer-refresh", ExpiresAt: &future}
+				refresher := &ghmock.TokenRefresherMock{
+					RefreshFunc: func(refreshToken string, hostname string) (gh.RefreshableCredential, error) {
+						tt.storePeer(t, authCfg, peer)
+						return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
+					},
+				}
+				authCfg.SetTokenRefresher(refresher)
+				loginRefreshableWithExpiry(t, authCfg, host, user, "old-access", "old-refresh", time.Now().Add(-time.Hour), tt.secure)
+
+				credential, status, err := authCfg.ActiveTokenWithRefresh(host)
+
+				require.NoError(t, err)
+				require.Equal(t, gh.RefreshStatusUnnecessary, status)
+				require.Equal(t, "peer-access", credential.Token)
+				require.Equal(t, "peer-refresh", credential.RefreshToken)
+				stored, _, err := authCfg.refreshableForUser(host, user)
+				require.NoError(t, err)
+				require.Equal(t, "peer-refresh", stored.RefreshToken)
+				require.Len(t, refresher.RefreshCalls(), 1)
+			})
+		}
+	})
+
+	t.Run("adopts a replacement stored while rechecking after the refresh token is rejected", func(t *testing.T) {
+		// The peer may still be writing its replacement when the server rejects our exchange, so the store is read
+		// again after short pauses before the credential is removed.
+		authCfg := newTestAuthConfig(t)
+		future := time.Now().Add(8 * time.Hour)
+		var pauses []time.Duration
+		authCfg.sleep = func(d time.Duration) {
+			pauses = append(pauses, d)
+			if d > 0 && len(pauses) == 2 {
+				setRefreshableKeyring(t, host, user, gh.Credential{Token: "peer-access", RefreshToken: "peer-refresh", ExpiresAt: &future})
+			}
+		}
+		authCfg.SetTokenRefresher(&ghmock.TokenRefresherMock{
+			RefreshFunc: func(refreshToken string, hostname string) (gh.RefreshableCredential, error) {
+				return gh.RefreshableCredential{}, fmt.Errorf("server rejected token: %w", gh.ErrRefreshTokenInvalid)
+			},
+		})
+		loginRefreshableWithExpiry(t, authCfg, host, user, "old-access", "old-refresh", time.Now().Add(-time.Hour), true)
+
+		credential, status, err := authCfg.ActiveTokenWithRefresh(host)
+
+		require.NoError(t, err)
+		require.Equal(t, gh.RefreshStatusUnnecessary, status)
+		require.Equal(t, "peer-access", credential.Token)
+		require.Len(t, pauses, 2)
+		stored, _, err := authCfg.refreshableForUser(host, user)
+		require.NoError(t, err)
+		require.Equal(t, "peer-refresh", stored.RefreshToken)
+	})
+
 	t.Run("skips the refresh when the lock file is inaccessible", func(t *testing.T) {
 		// A sandbox that mounts the state directory read-only would also block persisting the rotated credential,
 		// so gh must not spend the refresh token there and must keep presenting the current access token.
