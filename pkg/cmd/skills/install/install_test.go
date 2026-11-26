@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -3088,6 +3089,11 @@ func TestSkillSearchFuncEscapesDescriptionControlCharacters(t *testing.T) {
 }
 
 func TestPrintFileTreeEscapesFileNameControlCharacters(t *testing.T) {
+	// Windows does not allow control characters in file or directory names.
+	if runtime.GOOS == "windows" {
+		t.Skip("requires filenames containing control characters")
+	}
+
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "poc", "a\x1b[31mdir"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "poc", "a\x1b[31mdir", "b\x1b[31mfile"), nil, 0o644))
