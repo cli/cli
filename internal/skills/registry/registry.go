@@ -340,6 +340,12 @@ var Agents = []AgentHost{
 		UserDir:    ".agents/skills",
 	},
 	{
+		ID:         "wp-studio",
+		Name:       "WordPress Studio",
+		ProjectDir: sharedProjectSkillsDir,
+		UserDir:    ".studio/skills",
+	},
+	{
 		ID:         "zencoder",
 		Name:       "Zencoder",
 		ProjectDir: ".zencoder/skills",
