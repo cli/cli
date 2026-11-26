@@ -65,6 +65,11 @@ func TestNewCmdInstall(t *testing.T) {
 			},
 		},
 		{
+			name:     "wordpress studio agent",
+			cli:      "monalisa/skills-repo git-commit --agent wp-studio",
+			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Agent: "wp-studio", Scope: "project"},
+		},
+		{
 			name:     "dir flag",
 			cli:      "monalisa/skills-repo git-commit --dir ./custom-skills",
 			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Dir: "./custom-skills", Scope: "project"},

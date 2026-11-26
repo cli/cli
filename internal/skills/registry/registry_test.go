@@ -25,6 +25,7 @@ func TestFindByID(t *testing.T) {
 		{name: "antigravity2.0", id: "antigravity2.0", wantName: "Antigravity 2.0"},
 		{name: "devin", id: "devin", wantName: "Devin"},
 		{name: "grok", id: "grok", wantName: "Grok"},
+		{name: "wp-studio", id: "wp-studio", wantName: "WordPress Studio"},
 		{name: "windsurf is no longer supported", id: "windsurf", wantErr: "unknown agent"},
 		{name: "unknown agent", id: "nonexistent", wantErr: "unknown agent"},
 	}
@@ -221,6 +222,22 @@ func TestInstallDir(t *testing.T) {
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
 			wantDir: filepath.Join("/home/monalisa", ".grok", "skills"),
+		},
+		{
+			name:    "wp studio project scope",
+			hostID:  "wp-studio",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
+		},
+		{
+			name:    "wp studio user scope",
+			hostID:  "wp-studio",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".studio", "skills"),
 		},
 		{
 			// Issue #13494: Universal must use the shared .agents/skills dir
