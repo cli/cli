@@ -319,6 +319,49 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 	}
 }
 
+func TestScopesSuggestionForTokenSource(t *testing.T) {
+	makeResponse := func(haveScopes, needScopes string) *http.Response {
+		req, err := http.NewRequest("GET", "https://api.github.com/user/emails", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{
+			Request:    req,
+			StatusCode: 404,
+			Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
+			Header: map[string][]string{
+				"Content-Type":            {"application/json"},
+				"X-Oauth-Scopes":          {haveScopes},
+				"X-Accepted-Oauth-Scopes": {needScopes},
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		tokenSource string
+		want        string
+	}{
+		{
+			name:        "stored token suggests gh auth refresh",
+			tokenSource: "oauth_token",
+			want:        `This API operation needs the "user" scope. To request it, run:  gh auth refresh -h github.com -s user`,
+		},
+		{
+			name:        "environment token suggests replacing the environment variable",
+			tokenSource: "GH_TOKEN",
+			want:        `This API operation needs the "user" scope. Replace the token in the GH_TOKEN environment variable with one that has it.`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := makeResponse("repo", "user")
+			got := ScopesSuggestionForTokenSource(resp, tt.tokenSource)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestHTTPHeaders(t *testing.T) {
 	var gotReq *http.Request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

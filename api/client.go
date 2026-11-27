@@ -348,6 +348,32 @@ func ScopesSuggestion(resp *http.Response) string {
 		resp.Request.URL.Hostname())
 }
 
+// ScopesSuggestionForTokenSource is like ScopesSuggestion, but tailors the remediation step to where the
+// active token came from. gh auth refresh cannot update a token supplied through an environment variable,
+// so for that case it names the variable and suggests replacing its value instead of suggesting the refresh
+// command. tokenSource is the gh.Credential.Source for the request's host, as reported by AuthConfig.
+func ScopesSuggestionForTokenSource(resp *http.Response, tokenSource string) string {
+	s := missingScope(resp.StatusCode,
+		resp.Header.Get("X-Accepted-Oauth-Scopes"),
+		resp.Header.Get("X-Oauth-Scopes"))
+	if s == "" {
+		return ""
+	}
+
+	if strings.HasSuffix(tokenSource, "_TOKEN") {
+		return fmt.Sprintf(
+			"This API operation needs the %q scope. Replace the token in the %s environment variable with one that has it.",
+			s, tokenSource,
+		)
+	}
+
+	return fmt.Sprintf(
+		"This API operation needs the %[1]q scope. To request it, run:  gh auth refresh -h %[2]s -s %[1]s",
+		s,
+		ghauth.NormalizeHostname(resp.Request.URL.Hostname()),
+	)
+}
+
 // EndpointNeedsScopes adds additional OAuth scopes to an HTTP response as if they were returned from the
 // server endpoint. This improves HTTP 4xx error messaging for endpoints that don't explicitly list the
 // OAuth scopes they need.
@@ -359,6 +385,21 @@ func EndpointNeedsScopes(resp *http.Response, s string) {
 }
 
 func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScopes, hostname string) string {
+	s := missingScope(statusCode, endpointNeedsScopes, tokenHasScopes)
+	if s == "" {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"This API operation needs the %[1]q scope. To request it, run:  gh auth refresh -h %[2]s -s %[1]s",
+		s,
+		ghauth.NormalizeHostname(hostname),
+	)
+}
+
+// missingScope reports the first scope that endpointNeedsScopes requires but tokenHasScopes does not grant,
+// or "" if the response does not indicate a missing scope.
+func missingScope(statusCode int, endpointNeedsScopes, tokenHasScopes string) string {
 	if statusCode < 400 || statusCode > 499 || statusCode == 422 {
 		return ""
 	}
@@ -400,11 +441,7 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 		if _, gotScope := gotScopes[s]; s == "" || gotScope {
 			continue
 		}
-		return fmt.Sprintf(
-			"This API operation needs the %[1]q scope. To request it, run:  gh auth refresh -h %[2]s -s %[1]s",
-			s,
-			ghauth.NormalizeHostname(hostname),
-		)
+		return s
 	}
 
 	return ""

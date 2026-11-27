@@ -63,6 +63,11 @@ type ApiOptions struct {
 	Verbose             bool
 
 	AllowEscapeSequences bool
+
+	// tokenSource is the gh.Credential.Source for the active token on the request's host, resolved by
+	// apiRun. processResponse reads it to tailor the scope hint on a missing-scope error: gh auth refresh
+	// cannot update a token sourced from an environment variable.
+	tokenSource string
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
@@ -424,6 +429,7 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	apiHost, _ := cfg.Authentication().APIHostForHost(host)
+	opts.tokenSource = cfg.Authentication().ActiveToken(host).Source
 
 	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
 	err = tmpl.Parse(opts.Template)
@@ -562,7 +568,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	}
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		if msg := api.ScopesSuggestion(resp); msg != "" {
+		if msg := api.ScopesSuggestionForTokenSource(resp, opts.tokenSource); msg != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
 		}
 		if u := factory.SSOURL(); u != "" {

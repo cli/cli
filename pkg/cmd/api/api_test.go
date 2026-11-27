@@ -870,6 +870,50 @@ func Test_apiRun_eventListenHint(t *testing.T) {
 	}
 }
 
+// Test_apiRun_scopeHintForEnvironmentToken covers https://github.com/cli/cli/issues/15129: when the
+// active token comes from an environment variable, `gh auth refresh` cannot update it, so the scope
+// hint printed on a missing-scope error must not point users at a command that is guaranteed to fail.
+func Test_apiRun_scopeHintForEnvironmentToken(t *testing.T) {
+	ios, _, _, stderr := iostreams.Test()
+
+	cfg := config.NewMockConfig()
+	// AuthenticationFunc builds a new AuthConfig on every call, so the override must be installed on a
+	// cached instance and that instance returned from every subsequent call.
+	authCfg := cfg.Authentication()
+	authCfg.SetActiveToken("ghp_environment", "GH_TOKEN")
+	cfg.AuthenticationFunc = func() gh.AuthConfig { return authCfg }
+
+	opts := &ApiOptions{
+		IO:            ios,
+		Hostname:      "github.com",
+		RequestMethod: "GET",
+		RequestPath:   "user/emails",
+		Config:        func() (gh.Config, error) { return cfg, nil },
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: 404,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"message":"Not Found"}`)),
+					Header: http.Header{
+						"Content-Type":            []string{"application/json"},
+						"X-Oauth-Scopes":          []string{"repo"},
+						"X-Accepted-Oauth-Scopes": []string{"user"},
+					},
+					Request: req,
+				}, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+	}
+
+	err := apiRun(opts)
+	assert.Equal(t, cmdutil.SilentError, err)
+
+	assert.Equal(t,
+		"gh: Not Found (HTTP 404)\ngh: This API operation needs the \"user\" scope. Replace the token in the GH_TOKEN environment variable with one that has it.\n",
+		stderr.String())
+}
+
 func Test_apiRun_paginationREST(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 
