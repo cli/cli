@@ -8,6 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/flock"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/keyring"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
@@ -28,7 +29,7 @@ const (
 	// refreshOutcomeRejectedRemoved means the server rejected the refresh token and gh removed the stored credential.
 	refreshOutcomeRejectedRemoved = "rejected_removed"
 	// refreshOutcomeRejectedRemoveFailed means the server rejected the refresh token and gh tried to remove the stored
-	// credential, but writing the configuration failed, so the credential may still be on disk.
+	// credential, but writing the configuration failed or the credential survived in the keyring.
 	refreshOutcomeRejectedRemoveFailed = "rejected_remove_failed"
 	// refreshOutcomeRejectedKept means the server rejected the refresh token, but gh kept the stored credential
 	// because it did not hold the lock.
@@ -66,14 +67,25 @@ const (
 	refreshStorageUnknown   = "unknown"
 )
 
+// Values of the storage_error dimension of the auth_token_refresh event. It deliberately reports only whether storing
+// or removing the credential failed or timed out, never the underlying error, which could reveal the credential store
+// in use.
+const (
+	refreshStorageErrorNone    = "none"
+	refreshStorageErrorFailed  = "error"
+	refreshStorageErrorTimeout = "timeout"
+)
+
 // refreshAttempt collects the facts of one token refresh attempt for the auth_token_refresh event.
 type refreshAttempt struct {
-	outcome  string
-	lock     string
-	storage  string
-	lockWait time.Duration
-	exchange time.Duration
-	recheck  time.Duration
+	outcome string
+	lock    string
+	storage string
+	// storageError classifies the failure to persist the renewed credential or to remove a rejected one.
+	storageError string
+	lockWait     time.Duration
+	exchange     time.Duration
+	recheck      time.Duration
 }
 
 // refreshLockState classifies the error from acquiring the refresh lock for the refresh_lock dimension.
@@ -87,6 +99,19 @@ func refreshLockState(lockErr error) string {
 		return refreshLockStateTimeout
 	default:
 		return refreshLockStateUnavailable
+	}
+}
+
+// refreshStorageErrorKind classifies a credential storage error for the storage_error dimension.
+func refreshStorageErrorKind(err error) string {
+	var timeoutErr *keyring.TimeoutError
+	switch {
+	case err == nil:
+		return refreshStorageErrorNone
+	case errors.As(err, &timeoutErr):
+		return refreshStorageErrorTimeout
+	default:
+		return refreshStorageErrorFailed
 	}
 }
 
@@ -117,6 +142,7 @@ func (c *AuthConfig) recordRefreshAttempt(hostname string, attempt refreshAttemp
 			"refresh_outcome":     attempt.outcome,
 			"refresh_lock":        attempt.lock,
 			"storage_type":        attempt.storage,
+			"storage_error":       attempt.storageError,
 			"gh_config_dir_set":   envSet("GH_CONFIG_DIR"),
 			"xdg_config_home_set": envSet("XDG_CONFIG_HOME"),
 			"xdg_state_home_set":  envSet("XDG_STATE_HOME"),
