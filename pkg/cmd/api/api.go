@@ -25,6 +25,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/cli/go-gh/v2/pkg/jq"
 	"github.com/cli/go-gh/v2/pkg/template"
 	"github.com/spf13/cobra"
@@ -64,10 +65,15 @@ type ApiOptions struct {
 
 	AllowEscapeSequences bool
 
-	// tokenSource is the gh.Credential.Source for the active token on the request's host, resolved by
-	// apiRun. processResponse reads it to tailor the scope hint on a missing-scope error: gh auth refresh
-	// cannot update a token sourced from an environment variable.
-	tokenSource string
+	// authCfg is resolved by apiRun and read by processResponse to tailor the scope hint on a missing-scope
+	// error to the token that actually authenticated the request, rather than to whatever token would apply
+	// to the command's default host.
+	authCfg gh.AuthConfig
+	// hasExplicitAuthHeader records whether requestHeaders already set an Authorization header, which bypasses
+	// any token authCfg would otherwise supply. processResponse reads it so the scope hint does not misattribute
+	// such a request to a configured credential: gh auth refresh or replacing an environment variable cannot
+	// change a header the user supplied explicitly.
+	hasExplicitAuthHeader bool
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
@@ -429,7 +435,8 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	apiHost, _ := cfg.Authentication().APIHostForHost(host)
-	opts.tokenSource = cfg.Authentication().ActiveToken(host).Source
+	opts.authCfg = cfg.Authentication()
+	opts.hasExplicitAuthHeader = hasHeader(requestHeaders, "Authorization")
 
 	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
 	err = tmpl.Parse(opts.Template)
@@ -483,6 +490,28 @@ func apiRun(opts *ApiOptions) error {
 	}
 	printEventListenHint(opts, host, method, endpoint)
 	return nil
+}
+
+// tokenSourceForRequest reports the gh.Credential.Source of the token that authenticated req, resolving the
+// host from req itself (not the command's default host) so it matches whatever host the request actually
+// went to, including an absolute URL or a configured api_host. It applies the same api_host fallback as
+// addAuthHeaderRoundTripper: if the request's host has no token of its own, it falls back to the token of
+// the host that configured it as an api_host. It returns "" when hasExplicitAuthHeader is set, since an
+// explicit Authorization header bypasses authCfg entirely and attributing it to a configured credential would
+// suggest a fix (gh auth refresh, or replacing an environment variable) that cannot affect that header.
+func (opts *ApiOptions) tokenSourceForRequest(req *http.Request) string {
+	if opts.hasExplicitAuthHeader {
+		return ""
+	}
+
+	hostname := ghauth.NormalizeHostname(req.URL.Hostname())
+	cred := opts.authCfg.ActiveToken(hostname)
+	if cred.Token == "" {
+		if canonicalHost, ok := opts.authCfg.HostForAPIHost(hostname); ok {
+			cred = opts.authCfg.ActiveToken(canonicalHost)
+		}
+	}
+	return cred.Source
 }
 
 var jsonContentTypeRE = regexp.MustCompile(`[/+]json(;|$)`)
@@ -568,7 +597,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	}
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		if msg := api.ScopesSuggestionForTokenSource(resp, opts.tokenSource); msg != "" {
+		if msg := api.ScopesSuggestionForTokenSource(resp, opts.tokenSourceForRequest(resp.Request)); msg != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
 		}
 		if u := factory.SSOURL(); u != "" {

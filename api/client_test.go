@@ -352,6 +352,11 @@ func TestScopesSuggestionForTokenSource(t *testing.T) {
 			tokenSource: "GH_TOKEN",
 			want:        `This API operation needs the "user" scope. Replace the token in the GH_TOKEN environment variable with one that has it.`,
 		},
+		{
+			name:        "no resolved token source suggests gh auth refresh",
+			tokenSource: "",
+			want:        `This API operation needs the "user" scope. To request it, run:  gh auth refresh -h github.com -s user`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -24,6 +24,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/template"
 	"github.com/google/shlex"
@@ -870,6 +871,23 @@ func Test_apiRun_eventListenHint(t *testing.T) {
 	}
 }
 
+// missingScopeResponder returns a 404 response, carrying the given OAuth scope headers, that triggers the
+// missing-scope hint.
+func missingScopeResponder(tokenHasScopes, endpointNeedsScopes string) httpmock.Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: 404,
+			Request:    req,
+			Body:       io.NopCloser(bytes.NewBufferString(`{"message":"Not Found"}`)),
+			Header: http.Header{
+				"Content-Type":            []string{"application/json"},
+				"X-Oauth-Scopes":          []string{tokenHasScopes},
+				"X-Accepted-Oauth-Scopes": []string{endpointNeedsScopes},
+			},
+		}, nil
+	}
+}
+
 // Test_apiRun_scopeHintForEnvironmentToken covers https://github.com/cli/cli/issues/15129: when the
 // active token comes from an environment variable, `gh auth refresh` cannot update it, so the scope
 // hint printed on a missing-scope error must not point users at a command that is guaranteed to fail.
@@ -883,6 +901,13 @@ func Test_apiRun_scopeHintForEnvironmentToken(t *testing.T) {
 	authCfg.SetActiveToken("ghp_environment", "GH_TOKEN")
 	cfg.AuthenticationFunc = func() gh.AuthConfig { return authCfg }
 
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.WithHost(httpmock.REST("GET", "user/emails"), "api.github.com"),
+		missingScopeResponder("repo", "user"),
+	)
+
 	opts := &ApiOptions{
 		IO:            ios,
 		Hostname:      "github.com",
@@ -890,27 +915,88 @@ func Test_apiRun_scopeHintForEnvironmentToken(t *testing.T) {
 		RequestPath:   "user/emails",
 		Config:        func() (gh.Config, error) { return cfg, nil },
 		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
-			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
-				return &http.Response{
-					StatusCode: 404,
-					Body:       io.NopCloser(bytes.NewBufferString(`{"message":"Not Found"}`)),
-					Header: http.Header{
-						"Content-Type":            []string{"application/json"},
-						"X-Oauth-Scopes":          []string{"repo"},
-						"X-Accepted-Oauth-Scopes": []string{"user"},
-					},
-					Request: req,
-				}, nil
-			}
-			return &http.Client{Transport: tr}, nil
+			return &http.Client{Transport: reg}, nil
 		},
 	}
 
 	err := apiRun(opts)
-	assert.Equal(t, cmdutil.SilentError, err)
+	require.ErrorIs(t, err, cmdutil.SilentError)
 
 	assert.Equal(t,
 		"gh: Not Found (HTTP 404)\ngh: This API operation needs the \"user\" scope. Replace the token in the GH_TOKEN environment variable with one that has it.\n",
+		stderr.String())
+}
+
+// Test_apiRun_scopeHintForWrongHostToken covers https://github.com/cli/cli/issues/15129: with both
+// GH_TOKEN and GH_ENTERPRISE_TOKEN set, a request to an absolute URL on the enterprise host authenticates
+// with GH_ENTERPRISE_TOKEN, so the hint must name that variable, not the default host's GH_TOKEN.
+func Test_apiRun_scopeHintForWrongHostToken(t *testing.T) {
+	ios, _, _, stderr := iostreams.Test()
+
+	cfg, _ := config.NewIsolatedTestConfig(t, "")
+	t.Setenv("GH_TOKEN", "ghp_default_host")
+	t.Setenv("GH_ENTERPRISE_TOKEN", "ghp_enterprise")
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.WithHost(httpmock.REST("GET", "api/v3/user/emails"), "ghe.example.com"),
+		missingScopeResponder("repo", "user"),
+	)
+
+	opts := &ApiOptions{
+		IO:            ios,
+		RequestMethod: "GET",
+		RequestPath:   "https://ghe.example.com/api/v3/user/emails",
+		Config:        func() (gh.Config, error) { return cfg, nil },
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+	}
+
+	err := apiRun(opts)
+	require.ErrorIs(t, err, cmdutil.SilentError)
+
+	assert.Equal(t,
+		"gh: Not Found (HTTP 404)\ngh: This API operation needs the \"user\" scope. Replace the token in the GH_ENTERPRISE_TOKEN environment variable with one that has it.\n",
+		stderr.String())
+}
+
+// Test_apiRun_scopeHintForExplicitAuthHeader covers https://github.com/cli/cli/issues/15129: an explicit
+// Authorization header bypasses any configured token, so the hint must not suggest replacing an environment
+// variable (or running gh auth refresh) that cannot affect that header's value.
+func Test_apiRun_scopeHintForExplicitAuthHeader(t *testing.T) {
+	ios, _, _, stderr := iostreams.Test()
+
+	cfg := config.NewMockConfig()
+	authCfg := cfg.Authentication()
+	authCfg.SetActiveToken("ghp_environment", "GH_TOKEN")
+	cfg.AuthenticationFunc = func() gh.AuthConfig { return authCfg }
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.WithHost(httpmock.REST("GET", "user/emails"), "api.github.com"),
+		missingScopeResponder("repo", "user"),
+	)
+
+	opts := &ApiOptions{
+		IO:             ios,
+		Hostname:       "github.com",
+		RequestMethod:  "GET",
+		RequestPath:    "user/emails",
+		RequestHeaders: []string{"Authorization: Bearer explicit-token"},
+		Config:         func() (gh.Config, error) { return cfg, nil },
+		HttpClient: func(rootapi.HTTPClientOptions) (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+	}
+
+	err := apiRun(opts)
+	require.ErrorIs(t, err, cmdutil.SilentError)
+
+	assert.Equal(t,
+		"gh: Not Found (HTTP 404)\ngh: This API operation needs the \"user\" scope. To request it, run:  gh auth refresh -h github.com -s user\n",
 		stderr.String())
 }
 

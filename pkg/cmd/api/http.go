@@ -92,6 +92,21 @@ func httpRequest(client *http.Client, hostname string, apiHost string, method st
 	return client.Do(req)
 }
 
+// hasHeader reports whether headers, in the "name: value" format httpRequest parses, already sets a header
+// named name, matched case-insensitively.
+func hasHeader(headers []string, name string) bool {
+	for _, h := range headers {
+		idx := strings.IndexRune(h, ':')
+		if idx == -1 {
+			continue
+		}
+		if strings.EqualFold(h[:idx], name) {
+			return true
+		}
+	}
+	return false
+}
+
 func groupGraphQLVariables(params map[string]any) map[string]any {
 	topLevel := make(map[string]any)
 	variables := make(map[string]any)

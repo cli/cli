@@ -351,8 +351,13 @@ func ScopesSuggestion(resp *http.Response) string {
 // ScopesSuggestionForTokenSource is like ScopesSuggestion, but tailors the remediation step to where the
 // active token came from. gh auth refresh cannot update a token supplied through an environment variable,
 // so for that case it names the variable and suggests replacing its value instead of suggesting the refresh
-// command. tokenSource is the gh.Credential.Source for the request's host, as reported by AuthConfig.
+// command. tokenSource is the gh.Credential.Source for the request's host, as reported by AuthConfig, or ""
+// when no configured credential authenticated the request (for example, an explicit Authorization header).
 func ScopesSuggestionForTokenSource(resp *http.Response, tokenSource string) string {
+	if !strings.HasSuffix(tokenSource, "_TOKEN") {
+		return ScopesSuggestion(resp)
+	}
+
 	s := missingScope(resp.StatusCode,
 		resp.Header.Get("X-Accepted-Oauth-Scopes"),
 		resp.Header.Get("X-Oauth-Scopes"))
@@ -360,17 +365,9 @@ func ScopesSuggestionForTokenSource(resp *http.Response, tokenSource string) str
 		return ""
 	}
 
-	if strings.HasSuffix(tokenSource, "_TOKEN") {
-		return fmt.Sprintf(
-			"This API operation needs the %q scope. Replace the token in the %s environment variable with one that has it.",
-			s, tokenSource,
-		)
-	}
-
 	return fmt.Sprintf(
-		"This API operation needs the %[1]q scope. To request it, run:  gh auth refresh -h %[2]s -s %[1]s",
-		s,
-		ghauth.NormalizeHostname(resp.Request.URL.Hostname()),
+		"This API operation needs the %q scope. Replace the token in the %s environment variable with one that has it.",
+		s, tokenSource,
 	)
 }
 
