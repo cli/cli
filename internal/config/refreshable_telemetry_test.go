@@ -166,6 +166,32 @@ func TestRefreshTelemetry(t *testing.T) {
 			wantWarning:      "the credential remained in the keyring",
 		},
 		{
+			name:   "rejected but the removal could not be confirmed",
+			secure: true,
+			setup: func(t *testing.T) {
+				stubKeyringDeleteThenReadError(t, errors.New("locked"))
+			},
+			refresher:        func(*testing.T) gh.TokenRefresher { return rejectingRefresher(nil) },
+			wantOutcome:      "rejected_remove_failed",
+			wantLock:         "held",
+			wantStorage:      "keyring",
+			wantStorageError: "error",
+			wantWarning:      "could not confirm the credential was removed from the keyring: locked",
+		},
+		{
+			name:   "rejected but confirming the removal timed out",
+			secure: true,
+			setup: func(t *testing.T) {
+				stubKeyringDeleteThenReadError(t, &keyring.TimeoutError{})
+			},
+			refresher:        func(*testing.T) gh.TokenRefresher { return rejectingRefresher(nil) },
+			wantOutcome:      "rejected_remove_failed",
+			wantLock:         "held",
+			wantStorage:      "keyring",
+			wantStorageError: "timeout",
+			wantWarning:      "could not confirm the credential was removed from the keyring",
+		},
+		{
 			name:   "rejected but the keyring delete timed out",
 			secure: true,
 			setup: func(t *testing.T) {
@@ -283,6 +309,18 @@ func stubKeyringDelete(t *testing.T, err error) {
 	original := keyringDelete
 	t.Cleanup(func() { keyringDelete = original })
 	keyringDelete = func(string, string) error { return err }
+}
+
+// stubKeyringDeleteThenReadError makes keyring deletes report success and every later keyring operation fail with err,
+// so the read that verifies the removal fails.
+func stubKeyringDeleteThenReadError(t *testing.T, err error) {
+	t.Helper()
+	original := keyringDelete
+	t.Cleanup(func() { keyringDelete = original })
+	keyringDelete = func(string, string) error {
+		keyring.MockInitWithError(err)
+		return nil
+	}
 }
 
 func TestRefreshTelemetryReportsDirectoryOverrides(t *testing.T) {

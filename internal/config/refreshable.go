@@ -647,12 +647,18 @@ func (c *AuthConfig) removeCredentialForUser(hostname, username string, secure b
 	if !secure || errors.Is(refreshableErr, keyring.ErrNotFound) {
 		return nil
 	}
-	if refreshableErr == nil {
-		if _, err := keyring.Get(refreshableServiceName(hostname), username); err == nil {
-			return errors.New("the credential remained in the keyring")
-		}
+	if refreshableErr != nil {
+		return refreshableErr
 	}
-	return refreshableErr
+	// Only a missing record confirms the removal; any other read error leaves it unconfirmed.
+	_, err := keyring.Get(refreshableServiceName(hostname), username)
+	if err == nil {
+		return errors.New("the credential remained in the keyring")
+	}
+	if errors.Is(err, keyring.ErrNotFound) {
+		return nil
+	}
+	return fmt.Errorf("could not confirm the credential was removed from the keyring: %w", err)
 }
 
 // persistRefreshedCredential writes a renewed refreshable credential back to the storage form it already lived in.
