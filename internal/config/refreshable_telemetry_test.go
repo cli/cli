@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
+	"github.com/cli/cli/v2/internal/keyring"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,14 +55,19 @@ func TestRefreshTelemetry(t *testing.T) {
 	future := time.Now().Add(8 * time.Hour)
 
 	tests := []struct {
-		name        string
-		secure      bool
-		lockErr     error
-		whileLock   func(t *testing.T)
+		name      string
+		secure    bool
+		lockErr   error
+		whileLock func(t *testing.T)
+		// setup runs after the expiring credential is stored.
+		setup       func(t *testing.T)
 		refresher   func(t *testing.T) gh.TokenRefresher
 		wantOutcome string
 		wantLock    string
 		wantStorage string
+		// wantStorageError defaults to "none".
+		wantStorageError string
+		wantWarning      string
 	}{
 		{
 			name:   "renewed by a peer while waiting for the lock",
@@ -116,7 +122,69 @@ func TestRefreshTelemetry(t *testing.T) {
 					require.NoError(t, os.Chmod(filepath.Join(os.Getenv("GH_CONFIG_DIR"), "hosts.yml"), 0400))
 				})
 			},
-			wantOutcome: "rejected_remove_failed",
+			wantOutcome:      "rejected_remove_failed",
+			wantLock:         "held",
+			wantStorage:      "plaintext",
+			wantStorageError: "error",
+			wantWarning:      "gh could not remove the stored credential",
+		},
+		{
+			name:   "rejected but the keyring delete failed",
+			secure: true,
+			setup: func(t *testing.T) {
+				stubKeyringDelete(t, errors.New("denied"))
+			},
+			refresher:        func(*testing.T) gh.TokenRefresher { return rejectingRefresher(nil) },
+			wantOutcome:      "rejected_remove_failed",
+			wantLock:         "held",
+			wantStorage:      "keyring",
+			wantStorageError: "error",
+			wantWarning:      "gh could not remove the stored credential: denied",
+		},
+		{
+			name:   "rejected and already removed from the keyring",
+			secure: true,
+			setup: func(t *testing.T) {
+				stubKeyringDelete(t, keyring.ErrNotFound)
+			},
+			refresher:   func(*testing.T) gh.TokenRefresher { return rejectingRefresher(nil) },
+			wantOutcome: "rejected_removed",
+			wantLock:    "held",
+			wantStorage: "keyring",
+		},
+		{
+			name:   "rejected but the keyring silently kept the credential",
+			secure: true,
+			setup: func(t *testing.T) {
+				stubKeyringDelete(t, nil)
+			},
+			refresher:        func(*testing.T) gh.TokenRefresher { return rejectingRefresher(nil) },
+			wantOutcome:      "rejected_remove_failed",
+			wantLock:         "held",
+			wantStorage:      "keyring",
+			wantStorageError: "error",
+			wantWarning:      "the credential remained in the keyring",
+		},
+		{
+			name:   "rejected but the keyring delete timed out",
+			secure: true,
+			setup: func(t *testing.T) {
+				stubKeyringDelete(t, &keyring.TimeoutError{})
+			},
+			refresher:        func(*testing.T) gh.TokenRefresher { return rejectingRefresher(nil) },
+			wantOutcome:      "rejected_remove_failed",
+			wantLock:         "held",
+			wantStorage:      "keyring",
+			wantStorageError: "timeout",
+			wantWarning:      "gh could not remove the stored credential",
+		},
+		{
+			name: "rejected and removed from the config although the keyring delete timed out",
+			setup: func(t *testing.T) {
+				stubKeyringDelete(t, &keyring.TimeoutError{})
+			},
+			refresher:   func(*testing.T) gh.TokenRefresher { return rejectingRefresher(nil) },
+			wantOutcome: "rejected_removed",
 			wantLock:    "held",
 			wantStorage: "plaintext",
 		},
@@ -127,6 +195,22 @@ func TestRefreshTelemetry(t *testing.T) {
 			wantOutcome: "rejected_kept",
 			wantLock:    "unavailable",
 			wantStorage: "plaintext",
+		},
+		{
+			name: "persist failed",
+			refresher: func(t *testing.T) gh.TokenRefresher {
+				return &ghmock.TokenRefresherMock{
+					RefreshFunc: func(string, string) (gh.RefreshableCredential, error) {
+						require.NoError(t, os.Chmod(filepath.Join(os.Getenv("GH_CONFIG_DIR"), "hosts.yml"), 0400))
+						return renewingRefresher().Refresh("old-refresh", host)
+					},
+				}
+			},
+			wantOutcome:      "persist_failed",
+			wantLock:         "held",
+			wantStorage:      "plaintext",
+			wantStorageError: "error",
+			wantWarning:      "Refreshed the token of account test-user on github.com but could not store it",
 		},
 		{
 			name: "exchange failed",
@@ -148,12 +232,16 @@ func TestRefreshTelemetry(t *testing.T) {
 			wantOutcome: "skipped",
 			wantLock:    "inaccessible",
 			wantStorage: "plaintext",
+			wantWarning: "Skipped refreshing the token",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			authCfg := newTestAuthConfig(t)
 			loginRefreshableWithExpiry(t, authCfg, host, user, "old-access", "old-refresh", time.Now().Add(-time.Hour), tt.secure)
+			if tt.setup != nil {
+				tt.setup(t)
+			}
 			authCfg.acquireRefreshLock = func(ctx context.Context, path string) (func(), error) {
 				if tt.whileLock != nil {
 					tt.whileLock(t)
@@ -173,8 +261,28 @@ func TestRefreshTelemetry(t *testing.T) {
 			require.Equal(t, tt.wantOutcome, event.Dimensions["refresh_outcome"])
 			require.Equal(t, tt.wantLock, event.Dimensions["refresh_lock"])
 			require.Equal(t, tt.wantStorage, event.Dimensions["storage_type"])
+			wantStorageError := tt.wantStorageError
+			if wantStorageError == "" {
+				wantStorageError = "none"
+			}
+			require.Equal(t, wantStorageError, event.Dimensions["storage_error"])
+
+			if tt.wantWarning == "" {
+				require.Empty(t, authCfg.Warnings())
+			} else {
+				require.Len(t, authCfg.Warnings(), 1)
+				require.Contains(t, authCfg.Warnings()[0], tt.wantWarning)
+			}
 		})
 	}
+}
+
+// stubKeyringDelete makes keyring deletes return err without deleting anything.
+func stubKeyringDelete(t *testing.T, err error) {
+	t.Helper()
+	original := keyringDelete
+	t.Cleanup(func() { keyringDelete = original })
+	keyringDelete = func(string, string) error { return err }
 }
 
 func TestRefreshTelemetryReportsDirectoryOverrides(t *testing.T) {

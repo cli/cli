@@ -33,8 +33,9 @@ var errRefreshableNotFound = errors.New("no refreshable credentials found")
 // expiry-based refresh decisions.
 var timeNow = time.Now
 
-// keyringDelete removes a keyring secret during the login purges. It is a package-level indirection so tests can
-// simulate a delete that silently leaves the secret in place, which the keyring mock cannot express.
+// keyringDelete removes a keyring secret during the login purges and the removal of a rejected credential. It is a
+// package-level indirection so tests can simulate a delete that silently leaves the secret in place, which the keyring
+// mock cannot express.
 var keyringDelete = keyring.Delete
 
 // refreshLockFile names the cross-process lock, in the state directory, that serializes credential-store
@@ -426,9 +427,10 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 	status := gh.RefreshStatusFailed
 
 	attempt := refreshAttempt{
-		outcome: refreshOutcomeIncomplete,
-		lock:    refreshLockStateUnknown,
-		storage: refreshStorageUnknown,
+		outcome:      refreshOutcomeIncomplete,
+		lock:         refreshLockStateUnknown,
+		storage:      refreshStorageUnknown,
+		storageError: refreshStorageErrorNone,
 	}
 	defer func() { c.recordRefreshAttempt(hostname, attempt) }()
 	started := time.Now()
@@ -473,10 +475,7 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 			status = gh.RefreshStatusExpired
 			attempt.outcome = refreshOutcomeRejectedKept
 			if lockHeld {
-				attempt.outcome = refreshOutcomeRejectedRemoved
-				if c.removeCredentialForUser(hostname, username) != nil {
-					attempt.outcome = refreshOutcomeRejectedRemoveFailed
-				}
+				c.removeRejectedCredential(hostname, username, secure, &attempt)
 			}
 			return gh.ErrRefreshTokenInvalid
 		}
@@ -528,14 +527,12 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 			// forcing a needless re-authentication. When the lock is unavailable we therefore leave storage
 			// untouched and let the peer's write stand, while still reporting the rejection so the caller can
 			// advise re-authentication. Removal is best effort even when attempted: a failure does not change
-			// the reported status, and we return an empty credential because the stored one is being discarded.
+			// the reported status, and we return an empty credential because the stored one is being discarded. A
+			// failed removal is still surfaced as a warning, since the stale credential would keep being presented.
 			result = gh.Credential{}
 			attempt.outcome = refreshOutcomeRejectedKept
 			if lockHeld {
-				attempt.outcome = refreshOutcomeRejectedRemoved
-				if c.removeCredentialForUser(hostname, username) != nil {
-					attempt.outcome = refreshOutcomeRejectedRemoveFailed
-				}
+				c.removeRejectedCredential(hostname, username, secure, &attempt)
 			}
 			return err
 		}
@@ -547,6 +544,7 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 		}
 		if err := c.persistRefreshedCredential(hostname, username, newCredential, secure); err != nil {
 			attempt.outcome = refreshOutcomePersistFailed
+			attempt.storageError = refreshStorageErrorKind(err)
 			// This is a dead-end because the old credential is no longer usable (due to refresh) and the new one is
 			// failed to store.
 			//
@@ -554,10 +552,13 @@ func (c *AuthConfig) refreshCredentialForUser(hostname, username string, credent
 			// but, subsequent flows in this process (most probably API calls) would fail because the new credential was
 			// not successfully persisted. So, returning the new token would be misleading and may cause unexpected
 			// failures in subsequent operations.
-			//
-			// We deliberately do not expose the underlying storage error for now; the caller only needs to know the
-			// refresh could not be completed.
 			result = current
+			c.addWarning(fmt.Sprintf(
+				"Refreshed the token of account %s on %s but could not store it: %v. "+
+					"The stored token can no longer be refreshed, so run `gh auth login -h %s` to sign in again. "+
+					"If gh is running in a sandbox, it may not be allowed to write to the system keyring or gh's "+
+					"configuration directory; run the command outside of it.",
+				username, hostname, err, hostname))
 			return fmt.Errorf("failed to persist refreshed credential; the user needs to re-authenticate via 'gh auth login': %w", err)
 		}
 		attempt.outcome = refreshOutcomeDone
@@ -599,18 +600,59 @@ func (c *AuthConfig) credentialRotatedByPeer(hostname, username, rejectedRefresh
 	return gh.Credential{}, false
 }
 
+// removeRejectedCredential removes the user's stored credential after the server rejected its refresh token, and
+// records the outcome on attempt. secure tells whether the credential was read from the keyring.
+//
+// It deliberately returns no error. The removal is cleanup on a path that has already failed: the refresh reports the
+// rejection either way, and the user has to sign in again whether or not the removal succeeds, so a removal error must
+// not replace the rejection the caller acts on. Callers of the refreshing token methods also drop returned errors, so
+// the error would never reach the user anyway. Instead, a failed removal is recorded in telemetry and surfaced as a
+// warning, because the rejected credential would otherwise keep being presented without the user knowing why.
+func (c *AuthConfig) removeRejectedCredential(hostname, username string, secure bool, attempt *refreshAttempt) {
+	err := c.removeCredentialForUser(hostname, username, secure)
+	if err == nil {
+		attempt.outcome = refreshOutcomeRejectedRemoved
+		return
+	}
+	attempt.outcome = refreshOutcomeRejectedRemoveFailed
+	attempt.storageError = refreshStorageErrorKind(err)
+	c.addWarning(fmt.Sprintf(
+		"The refresh token of account %s on %s was rejected, and gh could not remove the stored credential: %v. "+
+			"Run `gh auth login -h %s` to sign in again. If gh is running in a sandbox, it may not be allowed to "+
+			"modify the system keyring or gh's configuration directory; run the command outside of it.",
+		username, hostname, err, hostname))
+}
+
 // removeCredentialForUser deletes every stored credential record for the user on the host, covering both the
 // refreshable and the non-expiring forms in both the keyring and the insecure config, then writes the config. It
 // intentionally leaves the active-user pointer and the rest of the host configuration untouched, so it neither
 // switches accounts nor removes the host; the caller is responsible for whatever locking the write requires (it is
 // called under the refresh lock). Each delete is best effort so a missing record or unavailable keyring does not stop
 // the others.
-func (c *AuthConfig) removeCredentialForUser(hostname, username string) error {
-	_ = keyring.Delete(refreshableServiceName(hostname), username)
-	_ = keyring.Delete(keyringServiceName(hostname), username)
+//
+// Only the store that held the credential, as told by secure, is checked. The keyring delete errors are otherwise
+// meaningless: a missing record or an unavailable keyring fails the delete although nothing is stored, and a hung
+// keyring times out for a plaintext user whose credential was never there. For a keyring credential the delete error
+// is trusted, since the credential was just read from that keyring, so any error other than a missing record means the
+// credential survived. A successful delete is verified by re-reading, because a dismissed Secret Service prompt reports
+// success although nothing was deleted.
+func (c *AuthConfig) removeCredentialForUser(hostname, username string, secure bool) error {
+	refreshableErr := keyringDelete(refreshableServiceName(hostname), username)
+	_ = keyringDelete(keyringServiceName(hostname), username)
 	_ = c.cfg.Remove(refreshablePath(hostname, username))
 	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username, oauthTokenKey})
-	return ghConfig.Write(c.cfg)
+	if err := ghConfig.Write(c.cfg); err != nil {
+		return err
+	}
+	if !secure || errors.Is(refreshableErr, keyring.ErrNotFound) {
+		return nil
+	}
+	if refreshableErr == nil {
+		if _, err := keyring.Get(refreshableServiceName(hostname), username); err == nil {
+			return errors.New("the credential remained in the keyring")
+		}
+	}
+	return refreshableErr
 }
 
 // persistRefreshedCredential writes a renewed refreshable credential back to the storage form it already lived in.
