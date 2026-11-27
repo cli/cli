@@ -18,7 +18,7 @@ import (
 )
 
 func rootUsageFunc(w io.Writer, command *cobra.Command) error {
-	fmt.Fprintf(w, "Usage:  %s", command.UseLine())
+	fmt.Fprintf(w, "Usage:  %s\n", command.UseLine())
 
 	var subcommands []*cobra.Command
 	for _, c := range command.Commands() {
@@ -29,7 +29,7 @@ func rootUsageFunc(w io.Writer, command *cobra.Command) error {
 	}
 
 	if len(subcommands) > 0 {
-		fmt.Fprint(w, "\n\nAvailable commands:\n")
+		fmt.Fprint(w, "\nAvailable commands:\n")
 		for _, c := range subcommands {
 			fmt.Fprintf(w, "  %s\n", c.Name())
 		}
@@ -38,7 +38,7 @@ func rootUsageFunc(w io.Writer, command *cobra.Command) error {
 
 	flagUsages := command.LocalFlags().FlagUsages()
 	if flagUsages != "" {
-		fmt.Fprintln(w, "\n\nFlags:")
+		fmt.Fprintln(w, "\nFlags:")
 		fmt.Fprint(w, text.Indent(dedent(flagUsages), "  "))
 	}
 	return nil

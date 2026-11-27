@@ -195,3 +195,56 @@ func TestWriteHelp_aliasResolution(t *testing.T) {
 		require.Contains(t, buf.String(), "gh pr list")
 	})
 }
+
+func TestRootUsageFunc(t *testing.T) {
+	t.Run("terse command without subcommands or local flags ends with a single newline", func(t *testing.T) {
+		rootCmd := &cobra.Command{Use: "gh"}
+		actionsCmd := &cobra.Command{Use: "actions", Short: "Learn about working with GitHub Actions", Hidden: true}
+		rootCmd.AddCommand(actionsCmd)
+
+		var usageBuf bytes.Buffer
+		require.NoError(t, rootUsageFunc(&usageBuf, actionsCmd))
+		require.Equal(t, "Usage:  gh actions\n", usageBuf.String())
+
+		ios, _, _, errOut := iostreams.Test()
+		f := &cmdutil.Factory{
+			IOStreams: ios,
+			Config:    func() (gh.Config, error) { return config.NewMockConfig(), nil },
+			Browser:   &browser.Stub{},
+			ExtensionManager: &extensions.ExtensionManagerMock{
+				ListFunc: func() []extensions.Extension { return nil },
+			},
+		}
+		fullRoot, err := NewCmdRoot(f, &telemetry.NoOpService{}, "N/A", "")
+		require.NoError(t, err)
+		fullRoot.SetArgs([]string{"actions", "list"})
+		_, err = fullRoot.ExecuteC()
+		require.NoError(t, err)
+		require.Equal(t, "unknown command \"list\" for \"gh actions\"\n\nUsage:  gh actions [flags]\n", errOut.String())
+	})
+
+	t.Run("command with available subcommands preserves blank separator line", func(t *testing.T) {
+		rootCmd := &cobra.Command{Use: "gh"}
+		prCmd := &cobra.Command{Use: "pr"}
+		listCmd := &cobra.Command{Use: "list", Run: func(*cobra.Command, []string) {}}
+		prCmd.AddCommand(listCmd)
+		rootCmd.AddCommand(prCmd)
+
+		var buf bytes.Buffer
+		require.NoError(t, rootUsageFunc(&buf, prCmd))
+		require.Equal(t, "Usage:  gh pr\n\nAvailable commands:\n  list\n", buf.String())
+	})
+
+	t.Run("command with local flags preserves blank separator line", func(t *testing.T) {
+		rootCmd := &cobra.Command{Use: "gh"}
+		flagCmd := &cobra.Command{Use: "status"}
+		flagCmd.Flags().String("repo", "", "Select a repository")
+		rootCmd.AddCommand(flagCmd)
+
+		var buf bytes.Buffer
+		require.NoError(t, rootUsageFunc(&buf, flagCmd))
+		out := buf.String()
+		require.Contains(t, out, "Usage:  gh status [flags]\n\nFlags:\n")
+		require.Contains(t, out, "--repo")
+	})
+}
