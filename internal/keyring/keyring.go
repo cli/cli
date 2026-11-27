@@ -58,7 +58,7 @@ func Get(service, user string) (string, error) {
 	}
 }
 
-// Delete secret from keyring.
+// Delete secret from keyring. It returns ErrNotFound when there is no such secret.
 func Delete(service, user string) error {
 	ch := make(chan error, 1)
 	go func() {
@@ -67,6 +67,9 @@ func Delete(service, user string) error {
 	}()
 	select {
 	case err := <-ch:
+		if errors.Is(err, keyring.ErrNotFound) {
+			return ErrNotFound
+		}
 		return err
 	case <-time.After(60 * time.Second):
 		return &TimeoutError{"timeout while trying to delete secret from keyring"}
